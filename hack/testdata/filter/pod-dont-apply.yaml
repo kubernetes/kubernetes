@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: selector-test-pod-dont-apply
+  labels:
+    name: selector-test-pod-dont-apply
+    unique-label: biz
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: k8s.gcr.io/pause:2.0

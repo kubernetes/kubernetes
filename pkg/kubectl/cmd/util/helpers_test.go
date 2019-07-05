@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,24 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
+	"os"
+	"strings"
 	"syscall"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/utils/exec"
 )
 
 func TestMerge(t *testing.T) {
@@ -34,129 +43,136 @@ func TestMerge(t *testing.T) {
 		fragment  string
 		expected  runtime.Object
 		expectErr bool
-		kind      string
 	}{
 		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1" }`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, "v1"),
+			expected: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-			},
-			fragment: `{ "apiVersion": "v1beta1", "id": "baz", "desiredState": { "host": "bar" } }`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "baz",
-				},
-				Spec: api.PodSpec{
-					Host:          "bar",
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
+				Spec: corev1.PodSpec{},
 			},
 		},
+		/* TODO: uncomment this test once Merge is updated to use
+		strategic-merge-patch. See #8449.
 		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-			},
-			fragment: `{ "apiVersion": "v1beta3", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: api.PodSpec{
-					Volumes: []api.Volume{
-						{
-							Name:         "v1",
-							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:  "c1",
+							Image: "red-image",
 						},
-						{
-							Name:         "v2",
-							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+						corev1.Container{
+							Name:  "c2",
+							Image: "blue-image",
 						},
 					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, schema.GroupVersion{Group:"", Version: "v1"}.String()),
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:  "c1",
+							Image: "green-image",
+						},
+						corev1.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+		}, */
+		{
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, "v1"),
+			expected: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "v1",
+						},
+						{
+							Name: "v2",
+						},
+					},
 				},
 			},
 		},
 		{
-			kind:      "Pod",
-			obj:       &api.Pod{},
+			obj:       &corev1.Pod{},
 			fragment:  "invalid json",
-			expected:  &api.Pod{},
+			expected:  &corev1.Pod{},
 			expectErr: true,
 		},
 		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-			},
-			fragment: `{ "apiVersion": "v1beta1", "id": null}`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		{
-			kind:      "Service",
-			obj:       &api.Service{},
+			obj:       &corev1.Service{},
 			fragment:  `{ "apiVersion": "badVersion" }`,
 			expectErr: true,
 		},
 		{
-			kind: "Service",
-			obj: &api.Service{
-				Spec: api.ServiceSpec{},
+			obj: &corev1.Service{
+				Spec: corev1.ServiceSpec{},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "port": 0 }`,
-			expected: &api.Service{
-				Spec: api.ServiceSpec{
-					SessionAffinity: "None",
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, "v1"),
+			expected: &corev1.Service{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Service",
+					APIVersion: "v1",
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port: 0,
+						},
+					},
 				},
 			},
 		},
 		{
-			kind: "Service",
-			obj: &api.Service{
-				Spec: api.ServiceSpec{
+			obj: &corev1.Service{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{
 						"version": "v1",
 					},
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "selector": { "version": "v2" } }`,
-			expected: &api.Service{
-				Spec: api.ServiceSpec{
-					SessionAffinity: "None",
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, "v1"),
+			expected: &corev1.Service{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Service",
+					APIVersion: "v1",
+				},
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{
 						"version": "v2",
 					},
@@ -165,13 +181,15 @@ func TestMerge(t *testing.T) {
 		},
 	}
 
+	codec := runtime.NewCodec(scheme.DefaultJSONEncoder(),
+		scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
 	for i, test := range tests {
-		out, err := Merge(test.obj, test.fragment, test.kind)
+		out, err := Merge(codec, test.obj, test.fragment)
 		if !test.expectErr {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)
-			} else if !reflect.DeepEqual(out, test.expected) {
-				t.Errorf("\n\ntestcase[%d]\nexpected:\n%+v\nsaw:\n%+v", i, test.expected, out)
+			} else if !apiequality.Semantic.DeepEqual(test.expected, out) {
+				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, diff.ObjectReflectDiff(test.expected, out))
 			}
 		}
 		if test.expectErr && err == nil {
@@ -180,73 +198,115 @@ func TestMerge(t *testing.T) {
 	}
 }
 
-type fileHandler struct {
-	data []byte
+type checkErrTestCase struct {
+	err          error
+	expectedErr  string
+	expectedCode int
 }
 
-func (f *fileHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/error" {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-	res.WriteHeader(http.StatusOK)
-	res.Write(f.data)
+func TestCheckInvalidErr(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid1").GroupKind(), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
+			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
+			DefaultErrorExitCode,
+		},
+		{
+			errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid2").GroupKind(), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
+			"The Invalid2 \"invalidation\" is invalid: \n* field1: Invalid value: \"multi1\": details\n* field2: Invalid value: \"multi2\": details\n",
+			DefaultErrorExitCode,
+		},
+		{
+			errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid3").GroupKind(), "invalidation", field.ErrorList{}),
+			"The Invalid3 \"invalidation\" is invalid",
+			DefaultErrorExitCode,
+		},
+		{
+			errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid4").GroupKind(), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
+			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
+			DefaultErrorExitCode,
+		},
+	})
 }
 
-func TestReadConfigData(t *testing.T) {
-	httpData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	server := httptest.NewServer(&fileHandler{data: httpData})
+func TestCheckNoResourceMatchError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
+			`the server doesn't have a resource type "foo"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Version: "theversion", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in version "theversion"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in group "thegroup"`,
+			DefaultErrorExitCode,
+		},
+	})
+}
 
-	fileData := []byte{11, 12, 13, 14, 15, 16, 17, 18, 19}
-	f, err := ioutil.TempFile("", "config")
-	if err != nil {
-		t.Errorf("unexpected error setting up config file")
-		t.Fail()
-	}
-	defer syscall.Unlink(f.Name())
-	ioutil.WriteFile(f.Name(), fileData, 0644)
-	// TODO: test TLS here, requires making it possible to inject the HTTP client.
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			exec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"pod foo/bar terminated",
+			42,
+		},
+	})
+}
 
-	tests := []struct {
-		config    string
-		data      []byte
-		expectErr bool
-	}{
-		{
-			config: server.URL,
-			data:   httpData,
-		},
-		{
-			config:    server.URL + "/error",
-			expectErr: true,
-		},
-		{
-			config:    "http://some.non.existent.foobar",
-			expectErr: true,
-		},
-		{
-			config: f.Name(),
-			data:   fileData,
-		},
-		{
-			config:    "some-non-existent-file",
-			expectErr: true,
-		},
-		{
-			config:    "",
-			expectErr: true,
-		},
+func testCheckError(t *testing.T, tests []checkErrTestCase) {
+	var errReturned string
+	var codeReturned int
+	errHandle := func(err string, code int) {
+		errReturned = err
+		codeReturned = code
 	}
+
 	for _, test := range tests {
-		dataOut, err := ReadConfigData(test.config)
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected err: %v for %s", err, test.config)
+		checkErr(test.err, errHandle)
+
+		if errReturned != test.expectedErr {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expectedErr)
 		}
-		if err == nil && test.expectErr {
-			t.Errorf("unexpected non-error for %s", test.config)
+		if codeReturned != test.expectedCode {
+			t.Fatalf("Got: %d, expected: %d", codeReturned, test.expectedCode)
 		}
-		if !test.expectErr && !reflect.DeepEqual(test.data, dataOut) {
-			t.Errorf("unexpected data: %v, expected %v", dataOut, test.data)
+	}
+}
+
+func TestDumpReaderToFile(t *testing.T) {
+	testString := "TEST STRING"
+	tempFile, err := ioutil.TempFile("", "hlpers_test_dump_")
+	if err != nil {
+		t.Errorf("unexpected error setting up a temporary file %v", err)
+	}
+	defer syscall.Unlink(tempFile.Name())
+	defer tempFile.Close()
+	defer func() {
+		if !t.Failed() {
+			os.Remove(tempFile.Name())
 		}
+	}()
+	err = DumpReaderToFile(strings.NewReader(testString), tempFile.Name())
+	if err != nil {
+		t.Errorf("error in DumpReaderToFile: %v", err)
+	}
+	data, err := ioutil.ReadFile(tempFile.Name())
+	if err != nil {
+		t.Errorf("error when reading %s: %v", tempFile.Name(), err)
+	}
+	stringData := string(data)
+	if stringData != testString {
+		t.Fatalf("Wrong file content %s != %s", testString, stringData)
 	}
 }

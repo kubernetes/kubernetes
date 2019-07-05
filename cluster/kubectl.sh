@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,77 +18,29 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-UTILS=${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh
-if [ -f ${UTILS} ]; then
-    source "${UTILS}"
-fi
+# Stop the bleeding, turn off the warning until we fix token gen.
+# echo "-=-=-=-=-=-=-=-=-=-="
+# echo "NOTE:"
+# echo "kubectl.sh is deprecated and will be removed soon."
+# echo "please replace all usage with calls to the kubectl"
+# echo "binary and ensure that it is in your PATH."
+# echo ""
+# echo "Please see 'kubectl help config' for more details"
+# echo "about configuring kubectl for your cluster."
+# echo "-=-=-=-=-=-=-=-=-=-="
 
-# Get the absolute path of the directory component of a file, i.e. the
-# absolute path of the dirname of $1.
-get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
-}
 
-# Detect the OS name/arch so that we can find our binary
-case "$(uname -s)" in
-  Darwin)
-    host_os=darwin
-    ;;
-  Linux)
-    host_os=linux
-    ;;
-  *)
-    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-    exit 1
-    ;;
-esac
-
-case "$(uname -m)" in
-  x86_64*)
-    host_arch=amd64
-    ;;
-  i?86_64*)
-    host_arch=amd64
-    ;;
-  amd64*)
-    host_arch=amd64
-    ;;
-  arm*)
-    host_arch=arm
-    ;;
-  i?86*)
-    host_arch=x86
-    ;;
-  *)
-    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
-    exit 1
-    ;;
-esac
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
+source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/cluster/clientbin.sh"
 
 # If KUBECTL_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.
 if [[ -z "${KUBECTL_PATH:-}" ]]; then
-  locations=(
-    "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
-    "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
-    "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
-  )
-  kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  kubectl=$( get_bin "kubectl" "cmd/kubectl" )
 
   if [[ ! -x "$kubectl" ]]; then
-    {
-      echo "It looks as if you don't have a compiled kubectl binary"
-      echo
-      echo "If you are running from a clone of the git repo, please run"
-      echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
-      echo "Docker installed."
-      echo
-      echo "If you are running from a binary release tarball, something is wrong. "
-      echo "Look at http://kubernetes.io/ for information on how to contact the "
-      echo "development team for help."
-    } >&2
+    print_error "kubectl"
     exit 1
   fi
 elif [[ ! -x "${KUBECTL_PATH}" ]]; then
@@ -100,34 +52,26 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# While GKE requires the kubectl binary, it's actually called through
-# gcloud. But we need to adjust the PATH so gcloud gets the right one.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-  export PATH=$(get_absolute_dirname $kubectl):$PATH
-  kubectl="${GCLOUD}"
-  # GKE runs kubectl through gcloud.
-  config=(
-    "alpha"
-    "container"
-    "kubectl"
-    "--project=${PROJECT}"
-    "--zone=${ZONE}"
-    "--cluster=${CLUSTER_NAME}"
-  )
-elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded kubeconfig, and do not clobber public endpoints
-  config=(
-    "--kubeconfig=$HOME/.kubernetes_vagrant_kubeconfig"
-  )
-elif [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
   detect-master > /dev/null
   config=(
     "--server=http://${KUBE_MASTER_IP}:8080"
   )
 fi
 
-echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
 
-echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+if false; then
+  # disable these debugging messages by default
+  echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
+  echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+fi
+
+if [[ "${1:-}" =~ ^(path)$ ]]; then
+  echo "${kubectl}"
+  exit 0
+fi
+
 "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
+

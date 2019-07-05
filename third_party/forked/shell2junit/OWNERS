@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - cblecker
+  - ixdy
+  - mengqiy
+  - pwittrock
+approvers:
+  - cblecker
+  - ixdy
+  - mengqiy
+  - pwittrock

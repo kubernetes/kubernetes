@@ -1,0 +1,40 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*":
+    reviewers:
+      - brendandburns
+      - dchen1107
+      - jbeda
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - liggitt
+    approvers:
+      - bgrant0607
+      - brendandburns
+      - dchen1107
+      - jbeda
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - wojtek-t
+      - liggitt
+
+  # Bazel build infrastructure changes often touch files throughout the tree
+  "\\.bzl$":
+    reviewers:
+      - ixdy
+    approvers:
+      - ixdy
+  "BUILD(\\.bazel)?$":
+    approvers:
+      - ixdy
+
+  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
+  # dep-approvers
+  "go\\.(mod|sum)$":
+    required_reviewers:
+      - kubernetes/dep-approvers
+    labels:
+      - area/dependency

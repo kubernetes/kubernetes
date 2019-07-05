@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,24 +20,47 @@ import (
 	"errors"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/klog"
+
+	"k8s.io/apiserver/pkg/admission"
 )
 
-func init() {
-	admission.RegisterPlugin("AlwaysDeny", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+// PluginName indicates name of admission plugin.
+const PluginName = "AlwaysDeny"
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysDeny(), nil
 	})
 }
 
 // alwaysDeny is an implementation of admission.Interface which always says no to an admission request.
-// It is useful in unit tests to force an operation to be forbidden.
 type alwaysDeny struct{}
 
-func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+var _ admission.MutationInterface = alwaysDeny{}
+var _ admission.ValidationInterface = alwaysDeny{}
+
+// Admit makes an admission decision based on the request attributes.
+func (alwaysDeny) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	return admission.NewForbidden(a, errors.New("admission control is denying all modifications"))
 }
 
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (alwaysDeny) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	return admission.NewForbidden(a, errors.New("admission control is denying all modifications"))
+}
+
+// Handles returns true if this admission controller can handle the given operation
+// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
+func (alwaysDeny) Handles(operation admission.Operation) bool {
+	return true
+}
+
+// NewAlwaysDeny creates an always deny admission handler
 func NewAlwaysDeny() admission.Interface {
+	// DEPRECATED: AlwaysDeny denys all admission request, it is no use.
+	klog.Warningf("%s admission controller is deprecated. "+
+		"Please remove this controller from your configuration files and scripts.", PluginName)
 	return new(alwaysDeny)
 }

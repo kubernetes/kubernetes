@@ -1,0 +1,18 @@
+apiVersion: rbac.authorization.k8s.io/v1
+# The persistent volume binder creates recycler pods in the default namespace,
+# but the addon manager only creates namespaced objects in the kube-system
+# namespace, so this is a ClusterRoleBinding.
+kind: ClusterRoleBinding
+metadata:
+  name: gce:podsecuritypolicy:persistent-volume-binder
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gce:podsecuritypolicy:persistent-volume-binder
+subjects:
+- kind: ServiceAccount
+  name: persistent-volume-binder
+  namespace: kube-system

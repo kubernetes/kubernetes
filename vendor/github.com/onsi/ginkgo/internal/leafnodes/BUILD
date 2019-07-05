@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "benchmarker.go",
+        "interfaces.go",
+        "it_node.go",
+        "measure_node.go",
+        "runner.go",
+        "setup_nodes.go",
+        "suite_nodes.go",
+        "synchronized_after_suite_node.go",
+        "synchronized_before_suite_node.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes",
+    importpath = "github.com/onsi/ginkgo/internal/leafnodes",
+    visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo/internal/codelocation:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/internal/failer:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/types:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

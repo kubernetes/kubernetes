@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: PodStatusResult
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fields:
+      "18":
+        "19": null
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "16964250748386560239"
+  selfLink: "5"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+status:
+  conditions:
+  - lastProbeTime: "2942-12-08T14:55:02Z"
+    lastTransitionTime: "2763-08-05T14:40:52Z"
+    message: "25"
+    reason: "24"
+    status: -Ǐ忄*齧獚敆Ȏțê
+    type: (ĿȊ甞谐颋ǅSǡƏS
+  containerStatuses:
+  - containerID: "59"
+    image: "57"
+    imageID: "58"
+    lastState:
+      running:
+        startedAt: "2059-10-03T11:19:35Z"
+      terminated:
+        containerID: "56"
+        exitCode: -1771047449
+        finishedAt: "2659-11-29T13:57:54Z"
+        message: "55"
+        reason: "54"
+        signal: -1280107919
+        startedAt: "2619-11-08T20:15:12Z"
+      waiting:
+        message: "53"
+        reason: "52"
+    name: "46"
+    ready: false
+    restartCount: 763139569
+    state:
+      running:
+        startedAt: "2838-11-28T02:42:14Z"
+      terminated:
+        containerID: "51"
+        exitCode: -2020907169
+        finishedAt: "2906-07-22T10:19:33Z"
+        message: "50"
+        reason: "49"
+        signal: 607015027
+        startedAt: "2448-04-25T19:46:34Z"
+      waiting:
+        message: "48"
+        reason: "47"
+  hostIP: "29"
+  initContainerStatuses:
+  - containerID: "45"
+    image: "43"
+    imageID: "44"
+    lastState:
+      running:
+        startedAt: "2567-05-09T03:50:37Z"
+      terminated:
+        containerID: "42"
+        exitCode: -655946460
+        finishedAt: "2680-06-15T09:55:37Z"
+        message: "41"
+        reason: "40"
+        signal: -819620182
+        startedAt: "2516-08-23T06:28:28Z"
+      waiting:
+        message: "39"
+        reason: "38"
+    name: "32"
+    ready: true
+    restartCount: -763018796
+    state:
+      running:
+        startedAt: "2568-01-21T11:26:44Z"
+      terminated:
+        containerID: "37"
+        exitCode: -593117110
+        finishedAt: "2491-01-26T12:57:24Z"
+        message: "36"
+        reason: "35"
+        signal: -734360256
+        startedAt: "2777-11-15T04:18:59Z"
+      waiting:
+        message: "34"
+        reason: "33"
+  message: "26"
+  nominatedNodeName: "28"
+  phase: ƗǸƢ6/ʕV
+  podIP: "30"
+  podIPs:
+  - ip: "31"
+  reason: "27"

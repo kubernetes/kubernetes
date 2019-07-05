@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock
+  labels:
+    app: mock
+spec:
+  ports:
+  - port: 99
+    protocol: TCP
+    targetPort: 9949
+  selector:
+    app: mock
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: mock
+spec:
+  replicas: 1
+  selector:
+    app: mock
+  template:
+    metadata:
+      labels:
+        app: mock
+    spec:
+      containers:
+      - name: mock-container
+        image: k8s.gcr.io/pause:2.0
+        ports:
+        - containerPort: 9949
+          protocol: TCP

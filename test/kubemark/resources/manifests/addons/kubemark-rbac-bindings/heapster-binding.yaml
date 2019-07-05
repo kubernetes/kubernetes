@@ -1,0 +1,15 @@
+# This is the role binding for the kubemark heapster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: heapster-view-binding
+  labels:
+    kubernetes.io/cluster-service: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:heapster
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:heapster

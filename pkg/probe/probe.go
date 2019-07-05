@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +16,16 @@ limitations under the License.
 
 package probe
 
-type Result int
+// Result is a string used to handle the results for probing container readiness/liveness
+type Result string
 
-// Status values must be one of these constants.
 const (
-	Success Result = iota
-	Failure
-	Unknown
+	// Success Result
+	Success Result = "success"
+	// Warning Result. Logically success, but with additional debugging information attached.
+	Warning Result = "warning"
+	// Failure Result
+	Failure Result = "failure"
+	// Unknown Result
+	Unknown Result = "unknown"
 )
-
-func (s Result) String() string {
-	switch s {
-	case Success:
-		return "success"
-	case Failure:
-		return "failure"
-	default:
-		return "unknown"
-	}
-}

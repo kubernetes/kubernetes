@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,24 +19,46 @@ package admit
 import (
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/klog"
 )
 
-func init() {
-	admission.RegisterPlugin("AlwaysAdmit", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+// PluginName indicates name of admission plugin.
+const PluginName = "AlwaysAdmit"
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysAdmit(), nil
 	})
 }
 
 // alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
-// It is useful in tests and when using kubernetes in an open manner.
 type alwaysAdmit struct{}
 
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+var _ admission.MutationInterface = alwaysAdmit{}
+var _ admission.ValidationInterface = alwaysAdmit{}
+
+// Admit makes an admission decision based on the request attributes
+func (alwaysAdmit) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (alwaysAdmit) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	return nil
+}
+
+// Handles returns true if this admission controller can handle the given operation
+// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
+func (alwaysAdmit) Handles(operation admission.Operation) bool {
+	return true
+}
+
+// NewAlwaysAdmit creates a new always admit admission handler
 func NewAlwaysAdmit() admission.Interface {
+	// DEPRECATED: AlwaysAdmit admit all admission request, it is no use.
+	klog.Warningf("%s admission controller is deprecated. "+
+		"Please remove this controller from your configuration files and scripts.", PluginName)
 	return new(alwaysAdmit)
 }

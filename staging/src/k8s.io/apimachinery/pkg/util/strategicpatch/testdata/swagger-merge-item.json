@@ -1,0 +1,170 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "StrategicMergePatchTestingMergeItem",
+    "version": "v1.9.0"
+  },
+  "paths": {},
+  "definitions": {
+    "mergeItem": {
+      "description": "MergeItem is type definition for testing strategic merge.",
+      "required": [],
+      "properties": {
+        "name": {
+          "description": "Name field.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value field.",
+          "type": "string"
+        },
+        "other": {
+          "description": "Other field.",
+          "type": "string"
+        },
+        "mergingList": {
+          "description": "MergingList field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mergeItem"
+          },
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "nonMergingList": {
+          "description": "NonMergingList field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mergeItem"
+          }
+        },
+        "mergingIntList": {
+          "description": "MergingIntList field.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "nonMergingIntList": {
+          "description": "NonMergingIntList field.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "mergeItemPtr": {
+          "description": "MergeItemPtr field.",
+          "$ref": "#/definitions/mergeItem",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "simpleMap": {
+          "description": "SimpleMap field.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "replacingItem": {
+          "description": "ReplacingItem field.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "x-kubernetes-patch-strategy": "replace"
+        },
+        "retainKeysMap": {
+          "description": "RetainKeysMap field.",
+          "$ref": "#/definitions/retainKeysMergeItem",
+          "x-kubernetes-patch-strategy": "retainKeys"
+        },
+        "retainKeysMergingList": {
+          "description": "RetainKeysMergingList field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mergeItem"
+          },
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge,retainKeys"
+        }
+      },
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "fake-group",
+          "kind": "mergeItem",
+          "version": "some-version"
+        }
+      ]
+    },
+    "retainKeysMergeItem": {
+      "description": "RetainKeysMergeItem is type definition for testing strategic merge.",
+      "required": [],
+      "properties": {
+        "name": {
+          "description": "Name field.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value field.",
+          "type": "string"
+        },
+        "other": {
+          "description": "Other field.",
+          "type": "string"
+        },
+        "simpleMap": {
+          "description": "SimpleMap field.",
+          "additionalProperties": "object",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mergingList": {
+          "description": "MergingList field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mergeItem"
+          },
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "nonMergingList": {
+          "description": "NonMergingList field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mergeItem"
+          }
+        },
+        "mergingIntList": {
+          "description": "MergingIntList field.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "x-kubernetes-patch-strategy": "merge"
+        }
+      },
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "fake-group",
+          "kind": "retainKeysMergeItem",
+          "version": "some-version"
+        }
+      ]
+    },
+    "io.k8s.apimachinery.pkg.runtime.RawExtension": {
+      "description": "RawExtension is used to hold extensions in external versions.",
+      "required": [
+        "Raw"
+      ],
+      "properties": {
+        "Raw": {
+          "description": "Raw is the underlying serialization of this object.",
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    }
+  }
+}

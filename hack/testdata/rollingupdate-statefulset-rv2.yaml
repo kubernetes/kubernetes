@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginx
+  labels:
+    app: nginx-statefulset
+spec:
+  selector:
+    matchLabels:
+      app: nginx-statefulset
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: "nginx"
+  replicas: 0
+  template:
+    metadata:
+      labels:
+        app: nginx-statefulset
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: nginx
+        image: k8s.gcr.io/nginx-slim:0.8
+        ports:
+        - containerPort: 80
+          name: web
+        command:
+        - sh
+        - -c
+        - 'while true; do sleep 1; done'
+      - name: pause
+        image: k8s.gcr.io/pause:2.0
+        ports:
+        - containerPort: 81
+          name: web-2

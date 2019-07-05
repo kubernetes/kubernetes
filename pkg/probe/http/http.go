@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,63 +17,126 @@ limitations under the License.
 package http
 
 import (
-	"net"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-func New() HTTPProber {
-	transport := &http.Transport{}
-	return httpProber{transport}
+// New creates Prober that will skip TLS verification while probing.
+// followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
+//   If disabled, redirects to other hosts will trigger a warning result.
+func New(followNonLocalRedirects bool) Prober {
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	return NewWithTLSConfig(tlsConfig, followNonLocalRedirects)
 }
 
-type HTTPProber interface {
-	Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error)
+// NewWithTLSConfig takes tls config as parameter.
+// followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
+//   If disabled, redirects to other hosts will trigger a warning result.
+func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
+	// We do not want the probe use node's local proxy set.
+	transport := utilnet.SetTransportDefaults(
+		&http.Transport{
+			TLSClientConfig:   config,
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyURL(nil),
+		})
+	return httpProber{transport, followNonLocalRedirects}
+}
+
+// Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
+type Prober interface {
+	Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error)
 }
 
 type httpProber struct {
-	transport *http.Transport
+	transport               *http.Transport
+	followNonLocalRedirects bool
 }
 
-// Probe returns a ProbeRunner capable of running an http check.
-func (pr httpProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error) {
-	return DoHTTPProbe(formatURL(host, port, path), &http.Client{Timeout: timeout, Transport: pr.transport})
+// Probe returns a ProbeRunner capable of running an HTTP check.
+func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
+	client := &http.Client{
+		Timeout:       timeout,
+		Transport:     pr.transport,
+		CheckRedirect: redirectChecker(pr.followNonLocalRedirects),
+	}
+	return DoHTTPProbe(url, headers, client)
 }
 
-type HTTPGetInterface interface {
-	Get(u string) (*http.Response, error)
+// GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
+type GetHTTPInterface interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 // DoHTTPProbe checks if a GET request to the url succeeds.
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, error) {
-	res, err := client.Get(url)
+func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (probe.Result, string, error) {
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		glog.V(1).Infof("HTTP probe error: %v", err)
-		return probe.Failure, nil
+		// Convert errors into failures to catch timeouts.
+		return probe.Failure, err.Error(), nil
+	}
+	if _, ok := headers["User-Agent"]; !ok {
+		if headers == nil {
+			headers = http.Header{}
+		}
+		// explicitly set User-Agent so it's not set to default Go value
+		v := version.Get()
+		headers.Set("User-Agent", fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor))
+	}
+	req.Header = headers
+	if headers.Get("Host") != "" {
+		req.Host = headers.Get("Host")
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		// Convert errors into failures to catch timeouts.
+		return probe.Failure, err.Error(), nil
 	}
 	defer res.Body.Close()
-	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return probe.Success, nil
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return probe.Failure, "", err
 	}
-	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-	return probe.Failure, nil
+	body := string(b)
+	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
+		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
+			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
+			return probe.Warning, body, nil
+		}
+		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		return probe.Success, body, nil
+	}
+	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 }
 
-// formatURL formats a URL from args.  For testability.
-func formatURL(host string, port int, path string) string {
-	u := url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
-		Path:   path,
+func redirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.Request) error {
+	if followNonLocalRedirects {
+		return nil // Use the default http client checker.
 	}
-	return u.String()
+
+	return func(req *http.Request, via []*http.Request) error {
+		if req.URL.Hostname() != via[0].URL.Hostname() {
+			return http.ErrUseLastResponse
+		}
+		// Default behavior: stop after 10 redirects.
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
 }

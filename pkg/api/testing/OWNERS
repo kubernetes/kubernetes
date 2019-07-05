@@ -1,0 +1,41 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+- thockin
+- lavalamp
+- smarterclayton
+- wojtek-t
+- deads2k
+- yujuhong
+- brendandburns
+- derekwaynecarr
+- caesarxuchao
+- vishh
+- mikedanese
+- nikhiljindal
+- erictune
+- pmorie
+- dchen1107
+- saad-ali
+- zmerlynn
+- justinsb
+- pwittrock
+- roberthbailey
+- tallclair
+- yifan-gu
+- eparis
+- soltysh
+- jsafrane
+- madhusudancs
+- hongchaodeng
+- rootfs
+- jszczepkowski
+- markturansky
+- fgrzadkowski
+- aveshagarwal
+- david-mcmahon
+- pweil-
+- rata
+- feihujiang
+- sdminonne
+- ghodss

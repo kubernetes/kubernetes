@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,41 +13,42 @@
 # limitations under the License.
 
 # This file creates a standard build environment for building Kubernetes
-
-FROM kube-build:cross
-MAINTAINER  Joe Beda <jbeda@google.com>
-
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
-ENV GOOS    linux
-ENV GOARCH  amd64
-
-# Get the code coverage tool and godep
-RUN go get golang.org/x/tools/cmd/cover github.com/tools/godep
-
-# We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
-# machine vs. `install`
-RUN rm -rf /var/lib/apt/lists/
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
-
-# Download and symlink etcd.  We need this for our integration tests.
-RUN mkdir -p /usr/local/src/etcd &&\
-    cd /usr/local/src/etcd &&\
-    curl -L -O -s https://github.com/coreos/etcd/releases/download/v2.0.0/etcd-v2.0.0-linux-amd64.tar.gz &&\
-    tar xzf etcd-v2.0.0-linux-amd64.tar.gz &&\
-    ln -s ../src/etcd/etcd-v2.0.0-linux-amd64/etcd /usr/local/bin/
+FROM k8s.gcr.io/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+# To run as non-root we sometimes need to rebuild go stdlib packages.
+RUN chmod -R a+rwx /usr/local/go/pkg
 
-# Propagate the git tree version into the build image
-ADD kube-version-defs /kube-version-defs
-ENV KUBE_GIT_VERSION_FILE /kube-version-defs
+# For running integration tests /var/run/kubernetes is required
+# and should be writable by user
+RUN mkdir /var/run/kubernetes && chmod a+rwx /var/run/kubernetes
+
+# The kubernetes source is expected to be mounted here.  This will be the base
+# of operations.
+ENV HOME /go/src/k8s.io/kubernetes
+WORKDIR ${HOME}
 
 # Make output from the dockerized build go someplace else
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
-# Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes
+# Pick up version stuff here as we don't copy our .git over.
+ENV KUBE_GIT_VERSION_FILE ${HOME}/.dockerized-kube-version-defs
+
+# Add system-wide git user information
+RUN git config --system user.email "nobody@k8s.io" \
+  && git config --system user.name "kube-build-image"
+
+# Fix permissions on gopath
+RUN chmod -R a+rwx $GOPATH
+
+# Make log messages use the right timezone
+ADD localtime /etc/localtime
+RUN chmod a+r /etc/localtime
+
+# Set up rsyncd
+ADD rsyncd.password /
+RUN chmod a+r /rsyncd.password
+ADD rsyncd.sh /
+RUN chmod a+rx /rsyncd.sh

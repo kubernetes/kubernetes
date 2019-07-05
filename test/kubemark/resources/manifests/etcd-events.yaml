@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd-server-events
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  nodeName: {{instance_prefix}}-master
+  containers:
+  - name: etcd-container
+    image: {{kube_docker_registry}}/etcd:{{etcd_image}}
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+    command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/etcd
+      {{params}}
+      1>>/var/log/etcd-events.log 2>&1
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /health
+        port: 4002
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    ports:
+    - name: serverport
+      containerPort: 2381
+      hostPort: 2381
+      protocol: TCP
+    - name: clientport
+      containerPort: 4002
+      hostPort: 4002
+      protocol: TCP
+    volumeMounts:
+    - name: varetcd
+      mountPath: /var/etcd
+    - name: varlogetcd
+      mountPath: /var/log/etcd-events.log
+  volumes:
+  - name: varetcd
+    hostPath:
+      path: /var/etcd/events
+  - name: varlogetcd
+    hostPath:
+      path: /var/log/etcd-events.log
+      type: FileOrCreate

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,34 +17,39 @@ limitations under the License.
 package exec
 
 import (
-	"strings"
+	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/utils/exec"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-const defaultHealthyOutput = "ok"
-
-func New() ExecProber {
+// New creates a Prober.
+func New() Prober {
 	return execProber{}
 }
 
-type ExecProber interface {
-	Probe(e uexec.Cmd) (probe.Result, error)
+// Prober is an interface defining the Probe object for container readiness/liveness checks.
+type Prober interface {
+	Probe(e exec.Cmd) (probe.Result, string, error)
 }
 
 type execProber struct{}
 
-func (pr execProber) Probe(e uexec.Cmd) (probe.Result, error) {
+// Probe executes a command to check the liveness/readiness of container
+// from executing a command. Returns the Result status, command output, and
+// errors if any.
+func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 	data, err := e.CombinedOutput()
-	glog.V(4).Infof("health check response: %s", string(data))
+	klog.V(4).Infof("Exec probe response: %q", string(data))
 	if err != nil {
-		return probe.Unknown, err
+		exit, ok := err.(exec.ExitError)
+		if ok {
+			if exit.ExitStatus() == 0 {
+				return probe.Success, string(data), nil
+			}
+			return probe.Failure, string(data), nil
+		}
+		return probe.Unknown, "", err
 	}
-	if strings.ToLower(string(data)) != defaultHealthyOutput {
-		return probe.Failure, nil
-	}
-	return probe.Success, nil
+	return probe.Success, string(data), nil
 }

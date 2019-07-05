@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,60 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
+# This script will source the default skeleton helper functions, then sources
+# cluster/${KUBERNETES_PROVIDER}/util.sh where KUBERNETES_PROVIDER, if unset,
+# will use its default value (gce).
 
-# Must ensure that the following ENV vars are set
-function detect-master {
-	echo "KUBE_MASTER_IP: $KUBE_MASTER_IP"
-	echo "KUBE_MASTER: $KUBE_MASTER"
-}
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# Get minion names if they are not static.
-function detect-minion-names {
-        echo "MINION_NAMES: ${MINION_NAMES[*]}"
-}
+source "${KUBE_ROOT}/cluster/skeleton/util.sh"
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
-function detect-minions {
-	echo "KUBE_MINION_IP_ADDRESSES=[]"
-}
+if [[ "${KUBERNETES_PROVIDER:-}" != "kubernetes-anywhere" ]]; then
+    if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
+        KUBERNETES_PROVIDER=""
+    else
+        KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
+    fi
+fi
 
-# Verify prereqs on host machine
-function verify-prereqs {
-	echo "TODO"
-}
+# PROVIDER_VARS is a list of cloud provider specific variables. Note:
+# this is a list of the _names_ of the variables, not the value of the
+# variables. Providers can add variables to be appended to kube-env.
+# (see `build-kube-env`).
 
-# Instantiate a kubernetes cluster
-function kube-up {
-	echo "TODO"
-}
-
-# Delete a kubernetes cluster
-function kube-down {
-	echo "TODO"
-}
-
-# Update a kubernetes cluster with latest source
-function kube-push {
-	echo "TODO"
-}
-
-# Execute prior to running tests to build a release if required for env
-function test-build-release {
-	echo "TODO"
-}
-
-# Execute prior to running tests to initialize required structure
-function test-setup {
-	echo "TODO"
-}
-
-# Execute after running tests to perform any required clean-up
-function test-teardown {
-	echo "TODO"
-}
-
-# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
-function get-password {
-	echo "TODO"
-}
+PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+if [ -f "${PROVIDER_UTILS}" ]; then
+    source "${PROVIDER_UTILS}"
+fi

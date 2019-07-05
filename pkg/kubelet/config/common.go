@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,101 +23,134 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	// TODO: remove this import if
+	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
+	// to "v1"?
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/hash"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-// Generate a pod name that is unique among nodes by appending the hostname.
-func generatePodName(name, hostname string) (string, error) {
-	// Hostname can be a fully-qualified domain name. To increase readability,
-	// only append the first chunk. Note that this assumes that no two nodes in
-	// the cluster should have the same host-specific label; this is true if
-	// all nodes have the same domain name.
-	chunks := strings.Split(hostname, ".")
-	return fmt.Sprintf("%s-%s", name, chunks[0]), nil
+// Generate a pod name that is unique among nodes by appending the nodeName.
+func generatePodName(name string, nodeName types.NodeName) string {
+	return fmt.Sprintf("%s-%s", name, strings.ToLower(string(nodeName)))
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) error {
+func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		if isFile {
-			fmt.Fprintf(hasher, "host:%s", hostname)
+			fmt.Fprintf(hasher, "host:%s", nodeName)
 			fmt.Fprintf(hasher, "file:%s", source)
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
 		}
-		util.DeepHashObject(hasher, pod)
+		hash.DeepHashObject(hasher, pod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		glog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
+		klog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
 	}
 
-	// This is required for backward compatibility, and should be removed once we
-	// completely deprecate ContainerManifest.
-	var err error
-	if len(pod.Name) == 0 {
-		pod.Name = string(pod.UID)
-	}
-	if pod.Name, err = generatePodName(pod.Name, hostname); err != nil {
-		return err
-	}
-	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
+	pod.Name = generatePodName(pod.Name, nodeName)
+	klog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
-		pod.Namespace = kubelet.NamespaceDefault
+		pod.Namespace = metav1.NamespaceDefault
 	}
-	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
+	klog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
-	pod.Spec.Host = hostname
+	pod.Spec.NodeName = string(nodeName)
 
-	// Currently just simply follow the same format in resthandler.go
-	pod.ObjectMeta.SelfLink =
-		fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s", pod.Name, pod.Namespace)
+	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	// The generated UID is the hash of the file.
+	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
+
+	if isFile {
+		// Applying the default Taint tolerations to static pods,
+		// so they are not evicted when there are node problems.
+		helper.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+			Operator: "Exists",
+			Effect:   api.TaintEffectNoExecute,
+		})
+	}
+
+	// Set the default status to pending.
+	pod.Status.Phase = api.PodPending
 	return nil
+}
+
+func getSelfLink(name, namespace string) string {
+	var selfLink string
+	if len(namespace) == 0 {
+		namespace = metav1.NamespaceDefault
+	}
+	selfLink = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", namespace, name)
+	return selfLink
 }
 
 type defaultFunc func(pod *api.Pod) error
 
-func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *api.Pod, err error) {
-	obj, err := api.Scheme.Decode(data)
+func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
+	// JSON is valid YAML, so this should work for everything.
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return false, nil, err
+	}
+	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), json)
 	if err != nil {
 		return false, pod, err
 	}
+
+	newPod, ok := obj.(*api.Pod)
 	// Check whether the object could be converted to single pod.
-	if _, ok := obj.(*api.Pod); !ok {
-		err = fmt.Errorf("invalid pod: %+v", obj)
-		return false, pod, err
+	if !ok {
+		return false, pod, fmt.Errorf("invalid pod: %#v", obj)
 	}
-	newPod := obj.(*api.Pod)
+
 	// Apply default values and validate the pod.
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
 	if errs := validation.ValidatePod(newPod); len(errs) > 0 {
-		err = fmt.Errorf("invalid pod: %v", errs)
-		return true, pod, err
+		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
-	return true, newPod, nil
+	v1Pod := &v1.Pod{}
+	if err := k8s_api_v1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+		klog.Errorf("Pod %q failed to convert to v1", newPod.Name)
+		return true, nil, err
+	}
+	return true, v1Pod, nil
 }
 
-func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	obj, err := api.Scheme.Decode(data)
+func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.PodList, err error) {
+	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return false, pods, err
 	}
+
+	newPods, ok := obj.(*api.PodList)
 	// Check whether the object could be converted to list of pods.
-	if _, ok := obj.(*api.PodList); !ok {
-		err = fmt.Errorf("invalid pods list: %+v", obj)
+	if !ok {
+		err = fmt.Errorf("invalid pods list: %#v", obj)
 		return false, pods, err
 	}
-	newPods := obj.(*api.PodList)
+
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]
@@ -129,70 +162,9 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api
 			return true, pods, err
 		}
 	}
-	return true, *newPods, err
-}
-
-func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod *api.Pod, err error) {
-	// TODO: should be api.Scheme.Decode
-	// This is awful.  DecodeInto() expects to find an APIObject, which
-	// Manifest is not.  We keep reading manifest for now for compat, but
-	// we will eventually change it to read Pod (at which point this all
-	// becomes nicer).  Until then, we assert that the ContainerManifest
-	// structure on disk is always v1beta1.  Read that, convert it to a
-	// "current" ContainerManifest (should be ~identical), then convert
-	// that to a Pod (which is a well-understood conversion).  This
-	// avoids writing a v1beta1.ContainerManifest -> api.Pod
-	// conversion which would be identical to the api.ContainerManifest ->
-	// api.Pod conversion.
-	pod = new(api.Pod)
-	if err = yaml.Unmarshal(data, &manifest); err != nil {
-		return false, manifest, pod, err
+	v1Pods := &v1.PodList{}
+	if err := k8s_api_v1.Convert_core_PodList_To_v1_PodList(newPods, v1Pods, nil); err != nil {
+		return true, pods, err
 	}
-	newManifest := api.ContainerManifest{}
-	if err = api.Scheme.Convert(&manifest, &newManifest); err != nil {
-		return false, manifest, pod, err
-	}
-	if errs := validation.ValidateManifest(&newManifest); len(errs) > 0 {
-		err = fmt.Errorf("invalid manifest: %v", errs)
-		return false, manifest, pod, err
-	}
-	if err = api.Scheme.Convert(&newManifest, pod); err != nil {
-		return true, manifest, pod, err
-	}
-	if err := defaultFn(pod); err != nil {
-		return true, manifest, pod, err
-	}
-	// Success.
-	return true, manifest, pod, nil
-}
-
-func tryDecodeManifestList(data []byte, defaultFn defaultFunc) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
-	// TODO: should be api.Scheme.Decode
-	// See the comment in tryDecodeSingle().
-	if err = yaml.Unmarshal(data, &manifests); err != nil {
-		return false, manifests, pods, err
-	}
-	newManifests := []api.ContainerManifest{}
-	if err = api.Scheme.Convert(&manifests, &newManifests); err != nil {
-		return false, manifests, pods, err
-	}
-	for i := range newManifests {
-		manifest := &newManifests[i]
-		if errs := validation.ValidateManifest(manifest); len(errs) > 0 {
-			err = fmt.Errorf("invalid manifest: %v", errs)
-			return false, manifests, pods, err
-		}
-	}
-	list := api.ContainerManifestList{Items: newManifests}
-	if err = api.Scheme.Convert(&list, &pods); err != nil {
-		return true, manifests, pods, err
-	}
-	for i := range pods.Items {
-		pod := &pods.Items[i]
-		if err := defaultFn(pod); err != nil {
-			return true, manifests, pods, err
-		}
-	}
-	// Success.
-	return true, manifests, pods, nil
+	return true, *v1Pods, err
 }

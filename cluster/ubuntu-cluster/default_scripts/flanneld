@@ -1,7 +1,0 @@
-# flannel Upstart and SysVinit configuration file
-
-# Customize kube-apiserver binary location 
-# FLANNEL="/opt/bin/flanneld"
-
-# Use FLANNEL_OPTS to modify the start/restart options
-FLANNEL_OPTS=""

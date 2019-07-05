@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,119 +17,45 @@ limitations under the License.
 package testing
 
 import (
-	"math/rand"
-	"strconv"
-	"testing"
+	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
-	"speter.net/go/exp/math/dec/inf"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
+	"k8s.io/apimachinery/pkg/runtime"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	appsfuzzer "k8s.io/kubernetes/pkg/apis/apps/fuzzer"
+	auditregistrationfuzzer "k8s.io/kubernetes/pkg/apis/auditregistration/fuzzer"
+	autoscalingfuzzer "k8s.io/kubernetes/pkg/apis/autoscaling/fuzzer"
+	batchfuzzer "k8s.io/kubernetes/pkg/apis/batch/fuzzer"
+	certificatesfuzzer "k8s.io/kubernetes/pkg/apis/certificates/fuzzer"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
+	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
+	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
+	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
+	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
+	schedulingfuzzer "k8s.io/kubernetes/pkg/apis/scheduling/fuzzer"
+	storagefuzzer "k8s.io/kubernetes/pkg/apis/storage/fuzzer"
 )
 
-func fuzzOneOf(c fuzz.Continue, objs ...interface{}) {
-	// Use a new fuzzer which cannot populate nil to ensure one obj will be set.
-	f := fuzz.New().NilChance(0).NumElements(1, 1)
-	i := c.RandUint64() % uint64(len(objs))
-	f.Fuzz(objs[i])
-}
-
-// FuzzerFor can randomly populate api objects that are destined for version.
-func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
-	f := fuzz.New().NilChance(.5).NumElements(1, 1)
-	if src != nil {
-		f.RandSource(src)
-	}
-	f.Funcs(
-		func(j *runtime.PluginBase, c fuzz.Continue) {
-			// Do nothing; this struct has only a Kind field and it must stay blank in memory.
-		},
-		func(j *runtime.TypeMeta, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
-			j.Kind = ""
-		},
-		func(j *api.TypeMeta, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
-			j.Kind = ""
-		},
-		func(j *api.ObjectMeta, c fuzz.Continue) {
-			j.Name = c.RandString()
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
-			j.UID = types.UID(c.RandString())
-			j.GenerateName = c.RandString()
-
-			var sec, nsec int64
-			c.Fuzz(&sec)
-			c.Fuzz(&nsec)
-			j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
-		},
-		func(j *api.ObjectReference, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = c.RandString()
-			j.Kind = c.RandString()
-			j.Namespace = c.RandString()
-			j.Name = c.RandString()
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.FieldPath = c.RandString()
-		},
-		func(j *api.ListMeta, c fuzz.Continue) {
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
-		},
-		func(j *api.ListOptions, c fuzz.Continue) {
-			// TODO: add some parsing
-			j.LabelSelector, _ = labels.Parse("a=b")
-			j.FieldSelector, _ = fields.ParseSelector("a=b")
-		},
-		func(j *api.PodPhase, c fuzz.Continue) {
-			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
-			*j = statuses[c.Rand.Intn(len(statuses))]
-		},
-		func(j *api.PodTemplateSpec, c fuzz.Continue) {
-			// TODO: v1beta1/2 can't round trip a nil template correctly, fix by having v1beta1/2
-			// conversion compare converted object to nil via DeepEqual
-			j.ObjectMeta = api.ObjectMeta{}
-			c.Fuzz(&j.ObjectMeta)
-			j.ObjectMeta = api.ObjectMeta{Labels: j.ObjectMeta.Labels}
-			j.Spec = api.PodSpec{}
-			c.Fuzz(&j.Spec)
-		},
-		func(j *api.Binding, c fuzz.Continue) {
-			c.Fuzz(&j.ObjectMeta)
-			j.Target.Name = c.RandString()
-		},
-		func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j)   // fuzz self without calling this function again
-			j.TemplateRef = nil // this is required for round trip
-		},
-		func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
-			// only replicas round trips
-			j.Replicas = int(c.RandUint64())
-		},
-		func(j *api.List, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			if j.Items == nil {
-				j.Items = []runtime.Object{}
-			}
-		},
+// overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
+// values in a Kubernetes context.
+func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
+	return []interface{}{
 		func(j *runtime.Object, c fuzz.Continue) {
-			if c.RandBool() {
+			// TODO: uncomment when round trip starts from a versioned object
+			if true { //c.RandBool() {
 				*j = &runtime.Unknown{
-					TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown"},
-					RawJSON:  []byte(`{"apiVersion":"unknown","kind":"Something","someKey":"someValue"}`),
+					// We do not set TypeMeta here because it is not carried through a round trip
+					Raw:         []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
+					ContentType: runtime.ContentTypeJSON,
 				}
 			} else {
 				types := []runtime.Object{&api.Pod{}, &api.ReplicationController{}}
@@ -138,102 +64,47 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				*j = t
 			}
 		},
-		func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
-			// This is necessary because keys with nil values get omitted.
-			// TODO: Is this a bug?
-			pb[docker.Port(c.RandString())] = []docker.PortBinding{
-				{c.RandString(), c.RandString()},
-				{c.RandString(), c.RandString()},
+		func(r *runtime.RawExtension, c fuzz.Continue) {
+			// Pick an arbitrary type and fuzz it
+			types := []runtime.Object{&api.Pod{}, &apps.Deployment{}, &api.Service{}}
+			obj := types[c.Rand.Intn(len(types))]
+			c.Fuzz(obj)
+
+			var codec runtime.Codec
+			switch obj.(type) {
+			case *apps.Deployment:
+				codec = apitesting.TestCodec(codecs, appsv1.SchemeGroupVersion)
+			default:
+				codec = apitesting.TestCodec(codecs, v1.SchemeGroupVersion)
 			}
-		},
-		func(pm map[string]docker.PortMapping, c fuzz.Continue) {
-			// This is necessary because keys with nil values get omitted.
-			// TODO: Is this a bug?
-			pm[c.RandString()] = docker.PortMapping{
-				c.RandString(): c.RandString(),
+
+			// Convert the object to raw bytes
+			bytes, err := runtime.Encode(codec, obj)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to encode object: %v", err))
 			}
+
+			// Set the bytes field on the RawExtension
+			r.Raw = bytes
 		},
-		func(q *resource.Quantity, c fuzz.Continue) {
-			// Real Quantity fuzz testing is done elsewhere;
-			// this limited subset of functionality survives
-			// round-tripping to v1beta1/2.
-			q.Amount = &inf.Dec{}
-			q.Format = resource.DecimalExponent
-			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
-			q.Amount.SetUnscaled(c.Int63n(1000))
-		},
-		func(p *api.PullPolicy, c fuzz.Continue) {
-			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
-			*p = policies[c.Rand.Intn(len(policies))]
-		},
-		func(rp *api.RestartPolicy, c fuzz.Continue) {
-			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
-			*rp = policies[c.Rand.Intn(len(policies))]
-		},
-		func(vs *api.VolumeSource, c fuzz.Continue) {
-			// Exactly one of the fields should be set.
-			//FIXME: the fuzz can still end up nil.  What if fuzz allowed me to say that?
-			fuzzOneOf(c, &vs.HostPath, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.AWSElasticBlockStore, &vs.GitRepo, &vs.Secret, &vs.NFS, &vs.ISCSI, &vs.Glusterfs)
-		},
-		func(d *api.DNSPolicy, c fuzz.Continue) {
-			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
-			*d = policies[c.Rand.Intn(len(policies))]
-		},
-		func(p *api.Protocol, c fuzz.Continue) {
-			protocols := []api.Protocol{api.ProtocolTCP, api.ProtocolUDP}
-			*p = protocols[c.Rand.Intn(len(protocols))]
-		},
-		func(p *api.AffinityType, c fuzz.Continue) {
-			types := []api.AffinityType{api.AffinityTypeClientIP, api.AffinityTypeNone}
-			*p = types[c.Rand.Intn(len(types))]
-		},
-		func(ct *api.Container, c fuzz.Continue) {
-			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
-			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
-		},
-		func(e *api.Event, c fuzz.Continue) {
-			c.FuzzNoCustom(e) // fuzz self without calling this function again
-			// Fix event count to 1, otherwise, if a v1beta1 or v1beta2 event has a count set arbitrarily, it's count is ignored
-			if e.FirstTimestamp.IsZero() {
-				e.Count = 1
-			} else {
-				c.Fuzz(&e.Count)
-			}
-		},
-		func(s *api.Secret, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			s.Type = api.SecretTypeOpaque
-		},
-		func(s *api.NamespaceSpec, c fuzz.Continue) {
-			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
-		},
-		func(s *api.NamespaceStatus, c fuzz.Continue) {
-			s.Phase = api.NamespaceActive
-		},
-		func(http *api.HTTPGetAction, c fuzz.Continue) {
-			c.FuzzNoCustom(http)        // fuzz self without calling this function again
-			http.Path = "/" + http.Path // can't be blank
-		},
-		func(ss *api.ServiceSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(ss) // fuzz self without calling this function again
-			if len(ss.Ports) == 0 {
-				// There must be at least 1 port.
-				ss.Ports = append(ss.Ports, api.ServicePort{})
-				c.Fuzz(&ss.Ports[0])
-			}
-			for i := range ss.Ports {
-				switch ss.Ports[i].TargetPort.Kind {
-				case util.IntstrInt:
-					ss.Ports[i].TargetPort.IntVal = 1 + ss.Ports[i].TargetPort.IntVal%65535 // non-zero
-				case util.IntstrString:
-					ss.Ports[i].TargetPort.StrVal = "x" + ss.Ports[i].TargetPort.StrVal // non-empty
-				}
-			}
-		},
-		func(n *api.Node, c fuzz.Continue) {
-			c.FuzzNoCustom(n)
-			n.Spec.ExternalID = "external"
-		},
-	)
-	return f
+	}
 }
+
+// FuzzerFuncs is a list of fuzzer functions
+var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
+	overrideGenericFuncs,
+	corefuzzer.Funcs,
+	extensionsfuzzer.Funcs,
+	appsfuzzer.Funcs,
+	batchfuzzer.Funcs,
+	autoscalingfuzzer.Funcs,
+	rbacfuzzer.Funcs,
+	policyfuzzer.Funcs,
+	certificatesfuzzer.Funcs,
+	admissionregistrationfuzzer.Funcs,
+	auditregistrationfuzzer.Funcs,
+	storagefuzzer.Funcs,
+	networkingfuzzer.Funcs,
+	metafuzzer.Funcs,
+	schedulingfuzzer.Funcs,
+)

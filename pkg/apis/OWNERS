@@ -1,0 +1,55 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*":
+    approvers:
+    - erictune
+    - lavalamp
+    - smarterclayton
+    - thockin
+    - liggitt
+    # - bgrant0607 # manual escalations only
+    reviewers:
+    - lavalamp
+    - smarterclayton
+    - wojtek-t
+    - deads2k
+    - yujuhong
+    - brendandburns
+    - derekwaynecarr
+    - caesarxuchao
+    - vishh
+    - mikedanese
+    - liggitt
+    - nikhiljindal
+    - gmarek
+    - erictune
+    - pmorie
+    - sttts
+    - dchen1107
+    - saad-ali
+    - luxas
+    - janetkuo
+    - justinsb
+    - pwittrock
+    - ncdc
+    - tallclair
+    - yifan-gu
+    - eparis
+    - mwielgus
+    - feiskyer
+    - soltysh
+    - piosz
+    - dims
+    - errordeveloper
+    - madhusudancs
+    - krousey
+    - rootfs
+    - jszczepkowski
+
+  # examples:
+  #   pkg/apis/*/types.go
+  #   pkg/apis/*/*/types.go
+  "[^/]+/([^/]+/)?(register|types)\\.go$":
+    labels:
+      - kind/api-change

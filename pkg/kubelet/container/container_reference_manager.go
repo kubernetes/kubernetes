@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package container
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 )
 
 // RefManager manages the references for the containers.
@@ -28,34 +28,31 @@ import (
 // for the caller.
 type RefManager struct {
 	sync.RWMutex
-	// TODO(yifan): To use strong type.
-	containerIDToRef map[string]*api.ObjectReference
+	containerIDToRef map[ContainerID]*v1.ObjectReference
 }
 
 // NewRefManager creates and returns a container reference manager
 // with empty contents.
 func NewRefManager() *RefManager {
-	return &RefManager{containerIDToRef: make(map[string]*api.ObjectReference)}
+	return &RefManager{containerIDToRef: make(map[ContainerID]*v1.ObjectReference)}
 }
 
 // SetRef stores a reference to a pod's container, associating it with the given container ID.
-func (c *RefManager) SetRef(id string, ref *api.ObjectReference) {
+func (c *RefManager) SetRef(id ContainerID, ref *v1.ObjectReference) {
 	c.Lock()
 	defer c.Unlock()
 	c.containerIDToRef[id] = ref
 }
 
 // ClearRef forgets the given container id and its associated container reference.
-// TODO(yifan): This is currently never called. Consider to remove this function,
-// or figure out when to clear the references.
-func (c *RefManager) ClearRef(id string) {
+func (c *RefManager) ClearRef(id ContainerID) {
 	c.Lock()
 	defer c.Unlock()
 	delete(c.containerIDToRef, id)
 }
 
 // GetRef returns the container reference of the given ID, or (nil, false) if none is stored.
-func (c *RefManager) GetRef(id string) (ref *api.ObjectReference, ok bool) {
+func (c *RefManager) GetRef(id ContainerID) (ref *v1.ObjectReference, ok bool) {
 	c.RLock()
 	defer c.RUnlock()
 	ref, ok = c.containerIDToRef[id]

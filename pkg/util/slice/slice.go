@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,17 @@ limitations under the License.
 package slice
 
 import (
-	"math/rand"
 	"sort"
+
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 // CopyStrings copies the contents of the specified string slice
 // into a new slice.
 func CopyStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	c := make([]string, len(s))
 	copy(c, s)
 	return c
@@ -40,10 +44,48 @@ func SortStrings(s []string) []string {
 // ShuffleStrings copies strings from the specified slice into a copy in random
 // order. It returns a new slice.
 func ShuffleStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	shuffled := make([]string, len(s))
-	perm := rand.Perm(len(s))
+	perm := utilrand.Perm(len(s))
 	for i, j := range perm {
 		shuffled[j] = s[i]
 	}
 	return shuffled
+}
+
+// ContainsString checks if a given slice of strings contains the provided string.
+// If a modifier func is provided, it is called with the slice item before the comparation.
+func ContainsString(slice []string, s string, modifier func(s string) string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+		if modifier != nil && modifier(item) == s {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveString returns a newly created []string that contains all items from slice that
+// are not equal to s and modifier(s) in case modifier func is provided.
+func RemoveString(slice []string, s string, modifier func(s string) string) []string {
+	newSlice := make([]string, 0)
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		if modifier != nil && modifier(item) == s {
+			continue
+		}
+		newSlice = append(newSlice, item)
+	}
+	if len(newSlice) == 0 {
+		// Sanitize for unit tests so we don't need to distinguish empty array
+		// and nil.
+		newSlice = nil
+	}
+	return newSlice
 }

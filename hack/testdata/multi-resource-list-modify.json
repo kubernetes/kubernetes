@@ -1,0 +1,61 @@
+{
+   "kind":"List",
+   "apiVersion":"v1",
+   "items":[
+      {
+        "kind":"Service",
+        "apiVersion":"v1",
+        "metadata":{
+          "name":"mock",
+          "labels":{
+            "app":"mock",
+            "status":"replaced"
+          }
+        },
+        "spec":{
+          "ports": [{
+            "protocol": "TCP",
+            "port": 99,
+            "targetPort": 9949
+          }],
+          "selector":{
+            "app":"mock"
+          }
+        }
+      },
+      {
+         "kind":"ReplicationController",
+         "apiVersion":"v1",
+         "metadata":{
+            "name":"mock",
+            "labels":{
+              "app":"mock",
+              "status":"replaced"
+            }
+         },
+         "spec":{
+            "replicas":1,
+            "selector":{
+               "app":"mock"
+            },
+            "template":{
+               "metadata":{
+                  "labels":{
+                     "app":"mock"
+                  }
+               },
+               "spec":{
+                  "containers":[{
+                    "name": "mock-container",
+                    "image": "k8s.gcr.io/pause:2.0",
+                    "ports":[{
+                        "containerPort":9949,
+                        "protocol":"TCP"
+                     }]
+                  }]
+               }
+            }
+         }
+      }
+   ]
+}

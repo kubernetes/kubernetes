@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,29 +22,40 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubectl/pkg/util/templates"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+)
+
+var (
+	useContextExample = templates.Examples(`
+		# Use the context for the minikube cluster
+		kubectl config use-context minikube`)
 )
 
 type useContextOptions struct {
-	configAccess ConfigAccess
+	configAccess clientcmd.ConfigAccess
 	contextName  string
 }
 
-func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+// NewCmdConfigUseContext returns a Command instance for 'config use-context' sub command
+func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "use-context CONTEXT_NAME",
-		Short: "Sets the current-context in a kubeconfig file",
-		Long:  `Sets the current-context in a kubeconfig file`,
+		Use:                   "use-context CONTEXT_NAME",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Sets the current-context in a kubeconfig file"),
+		Aliases:               []string{"use"},
+		Long:                  `Sets the current-context in a kubeconfig file`,
+		Example:               useContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd) {
-				return
-			}
-
-			err := options.run()
-			if err != nil {
-				fmt.Printf("%v\n", err)
-			}
+			cmdutil.CheckErr(options.complete(cmd))
+			cmdutil.CheckErr(options.run())
+			fmt.Fprintf(out, "Switched to context %q.\n", options.contextName)
 		},
 	}
 
@@ -52,40 +63,41 @@ func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 }
 
 func (o useContextOptions) run() error {
-	err := o.validate()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	config, err := o.configAccess.GetStartingConfig()
+	err = o.validate(config)
 	if err != nil {
 		return err
 	}
 
 	config.CurrentContext = o.contextName
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
-func (o *useContextOptions) complete(cmd *cobra.Command) bool {
+func (o *useContextOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 1 {
-		cmd.Help()
-		return false
+		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
 	}
 
 	o.contextName = endingArgs[0]
-	return true
+	return nil
 }
 
-func (o useContextOptions) validate() error {
+func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("You must specify a current-context")
+		return errors.New("empty context names are not allowed")
 	}
 
-	return nil
+	for name := range config.Contexts {
+		if name == o.contextName {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no context exists with the name: %q", o.contextName)
 }

@@ -1,0 +1,14 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+- thockin
+- deads2k
+- yujuhong
+- derekwaynecarr
+- vishh
+- mikedanese
+- davidopp
+- eparis
+- dims
+- david-mcmahon
+- therc

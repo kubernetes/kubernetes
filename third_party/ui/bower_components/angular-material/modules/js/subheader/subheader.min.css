@@ -1,6 +1,0 @@
-/*!
- * Angular Material Design
- * https://github.com/angular/material
- * @license MIT
- * v0.7.0-rc3
- */@-webkit-keyframes subheaderStickyHoverIn{0%{box-shadow:0 0 transparent}100%{box-shadow:0 2px 4px 0 rgba(0,0,0,.16)}}@keyframes subheaderStickyHoverIn{0%{box-shadow:0 0 transparent}100%{box-shadow:0 2px 4px 0 rgba(0,0,0,.16)}}@-webkit-keyframes subheaderStickyHoverOut{0%{box-shadow:0 2px 4px 0 rgba(0,0,0,.16)}100%{box-shadow:0 0 transparent}}@keyframes subheaderStickyHoverOut{0%{box-shadow:0 2px 4px 0 rgba(0,0,0,.16)}100%{box-shadow:0 0 transparent}}.md-subheader{display:block;font-size:.9em;font-weight:400;line-height:1em;padding:16px 0 16px 16px;margin:0 16px 0 0;position:relative}.md-subheader:not(.md-sticky-no-effect){-webkit-transition:.2s ease-out margin;transition:.2s ease-out margin}.md-subheader:not(.md-sticky-no-effect):after{position:absolute;left:0;bottom:0;top:0;right:-16px;content:''}.md-subheader:not(.md-sticky-no-effect)[sticky-state=active]{margin-top:-2px}.md-subheader:not(.md-sticky-no-effect):not(.md-sticky-clone)[sticky-prev-state=active]:after{-webkit-animation:subheaderStickyHoverOut .3s ease-out both;animation:subheaderStickyHoverOut .3s ease-out both}.md-subheader .md-subheader-content{z-index:1;position:relative}

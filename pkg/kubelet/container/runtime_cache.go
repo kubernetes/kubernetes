@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +23,7 @@ import (
 
 var (
 	// TODO(yifan): Maybe set the them as parameters for NewCache().
-	defaultCachePeriod    = time.Second * 2
-	defaultUpdateInterval = time.Millisecond * 100
+	defaultCachePeriod = time.Second * 2
 )
 
 type RuntimeCache interface {
@@ -32,8 +31,6 @@ type RuntimeCache interface {
 	ForceUpdateIfOlder(time.Time) error
 }
 
-// TODO(yifan): This interface can be removed once docker manager has implemented
-// all the runtime interfaces, (thus we can pass the runtime directly).
 type podsGetter interface {
 	GetPods(bool) ([]*Pod, error)
 }
@@ -41,11 +38,14 @@ type podsGetter interface {
 // NewRuntimeCache creates a container runtime cache.
 func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
 	return &runtimeCache{
-		getter:   getter,
-		updating: false,
+		getter: getter,
 	}, nil
 }
 
+// runtimeCache caches a list of pods. It records a timestamp (cacheTime) right
+// before updating the pods, so the timestamp is at most as new as the pods
+// (and can be slightly older). The timestamp always moves forward. Callers are
+// expected not to modify the pods returned from GetPods.
 type runtimeCache struct {
 	sync.Mutex
 	// The underlying container runtime used to update the cache.
@@ -54,15 +54,10 @@ type runtimeCache struct {
 	cacheTime time.Time
 	// The content of the cache.
 	pods []*Pod
-	// Whether the background thread updating the cache is running.
-	updating bool
-	// Time when the background thread should be stopped.
-	updatingThreadStopTime time.Time
 }
 
-// GetPods returns the cached result for ListPods if the result is not
-// outdated, otherwise it will retrieve the newest result.
-// If the cache updating loop has stopped, this function will restart it.
+// GetPods returns the cached pods if they are not outdated; otherwise, it
+// retrieves the latest pods and return them.
 func (r *runtimeCache) GetPods() ([]*Pod, error) {
 	r.Lock()
 	defer r.Unlock()
@@ -70,12 +65,6 @@ func (r *runtimeCache) GetPods() ([]*Pod, error) {
 		if err := r.updateCache(); err != nil {
 			return nil, err
 		}
-	}
-	// Stop refreshing thread if there were no requests within the default cache period
-	r.updatingThreadStopTime = time.Now().Add(defaultCachePeriod)
-	if !r.updating {
-		r.updating = true
-		go r.startUpdatingCache()
 	}
 	return r.pods, nil
 }
@@ -90,34 +79,18 @@ func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error 
 }
 
 func (r *runtimeCache) updateCache() error {
-	pods, err := r.getter.GetPods(false)
+	pods, timestamp, err := r.getPodsWithTimestamp()
 	if err != nil {
 		return err
 	}
-	r.pods = pods
-	r.cacheTime = time.Now()
+	r.pods, r.cacheTime = pods, timestamp
 	return nil
 }
 
-// startUpdateingCache continues to invoke GetPods to get the newest result until
-// there is no requests within the default cache period.
-func (r *runtimeCache) startUpdatingCache() {
-	run := true
-	for run {
-		time.Sleep(defaultUpdateInterval)
-		pods, err := r.getter.GetPods(false)
-		cacheTime := time.Now()
-		if err != nil {
-			continue
-		}
-
-		r.Lock()
-		if time.Now().After(r.updatingThreadStopTime) {
-			r.updating = false
-			run = false
-		}
-		r.pods = pods
-		r.cacheTime = cacheTime
-		r.Unlock()
-	}
+// getPodsWithTimestamp records a timestamp and retrieves pods from the getter.
+func (r *runtimeCache) getPodsWithTimestamp() ([]*Pod, time.Time, error) {
+	// Always record the timestamp before getting the pods to avoid stale pods.
+	timestamp := time.Now()
+	pods, err := r.getter.GetPods(false)
+	return pods, timestamp, err
 }

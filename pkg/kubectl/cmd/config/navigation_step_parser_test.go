@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/apimachinery/pkg/util/diff"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type stepParserTest struct {
@@ -36,7 +36,7 @@ func TestParseWithDots(t *testing.T) {
 		path: "clusters.my.dot.delimited.name.server",
 		expectedNavigationSteps: navigationSteps{
 			steps: []navigationStep{
-				{"clusters", reflect.TypeOf(make(map[string]clientcmdapi.Cluster))},
+				{"clusters", reflect.TypeOf(make(map[string]*clientcmdapi.Cluster))},
 				{"my.dot.delimited.name", reflect.TypeOf(clientcmdapi.Cluster{})},
 				{"server", reflect.TypeOf("")},
 			},
@@ -51,7 +51,7 @@ func TestParseWithDotsEndingWithName(t *testing.T) {
 		path: "contexts.10.12.12.12",
 		expectedNavigationSteps: navigationSteps{
 			steps: []navigationStep{
-				{"contexts", reflect.TypeOf(make(map[string]clientcmdapi.Context))},
+				{"contexts", reflect.TypeOf(make(map[string]*clientcmdapi.Context))},
 				{"10.12.12.12", reflect.TypeOf(clientcmdapi.Context{})},
 			},
 		},
@@ -67,6 +67,18 @@ func TestParseWithBadValue(t *testing.T) {
 			steps: []navigationStep{},
 		},
 		expectedError: "unable to parse user.bad after [] at api.Config",
+	}
+
+	test.run(t)
+}
+
+func TestParseWithNoMatchingValue(t *testing.T) {
+	test := stepParserTest{
+		path: "users.jheiss.exec.command",
+		expectedNavigationSteps: navigationSteps{
+			steps: []navigationStep{},
+		},
+		expectedError: "unable to parse one or more field values of users.jheiss.exec",
 	}
 
 	test.run(t)
@@ -90,6 +102,7 @@ func (test stepParserTest) run(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(test.expectedNavigationSteps, *actualSteps) {
-		t.Errorf("diff: %v", util.ObjectDiff(test.expectedNavigationSteps, *actualSteps))
+		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedNavigationSteps, *actualSteps))
+		t.Errorf("expected: %#v\n actual:   %#v", test.expectedNavigationSteps, *actualSteps)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,626 +17,524 @@ limitations under the License.
 package master
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/pprof"
-	"net/url"
-	rt "runtime"
+	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
-	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
-	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
-	namespaceetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace/etcd"
-	pvetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolume/etcd"
-	pvcetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
-	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
+	authorizationapiv1 "k8s.io/api/authorization/v1"
+	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
+	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
+	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchapiv1 "k8s.io/api/batch/v1"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
+	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
+	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	coordinationapiv1 "k8s.io/api/coordination/v1"
+	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
+	apiv1 "k8s.io/api/core/v1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingapiv1 "k8s.io/api/networking/v1"
+	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	schedulingapiv1 "k8s.io/api/scheduling/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
+	storageapiv1 "k8s.io/api/storage/v1"
+	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	"k8s.io/client-go/informers"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/pkg/master/tunneler"
+	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/serviceaccount"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
-	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
+
+	// RESTStorage installers
+	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
+	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	auditregistrationrest "k8s.io/kubernetes/pkg/registry/auditregistration/rest"
+	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
+	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
+	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
+	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
+	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
+	coordinationrest "k8s.io/kubernetes/pkg/registry/coordination/rest"
+	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
+	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
+	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
+	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
+	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
+	settingsrest "k8s.io/kubernetes/pkg/registry/settings/rest"
+	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
 
-// Config is a structure used to configure a Master.
-type Config struct {
-	EtcdHelper        tools.EtcdHelper
-	EventTTL          time.Duration
-	MinionRegexp      string
-	KubeletClient     client.KubeletClient
-	PortalNet         *net.IPNet
+const (
+	// DefaultEndpointReconcilerInterval is the default amount of time for how often the endpoints for
+	// the kubernetes Service are reconciled.
+	DefaultEndpointReconcilerInterval = 10 * time.Second
+	// DefaultEndpointReconcilerTTL is the default TTL timeout for the storage layer
+	DefaultEndpointReconcilerTTL = 15 * time.Second
+)
+
+type ExtraConfig struct {
+	ClientCARegistrationHook ClientCARegistrationHook
+
+	APIResourceConfigSource  serverstorage.APIResourceConfigSource
+	StorageFactory           serverstorage.StorageFactory
+	EndpointReconcilerConfig EndpointReconcilerConfig
+	EventTTL                 time.Duration
+	KubeletClientConfig      kubeletclient.KubeletClientConfig
+
+	// Used to start and monitor tunneling
+	Tunneler          tunneler.Tunneler
 	EnableLogsSupport bool
-	EnableUISupport   bool
-	// allow downstream consumers to disable swagger
-	EnableSwaggerSupport bool
-	// allow v1beta3 to be conditionally disabled
-	DisableV1Beta3 bool
-	// allow downstream consumers to disable the index route
-	EnableIndex            bool
-	EnableProfiling        bool
-	APIPrefix              string
-	CorsAllowedOriginList  util.StringList
-	Authenticator          authenticator.Request
-	Authorizer             authorizer.Authorizer
-	AdmissionControl       admission.Interface
-	MasterServiceNamespace string
+	ProxyTransport    http.RoundTripper
 
-	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
-	RequestContextMapper api.RequestContextMapper
+	// Values to build the IP addresses used by discovery
+	// The range of IPs to be assigned to services with type=ClusterIP or greater
+	ServiceIPRange net.IPNet
+	// The IP address for the GenericAPIServer service (must be inside ServiceIPRange)
+	APIServerServiceIP net.IP
+	// Port for the apiserver service.
+	APIServerServicePort int
 
-	// If specified, all web services will be registered into this container
-	RestfulContainer *restful.Container
+	// TODO, we can probably group service related items into a substruct to make it easier to configure
+	// the API server items and `Extra*` fields likely fit nicely together.
+
+	// The range of ports to be assigned to services with type=NodePort or greater
+	ServiceNodePortRange utilnet.PortRange
+	// Additional ports to be exposed on the GenericAPIServer service
+	// extraServicePorts is injectable in the event that more ports
+	// (other than the default 443/tcp) are exposed on the GenericAPIServer
+	// and those ports need to be load balanced by the GenericAPIServer
+	// service because this pkg is linked by out-of-tree projects
+	// like openshift which want to use the GenericAPIServer but also do
+	// more stuff.
+	ExtraServicePorts []apiv1.ServicePort
+	// Additional ports to be exposed on the GenericAPIServer endpoints
+	// Port names should align with ports defined in ExtraServicePorts
+	ExtraEndpointPorts []apiv1.EndpointPort
+	// If non-zero, the "kubernetes" services uses this port as NodePort.
+	KubernetesServiceNodePort int
 
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
 
-	// The port on PublicAddress where a read-only server will be installed.
-	// Defaults to 7080 if not set.
-	ReadOnlyPort int
-	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 6443 if not set.
-	ReadWritePort int
+	// MasterEndpointReconcileTTL sets the time to live in seconds of an
+	// endpoint record recorded by each master. The endpoints are checked at an
+	// interval that is 2/3 of this value and this value defaults to 15s if
+	// unset. In very large clusters, this value may be increased to reduce the
+	// possibility that the master endpoint record expires (due to other load
+	// on the etcd server) and causes masters to drop in and out of the
+	// kubernetes service record. It is not recommended to set this value below
+	// 15s.
+	MasterEndpointReconcileTTL time.Duration
 
-	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
-	ExternalHost string
+	// Selects which reconciler to use
+	EndpointReconcilerType reconcilers.Type
 
-	// If nil, the first result from net.InterfaceAddrs will be used.
-	PublicAddress net.IP
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountMaxExpiration time.Duration
 
-	// Control the interval that pod, node IP, and node heath status caches
-	// expire.
-	CacheTimeout time.Duration
+	VersionedInformers informers.SharedInformerFactory
+}
 
-	// The name of the cluster.
-	ClusterName string
+type Config struct {
+	GenericConfig *genericapiserver.Config
+	ExtraConfig   ExtraConfig
+}
+
+type completedConfig struct {
+	GenericConfig genericapiserver.CompletedConfig
+	ExtraConfig   *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
+}
+
+// EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
+// used by the master.
+type EndpointReconcilerConfig struct {
+	Reconciler reconcilers.EndpointReconciler
+	Interval   time.Duration
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
-	// "Inputs", Copied from Config
-	portalNet    *net.IPNet
-	cacheTimeout time.Duration
+	GenericAPIServer *genericapiserver.GenericAPIServer
 
-	mux                   apiserver.Mux
-	muxHelper             *apiserver.MuxHelper
-	handlerContainer      *restful.Container
-	rootWebService        *restful.WebService
-	enableLogsSupport     bool
-	enableUISupport       bool
-	enableSwaggerSupport  bool
-	enableProfiling       bool
-	apiPrefix             string
-	corsAllowedOriginList util.StringList
-	authenticator         authenticator.Request
-	authorizer            authorizer.Authorizer
-	admissionControl      admission.Interface
-	masterCount           int
-	v1beta3               bool
-	requestContextMapper  api.RequestContextMapper
-
-	// External host is the name that should be used in external (public internet) URLs for this master
-	externalHost string
-	// clusterIP is the IP address of the master within the cluster.
-	clusterIP            net.IP
-	publicReadOnlyPort   int
-	publicReadWritePort  int
-	serviceReadOnlyIP    net.IP
-	serviceReadOnlyPort  int
-	serviceReadWriteIP   net.IP
-	serviceReadWritePort int
-	masterServices       *util.Runner
-
-	// storage contains the RESTful endpoints exposed by this master
-	storage map[string]rest.Storage
-
-	// registries are internal client APIs for accessing the storage layer
-	// TODO: define the internal typed interface in a way that clients can
-	// also be replaced
-	nodeRegistry      minion.Registry
-	namespaceRegistry namespace.Registry
-	serviceRegistry   service.Registry
-	endpointRegistry  endpoint.Registry
-
-	// "Outputs"
-	Handler         http.Handler
-	InsecureHandler http.Handler
+	ClientCARegistrationHook ClientCARegistrationHook
 }
 
-// NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
-// is incorrect.
-func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHelper, err error) {
-	if version == "" {
-		version = latest.Version
-	}
-	versionInterfaces, err := latest.InterfacesFor(version)
+func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
+}
+
+func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
+	return reconcilers.NewNoneEndpointReconciler()
+}
+
+func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
+	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
-		return helper, err
+		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	return tools.NewEtcdHelper(client, versionInterfaces.Codec), nil
+	leaseStorage, _, err := storagefactory.Create(*config)
+	if err != nil {
+		klog.Fatalf("Error creating storage factory: %v", err)
+	}
+	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
+	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
 }
 
-// setDefaults fills in any fields not set that are required to have valid data.
-func setDefaults(c *Config) {
-	if c.PortalNet == nil {
-		defaultNet := "10.0.0.0/24"
-		glog.Warningf("Portal net unspecified. Defaulting to %v.", defaultNet)
-		_, portalNet, err := net.ParseCIDR(defaultNet)
-		if err != nil {
-			glog.Fatalf("Unable to parse CIDR: %v", err)
-		}
-		c.PortalNet = portalNet
+func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
+	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
+	switch c.ExtraConfig.EndpointReconcilerType {
+	// there are numerous test dependencies that depend on a default controller
+	case "", reconcilers.MasterCountReconcilerType:
+		return c.createMasterCountReconciler()
+	case reconcilers.LeaseEndpointReconcilerType:
+		return c.createLeaseReconciler()
+	case reconcilers.NoneEndpointReconcilerType:
+		return c.createNoneReconciler()
+	default:
+		klog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
 	}
-	if c.MasterCount == 0 {
-		// Clearly, there will be at least one master.
-		c.MasterCount = 1
+	return nil
+}
+
+// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+func (cfg *Config) Complete() CompletedConfig {
+	c := completedConfig{
+		cfg.GenericConfig.Complete(cfg.ExtraConfig.VersionedInformers),
+		&cfg.ExtraConfig,
 	}
-	if c.ReadOnlyPort == 0 {
-		c.ReadOnlyPort = 7080
+
+	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ExtraConfig.ServiceIPRange)
+	if err != nil {
+		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	if c.ReadWritePort == 0 {
-		c.ReadWritePort = 6443
+	if c.ExtraConfig.ServiceIPRange.IP == nil {
+		c.ExtraConfig.ServiceIPRange = serviceIPRange
 	}
-	if c.CacheTimeout == 0 {
-		c.CacheTimeout = 5 * time.Second
+	if c.ExtraConfig.APIServerServiceIP == nil {
+		c.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
-	for c.PublicAddress == nil || c.PublicAddress.IsUnspecified() {
-		// TODO: This should be done in the caller and just require a
-		// valid value to be passed in.
-		hostIP, err := util.ChooseHostInterface()
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", err)
-			time.Sleep(5 * time.Second)
-		}
-		c.PublicAddress = hostIP
-		glog.Infof("Will report %v as public IP address.", c.PublicAddress)
+
+	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: c.GenericConfig.ExternalAddress}
+	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
+		discovery.CIDRRule{IPRange: c.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(c.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(c.ExtraConfig.APIServerServicePort))})
+	c.GenericConfig.DiscoveryAddresses = discoveryAddresses
+
+	if c.ExtraConfig.ServiceNodePortRange.Size == 0 {
+		// TODO: Currently no way to specify an empty range (do we need to allow this?)
+		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
+		// but then that breaks the strict nestedness of ServiceType.
+		// Review post-v1
+		c.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
+		klog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
 	}
-	if c.RequestContextMapper == nil {
-		c.RequestContextMapper = api.NewRequestContextMapper()
+
+	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
+		c.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
+
+	if c.ExtraConfig.MasterEndpointReconcileTTL == 0 {
+		c.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
+	}
+
+	if c.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
+		c.ExtraConfig.EndpointReconcilerConfig.Reconciler = cfg.createEndpointReconciler()
+	}
+
+	return CompletedConfig{&c}
 }
 
 // New returns a new instance of Master from the given config.
-// Certain config fields will be set to a default value if unset,
-// including:
-//   PortalNet
-//   MasterCount
-//   ReadOnlyPort
-//   ReadWritePort
-//   PublicAddress
+// Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClient
-// Public fields:
-//   Handler -- The returned master has a field TopHandler which is an
-//   http.Handler which handles all the endpoints provided by the master,
-//   including the API, the UI, and miscelaneous debugging endpoints.  All
-//   these are subject to authorization and authentication.
-//   InsecureHandler -- an http.Handler which handles all the same
-//   endpoints as Handler, but no authorization and authentication is done.
-// Public methods:
-//   HandleWithAuth -- Allows caller to add an http.Handler for an endpoint
-//   that uses the same authentication and authorization (if any is configured)
-//   as the master's built-in endpoints.
-//   If the caller wants to add additional endpoints not using the master's
-//   auth, then the caller should create a handler for those endpoints, which delegates the
-//   any unhandled paths to "Handler".
-func New(c *Config) *Master {
-	setDefaults(c)
-	if c.KubeletClient == nil {
-		glog.Fatalf("master.New() called with config.KubeletClient == nil")
+//   KubeletClientConfig
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) {
+	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
+		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	// Select the first two valid IPs from portalNet to use as the master service portalIPs
-	serviceReadOnlyIP, err := service.GetIndexedIP(c.PortalNet, 1)
+	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
-		glog.Fatalf("Failed to generate service read-only IP for master service: %v", err)
+		return nil, err
 	}
-	serviceReadWriteIP, err := service.GetIndexedIP(c.PortalNet, 2)
-	if err != nil {
-		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
+
+	if c.ExtraConfig.EnableLogsSupport {
+		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
-	glog.V(4).Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
 
 	m := &Master{
-		portalNet:             c.PortalNet,
-		rootWebService:        new(restful.WebService),
-		enableLogsSupport:     c.EnableLogsSupport,
-		enableUISupport:       c.EnableUISupport,
-		enableSwaggerSupport:  c.EnableSwaggerSupport,
-		enableProfiling:       c.EnableProfiling,
-		apiPrefix:             c.APIPrefix,
-		corsAllowedOriginList: c.CorsAllowedOriginList,
-		authenticator:         c.Authenticator,
-		authorizer:            c.Authorizer,
-		admissionControl:      c.AdmissionControl,
-		v1beta3:               !c.DisableV1Beta3,
-		requestContextMapper:  c.RequestContextMapper,
-
-		cacheTimeout: c.CacheTimeout,
-
-		masterCount:         c.MasterCount,
-		externalHost:        c.ExternalHost,
-		clusterIP:           c.PublicAddress,
-		publicReadOnlyPort:  c.ReadOnlyPort,
-		publicReadWritePort: c.ReadWritePort,
-		serviceReadOnlyIP:   serviceReadOnlyIP,
-		// TODO: serviceReadOnlyPort should be passed in as an argument, it may not always be 80
-		serviceReadOnlyPort: 80,
-		serviceReadWriteIP:  serviceReadWriteIP,
-		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
-		serviceReadWritePort: 443,
+		GenericAPIServer: s,
 	}
 
-	if c.RestfulContainer != nil {
-		m.mux = c.RestfulContainer.ServeMux
-		m.handlerContainer = c.RestfulContainer
-	} else {
-		mux := http.NewServeMux()
-		m.mux = mux
-		m.handlerContainer = NewHandlerContainer(mux)
-	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	m.handlerContainer.Router(restful.CurlyRouter{})
-	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
-
-	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
-	m.init(c)
-	return m
-}
-
-// HandleWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the master's built-in endpoints.
-func (m *Master) HandleWithAuth(pattern string, handler http.Handler) {
-	// TODO: Add a way for plugged-in endpoints to translate their
-	// URLs into attributes that an Authorizer can understand, and have
-	// sensible policy defaults for plugged-in endpoints.  This will be different
-	// for generic endpoints versus REST object endpoints.
-	// TODO: convert to go-restful
-	m.muxHelper.Handle(pattern, handler)
-}
-
-// HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the master's built-in endpoints.
-func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	// TODO: convert to go-restful
-	m.muxHelper.HandleFunc(pattern, handler)
-}
-
-func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
-	container := restful.NewContainer()
-	container.ServeMux = mux
-	container.RecoverHandler(logStackOnRecover)
-	return container
-}
-
-//TODO: Unify with RecoverPanics?
-func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) {
-	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
-	for i := 2; ; i += 1 {
-		_, file, line, ok := rt.Caller(i)
-		if !ok {
-			break
+	// install legacy rest storage
+	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
+		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			ProxyTransport:              c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
+			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
 		}
-		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
+		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
-	glog.Errorln(buffer.String())
+
+	// The order here is preserved in discovery.
+	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
+	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
+	// with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
+	// handlers that we have.
+	restStorageProviders := []RESTStorageProvider{
+		auditregistrationrest.RESTStorageProvider{},
+		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
+		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
+		autoscalingrest.RESTStorageProvider{},
+		batchrest.RESTStorageProvider{},
+		certificatesrest.RESTStorageProvider{},
+		coordinationrest.RESTStorageProvider{},
+		extensionsrest.RESTStorageProvider{},
+		networkingrest.RESTStorageProvider{},
+		noderest.RESTStorageProvider{},
+		policyrest.RESTStorageProvider{},
+		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
+		schedulingrest.RESTStorageProvider{},
+		settingsrest.RESTStorageProvider{},
+		storagerest.RESTStorageProvider{},
+		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
+		// See https://github.com/kubernetes/kubernetes/issues/42392
+		appsrest.RESTStorageProvider{},
+		admissionregistrationrest.RESTStorageProvider{},
+		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
+	}
+	m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...)
+
+	if c.ExtraConfig.Tunneler != nil {
+		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+	}
+
+	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
+
+	return m, nil
 }
 
-// init initializes master.
-func (m *Master) init(c *Config) {
-	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
-	podRegistry := pod.NewRegistry(podStorage.Pod)
-
-	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
-	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
-
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
-	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.EtcdHelper)
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.EtcdHelper)
-
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.EtcdHelper)
-	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
-
-	endpointsStorage := endpointsetcd.NewStorage(c.EtcdHelper)
-	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
-
-	nodeStorage, nodeStatusStorage := nodeetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
-	m.nodeRegistry = minion.NewRegistry(nodeStorage)
-
-	// TODO: split me up into distinct storage registries
-	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
-	m.serviceRegistry = registry
-
-	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
-
-	// TODO: Factor out the core API registration
-	m.storage = map[string]rest.Storage{
-		"pods":             podStorage.Pod,
-		"pods/status":      podStorage.Status,
-		"pods/log":         podStorage.Log,
-		"pods/exec":        podStorage.Exec,
-		"pods/portforward": podStorage.PortForward,
-		"pods/proxy":       podStorage.Proxy,
-		"pods/binding":     podStorage.Binding,
-		"bindings":         podStorage.Binding,
-
-		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
-		"endpoints":              endpointsStorage,
-		"minions":                nodeStorage,
-		"minions/status":         nodeStatusStorage,
-		"nodes":                  nodeStorage,
-		"nodes/status":           nodeStatusStorage,
-		"events":                 event.NewStorage(eventRegistry),
-
-		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),
-		"resourceQuotas":                resourceQuotaStorage,
-		"resourceQuotas/status":         resourceQuotaStatusStorage,
-		"namespaces":                    namespaceStorage,
-		"namespaces/status":             namespaceStatusStorage,
-		"namespaces/finalize":           namespaceFinalizeStorage,
-		"secrets":                       secret.NewStorage(secretRegistry),
-		"persistentVolumes":             persistentVolumeStorage,
-		"persistentVolumes/status":      persistentVolumeStatusStorage,
-		"persistentVolumeClaims":        persistentVolumeClaimStorage,
-		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
+func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
+	if err != nil {
+		klog.Fatalf("Error building core storage: %v", err)
 	}
 
-	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := m.api_v1beta1().InstallREST(m.handlerContainer); err != nil {
-		glog.Fatalf("Unable to setup API v1beta1: %v", err)
+	controllerName := "bootstrap-controller"
+	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
+	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
+	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
+
+	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
+		klog.Fatalf("Error in registering group versions: %v", err)
 	}
-	if err := m.api_v1beta2().InstallREST(m.handlerContainer); err != nil {
-		glog.Fatalf("Unable to setup API v1beta2: %v", err)
-	}
-	if m.v1beta3 {
-		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
-			glog.Fatalf("Unable to setup API v1beta3: %v", err)
-		}
-		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
-	}
-
-	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
-	apiserver.InstallServiceErrorHandler(m.handlerContainer)
-
-	// Register root handler.
-	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	// Allow master to be embedded in contexts which already have something registered at the root
-	if c.EnableIndex {
-		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
-	}
-
-	// TODO: use go-restful
-	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
-	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(m.muxHelper)
-	}
-	if c.EnableUISupport {
-		ui.InstallSupport(m.muxHelper, m.enableSwaggerSupport)
-	}
-
-	if c.EnableProfiling {
-		m.mux.HandleFunc("/debug/pprof/", pprof.Index)
-		m.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		m.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	}
-
-	handler := http.Handler(m.mux.(*http.ServeMux))
-
-	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	m.InsecureHandler = handler
-
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
-
-	// Install Authenticator
-	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(m.requestContextMapper, c.Authenticator, handlers.Unauthorized, handler)
-		if err != nil {
-			glog.Fatalf("Could not initialize authenticator: %v", err)
-		}
-		handler = authenticatedHandler
-	}
-
-	// Install root web services
-	m.handlerContainer.Add(m.rootWebService)
-
-	// TODO: Make this optional?  Consumers of master depend on this currently.
-	m.Handler = handler
-
-	if m.enableSwaggerSupport {
-		m.InstallSwaggerAPI()
-	}
-
-	// After all wrapping is done, put a context filter around both handlers
-	if handler, err := api.NewRequestContextFilter(m.requestContextMapper, m.Handler); err != nil {
-		glog.Fatalf("Could not initialize request context filter: %v", err)
-	} else {
-		m.Handler = handler
-	}
-
-	if handler, err := api.NewRequestContextFilter(m.requestContextMapper, m.InsecureHandler); err != nil {
-		glog.Fatalf("Could not initialize request context filter: %v", err)
-	} else {
-		m.InsecureHandler = handler
-	}
-
-	// TODO: Attempt clean shutdown?
-	m.masterServices.Start()
 }
 
-// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal.  It is optional to allow consumers of the Kubernetes master to
-// register their own web services into the Kubernetes mux prior to initialization
-// of swagger, so that other resource types show up in the documentation.
-func (m *Master) InstallSwaggerAPI() {
-	hostAndPort := m.externalHost
-	protocol := "https://"
-
-	// TODO: this is kind of messed up, we should just pipe in the full URL from the outside, rather
-	// than guessing at it.
-	if len(m.externalHost) == 0 && m.clusterIP != nil {
-		host := m.clusterIP.String()
-		if m.publicReadWritePort != 0 {
-			hostAndPort = net.JoinHostPort(host, strconv.Itoa(m.publicReadWritePort))
-		} else {
-			// Use the read only port.
-			hostAndPort = net.JoinHostPort(host, strconv.Itoa(m.publicReadOnlyPort))
-			protocol = "http://"
-		}
-	}
-	webServicesUrl := protocol + hostAndPort
-
-	// Enable swagger UI and discovery API
-	swaggerConfig := swagger.Config{
-		WebServicesUrl:  webServicesUrl,
-		WebServices:     m.handlerContainer.RegisteredWebServices(),
-		ApiPath:         "/swaggerapi/",
-		SwaggerPath:     "/swaggerui/",
-		SwaggerFilePath: "/swagger-ui/",
-	}
-	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
+func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
+	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
+	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_duration_seconds",
+		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Help: "(Deprecated) The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
 }
 
-func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
-	serversToValidate := map[string]apiserver.Server{
-		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
-	}
-	for ix, machine := range c.EtcdHelper.Client.GetCluster() {
-		etcdUrl, err := url.Parse(machine)
-		if err != nil {
-			glog.Errorf("Failed to parse etcd url for validation: %v", err)
+// RESTStorageProvider is a factory type for REST storage.
+type RESTStorageProvider interface {
+	GroupName() string
+	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+}
+
+// InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
+func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
+	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
+
+	for _, restStorageBuilder := range restStorageProviders {
+		groupName := restStorageBuilder.GroupName()
+		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
+			klog.V(1).Infof("Skipping disabled API group %q.", groupName)
 			continue
 		}
-		var port int
-		var addr string
-		if strings.Contains(etcdUrl.Host, ":") {
-			var portString string
-			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
+		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+		if !enabled {
+			klog.Warningf("Problem initializing API group %q, skipping.", groupName)
+			continue
+		}
+		klog.V(1).Infof("Enabling API group %q.", groupName)
+
+		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
+			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
-				glog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
+				klog.Fatalf("Error building PostStartHook: %v", err)
+			}
+			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
+		}
+
+		apiGroupsInfo = append(apiGroupsInfo, &apiGroupInfo)
+	}
+
+	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
+		klog.Fatalf("Error in registering group versions: %v", err)
+	}
+}
+
+type nodeAddressProvider struct {
+	nodeClient corev1client.NodeInterface
+}
+
+func (n nodeAddressProvider) externalAddresses() ([]string, error) {
+	preferredAddressTypes := []apiv1.NodeAddressType{
+		apiv1.NodeExternalIP,
+	}
+	nodes, err := n.nodeClient.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var matchErr error
+	addrs := []string{}
+	for ix := range nodes.Items {
+		node := &nodes.Items[ix]
+		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
+		if err != nil {
+			if _, ok := err.(*nodeutil.NoMatchError); ok {
+				matchErr = err
 				continue
 			}
-			port, _ = strconv.Atoi(portString)
-		} else {
-			addr = etcdUrl.Host
-			port = 4001
+			return nil, err
 		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
+		addrs = append(addrs, addr)
 	}
-	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
-	if err != nil {
-		glog.Errorf("Failed to list minions: %v", err)
+	if len(addrs) == 0 && matchErr != nil {
+		// We only return an error if we have items.
+		// Currently we return empty list/no error if Items is empty.
+		// We do this for backward compatibility reasons.
+		return nil, matchErr
 	}
-	for ix, node := range nodes.Items {
-		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.KubeletPort, Path: "/healthz", EnableHTTPS: true}
-	}
-	return serversToValidate
+	return addrs, nil
 }
 
-func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
-	return &apiserver.APIGroupVersion{
-		Root: m.apiPrefix,
+func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+	ret := serverstorage.NewResourceConfig()
+	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
+	ret.EnableVersions(
+		admissionregistrationv1beta1.SchemeGroupVersion,
+		apiv1.SchemeGroupVersion,
+		appsv1.SchemeGroupVersion,
+		authenticationv1.SchemeGroupVersion,
+		authenticationv1beta1.SchemeGroupVersion,
+		authorizationapiv1.SchemeGroupVersion,
+		authorizationapiv1beta1.SchemeGroupVersion,
+		autoscalingapiv1.SchemeGroupVersion,
+		autoscalingapiv2beta1.SchemeGroupVersion,
+		autoscalingapiv2beta2.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion,
+		batchapiv1beta1.SchemeGroupVersion,
+		certificatesapiv1beta1.SchemeGroupVersion,
+		coordinationapiv1.SchemeGroupVersion,
+		coordinationapiv1beta1.SchemeGroupVersion,
+		eventsv1beta1.SchemeGroupVersion,
+		extensionsapiv1beta1.SchemeGroupVersion,
+		networkingapiv1.SchemeGroupVersion,
+		networkingapiv1beta1.SchemeGroupVersion,
+		nodev1beta1.SchemeGroupVersion,
+		policyapiv1beta1.SchemeGroupVersion,
+		rbacv1.SchemeGroupVersion,
+		rbacv1beta1.SchemeGroupVersion,
+		storageapiv1.SchemeGroupVersion,
+		storageapiv1beta1.SchemeGroupVersion,
+		schedulingapiv1beta1.SchemeGroupVersion,
+		schedulingapiv1.SchemeGroupVersion,
+	)
+	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+	)
+	// disable deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
+	ret.DisableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicationcontrollers"),
+	)
+	// disable deprecated beta versions explicitly so we have a full list of what's possible to serve
+	ret.DisableVersions(
+		appsv1beta1.SchemeGroupVersion,
+		appsv1beta2.SchemeGroupVersion,
+	)
+	// disable alpha versions explicitly so we have a full list of what's possible to serve
+	ret.DisableVersions(
+		auditregistrationv1alpha1.SchemeGroupVersion,
+		batchapiv2alpha1.SchemeGroupVersion,
+		nodev1alpha1.SchemeGroupVersion,
+		rbacv1alpha1.SchemeGroupVersion,
+		schedulingv1alpha1.SchemeGroupVersion,
+		settingsv1alpha1.SchemeGroupVersion,
+		storageapiv1alpha1.SchemeGroupVersion,
+	)
 
-		Mapper: latest.RESTMapper,
-
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Typer:     api.Scheme,
-		Linker:    latest.SelfLinker,
-
-		Admit:   m.admissionControl,
-		Context: m.requestContextMapper,
-	}
-}
-
-// api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		storage[k] = v
-	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1beta1"
-	version.Codec = v1beta1.Codec
-	return version
-}
-
-// api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		storage[k] = v
-	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1beta2"
-	version.Codec = v1beta2.Codec
-	return version
-}
-
-// api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		if k == "minions" {
-			continue
-		}
-		storage[strings.ToLower(k)] = v
-	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1beta3"
-	version.Codec = v1beta3.Codec
-	return version
+	return ret
 }

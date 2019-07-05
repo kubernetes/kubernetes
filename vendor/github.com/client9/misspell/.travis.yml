@@ -1,0 +1,20 @@
+sudo: required
+dist: trusty
+group: edge
+language: go
+go:
+    - "1.10"
+git:
+  depth: 1
+
+script:
+  - ./scripts/travis.sh
+
+# calls goreleaser when a new tag is pushed
+deploy:
+- provider: script
+  skip_cleanup: true
+  script: curl -sL http://git.io/goreleaser | bash
+  on:
+    tags: true
+    condition: $TRAVIS_OS_NAME = linux

@@ -1,0 +1,6 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- sig-cluster-lifecycle-maintainers
+reviewers:
+- sig-cluster-lifecycle

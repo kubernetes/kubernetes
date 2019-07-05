@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,43 +24,71 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
-	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 type sourceURL struct {
-	url      string
-	hostname string
-	updates  chan<- interface{}
-	data     []byte
+	url         string
+	header      http.Header
+	nodeName    types.NodeName
+	updates     chan<- interface{}
+	data        []byte
+	failureLogs int
+	client      *http.Client
 }
 
-func NewSourceURL(url, hostname string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
-		hostname: hostname,
+		header:   header,
+		nodeName: nodeName,
 		updates:  updates,
 		data:     nil,
+		// Timing out requests leads to retries. This client is only used to
+		// read the manifest URL passed to kubelet.
+		client: &http.Client{Timeout: 10 * time.Second},
 	}
-	glog.V(1).Infof("Watching URL %s", url)
-	go util.Forever(config.run, period)
+	klog.V(1).Infof("Watching URL %s", url)
+	go wait.Until(config.run, period, wait.NeverStop)
 }
 
 func (s *sourceURL) run() {
 	if err := s.extractFromURL(); err != nil {
-		glog.Errorf("Failed to read URL: %v", err)
+		// Don't log this multiple times per minute. The first few entries should be
+		// enough to get the point across.
+		if s.failureLogs < 3 {
+			klog.Warningf("Failed to read pods from URL: %v", err)
+		} else if s.failureLogs == 3 {
+			klog.Warningf("Failed to read pods from URL. Dropping verbosity of this message to V(4): %v", err)
+		} else {
+			klog.V(4).Infof("Failed to read pods from URL: %v", err)
+		}
+		s.failureLogs++
+	} else {
+		if s.failureLogs > 0 {
+			klog.Info("Successfully read pods from URL.")
+			s.failureLogs = 0
+		}
 	}
 }
 
 func (s *sourceURL) applyDefaults(pod *api.Pod) error {
-	return applyDefaults(pod, s.url, false, s.hostname)
+	return applyDefaults(pod, s.url, false, s.nodeName)
 }
 
 func (s *sourceURL) extractFromURL() error {
-	resp, err := http.Get(s.url)
+	req, err := http.NewRequest("GET", s.url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header = s.header
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -69,57 +97,19 @@ func (s *sourceURL) extractFromURL() error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%v: %v", s.url, resp.Status)
 	}
 	if len(data) == 0 {
 		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
-	// Short circuit if the manifest has not changed since the last time it was read.
+	// Short circuit if the data has not changed since the last time it was read.
 	if bytes.Compare(data, s.data) == 0 {
 		return nil
 	}
 	s.data = data
-
-	// First try as if it's a single manifest
-	parsed, manifest, pod, singleErr := tryDecodeSingleManifest(data, s.applyDefaults)
-	if parsed {
-		if singleErr != nil {
-			// It parsed but could not be used.
-			return singleErr
-		}
-		// It parsed!
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
-		return nil
-	}
-
-	// That didn't work, so try an array of manifests.
-	parsed, manifests, podList, multiErr := tryDecodeManifestList(data, s.applyDefaults)
-	if parsed {
-		if multiErr != nil {
-			// It parsed but could not be used.
-			return multiErr
-		}
-		// A single manifest that did not pass semantic validation will yield an empty
-		// array of manifests (and no error) when unmarshaled as such.  In that case,
-		// if the single manifest at least had a Version, we return the single-manifest
-		// error (if any).
-		if len(manifests) == 0 && len(manifest.Version) != 0 {
-			return singleErr
-		}
-		// It parsed!
-		pods := make([]*api.Pod, 0)
-		for i := range podList.Items {
-			pods = append(pods, &podList.Items[i])
-		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.HTTPSource}
-		return nil
-	}
-
-	// Parsing it as ContainerManifest(s) failed.
-	// Try to parse it as Pod(s).
 
 	// First try as it is a single pod.
 	parsed, pod, singlePodErr := tryDecodeSinglePod(data, s.applyDefaults)
@@ -128,7 +118,7 @@ func (s *sourceURL) extractFromURL() error {
 			// It parsed but could not be used.
 			return singlePodErr
 		}
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
 		return nil
 	}
 
@@ -139,17 +129,15 @@ func (s *sourceURL) extractFromURL() error {
 			// It parsed but could not be used.
 			return multiPodErr
 		}
-		pods := make([]*api.Pod, 0)
+		pods := make([]*v1.Pod, 0)
 		for i := range podList.Items {
 			pods = append(pods, &podList.Items[i])
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
 		return nil
 	}
 
-	return fmt.Errorf("%v: received '%v', but couldn't parse as neither "+
-		"single (%v: %+v) or multiple manifests (%v: %+v) nor "+
+	return fmt.Errorf("%v: received '%v', but couldn't parse as "+
 		"single (%v) or multiple pods (%v).\n",
-		s.url, string(data), singleErr, manifest, multiErr, manifests,
-		singlePodErr, multiPodErr)
+		s.url, string(data), singlePodErr, multiPodErr)
 }

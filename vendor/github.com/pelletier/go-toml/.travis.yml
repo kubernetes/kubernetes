@@ -1,0 +1,23 @@
+sudo: false
+language: go
+go:
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+  - tip
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+script:
+  - if [ -n "$(go fmt ./...)" ]; then exit 1; fi
+  - ./test.sh
+  - ./benchmark.sh $TRAVIS_BRANCH https://github.com/$TRAVIS_REPO_SLUG.git
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+branches:
+  only: [master]
+after_success:
+  - $HOME/gopath/bin/goveralls -service=travis-ci -coverprofile=coverage.out -repotoken $COVERALLS_TOKEN

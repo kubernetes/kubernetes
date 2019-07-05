@@ -1,0 +1,132 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: hollow-node
+  labels:
+    name: hollow-node
+    {{kubemark_mig_config}}
+spec:
+  replicas: {{numreplicas}}
+  selector:
+    name: hollow-node
+  template:
+    metadata:
+      labels:
+        name: hollow-node
+        {{kubemark_mig_config}}
+    spec:
+      initContainers:
+      - name: init-inotify-limit
+        image: busybox
+        command: ['sysctl', '-w', 'fs.inotify.max_user_instances=1000']
+        securityContext:
+          privileged: true
+      volumes:
+      - name: kubeconfig-volume
+        secret:
+          secretName: kubeconfig
+      - name: kernelmonitorconfig-volume
+        configMap:
+          name: node-configmap
+      - name: logs-volume
+        hostPath:
+          path: /var/log
+      - name: no-serviceaccount-access-to-real-master
+        emptyDir: {}
+      containers:
+      - name: hollow-kubelet
+        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
+        ports:
+        - containerPort: 4194
+        - containerPort: 10250
+        - containerPort: 10255
+        env:
+        - name: CONTENT_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: node-configmap
+              key: content.type
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -c
+        - /kubemark --morph=kubelet --name=$(NODE_NAME) {{hollow_kubelet_params}} --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        volumeMounts:
+        - name: kubeconfig-volume
+          mountPath: /kubeconfig
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log
+        resources:
+          requests:
+            cpu: 40m
+            memory: 100M
+        securityContext:
+          privileged: true
+      - name: hollow-proxy
+        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
+        env:
+        - name: CONTENT_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: node-configmap
+              key: content.type
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -c
+        - /kubemark --morph=proxy --name=$(NODE_NAME) {{hollow_proxy_params}} --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        volumeMounts:
+        - name: kubeconfig-volume
+          mountPath: /kubeconfig
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log
+        resources:
+          requests:
+            cpu: {{HOLLOW_PROXY_CPU}}m
+            memory: {{HOLLOW_PROXY_MEM}}Ki
+      - name: hollow-node-problem-detector
+        image: k8s.gcr.io/node-problem-detector:v0.4.1
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -c
+        - /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
+        volumeMounts:
+        - name: kubeconfig-volume
+          mountPath: /kubeconfig
+          readOnly: true
+        - name: kernelmonitorconfig-volume
+          mountPath: /config
+          readOnly: true
+        - name: no-serviceaccount-access-to-real-master
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log
+        resources:
+          requests:
+            cpu: 20m
+            memory: 20Mi
+        securityContext:
+          privileged: true
+      # Keep the pod running on unreachable node for 15 minutes.
+      # This time should be sufficient for a VM reboot and should
+      # avoid recreating a new hollow node.
+      # See https://github.com/kubernetes/kubernetes/issues/67120 for context.
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 900

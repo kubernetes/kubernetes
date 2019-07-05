@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,4 +15,5 @@ limitations under the License.
 */
 
 // Package cloudprovider supplies interfaces and implementations for cloud service providers.
+// To use: import cloudprovider "k8s.io/cloud-provider"
 package cloudprovider

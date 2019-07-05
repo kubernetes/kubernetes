@@ -1,0 +1,13 @@
+{
+	"kind": "Status",
+	"apiVersion": "v1",
+	"metadata": {},
+	"status": "Failure",
+	"message": "services \"missing\" not found",
+	"reason": "NotFound",
+	"details": {
+		"name": "missing",
+		"kind": "services"
+	},
+	"code": 404
+}

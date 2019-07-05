@@ -1,0 +1,74 @@
+syntax = "proto3";
+package etcdserverpb;
+
+import "gogoproto/gogo.proto";
+import "etcdserver.proto";
+import "rpc.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+message RequestHeader {
+  uint64 ID = 1;
+  // username is a username that is associated with an auth token of gRPC connection
+  string username = 2;
+  // auth_revision is a revision number of auth.authStore. It is not related to mvcc
+  uint64 auth_revision = 3;
+}
+
+// An InternalRaftRequest is the union of all requests which can be
+// sent via raft.
+message InternalRaftRequest {
+  RequestHeader header = 100;
+  uint64 ID = 1;
+
+  Request v2 = 2;
+
+  RangeRequest range = 3;
+  PutRequest put = 4;
+  DeleteRangeRequest delete_range = 5;
+  TxnRequest txn = 6;
+  CompactionRequest compaction = 7;
+
+  LeaseGrantRequest lease_grant = 8;
+  LeaseRevokeRequest lease_revoke = 9;
+
+  AlarmRequest alarm = 10;
+
+  AuthEnableRequest auth_enable = 1000;
+  AuthDisableRequest auth_disable = 1011;
+
+  InternalAuthenticateRequest authenticate = 1012;
+
+  AuthUserAddRequest auth_user_add = 1100;
+  AuthUserDeleteRequest auth_user_delete = 1101;
+  AuthUserGetRequest auth_user_get = 1102;
+  AuthUserChangePasswordRequest auth_user_change_password = 1103;
+  AuthUserGrantRoleRequest auth_user_grant_role = 1104;
+  AuthUserRevokeRoleRequest auth_user_revoke_role = 1105;
+  AuthUserListRequest auth_user_list = 1106;
+  AuthRoleListRequest auth_role_list = 1107;
+
+  AuthRoleAddRequest auth_role_add = 1200;
+  AuthRoleDeleteRequest auth_role_delete = 1201;
+  AuthRoleGetRequest auth_role_get = 1202;
+  AuthRoleGrantPermissionRequest auth_role_grant_permission = 1203;
+  AuthRoleRevokePermissionRequest auth_role_revoke_permission = 1204;
+}
+
+message EmptyResponse {
+}
+
+// What is the difference between AuthenticateRequest (defined in rpc.proto) and InternalAuthenticateRequest?
+// InternalAuthenticateRequest has a member that is filled by etcdserver and shouldn't be user-facing.
+// For avoiding misusage the field, we have an internal version of AuthenticateRequest.
+message InternalAuthenticateRequest {
+  string name = 1;
+  string password = 2;
+
+  // simple_token is generated in API layer (etcdserver/v3_server.go)
+  string simple_token = 3;
+}
+

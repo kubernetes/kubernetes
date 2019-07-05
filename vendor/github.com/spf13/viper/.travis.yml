@@ -1,0 +1,31 @@
+go_import_path: github.com/spf13/viper
+
+language: go
+
+env:
+  global:
+  - GO111MODULE="on"
+
+go:
+  - 1.11.x
+  - tip
+
+os:
+  - linux
+  - osx
+
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+
+script:
+  - go install ./...
+  - diff -u <(echo -n) <(gofmt -d .)
+  - go test -v ./...
+
+after_success:
+  - go get -u -d github.com/spf13/hugo
+  - cd $GOPATH/src/github.com/spf13/hugo && make && ./hugo -s docs && cd -
+
+sudo: false

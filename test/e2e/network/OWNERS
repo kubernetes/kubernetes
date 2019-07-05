@@ -1,0 +1,6 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - sig-network-reviewers
+approvers:
+  - sig-network-approvers

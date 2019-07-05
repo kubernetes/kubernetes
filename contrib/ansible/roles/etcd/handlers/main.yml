@@ -1,6 +1,0 @@
----
-- name: restart etcd
-  service: name=etcd state=restarted
-
-- name: Save iptables rules
-  command: service iptables save

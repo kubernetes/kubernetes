@@ -1,0 +1,22 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - bowei
+  - cjcullen
+  - gmarek
+  - jszczepkowski
+  - vishh
+  - mwielgus
+  - MaciekPytel
+  - jingax10
+  - yujuhong
+approvers:
+  - bowei
+  - cjcullen
+  - gmarek
+  - jszczepkowski
+  - vishh
+  - mwielgus
+  - MaciekPytel
+  - jingax10
+  - yujuhong

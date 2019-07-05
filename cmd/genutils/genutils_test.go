@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,13 +30,13 @@ func TestValidDir(t *testing.T) {
 func TestInvalidDir(t *testing.T) {
 	_, err := OutDir("./nondir")
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("expected an error")
 	}
 }
 
 func TestNotDir(t *testing.T) {
 	_, err := OutDir("./genutils_test.go")
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("expected an error")
 	}
 }

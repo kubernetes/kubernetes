@@ -1,0 +1,94 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "cluster-autoscaler",
+        "namespace": "kubemark",
+        "labels": {
+            "tier": "cluster-management",
+            "component": "cluster-autoscaler"
+        }
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "cluster-autoscaler",
+                "image": "k8s.gcr.io/cluster-autoscaler:v1.0.0",
+                "command": [
+                    "./run.sh",
+                    "--kubernetes=https://{{master_ip}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/cluster_autoscaler.kubeconfig",
+                    "--v=4",
+                    "--logtostderr=true",
+                    "--write-status-configmap=true",
+                    "--cloud-provider=kubemark",
+                    "--nodes={{kubemark_autoscaler_min_nodes}}:{{kubemark_autoscaler_max_nodes}}:{{kubemark_autoscaler_mig_name}}"
+                ],
+                "env": [
+                    {
+                        "name": "LOG_OUTPUT",
+                        "value": "/var/log/cluster-autoscaler.log"
+                    }
+                ],
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "300Mi"
+                    }
+                },
+                "volumeMounts": [
+                    {"name": "cloudconfigmount","mountPath": "/etc/gce.conf", "readOnly": true},
+                    {
+                        "name": "ssl-certs",
+                        "readOnly": true,
+                        "mountPath": "/etc/ssl/certs"
+                    },
+                    {
+                        "name": "usrsharecacerts",
+                        "readOnly": true,
+                        "mountPath": "/usr/share/ca-certificates"
+                    },
+                    {
+                        "name": "logdir",
+                        "mountPath": "/var/log",
+                        "readOnly": false
+                    },
+                    {
+                        "name": "kubeconfig-volume",
+                        "mountPath": "/kubeconfig"
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "Always"
+            }
+        ],
+        "volumes": [
+            {"name": "cloudconfigmount","hostPath": {"path": "/etc/gce.conf"}},
+            {
+                "name": "ssl-certs",
+                "hostPath": {
+                    "path": "/etc/ssl/certs"
+                }
+            },
+            {
+                "name": "usrsharecacerts",
+                "hostPath": {
+                    "path": "/usr/share/ca-certificates"
+                }
+            },
+            {
+                "name": "logdir",
+                "hostPath": {
+                    "path": "/var/log"
+                }
+            },
+            {
+                "name": "kubeconfig-volume",
+                "secret": {
+                    "secretName": "kubeconfig"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}

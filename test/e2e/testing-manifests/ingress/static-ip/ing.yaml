@@ -1,0 +1,15 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: static-ip
+  # This annotation is added by the test upon allocating a staticip.
+  # annotations:
+  #  kubernetes.io/ingress.global-static-ip-name: "staticip"
+spec:
+  tls:
+  # This assumes tls-secret exists.
+  # To generate it run the make in this directory.
+  - secretName: tls-secret
+  backend:
+    serviceName: echoheaders-https
+    servicePort: 80

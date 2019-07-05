@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# Build a release
-"${KUBE_ROOT}/build/release.sh"
-if [ "$?" != "0" ]; then
+# Build a dev release
+if ! make -f "${KUBE_ROOT}"/Makefile quick-release
+then
         echo "Building a release failed!"
         exit 1
 fi

@@ -1,0 +1,451 @@
+aliases:
+  # sig-auth subproject aliases
+  sig-auth-audit-approvers:
+    - sttts
+    - tallclair
+  sig-auth-audit-reviewers:
+    - CaoShuFeng
+    - hzxuzhonghu
+    - lavalamp
+    - sttts
+    - tallclair
+
+  sig-auth-authenticators-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authenticators-reviewers:
+    - deads2k
+    - enj
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - sttts
+    - wojtek-t
+
+  sig-auth-authorizers-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authorizers-reviewers:
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - erictune
+    - jianhuiz
+    - krousey
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - mml
+    - ncdc
+    - nikhiljindal
+    - smarterclayton
+    - sttts
+    - thockin
+    - wojtek-t
+
+  sig-auth-certificates-approvers:
+    - liggitt
+    - mikedanese
+    - smarterclayton
+  sig-auth-certificates-reviewers:
+    - awly
+    - caesarxuchao
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - errordeveloper
+    - hongchaodeng
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - smarterclayton
+    - sttts
+    - thockin
+    - timothysc
+    - wojtek-t
+
+  sig-auth-encryption-at-rest-approvers:
+    - immutableT
+    - smarterclayton
+  sig-auth-encryption-at-rest-reviewers:
+    - enj
+    - immutableT
+    - lavalamp
+    - liggitt
+    - sakshamsharma
+    - smarterclayton
+    - wojtek-t
+
+  sig-auth-node-isolation-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+  sig-auth-node-isolation-reviewers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+
+  sig-auth-policy-approvers:
+    - deads2k
+    - liggitt
+    - tallclair
+  sig-auth-policy-reviewers:
+    - deads2k
+    - hongchaodeng
+    - jianhuiz
+    - liggitt
+    - mbohlool
+    - pweil-
+    - tallclair
+    - krmayankk
+
+  sig-auth-serviceaccounts-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-serviceaccounts-reviewers:
+    - awly
+    - deads2k
+    - enj
+    - liggitt
+    - mikedanese
+    - WanLinghao
+
+  sig-storage-reviewers:
+    - saad-ali
+    - childsb
+
+  sig-scheduling-maintainers:
+    - bsalamat
+    - k82cn
+    - wojtek-t
+    - ravisantoshgudimetla
+    - Huang-Wei
+  sig-scheduling:
+    - bsalamat
+    - k82cn
+    - resouer
+    - ravisantoshgudimetla
+    - Huang-Wei
+    - wgliang
+
+  sig-cli-maintainers:
+    - adohe
+    - brendandburns
+    - deads2k
+    - janetkuo
+    - liggitt
+    - seans3
+    - monopole
+    - droot
+    - apelisse
+    - mengqiy
+    - smarterclayton
+    - soltysh
+  sig-cli:
+    - adohe
+    - deads2k
+    - derekwaynecarr
+    - dixudx
+    - dims
+    - dshulyak
+    - eparis
+    - ghodss
+    - juanvallejo
+    - mengqiy
+    - rootfs
+    - seans3
+    - shiywang
+    - smarterclayton
+    - soltysh
+  sig-testing-reviewers:
+    - bentheelder
+    - cblecker
+    - fejta
+    - krzyzacy
+    - ixdy
+    - spiffxp
+  sig-testing-approvers:
+    - bentheelder
+    - cblecker
+    - fejta
+    - krzyzacy
+    - ixdy
+    - spiffxp
+  sig-node-reviewers:
+    - Random-Liu
+    - dashpole
+    - dchen1107
+    - derekwaynecarr
+    - dims
+    - feiskyer
+    - mtaufen
+    - pmorie
+    - resouer
+    - sjenning
+    - sjpotter
+    - tallclair
+    - tmrts
+    - vishh
+    - yifan-gu
+    - yujuhong
+    - krmayankk
+    - mattjmcnaughton
+  sig-network-approvers:
+    - bowei
+    - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - johnbelamaric
+    - mrhohn
+    - nicksardo
+    - thockin
+  sig-network-reviewers:
+    - bowei
+    - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - johnbelamaric
+    - mrhohn
+    - nicksardo
+    - thockin
+    - rramkumar1
+    - cmluciano
+    - m1093782566
+    - andrewsykim
+  sig-apps-approvers:
+    - kow3ns
+    - janetkuo
+    - soltysh
+    - tnozicka
+    - erictune
+    - smarterclayton
+  sig-apps-reviewers:
+    - enisoc
+    - erictune
+    - foxish
+    - janetkuo
+    - kow3ns
+    - mortent
+    - smarterclayton
+    - soltysh
+    - tnozicka
+    - krmayankk
+  sig-autoscaling-maintainers:
+    - aleksandra-malinowska
+    - bskiba
+    - MaciekPytel
+    - mwielgus
+
+  api-approvers:
+    - erictune
+    - lavalamp
+    - smarterclayton
+    - thockin
+    - liggitt
+    # - bgrant0607 # manual escalations only
+
+  # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
+  sig-api-machinery-api-approvers:
+    - lavalamp
+    - liggitt
+    - smarterclayton
+
+  sig-apps-api-approvers:
+    - erictune
+    - lavalamp
+    - liggitt
+    - smarterclayton
+
+  sig-auth-api-approvers:
+    - liggitt
+    - smarterclayton
+
+  sig-cli-api-approvers:
+    - liggitt
+    - smarterclayton
+
+  sig-cloud-provider-api-approvers:
+    - liggitt
+    - thockin
+
+  sig-cluster-lifecycle-api-approvers:
+    - liggitt
+    - smarterclayton
+
+  sig-network-api-approvers:
+    - smarterclayton
+    - thockin
+
+  sig-network-api-reviewers:
+    - caseydavenport
+    - cmluciano
+    - danwinship
+    - thockin
+
+  sig-node-api-approvers:
+    - smarterclayton
+    - thockin
+
+  sig-scheduling-api-approvers:
+    - lavalamp
+    - smarterclayton
+    - thockin
+
+  sig-storage-api-approvers:
+    - liggitt
+    - thockin
+
+  sig-windows-api-approvers:
+    - smarterclayton
+    - thockin
+    - liggitt
+  
+  api-reviewers:
+    - erictune
+    - lavalamp
+    - smarterclayton
+    - thockin
+    - liggitt
+    - wojtek-t
+    - deads2k
+    - yujuhong
+    - brendandburns
+    - derekwaynecarr
+    - caesarxuchao
+    - vishh
+    - mikedanese
+    - nikhiljindal
+    - gmarek
+    - davidopp
+    - pmorie
+    - sttts
+    - dchen1107
+    - saad-ali
+    - zmerlynn
+    - luxas
+    - janetkuo
+    - justinsb
+    - pwittrock
+    - roberthbailey
+    - ncdc
+    - tallclair
+    - yifan-gu
+    - eparis
+    - mwielgus
+    - timothysc
+    - soltysh
+    - piosz
+    - jsafrane
+    - jbeda
+
+  # api-reviewers targeted by sig area
+  # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
+  
+  sig-api-machinery-api-reviewers:
+    - caesarxuchao
+    - deads2k
+    - jpbetz
+    - sttts
+  
+  # sig-apps-api-reviewers:
+  #   - 
+  #   - 
+
+  sig-auth-api-reviewers:
+    - enj
+    - mikedanese
+
+  sig-cli-api-reviewers:
+    - pwittrock
+    - soltysh
+
+  sig-cloud-provider-api-reviewers:
+    - andrewsykim
+    - cheftako
+  
+  # sig-cluster-lifecycle-api-reviewers:
+  #   - 
+  #   -
+  
+  sig-node-api-reviewers:
+    - dchen1107
+    - derekwaynecarr
+    - tallclair
+    - yujuhong
+  
+  sig-scheduling-api-reviewers:
+      - bsalamat
+      - k82cn
+  
+  sig-storage-api-reviewers:
+    - saad-ali
+    - msau42
+    - jsafrane
+
+  
+  sig-windows-api-reviewers:
+    - patricklang
+    - ddebroy
+    - benmoss
+
+  dep-approvers:
+    - apelisse
+    - BenTheElder
+    - cblecker
+    - dims
+    - thockin
+    - sttts
+    - soltysh
+  feature-approvers:
+    - bgrant0607      # Architecture
+    - brancz          # Instrumentation
+    - bsalamat        # Scheduling
+    - calebamiles     # Release
+    - caseydavenport  # Network
+    - childsb         # Storage
+    - countspongebob  # Scalability
+    - csbell          # Multicluster
+    - dcbw            # Network
+    - dchen1107       # Node
+    - deads2k         # API Machinery
+    - derekwaynecarr  # Node
+    - dghubble        # On Premise
+    - jdumars         # Architecture, Cluster Ops, Release
+    - kow3ns          # Apps
+    - lavalamp        # API Machinery
+    - liggitt         # Auth
+    - lukemarsden     # Cluster Lifecycle
+    - luxas           # Cluster Lifecycle
+    - marcoceppi      # On Premise
+    - mattfarina      # Apps
+    - michmike        # Windows
+    - mwielgus        # Autoscaling
+    - piosz           # Instrumentation
+    - prydonius       # Apps
+    - pwittrock       # CLI
+    - quinton-hoole   # Multicluster
+    - roberthbailey   # Cluster Lifecycle
+    - saad-ali        # Storage
+    - seans3          # CLI
+    - soltysh         # CLI
+    - tallclair       # Auth
+    - thockin         # Network
+    - timothysc       # Cluster Lifecycle, Scheduling
+    - wojtek-t        # Scalability
+    - zehicle         # Cluster Ops

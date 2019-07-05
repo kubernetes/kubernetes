@@ -1,0 +1,7 @@
+{
+  "apiVersion": "authentication.k8s.io/v1beta1",
+  "kind": "TokenReview",
+  "spec": {
+    "token": "test-token"
+  }
+}

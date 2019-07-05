@@ -1,9 +1,0 @@
-# Etcd Upstart and SysVinit configuration file
-
-# Customize etcd location 
-# ETCD="/opt/bin/etcd"
-
-# Use ETCD_OPTS to modify the start/restart options
-ETCD_OPTS="-listen-client-urls=http://127.0.0.1:4001"
-
-# Add more envionrment settings used by etcd here

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,180 +19,126 @@ package resourcequota
 import (
 	"fmt"
 	"io"
+	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
+	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
-func init() {
-	admission.RegisterPlugin("ResourceQuota", func(client client.Interface, config io.Reader) (admission.Interface, error) {
-		return NewResourceQuota(client), nil
-	})
-}
+// PluginName is a string with the name of the plugin
+const PluginName = "ResourceQuota"
 
-type quota struct {
-	client  client.Interface
-	indexer cache.Indexer
-}
-
-func NewResourceQuota(client client.Interface) admission.Interface {
-	lw := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
-		},
-		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
-		},
-	}
-	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)
-	reflector.Run()
-	return &quota{client: client, indexer: indexer}
-}
-
-var resourceToResourceName = map[string]api.ResourceName{
-	"pods":                   api.ResourcePods,
-	"services":               api.ResourceServices,
-	"replicationControllers": api.ResourceReplicationControllers,
-	"resourceQuotas":         api.ResourceQuotas,
-}
-
-func (q *quota) Admit(a admission.Attributes) (err error) {
-	if a.GetOperation() == "DELETE" {
-		return nil
-	}
-
-	key := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: a.GetNamespace(),
-			Name:      "",
-		},
-	}
-	items, err := q.indexer.Index("namespace", key)
-	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
-	}
-	if len(items) == 0 {
-		return nil
-	}
-
-	for i := range items {
-		quota := items[i].(*api.ResourceQuota)
-
-		// we cannot modify the value directly in the cache, so we copy
-		status := &api.ResourceQuotaStatus{
-			Hard: api.ResourceList{},
-			Used: api.ResourceList{},
-		}
-		for k, v := range quota.Status.Hard {
-			status.Hard[k] = *v.Copy()
-		}
-		for k, v := range quota.Status.Used {
-			status.Used[k] = *v.Copy()
-		}
-
-		dirty, err := IncrementUsage(a, status, q.client)
-		if err != nil {
-			return admission.NewForbidden(a, err)
-		}
-
-		if dirty {
-			// construct a usage record
-			usage := api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
-					Name:            quota.Name,
-					Namespace:       quota.Namespace,
-					ResourceVersion: quota.ResourceVersion,
-					Labels:          quota.Labels,
-					Annotations:     quota.Annotations},
-			}
-			usage.Status = *status
-			_, err = q.client.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName,
+		func(config io.Reader) (admission.Interface, error) {
+			// load the configuration provided (if any)
+			configuration, err := LoadConfiguration(config)
 			if err != nil {
-				return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
+				return nil, err
 			}
-		}
+			// validate the configuration (if any)
+			if configuration != nil {
+				if errs := validation.ValidateConfiguration(configuration); len(errs) != 0 {
+					return nil, errs.ToAggregate()
+				}
+			}
+			return NewResourceQuota(configuration, 5, make(chan struct{}))
+		})
+}
+
+// QuotaAdmission implements an admission controller that can enforce quota constraints
+type QuotaAdmission struct {
+	*admission.Handler
+	config             *resourcequotaapi.Configuration
+	stopCh             <-chan struct{}
+	quotaConfiguration quota.Configuration
+	numEvaluators      int
+	quotaAccessor      *quotaAccessor
+	evaluator          Evaluator
+}
+
+var _ admission.ValidationInterface = &QuotaAdmission{}
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
+var _ = kubeapiserveradmission.WantsQuotaConfiguration(&QuotaAdmission{})
+
+type liveLookupEntry struct {
+	expiry time.Time
+	items  []*corev1.ResourceQuota
+}
+
+// NewResourceQuota configures an admission controller that can enforce quota constraints
+// using the provided registry.  The registry must have the capability to handle group/kinds that
+// are persisted by the server this admission controller is intercepting
+func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (*QuotaAdmission, error) {
+	quotaAccessor, err := newQuotaAccessor()
+	if err != nil {
+		return nil, err
+	}
+
+	return &QuotaAdmission{
+		Handler:       admission.NewHandler(admission.Create, admission.Update),
+		stopCh:        stopCh,
+		numEvaluators: numEvaluators,
+		config:        config,
+		quotaAccessor: quotaAccessor,
+	}, nil
+}
+
+// SetExternalKubeClientSet registers the client into QuotaAdmission
+func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
+	a.quotaAccessor.client = client
+}
+
+// SetExternalKubeInformerFactory registers an informer factory into QuotaAdmission
+func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	a.quotaAccessor.lister = f.Core().V1().ResourceQuotas().Lister()
+}
+
+// SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
+func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
+	a.quotaConfiguration = c
+	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)
+}
+
+// ValidateInitialization ensures an authorizer is set.
+func (a *QuotaAdmission) ValidateInitialization() error {
+	if a.quotaAccessor == nil {
+		return fmt.Errorf("missing quotaAccessor")
+	}
+	if a.quotaAccessor.client == nil {
+		return fmt.Errorf("missing quotaAccessor.client")
+	}
+	if a.quotaAccessor.lister == nil {
+		return fmt.Errorf("missing quotaAccessor.lister")
+	}
+	if a.quotaConfiguration == nil {
+		return fmt.Errorf("missing quotaConfiguration")
+	}
+	if a.evaluator == nil {
+		return fmt.Errorf("missing evaluator")
 	}
 	return nil
 }
 
-// IncrementUsage updates the supplied ResourceQuotaStatus object based on the incoming operation
-// Return true if the usage must be recorded prior to admitting the new resource
-// Return an error if the operation should not pass admission control
-func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
-	dirty := false
-	set := map[api.ResourceName]bool{}
-	for k := range status.Hard {
-		set[k] = true
+// Validate makes admission decisions while enforcing quota
+func (a *QuotaAdmission) Validate(attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	// ignore all operations that correspond to sub-resource actions
+	if attr.GetSubresource() != "" {
+		return nil
 	}
-	obj := a.GetObject()
-	// handle max counts for each kind of resource (pods, services, replicationControllers, etc.)
-	if a.GetOperation() == "CREATE" {
-		resourceName := resourceToResourceName[a.GetResource()]
-		hard, hardFound := status.Hard[resourceName]
-		if hardFound {
-			used, usedFound := status.Used[resourceName]
-			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
-			}
-			if used.Value() >= hard.Value() {
-				return false, fmt.Errorf("Limited to %s %s", hard.String(), resourceName)
-			} else {
-				status.Used[resourceName] = *resource.NewQuantity(used.Value()+int64(1), resource.DecimalSI)
-				dirty = true
-			}
-		}
+	// ignore all operations that are not namespaced
+	if attr.GetNamespace() == "" {
+		return nil
 	}
-	// handle memory/cpu constraints, and any diff of usage based on memory/cpu on updates
-	if a.GetResource() == "pods" && (set[api.ResourceMemory] || set[api.ResourceCPU]) {
-		pod := obj.(*api.Pod)
-		deltaCPU := resourcequota.PodCPU(pod)
-		deltaMemory := resourcequota.PodMemory(pod)
-		// if this is an update, we need to find the delta cpu/memory usage from previous state
-		if a.GetOperation() == "UPDATE" {
-			oldPod, err := client.Pods(a.GetNamespace()).Get(pod.Name)
-			if err != nil {
-				return false, err
-			}
-			oldCPU := resourcequota.PodCPU(oldPod)
-			oldMemory := resourcequota.PodMemory(oldPod)
-			deltaCPU = resource.NewMilliQuantity(deltaCPU.MilliValue()-oldCPU.MilliValue(), resource.DecimalSI)
-			deltaMemory = resource.NewQuantity(deltaMemory.Value()-oldMemory.Value(), resource.DecimalSI)
-		}
-
-		hardMem, hardMemFound := status.Hard[api.ResourceMemory]
-		if hardMemFound {
-			used, usedFound := status.Used[api.ResourceMemory]
-			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
-			}
-			if used.Value()+deltaMemory.Value() > hardMem.Value() {
-				return false, fmt.Errorf("Limited to %s memory", hardMem.String())
-			} else {
-				status.Used[api.ResourceMemory] = *resource.NewQuantity(used.Value()+deltaMemory.Value(), resource.DecimalSI)
-				dirty = true
-			}
-		}
-		hardCPU, hardCPUFound := status.Hard[api.ResourceCPU]
-		if hardCPUFound {
-			used, usedFound := status.Used[api.ResourceCPU]
-			if !usedFound {
-				return false, fmt.Errorf("Quota usage stats are not yet known, unable to admit resource until an accurate count is completed.")
-			}
-			if used.MilliValue()+deltaCPU.MilliValue() > hardCPU.MilliValue() {
-				return false, fmt.Errorf("Limited to %s CPU", hardCPU.String())
-			} else {
-				status.Used[api.ResourceCPU] = *resource.NewMilliQuantity(used.MilliValue()+deltaCPU.MilliValue(), resource.DecimalSI)
-				dirty = true
-			}
-		}
-	}
-	return dirty, nil
+	return a.evaluator.Evaluate(attr)
 }

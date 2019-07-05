@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - dcbw
+  - thockin
+  - eparis
+  - danwinship
+approvers:
+  - dcbw
+  - thockin
+  - eparis
+labels:
+- sig/network

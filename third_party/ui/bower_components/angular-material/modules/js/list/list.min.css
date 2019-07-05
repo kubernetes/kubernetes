@@ -1,6 +1,0 @@
-/*!
- * Angular Material Design
- * https://github.com/angular/material
- * @license MIT
- * v0.7.0-rc3
- */md-list{padding:8px 0}md-item-content{display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;-webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;-webkit-box-orient:horizontal;-webkit-box-direction:normal;-webkit-flex-direction:row;-ms-flex-direction:row;flex-direction:row;box-sizing:border-box;position:relative;padding:0}.md-tile-left{min-width:56px;margin-right:-16px}.md-tile-content{-webkit-box-flex:1;-webkit-flex:1;-ms-flex:1;flex:1;padding:16px;text-overflow:ellipsis}.md-tile-content h3{margin:0 0 3px;font-weight:400;font-size:1.1em}.md-tile-content h4{margin:0 0 3px;font-weight:400;font-size:.9em}.md-tile-content p{margin:0 0 3px;font-size:.75em}.md-tile-right{padding-right:0}

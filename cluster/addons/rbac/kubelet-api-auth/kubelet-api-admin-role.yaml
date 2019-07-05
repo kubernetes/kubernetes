@@ -1,0 +1,18 @@
+# This role allows full access to the kubelet API
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubelet-api-admin
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes/proxy
+  - nodes/log
+  - nodes/stats
+  - nodes/metrics
+  - nodes/spec
+  verbs:
+  - "*"

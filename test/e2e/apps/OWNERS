@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- janetkuo
+- nikhiljindal
+- kargakis
+- mfojtik
+reviewers:
+- sig-apps-reviewers
+labels:
+- sig/apps

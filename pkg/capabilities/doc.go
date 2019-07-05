@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package capbabilities manages system level capabilities
-package capabilities
+// Package capabilities manages system level capabilities
+package capabilities // import "k8s.io/kubernetes/pkg/capabilities"

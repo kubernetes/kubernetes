@@ -1,0 +1,53 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "bridge.go",
+        "cluster.go",
+        "cluster_direct.go",
+        "doc.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/integration",
+    importpath = "github.com/coreos/etcd/integration",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/coreos/etcd/client:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/coreos/etcd/embed:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/etcdhttp:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v2http:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3client:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3election:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3lock:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3lock/v3lockpb:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/testutil:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/tlsutil:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
+        "//vendor/github.com/coreos/etcd/rafthttp:go_default_library",
+        "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
+        "//vendor/github.com/soheilhy/cmux:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/grpclog:go_default_library",
+        "//vendor/google.golang.org/grpc/keepalive:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

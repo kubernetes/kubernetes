@@ -1,0 +1,5 @@
+amd64=debian:jessie
+arm=arm32v7/debian:jessie
+arm64=arm64v8/debian:jessie
+ppc64le=ppc64le/debian:jessie
+s390x=s390x/debian:jessie

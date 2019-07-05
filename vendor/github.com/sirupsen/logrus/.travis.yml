@@ -1,0 +1,25 @@
+language: go
+go_import_path: github.com/sirupsen/logrus
+git:
+  depth: 1
+env:
+  - GO111MODULE=on
+  - GO111MODULE=off
+go: [ 1.11.x, 1.12.x ]
+os: [ linux, osx ]
+matrix:
+  exclude:
+    - go: 1.12.x
+      env: GO111MODULE=off
+    - go: 1.11.x
+      os: osx
+install:
+  - ./travis/install.sh
+  - if [[ "$GO111MODULE" ==  "on" ]]; then go mod download; fi
+  - if [[ "$GO111MODULE" == "off" ]]; then go get github.com/stretchr/testify/assert golang.org/x/sys/unix github.com/konsorten/go-windows-terminal-sequences; fi
+script:
+  - ./travis/cross_build.sh
+  - export GOMAXPROCS=4
+  - export GORACE=halt_on_error=1
+  - go test -race -v ./...
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then go test -race -v -tags appengine ./... ; fi

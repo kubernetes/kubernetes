@@ -1,0 +1,40 @@
+# People who have agreed to one of the CLAs and can contribute patches.
+# The AUTHORS file lists the copyright holders; this file
+# lists people.  For example, Google employees are listed here
+# but not in AUTHORS, because Google holds the copyright.
+#
+# https://developers.google.com/open-source/cla/individual
+# https://developers.google.com/open-source/cla/corporate
+#
+# Names should be added to this file as:
+#     Name <email address>
+
+# Keep the list alphabetically sorted.
+
+Alexis Hunt <lexer@google.com>
+Andreas Litt <andreas.litt@gmail.com>
+Andrew Gerrand <adg@golang.org>
+Brad Fitzpatrick <bradfitz@golang.org>
+Burcu Dogan <jbd@google.com>
+Dave Day <djd@golang.org>
+David Sansome <me@davidsansome.com>
+David Symonds <dsymonds@golang.org>
+Filippo Valsorda <hi@filippo.io>
+Glenn Lewis <gmlewis@google.com>
+Ingo Oeser <nightlyone@googlemail.com>
+James Hall <james.hall@shopify.com>
+Johan Euphrosine <proppy@google.com>
+Jonathan Amsterdam <jba@google.com>
+Kunpei Sakai <namusyaka@gmail.com>
+Luna Duclos <luna.duclos@palmstonegames.com>
+Magnus Hiie <magnus.hiie@gmail.com>
+Mario Castro <mariocaster@gmail.com>
+Michael McGreevy <mcgreevy@golang.org>
+Omar Jarjur <ojarjur@google.com>
+Paweł Knap <pawelknap88@gmail.com>
+Péter Szilágyi <peterke@gmail.com>
+Sarah Adams <shadams@google.com>
+Thanatat Tamtan <acoshift@gmail.com>
+Toby Burress <kurin@google.com>
+Tuo Shan <shantuo@google.com>
+Tyler Treat <ttreat31@gmail.com>

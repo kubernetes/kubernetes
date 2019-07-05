@@ -1,0 +1,108 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "cluster-autoscaler",
+        "namespace": "kube-system",
+        "labels": {
+            "tier": "cluster-management",
+            "component": "cluster-autoscaler"
+        },
+        "annotations": {
+            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
+        }
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "cluster-autoscaler",
+                "image": "k8s.gcr.io/cluster-autoscaler:v1.15.0",
+                "livenessProbe": {
+                    "httpGet": {
+                        "path": "/health-check",
+                        "port": 8085
+                    },
+                    "initialDelaySeconds": 600,
+                    "periodSeconds": 60
+                },
+                "command": [
+                    "./run.sh",
+                    "--kubernetes=https://127.0.0.1:443",
+                    "--v=4",
+                    "--logtostderr=true",
+                    "--write-status-configmap=true",
+                    "--balance-similar-node-groups=true",
+		    "--expendable-pods-priority-cutoff=-10",
+                    {{params}}
+                ],
+                "env": [
+                    {
+                        "name": "LOG_OUTPUT",
+                        "value": "/var/log/cluster-autoscaler.log"
+                    }
+                ],
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "300Mi"
+                    }
+                },
+                "volumeMounts": [
+                    {{cloud_config_mount}}
+                    {
+                        "name": "ssl-certs",
+                        "readOnly": true,
+                        "mountPath": "/etc/ssl/certs"
+                    },
+                    {
+                        "name": "usrsharecacerts",
+                        "readOnly": true,
+                        "mountPath": "/usr/share/ca-certificates"
+                    },
+                    {
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes/cluster-autoscaler"
+                    },
+                    {
+                        "name": "logfile",
+                        "mountPath": "/var/log/cluster-autoscaler.log",
+                        "readOnly": false
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent"
+            }
+        ],
+        "volumes": [
+            {{cloud_config_volume}}
+            {
+                "name": "ssl-certs",
+                "hostPath": {
+                    "path": "/etc/ssl/certs"
+                }
+            },
+            {
+                "name": "usrsharecacerts",
+                "hostPath": {
+                    "path": "/usr/share/ca-certificates"
+                }
+            },
+            {
+                "name": "srvkube",
+                "hostPath": {
+                    "path": "/etc/srv/kubernetes/cluster-autoscaler"
+                }
+            },
+            {
+                "name": "logfile",
+                "hostPath": {
+                    "path": "/var/log/cluster-autoscaler.log",
+                    "type": "FileOrCreate"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}

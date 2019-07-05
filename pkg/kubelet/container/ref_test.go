@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,27 +19,29 @@ package container
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestFieldPath(t *testing.T) {
-	pod := &api.Pod{Spec: api.PodSpec{Containers: []api.Container{
+	pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{
 		{Name: "foo"},
 		{Name: "bar"},
 		{Name: ""},
 		{Name: "baz"},
 	}}}
 	table := map[string]struct {
-		pod       *api.Pod
-		container *api.Container
+		pod       *v1.Pod
+		container *v1.Container
 		path      string
 		success   bool
 	}{
-		"basic":            {pod, &api.Container{Name: "foo"}, "spec.containers{foo}", true},
-		"basic2":           {pod, &api.Container{Name: "baz"}, "spec.containers{baz}", true},
-		"emptyName":        {pod, &api.Container{Name: ""}, "spec.containers[2]", true},
+		"basic":            {pod, &v1.Container{Name: "foo"}, "spec.containers{foo}", true},
+		"basic2":           {pod, &v1.Container{Name: "baz"}, "spec.containers{baz}", true},
+		"emptyName":        {pod, &v1.Container{Name: ""}, "spec.containers[2]", true},
 		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers{foo}", true},
-		"missing":          {pod, &api.Container{Name: "qux"}, "", false},
+		"missing":          {pod, &v1.Container{Name: "qux"}, "", false},
 	}
 
 	for name, item := range table {
@@ -62,20 +64,20 @@ func TestFieldPath(t *testing.T) {
 
 func TestGenerateContainerRef(t *testing.T) {
 	var (
-		okPod = api.Pod{
-			TypeMeta: api.TypeMeta{
+		okPod = v1.Pod{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: "v1beta1",
+				APIVersion: "v1",
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				SelfLink:        "/api/v1beta1/pods/foo",
+				SelfLink:        "/api/v1/pods/foo",
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name: "by-name",
 					},
@@ -86,25 +88,27 @@ func TestGenerateContainerRef(t *testing.T) {
 		noSelfLinkPod        = okPod
 		defaultedSelfLinkPod = okPod
 	)
+	noSelfLinkPod.Kind = ""
+	noSelfLinkPod.APIVersion = ""
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
-	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/v1beta1/pods/ok"
+	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/v1/pods/ok"
 
 	cases := []struct {
 		name      string
-		pod       *api.Pod
-		container *api.Container
-		expected  *api.ObjectReference
+		pod       *v1.Pod
+		container *v1.Container
+		expected  *v1.ObjectReference
 		success   bool
 	}{
 		{
 			name: "by-name",
 			pod:  &okPod,
-			container: &api.Container{
+			container: &v1.Container{
 				Name: "by-name",
 			},
-			expected: &api.ObjectReference{
+			expected: &v1.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      "v1",
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -116,10 +120,10 @@ func TestGenerateContainerRef(t *testing.T) {
 		{
 			name:      "no-name",
 			pod:       &okPod,
-			container: &api.Container{},
-			expected: &api.ObjectReference{
+			container: &v1.Container{},
+			expected: &v1.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      "v1",
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -131,19 +135,19 @@ func TestGenerateContainerRef(t *testing.T) {
 		{
 			name:      "no-selflink",
 			pod:       &noSelfLinkPod,
-			container: &api.Container{},
+			container: &v1.Container{},
 			expected:  nil,
 			success:   false,
 		},
 		{
 			name: "defaulted-selflink",
 			pod:  &defaultedSelfLinkPod,
-			container: &api.Container{
+			container: &v1.Container{
 				Name: "by-name",
 			},
-			expected: &api.ObjectReference{
+			expected: &v1.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      "v1",
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -155,12 +159,12 @@ func TestGenerateContainerRef(t *testing.T) {
 		{
 			name: "implicitly-required",
 			pod:  &okPod,
-			container: &api.Container{
+			container: &v1.Container{
 				Name: "net",
 			},
-			expected: &api.ObjectReference{
+			expected: &v1.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      "v1",
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",

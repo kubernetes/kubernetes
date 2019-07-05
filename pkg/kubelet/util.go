@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,51 +17,17 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
+	"os"
 )
 
-func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
-	c := api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
-			int64(info.NumCores*1000),
-			resource.DecimalSI),
-		api.ResourceMemory: *resource.NewQuantity(
-			info.MemoryCapacity,
-			resource.BinarySI),
-	}
-	return c
-}
-
-// Check whether we have the capabilities to run the specified pod.
-func canRunPod(pod *api.Pod) error {
-	if pod.Spec.HostNetwork {
-		allowed, err := allowHostNetwork(pod)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
-		}
-	}
-	// TODO(vmarmol): Check Privileged too.
-	return nil
-}
-
-// Determined whether the specified pod is allowed to use host networking
-func allowHostNetwork(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
+// dirExists returns true if the path exists and represents a directory.
+func dirExists(path string) bool {
+	s, err := os.Stat(path)
 	if err != nil {
-		return false, err
+		return false
 	}
-	for _, source := range capabilities.Get().HostNetworkSources {
-		if source == podSource {
-			return true, nil
-		}
-	}
-	return false, nil
+	return s.IsDir()
 }
+
+// empty is a placeholder type used to implement a set
+type empty struct{}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,228 +17,144 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-type internalType struct {
-	Kind       string
-	APIVersion string
+func TestNormalizationFuncGlobalExistence(t *testing.T) {
+	// This test can be safely deleted when we will not support multiple flag formats
+	root := NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
 
-	Name string
-}
-
-type externalType struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
-
-	Name string `json:"name"`
-}
-
-func (*internalType) IsAnAPIObject() {}
-func (*externalType) IsAnAPIObject() {}
-
-func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Type", &internalType{})
-	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
-
-	codec := runtime.CodecFor(scheme, "unlikelyversion")
-	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion"}, func(version string) (*meta.VersionInterfaces, bool) {
-		return &meta.VersionInterfaces{
-			Codec:            codec,
-			ObjectConvertor:  scheme,
-			MetadataAccessor: meta.NewAccessor(),
-		}, (version == "unlikelyversion")
-	})
-	for _, version := range []string{"unlikelyversion"} {
-		for kind := range scheme.KnownTypes(version) {
-			mixedCase := false
-			scope := meta.RESTScopeNamespace
-			mapper.Add(scope, kind, version, mixedCase)
-		}
+	if root.Parent() != nil {
+		t.Fatal("We expect the root command to be returned")
+	}
+	if root.GlobalNormalizationFunc() == nil {
+		t.Fatal("We expect that root command has a global normalization function")
 	}
 
-	return scheme, mapper, codec
-}
-
-type testPrinter struct {
-	Objects []runtime.Object
-	Err     error
-}
-
-func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Objects = append(t.Objects, obj)
-	fmt.Fprintf(out, "%#v", obj)
-	return t.Err
-}
-
-type testDescriber struct {
-	Name, Namespace string
-	Output          string
-	Err             error
-}
-
-func (t *testDescriber) Describe(namespace, name string) (output string, err error) {
-	t.Namespace, t.Name = namespace, name
-	return t.Output, t.Err
-}
-
-type testFactory struct {
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Client       kubectl.RESTClient
-	Describer    kubectl.Describer
-	Printer      kubectl.ResourcePrinter
-	Validator    validation.Schema
-	Namespace    string
-	ClientConfig *client.Config
-	Err          error
-}
-
-func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
-	scheme, mapper, codec := newExternalScheme()
-	t := &testFactory{
-		Validator: validation.NullSchema{},
-		Mapper:    mapper,
-		Typer:     scheme,
+	if reflect.ValueOf(root.GlobalNormalizationFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
+		t.Fatal("root command seems to have a wrong normalization function")
 	}
-	return &cmdutil.Factory{
-		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			return t.Mapper, t.Typer
-		},
-		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
-			return t.Client, t.Err
-		},
-		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
-			return t.Describer, t.Err
-		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
-			return t.Printer, t.Err
-		},
-		Validator: func() (validation.Schema, error) {
-			return t.Validator, t.Err
-		},
-		DefaultNamespace: func() (string, error) {
-			return t.Namespace, t.Err
-		},
-		ClientConfig: func() (*client.Config, error) {
-			return t.ClientConfig, t.Err
-		},
-	}, t, codec
-}
 
-func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
-	t := &testFactory{
-		Validator: validation.NullSchema{},
+	sub := root
+	for sub.HasSubCommands() {
+		sub = sub.Commands()[0]
 	}
-	return &cmdutil.Factory{
-		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
-			return latest.RESTMapper, api.Scheme
-		},
-		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
-			return t.Client, t.Err
-		},
-		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
-			return t.Describer, t.Err
-		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
-			return t.Printer, t.Err
-		},
-		Validator: func() (validation.Schema, error) {
-			return t.Validator, t.Err
-		},
-		DefaultNamespace: func() (string, error) {
-			return t.Namespace, t.Err
-		},
-		ClientConfig: func() (*client.Config, error) {
-			return t.ClientConfig, t.Err
-		},
-	}, t, latest.Codec
-}
 
-func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
-}
-
-func stringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
-}
-
-// Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
-func TestClientVersions(t *testing.T) {
-	f := cmdutil.NewFactory(nil)
-
-	versions := []string{
-		"v1beta1",
-		"v1beta2",
-		"v1beta3",
-	}
-	for _, version := range versions {
-		mapping := &meta.RESTMapping{
-			APIVersion: version,
-		}
-		c, err := f.RESTClient(mapping)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		client := c.(*client.RESTClient)
-		if client.APIVersion() != version {
-			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
-		}
+	// In case of failure of this test check this PR: spf13/cobra#110
+	if reflect.ValueOf(sub.Flags().GetNormalizeFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
+		t.Fatal("child and root commands should have the same normalization functions")
 	}
 }
 
-func ExamplePrintReplicationController() {
-	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false)
-	tf.Client = &client.FakeRESTClient{
-		Codec:  codec,
-		Client: nil,
-	}
-	cmd := NewCmdRunContainer(f, os.Stdout)
-	ctrl := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name:   "foo",
-			Labels: map[string]string{"foo": "bar"},
+func TestKubectlCommandHandlesPlugins(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectPlugin     string
+		expectPluginArgs []string
+		expectError      string
+	}{
+		{
+			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
+			args:             []string{"kubectl", "get", "foo"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: 1,
-			Selector: map[string]string{"foo": "bar"},
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{"foo": "bar"},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:  "foo",
-							Image: "someimage",
-						},
-					},
-				},
-			},
+		{
+			name:             "test that a plugin executable is found based on command args",
+			args:             []string{"kubectl", "foo", "--bar"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"foo", "--bar"},
+		},
+		{
+			name: "test that a plugin does not execute over an existing command by the same name",
+			args: []string{"kubectl", "version"},
 		},
 	}
-	err := f.PrintObject(cmd, ctrl, os.Stdout)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pluginsHandler := &testPluginHandler{
+				pluginsDirectory: "plugin/testdata",
+			}
+			_, in, out, errOut := genericclioptions.NewTestIOStreams()
+
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				errOut.Write([]byte(str))
+			})
+
+			root := NewDefaultKubectlCommandWithArgs(pluginsHandler, test.args, in, out, errOut)
+			if err := root.Execute(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
+			}
+
+			if pluginsHandler.executedPlugin != test.expectPlugin {
+				t.Fatalf("unexpected plugin execution: expedcted %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+			}
+
+			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
+				t.Fatalf("unexpected plugin execution args: expedcted %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+			}
+		})
+	}
+}
+
+type testPluginHandler struct {
+	pluginsDirectory string
+
+	// execution results
+	executedPlugin string
+	withArgs       []string
+	withEnv        []string
+
+	err error
+}
+
+func (h *testPluginHandler) Lookup(filename string) (string, bool) {
+	// append supported plugin prefix to the filename
+	filename = fmt.Sprintf("%s-%s", "kubectl", filename)
+
+	dir, err := os.Stat(h.pluginsDirectory)
 	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
+		h.err = err
+		return "", false
 	}
-	// Output:
-	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
-	// foo          foo            someimage   foo=bar    1
+
+	if !dir.IsDir() {
+		h.err = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
+		return "", false
+	}
+
+	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
+	if err != nil {
+		h.err = err
+		return "", false
+	}
+
+	for _, p := range plugins {
+		if p.Name() == filename {
+			return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), true
+		}
+	}
+
+	h.err = fmt.Errorf("unable to find a plugin executable %q", filename)
+	return "", false
+}
+
+func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string) error {
+	h.executedPlugin = executablePath
+	h.withArgs = cmdArgs
+	h.withEnv = env
+	return nil
 }

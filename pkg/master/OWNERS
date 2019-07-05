@@ -1,0 +1,45 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- deads2k
+- derekwaynecarr
+- lavalamp
+- mikedanese
+- nikhiljindal
+- sttts
+- wojtek-t
+reviewers:
+- thockin
+- lavalamp
+- smarterclayton
+- wojtek-t
+- deads2k
+- yujuhong
+- derekwaynecarr
+- caesarxuchao
+- mikedanese
+- liggitt
+- nikhiljindal
+- gmarek
+- erictune
+- davidopp
+- pmorie
+- sttts
+- dchen1107
+- saad-ali
+- luxas
+- janetkuo
+- justinsb
+- roberthbailey
+- ncdc
+- tallclair
+- mwielgus
+- timothysc
+- soltysh
+- piosz
+- madhusudancs
+- hongchaodeng
+- jszczepkowski
+- enj
+labels:
+- sig/api-machinery

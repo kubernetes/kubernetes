@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - ixdy
+  - luxas
+  - mikedanese
+approvers:
+  - ixdy
+  - luxas
+  - mikedanese
+labels:
+- sig/release

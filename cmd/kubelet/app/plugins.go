@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,29 +19,42 @@ package app
 // This file exists to force the desired plugin implementations to be linked.
 import (
 	// Credential providers
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider/gcp"
-	// Network plugins
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network/exec"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
+	"k8s.io/utils/exec"
 	// Volume plugins
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/aws_ebs"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/gce_pd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/git_repo"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/glusterfs"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/iscsi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/nfs"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/persistent_claim"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/secret"
-	//Cloud providers
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/awsebs"
+	"k8s.io/kubernetes/pkg/volume/azure_dd"
+	"k8s.io/kubernetes/pkg/volume/azure_file"
+	"k8s.io/kubernetes/pkg/volume/cephfs"
+	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/configmap"
+	"k8s.io/kubernetes/pkg/volume/csi"
+	"k8s.io/kubernetes/pkg/volume/downwardapi"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
+	"k8s.io/kubernetes/pkg/volume/fc"
+	"k8s.io/kubernetes/pkg/volume/flexvolume"
+	"k8s.io/kubernetes/pkg/volume/flocker"
+	"k8s.io/kubernetes/pkg/volume/gcepd"
+	"k8s.io/kubernetes/pkg/volume/git_repo"
+	"k8s.io/kubernetes/pkg/volume/glusterfs"
+	"k8s.io/kubernetes/pkg/volume/hostpath"
+	"k8s.io/kubernetes/pkg/volume/iscsi"
+	"k8s.io/kubernetes/pkg/volume/local"
+	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/portworx"
+	"k8s.io/kubernetes/pkg/volume/projected"
+	"k8s.io/kubernetes/pkg/volume/quobyte"
+	"k8s.io/kubernetes/pkg/volume/rbd"
+	"k8s.io/kubernetes/pkg/volume/scaleio"
+	"k8s.io/kubernetes/pkg/volume/secret"
+	"k8s.io/kubernetes/pkg/volume/storageos"
+	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
+
+	// Cloud providers
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
@@ -51,26 +64,41 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	// The list of plugins to probe is decided by the kubelet binary, not
 	// by dynamic linking or other "magic".  Plugins will be analyzed and
 	// initialized later.
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, empty_dir.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	//
+	// Kubelet does not currently need to configure volume plugins.
+	// If/when it does, see kube-controller-manager/app/plugins.go for example of using volume.VolumeConfig
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(volume.VolumeConfig{})...)
+	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, persistent_claim.ProbeVolumePlugins()...)
-
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cephfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
-// ProbeNetworkPlugins collects all compiled-in plugins
-func ProbeNetworkPlugins() []network.NetworkPlugin {
-	allPlugins := []network.NetworkPlugin{}
-
-	// for each existing plugin, add to the list
-	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins()...)
-
-	return allPlugins
+// GetDynamicPluginProber gets the probers of dynamically discoverable plugins
+// for kubelet.
+// Currently only Flexvolume plugins are dynamically discoverable.
+func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(pluginDir, runner)
 }

@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-scheduler
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-scheduler
+    image: k8s.gcr.io/kube-scheduler:34d0b8f8b31e27937327961528739bc9
+    command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/kube-scheduler --master=127.0.0.1:8080 --v=2 --leader-elect 1>>/var/log/kube-scheduler.log
+      2>&1
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 10251
+      initialDelaySeconds: 15
+      timeoutSeconds: 1
+    volumeMounts:
+    - mountPath: /var/log/kube-scheduler.log
+      name: logfile
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: default-token-s8ejd
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: /var/log/kube-scheduler.log
+      type: FileOrCreate
+    name: logfile

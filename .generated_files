@@ -1,0 +1,27 @@
+# Files that should be ignored by tools which do not want to consider generated
+# code.
+#
+# https://github.com/kubernetes/contrib/blob/master/mungegithub/mungers/size.go
+#
+# This file is a series of lines, each of the form:
+#     <type> <name>
+#
+# Type can be:
+#    path - an exact path to a single file
+#    file-name - an exact leaf filename, regardless of path
+#    path-prefix - a prefix match on the file path
+#    file-prefix - a prefix match of the leaf filename (no path)
+#    paths-from-repo - read a file from the repo and load file paths
+#
+
+file-prefix	zz_generated.
+
+file-name	BUILD
+file-name	types.generated.go
+file-name	generated.pb.go
+file-name	generated.proto
+file-name	types_swagger_doc_generated.go
+
+path-prefix	Godeps/
+path-prefix	vendor/
+path-prefix	pkg/generated/

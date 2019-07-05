@@ -1,0 +1,17 @@
+language: go
+
+go:
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
+
+env:
+  - GO111MODULE=on
+
+install:
+  - go get -v ./...
+  - go build ./...
+  - go get github.com/onsi/ginkgo
+  - go install github.com/onsi/ginkgo/ginkgo
+
+script: make test

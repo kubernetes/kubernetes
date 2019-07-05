@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,21 +18,36 @@ package cadvisor
 
 import (
 	"github.com/google/cadvisor/events"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
 type Interface interface {
-	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
-	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	MachineInfo() (*cadvisorApi.MachineInfo, error)
+	Start() error
+	DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error)
+	ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
+	SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
+	MachineInfo() (*cadvisorapi.MachineInfo, error)
 
-	VersionInfo() (*cadvisorApi.VersionInfo, error)
+	VersionInfo() (*cadvisorapi.VersionInfo, error)
 
-	// Returns usage information about the filesystem holding Docker images.
-	DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error)
+	// Returns usage information about the filesystem holding container images.
+	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 
-	// Get past events that have been detected and that fit the request.
-	GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error)
+	// Returns usage information about the root filesystem.
+	RootFsInfo() (cadvisorapiv2.FsInfo, error)
+
+	// Get events streamed through passedChannel that fit the request.
+	WatchEvents(request *events.Request) (*events.EventChannel, error)
+
+	// Get filesystem information for the filesystem that contains the given file.
+	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)
+}
+
+// ImageFsInfoProvider informs cAdvisor how to find imagefs for container images.
+type ImageFsInfoProvider interface {
+	// ImageFsInfoLabel returns the label cAdvisor should use to find the filesystem holding container images.
+	ImageFsInfoLabel() (string, error)
 }

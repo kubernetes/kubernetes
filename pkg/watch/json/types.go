@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // WatchEvent objects are streamed from the api server in response to a watch request.
@@ -31,23 +31,25 @@ import (
 // in the schema.
 type WatchEvent struct {
 	// The type of the watch event; added, modified, deleted, or error.
-	Type watch.EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"`
+	// +optional
+	Type watch.EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, BOOKMARK or ERROR"`
 
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
 	// For errors, it's an api.Status.
+	// +optional
 	Object runtime.RawExtension `json:"object,omitempty" description:"the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"`
 }
 
 // Object converts a watch.Event into an appropriately serializable JSON object
-func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
+func Object(encoder runtime.Encoder, event *watch.Event) (interface{}, error) {
 	obj, ok := event.Object.(runtime.Object)
 	if !ok {
 		return nil, fmt.Errorf("the event object cannot be safely converted to JSON: %v", reflect.TypeOf(event.Object).Name())
 	}
-	data, err := codec.Encode(obj)
+	data, err := runtime.Encode(encoder, obj)
 	if err != nil {
 		return nil, err
 	}
-	return &WatchEvent{event.Type, runtime.RawExtension{json.RawMessage(data)}}, nil
+	return &WatchEvent{event.Type, runtime.RawExtension{Raw: json.RawMessage(data)}}, nil
 }

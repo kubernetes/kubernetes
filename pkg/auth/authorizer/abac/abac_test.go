@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,15 @@ package abac
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 )
 
 func TestEmptyFile(t *testing.T) {
@@ -33,15 +38,15 @@ func TestEmptyFile(t *testing.T) {
 }
 
 func TestOneLineFileNoNewLine(t *testing.T) {
-	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "kind": "pods", "namespace":"ns1"}`)
+	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "resource": "pods", "namespace":"ns1"}`)
 	if err != nil {
 		t.Errorf("unable to read policy file: %v", err)
 	}
 }
 
 func TestTwoLineFile(t *testing.T) {
-	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "kind": "pods"}
-{"user":"scheduler",  "readonly": true, "kind": "services"}
+	_, err := newWithContents(t, `{"user":"scheduler",  "readonly": true, "resource": "pods"}
+{"user":"scheduler",  "readonly": true, "resource": "services"}
 `)
 	if err != nil {
 		t.Errorf("unable to read policy file: %v", err)
@@ -56,77 +61,400 @@ func TestExampleFile(t *testing.T) {
 	}
 }
 
-func NotTestAuthorize(t *testing.T) {
-	a, err := newWithContents(t, `{                     "readonly": true, "kind": "events"}
-{"user":"scheduler",  "readonly": true, "kind": "pods"}
-{"user":"scheduler",              "kind": "bindings"}
-{"user":"kubelet",    "readonly": true, "kind": "bindings"}
-{"user":"kubelet",                "kind": "events"}
-{"user":"alice",                                     "ns": "projectCaribou"}
-{"user":"bob",        "readonly": true,                    "ns": "projectCaribou"}
+func TestAuthorizeV0(t *testing.T) {
+	a, err := newWithContents(t, `{                    "readonly": true, "resource": "events"   }
+{"user":"scheduler", "readonly": true, "resource": "pods"     }
+{"user":"scheduler",                   "resource": "bindings" }
+{"user":"kubelet",   "readonly": true, "resource": "bindings" }
+{"user":"kubelet",                     "resource": "events"   }
+{"user":"alice",                                              "namespace": "projectCaribou"}
+{"user":"bob",       "readonly": true,                        "namespace": "projectCaribou"}
 `)
 	if err != nil {
 		t.Fatalf("unable to read policy file: %v", err)
 	}
 
-	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1"}
-	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3"}
-	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5"}
+	authenticatedGroup := []string{user.AllAuthenticated}
+
+	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1", Groups: authenticatedGroup}
+	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3", Groups: authenticatedGroup}
+	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5", Groups: authenticatedGroup}
 
 	testCases := []struct {
-		User        user.DefaultInfo
-		RO          bool
-		Resource    string
-		NS          string
-		ExpectAllow bool
+		User           user.DefaultInfo
+		Verb           string
+		Resource       string
+		NS             string
+		APIGroup       string
+		Path           string
+		ExpectDecision authorizer.Decision
 	}{
 		// Scheduler can read pods
-		{User: uScheduler, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: true},
-		{User: uScheduler, RO: true, Resource: "pods", NS: "", ExpectAllow: true},
+		{User: uScheduler, Verb: "list", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionAllow},
+		{User: uScheduler, Verb: "list", Resource: "pods", NS: "", ExpectDecision: authorizer.DecisionAllow},
 		// Scheduler cannot write pods
-		{User: uScheduler, RO: false, Resource: "pods", NS: "ns1", ExpectAllow: false},
-		{User: uScheduler, RO: false, Resource: "pods", NS: "", ExpectAllow: false},
+		{User: uScheduler, Verb: "create", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uScheduler, Verb: "create", Resource: "pods", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
 		// Scheduler can write bindings
-		{User: uScheduler, RO: true, Resource: "bindings", NS: "ns1", ExpectAllow: true},
-		{User: uScheduler, RO: true, Resource: "bindings", NS: "", ExpectAllow: true},
+		{User: uScheduler, Verb: "get", Resource: "bindings", NS: "ns1", ExpectDecision: authorizer.DecisionAllow},
+		{User: uScheduler, Verb: "get", Resource: "bindings", NS: "", ExpectDecision: authorizer.DecisionAllow},
 
 		// Alice can read and write anything in the right namespace.
-		{User: uAlice, RO: true, Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: true, Resource: "widgets", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: true, Resource: "", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: false, Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: false, Resource: "widgets", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: false, Resource: "", NS: "projectCaribou", ExpectAllow: true},
+		{User: uAlice, Verb: "get", Resource: "pods", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "get", Resource: "widgets", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "get", Resource: "", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "pods", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "widgets", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "foo", NS: "projectCaribou", APIGroup: "bar", ExpectDecision: authorizer.DecisionAllow},
 		// .. but not the wrong namespace.
-		{User: uAlice, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: false},
-		{User: uAlice, RO: true, Resource: "widgets", NS: "ns1", ExpectAllow: false},
-		{User: uAlice, RO: true, Resource: "", NS: "ns1", ExpectAllow: false},
+		{User: uAlice, Verb: "get", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uAlice, Verb: "get", Resource: "widgets", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uAlice, Verb: "get", Resource: "", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
 
 		// Chuck can read events, since anyone can.
-		{User: uChuck, RO: true, Resource: "events", NS: "ns1", ExpectAllow: true},
-		{User: uChuck, RO: true, Resource: "events", NS: "", ExpectAllow: true},
+		{User: uChuck, Verb: "get", Resource: "events", NS: "ns1", ExpectDecision: authorizer.DecisionAllow},
+		{User: uChuck, Verb: "get", Resource: "events", NS: "", ExpectDecision: authorizer.DecisionAllow},
 		// Chuck can't do other things.
-		{User: uChuck, RO: false, Resource: "events", NS: "ns1", ExpectAllow: false},
-		{User: uChuck, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: false},
-		{User: uChuck, RO: true, Resource: "floop", NS: "ns1", ExpectAllow: false},
+		{User: uChuck, Verb: "update", Resource: "events", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uChuck, Verb: "get", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uChuck, Verb: "get", Resource: "floop", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
 		// Chunk can't access things with no kind or namespace
-		// TODO: find a way to give someone access to miscelaneous endpoints, such as
-		// /healthz, /version, etc.
-		{User: uChuck, RO: true, Resource: "", NS: "", ExpectAllow: false},
+		{User: uChuck, Verb: "get", Path: "/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		attr := authorizer.AttributesRecord{
 			User:      &tc.User,
-			ReadOnly:  tc.RO,
+			Verb:      tc.Verb,
 			Resource:  tc.Resource,
 			Namespace: tc.NS,
+			APIGroup:  tc.APIGroup,
+			Path:      tc.Path,
+
+			ResourceRequest: len(tc.NS) > 0 || len(tc.Resource) > 0,
 		}
-		t.Logf("tc: %v -> attr %v", tc, attr)
-		err := a.Authorize(attr)
-		actualAllow := bool(err == nil)
-		if tc.ExpectAllow != actualAllow {
-			t.Errorf("Expected allowed=%v but actually allowed=%v, for case %v",
-				tc.ExpectAllow, actualAllow, tc)
+		decision, _, _ := a.Authorize(attr)
+		if tc.ExpectDecision != decision {
+			t.Logf("tc: %v -> attr %v", tc, attr)
+			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
+				i, tc.ExpectDecision, decision, tc)
+		}
+	}
+}
+
+func getResourceRules(infos []authorizer.ResourceRuleInfo) []authorizer.DefaultResourceRuleInfo {
+	rules := make([]authorizer.DefaultResourceRuleInfo, len(infos))
+	for i, info := range infos {
+		rules[i] = authorizer.DefaultResourceRuleInfo{
+			Verbs:         info.GetVerbs(),
+			APIGroups:     info.GetAPIGroups(),
+			Resources:     info.GetResources(),
+			ResourceNames: info.GetResourceNames(),
+		}
+	}
+	return rules
+}
+
+func getNonResourceRules(infos []authorizer.NonResourceRuleInfo) []authorizer.DefaultNonResourceRuleInfo {
+	rules := make([]authorizer.DefaultNonResourceRuleInfo, len(infos))
+	for i, info := range infos {
+		rules[i] = authorizer.DefaultNonResourceRuleInfo{
+			Verbs:           info.GetVerbs(),
+			NonResourceURLs: info.GetNonResourceURLs(),
+		}
+	}
+	return rules
+}
+
+func TestRulesFor(t *testing.T) {
+	a, err := newWithContents(t, `
+{                    "readonly": true, "resource": "events"   }
+{"user":"scheduler", "readonly": true, "resource": "pods"     }
+{"user":"scheduler",                   "resource": "bindings" }
+{"user":"kubelet",   "readonly": true, "resource": "pods"     }
+{"user":"kubelet",                     "resource": "events"   }
+{"user":"alice",                                              "namespace": "projectCaribou"}
+{"user":"bob",       "readonly": true,                        "namespace": "projectCaribou"}
+{"user":"bob",       "readonly": true,                                                     "nonResourcePath": "*"}
+{"group":"a",                          "resource": "bindings" }
+{"group":"b",        "readonly": true,                                                     "nonResourcePath": "*"}
+`)
+	if err != nil {
+		t.Fatalf("unable to read policy file: %v", err)
+	}
+
+	authenticatedGroup := []string{user.AllAuthenticated}
+
+	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1", Groups: authenticatedGroup}
+	uKubelet := user.DefaultInfo{Name: "kubelet", UID: "uid2", Groups: []string{"a", "b"}}
+	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3", Groups: authenticatedGroup}
+	uBob := user.DefaultInfo{Name: "bob", UID: "uid4", Groups: authenticatedGroup}
+	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5", Groups: []string{"a", "b"}}
+
+	testCases := []struct {
+		User                   user.DefaultInfo
+		Namespace              string
+		ExpectResourceRules    []authorizer.DefaultResourceRuleInfo
+		ExpectNonResourceRules []authorizer.DefaultNonResourceRuleInfo
+	}{
+		{
+			User:      uScheduler,
+			Namespace: "ns1",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"pods"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"bindings"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{},
+		},
+		{
+			User:      uKubelet,
+			Namespace: "ns1",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"pods"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"bindings"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get", "list", "watch"},
+					NonResourceURLs: []string{"*"},
+				},
+			},
+		},
+		{
+			User:      uAlice,
+			Namespace: "projectCaribou",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{},
+		},
+		{
+			User:      uBob,
+			Namespace: "projectCaribou",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get", "list", "watch"},
+					NonResourceURLs: []string{"*"},
+				},
+			},
+		},
+		{
+			User:      uChuck,
+			Namespace: "ns1",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"bindings"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get", "list", "watch"},
+					NonResourceURLs: []string{"*"},
+				},
+			},
+		},
+	}
+	for i, tc := range testCases {
+		attr := authorizer.AttributesRecord{
+			User:      &tc.User,
+			Namespace: tc.Namespace,
+		}
+		resourceRules, nonResourceRules, _, _ := a.RulesFor(attr.GetUser(), attr.GetNamespace())
+		actualResourceRules := getResourceRules(resourceRules)
+		if !reflect.DeepEqual(tc.ExpectResourceRules, actualResourceRules) {
+			t.Logf("tc: %v -> attr %v", tc, attr)
+			t.Errorf("%d: Expected: \n%#v\n but actual: \n%#v\n",
+				i, tc.ExpectResourceRules, actualResourceRules)
+		}
+		actualNonResourceRules := getNonResourceRules(nonResourceRules)
+		if !reflect.DeepEqual(tc.ExpectNonResourceRules, actualNonResourceRules) {
+			t.Logf("tc: %v -> attr %v", tc, attr)
+			t.Errorf("%d: Expected: \n%#v\n but actual: \n%#v\n",
+				i, tc.ExpectNonResourceRules, actualNonResourceRules)
+		}
+	}
+}
+
+func TestAuthorizeV1beta1(t *testing.T) {
+	a, err := newWithContents(t,
+		`
+		 # Comment line, after a blank line
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",         "readonly": true,                                                        "nonResourcePath": "/api"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",                                                                                  "nonResourcePath": "/custom"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",                                                                                  "nonResourcePath": "/root/*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"noresource",                                                                         "nonResourcePath": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",         "readonly": true, "resource": "events",   "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"scheduler", "readonly": true, "resource": "pods",     "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"scheduler",                   "resource": "bindings", "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"kubelet",   "readonly": true, "resource": "bindings", "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"kubelet",                     "resource": "events",   "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"alice",                       "resource": "*",        "namespace": "projectCaribou"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"bob",       "readonly": true, "resource": "*",        "namespace": "projectCaribou"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"debbie",                      "resource": "pods",     "namespace": "projectCaribou"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectAnyGroup",   "apiGroup": "*"}}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectEmptyGroup", "apiGroup": "" }}
+		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectXGroup",     "apiGroup": "x"}}`)
+
+	if err != nil {
+		t.Fatalf("unable to read policy file: %v", err)
+	}
+
+	authenticatedGroup := []string{user.AllAuthenticated}
+
+	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1", Groups: authenticatedGroup}
+	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3", Groups: authenticatedGroup}
+	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5", Groups: authenticatedGroup}
+	uDebbie := user.DefaultInfo{Name: "debbie", UID: "uid6", Groups: authenticatedGroup}
+	uNoResource := user.DefaultInfo{Name: "noresource", UID: "uid7", Groups: authenticatedGroup}
+	uAPIGroup := user.DefaultInfo{Name: "apigroupuser", UID: "uid8", Groups: authenticatedGroup}
+
+	testCases := []struct {
+		User           user.DefaultInfo
+		Verb           string
+		Resource       string
+		APIGroup       string
+		NS             string
+		Path           string
+		ExpectDecision authorizer.Decision
+	}{
+		// Scheduler can read pods
+		{User: uScheduler, Verb: "list", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionAllow},
+		{User: uScheduler, Verb: "list", Resource: "pods", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		// Scheduler cannot write pods
+		{User: uScheduler, Verb: "create", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uScheduler, Verb: "create", Resource: "pods", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
+		// Scheduler can write bindings
+		{User: uScheduler, Verb: "get", Resource: "bindings", NS: "ns1", ExpectDecision: authorizer.DecisionAllow},
+		{User: uScheduler, Verb: "get", Resource: "bindings", NS: "", ExpectDecision: authorizer.DecisionAllow},
+
+		// Alice can read and write anything in the right namespace.
+		{User: uAlice, Verb: "get", Resource: "pods", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "get", Resource: "widgets", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "get", Resource: "", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "pods", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "widgets", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAlice, Verb: "update", Resource: "", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+		// .. but not the wrong namespace.
+		{User: uAlice, Verb: "get", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uAlice, Verb: "get", Resource: "widgets", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uAlice, Verb: "get", Resource: "", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+
+		// Debbie can write to pods in the right namespace
+		{User: uDebbie, Verb: "update", Resource: "pods", NS: "projectCaribou", ExpectDecision: authorizer.DecisionAllow},
+
+		// Chuck can read events, since anyone can.
+		{User: uChuck, Verb: "get", Resource: "events", NS: "ns1", ExpectDecision: authorizer.DecisionAllow},
+		{User: uChuck, Verb: "get", Resource: "events", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		// Chuck can't do other things.
+		{User: uChuck, Verb: "update", Resource: "events", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uChuck, Verb: "get", Resource: "pods", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uChuck, Verb: "get", Resource: "floop", NS: "ns1", ExpectDecision: authorizer.DecisionNoOpinion},
+		// Chuck can't access things with no resource or namespace
+		{User: uChuck, Verb: "get", Path: "/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
+		// but can access /api
+		{User: uChuck, Verb: "get", Path: "/api", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		// though he cannot write to it
+		{User: uChuck, Verb: "create", Path: "/api", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
+		// while he can write to /custom
+		{User: uChuck, Verb: "update", Path: "/custom", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		// he cannot get "/root"
+		{User: uChuck, Verb: "get", Path: "/root", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
+		// but can get any subpath
+		{User: uChuck, Verb: "get", Path: "/root/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		{User: uChuck, Verb: "get", Path: "/root/test/1/2/3", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+
+		// the user "noresource" can get any non-resource request
+		{User: uNoResource, Verb: "get", Path: "", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		{User: uNoResource, Verb: "get", Path: "/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		{User: uNoResource, Verb: "get", Path: "/foo/bar/baz", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
+		// but cannot get any request where IsResourceRequest() == true
+		{User: uNoResource, Verb: "get", Path: "/", Resource: "", NS: "bar", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uNoResource, Verb: "get", Path: "/foo/bar/baz", Resource: "foo", NS: "bar", ExpectDecision: authorizer.DecisionNoOpinion},
+
+		// Test APIGroup matching
+		{User: uAPIGroup, Verb: "get", APIGroup: "x", Resource: "foo", NS: "projectAnyGroup", ExpectDecision: authorizer.DecisionAllow},
+		{User: uAPIGroup, Verb: "get", APIGroup: "x", Resource: "foo", NS: "projectEmptyGroup", ExpectDecision: authorizer.DecisionNoOpinion},
+		{User: uAPIGroup, Verb: "get", APIGroup: "x", Resource: "foo", NS: "projectXGroup", ExpectDecision: authorizer.DecisionAllow},
+	}
+	for i, tc := range testCases {
+		attr := authorizer.AttributesRecord{
+			User:            &tc.User,
+			Verb:            tc.Verb,
+			Resource:        tc.Resource,
+			APIGroup:        tc.APIGroup,
+			Namespace:       tc.NS,
+			ResourceRequest: len(tc.NS) > 0 || len(tc.Resource) > 0,
+			Path:            tc.Path,
+		}
+		// t.Logf("tc %2v: %v -> attr %v", i, tc, attr)
+		decision, _, _ := a.Authorize(attr)
+		if tc.ExpectDecision != decision {
+			t.Errorf("%d: Expected allowed=%v but actually allowed=%v, for case %+v & %+v",
+				i, tc.ExpectDecision, decision, tc, attr)
 		}
 	}
 }
@@ -134,116 +462,352 @@ func NotTestAuthorize(t *testing.T) {
 func TestSubjectMatches(t *testing.T) {
 	testCases := map[string]struct {
 		User        user.DefaultInfo
-		PolicyUser  string
-		PolicyGroup string
+		Policy      runtime.Object
 		ExpectMatch bool
 	}{
-		"empty policy matches unauthed user": {
-			User:        user.DefaultInfo{},
-			PolicyUser:  "",
-			PolicyGroup: "",
+		"v0 empty policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "",
+			},
+			ExpectMatch: false,
+		},
+		"v0 * user policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v0.Policy{
+				User:  "*",
+				Group: "",
+			},
+			ExpectMatch: false,
+		},
+		"v0 * group policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "*",
+			},
+			ExpectMatch: false,
+		},
+		"v0 empty policy matches authed user": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "",
+			},
 			ExpectMatch: true,
 		},
-		"empty policy matches authed user": {
-			User:        user.DefaultInfo{Name: "Foo"},
-			PolicyUser:  "",
-			PolicyGroup: "",
-			ExpectMatch: true,
-		},
-		"empty policy matches authed user with groups": {
-			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"a", "b"}},
-			PolicyUser:  "",
-			PolicyGroup: "",
-			ExpectMatch: true,
-		},
-
-		"user policy does not match unauthed user": {
-			User:        user.DefaultInfo{},
-			PolicyUser:  "Foo",
-			PolicyGroup: "",
-			ExpectMatch: false,
-		},
-		"user policy does not match different user": {
-			User:        user.DefaultInfo{Name: "Bar"},
-			PolicyUser:  "Foo",
-			PolicyGroup: "",
-			ExpectMatch: false,
-		},
-		"user policy is case-sensitive": {
-			User:        user.DefaultInfo{Name: "foo"},
-			PolicyUser:  "Foo",
-			PolicyGroup: "",
-			ExpectMatch: false,
-		},
-		"user policy does not match substring": {
-			User:        user.DefaultInfo{Name: "FooBar"},
-			PolicyUser:  "Foo",
-			PolicyGroup: "",
-			ExpectMatch: false,
-		},
-		"user policy matches username": {
-			User:        user.DefaultInfo{Name: "Foo"},
-			PolicyUser:  "Foo",
-			PolicyGroup: "",
+		"v0 empty policy matches authed user with groups": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"a", "b", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "",
+			},
 			ExpectMatch: true,
 		},
 
-		"group policy does not match unauthed user": {
-			User:        user.DefaultInfo{},
-			PolicyUser:  "",
-			PolicyGroup: "Foo",
+		"v0 user policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "",
+			},
 			ExpectMatch: false,
 		},
-		"group policy does not match user in different group": {
-			User:        user.DefaultInfo{Name: "FooBar", Groups: []string{"B"}},
-			PolicyUser:  "",
-			PolicyGroup: "A",
+		"v0 user policy does not match different user": {
+			User: user.DefaultInfo{Name: "Bar", Groups: []string{user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "",
+			},
 			ExpectMatch: false,
 		},
-		"group policy is case-sensitive": {
-			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
-			PolicyUser:  "",
-			PolicyGroup: "b",
+		"v0 user policy is case-sensitive": {
+			User: user.DefaultInfo{Name: "foo", Groups: []string{user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "",
+			},
 			ExpectMatch: false,
 		},
-		"group policy does not match substring": {
-			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "BBB", "C"}},
-			PolicyUser:  "",
-			PolicyGroup: "B",
+		"v0 user policy does not match substring": {
+			User: user.DefaultInfo{Name: "FooBar", Groups: []string{user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "",
+			},
 			ExpectMatch: false,
 		},
-		"group policy matches user in group": {
-			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
-			PolicyUser:  "",
-			PolicyGroup: "B",
+		"v0 user policy matches username": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "",
+			},
 			ExpectMatch: true,
 		},
 
-		"user and group policy requires user match": {
-			User:        user.DefaultInfo{Name: "Bar", Groups: []string{"A", "B", "C"}},
-			PolicyUser:  "Foo",
-			PolicyGroup: "B",
+		"v0 group policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "Foo",
+			},
 			ExpectMatch: false,
 		},
-		"user and group policy requires group match": {
-			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
-			PolicyUser:  "Foo",
-			PolicyGroup: "D",
+		"v0 group policy does not match user in different group": {
+			User: user.DefaultInfo{Name: "FooBar", Groups: []string{"B", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "A",
+			},
 			ExpectMatch: false,
 		},
-		"user and group policy matches": {
-			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
-			PolicyUser:  "Foo",
-			PolicyGroup: "B",
+		"v0 group policy is case-sensitive": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "b",
+			},
+			ExpectMatch: false,
+		},
+		"v0 group policy does not match substring": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "BBB", "C", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "B",
+			},
+			ExpectMatch: false,
+		},
+		"v0 group policy matches user in group": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "",
+				Group: "B",
+			},
+			ExpectMatch: true,
+		},
+
+		"v0 user and group policy requires user match": {
+			User: user.DefaultInfo{Name: "Bar", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "B",
+			},
+			ExpectMatch: false,
+		},
+		"v0 user and group policy requires group match": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "D",
+			},
+			ExpectMatch: false,
+		},
+		"v0 user and group policy matches": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v0.Policy{
+				User:  "Foo",
+				Group: "B",
+			},
+			ExpectMatch: true,
+		},
+
+		"v1 empty policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 * user policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "*",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 * group policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "*",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 empty policy does not match authed user": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 empty policy does not match authed user with groups": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"a", "b", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+
+		"v1 user policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 user policy does not match different user": {
+			User: user.DefaultInfo{Name: "Bar", Groups: []string{user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 user policy is case-sensitive": {
+			User: user.DefaultInfo{Name: "foo", Groups: []string{user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 user policy does not match substring": {
+			User: user.DefaultInfo{Name: "FooBar", Groups: []string{user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 user policy matches username": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "",
+				},
+			},
+			ExpectMatch: true,
+		},
+
+		"v1 group policy does not match unauthed user": {
+			User: user.DefaultInfo{Name: "system:anonymous", Groups: []string{"system:unauthenticated"}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "Foo",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 group policy does not match user in different group": {
+			User: user.DefaultInfo{Name: "FooBar", Groups: []string{"B", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "A",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 group policy is case-sensitive": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "b",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 group policy does not match substring": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "BBB", "C", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "B",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 group policy matches user in group": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "",
+					Group: "B",
+				},
+			},
+			ExpectMatch: true,
+		},
+
+		"v1 user and group policy requires user match": {
+			User: user.DefaultInfo{Name: "Bar", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "B",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 user and group policy requires group match": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "D",
+				},
+			},
+			ExpectMatch: false,
+		},
+		"v1 user and group policy matches": {
+			User: user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C", user.AllAuthenticated}},
+			Policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:  "Foo",
+					Group: "B",
+				},
+			},
 			ExpectMatch: true,
 		},
 	}
 
 	for k, tc := range testCases {
+		policy := &abac.Policy{}
+		if err := abac.Scheme.Convert(tc.Policy, policy, nil); err != nil {
+			t.Errorf("%s: error converting: %v", k, err)
+			continue
+		}
 		attr := authorizer.AttributesRecord{
 			User: &tc.User,
 		}
-		actualMatch := policy{User: tc.PolicyUser, Group: tc.PolicyGroup}.subjectMatches(attr)
+		actualMatch := subjectMatches(*policy, attr.GetUser())
 		if tc.ExpectMatch != actualMatch {
 			t.Errorf("%v: Expected actorMatches=%v but actually got=%v",
 				k, tc.ExpectMatch, actualMatch)
@@ -251,7 +815,7 @@ func TestSubjectMatches(t *testing.T) {
 	}
 }
 
-func newWithContents(t *testing.T, contents string) (authorizer.Authorizer, error) {
+func newWithContents(t *testing.T, contents string) (PolicyList, error) {
 	f, err := ioutil.TempFile("", "abac_test")
 	if err != nil {
 		t.Fatalf("unexpected error creating policyfile: %v", err)
@@ -269,78 +833,436 @@ func newWithContents(t *testing.T, contents string) (authorizer.Authorizer, erro
 
 func TestPolicy(t *testing.T) {
 	tests := []struct {
-		policy  policy
+		policy  runtime.Object
 		attr    authorizer.Attributes
 		matches bool
 		name    string
 	}{
+		// v0 mismatches
 		{
-			policy:  policy{},
-			attr:    authorizer.AttributesRecord{},
-			matches: true,
-			name:    "null",
-		},
-		{
-			policy: policy{
+			policy: &v0.Policy{
 				Readonly: true,
 			},
-			attr:    authorizer.AttributesRecord{},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Verb: "create",
+			},
 			matches: false,
-			name:    "read-only mismatch",
+			name:    "v0 read-only mismatch",
 		},
 		{
-			policy: policy{
+			policy: &v0.Policy{
 				User: "foo",
 			},
 			attr: authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
-					Name: "bar",
+					Name:   "bar",
+					Groups: []string{user.AllAuthenticated},
 				},
 			},
 			matches: false,
-			name:    "user name mis-match",
+			name:    "v0 user name mis-match",
 		},
 		{
-			policy: policy{
+			policy: &v0.Policy{
 				Resource: "foo",
 			},
 			attr: authorizer.AttributesRecord{
-				Resource: "bar",
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Resource:        "bar",
+				ResourceRequest: true,
 			},
 			matches: false,
-			name:    "resource mis-match",
+			name:    "v0 resource mis-match",
 		},
 		{
-			policy: policy{
+			policy: &v0.Policy{
 				User:      "foo",
 				Resource:  "foo",
 				Namespace: "foo",
 			},
 			attr: authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
-					Name: "foo",
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
 				},
-				Resource:  "foo",
-				Namespace: "foo",
+				Resource:        "foo",
+				Namespace:       "foo",
+				ResourceRequest: true,
 			},
 			matches: true,
-			name:    "namespace mis-match",
+			name:    "v0 namespace mis-match",
+		},
+
+		// v0 matches
+		{
+			policy: &v0.Policy{},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v0 null resource",
 		},
 		{
-			policy: policy{
-				Namespace: "foo",
+			policy: &v0.Policy{
+				Readonly: true,
 			},
 			attr: authorizer.AttributesRecord{
-				Namespace: "bar",
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Verb: "get",
+			},
+			matches: true,
+			name:    "v0 read-only match",
+		},
+		{
+			policy: &v0.Policy{
+				User: "foo",
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+			},
+			matches: true,
+			name:    "v0 user name match",
+		},
+		{
+			policy: &v0.Policy{
+				Resource: "foo",
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Resource:        "foo",
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v0 resource match",
+		},
+
+		// v1 mismatches
+		{
+			policy: &v1beta1.Policy{},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				ResourceRequest: true,
 			},
 			matches: false,
-			name:    "resource mis-match",
+			name:    "v1 null",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User: "foo",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "bar",
+					Groups: []string{user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: false,
+			name:    "v1 user name mis-match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:     "*",
+					Readonly: true,
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: false,
+			name:    "v1 read-only mismatch",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:     "*",
+					Resource: "foo",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Resource:        "bar",
+				ResourceRequest: true,
+			},
+			matches: false,
+			name:    "v1 resource mis-match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:      "foo",
+					Namespace: "barr",
+					Resource:  "baz",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Namespace:       "bar",
+				Resource:        "baz",
+				ResourceRequest: true,
+			},
+			matches: false,
+			name:    "v1 namespace mis-match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:            "*",
+					NonResourcePath: "/api",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Path:            "/api2",
+				ResourceRequest: false,
+			},
+			matches: false,
+			name:    "v1 non-resource mis-match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:            "*",
+					NonResourcePath: "/api/*",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Path:            "/api2/foo",
+				ResourceRequest: false,
+			},
+			matches: false,
+			name:    "v1 non-resource wildcard subpath mis-match",
+		},
+
+		// v1 matches
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User: "foo",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 user match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User: "*",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 user wildcard match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					Group: "bar",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{"bar", user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 group match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					Group: "*",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{"bar", user.AllAuthenticated},
+				},
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 group wildcard match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:     "*",
+					Readonly: true,
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Verb:            "get",
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 read-only match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:     "*",
+					Resource: "foo",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Resource:        "foo",
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 resource match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:      "foo",
+					Namespace: "bar",
+					Resource:  "baz",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Namespace:       "bar",
+				Resource:        "baz",
+				ResourceRequest: true,
+			},
+			matches: true,
+			name:    "v1 namespace match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:            "*",
+					NonResourcePath: "/api",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Path:            "/api",
+				ResourceRequest: false,
+			},
+			matches: true,
+			name:    "v1 non-resource match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:            "*",
+					NonResourcePath: "*",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Path:            "/api",
+				ResourceRequest: false,
+			},
+			matches: true,
+			name:    "v1 non-resource wildcard match",
+		},
+		{
+			policy: &v1beta1.Policy{
+				Spec: v1beta1.PolicySpec{
+					User:            "*",
+					NonResourcePath: "/api/*",
+				},
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "foo",
+					Groups: []string{user.AllAuthenticated},
+				},
+				Path:            "/api/foo",
+				ResourceRequest: false,
+			},
+			matches: true,
+			name:    "v1 non-resource wildcard subpath match",
 		},
 	}
 	for _, test := range tests {
-		matches := test.policy.matches(test.attr)
+		policy := &abac.Policy{}
+		if err := abac.Scheme.Convert(test.policy, policy, nil); err != nil {
+			t.Errorf("%s: error converting: %v", test.name, err)
+			continue
+		}
+		matches := matches(*policy, test.attr)
 		if test.matches != matches {
-			t.Errorf("unexpected value for %s, expected: %t, saw: %t", test.name, test.matches, matches)
+			t.Errorf("%s: expected: %t, saw: %t", test.name, test.matches, matches)
+			continue
 		}
 	}
 }

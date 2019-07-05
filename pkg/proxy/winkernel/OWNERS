@@ -1,0 +1,14 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- dineshgovindasamy
+- madhanrm
+- feiskyer
+- ksubrmnn
+reviewers:
+- dineshgovindasamy
+- madhanrm
+- feiskyer
+- ksubrmnn
+labels:
+- sig/network
