@@ -265,8 +265,8 @@ func computeAverage(sample []float64) float64 {
 }
 
 func computeQuantile(sample []float64, quantile float64) float64 {
-	gomega.Expect(sort.Float64sAreSorted(sample)).To(gomega.Equal(true))
-	gomega.Expect(quantile >= 0.0 && quantile <= 1.0).To(gomega.Equal(true))
+	framework.ExpectEqual(sort.Float64sAreSorted(sample), true)
+	framework.ExpectEqual(quantile >= 0.0 && quantile <= 1.0, true)
 	index := int(quantile*float64(len(sample))) - 1
 	if index < 0 {
 		return math.NaN()
@@ -488,7 +488,7 @@ var _ = SIGDescribe("Density", func() {
 		// Fail if there were some high-latency requests.
 		gomega.Expect(highLatencyRequests).NotTo(gomega.BeNumerically(">", 0), "There should be no high-latency requests")
 		// Fail if more than the allowed threshold of measurements were missing in the latencyTest.
-		gomega.Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(gomega.Equal(true))
+		framework.ExpectEqual(missingMeasurements <= MaxMissingPodStartupMeasurements, true)
 	})
 
 	options := framework.Options{
@@ -833,7 +833,7 @@ var _ = SIGDescribe("Density", func() {
 								if !ok {
 									e2elog.Logf("Failed to cast observed object to *v1.Pod.")
 								}
-								gomega.Expect(ok).To(gomega.Equal(true))
+								framework.ExpectEqual(ok, true)
 								go checkPod(p)
 							},
 							UpdateFunc: func(oldObj, newObj interface{}) {
@@ -841,7 +841,7 @@ var _ = SIGDescribe("Density", func() {
 								if !ok {
 									e2elog.Logf("Failed to cast observed object to *v1.Pod.")
 								}
-								gomega.Expect(ok).To(gomega.Equal(true))
+								framework.ExpectEqual(ok, true)
 								go checkPod(p)
 							},
 						},
