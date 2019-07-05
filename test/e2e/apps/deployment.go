@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -53,6 +54,9 @@ const (
 
 var (
 	nilRs *apps.ReplicaSet
+
+	// DeploymentGroupVersionResource identifies a Deployment resource.
+	DeploymentGroupVersionResource = schema.GroupVersionResource{Group: extensions.GroupName, Version: "v1beta1", Resource: "deployments"}
 )
 
 var _ = SIGDescribe("Deployment", func() {
@@ -509,6 +513,9 @@ func ensureReplicas(rs *apps.ReplicaSet, replicas int32) {
 // Then rollback the deployment to revision 10 (doesn't exist in history) should fail.
 // Finally, rollback current deployment (revision 4) to revision 4 should be no-op.
 func testRollbackDeployment(f *framework.Framework) {
+	// extensions/v1beta1 is deprecated, only testing if the server serves this api
+	framework.SkipIfMissingResource(f.DynamicClient, DeploymentGroupVersionResource, f.Namespace.Name)
+
 	ns := f.Namespace.Name
 	c := f.ClientSet
 	podName := "nginx"
