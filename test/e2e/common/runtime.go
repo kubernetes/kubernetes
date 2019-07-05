@@ -131,6 +131,8 @@ while true; do sleep 1; done
 		ginkgo.Context("on terminated container", func() {
 			rootUser := int64(0)
 			nonRootUser := int64(10000)
+			adminUserName := "ContainerAdministrator"
+			nonAdminUserName := "ContainerUser"
 
 			// Create and then terminate the container under defined PodPhase to verify if termination message matches the expected output. Lastly delete the created container.
 			matchTerminationMessage := func(container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
@@ -165,14 +167,19 @@ while true; do sleep 1; done
 
 			ginkgo.It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
 				// Cannot mount files in Windows Containers.
+				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
+				// container runtime on Windows, and when the WindowsRunAsUserName feature becomes available by default.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 					TerminationMessagePath: "/dev/termination-log",
-					SecurityContext: &v1.SecurityContext{
-						RunAsUser: &rootUser,
-					},
+					SecurityContext:        &v1.SecurityContext{},
+				}
+				if framework.NodeOSDistroIs("windows") {
+					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &adminUserName}
+				} else {
+					container.SecurityContext.RunAsUser = &rootUser
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
@@ -184,14 +191,19 @@ while true; do sleep 1; done
 				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
 			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
+				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
+				// container runtime on Windows, and when the WindowsRunAsUserName feature becomes available by default.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 					TerminationMessagePath: "/dev/termination-custom-log",
-					SecurityContext: &v1.SecurityContext{
-						RunAsUser: &nonRootUser,
-					},
+					SecurityContext:        &v1.SecurityContext{},
+				}
+				if framework.NodeOSDistroIs("windows") {
+					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &nonAdminUserName}
+				} else {
+					container.SecurityContext.RunAsUser = &nonRootUser
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
