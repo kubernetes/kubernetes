@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -341,7 +340,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// ClusterIP ServicePorts have no NodePort
 			for _, sp := range svcPorts {
-				gomega.Expect(sp.NodePort).To(gomega.Equal(int32(0)))
+				framework.ExpectEqual(sp.NodePort, int32(0))
 			}
 		})
 
