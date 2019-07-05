@@ -79,6 +79,9 @@ var _ TypeConverter = &typeConverter{}
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
 func NewTypeConverter(models proto.Models) (TypeConverter, error) {
+	if models == nil {
+		return DeducedTypeConverter{}, nil
+	}
 	parser, err := newGVKParser(models)
 	if err != nil {
 		return nil, err

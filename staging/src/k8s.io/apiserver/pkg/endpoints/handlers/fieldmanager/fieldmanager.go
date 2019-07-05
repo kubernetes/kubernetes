@@ -68,17 +68,22 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 // NewCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This doesn't use openapi models (and it doesn't support the
 // validation field right now).
-func NewCRDFieldManager(objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) *FieldManager {
+func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (*FieldManager, error) {
+	typeConverter, err := internal.NewTypeConverter(models)
+	if err != nil {
+		return nil, err
+	}
+
 	return &FieldManager{
-		typeConverter:   internal.DeducedTypeConverter{},
+		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewCRDVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
+			Converter: internal.NewCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
-	}
+	}, nil
 }
 
 // Update is used when the object has already been merged (non-apply
