@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "event_broadcaster.go",
         "event_recorder.go",
+        "fake.go",
         "interfaces.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/events",
