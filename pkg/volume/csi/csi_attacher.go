@@ -255,7 +255,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 
 		skip, err := c.plugin.skipAttach(driverName)
 		if err != nil {
-			klog.Error(log("Failed to check CSIDriver for %s: %s", driverName, err))
+			klog.Error(log("Failed to check CSIDriver for %s: %v", driverName, err))
 		} else {
 			if skip {
 				// This volume is not attachable, pretend it's attached
@@ -265,14 +265,14 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 		}
 
 		attachID := getAttachmentName(volumeHandle, driverName, string(nodeName))
-		klog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
+		klog.V(4).Info(log("probing attachment status for VolumeAttachment %s", attachID))
 		attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
 			attached[spec] = false
-			klog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%v: %v", attachID, err))
+			klog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%s: %v", attachID, err))
 			continue
 		}
-		klog.V(4).Info(log("attacher.VolumesAreAttached attachment [%v] has status.attached=%t", attachID, attach.Status.Attached))
+		klog.V(4).Info(log("attacher.VolumesAreAttached attachment [%s] has status.attached=%t", attachID, attach.Status.Attached))
 		attached[spec] = attach.Status.Attached
 	}
 
