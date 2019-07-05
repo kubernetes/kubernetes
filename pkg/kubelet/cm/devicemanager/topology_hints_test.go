@@ -40,15 +40,15 @@ func TestGetTopologyHints(t *testing.T) {
 			name:   "Socket Affinity include 0, 1, 0 and 1",
 			amount: 1,
 			expectedHints: []topologymanager.TopologyHint{
-				topologymanager.TopologyHint{
+				{
 					SocketAffinity: firstSocketMask,
 					Preferred:      true,
 				},
-				topologymanager.TopologyHint{
+				{
 					SocketAffinity: secondSocketMask,
 					Preferred:      true,
 				},
-				topologymanager.TopologyHint{
+				{
 					SocketAffinity: crossSocketMask,
 					Preferred:      false,
 				},
@@ -58,7 +58,7 @@ func TestGetTopologyHints(t *testing.T) {
 			name:   "Socket Mask includes {1, 1}",
 			amount: 2,
 			expectedHints: []topologymanager.TopologyHint{
-				topologymanager.TopologyHint{
+				{
 					SocketAffinity: crossSocketMask,
 					Preferred:      false,
 				},

@@ -645,45 +645,48 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
 
+	allocated := available.UnsortedList()[:needed]
+
 	//Get Topology Mask for pod/container here, check available against devices to get devices that have the same socket and update available to these
 	containerTopologyHint := m.topologyAffinityStore.GetAffinity(podUID, contName)
-	klog.Infof("Topology Affinities for pod %v container %v are: %v", podUID, contName, containerTopologyHint)
+	if containerTopologyHint.SocketAffinity != nil {
+		klog.Infof("Topology Affinities for pod %v container %v are: %v", podUID, contName, containerTopologyHint)
 
-	allocated := available.UnsortedList()[:needed]
-	availableTopologyAligned := available
+		availableTopologyAligned := available
 
-	sockets := make(map[int]bool)
-	socketsArray := containerTopologyHint.SocketAffinity.GetSockets()
-	for _, socket := range socketsArray {
-		sockets[socket] = true
-	}
-
-	topologyAligned := false
-	for _, device := range allDevices[resource] {
-		topology := device.Topology
-		if topology != nil {
-			topologyAligned = true
+		sockets := make(map[int]bool)
+		socketsArray := containerTopologyHint.SocketAffinity.GetSockets()
+		for _, socket := range socketsArray {
+			sockets[socket] = true
 		}
-	}
 
-	if topologyAligned {
-		for availID := range available {
-			for _, device := range allDevices[resource] {
-				if availID == device.ID {
-					if !sockets[int(device.Topology.Socket)] {
-						delete(availableTopologyAligned, availID)
+		topologyAligned := false
+		for _, device := range allDevices[resource] {
+			topology := device.Topology
+			if topology != nil {
+				topologyAligned = true
+			}
+		}
+
+		if topologyAligned {
+			for availID := range available {
+				for _, device := range allDevices[resource] {
+					if availID == device.ID {
+						if !sockets[int(device.Topology.Socket)] {
+							delete(availableTopologyAligned, availID)
+						}
+						break
 					}
-					break
 				}
 			}
 		}
-	}
 
-	if int(availableTopologyAligned.Len()) < needed {
-		klog.Infof("[devicemanager] Requested number of devices unavailable in an Topology Aligned Manner for %s. Choosing arbitrary free devices.", resource)
-	} else {
-		klog.Infof("[devicemanager] Chosing Topology Aligned Devices for %s.", resource)
-		allocated = availableTopologyAligned.UnsortedList()[:needed]
+		if int(availableTopologyAligned.Len()) < needed {
+			klog.Infof("[devicemanager] Requested number of devices unavailable in an Topology Aligned Manner for %s. Choosing arbitrary free devices.", resource)
+		} else {
+			klog.Infof("[devicemanager] Chosing Topology Aligned Devices for %s.", resource)
+			allocated = availableTopologyAligned.UnsortedList()[:needed]
+		}
 	}
 	// Updates m.allocatedDevices with allocated devices to prevent them
 	// from being allocated to other pods/containers, given that we are

@@ -8,7 +8,7 @@ go_library(
         "manager.go",
         "manager_stub.go",
         "pod_devices.go",
-        "topology.go",
+        "topology_hints.go",
         "types.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager",
