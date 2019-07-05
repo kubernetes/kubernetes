@@ -37,7 +37,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
@@ -78,7 +77,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			gomega.Expect(sa.Secrets).To(gomega.Equal(secrets))
+			framework.ExpectEqual(sa.Secrets, secrets)
 		}
 
 		// delete the referenced secret
@@ -116,7 +115,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			gomega.Expect(sa.Secrets).To(gomega.Equal(secrets))
+			framework.ExpectEqual(sa.Secrets, secrets)
 		}
 
 		// delete the reference from the service account
@@ -156,7 +155,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			gomega.Expect(sa.Secrets).To(gomega.Equal(secrets))
+			framework.ExpectEqual(sa.Secrets, secrets)
 		}
 	})
 
@@ -234,19 +233,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 
 		// CA and namespace should be identical
-		gomega.Expect(mountedCA).To(gomega.Equal(rootCAContent))
-		gomega.Expect(mountedNamespace).To(gomega.Equal(f.Namespace.Name))
+		framework.ExpectEqual(mountedCA, rootCAContent)
+		framework.ExpectEqual(mountedNamespace, f.Namespace.Name)
 		// Token should be a valid credential that identifies the pod's service account
 		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
 		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(tokenReview)
 		framework.ExpectNoError(err)
-		gomega.Expect(tokenReview.Status.Authenticated).To(gomega.Equal(true))
-		gomega.Expect(tokenReview.Status.Error).To(gomega.Equal(""))
-		gomega.Expect(tokenReview.Status.User.Username).To(gomega.Equal("system:serviceaccount:" + f.Namespace.Name + ":" + sa.Name))
+		framework.ExpectEqual(tokenReview.Status.Authenticated, true)
+		framework.ExpectEqual(tokenReview.Status.Error, "")
+		framework.ExpectEqual(tokenReview.Status.User.Username, "system:serviceaccount:"+f.Namespace.Name+":"+sa.Name)
 		groups := sets.NewString(tokenReview.Status.User.Groups...)
-		gomega.Expect(groups.Has("system:authenticated")).To(gomega.Equal(true), fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
-		gomega.Expect(groups.Has("system:serviceaccounts")).To(gomega.Equal(true), fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
-		gomega.Expect(groups.Has("system:serviceaccounts:"+f.Namespace.Name)).To(gomega.Equal(true), fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
+		framework.ExpectEqual(groups.Has("system:authenticated"), true, fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
+		framework.ExpectEqual(groups.Has("system:serviceaccounts"), true, fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
+		framework.ExpectEqual(groups.Has("system:serviceaccounts:"+f.Namespace.Name), true, fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
 	})
 
 	/*
