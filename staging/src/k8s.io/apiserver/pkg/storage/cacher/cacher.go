@@ -346,6 +346,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
 
+	go watchCache.Run()
 	go cacher.dispatchEvents()
 
 	cacher.stopWg.Add(1)
@@ -359,6 +360,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 				}
 			}, time.Second, stopCh,
 		)
+		watchCache.Stop()
 	}()
 
 	return cacher

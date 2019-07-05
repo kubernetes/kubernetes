@@ -40,6 +40,10 @@ const (
 	// before terminating request and returning Timeout error with retry
 	// after suggestion.
 	blockTimeout = 3 * time.Second
+	// To increase throughput of watchCacher we introduce a buffer between
+	// logic of updating the cache and deliver events.
+	// TODO: Revisit if 100 is the right value here.
+	eventHandlerBufferSize = 100
 )
 
 // watchCacheEvent is a single "watch event" that is send to users of
@@ -127,6 +131,9 @@ type watchCache struct {
 	// and additionally gets the previous value of the object.
 	eventHandler func(*watchCacheEvent)
 
+	// Buffer of events that has to be deliever to the registered eventHandler.
+	eventHandlerBuffer chan *watchCacheEvent
+
 	// for testing timeouts.
 	clock clock.Clock
 
@@ -151,11 +158,26 @@ func newWatchCache(
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
+		eventHandlerBuffer:  make(chan *watchCacheEvent, eventHandlerBufferSize),
 		clock:               clock.RealClock{},
 		versioner:           versioner,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
+}
+
+func (w *watchCache) Run() {
+	if w.eventHandler != nil {
+		go w.deliverEvents()
+	}
+}
+
+func (w *watchCache) Stop() {
+	// Close the eventHandlerBuffer, which will result in stopping the
+	// deliverEvents goroutine (if started previously).
+	if w.eventHandler != nil {
+		close(w.eventHandlerBuffer)
+	}
 }
 
 // Add takes runtime.Object as an argument.
@@ -256,16 +278,23 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return err
 	}
 
-	// Avoid calling event handler under lock.
-	// This is safe as long as there is at most one call to processEvent in flight
-	// at any point in time.
+	// We need to deliver events to the handler in the order.
+	// It is safe to not do that under lock as long as there is at most one call
+	// to processEvent in flight at any point in time.
 	if w.eventHandler != nil {
-		w.eventHandler(watchCacheEvent)
+		w.eventHandlerBuffer <- watchCacheEvent
 	}
 	return nil
 }
 
-// Assumes that lock is already held for write.
+// deliverHandler delivers watchEvent to external handler.
+func (w *watchCache) deliverEvents() {
+	for event := range w.eventHandlerBuffer {
+		w.eventHandler(event)
+	}
+}
+
+// updateCache assumes that lock is already held for write.
 func (w *watchCache) updateCache(event *watchCacheEvent) {
 	if w.endIndex == w.startIndex+w.capacity {
 		// Cache is full - remove the oldest element.
