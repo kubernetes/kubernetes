@@ -1354,7 +1354,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "9012",
 				},
 			},
-			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test] from the EnvFrom secret test/test-secret were already defined by other configMap or secret. Use test/test-secret.",
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test] were defined from multiple configMap/secret.",
 		},
 		{
 			name:               "secret",
