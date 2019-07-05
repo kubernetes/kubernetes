@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -68,6 +70,101 @@ values:
   numVal: 1
   boolVal: true
   stringVal: "1"`, apiVersion, kind))
+	_, err = rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name("mytest").
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw()
+	if err == nil {
+		t.Fatal("Expected failure to patch with apply patch type")
+	}
+}
+
+func TestApplyWithValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+
+	var c apiextensionsv1beta1.CustomResourceValidation
+	err = yaml.Unmarshal([]byte(`
+openAPIV3Schema:
+  type: object
+  properties:
+    spec:
+      type: object
+      properties:
+        cronSpec:
+          type: string
+          pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$"
+        replicas:
+          type: integer
+          minimum: 1
+          maximum: 10
+        ports:
+          type: array
+          x-kubernetes-list-map-keys:
+          - containerPort
+          - protocol
+          x-kubernetes-list-type: map
+          items:
+            properties:
+              containerPort:
+                format: int32
+                type: integer
+              hostIP:
+                type: string
+              hostPort:
+                format: int32
+                type: integer
+              name:
+                type: string
+              protocol:
+                type: string
+            required:
+            - containerPort
+            type: object`), &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuDefinition.Spec.Validation = &c
+
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: mytest
+spec:
+  cronSpec: "* * * * */5"
+  replicas: 1
+  ports:
+  - name: x
+    containerPort: 80
+    protocol: TCP`, apiVersion, kind))
 	result, err := rest.Patch(types.ApplyPatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
@@ -81,7 +178,7 @@ values:
 	result, err = rest.Patch(types.MergePatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
-		Body([]byte(`{"values":{"numVal": 5}}`)).
+		Body([]byte(`{"spec":{"replicas": 5}}`)).
 		DoRaw()
 	if err != nil {
 		t.Fatal(err, string(result))
@@ -116,5 +213,4 @@ values:
 	if err != nil {
 		t.Fatal(err, string(result))
 	}
-
 }
