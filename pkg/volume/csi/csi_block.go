@@ -105,9 +105,10 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		klog.Infof(log("blockMapper.stageVolumeForBlock STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		return "", nil
 	}
-
-	publishVolumeInfo := attachment.Status.AttachmentMetadata
-
+	publishVolumeInfo := map[string]string{}
+	if attachment != nil {
+		publishVolumeInfo = attachment.Status.AttachmentMetadata
+	}
 	nodeStageSecrets := map[string]string{}
 	if csiSource.NodeStageSecretRef != nil {
 		nodeStageSecrets, err = getCredentialsFromSecret(m.k8s, csiSource.NodeStageSecretRef)
@@ -156,7 +157,10 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 ) (string, error) {
 	klog.V(4).Infof(log("blockMapper.publishVolumeForBlock called"))
 
-	publishVolumeInfo := attachment.Status.AttachmentMetadata
+	publishVolumeInfo := map[string]string{}
+	if attachment != nil {
+		publishVolumeInfo = attachment.Status.AttachmentMetadata
+	}
 
 	nodePublishSecrets := map[string]string{}
 	var err error
@@ -224,18 +228,23 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 		return "", err
 	}
 
-	// Search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
-	nodeName := string(m.plugin.host.GetNodeName())
-	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-	attachment, err := m.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	driverName := csiSource.Driver
+	skip, err := m.plugin.skipAttach(driverName)
 	if err != nil {
-		klog.Error(log("blockMapper.SetupDevice failed to get volume attachment [id=%v]: %v", attachID, err))
+		klog.Error(log("blockMapper.SetupDevice failed to check CSIDriver for %s: %v", driverName, err))
 		return "", err
 	}
 
-	if attachment == nil {
-		klog.Error(log("blockMapper.SetupDevice unable to find VolumeAttachment [id=%s]", attachID))
-		return "", errors.New("no existing VolumeAttachment found")
+	var attachment *storage.VolumeAttachment
+	if !skip {
+		// Search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
+		nodeName := string(m.plugin.host.GetNodeName())
+		attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
+		attachment, err = m.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		if err != nil {
+			klog.Error(log("blockMapper.SetupDevice failed to get volume attachment [id=%v]: %v", attachID, err))
+			return "", err
+		}
 	}
 
 	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
