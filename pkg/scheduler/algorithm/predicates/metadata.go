@@ -164,18 +164,20 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 
 	// use existingPodPriorityAffinityMap and incomingPodPriorityAffinityMap to calculate priority score for each node
 	nodeScore := make(map[string]int64, len(nodeNameToInfoMap))
-	for pair, value := range existingPodPriorityAffinityMap.pairToScore {
-		if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
-			for name := range nodeSet {
-				nodeScore[name] = nodeScore[name] + *value
+	if &pfactory.topologyInfo != nil && len(pfactory.topologyInfo) > 0 && existingPodPriorityAffinityMap != nil && incomingPodPriorityAffinityMap != nil {
+		for pair, value := range existingPodPriorityAffinityMap.pairToScore {
+			if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
+				for name := range nodeSet {
+					nodeScore[name] = nodeScore[name] + *value
+				}
 			}
 		}
-	}
 
-	for pair, value := range incomingPodPriorityAffinityMap.pairToScore {
-		if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
-			for name := range nodeSet {
-				nodeScore[name] = nodeScore[name] + *value
+		for pair, value := range incomingPodPriorityAffinityMap.pairToScore {
+			if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
+				for name := range nodeSet {
+					nodeScore[name] = nodeScore[name] + *value
+				}
 			}
 		}
 	}
@@ -199,9 +201,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 
 func newPairsMaps(topologyInfo *internalcache.NodeTopologyInfo) *pairsMaps {
 	var pm *pairsMaps
-	if topologyInfo == nil {
-		pm = &pairsMaps{pairToScore: make(map[internalcache.TopologyPair]*int64)}
-	} else {
+	if topologyInfo != nil && len(*topologyInfo) > 0 {
 		maps := make(map[internalcache.TopologyPair]*int64, len(*topologyInfo))
 		for pair := range *topologyInfo {
 			maps[pair] = new(int64)
@@ -212,11 +212,12 @@ func newPairsMaps(topologyInfo *internalcache.NodeTopologyInfo) *pairsMaps {
 }
 
 func (pairsMaps *pairsMaps) addTopologyPair(pair internalcache.TopologyPair, weight int64) {
-	if _, ok := pairsMaps.pairToScore[pair]; ok {
-		atomic.AddInt64(pairsMaps.pairToScore[pair], weight)
-	} else {
+	_, ok := pairsMaps.pairToScore[pair]
+	if !ok {
 		pairsMaps.pairToScore[pair] = new(int64)
+
 	}
+	atomic.AddInt64(pairsMaps.pairToScore[pair], weight)
 }
 
 // returns a pointer to a new topologyPairsMaps
@@ -487,64 +488,68 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 					}
 				}
 
-				terms = affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-				if len(terms) > 0 {
-					for _, term := range terms {
-						namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
-						selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
-						if err != nil {
-							catchError(err)
-							cancel()
-							return
-						}
-						if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-							if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
-								priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, -int64(term.Weight))
-							}
-						}
-
-					}
-
-				}
-			}
-
-			if affinity.PodAffinity != nil {
-				terms = affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-				if len(terms) > 0 {
-					for _, term := range terms {
-						namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
-						selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
-						if err != nil {
-							catchError(err)
-							cancel()
-							return
-						}
-						if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-							if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
-								priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
-							}
-						}
-
-					}
-				}
-
-				if hardPodAffinityWeight > 0 {
-					rterms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-					if len(rterms) > 0 {
-						for _, term := range rterms {
-							namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-							selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				if priorityTopologyMaps != nil {
+					terms = affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+					if len(terms) > 0 {
+						for _, term := range terms {
+							namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+							selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
 							if err != nil {
 								catchError(err)
 								cancel()
 								return
 							}
 							if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-								if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-									priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, int64(hardPodAffinityWeight))
+								if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+									priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, -int64(term.Weight))
 								}
 							}
 
+						}
+
+					}
+				}
+			}
+
+			if priorityTopologyMaps != nil {
+				if affinity.PodAffinity != nil {
+					terms = affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+					if len(terms) > 0 {
+						for _, term := range terms {
+							namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+							selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+							if err != nil {
+								catchError(err)
+								cancel()
+								return
+							}
+							if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+								if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+									priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+								}
+							}
+
+						}
+					}
+
+					if hardPodAffinityWeight > 0 {
+						rterms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+						if len(rterms) > 0 {
+							for _, term := range rterms {
+								namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+								selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+								if err != nil {
+									catchError(err)
+									cancel()
+									return
+								}
+								if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+									if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
+										priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, int64(hardPodAffinityWeight))
+									}
+								}
+
+							}
 						}
 					}
 				}
@@ -670,38 +675,40 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				}
 			}
 
-			// affinity
-			for _, term := range preferredAffinityTerms {
-				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
-				selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
-				if err != nil {
-					catchError(err)
-					cancel()
-					return
-				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
-					if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
-						priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+			if priorityTopologyMaps != nil {
+				// affinity
+				for _, term := range preferredAffinityTerms {
+					namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
+					selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+					if err != nil {
+						catchError(err)
+						cancel()
+						return
 					}
-				}
-
-			}
-
-			// antiAffinity
-			for _, term := range preferredAntiAffinityTerms {
-				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
-				selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
-				if err != nil {
-					catchError(err)
-					cancel()
-					return
-				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
-					if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
-						priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, -int64(term.Weight))
+					if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
+						if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+							priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+						}
 					}
+
 				}
 
+				// antiAffinity
+				for _, term := range preferredAntiAffinityTerms {
+					namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
+					selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+					if err != nil {
+						catchError(err)
+						cancel()
+						return
+					}
+					if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
+						if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+							priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, -int64(term.Weight))
+						}
+					}
+
+				}
 			}
 		}
 
