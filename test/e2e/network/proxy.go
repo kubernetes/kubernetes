@@ -312,7 +312,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 			serviceUnavailableErrors++
 		} else {
 			framework.ExpectNoError(err)
-			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
+			framework.ExpectEqual(status, http.StatusOK)
 			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}

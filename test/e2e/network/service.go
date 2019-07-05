@@ -317,12 +317,12 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("Retrieve sourceip from a pod on the same node")
 		sourceIP1, execPodIP1 := execSourceipTest(f, cs, ns, node1.Name, serviceIP, servicePort)
 		ginkgo.By("Verifying the preserved source ip")
-		gomega.Expect(sourceIP1).To(gomega.Equal(execPodIP1))
+		framework.ExpectEqual(sourceIP1, execPodIP1)
 
 		ginkgo.By("Retrieve sourceip from a pod on a different node")
 		sourceIP2, execPodIP2 := execSourceipTest(f, cs, ns, node2.Name, serviceIP, servicePort)
 		ginkgo.By("Verifying the preserved source ip")
-		gomega.Expect(sourceIP2).To(gomega.Equal(execPodIP2))
+		framework.ExpectEqual(sourceIP2, execPodIP2)
 	})
 
 	ginkgo.It("should be able to up and down services", func() {
@@ -1598,7 +1598,7 @@ var _ = SIGDescribe("Services", func() {
 			}
 			// should have the given static internal IP.
 			jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
-			gomega.Expect(framework.GetIngressPoint(lbIngress)).To(gomega.Equal(internalStaticIP))
+			framework.ExpectEqual(framework.GetIngressPoint(lbIngress), internalStaticIP)
 		}
 
 		ginkgo.By("switching to ClusterIP type to destroy loadbalancer")
@@ -1648,7 +1648,7 @@ var _ = SIGDescribe("Services", func() {
 		if err != nil {
 			e2elog.Failf("gceCloud.GetHttpHealthCheck(%q) = _, %v; want nil", hcName, err)
 		}
-		gomega.Expect(hc.CheckIntervalSec).To(gomega.Equal(gceHcCheckIntervalSeconds))
+		framework.ExpectEqual(hc.CheckIntervalSec, gceHcCheckIntervalSeconds)
 
 		ginkgo.By("modify the health check interval")
 		hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
