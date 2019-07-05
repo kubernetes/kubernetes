@@ -3989,7 +3989,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 	}
 }
 
-func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
+func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
 	t.Helper()
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
@@ -4024,7 +4024,7 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
+	status := expectAPIStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != metav1.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != metav1.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -4055,7 +4055,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
 	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
 	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
+	status := expectAPIStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
@@ -4109,7 +4109,7 @@ func TestCreateTimeout(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
+	itemOut := expectAPIStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
@@ -4287,12 +4287,12 @@ func TestDryRunDisabled(t *testing.T) {
 	}))
 	defer server.Close()
 	for _, test := range tests {
-		baseUrl := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseUrl+test.path, test.verb, test.data, test.contentType)
+		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
 		if response.StatusCode == http.StatusBadRequest {
 			t.Fatalf("unexpected BadRequest: %#v", response)
 		}
-		response = runRequest(t, baseUrl+test.path+"?dryRun", test.verb, test.data, test.contentType)
+		response = runRequest(t, baseURL+test.path+"?dryRun", test.verb, test.data, test.contentType)
 		if response.StatusCode != http.StatusBadRequest {
 			t.Fatalf("unexpected non BadRequest: %#v", response)
 		}
