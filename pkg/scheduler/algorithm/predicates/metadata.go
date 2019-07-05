@@ -183,10 +183,10 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	}
 
 	predicateMetadata := &predicateMetadata{
-		pod:                                    pod,
-		podBestEffort:                          isPodBestEffort(pod),
-		podRequest:                             GetResourceRequest(pod),
-		podPorts:                               schedutil.GetContainerPorts(pod),
+		pod:           pod,
+		podBestEffort: isPodBestEffort(pod),
+		podRequest:    GetResourceRequest(pod),
+		podPorts:      schedutil.GetContainerPorts(pod),
 		topologyPairsPotentialAffinityPods:     incomingPodPredicateAffinityMap,
 		topologyPairsPotentialAntiAffinityPods: incomingPodPredicateAntiAffinityMap,
 		topologyPairsAntiAffinityPodsMap:       existingPodPredicateAntiAffinityMap,
@@ -511,48 +511,47 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 				}
 			}
 
-			if priorityTopologyMaps != nil {
-				if affinity.PodAffinity != nil {
-					terms = affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-					if len(terms) > 0 {
-						for _, term := range terms {
-							namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
-							selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+			if priorityTopologyMaps != nil && affinity.PodAffinity != nil {
+				terms = affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+				if len(terms) > 0 {
+					for _, term := range terms {
+						namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+						selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+						if err != nil {
+							catchError(err)
+							cancel()
+							return
+						}
+						if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+							if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+								priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+							}
+						}
+
+					}
+				}
+
+				if hardPodAffinityWeight > 0 {
+					rterms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+					if len(rterms) > 0 {
+						for _, term := range rterms {
+							namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+							selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 							if err != nil {
 								catchError(err)
 								cancel()
 								return
 							}
 							if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-								if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
-									priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+								if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
+									priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, int64(hardPodAffinityWeight))
 								}
 							}
 
-						}
-					}
-
-					if hardPodAffinityWeight > 0 {
-						rterms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-						if len(rterms) > 0 {
-							for _, term := range rterms {
-								namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-								selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-								if err != nil {
-									catchError(err)
-									cancel()
-									return
-								}
-								if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-									if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-										priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, int64(hardPodAffinityWeight))
-									}
-								}
-
-							}
 						}
 					}
 				}
+
 			}
 
 			if len(nodeMaps.topologyPairToPods) > 0 {
