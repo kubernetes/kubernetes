@@ -31,7 +31,6 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -59,7 +58,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)
 		framework.ExpectNoError(err, "failed to query for limitRanges")
-		gomega.Expect(len(limitRanges.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(limitRanges.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: limitRanges.ListMeta.ResourceVersion,
