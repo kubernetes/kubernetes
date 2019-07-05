@@ -228,12 +228,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
 		// OpenAPIVersionedService and StaticOpenAPISpec are populated in generic apiserver PrepareRun().
-		// Together they serve the /openapi/v2 endpoint on a generic apiserver. A generic apiserver may
-		// choose to not enable OpenAPI by having null openAPIConfig, and thus OpenAPIVersionedService
-		// and StaticOpenAPISpec are both null. In that case we don't run the CRD OpenAPI controller.
-		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourcePublishOpenAPI) && s.GenericAPIServer.OpenAPIVersionedService != nil && s.GenericAPIServer.StaticOpenAPISpec != nil {
+		// Together they serve the /openapi/v2 endpoint on a generic apiserver.
+		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourcePublishOpenAPI) {
 			go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, context.StopCh)
 		}
+		crdHandler.SetStaticOpenAPISpec(s.GenericAPIServer.StaticOpenAPISpec)
 
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)

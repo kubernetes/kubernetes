@@ -40,6 +40,7 @@ import (
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -74,6 +75,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
@@ -117,6 +119,10 @@ type crdHandler struct {
 
 	// minRequestTimeout applies to CR's list/watch calls
 	minRequestTimeout time.Duration
+
+	// staticOpenAPISpec is the static apiextensions-apiserver OpenAPI spec,
+	// used to resolve ObjectMeta and other $refs in structural schemas.
+	staticOpenAPISpec *spec.Swagger
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -141,6 +147,9 @@ type crdInfo struct {
 	// storageVersion is the CRD version used when storing the object in etcd.
 	storageVersion string
 
+	// isStructural is true if structural validation schemas are provided
+	isStructural bool
+
 	waitGroup *utilwaitgroup.SafeWaitGroup
 }
 
@@ -160,7 +169,8 @@ func NewCustomResourceDefinitionHandler(
 	masterCount int,
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
-	minRequestTimeout time.Duration) (*crdHandler, error) {
+	minRequestTimeout time.Duration,
+) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -192,6 +202,12 @@ func NewCustomResourceDefinitionHandler(
 	ret.customStorage.Store(crdStorageMap{})
 
 	return ret, nil
+}
+
+func (r *crdHandler) SetStaticOpenAPISpec(spec *spec.Swagger) {
+	r.customStorageLock.Lock()
+	defer r.customStorageLock.Unlock()
+	r.staticOpenAPISpec = spec
 }
 
 // watches are expected to handle storage disruption gracefully,
@@ -314,7 +330,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		string(types.JSONPatchType),
 		string(types.MergePatchType),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && crdInfo.isStructural {
 		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 	}
 
@@ -578,6 +594,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
+	// we need the static OpenAPI spec to be available, which is asynchronous through the post-start-hooks
+	if r.staticOpenAPISpec == nil {
+		return nil, fmt.Errorf("handler is not ready to serve because the OpenAPI spec is not available")
+	}
+
 	// Get the up-to-date CRD when we have the lock, to avoid racing with updateCustomResourceDefinition.
 	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
 	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
@@ -604,6 +625,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 	equivalentResourceRegistry := runtime.NewEquivalentResourceRegistry()
 
+	isStructural := true
 	structuralSchemas := map[string]*structuralschema.Structural{}
 	for _, v := range crd.Spec.Versions {
 		val, err := apiextensions.GetSchemaForVersion(crd, v.Name)
@@ -612,12 +634,19 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			return nil, fmt.Errorf("the server could not properly serve the CR schema")
 		}
 		if val == nil {
+			isStructural = false
 			continue
 		}
 		structuralSchemas[v.Name], err = structuralschema.NewStructural(val.OpenAPIV3Schema)
+		if err != nil {
+			isStructural = false
+		}
 		if *crd.Spec.PreserveUnknownFields == false && err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
+		}
+		if err == nil && len(structuralschema.ValidateStructural(structuralSchemas[v.Name], nil)) > 0 {
+			isStructural = false
 		}
 	}
 
@@ -784,15 +813,29 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 			Authorizer: r.authorizer,
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			reqScope := *requestScopes[v.Name]
-			reqScope.FieldManager = fieldmanager.NewCRDFieldManager(
-				reqScope.Convertor,
-				reqScope.Defaulter,
-				reqScope.Kind.GroupVersion(),
-				reqScope.HubGroupVersion,
+
+		// set server-side-apply field manager, if the schema is structural
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && isStructural {
+			crdSpec, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true})
+			if err != nil {
+				return nil, err
+			}
+			merged := builder.MergeSpecs(r.staticOpenAPISpec, crdSpec)
+			model, err := utilopenapi.ToProtoModels(merged)
+			if err != nil {
+				return nil, err
+			}
+			mgr, err := fieldmanager.NewCRDFieldManager(
+				model,
+				requestScopes[v.Name].Convertor,
+				requestScopes[v.Name].Defaulter,
+				requestScopes[v.Name].Kind.GroupVersion(),
+				requestScopes[v.Name].HubGroupVersion,
 			)
-			requestScopes[v.Name] = &reqScope
+			if err != nil {
+				return nil, err
+			}
+			requestScopes[v.Name].FieldManager = mgr
 		}
 
 		// override scaleSpec subresource values
@@ -832,6 +875,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		statusRequestScopes: statusScopes,
 		storageVersion:      storageVersion,
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
+		isStructural:        isStructural,
 	}
 
 	// Copy because we cannot write to storageMap without a race
