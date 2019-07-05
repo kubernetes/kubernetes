@@ -132,7 +132,7 @@ func newProxyServer(
 		healthzUpdater = healthzServer
 	}
 
-	var proxier proxy.ProxyProvider
+	var proxier proxy.Provider
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
 	nodeIP := net.ParseIP(config.BindAddress)
