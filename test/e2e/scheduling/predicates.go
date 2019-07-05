@@ -38,11 +38,15 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
 
-const maxNumberOfPods int64 = 10
+const (
+	maxNumberOfPods int64 = 10
+	defaultTimeout        = 3 * time.Minute
+)
 
 var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
@@ -805,6 +809,27 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
+}
+
+// CreateNodeSelectorPods creates RC with host port 4321 and defines node selector
+func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) error {
+	ginkgo.By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
+
+	config := &testutils.RCConfig{
+		Client:       f.ClientSet,
+		Name:         id,
+		Namespace:    f.Namespace.Name,
+		Timeout:      defaultTimeout,
+		Image:        imageutils.GetPauseImageName(),
+		Replicas:     replicas,
+		HostPorts:    map[string]int{"port1": 4321},
+		NodeSelector: nodeSelector,
+	}
+	err := framework.RunRC(*config)
+	if expectRunning {
+		return err
+	}
+	return nil
 }
 
 // create pod which using hostport on the specified node according to the nodeSelector
