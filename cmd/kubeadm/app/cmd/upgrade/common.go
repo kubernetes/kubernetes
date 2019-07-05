@@ -50,7 +50,7 @@ func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsM
 
 	// If the version is specified in config file, pick up that value.
 	if flags.cfgPath != "" {
-		// Note that cfg isn't preserved here, it's just an one-off to populate userVersion based on --config
+		// Note that cfg isn't preserved here, it's just a one-off to populate userVersion based on --config
 		cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 		if err != nil {
 			return "", err

@@ -401,7 +401,7 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	klog.V(2).Infof("processing item %s", item.identity)
-	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
+	// "being deleted" is a one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
 		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
 		return nil

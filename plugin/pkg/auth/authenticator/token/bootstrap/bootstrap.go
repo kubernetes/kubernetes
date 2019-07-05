@@ -53,7 +53,7 @@ type TokenAuthenticator struct {
 	lister corev1listers.SecretNamespaceLister
 }
 
-// tokenErrorf prints a error message for a secret that has matched a bearer
+// tokenErrorf prints an error message for a secret that has matched a bearer
 // token but fails to meet some other criteria.
 //
 //    tokenErrorf(secret, "has invalid value for key %s", key)
