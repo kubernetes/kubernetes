@@ -24,65 +24,16 @@ go_library(
     srcs = [
         "fileutil.go",
         "lock.go",
+        "lock_plan9.go",
+        "lock_solaris.go",
+        "lock_unix.go",
+        "lock_windows.go",
+        "perallocate_unsupported.go",
+        "preallocate.go",
         "purge.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "lock_unix.go",
-            "preallocate.go",
-            "sync_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "lock_unix.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "lock_plan9.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "lock_solaris.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "lock_windows.go",
-            "perallocate_unsupported.go",
-            "sync.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "sync.go",
+        "sync_linux.go",
+    ],
     importpath = "k8s.io/kubernetes/third_party/forked/etcd237/pkg/fileutil",
     deps = [
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",

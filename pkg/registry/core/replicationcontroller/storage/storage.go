@@ -50,12 +50,11 @@ type ControllerStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) ControllerStorage {
 	controllerREST, statusREST := NewREST(optsGetter)
-	controllerRegistry := replicationcontroller.NewRegistry(controllerREST)
 
 	return ControllerStorage{
 		Controller: controllerREST,
 		Status:     statusREST,
-		Scale:      &ScaleREST{registry: controllerRegistry},
+		Scale:      &ScaleREST{store: controllerREST.Store},
 	}
 }
 
@@ -75,7 +74,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: replicationcontroller.Strategy,
 		DeleteStrategy: replicationcontroller.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicationcontroller.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -119,12 +118,14 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
 type ScaleREST struct {
-	registry replicationcontroller.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
@@ -146,22 +147,24 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	rc, err := r.registry.GetController(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), name)
 	}
+	rc := obj.(*api.ReplicationController)
 	return scaleFromRC(rc), nil
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	rc, err := r.registry.GetController(ctx, name, &metav1.GetOptions{})
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), name)
 	}
+	rc := obj.(*api.ReplicationController)
 
 	oldScale := scaleFromRC(rc)
 	// TODO: should this pass validation?
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -180,11 +183,35 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	rc.Spec.Replicas = scale.Spec.Replicas
 	rc.ResourceVersion = scale.ResourceVersion
-	rc, err = r.registry.UpdateController(ctx, rc, createValidation, updateValidation)
+	obj, _, err = r.store.Update(
+		ctx,
+		rc.Name,
+		rest.DefaultUpdatedObjectInfo(rc),
+		toScaleCreateValidation(createValidation),
+		toScaleUpdateValidation(updateValidation),
+		false,
+		options,
+	)
 	if err != nil {
 		return nil, false, err
 	}
+	rc = obj.(*api.ReplicationController)
 	return scaleFromRC(rc), false, nil
+}
+
+func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(obj runtime.Object) error {
+		return f(scaleFromRC(obj.(*api.ReplicationController)))
+	}
+}
+
+func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(obj, old runtime.Object) error {
+		return f(
+			scaleFromRC(obj.(*api.ReplicationController)),
+			scaleFromRC(old.(*api.ReplicationController)),
+		)
+	}
 }
 
 // scaleFromRC returns a scale subresource for a replication controller.

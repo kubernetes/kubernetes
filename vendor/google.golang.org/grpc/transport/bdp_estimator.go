@@ -41,12 +41,9 @@ const (
 	gamma = 2
 )
 
-var (
-	// Adding arbitrary data to ping so that its ack can be
-	// identified.
-	// Easter-egg: what does the ping message say?
-	bdpPing = &ping{data: [8]byte{2, 4, 16, 16, 9, 14, 7, 7}}
-)
+// Adding arbitrary data to ping so that its ack can be identified.
+// Easter-egg: what does the ping message say?
+var bdpPing = &ping{data: [8]byte{2, 4, 16, 16, 9, 14, 7, 7}}
 
 type bdpEstimator struct {
 	// sentAt is the time when the ping was sent.

@@ -29,16 +29,52 @@ import (
 )
 
 type testDecodable struct {
-	Other string
-	Value int `json:"value"`
-	gvk   schema.GroupVersionKind
+	Other     string
+	Value     int           `json:"value"`
+	Spec      DecodableSpec `json:"spec"`
+	Interface interface{}   `json:"interface"`
+	gvk       schema.GroupVersionKind
+}
+
+// DecodableSpec has 15 fields. json-iterator treats struct with more than 10
+// fields differently from struct that has less than 10 fields.
+type DecodableSpec struct {
+	A int `json:"A"`
+	B int `json:"B"`
+	C int `json:"C"`
+	D int `json:"D"`
+	E int `json:"E"`
+	F int `json:"F"`
+	G int `json:"G"`
+	H int `json:"h"`
+	I int `json:"i"`
+	J int `json:"j"`
+	K int `json:"k"`
+	L int `json:"l"`
+	M int `json:"m"`
+	N int `json:"n"`
+	O int `json:"o"`
 }
 
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
-func (d *testDecodable) DeepCopyObject() runtime.Object {
-	panic("testDecodable does not support DeepCopy")
+func (in *testDecodable) DeepCopyObject() runtime.Object {
+	if in == nil {
+		return nil
+	}
+	out := new(testDecodable)
+	in.DeepCopyInto(out)
+	return out
+}
+func (in *testDecodable) DeepCopyInto(out *testDecodable) {
+	*out = *in
+	out.Other = in.Other
+	out.Value = in.Value
+	out.Spec = in.Spec
+	out.Interface = in.Interface
+	out.gvk = in.gvk
+	return
 }
 
 func TestDecode(t *testing.T) {
@@ -47,6 +83,7 @@ func TestDecode(t *testing.T) {
 		typer   runtime.ObjectTyper
 		yaml    bool
 		pretty  bool
+		strict  bool
 
 		data       []byte
 		defaultGVK *schema.GroupVersionKind
@@ -158,7 +195,7 @@ func TestDecode(t *testing.T) {
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",
@@ -221,14 +258,169 @@ func TestDecode(t *testing.T) {
 				},
 			},
 		},
+		// Error on invalid number
+		{
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","interface":1e1000}`),
+			creater:     &mockCreater{obj: &testDecodable{}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `json_test.testDecodable.Interface: DecodeNumber: strconv.ParseFloat: parsing "1e1000": value out of range`)
+			},
+		},
+		// Unmarshalling is case-sensitive
+		{
+			// "VaLue" should have been "value"
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","VaLue":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+			},
+		},
+		// Unmarshalling is case-sensitive for big struct.
+		{
+			// "b" should have been "B", "I" should have been "i"
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","spec": {"A": 1, "b": 2, "h": 3, "I": 4}}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Spec: DecodableSpec{A: 1, H: 3},
+			},
+		},
+		// Unknown fields should return an error from the strict JSON deserializer.
+		{
+			data:        []byte(`{"unknown": 1}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "found unknown field")
+			},
+			strict: true,
+		},
+		// Unknown fields should return an error from the strict YAML deserializer.
+		{
+			data:        []byte("unknown: 1\n"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "found unknown field")
+			},
+			yaml:   true,
+			strict: true,
+		},
+		// Duplicate fields should return an error from the strict JSON deserializer.
+		{
+			data:        []byte(`{"value":1,"value":1}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "already set in map")
+			},
+			strict: true,
+		},
+		// Duplicate fields should return an error from the strict YAML deserializer.
+		{
+			data: []byte("value: 1\n" +
+				"value: 1\n"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "already set in map")
+			},
+			yaml:   true,
+			strict: true,
+		},
+		// Strict JSON decode should fail for untagged fields.
+		{
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "found unknown field")
+			},
+			strict: true,
+		},
+		// Strict YAML decode should fail for untagged fields.
+		{
+			data: []byte("kind: Test\n" +
+				"apiVersion: other/blah\n" +
+				"value: 1\n" +
+				"Other: test\n"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "found unknown field")
+			},
+			yaml:   true,
+			strict: true,
+		},
+		// Strict JSON decode into unregistered objects directly.
+		{
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+				Value: 1,
+			},
+			strict: true,
+		},
+		// Strict YAML decode into unregistered objects directly.
+		{
+			data: []byte("kind: Test\n" +
+				"apiVersion: other/blah\n" +
+				"value: 1\n" +
+				"Other: test\n"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+				Value: 1,
+			},
+			yaml:   true,
+			strict: true,
+		},
+		// Valid strict JSON decode without GVK.
+		{
+			data:        []byte(`{"value":1234}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Value: 1234,
+			},
+			strict: true,
+		},
+		// Valid strict YAML decode without GVK.
+		{
+			data:        []byte("value: 1234\n"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Value: 1234,
+			},
+			yaml:   true,
+			strict: true,
+		},
 	}
 
 	for i, test := range testCases {
 		var s runtime.Serializer
 		if test.yaml {
-			s = json.NewYAMLSerializer(json.DefaultMetaFactory, test.creater, test.typer)
+			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, json.SerializerOptions{Yaml: test.yaml, Pretty: false, Strict: test.strict})
 		} else {
-			s = json.NewSerializer(json.DefaultMetaFactory, test.creater, test.typer, test.pretty)
+			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, json.SerializerOptions{Yaml: test.yaml, Pretty: test.pretty, Strict: test.strict})
 		}
 		obj, gvk, err := s.Decode([]byte(test.data), test.defaultGVK, test.into)
 

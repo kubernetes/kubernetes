@@ -121,7 +121,7 @@ func (s *CertPool) AppendCertsFromPEM(pemCerts []byte) (ok bool) {
 		}
 
 		cert, err := ParseCertificate(block.Bytes)
-		if err != nil {
+		if IsFatal(err) {
 			continue
 		}
 

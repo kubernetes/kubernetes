@@ -86,7 +86,6 @@ func TestHasKubeletUsages(t *testing.T) {
 
 func TestHandle(t *testing.T) {
 	cases := []struct {
-		message    string
 		allowed    bool
 		recognized bool
 		err        bool

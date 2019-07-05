@@ -22,8 +22,12 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validation/path"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"k8s.io/klog"
 )
 
 // LongRunningRequestCheck is a predicate which is true for long-running http requests.
@@ -203,18 +207,34 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
-		// Assumes v1.ListOptions
-		// Any query value that is not 0 or false is considered true
-		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
-		if values := req.URL.Query()["watch"]; len(values) > 0 {
-			switch strings.ToLower(values[0]) {
-			case "false", "0":
-				requestInfo.Verb = "list"
-			default:
-				requestInfo.Verb = "watch"
+		opts := metainternalversion.ListOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err != nil {
+			// An error in parsing request will result in default to "list" and not setting "name" field.
+			klog.Errorf("Couldn't parse request %#v: %v", req.URL.Query(), err)
+			// Reset opts to not rely on partial results from parsing.
+			// However, if watch is set, let's report it.
+			opts = metainternalversion.ListOptions{}
+			if values := req.URL.Query()["watch"]; len(values) > 0 {
+				switch strings.ToLower(values[0]) {
+				case "false", "0":
+				default:
+					opts.Watch = true
+				}
 			}
+		}
+
+		if opts.Watch {
+			requestInfo.Verb = "watch"
 		} else {
 			requestInfo.Verb = "list"
+		}
+
+		if opts.FieldSelector != nil {
+			if name, ok := opts.FieldSelector.RequiresExactMatch("metadata.name"); ok {
+				if len(path.IsValidPathSegmentName(name)) == 0 {
+					requestInfo.Name = name
+				}
+			}
 		}
 	}
 	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection

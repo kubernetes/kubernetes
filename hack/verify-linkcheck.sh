@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -38,7 +38,7 @@ mkdir -p "$OUTPUT"
 APIROOT="${KUBE_ROOT}/pkg/api/"
 APISROOT="${KUBE_ROOT}/pkg/apis/"
 DOCROOT="${KUBE_ROOT}/docs/"
-ROOTS=($APIROOT $APISROOT $DOCROOT)
+ROOTS=("$APIROOT" "$APISROOT" "$DOCROOT")
 found_invalid=false
 for root in "${ROOTS[@]}"; do
   "${linkcheck}" "--root-dir=${root}" 2> >(tee -a "${OUTPUT}/error" >&2) && ret=0 || ret=$?
@@ -54,7 +54,7 @@ done
 
 if [ ${found_invalid} = true ]; then
   echo "Summary of invalid links:"
-  cat ${OUTPUT}/error
+  cat "${OUTPUT}/error"
   exit 1
 fi
 

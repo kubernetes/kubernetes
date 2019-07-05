@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -34,6 +34,7 @@ const (
 	podPrefix = "Pod"
 )
 
+// PodCheckpoint defines the operations to retrieve pod
 type PodCheckpoint interface {
 	checkpointmanager.Checkpoint
 	GetPod() *v1.Pod
@@ -66,6 +67,7 @@ func (cp *Data) VerifyChecksum() error {
 	return cp.Checksum.Verify(*cp.Pod)
 }
 
+// GetPod retrieves the pod from the checkpoint
 func (cp *Data) GetPod() *v1.Pod {
 	return cp.Pod
 }
@@ -82,7 +84,7 @@ func checkAnnotations(pod *v1.Pod) bool {
 
 //getPodKey returns the full qualified path for the pod checkpoint
 func getPodKey(pod *v1.Pod) string {
-	return fmt.Sprintf("Pod%v%v.yaml", delimiter, pod.GetUID())
+	return fmt.Sprintf("%s%s%v.yaml", podPrefix, delimiter, pod.GetUID())
 }
 
 // LoadPods Loads All Checkpoints from disk
@@ -93,14 +95,14 @@ func LoadPods(cpm checkpointmanager.CheckpointManager) ([]*v1.Pod, error) {
 	checkpointKeys := []string{}
 	checkpointKeys, err = cpm.ListCheckpoints()
 	if err != nil {
-		glog.Errorf("Failed to list checkpoints: %v", err)
+		klog.Errorf("Failed to list checkpoints: %v", err)
 	}
 
 	for _, key := range checkpointKeys {
 		checkpoint := NewPodCheckpoint(nil)
 		err := cpm.GetCheckpoint(key, checkpoint)
 		if err != nil {
-			glog.Errorf("Failed to retrieve checkpoint for pod %q: %v", key, err)
+			klog.Errorf("Failed to retrieve checkpoint for pod %q: %v", key, err)
 			continue
 		}
 		pods = append(pods, checkpoint.GetPod())

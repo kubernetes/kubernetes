@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "http.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/cloudflare/cfssl/errors",
     importpath = "github.com/cloudflare/cfssl/errors",
     visibility = ["//visibility:public"],
 )

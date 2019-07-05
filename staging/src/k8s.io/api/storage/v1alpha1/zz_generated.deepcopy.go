@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -56,7 +57,7 @@ func (in *VolumeAttachment) DeepCopyObject() runtime.Object {
 func (in *VolumeAttachmentList) DeepCopyInto(out *VolumeAttachmentList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]VolumeAttachment, len(*in))
@@ -90,12 +91,13 @@ func (in *VolumeAttachmentSource) DeepCopyInto(out *VolumeAttachmentSource) {
 	*out = *in
 	if in.PersistentVolumeName != nil {
 		in, out := &in.PersistentVolumeName, &out.PersistentVolumeName
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
+	}
+	if in.InlineVolumeSpec != nil {
+		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
+		*out = new(v1.PersistentVolumeSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -139,21 +141,13 @@ func (in *VolumeAttachmentStatus) DeepCopyInto(out *VolumeAttachmentStatus) {
 	}
 	if in.AttachError != nil {
 		in, out := &in.AttachError, &out.AttachError
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VolumeError)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(VolumeError)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.DetachError != nil {
 		in, out := &in.DetachError, &out.DetachError
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VolumeError)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(VolumeError)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

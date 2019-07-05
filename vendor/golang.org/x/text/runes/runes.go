@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package runes provide transforms for UTF-8 encoded text.
-package runes
+package runes // import "golang.org/x/text/runes"
 
 import (
 	"unicode"

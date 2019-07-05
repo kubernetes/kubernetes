@@ -18,14 +18,15 @@ package intstr
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"runtime/debug"
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/google/gofuzz"
+	"k8s.io/klog"
 )
 
 // IntOrString is a type that can hold an int32 or a string.  When used in
@@ -57,7 +58,7 @@ const (
 // TODO: convert to (val int32)
 func FromInt(val int) IntOrString {
 	if val > math.MaxInt32 || val < math.MinInt32 {
-		glog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
+		klog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
 	}
 	return IntOrString{Type: Int, IntVal: int32(val)}
 }
@@ -142,7 +143,17 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 	}
 }
 
+func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrString {
+	if intOrPercent == nil {
+		return &defaultValue
+	}
+	return intOrPercent
+}
+
 func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
+	if intOrPercent == nil {
+		return 0, errors.New("nil value for IntOrString")
+	}
 	value, isPercent, err := getIntOrPercentValue(intOrPercent)
 	if err != nil {
 		return 0, fmt.Errorf("invalid value for IntOrString: %v", err)

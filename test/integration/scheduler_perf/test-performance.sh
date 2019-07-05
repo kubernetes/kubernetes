@@ -18,13 +18,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-DIR_BASENAME=$(dirname "${BASH_SOURCE}")
-pushd ${DIR_BASENAME}
+DIR_BASENAME=$(dirname "${BASH_SOURCE[0]}")
+pushd "${DIR_BASENAME}"
 
 cleanup() {
   popd 2> /dev/null

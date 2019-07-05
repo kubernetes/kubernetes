@@ -1,12 +1,12 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // PluginCreate creates a plugin
@@ -18,9 +18,6 @@ func (cli *Client) PluginCreate(ctx context.Context, createContext io.Reader, cr
 	query.Set("name", createOptions.RepoName)
 
 	resp, err := cli.postRaw(ctx, "/plugins/create", query, createContext, headers)
-	if err != nil {
-		return err
-	}
 	ensureReaderClosed(resp)
 	return err
 }

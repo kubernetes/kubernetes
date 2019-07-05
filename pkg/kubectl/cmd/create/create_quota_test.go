@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreateQuota(t *testing.T) {
@@ -51,10 +51,8 @@ func TestCreateQuota(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
-
-			tf.Namespace = "test"
 
 			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdCreateQuota(tf, ioStreams)

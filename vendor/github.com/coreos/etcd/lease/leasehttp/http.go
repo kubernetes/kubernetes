@@ -191,7 +191,12 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 // TimeToLiveHTTP retrieves lease information of the given lease ID.
 func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string, rt http.RoundTripper) (*leasepb.LeaseInternalResponse, error) {
 	// will post lreq protobuf to leader
-	lreq, err := (&leasepb.LeaseInternalRequest{&pb.LeaseTimeToLiveRequest{ID: int64(id), Keys: keys}}).Marshal()
+	lreq, err := (&leasepb.LeaseInternalRequest{
+		LeaseTimeToLiveRequest: &pb.LeaseTimeToLiveRequest{
+			ID:   int64(id),
+			Keys: keys,
+		},
+	}).Marshal()
 	if err != nil {
 		return nil, err
 	}

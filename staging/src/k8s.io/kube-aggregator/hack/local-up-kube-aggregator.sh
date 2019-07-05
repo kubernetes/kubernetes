@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-AGG_ROOT=$(dirname "${BASH_SOURCE}")/..
+AGG_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_ROOT=${AGG_ROOT}/../../../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
@@ -68,10 +68,10 @@ function start_kube-aggregator {
 	kubectl -n kube-public delete configmap etcd-ca kube-aggregator-ca client-ca request-header-ca > /dev/null 2>&1 || true
 	kubectl -n kube-public delete -f "${AGG_ROOT}/artifacts/self-contained" > /dev/null 2>&1 || true
 
-	${sudo} $(which kubectl) -n kube-public create secret tls auth-proxy-client --cert="${FRONT_PROXY_CLIENT_CERT}" --key="${FRONT_PROXY_CLIENT_KEY}"
-	${sudo} $(which kubectl)  -n kube-public create secret tls serving-etcd --cert="${AGGREGATOR_CERT_DIR}/serving-etcd.crt" --key="${AGGREGATOR_CERT_DIR}/serving-etcd.key"
-	${sudo} $(which kubectl)  -n kube-public create secret tls serving-kube-aggregator --cert="${SERVING_CERT}" --key="${SERVING_KEY}"
-	${sudo} $(which kubectl)  -n kube-public create secret tls kube-aggregator-etcd --cert="${AGGREGATOR_CERT_DIR}/client-kube-aggregator-etcd.crt" --key="${AGGREGATOR_CERT_DIR}/client-kube-aggregator-etcd.key"
+	${sudo} "$(which kubectl)" -n kube-public create secret tls auth-proxy-client --cert="${FRONT_PROXY_CLIENT_CERT}" --key="${FRONT_PROXY_CLIENT_KEY}"
+	${sudo} "$(which kubectl)"  -n kube-public create secret tls serving-etcd --cert="${AGGREGATOR_CERT_DIR}/serving-etcd.crt" --key="${AGGREGATOR_CERT_DIR}/serving-etcd.key"
+	${sudo} "$(which kubectl)"  -n kube-public create secret tls serving-kube-aggregator --cert="${SERVING_CERT}" --key="${SERVING_KEY}"
+	${sudo} "$(which kubectl)"  -n kube-public create secret tls kube-aggregator-etcd --cert="${AGGREGATOR_CERT_DIR}/client-kube-aggregator-etcd.crt" --key="${AGGREGATOR_CERT_DIR}/client-kube-aggregator-etcd.key"
 	kubectl -n kube-public create configmap etcd-ca --from-file="ca.crt=${AGGREGATOR_CERT_DIR}/etcd-ca.crt" || true
 	kubectl -n kube-public create configmap kube-aggregator-ca --from-file="ca.crt=${SERVING_CERT_CA_CERT}" || true
 	kubectl -n kube-public create configmap client-ca --from-file="ca.crt=${CLIENT_CERT_CA_CERT}" || true

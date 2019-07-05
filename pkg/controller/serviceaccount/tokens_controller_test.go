@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -568,7 +568,7 @@ func TestTokenCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		glog.Infof(k)
+		klog.Infof(k)
 
 		// Re-seed to reset name generation
 		utilrand.Seed(1)

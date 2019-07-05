@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // Status is the status of a container.
@@ -84,6 +85,12 @@ type BaseContainer interface {
 	// errors:
 	// SystemError - System error.
 	State() (*State, error)
+
+	// OCIState returns the current container's state information.
+	//
+	// errors:
+	// SystemError - System error.
+	OCIState() (*specs.State, error)
 
 	// Returns the current config of the container.
 	Config() configs.Config

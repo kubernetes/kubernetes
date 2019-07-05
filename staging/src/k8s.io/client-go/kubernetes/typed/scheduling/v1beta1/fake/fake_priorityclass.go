@@ -59,7 +59,7 @@ func (c *FakePriorityClasses) List(opts v1.ListOptions) (result *v1beta1.Priorit
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.PriorityClassList{}
+	list := &v1beta1.PriorityClassList{ListMeta: obj.(*v1beta1.PriorityClassList).ListMeta}
 	for _, item := range obj.(*v1beta1.PriorityClassList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -112,7 +112,7 @@ func (c *FakePriorityClasses) DeleteCollection(options *v1.DeleteOptions, listOp
 // Patch applies the patch and returns the patched priorityClass.
 func (c *FakePriorityClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PriorityClass, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, data, subresources...), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), &v1beta1.PriorityClass{})
 	if obj == nil {
 		return nil, err
 	}

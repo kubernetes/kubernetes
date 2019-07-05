@@ -5,6 +5,7 @@ package toml
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -185,10 +186,7 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	}
 
 	// assign value to the found table
-	keyVals, err := parseKey(key.val)
-	if err != nil {
-		p.raiseError(key, "%s", err)
-	}
+	keyVals := []string{key.val}
 	if len(keyVals) != 1 {
 		p.raiseError(key, "Invalid key")
 	}
@@ -205,20 +203,32 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	case *Tree, []*Tree:
 		toInsert = value
 	default:
-		toInsert = &tomlValue{value, key.Position}
+		toInsert = &tomlValue{value: value, position: key.Position}
 	}
 	targetNode.values[keyVal] = toInsert
 	return p.parseStart
 }
 
 var numberUnderscoreInvalidRegexp *regexp.Regexp
+var hexNumberUnderscoreInvalidRegexp *regexp.Regexp
 
-func cleanupNumberToken(value string) (string, error) {
+func numberContainsInvalidUnderscore(value string) error {
 	if numberUnderscoreInvalidRegexp.MatchString(value) {
-		return "", errors.New("invalid use of _ in number")
+		return errors.New("invalid use of _ in number")
 	}
+	return nil
+}
+
+func hexNumberContainsInvalidUnderscore(value string) error {
+	if hexNumberUnderscoreInvalidRegexp.MatchString(value) {
+		return errors.New("invalid use of _ in hex number")
+	}
+	return nil
+}
+
+func cleanupNumberToken(value string) string {
 	cleanedVal := strings.Replace(value, "_", "", -1)
-	return cleanedVal, nil
+	return cleanedVal
 }
 
 func (p *tomlParser) parseRvalue() interface{} {
@@ -234,21 +244,57 @@ func (p *tomlParser) parseRvalue() interface{} {
 		return true
 	case tokenFalse:
 		return false
-	case tokenInteger:
-		cleanedVal, err := cleanupNumberToken(tok.val)
-		if err != nil {
-			p.raiseError(tok, "%s", err)
+	case tokenInf:
+		if tok.val[0] == '-' {
+			return math.Inf(-1)
 		}
-		val, err := strconv.ParseInt(cleanedVal, 10, 64)
+		return math.Inf(1)
+	case tokenNan:
+		return math.NaN()
+	case tokenInteger:
+		cleanedVal := cleanupNumberToken(tok.val)
+		var err error
+		var val int64
+		if len(cleanedVal) >= 3 && cleanedVal[0] == '0' {
+			switch cleanedVal[1] {
+			case 'x':
+				err = hexNumberContainsInvalidUnderscore(tok.val)
+				if err != nil {
+					p.raiseError(tok, "%s", err)
+				}
+				val, err = strconv.ParseInt(cleanedVal[2:], 16, 64)
+			case 'o':
+				err = numberContainsInvalidUnderscore(tok.val)
+				if err != nil {
+					p.raiseError(tok, "%s", err)
+				}
+				val, err = strconv.ParseInt(cleanedVal[2:], 8, 64)
+			case 'b':
+				err = numberContainsInvalidUnderscore(tok.val)
+				if err != nil {
+					p.raiseError(tok, "%s", err)
+				}
+				val, err = strconv.ParseInt(cleanedVal[2:], 2, 64)
+			default:
+				panic("invalid base") // the lexer should catch this first
+			}
+		} else {
+			err = numberContainsInvalidUnderscore(tok.val)
+			if err != nil {
+				p.raiseError(tok, "%s", err)
+			}
+			val, err = strconv.ParseInt(cleanedVal, 10, 64)
+		}
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
 		return val
 	case tokenFloat:
-		cleanedVal, err := cleanupNumberToken(tok.val)
+		err := numberContainsInvalidUnderscore(tok.val)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
+		cleanedVal := cleanupNumberToken(tok.val)
 		val, err := strconv.ParseFloat(cleanedVal, 64)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
@@ -309,7 +355,7 @@ Loop:
 			}
 			p.getToken()
 		default:
-			p.raiseError(follow, "unexpected token type in inline table: %s", follow.typ.String())
+			p.raiseError(follow, "unexpected token type in inline table: %s", follow.String())
 		}
 		previous = follow
 	}
@@ -379,5 +425,6 @@ func parseToml(flow []token) *Tree {
 }
 
 func init() {
-	numberUnderscoreInvalidRegexp = regexp.MustCompile(`([^\d]_|_[^\d]|_$|^_)`)
+	numberUnderscoreInvalidRegexp = regexp.MustCompile(`([^\d]_|_[^\d])|_$|^_`)
+	hexNumberUnderscoreInvalidRegexp = regexp.MustCompile(`(^0x_)|([^\da-f]_|_[^\da-f])|_$|^_`)
 }

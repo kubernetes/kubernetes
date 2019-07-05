@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -53,7 +55,7 @@ func TestGetReference(t *testing.T) {
 	// then you run into trouble because the types aren't registered in the scheme by anything.  This does the
 	// register manually to allow unit test execution
 	if _, _, err := legacyscheme.Scheme.ObjectKinds(&api.Pod{}); err != nil {
-		api.AddToScheme(legacyscheme.Scheme)
+		require.NoError(t, api.AddToScheme(legacyscheme.Scheme))
 	}
 
 	table := map[string]struct {

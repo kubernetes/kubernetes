@@ -30,10 +30,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
 	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols)
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
@@ -42,15 +42,15 @@ func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 	}
 	streamChan := make(chan httpstream.Stream, 1)
 
-	glog.V(5).Infof("Upgrading port forward response")
+	klog.V(5).Infof("Upgrading port forward response")
 	upgrader := spdy.NewResponseUpgrader()
 	conn := upgrader.UpgradeResponse(w, req, httpStreamReceived(streamChan))
 	if conn == nil {
-		return errors.New("Unable to upgrade websocket connection")
+		return errors.New("Unable to upgrade httpstream connection")
 	}
 	defer conn.Close()
 
-	glog.V(5).Infof("(conn=%p) setting port forwarding streaming connection idle timeout to %v", conn, idleTimeout)
+	klog.V(5).Infof("(conn=%p) setting port forwarding streaming connection idle timeout to %v", conn, idleTimeout)
 	conn.SetIdleTimeout(idleTimeout)
 
 	h := &httpStreamHandler{
@@ -58,9 +58,9 @@ func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 		streamChan:            streamChan,
 		streamPairs:           make(map[string]*httpStreamPair),
 		streamCreationTimeout: streamCreationTimeout,
-		pod:       podName,
-		uid:       uid,
-		forwarder: portForwarder,
+		pod:                   podName,
+		uid:                   uid,
+		forwarder:             portForwarder,
 	}
 	h.run()
 
@@ -121,11 +121,11 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 	defer h.streamPairsLock.Unlock()
 
 	if p, ok := h.streamPairs[requestID]; ok {
-		glog.V(5).Infof("(conn=%p, request=%s) found existing stream pair", h.conn, requestID)
+		klog.V(5).Infof("(conn=%p, request=%s) found existing stream pair", h.conn, requestID)
 		return p, false
 	}
 
-	glog.V(5).Infof("(conn=%p, request=%s) creating new stream pair", h.conn, requestID)
+	klog.V(5).Infof("(conn=%p, request=%s) creating new stream pair", h.conn, requestID)
 
 	p := newPortForwardPair(requestID)
 	h.streamPairs[requestID] = p
@@ -143,7 +143,7 @@ func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan 
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
-		glog.V(5).Infof("(conn=%v, request=%s) successfully received error and data streams", h.conn, p.requestID)
+		klog.V(5).Infof("(conn=%v, request=%s) successfully received error and data streams", h.conn, p.requestID)
 	}
 	h.removeStreamPair(p.requestID)
 }
@@ -170,7 +170,7 @@ func (h *httpStreamHandler) removeStreamPair(requestID string) {
 func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 	requestID := stream.Headers().Get(api.PortForwardRequestIDHeader)
 	if len(requestID) == 0 {
-		glog.V(5).Infof("(conn=%p) stream received without %s header", h.conn, api.PortForwardRequestIDHeader)
+		klog.V(5).Infof("(conn=%p) stream received without %s header", h.conn, api.PortForwardRequestIDHeader)
 		// If we get here, it's because the connection came from an older client
 		// that isn't generating the request id header
 		// (https://github.com/kubernetes/kubernetes/blob/843134885e7e0b360eb5441e85b1410a8b1a7a0c/pkg/client/unversioned/portforward/portforward.go#L258-L287)
@@ -197,7 +197,7 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 			requestID = strconv.Itoa(int(stream.Identifier()) - 2)
 		}
 
-		glog.V(5).Infof("(conn=%p) automatically assigning request ID=%q from stream type=%s, stream ID=%d", h.conn, requestID, streamType, stream.Identifier())
+		klog.V(5).Infof("(conn=%p) automatically assigning request ID=%q from stream type=%s, stream ID=%d", h.conn, requestID, streamType, stream.Identifier())
 	}
 	return requestID
 }
@@ -206,17 +206,17 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 // streams, invoking portForward for each complete stream pair. The loop exits
 // when the httpstream.Connection is closed.
 func (h *httpStreamHandler) run() {
-	glog.V(5).Infof("(conn=%p) waiting for port forward streams", h.conn)
+	klog.V(5).Infof("(conn=%p) waiting for port forward streams", h.conn)
 Loop:
 	for {
 		select {
 		case <-h.conn.CloseChan():
-			glog.V(5).Infof("(conn=%p) upgraded connection closed", h.conn)
+			klog.V(5).Infof("(conn=%p) upgraded connection closed", h.conn)
 			break Loop
 		case stream := <-h.streamChan:
 			requestID := h.requestID(stream)
 			streamType := stream.Headers().Get(api.StreamType)
-			glog.V(5).Infof("(conn=%p, request=%s) received new stream of type %s", h.conn, requestID, streamType)
+			klog.V(5).Infof("(conn=%p, request=%s) received new stream of type %s", h.conn, requestID, streamType)
 
 			p, created := h.getStreamPair(requestID)
 			if created {
@@ -242,9 +242,9 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
-	glog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
+	klog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
 	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), p.dataStream)
-	glog.V(5).Infof("(conn=%p, request=%s) done invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
+	klog.V(5).Infof("(conn=%p, request=%s) done invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)

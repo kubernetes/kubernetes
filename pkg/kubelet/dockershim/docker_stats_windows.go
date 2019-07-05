@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ContainerStats returns stats for a container stats request based on container id.
@@ -64,6 +64,11 @@ func (ds *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.L
 }
 
 func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+	info, err := ds.client.Info()
+	if err != nil {
+		return nil, err
+	}
+
 	statsJSON, err := ds.client.GetContainerStats(containerID)
 	if err != nil {
 		return nil, err
@@ -101,6 +106,7 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		},
 		WritableLayer: &runtimeapi.FilesystemUsage{
 			Timestamp: timestamp,
+			FsId:      &runtimeapi.FilesystemIdentifier{Mountpoint: info.DockerRootDir},
 			UsedBytes: &runtimeapi.UInt64Value{Value: uint64(*containerJSON.SizeRw)},
 		},
 	}

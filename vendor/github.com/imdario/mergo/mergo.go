@@ -32,7 +32,7 @@ type visit struct {
 	next *visit
 }
 
-// From src/pkg/encoding/json.
+// From src/pkg/encoding/json/encode.go.
 func isEmptyValue(v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
@@ -46,7 +46,14 @@ func isEmptyValue(v reflect.Value) bool {
 	case reflect.Float32, reflect.Float64:
 		return v.Float() == 0
 	case reflect.Interface, reflect.Ptr:
+		if v.IsNil() {
+			return true
+		}
+		return isEmptyValue(v.Elem())
+	case reflect.Func:
 		return v.IsNil()
+	case reflect.Invalid:
+		return true
 	}
 	return false
 }

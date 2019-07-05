@@ -22,7 +22,6 @@
   "Redis",
   "ReplicaSet",
   "ReplicationController",
-  "Rescheduler",
   "RethinkDB",
   "Secret",
   "Security",

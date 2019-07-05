@@ -26,13 +26,13 @@ func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
 }
 
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
+func (admissionHandler chainAdmissionHandler) Admit(a Attributes, o ObjectInterfaces) error {
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if mutator, ok := handler.(MutationInterface); ok {
-			err := mutator.Admit(a)
+			err := mutator.Admit(a, o)
 			if err != nil {
 				return err
 			}
@@ -42,13 +42,13 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 }
 
 // Validate performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
+func (admissionHandler chainAdmissionHandler) Validate(a Attributes, o ObjectInterfaces) error {
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if validator, ok := handler.(ValidationInterface); ok {
-			err := validator.Validate(a)
+			err := validator.Validate(a, o)
 			if err != nil {
 				return err
 			}

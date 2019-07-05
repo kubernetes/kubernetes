@@ -17,6 +17,10 @@ limitations under the License.
 package transport
 
 import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 )
@@ -91,18 +95,32 @@ stR0Yiw0buV6DL/moUO0HIM9Bjh96HJp+LxiIS6UCdIhMPp5HoQa
 
 func TestNew(t *testing.T) {
 	testCases := map[string]struct {
-		Config  *Config
-		Err     bool
-		TLS     bool
-		Default bool
+		Config       *Config
+		Err          bool
+		TLS          bool
+		TLSCert      bool
+		TLSErr       bool
+		Default      bool
+		Insecure     bool
+		DefaultRoots bool
 	}{
 		"default transport": {
 			Default: true,
 			Config:  &Config{},
 		},
 
+		"insecure": {
+			TLS:          true,
+			Insecure:     true,
+			DefaultRoots: true,
+			Config: &Config{TLS: TLSConfig{
+				Insecure: true,
+			}},
+		},
+
 		"server name": {
-			TLS: true,
+			TLS:          true,
+			DefaultRoots: true,
 			Config: &Config{TLS: TLSConfig{
 				ServerName: "foo",
 			}},
@@ -135,7 +153,8 @@ func TestNew(t *testing.T) {
 		},
 
 		"cert transport": {
-			TLS: true,
+			TLS:     true,
+			TLSCert: true,
 			Config: &Config{
 				TLS: TLSConfig{
 					CAData:   []byte(rootCACert),
@@ -165,7 +184,8 @@ func TestNew(t *testing.T) {
 			},
 		},
 		"key data overriding bad file cert transport": {
-			TLS: true,
+			TLS:     true,
+			TLSCert: true,
 			Config: &Config{
 				TLS: TLSConfig{
 					CAData:   []byte(rootCACert),
@@ -175,37 +195,258 @@ func TestNew(t *testing.T) {
 				},
 			},
 		},
+		"callback cert and key": {
+			TLS:     true,
+			TLSCert: true,
+			Config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(rootCACert),
+					GetCert: func() (*tls.Certificate, error) {
+						crt, err := tls.X509KeyPair([]byte(certData), []byte(keyData))
+						return &crt, err
+					},
+				},
+			},
+		},
+		"cert callback error": {
+			TLS:     true,
+			TLSCert: true,
+			TLSErr:  true,
+			Config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(rootCACert),
+					GetCert: func() (*tls.Certificate, error) {
+						return nil, errors.New("GetCert failure")
+					},
+				},
+			},
+		},
+		"cert data overrides empty callback result": {
+			TLS:     true,
+			TLSCert: true,
+			Config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(rootCACert),
+					GetCert: func() (*tls.Certificate, error) {
+						return nil, nil
+					},
+					CertData: []byte(certData),
+					KeyData:  []byte(keyData),
+				},
+			},
+		},
+		"callback returns nothing": {
+			TLS:     true,
+			TLSCert: true,
+			Config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(rootCACert),
+					GetCert: func() (*tls.Certificate, error) {
+						return nil, nil
+					},
+				},
+			},
+		},
 	}
 	for k, testCase := range testCases {
-		transport, err := New(testCase.Config)
-		switch {
-		case testCase.Err && err == nil:
-			t.Errorf("%s: unexpected non-error", k)
-			continue
-		case !testCase.Err && err != nil:
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
+		t.Run(k, func(t *testing.T) {
+			rt, err := New(testCase.Config)
+			switch {
+			case testCase.Err && err == nil:
+				t.Fatal("unexpected non-error")
+			case !testCase.Err && err != nil:
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if testCase.Err {
+				return
+			}
 
-		switch {
-		case testCase.Default && transport != http.DefaultTransport:
-			t.Errorf("%s: expected the default transport, got %#v", k, transport)
-			continue
-		case !testCase.Default && transport == http.DefaultTransport:
-			t.Errorf("%s: expected non-default transport, got %#v", k, transport)
-			continue
-		}
+			switch {
+			case testCase.Default && rt != http.DefaultTransport:
+				t.Fatalf("got %#v, expected the default transport", rt)
+			case !testCase.Default && rt == http.DefaultTransport:
+				t.Fatalf("got %#v, expected non-default transport", rt)
+			}
 
-		// We only know how to check TLSConfig on http.Transports
-		if transport, ok := transport.(*http.Transport); ok {
+			// We only know how to check TLSConfig on http.Transports
+			transport := rt.(*http.Transport)
 			switch {
 			case testCase.TLS && transport.TLSClientConfig == nil:
-				t.Errorf("%s: expected TLSClientConfig, got %#v", k, transport)
-				continue
+				t.Fatalf("got %#v, expected TLSClientConfig", transport)
 			case !testCase.TLS && transport.TLSClientConfig != nil:
-				t.Errorf("%s: expected no TLSClientConfig, got %#v", k, transport)
-				continue
+				t.Fatalf("got %#v, expected no TLSClientConfig", transport)
 			}
+			if !testCase.TLS {
+				return
+			}
+
+			switch {
+			case testCase.DefaultRoots && transport.TLSClientConfig.RootCAs != nil:
+				t.Fatalf("got %#v, expected nil root CAs", transport.TLSClientConfig.RootCAs)
+			case !testCase.DefaultRoots && transport.TLSClientConfig.RootCAs == nil:
+				t.Fatalf("got %#v, expected non-nil root CAs", transport.TLSClientConfig.RootCAs)
+			}
+
+			switch {
+			case testCase.Insecure != transport.TLSClientConfig.InsecureSkipVerify:
+				t.Fatalf("got %#v, expected %#v", transport.TLSClientConfig.InsecureSkipVerify, testCase.Insecure)
+			}
+
+			switch {
+			case testCase.TLSCert && transport.TLSClientConfig.GetClientCertificate == nil:
+				t.Fatalf("got %#v, expected TLSClientConfig.GetClientCertificate", transport.TLSClientConfig)
+			case !testCase.TLSCert && transport.TLSClientConfig.GetClientCertificate != nil:
+				t.Fatalf("got %#v, expected no TLSClientConfig.GetClientCertificate", transport.TLSClientConfig)
+			}
+			if !testCase.TLSCert {
+				return
+			}
+
+			_, err = transport.TLSClientConfig.GetClientCertificate(nil)
+			switch {
+			case testCase.TLSErr && err == nil:
+				t.Error("got nil error from GetClientCertificate, expected non-nil")
+			case !testCase.TLSErr && err != nil:
+				t.Errorf("got error from GetClientCertificate: %q, expected nil", err)
+			}
+		})
+	}
+}
+
+type fakeRoundTripper struct {
+	Req  *http.Request
+	Resp *http.Response
+	Err  error
+}
+
+func (rt *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.Req = req
+	return rt.Resp, rt.Err
+}
+
+type chainRoundTripper struct {
+	rt    http.RoundTripper
+	value string
+}
+
+func testChain(value string) WrapperFunc {
+	return func(rt http.RoundTripper) http.RoundTripper {
+		return &chainRoundTripper{rt: rt, value: value}
+	}
+}
+
+func (rt *chainRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := rt.rt.RoundTrip(req)
+	if resp != nil {
+		if resp.Header == nil {
+			resp.Header = make(http.Header)
 		}
+		resp.Header.Set("Value", resp.Header.Get("Value")+rt.value)
+	}
+	return resp, err
+}
+
+func TestWrappers(t *testing.T) {
+	resp1 := &http.Response{}
+	wrapperResp1 := func(rt http.RoundTripper) http.RoundTripper {
+		return &fakeRoundTripper{Resp: resp1}
+	}
+	resp2 := &http.Response{}
+	wrapperResp2 := func(rt http.RoundTripper) http.RoundTripper {
+		return &fakeRoundTripper{Resp: resp2}
+	}
+
+	tests := []struct {
+		name    string
+		fns     []WrapperFunc
+		wantNil bool
+		want    func(*http.Response) bool
+	}{
+		{fns: []WrapperFunc{}, wantNil: true},
+		{fns: []WrapperFunc{nil, nil}, wantNil: true},
+		{fns: []WrapperFunc{nil}, wantNil: false},
+
+		{fns: []WrapperFunc{nil, wrapperResp1}, want: func(resp *http.Response) bool { return resp == resp1 }},
+		{fns: []WrapperFunc{wrapperResp1, nil}, want: func(resp *http.Response) bool { return resp == resp1 }},
+		{fns: []WrapperFunc{nil, wrapperResp1, nil}, want: func(resp *http.Response) bool { return resp == resp1 }},
+		{fns: []WrapperFunc{nil, wrapperResp1, wrapperResp2}, want: func(resp *http.Response) bool { return resp == resp2 }},
+		{fns: []WrapperFunc{wrapperResp1, wrapperResp2}, want: func(resp *http.Response) bool { return resp == resp2 }},
+		{fns: []WrapperFunc{wrapperResp2, wrapperResp1}, want: func(resp *http.Response) bool { return resp == resp1 }},
+
+		{fns: []WrapperFunc{testChain("1")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "1" }},
+		{fns: []WrapperFunc{testChain("1"), testChain("2")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "12" }},
+		{fns: []WrapperFunc{testChain("2"), testChain("1")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "21" }},
+		{fns: []WrapperFunc{testChain("1"), testChain("2"), testChain("3")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "123" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Wrappers(tt.fns...)
+			if got == nil != tt.wantNil {
+				t.Errorf("Wrappers() = %v", got)
+				return
+			}
+			if got == nil {
+				return
+			}
+
+			rt := &fakeRoundTripper{Resp: &http.Response{}}
+			nested := got(rt)
+			req := &http.Request{}
+			resp, _ := nested.RoundTrip(req)
+			if tt.want != nil && !tt.want(resp) {
+				t.Errorf("unexpected response: %#v", resp)
+			}
+		})
+	}
+}
+
+func Test_contextCanceller_RoundTrip(t *testing.T) {
+	tests := []struct {
+		name string
+		open bool
+		want bool
+	}{
+		{name: "open context should call nested round tripper", open: true, want: true},
+		{name: "closed context should return a known error", open: false, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &http.Request{}
+			rt := &fakeRoundTripper{Resp: &http.Response{}}
+			ctx := context.Background()
+			if !tt.open {
+				c, fn := context.WithCancel(ctx)
+				fn()
+				ctx = c
+			}
+			errTesting := fmt.Errorf("testing")
+			b := &contextCanceller{
+				rt:  rt,
+				ctx: ctx,
+				err: errTesting,
+			}
+			got, err := b.RoundTrip(req)
+			if tt.want {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if got != rt.Resp {
+					t.Errorf("wanted response")
+				}
+				if req != rt.Req {
+					t.Errorf("expect nested call")
+				}
+			} else {
+				if err != errTesting {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if got != nil {
+					t.Errorf("wanted no response")
+				}
+				if rt.Req != nil {
+					t.Errorf("want no nested call")
+				}
+			}
+		})
 	}
 }

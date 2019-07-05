@@ -23,8 +23,9 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 
-	"github.com/vmware/govmomi/vim25/methods"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -40,25 +41,40 @@ var refValueMap = map[string]string{
 	"VirtualMachine":                 "vm",
 	"VirtualMachineSnapshot":         "snapshot",
 	"VmwareDistributedVirtualSwitch": "dvs",
+	"DistributedVirtualSwitch":       "dvs",
 }
 
 // Map is the default Registry instance.
 var Map = NewRegistry()
 
-// RegisterObject interface supports callbacks when objects are added and removed from the Registry
+// RegisterObject interface supports callbacks when objects are created, updated and deleted from the Registry
 type RegisterObject interface {
 	mo.Reference
 	PutObject(mo.Reference)
+	UpdateObject(mo.Reference, []types.PropertyChange)
 	RemoveObject(types.ManagedObjectReference)
 }
 
 // Registry manages a map of mo.Reference objects
 type Registry struct {
+	counter  int64 // Keep first to ensure 64-bit alignment
 	m        sync.Mutex
 	objects  map[types.ManagedObjectReference]mo.Reference
 	handlers map[types.ManagedObjectReference]RegisterObject
 	locks    map[types.ManagedObjectReference]sync.Locker
-	counter  int
+
+	Namespace string
+	Path      string
+
+	tagManager tagManager
+}
+
+// tagManager is an interface to simplify internal interaction with the vapi tag manager simulator.
+type tagManager interface {
+	AttachedObjects(types.VslmTagEntry) ([]types.ManagedObjectReference, types.BaseMethodFault)
+	AttachedTags(id types.ManagedObjectReference) ([]types.VslmTagEntry, types.BaseMethodFault)
+	AttachTag(types.ManagedObjectReference, types.VslmTagEntry) types.BaseMethodFault
+	DetachTag(types.ManagedObjectReference, types.VslmTagEntry) types.BaseMethodFault
 }
 
 // NewRegistry creates a new instances of Registry
@@ -67,9 +83,21 @@ func NewRegistry() *Registry {
 		objects:  make(map[types.ManagedObjectReference]mo.Reference),
 		handlers: make(map[types.ManagedObjectReference]RegisterObject),
 		locks:    make(map[types.ManagedObjectReference]sync.Locker),
+
+		Namespace: vim25.Namespace,
+		Path:      vim25.Path,
 	}
 
 	return r
+}
+
+func (r *Registry) typeFunc(name string) (reflect.Type, bool) {
+	if r.Namespace != "" && r.Namespace != vim25.Namespace {
+		if kind, ok := defaultMapType(r.Namespace + ":" + name); ok {
+			return kind, ok
+		}
+	}
+	return defaultMapType(name)
 }
 
 // typeName returns the type of the given object.
@@ -96,8 +124,8 @@ func (r *Registry) newReference(item mo.Reference) types.ManagedObjectReference 
 	}
 
 	if ref.Value == "" {
-		r.counter++
-		ref.Value = fmt.Sprintf("%s-%d", valuePrefix(ref.Type), r.counter)
+		n := atomic.AddInt64(&r.counter, 1)
+		ref.Value = fmt.Sprintf("%s-%d", valuePrefix(ref.Type), n)
 	}
 
 	return ref
@@ -110,7 +138,9 @@ func (r *Registry) setReference(item mo.Reference, ref types.ManagedObjectRefere
 
 // AddHandler adds a RegisterObject handler to the Registry.
 func (r *Registry) AddHandler(h RegisterObject) {
+	r.m.Lock()
 	r.handlers[h.Reference()] = h
+	r.m.Unlock()
 }
 
 // NewEntity sets Entity().Self with a new, unique Value.
@@ -157,10 +187,41 @@ func (r *Registry) Any(kind string) mo.Entity {
 	return nil
 }
 
+// All returns all entities of type specified by kind.
+// If kind is empty - all entities will be returned.
+func (r *Registry) All(kind string) []mo.Entity {
+	r.m.Lock()
+	defer r.m.Unlock()
+
+	var entities []mo.Entity
+	for ref, val := range r.objects {
+		if kind == "" || ref.Type == kind {
+			if e, ok := val.(mo.Entity); ok {
+				entities = append(entities, e)
+			}
+		}
+	}
+
+	return entities
+}
+
+// applyHandlers calls the given func for each r.handlers
+func (r *Registry) applyHandlers(f func(o RegisterObject)) {
+	r.m.Lock()
+	handlers := make([]RegisterObject, 0, len(r.handlers))
+	for _, handler := range r.handlers {
+		handlers = append(handlers, handler)
+	}
+	r.m.Unlock()
+
+	for i := range handlers {
+		f(handlers[i])
+	}
+}
+
 // Put adds a new object to Registry, generating a ManagedObjectReference if not already set.
 func (r *Registry) Put(item mo.Reference) mo.Reference {
 	r.m.Lock()
-	defer r.m.Unlock()
 
 	ref := item.Reference()
 	if ref.Type == "" || ref.Value == "" {
@@ -176,25 +237,50 @@ func (r *Registry) Put(item mo.Reference) mo.Reference {
 
 	r.objects[ref] = item
 
-	for _, h := range r.handlers {
-		h.PutObject(item)
-	}
+	r.m.Unlock()
+
+	r.applyHandlers(func(o RegisterObject) {
+		o.PutObject(item)
+	})
 
 	return item
 }
 
 // Remove removes an object from the Registry.
 func (r *Registry) Remove(item types.ManagedObjectReference) {
+	r.applyHandlers(func(o RegisterObject) {
+		o.RemoveObject(item)
+	})
+
 	r.m.Lock()
-	defer r.m.Unlock()
-
-	for _, h := range r.handlers {
-		h.RemoveObject(item)
-	}
-
 	delete(r.objects, item)
 	delete(r.handlers, item)
 	delete(r.locks, item)
+	r.m.Unlock()
+}
+
+// Update dispatches object property changes to RegisterObject handlers,
+// such as any PropertyCollector instances with in-progress WaitForUpdates calls.
+// The changes are also applied to the given object via mo.ApplyPropertyChange,
+// so there is no need to set object fields directly.
+func (r *Registry) Update(obj mo.Reference, changes []types.PropertyChange) {
+	for i := range changes {
+		if changes[i].Op == "" {
+			changes[i].Op = types.PropertyChangeOpAssign
+		}
+		if changes[i].Val != nil {
+			rval := reflect.ValueOf(changes[i].Val)
+			changes[i].Val = wrapValue(rval, rval.Type())
+		}
+	}
+
+	val := getManagedObject(obj).Addr().Interface().(mo.Reference)
+
+	mo.ApplyPropertyChange(val, changes)
+
+	r.applyHandlers(func(o RegisterObject) {
+		o.UpdateObject(val, changes)
+	})
 }
 
 // getEntityParent traverses up the inventory and returns the first object of type kind.
@@ -332,7 +418,7 @@ func (r *Registry) removeString(obj mo.Reference, field *[]string, val string) {
 }
 
 func (r *Registry) content() types.ServiceContent {
-	return r.Get(methods.ServiceInstance).(*ServiceInstance).Content
+	return r.Get(vim25.ServiceInstance).(*ServiceInstance).Content
 }
 
 // IsESX returns true if this Registry maps an ESX model
@@ -380,6 +466,16 @@ func (r *Registry) SessionManager() *SessionManager {
 	return r.Get(r.content().SessionManager.Reference()).(*SessionManager)
 }
 
+// OptionManager returns the OptionManager singleton
+func (r *Registry) OptionManager() *OptionManager {
+	return r.Get(r.content().Setting.Reference()).(*OptionManager)
+}
+
+// CustomFieldsManager returns CustomFieldsManager singleton
+func (r *Registry) CustomFieldsManager() *CustomFieldsManager {
+	return r.Get(r.content().CustomFieldsManager.Reference()).(*CustomFieldsManager)
+}
+
 func (r *Registry) MarshalJSON() ([]byte, error) {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -396,11 +492,23 @@ func (r *Registry) MarshalJSON() ([]byte, error) {
 }
 
 func (r *Registry) locker(obj mo.Reference) sync.Locker {
+	var ref types.ManagedObjectReference
+
+	switch x := obj.(type) {
+	case types.ManagedObjectReference:
+		ref = x
+		obj = r.Get(ref) // to check for sync.Locker
+	case *types.ManagedObjectReference:
+		ref = *x
+		obj = r.Get(ref) // to check for sync.Locker
+	default:
+		ref = obj.Reference()
+	}
+
 	if mu, ok := obj.(sync.Locker); ok {
 		return mu
 	}
 
-	ref := obj.Reference()
 	r.m.Lock()
 	mu, ok := r.locks[ref]
 	if !ok {
@@ -423,3 +531,9 @@ func (r *Registry) WithLock(obj mo.Reference, f func()) {
 	}
 	f()
 }
+
+// nopLocker can be embedded to opt-out of auto-locking (see Registry.WithLock)
+type nopLocker struct{}
+
+func (*nopLocker) Lock()   {}
+func (*nopLocker) Unlock() {}

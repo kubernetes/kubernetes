@@ -11,9 +11,9 @@ go_library(
     srcs = ["i18n.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/util/i18n",
     deps = [
-        "//pkg/generated:go_default_library",
+        "//pkg/kubectl/generated:go_default_library",
         "//vendor/github.com/chai2010/gettext-go/gettext:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

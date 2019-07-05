@@ -6,6 +6,7 @@ go_library(
         "compare.go",
         "comparetest.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/compare",
     importpath = "github.com/gogo/protobuf/plugin/compare",
     visibility = ["//visibility:public"],
     deps = [

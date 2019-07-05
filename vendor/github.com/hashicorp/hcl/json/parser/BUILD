@@ -6,10 +6,12 @@ go_library(
         "flatten.go",
         "parser.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/hashicorp/hcl/json/parser",
     importpath = "github.com/hashicorp/hcl/json/parser",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",
+        "//vendor/github.com/hashicorp/hcl/hcl/token:go_default_library",
         "//vendor/github.com/hashicorp/hcl/json/scanner:go_default_library",
         "//vendor/github.com/hashicorp/hcl/json/token:go_default_library",
     ],

@@ -1,10 +1,10 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"io"
 	"net/url"
-
-	"golang.org/x/net/context"
+	"strings"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
@@ -25,6 +25,9 @@ func (cli *Client) ImageImport(ctx context.Context, source types.ImageImportSour
 	query.Set("repo", ref)
 	query.Set("tag", options.Tag)
 	query.Set("message", options.Message)
+	if options.Platform != "" {
+		query.Set("platform", strings.ToLower(options.Platform))
+	}
 	for _, change := range options.Changes {
 		query.Add("changes", change)
 	}

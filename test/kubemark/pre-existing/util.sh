@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 
 source "${KUBE_ROOT}/test/kubemark/common/util.sh"
 
@@ -23,5 +23,5 @@ source "${KUBE_ROOT}/test/kubemark/common/util.sh"
 function execute-cmd-on-pre-existing-master-with-retries() {
   IP_WITHOUT_PORT=$(echo "${MASTER_IP}" | cut -f 1 -d ':') || "${MASTER_IP}"
 
-  RETRIES="${2:-1}" run-cmd-with-retries ssh kubernetes@"${IP_WITHOUT_PORT}" $1
+  RETRIES="${2:-1}" run-cmd-with-retries ssh kubernetes@"${IP_WITHOUT_PORT}" "${1}"
 }

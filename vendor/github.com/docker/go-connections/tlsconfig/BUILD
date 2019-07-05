@@ -9,6 +9,7 @@ go_library(
         "config_client_ciphers.go",
         "config_legacy_client_ciphers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/go-connections/tlsconfig",
     importpath = "github.com/docker/go-connections/tlsconfig",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/pkg/errors:go_default_library"],

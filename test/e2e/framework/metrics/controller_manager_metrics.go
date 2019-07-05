@@ -16,19 +16,21 @@ limitations under the License.
 
 package metrics
 
+// ControllerManagerMetrics is metrics for controller manager
 type ControllerManagerMetrics Metrics
 
+// Equal returns true if all metrics are the same as the arguments.
 func (m *ControllerManagerMetrics) Equal(o ControllerManagerMetrics) bool {
 	return (*Metrics)(m).Equal(Metrics(o))
 }
 
-func NewControllerManagerMetrics() ControllerManagerMetrics {
+func newControllerManagerMetrics() ControllerManagerMetrics {
 	result := NewMetrics()
 	return ControllerManagerMetrics(result)
 }
 
 func parseControllerManagerMetrics(data string) (ControllerManagerMetrics, error) {
-	result := NewControllerManagerMetrics()
+	result := newControllerManagerMetrics()
 	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
 		return ControllerManagerMetrics{}, err
 	}

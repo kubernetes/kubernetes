@@ -27,7 +27,7 @@ import (
 // select the loopback certificate via SNI if TLS is used.
 const LoopbackClientServerNameOverride = "apiserver-loopback-client"
 
-func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert []byte) (*restclient.Config, error) {
+func (s *SecureServingInfo) NewClientConfig(caCert []byte) (*restclient.Config, error) {
 	if s == nil || (s.Cert == nil && len(s.SNICerts) == 0) {
 		return nil, nil
 	}
@@ -41,17 +41,27 @@ func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert [
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:         50,
-		Burst:       100,
-		Host:        "https://" + net.JoinHostPort(host, port),
-		BearerToken: token,
+		QPS:   50,
+		Burst: 100,
+		Host:  "https://" + net.JoinHostPort(host, port),
 		// override the ServerName to select our loopback certificate via SNI. This name is also
 		// used by the client to compare the returns server certificate against.
 		TLSClientConfig: restclient.TLSClientConfig{
-			ServerName: LoopbackClientServerNameOverride,
-			CAData:     loopbackCert,
+			CAData: caCert,
 		},
 	}, nil
+}
+
+func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert []byte) (*restclient.Config, error) {
+	c, err := s.NewClientConfig(loopbackCert)
+	if err != nil || c == nil {
+		return c, err
+	}
+
+	c.BearerToken = token
+	c.TLSClientConfig.ServerName = LoopbackClientServerNameOverride
+
+	return c, nil
 }
 
 // LoopbackHostPort returns the host and port loopback REST clients should use
@@ -63,6 +73,8 @@ func LoopbackHostPort(bindAddress string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid server bind address: %q", bindAddress)
 	}
 
+	isIPv6 := net.ParseIP(host).To4() == nil
+
 	// Value is expected to be an IP or DNS name, not "0.0.0.0".
 	if host == "0.0.0.0" || host == "::" {
 		host = "localhost"
@@ -72,7 +84,7 @@ func LoopbackHostPort(bindAddress string) (string, string, error) {
 		addrs, err := net.InterfaceAddrs()
 		if err == nil {
 			for _, address := range addrs {
-				if ipnet, ok := address.(*net.IPNet); ok && ipnet.IP.IsLoopback() {
+				if ipnet, ok := address.(*net.IPNet); ok && ipnet.IP.IsLoopback() && isIPv6 == (ipnet.IP.To4() == nil) {
 					host = ipnet.IP.String()
 					break
 				}

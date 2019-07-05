@@ -18,10 +18,11 @@ package ipvs
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 
-	"github.com/golang/glog"
+	"fmt"
+	"k8s.io/klog"
 )
 
 const (
@@ -63,6 +64,22 @@ const (
 
 	kubeNodePortLocalSetUDPComment = "Kubernetes nodeport UDP port with externalTrafficPolicy=local"
 	kubeNodePortLocalSetUDP        = "KUBE-NODE-PORT-LOCAL-UDP"
+
+	// This ipset is no longer active but still used in previous versions.
+	// DO NOT create an ipset using this name
+	legacyKubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose"
+	legacyKubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP"
+
+	// This ipset is no longer active but still used in previous versions.
+	// DO NOT create an ipset using this name
+	legacyKubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local"
+	legacyKubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP"
+
+	kubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose with type 'hash ip:port'"
+	kubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP-HASH"
+
+	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local with type 'hash ip:port'"
+	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP-HASH"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -107,6 +124,10 @@ func (set *IPSet) isEmpty() bool {
 	return len(set.activeEntries.UnsortedList()) == 0
 }
 
+func (set *IPSet) getComment() string {
+	return fmt.Sprintf("\"%s\"", set.Comment)
+}
+
 func (set *IPSet) resetEntries() {
 	set.activeEntries = sets.NewString()
 }
@@ -114,7 +135,7 @@ func (set *IPSet) resetEntries() {
 func (set *IPSet) syncIPSetEntries() {
 	appliedEntries, err := set.handle.ListEntries(set.Name)
 	if err != nil {
-		glog.Errorf("Failed to list ip set entries, error: %v", err)
+		klog.Errorf("Failed to list ip set entries, error: %v", err)
 		return
 	}
 
@@ -129,29 +150,27 @@ func (set *IPSet) syncIPSetEntries() {
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
-					glog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
+					klog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
 				}
 			} else {
-				glog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
+				klog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				glog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
+				klog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
 			} else {
-				glog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
+				klog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
 			}
 		}
 	}
 }
 
-func ensureIPSets(ipSets ...*IPSet) error {
-	for _, set := range ipSets {
-		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-			glog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
-			return err
-		}
+func ensureIPSet(set *IPSet) error {
+	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+		klog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
+		return err
 	}
 	return nil
 }
@@ -160,13 +179,13 @@ func ensureIPSets(ipSets ...*IPSet) error {
 func checkMinVersion(vstring string) bool {
 	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
-		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		klog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
 		return false
 	}
 
 	minVersion, err := utilversion.ParseGeneric(MinIPSetCheckVersion)
 	if err != nil {
-		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
+		klog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
 		return false
 	}
 	return !version.LessThan(minVersion)

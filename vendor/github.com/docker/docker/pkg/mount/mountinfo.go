@@ -1,4 +1,4 @@
-package mount
+package mount // import "github.com/docker/docker/pkg/mount"
 
 // Info reveals information about a particular mounted filesystem. This
 // struct is populated from the content in the /proc/<pid>/mountinfo file.
@@ -37,18 +37,4 @@ type Info struct {
 
 	// VfsOpts represents per super block options.
 	VfsOpts string
-}
-
-type byMountpoint []*Info
-
-func (by byMountpoint) Len() int {
-	return len(by)
-}
-
-func (by byMountpoint) Less(i, j int) bool {
-	return by[i].Mountpoint < by[j].Mountpoint
-}
-
-func (by byMountpoint) Swap(i, j int) {
-	by[i], by[j] = by[j], by[i]
 }

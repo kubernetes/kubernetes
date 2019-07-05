@@ -1,12 +1,12 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
-	"golang.org/x/net/context"
 )
 
 // ContainerTop shows process information from within a container.
@@ -18,11 +18,11 @@ func (cli *Client) ContainerTop(ctx context.Context, containerID string, argumen
 	}
 
 	resp, err := cli.get(ctx, "/containers/"+containerID+"/top", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&response)
-	ensureReaderClosed(resp)
 	return response, err
 }

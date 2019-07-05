@@ -17,18 +17,14 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
-	"fmt"
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	admission "k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -48,40 +44,15 @@ func Register(plugins *admission.Plugins) {
 // storageProtectionPlugin holds state for and implements the admission plugin.
 type storageProtectionPlugin struct {
 	*admission.Handler
-
-	pvcLister corelisters.PersistentVolumeClaimLister
-	pvLister  corelisters.PersistentVolumeLister
 }
 
 var _ admission.Interface = &storageProtectionPlugin{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&storageProtectionPlugin{})
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *storageProtectionPlugin {
 	return &storageProtectionPlugin{
 		Handler: admission.NewHandler(admission.Create),
 	}
-}
-
-func (c *storageProtectionPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	pvcInformer := f.Core().InternalVersion().PersistentVolumeClaims()
-	c.pvcLister = pvcInformer.Lister()
-	pvInformer := f.Core().InternalVersion().PersistentVolumes()
-	c.pvLister = pvInformer.Lister()
-	c.SetReadyFunc(func() bool {
-		return pvcInformer.Informer().HasSynced() && pvInformer.Informer().HasSynced()
-	})
-}
-
-// ValidateInitialization ensures lister is set.
-func (c *storageProtectionPlugin) ValidateInitialization() error {
-	if c.pvcLister == nil {
-		return fmt.Errorf("missing PVC lister")
-	}
-	if c.pvLister == nil {
-		return fmt.Errorf("missing PV lister")
-	}
-	return nil
 }
 
 var (
@@ -94,7 +65,7 @@ var (
 //
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
-func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
+func (c *storageProtectionPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		return nil
 	}
@@ -126,7 +97,7 @@ func (c *storageProtectionPlugin) admitPV(a admission.Attributes) error {
 			return nil
 		}
 	}
-	glog.V(4).Infof("adding PV protection finalizer to %s", pv.Name)
+	klog.V(4).Infof("adding PV protection finalizer to %s", pv.Name)
 	pv.Finalizers = append(pv.Finalizers, volumeutil.PVProtectionFinalizer)
 
 	return nil
@@ -150,7 +121,7 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 		}
 	}
 
-	glog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
 	return nil
 }

@@ -26,6 +26,8 @@ go_library(
         "string.go",
         "string_array.go",
         "string_slice.go",
+        "string_to_int.go",
+        "string_to_string.go",
         "uint.go",
         "uint16.go",
         "uint32.go",
@@ -33,6 +35,7 @@ go_library(
         "uint8.go",
         "uint_slice.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/spf13/pflag",
     importpath = "github.com/spf13/pflag",
     visibility = ["//visibility:public"],
 )

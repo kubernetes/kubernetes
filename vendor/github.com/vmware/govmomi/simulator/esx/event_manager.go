@@ -78,6 +78,12 @@ var EventInfo = []types.EventDescriptionEventDetail{
 		FullFormat:  "Host {{.Host.Name}} in {{.Datacenter.Name}} has exited maintenance mode",
 	},
 	{
+		Key:         "HostRemovedEvent",
+		Description: "Host removed",
+		FullFormat:  "Removed host {{.Host.Name}} in {{.Datacenter.Name}}",
+		Category:    "info",
+	},
+	{
 		Key:         "VmSuspendedEvent",
 		Description: "VM suspended",
 		Category:    "info",
@@ -160,6 +166,12 @@ var EventInfo = []types.EventDescriptionEventDetail{
 		Description: "VM starting",
 		Category:    "info",
 		FullFormat:  "{{.Vm.Name}} on host {{.Host.Name}} in {{.Datacenter.Name}} is starting",
+	},
+	{
+		Key:         "VmStoppingEvent",
+		Description: "VM stopping",
+		Category:    "info",
+		FullFormat:  "{{.Vm.Name}} on host {{.Host.Name}} in {{.Datacenter.Name}} is stopping",
 	},
 	{
 		Key:         "VmSuspendingEvent",

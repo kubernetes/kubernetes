@@ -19,9 +19,9 @@ package node
 import (
 	"sync"
 
-	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	corev1 "k8s.io/api/core/v1"
+	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )
@@ -305,7 +305,7 @@ func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
 //   configmap -> pod
 //   pvc       -> pod
 //   svcacct   -> pod
-func (g *Graph) AddPod(pod *api.Pod) {
+func (g *Graph) AddPod(pod *corev1.Pod) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -313,6 +313,13 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	podVertex := g.getOrCreateVertex_locked(podVertexType, pod.Namespace, pod.Name)
 	nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", pod.Spec.NodeName)
 	g.graph.SetEdge(newDestinationEdge(podVertex, nodeVertex, nodeVertex))
+
+	// Short-circuit adding edges to other resources for mirror pods.
+	// A node must never be able to create a pod that grants them permissions on other API objects.
+	// The NodeRestriction admission plugin prevents creation of such pods, but short-circuiting here gives us defense in depth.
+	if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
+		return
+	}
 
 	// TODO(mikedanese): If the pod doesn't mount the service account secrets,
 	// should the node still get access to the service account?
@@ -357,7 +364,7 @@ func (g *Graph) DeletePod(name, namespace string) {
 //   secret -> pv
 //
 //   pv -> pvc
-func (g *Graph) AddPV(pv *api.PersistentVolume) {
+func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 

@@ -6,6 +6,7 @@ go_library(
         "join.go",
         "vfs.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/cyphar/filepath-securejoin",
     importpath = "github.com/cyphar/filepath-securejoin",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/pkg/errors:go_default_library"],

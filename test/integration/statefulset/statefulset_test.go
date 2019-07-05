@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -37,7 +37,7 @@ func TestSpecReplicasChange(t *testing.T) {
 
 	createHeadlessService(t, c, newHeadlessService(ns.Name))
 	sts := newSTS("sts", ns.Name, 2)
-	stss, _ := createSTSsPods(t, c, []*v1beta1.StatefulSet{sts}, []*v1.Pod{})
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
 	sts = stss[0]
 	waitSTSStable(t, c, sts)
 
@@ -48,9 +48,9 @@ func TestSpecReplicasChange(t *testing.T) {
 
 	// Add a template annotation change to test STS's status does update
 	// without .Spec.Replicas change
-	stsClient := c.AppsV1beta1().StatefulSets(ns.Name)
+	stsClient := c.AppsV1().StatefulSets(ns.Name)
 	var oldGeneration int64
-	newSTS := updateSTS(t, stsClient, sts.Name, func(sts *v1beta1.StatefulSet) {
+	newSTS := updateSTS(t, stsClient, sts.Name, func(sts *appsv1.StatefulSet) {
 		oldGeneration = sts.Generation
 		sts.Spec.Template.Annotations = map[string]string{"test": "annotation"}
 	})
@@ -64,7 +64,7 @@ func TestSpecReplicasChange(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		return *newSTS.Status.ObservedGeneration >= savedGeneration, nil
+		return newSTS.Status.ObservedGeneration >= savedGeneration, nil
 	}); err != nil {
 		t.Fatalf("failed to verify .Status.ObservedGeneration has incremented for sts %s: %v", sts.Name, err)
 	}
@@ -80,12 +80,12 @@ func TestDeletingAndFailedPods(t *testing.T) {
 
 	labelMap := labelMap()
 	sts := newSTS("sts", ns.Name, 2)
-	stss, _ := createSTSsPods(t, c, []*v1beta1.StatefulSet{sts}, []*v1.Pod{})
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
 	sts = stss[0]
 	waitSTSStable(t, c, sts)
 
 	// Verify STS creates 2 pods
-	podClient := c.Core().Pods(ns.Name)
+	podClient := c.CoreV1().Pods(ns.Name)
 	pods := getPods(t, podClient, labelMap)
 	if len(pods.Items) != 2 {
 		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
@@ -97,7 +97,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
-	if err := c.Core().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("error deleting pod %s: %v", deletingPod.Name, err)
 	}
 

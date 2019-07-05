@@ -4,36 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "osext.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "osext_sysctl.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "osext_procfs.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "osext_sysctl.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "osext_procfs.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "osext_procfs.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "osext_procfs.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "osext_plan9.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "osext_procfs.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "osext_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "osext_plan9.go",
+        "osext_procfs.go",
+        "osext_sysctl.go",
+        "osext_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/kardianos/osext",
     importpath = "github.com/kardianos/osext",
     visibility = ["//visibility:public"],
 )

@@ -136,12 +136,12 @@ func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []strin
 
 	negotiatedProtocol := negotiateProtocol(clientProtocols, serverProtocols)
 	if len(negotiatedProtocol) == 0 {
-		w.WriteHeader(http.StatusForbidden)
 		for i := range serverProtocols {
 			w.Header().Add(HeaderAcceptedProtocolVersions, serverProtocols[i])
 		}
-		fmt.Fprintf(w, "unable to upgrade: unable to negotiate protocol: client supports %v, server accepts %v", clientProtocols, serverProtocols)
-		return "", fmt.Errorf("unable to upgrade: unable to negotiate protocol: client supports %v, server supports %v", clientProtocols, serverProtocols)
+		err := fmt.Errorf("unable to upgrade: unable to negotiate protocol: client supports %v, server accepts %v", clientProtocols, serverProtocols)
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return "", err
 	}
 
 	w.Header().Add(HeaderProtocolVersion, negotiatedProtocol)

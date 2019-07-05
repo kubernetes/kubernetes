@@ -21,17 +21,19 @@ import (
 	"io"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
+// PluginName is a string with the name of the plugin
 const PluginName = "ResourceQuota"
 
 // Register registers a plugin
@@ -65,12 +67,13 @@ type QuotaAdmission struct {
 }
 
 var _ admission.ValidationInterface = &QuotaAdmission{}
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
 var _ = kubeapiserveradmission.WantsQuotaConfiguration(&QuotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
-	items  []*api.ResourceQuota
+	items  []*corev1.ResourceQuota
 }
 
 // NewResourceQuota configures an admission controller that can enforce quota constraints
@@ -91,14 +94,17 @@ func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int,
 	}, nil
 }
 
-func (a *QuotaAdmission) SetInternalKubeClientSet(client internalclientset.Interface) {
+// SetExternalKubeClientSet registers the client into QuotaAdmission
+func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
 	a.quotaAccessor.client = client
 }
 
-func (a *QuotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
+// SetExternalKubeInformerFactory registers an informer factory into QuotaAdmission
+func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	a.quotaAccessor.lister = f.Core().V1().ResourceQuotas().Lister()
 }
 
+// SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
 	a.quotaConfiguration = c
 	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)
@@ -125,7 +131,7 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 }
 
 // Validate makes admission decisions while enforcing quota
-func (a *QuotaAdmission) Validate(attr admission.Attributes) (err error) {
+func (a *QuotaAdmission) Validate(attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if attr.GetSubresource() != "" {
 		return nil

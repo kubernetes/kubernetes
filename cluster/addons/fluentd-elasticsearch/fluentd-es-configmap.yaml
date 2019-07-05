@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: fluentd-es-config-v0.1.4
+  name: fluentd-es-config-v0.2.0
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
@@ -115,7 +115,6 @@ data:
       @type tail
       path /var/log/containers/*.log
       pos_file /var/log/es-containers.log.pos
-      time_format %Y-%m-%dT%H:%M:%S.%NZ
       tag raw.kubernetes.*
       read_from_head true
       <parse>
@@ -143,6 +142,39 @@ data:
       max_bytes 500000
       max_lines 1000
     </match>
+
+    # Concatenate multi-line logs
+    <filter **>
+      @id filter_concat
+      @type concat
+      key message
+      multiline_end_regexp /\n$/
+      separator ""
+    </filter>
+
+    # Enriches records with Kubernetes metadata
+    <filter kubernetes.**>
+      @id filter_kubernetes_metadata
+      @type kubernetes_metadata
+    </filter>
+
+    # Fixes json fields in Elasticsearch
+    <filter kubernetes.**>
+      @id filter_parser
+      @type parser
+      key_name log
+      reserve_data true
+      remove_key_name_field true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+        </pattern>
+        <pattern>
+          format none
+        </pattern>
+      </parse>
+    </filter>
 
   system.input.conf: |-
     # Example:
@@ -274,21 +306,6 @@ data:
     </source>
 
     # Example:
-    # I1104 10:36:20.242766       5 rescheduler.go:73] Running Rescheduler
-    <source>
-      @id rescheduler.log
-      @type tail
-      format multiline
-      multiline_flush_interval 5s
-      format_firstline /^\w\d{4}/
-      format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
-      time_format %m%d %H:%M:%S.%N
-      path /var/log/rescheduler.log
-      pos_file /var/log/es-rescheduler.log.pos
-      tag rescheduler
-    </source>
-
-    # Example:
     # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
     <source>
       @id glbc.log
@@ -323,10 +340,11 @@ data:
     <source>
       @id journald-docker
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "docker.service" }]
+      matches [{ "_SYSTEMD_UNIT": "docker.service" }]
       <storage>
         @type local
         persistent true
+        path /var/log/journald-docker.pos
       </storage>
       read_from_head true
       tag docker
@@ -335,10 +353,11 @@ data:
     <source>
       @id journald-container-runtime
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      matches [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
       <storage>
         @type local
         persistent true
+        path /var/log/journald-container-runtime.pos
       </storage>
       read_from_head true
       tag container-runtime
@@ -347,10 +366,11 @@ data:
     <source>
       @id journald-kubelet
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
+      matches [{ "_SYSTEMD_UNIT": "kubelet.service" }]
       <storage>
         @type local
         persistent true
+        path /var/log/journald-kubelet.pos
       </storage>
       read_from_head true
       tag kubelet
@@ -359,22 +379,24 @@ data:
     <source>
       @id journald-node-problem-detector
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
+      matches [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
       <storage>
         @type local
         persistent true
+        path /var/log/journald-node-problem-detector.pos
       </storage>
       read_from_head true
       tag node-problem-detector
     </source>
-    
+
     <source>
       @id kernel
       @type systemd
-      filters [{ "_TRANSPORT": "kernel" }]
+      matches [{ "_TRANSPORT": "kernel" }]
       <storage>
         @type local
         persistent true
+        path /var/log/kernel.pos
       </storage>
       <entry>
         fields_strip_underscores true
@@ -387,6 +409,7 @@ data:
   forward.input.conf: |-
     # Takes the messages sent over TCP
     <source>
+      @id forward
       @type forward
     </source>
 
@@ -394,15 +417,18 @@ data:
     # Prometheus Exporter Plugin
     # input plugin that exports metrics
     <source>
+      @id prometheus
       @type prometheus
     </source>
 
     <source>
+      @id monitor_agent
       @type monitor_agent
     </source>
 
     # input plugin that collects metrics from MonitorAgent
     <source>
+      @id prometheus_monitor
       @type prometheus_monitor
       <labels>
         host ${hostname}
@@ -411,6 +437,7 @@ data:
 
     # input plugin that collects metrics for output plugin
     <source>
+      @id prometheus_output_monitor
       @type prometheus_output_monitor
       <labels>
         host ${hostname}
@@ -419,6 +446,7 @@ data:
 
     # input plugin that collects metrics for in_tail plugin
     <source>
+      @id prometheus_tail_monitor
       @type prometheus_tail_monitor
       <labels>
         host ${hostname}
@@ -426,15 +454,11 @@ data:
     </source>
 
   output.conf: |-
-    # Enriches records with Kubernetes metadata
-    <filter kubernetes.**>
-      @type kubernetes_metadata
-    </filter>
-
     <match **>
       @id elasticsearch
       @type elasticsearch
       @log_level info
+      type_name _doc
       include_tag_key true
       host elasticsearch-logging
       port 9200

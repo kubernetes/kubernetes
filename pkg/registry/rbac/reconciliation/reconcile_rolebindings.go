@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"reflect"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 type RoleBindingModifier interface {
@@ -42,9 +42,9 @@ type RoleBinding interface {
 	SetLabels(map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(map[string]string)
-	GetRoleRef() rbac.RoleRef
-	GetSubjects() []rbac.Subject
-	SetSubjects([]rbac.Subject)
+	GetRoleRef() rbacv1.RoleRef
+	GetSubjects() []rbacv1.Subject
+	SetSubjects([]rbacv1.Subject)
 	DeepCopyRoleBinding() RoleBinding
 }
 
@@ -67,9 +67,9 @@ type ReconcileClusterRoleBindingResult struct {
 	RoleBinding RoleBinding
 
 	// MissingSubjects contains expected subjects that were missing from the currently persisted rolebinding
-	MissingSubjects []rbac.Subject
+	MissingSubjects []rbacv1.Subject
 	// ExtraSubjects contains extra subjects the currently persisted rolebinding had
-	ExtraSubjects []rbac.Subject
+	ExtraSubjects []rbacv1.Subject
 
 	// Operation is the API operation required to reconcile.
 	// If no reconciliation was needed, it is set to ReconcileNone.
@@ -176,7 +176,7 @@ func (o *ReconcileRoleBindingOptions) run(attempts int) (*ReconcileClusterRoleBi
 func computeReconciledRoleBinding(existing, expected RoleBinding, removeExtraSubjects bool) (*ReconcileClusterRoleBindingResult, error) {
 	result := &ReconcileClusterRoleBindingResult{Operation: ReconcileNone}
 
-	result.Protected = (existing.GetAnnotations()[rbac.AutoUpdateAnnotationKey] == "false")
+	result.Protected = (existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false")
 
 	// Reset the binding completely if the roleRef is different
 	if expected.GetRoleRef() != existing.GetRoleRef() {
@@ -216,7 +216,7 @@ func computeReconciledRoleBinding(existing, expected RoleBinding, removeExtraSub
 	return result, nil
 }
 
-func contains(list []rbac.Subject, item rbac.Subject) bool {
+func contains(list []rbacv1.Subject, item rbacv1.Subject) bool {
 	for _, listItem := range list {
 		if listItem == item {
 			return true
@@ -229,7 +229,7 @@ func contains(list []rbac.Subject, item rbac.Subject) bool {
 //   list1Only = list1 - list2
 //   list2Only = list2 - list1
 // if both returned lists are empty, the provided lists are equal
-func diffSubjectLists(list1 []rbac.Subject, list2 []rbac.Subject) (list1Only []rbac.Subject, list2Only []rbac.Subject) {
+func diffSubjectLists(list1 []rbacv1.Subject, list2 []rbacv1.Subject) (list1Only []rbacv1.Subject, list2Only []rbacv1.Subject) {
 	for _, list1Item := range list1 {
 		if !contains(list2, list1Item) {
 			if !contains(list1Only, list1Item) {

@@ -45,9 +45,9 @@ var _ = rest.Connecter(&ProxyREST{})
 
 var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
-// New returns an empty service resource
+// New returns an empty nodeProxyOptions object.
 func (r *ProxyREST) New() runtime.Object {
-	return &api.Node{}
+	return &api.NodeProxyOptions{}
 }
 
 // ConnectMethods returns the list of HTTP methods that can be proxied

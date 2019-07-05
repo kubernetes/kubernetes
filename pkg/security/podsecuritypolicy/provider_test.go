@@ -19,26 +19,30 @@ package podsecuritypolicy
 import (
 	"fmt"
 	"reflect"
-	"strings"
+	"strconv"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/utils/pointer"
 )
 
 const defaultContainerName = "test-c"
 
-func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
+func TestMutatePodNonmutating(t *testing.T) {
 	// Create a pod with a security context that needs filling in
 	createPod := func() *api.Pod {
 		return &api.Pod{
@@ -49,6 +53,7 @@ func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 	}
 
 	// Create a PSP with strategies that will populate a blank psc
+	allowPrivilegeEscalation := true
 	createPSP := func() *policy.PodSecurityPolicy {
 		return &policy.PodSecurityPolicy{
 			ObjectMeta: metav1.ObjectMeta{
@@ -58,9 +63,12 @@ func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 				},
 			},
 			Spec: policy.PodSecurityPolicySpec{
-				AllowPrivilegeEscalation: true,
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 				RunAsUser: policy.RunAsUserStrategyOptions{
 					Rule: policy.RunAsUserStrategyRunAsAny,
+				},
+				RunAsGroup: &policy.RunAsGroupStrategyOptions{
+					Rule: policy.RunAsGroupStrategyRunAsAny,
 				},
 				SELinux: policy.SELinuxStrategyOptions{
 					Rule: policy.SELinuxStrategyRunAsAny,
@@ -79,26 +87,22 @@ func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 	psp := createPSP()
 
 	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-	if err != nil {
-		t.Fatalf("unable to create provider %v", err)
-	}
-	err = provider.DefaultPodSecurityContext(pod)
-	if err != nil {
-		t.Fatalf("unable to create psc %v", err)
-	}
+	require.NoError(t, err, "unable to create provider")
+	err = provider.MutatePod(pod)
+	require.NoError(t, err, "unable to modify pod")
 
 	// Creating the provider or the security context should not have mutated the psp or pod
 	// since all the strategies were permissive
 	if !reflect.DeepEqual(createPod(), pod) {
 		diffs := diff.ObjectDiff(createPod(), pod)
-		t.Errorf("pod was mutated by DefaultPodSecurityContext. diff:\n%s", diffs)
+		t.Errorf("pod was mutated by MutatePod. diff:\n%s", diffs)
 	}
 	if !reflect.DeepEqual(createPSP(), psp) {
-		t.Error("psp was mutated by DefaultPodSecurityContext")
+		t.Error("psp was mutated by MutatePod")
 	}
 }
 
-func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
+func TestMutateContainerNonmutating(t *testing.T) {
 	untrue := false
 	tests := []struct {
 		security *api.SecurityContext
@@ -120,19 +124,22 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 		}
 
 		// Create a PSP with strategies that will populate a blank security context
+		allowPrivilegeEscalation := true
 		createPSP := func() *policy.PodSecurityPolicy {
 			return &policy.PodSecurityPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "psp-sa",
 					Annotations: map[string]string{
 						seccomp.AllowedProfilesAnnotationKey: "*",
-						seccomp.DefaultProfileAnnotationKey:  "foo",
 					},
 				},
 				Spec: policy.PodSecurityPolicySpec{
-					AllowPrivilegeEscalation: true,
+					AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 					RunAsUser: policy.RunAsUserStrategyOptions{
 						Rule: policy.RunAsUserStrategyRunAsAny,
+					},
+					RunAsGroup: &policy.RunAsGroupStrategyOptions{
+						Rule: policy.RunAsGroupStrategyRunAsAny,
 					},
 					SELinux: policy.SELinuxStrategyOptions{
 						Rule: policy.SELinuxStrategyRunAsAny,
@@ -151,27 +158,25 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 		psp := createPSP()
 
 		provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		err = provider.DefaultContainerSecurityContext(pod, &pod.Spec.Containers[0])
-		if err != nil {
-			t.Fatalf("unable to create container security context %v", err)
-		}
+		require.NoError(t, err, "unable to create provider")
+		err = provider.MutatePod(pod)
+		require.NoError(t, err, "unable to modify pod")
 
 		// Creating the provider or the security context should not have mutated the psp or pod
 		// since all the strategies were permissive
 		if !reflect.DeepEqual(createPod(), pod) {
 			diffs := diff.ObjectDiff(createPod(), pod)
-			t.Errorf("pod was mutated by DefaultContainerSecurityContext. diff:\n%s", diffs)
+			t.Errorf("pod was mutated. diff:\n%s", diffs)
 		}
 		if !reflect.DeepEqual(createPSP(), psp) {
-			t.Error("psp was mutated by DefaultContainerSecurityContext")
+			t.Error("psp was mutated")
 		}
 	}
 }
 
-func TestValidatePodSecurityContextFailures(t *testing.T) {
+func TestValidatePodFailures(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	failHostNetworkPod := defaultPod()
 	failHostNetworkPod.Spec.SecurityContext.HostNetwork = true
 
@@ -183,29 +188,46 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 
 	failSupplementalGroupPod := defaultPod()
 	failSupplementalGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{999}
-	failSupplementalGroupPSP := defaultPSP()
-	failSupplementalGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+	failSupplementalGroupMustPSP := defaultPSP()
+	failSupplementalGroupMustPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
+		},
+	}
+	failSupplementalGroupMayPSP := defaultPSP()
+	failSupplementalGroupMayPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+		Rule: policy.SupplementalGroupsStrategyMayRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 50, Max: 50},
+			{Min: 55, Max: 998},
+			{Min: 1000, Max: 1000},
 		},
 	}
 
 	failFSGroupPod := defaultPod()
 	fsGroup := int64(999)
 	failFSGroupPod.Spec.SecurityContext.FSGroup = &fsGroup
-	failFSGroupPSP := defaultPSP()
-	failFSGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+	failFSGroupMustPSP := defaultPSP()
+	failFSGroupMustPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
+		},
+	}
+	failFSGroupMayPSP := defaultPSP()
+	failFSGroupMayPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+		Rule: policy.FSGroupStrategyMayRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 10, Max: 20},
+			{Min: 1000, Max: 1001},
 		},
 	}
 
 	failNilSELinuxPod := defaultPod()
 	failSELinuxPSP := defaultPSP()
 	failSELinuxPSP.Spec.SELinux.Rule = policy.SELinuxStrategyMustRunAs
-	failSELinuxPSP.Spec.SELinux.SELinuxOptions = &api.SELinuxOptions{
+	failSELinuxPSP.Spec.SELinux.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "foo",
 	}
 
@@ -241,17 +263,60 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		{PathPrefix: "/foo/bar"},
 	}
 
-	failOtherSysctlsAllowedPSP := defaultPSP()
-	failOtherSysctlsAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
+	failHostPathReadOnlyPod := defaultPod()
+	failHostPathReadOnlyPod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{
+		{
+			Name:     "bad volume",
+			ReadOnly: false,
+		},
+	}
+	failHostPathReadOnlyPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo",
+				},
+			},
+		},
+	}
+	failHostPathReadOnlyPSP := defaultPSP()
+	failHostPathReadOnlyPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
+	failHostPathReadOnlyPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
+		{
+			PathPrefix: "/foo",
+			ReadOnly:   true,
+		},
+	}
 
-	failNoSysctlAllowedPSP := defaultPSP()
-	failNoSysctlAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = ""
+	failSysctlDisallowedPSP := defaultPSP()
+	failSysctlDisallowedPSP.Spec.ForbiddenSysctls = []string{"kernel.shm_rmid_forced"}
 
-	failSafeSysctlFooPod := defaultPod()
-	failSafeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+	failNoSafeSysctlAllowedPSP := defaultPSP()
+	failNoSafeSysctlAllowedPSP.Spec.ForbiddenSysctls = []string{"*"}
 
-	failUnsafeSysctlFooPod := defaultPod()
-	failUnsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+	failAllUnsafeSysctlsPSP := defaultPSP()
+	failAllUnsafeSysctlsPSP.Spec.AllowedUnsafeSysctls = []string{}
+
+	failSafeSysctlKernelPod := defaultPod()
+	failSafeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		},
+	}
+
+	failUnsafeSysctlPod := defaultPod()
+	failUnsafeSysctlPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.sem",
+				Value: "32000",
+			},
+		},
+	}
 
 	failSeccompProfilePod := defaultPod()
 	failSeccompProfilePod.Annotations = map[string]string{api.SeccompPodAnnotationKey: "foo"}
@@ -263,6 +328,18 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			VolumeSource: api.VolumeSource{
 				FlexVolume: &api.FlexVolumeSource{
 					Driver: "example/unknown",
+				},
+			},
+		},
+	}
+
+	failCSIDriverPod := defaultPod()
+	failCSIDriverPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "csi volume pod",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "csi.driver.foo",
 				},
 			},
 		},
@@ -288,24 +365,34 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           defaultPSP(),
 			expectedError: "Host IPC is not allowed to be used",
 		},
-		"failSupplementalGroupOutOfRange": {
+		"failSupplementalGroupOutOfMustRange": {
 			pod:           failSupplementalGroupPod,
-			psp:           failSupplementalGroupPSP,
+			psp:           failSupplementalGroupMustPSP,
 			expectedError: "group 999 must be in the ranges: [{1 1}]",
 		},
-		"failSupplementalGroupEmpty": {
+		"failSupplementalGroupOutOfMayRange": {
+			pod:           failSupplementalGroupPod,
+			psp:           failSupplementalGroupMayPSP,
+			expectedError: "group 999 must be in the ranges: [{50 50} {55 998} {1000 1000}]",
+		},
+		"failSupplementalGroupMustEmpty": {
 			pod:           defaultPod(),
-			psp:           failSupplementalGroupPSP,
+			psp:           failSupplementalGroupMustPSP,
 			expectedError: "unable to validate empty groups against required ranges",
 		},
-		"failFSGroupOutOfRange": {
+		"failFSGroupOutOfMustRange": {
 			pod:           failFSGroupPod,
-			psp:           failFSGroupPSP,
+			psp:           failFSGroupMustPSP,
 			expectedError: "group 999 must be in the ranges: [{1 1}]",
 		},
-		"failFSGroupEmpty": {
+		"failFSGroupOutOfMayRange": {
+			pod:           failFSGroupPod,
+			psp:           failFSGroupMayPSP,
+			expectedError: "group 999 must be in the ranges: [{10 20} {1000 1001}]",
+		},
+		"failFSGroupMustEmpty": {
 			pod:           defaultPod(),
-			psp:           failFSGroupPSP,
+			psp:           failFSGroupMustPSP,
 			expectedError: "unable to validate empty groups against required ranges",
 		},
 		"failNilSELinux": {
@@ -328,25 +415,25 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           failHostPathDirPSP,
 			expectedError: "is not allowed to be used",
 		},
-		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
-			pod:           failSafeSysctlFooPod,
-			psp:           failNoSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+		"failHostPathReadOnlyPSP": {
+			pod:           failHostPathReadOnlyPod,
+			psp:           failHostPathReadOnlyPSP,
+			expectedError: "must be read-only",
 		},
-		"failUnsafeSysctlFooPod with failNoSysctlAllowedSCC": {
-			pod:           failUnsafeSysctlFooPod,
-			psp:           failNoSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+		"failSafeSysctlKernelPod with failNoSafeSysctlAllowedPSP": {
+			pod:           failSafeSysctlKernelPod,
+			psp:           failNoSafeSysctlAllowedPSP,
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
-		"failSafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
-			pod:           failSafeSysctlFooPod,
-			psp:           failOtherSysctlsAllowedPSP,
-			expectedError: "sysctl \"foo\" is not allowed",
+		"failSafeSysctlKernelPod with failSysctlDisallowedPSP": {
+			pod:           failSafeSysctlKernelPod,
+			psp:           failSysctlDisallowedPSP,
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
-		"failUnsafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
-			pod:           failUnsafeSysctlFooPod,
-			psp:           failOtherSysctlsAllowedPSP,
-			expectedError: "sysctl \"foo\" is not allowed",
+		"failUnsafeSysctlPod with failAllUnsafeSysctlsPSP": {
+			pod:           failUnsafeSysctlPod,
+			psp:           failAllUnsafeSysctlsPSP,
+			expectedError: "unsafe sysctl \"kernel.sem\" is not allowed",
 		},
 		"failInvalidSeccomp": {
 			pod:           failSeccompProfilePod,
@@ -363,20 +450,49 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           allowFlexVolumesPSP(false, true),
 			expectedError: "Flexvolume driver is not allowed to be used",
 		},
+		"CSI policy using disallowed CDI driver": {
+			pod: failCSIDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.CSI}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "csi.driver.disallowed"}}
+				return psp
+			}(),
+			expectedError: "Inline CSI driver is not allowed to be used",
+		},
+		"Using inline CSI driver with no policy specified": {
+			pod: failCSIDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "csi.driver.foo"}}
+				return psp
+			}(),
+			expectedError: "csi volumes are not allowed to be used",
+		},
+		"policy.All using disallowed CDI driver": {
+			pod: failCSIDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.All}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "csi.driver.disallowed"}}
+				return psp
+			}(),
+			expectedError: "Inline CSI driver is not allowed to be used",
+		},
+		"CSI inline volumes without proper policy set": {
+			pod:           failCSIDriverPod,
+			psp:           defaultPSP(),
+			expectedError: "csi volumes are not allowed to be used",
+		},
 	}
-	for k, v := range errorCases {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		errs := provider.ValidatePod(v.pod, field.NewPath(""))
-		if len(errs) == 0 {
-			t.Errorf("%s expected validation failure but did not receive errors", k)
-			continue
-		}
-		if !strings.Contains(errs[0].Error(), v.expectedError) {
-			t.Errorf("%s received unexpected error %v", k, errs)
-		}
+	for name, test := range errorCases {
+		t.Run(name, func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "unable to create provider")
+			errs := provider.ValidatePod(test.pod)
+			require.NotEmpty(t, errs, "expected validation failure but did not receive errors")
+			assert.Contains(t, errs[0].Error(), test.expectedError, "received unexpected error")
+		})
 	}
 }
 
@@ -402,7 +518,7 @@ func allowFlexVolumesPSP(allowAllFlexVolumes, allowAllVolumes bool) *policy.PodS
 	return psp
 }
 
-func TestValidateContainerSecurityContextFailures(t *testing.T) {
+func TestValidateContainerFailures(t *testing.T) {
 	// fail user strategy
 	failUserPSP := defaultPSP()
 	uid := int64(999)
@@ -418,11 +534,12 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	failSELinuxPSP := defaultPSP()
 	failSELinuxPSP.Spec.SELinux = policy.SELinuxStrategyOptions{
 		Rule: policy.SELinuxStrategyMustRunAs,
-		SELinuxOptions: &api.SELinuxOptions{
+		SELinuxOptions: &v1.SELinuxOptions{
 			Level: "foo",
 		},
 	}
 	failSELinuxPod := defaultPod()
+	failSELinuxPod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{Level: "foo"}
 	failSELinuxPod.Spec.Containers[0].SecurityContext.SELinuxOptions = &api.SELinuxOptions{
 		Level: "bar",
 	}
@@ -441,6 +558,10 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	failPrivPod := defaultPod()
 	var priv bool = true
 	failPrivPod.Spec.Containers[0].SecurityContext.Privileged = &priv
+
+	failProcMountPod := defaultPod()
+	failProcMountPod.Spec.Containers[0].SecurityContext.ProcMount = new(api.ProcMountType)
+	*failProcMountPod.Spec.Containers[0].SecurityContext.ProcMount = api.UnmaskedProcMount
 
 	failCapsPod := defaultPod()
 	failCapsPod.Spec.Containers[0].SecurityContext.Capabilities = &api.Capabilities{
@@ -497,6 +618,11 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			psp:           defaultPSP(),
 			expectedError: "Privileged containers are not allowed",
 		},
+		"failProcMountPSP": {
+			pod:           failProcMountPod,
+			psp:           defaultPSP(),
+			expectedError: "ProcMountType is not allowed",
+		},
 		"failCapsPSP": {
 			pod:           failCapsPod,
 			psp:           defaultPSP(),
@@ -529,23 +655,20 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		},
 	}
 
-	for k, v := range errorCases {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
-		if len(errs) == 0 {
-			t.Errorf("%s expected validation failure but did not receive errors", k)
-			continue
-		}
-		if !strings.Contains(errs[0].Error(), v.expectedError) {
-			t.Errorf("%s received unexpected error %v\nexpected: %s", k, errs, v.expectedError)
-		}
+	for name, test := range errorCases {
+		t.Run(name, func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "unable to create provider")
+			errs := provider.ValidatePod(test.pod)
+			require.NotEmpty(t, errs, "expected validation failure but did not receive errors")
+			assert.Contains(t, errs[0].Error(), test.expectedError, "unexpected error")
+		})
 	}
 }
 
-func TestValidatePodSecurityContextSuccess(t *testing.T) {
+func TestValidatePodSuccess(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	hostNetworkPSP := defaultPSP()
 	hostNetworkPSP.Spec.HostNetwork = true
 	hostNetworkPod := defaultPod()
@@ -561,9 +684,16 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	hostIPCPod := defaultPod()
 	hostIPCPod.Spec.SecurityContext.HostIPC = true
 
-	supGroupPSP := defaultPSP()
-	supGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+	supGroupMustPSP := defaultPSP()
+	supGroupMustPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 1, Max: 5},
+		},
+	}
+	supGroupMayPSP := defaultPSP()
+	supGroupMayPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+		Rule: policy.SupplementalGroupsStrategyMayRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
@@ -571,9 +701,16 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	supGroupPod := defaultPod()
 	supGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{3}
 
-	fsGroupPSP := defaultPSP()
-	fsGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+	fsGroupMustPSP := defaultPSP()
+	fsGroupMustPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 1, Max: 5},
+		},
+	}
+	fsGroupMayPSP := defaultPSP()
+	fsGroupMayPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+		Rule: policy.FSGroupStrategyMayRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
@@ -591,20 +728,71 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	}
 	seLinuxPSP := defaultPSP()
 	seLinuxPSP.Spec.SELinux.Rule = policy.SELinuxStrategyMustRunAs
-	seLinuxPSP.Spec.SELinux.SELinuxOptions = &api.SELinuxOptions{
+	seLinuxPSP.Spec.SELinux.SELinuxOptions = &v1.SELinuxOptions{
 		User:  "user",
 		Role:  "role",
 		Type:  "type",
 		Level: "level",
 	}
 
+	hostPathDirPodVolumeMounts := []api.VolumeMount{
+		{
+			Name:     "writeable /foo/bar",
+			ReadOnly: false,
+		},
+		{
+			Name:     "read only /foo/bar/baz",
+			ReadOnly: true,
+		},
+		{
+			Name:     "parent read only volume",
+			ReadOnly: true,
+		},
+		{
+			Name:     "read only child volume",
+			ReadOnly: true,
+		},
+	}
+
 	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.InitContainers = []api.Container{
+		{
+			Name:         defaultContainerName,
+			VolumeMounts: hostPathDirPodVolumeMounts,
+		},
+	}
+
+	hostPathDirPod.Spec.Containers[0].VolumeMounts = hostPathDirPodVolumeMounts
 	hostPathDirPod.Spec.Volumes = []api.Volume{
 		{
-			Name: "good volume",
+			Name: "writeable /foo/bar",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar",
+				},
+			},
+		},
+		{
+			Name: "read only /foo/bar/baz",
 			VolumeSource: api.VolumeSource{
 				HostPath: &api.HostPathVolumeSource{
 					Path: "/foo/bar/baz",
+				},
+			},
+		},
+		{
+			Name: "parent read only volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/",
+				},
+			},
+		},
+		{
+			Name: "read only child volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/readonly/child",
 				},
 			},
 		},
@@ -613,23 +801,41 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	hostPathDirPSP := defaultPSP()
 	hostPathDirPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
 	hostPathDirPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		// overlapping test case where child is different than parent directory.
+		{PathPrefix: "/foo/bar/baz", ReadOnly: true},
+		{PathPrefix: "/foo", ReadOnly: true},
+		{PathPrefix: "/foo/bar", ReadOnly: false},
 	}
 
 	hostPathDirAsterisksPSP := defaultPSP()
 	hostPathDirAsterisksPSP.Spec.Volumes = []policy.FSType{policy.All}
 	hostPathDirAsterisksPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		{PathPrefix: "/foo"},
 	}
 
-	sysctlAllowFooPSP := defaultPSP()
-	sysctlAllowFooPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
+	sysctlAllowAllPSP := defaultPSP()
+	sysctlAllowAllPSP.Spec.ForbiddenSysctls = []string{}
+	sysctlAllowAllPSP.Spec.AllowedUnsafeSysctls = []string{"*"}
 
-	safeSysctlFooPod := defaultPod()
-	safeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+	safeSysctlKernelPod := defaultPod()
+	safeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		},
+	}
 
-	unsafeSysctlFooPod := defaultPod()
-	unsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+	unsafeSysctlKernelPod := defaultPod()
+	unsafeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.sem",
+				Value: "32000",
+			},
+		},
+	}
 
 	seccompPSP := defaultPSP()
 	seccompPSP.Annotations = map[string]string{
@@ -653,6 +859,34 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		},
 	}
 
+	csiDriverPod := defaultPod()
+	csiDriverPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "csi inline driver",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "foo",
+				},
+			},
+		},
+		{
+			Name: "csi inline driver 2",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "bar",
+				},
+			},
+		},
+		{
+			Name: "csi inline driver 3",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "baz",
+				},
+			},
+		},
+	}
+
 	successCases := map[string]struct {
 		pod *api.Pod
 		psp *policy.PodSecurityPolicy
@@ -669,33 +903,41 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: hostIPCPod,
 			psp: hostIPCPSP,
 		},
-		"pass supplemental group validating PSP": {
+		"pass required supplemental group validating PSP": {
 			pod: supGroupPod,
-			psp: supGroupPSP,
+			psp: supGroupMustPSP,
 		},
-		"pass fs group validating PSP": {
+		"pass optional supplemental group validation PSP": {
+			pod: supGroupPod,
+			psp: supGroupMayPSP,
+		},
+		"pass optional supplemental group validation PSP - no pod group specified": {
+			pod: defaultPod(),
+			psp: supGroupMayPSP,
+		},
+		"pass required fs group validating PSP": {
 			pod: fsGroupPod,
-			psp: fsGroupPSP,
+			psp: fsGroupMustPSP,
+		},
+		"pass optional fs group validating PSP": {
+			pod: fsGroupPod,
+			psp: fsGroupMayPSP,
+		},
+		"pass optional fs group validating PSP - no pod group specified": {
+			pod: defaultPod(),
+			psp: fsGroupMayPSP,
 		},
 		"pass selinux validating PSP": {
 			pod: seLinuxPod,
 			psp: seLinuxPSP,
 		},
-		"pass sysctl specific profile with safe sysctl": {
-			pod: safeSysctlFooPod,
-			psp: sysctlAllowFooPSP,
+		"pass sysctl specific profile with safe kernel sysctl": {
+			pod: safeSysctlKernelPod,
+			psp: sysctlAllowAllPSP,
 		},
-		"pass sysctl specific profile with unsafe sysctl": {
-			pod: unsafeSysctlFooPod,
-			psp: sysctlAllowFooPSP,
-		},
-		"pass empty profile with safe sysctl": {
-			pod: safeSysctlFooPod,
-			psp: defaultPSP(),
-		},
-		"pass empty profile with unsafe sysctl": {
-			pod: unsafeSysctlFooPod,
-			psp: defaultPSP(),
+		"pass sysctl specific profile with unsafe kernel sysctl": {
+			pod: unsafeSysctlKernelPod,
+			psp: sysctlAllowAllPSP,
 		},
 		"pass hostDir allowed directory validating PSP": {
 			pod: hostPathDirPod,
@@ -725,22 +967,46 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: flexVolumePod,
 			psp: allowFlexVolumesPSP(true, false),
 		},
+		"CSI policy with no CSI volumes used": {
+			pod: defaultPod(),
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.CSI}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
+		"CSI policy with CSI inline volumes used": {
+			pod: csiDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.CSI}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
+		"policy.All with CSI inline volumes used": {
+			pod: csiDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.All}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
 	}
 
-	for k, v := range successCases {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		errs := provider.ValidatePod(v.pod, field.NewPath(""))
-		if len(errs) != 0 {
-			t.Errorf("%s expected validation pass but received errors %v", k, errs)
-			continue
-		}
+	for name, test := range successCases {
+		t.Run(name, func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "unable to create provider")
+			errs := provider.ValidatePod(test.pod)
+			assert.Empty(t, errs, "expected validation pass but received errors")
+		})
 	}
 }
 
-func TestValidateContainerSecurityContextSuccess(t *testing.T) {
+func TestValidateContainerSuccess(t *testing.T) {
 	// success user strategy
 	userPSP := defaultPSP()
 	uid := int64(999)
@@ -755,11 +1021,12 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	seLinuxPSP := defaultPSP()
 	seLinuxPSP.Spec.SELinux = policy.SELinuxStrategyOptions{
 		Rule: policy.SELinuxStrategyMustRunAs,
-		SELinuxOptions: &api.SELinuxOptions{
+		SELinuxOptions: &v1.SELinuxOptions{
 			Level: "foo",
 		},
 	}
 	seLinuxPod := defaultPod()
+	seLinuxPod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{Level: "foo"}
 	seLinuxPod.Spec.Containers[0].SecurityContext.SELinuxOptions = &api.SELinuxOptions{
 		Level: "foo",
 	}
@@ -780,7 +1047,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	privPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	capsPSP := defaultPSP()
-	capsPSP.Spec.AllowedCapabilities = []api.Capability{"foo"}
+	capsPSP.Spec.AllowedCapabilities = []v1.Capability{"foo"}
 	capsPod := defaultPod()
 	capsPod.Spec.Containers[0].SecurityContext.Capabilities = &api.Capabilities{
 		Add: []api.Capability{"foo"},
@@ -788,7 +1055,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 
 	// pod should be able to request caps that are in the required set even if not specified in the allowed set
 	requiredCapsPSP := defaultPSP()
-	requiredCapsPSP.Spec.DefaultAddCapabilities = []api.Capability{"foo"}
+	requiredCapsPSP.Spec.DefaultAddCapabilities = []v1.Capability{"foo"}
 	requiredCapsPod := defaultPod()
 	requiredCapsPod.Spec.Containers[0].SecurityContext.Capabilities = &api.Capabilities{
 		Add: []api.Capability{"foo"},
@@ -826,6 +1093,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 
 	seccompPod := defaultPod()
 	seccompPod.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
 		api.SeccompContainerAnnotationKeyPrefix + seccompPod.Spec.Containers[0].Name: "foo",
 	}
 
@@ -892,16 +1160,13 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		},
 	}
 
-	for k, v := range successCases {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
-		if len(errs) != 0 {
-			t.Errorf("%s expected validation pass but received errors %v\n%s", k, errs, spew.Sdump(v.pod.ObjectMeta))
-			continue
-		}
+	for name, test := range successCases {
+		t.Run(name, func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "unable to create provider")
+			errs := provider.ValidatePod(test.pod)
+			assert.Empty(t, errs, "expected validation pass but received errors")
+		})
 	}
 }
 
@@ -959,41 +1224,41 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 		},
 	}
 
-	for k, v := range tests {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Errorf("%s unable to create provider %v", k, err)
-			continue
-		}
-		err = provider.DefaultContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0])
-		if err != nil {
-			t.Errorf("%s unable to create container security context %v", k, err)
-			continue
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "unable to create provider")
+			err = provider.MutatePod(test.pod)
+			require.NoError(t, err, "unable to mutate container")
 
-		sc := v.pod.Spec.Containers[0].SecurityContext
-		if v.expected == nil && sc.ReadOnlyRootFilesystem != nil {
-			t.Errorf("%s expected a nil ReadOnlyRootFilesystem but got %t", k, *sc.ReadOnlyRootFilesystem)
-		}
-		if v.expected != nil && sc.ReadOnlyRootFilesystem == nil {
-			t.Errorf("%s expected a non nil ReadOnlyRootFilesystem but received nil", k)
-		}
-		if v.expected != nil && sc.ReadOnlyRootFilesystem != nil && (*v.expected != *sc.ReadOnlyRootFilesystem) {
-			t.Errorf("%s expected a non nil ReadOnlyRootFilesystem set to %t but got %t", k, *v.expected, *sc.ReadOnlyRootFilesystem)
-		}
-
+			sc := test.pod.Spec.Containers[0].SecurityContext
+			if test.expected == nil {
+				assert.Nil(t, sc.ReadOnlyRootFilesystem, "expected a nil ReadOnlyRootFilesystem")
+			} else {
+				require.NotNil(t, sc.ReadOnlyRootFilesystem, "expected a non nil ReadOnlyRootFilesystem")
+				assert.Equal(t, *test.expected, *sc.ReadOnlyRootFilesystem)
+			}
+		})
 	}
 }
 
 func defaultPSP() *policy.PodSecurityPolicy {
+	return defaultNamedPSP("psp-sa")
+}
+
+func defaultNamedPSP(name string) *policy.PodSecurityPolicy {
+	allowPrivilegeEscalation := true
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "psp-sa",
+			Name:        name,
 			Annotations: map[string]string{},
 		},
 		Spec: policy.PodSecurityPolicySpec{
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyRunAsAny,
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
@@ -1004,7 +1269,7 @@ func defaultPSP() *policy.PodSecurityPolicy {
 			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
 				Rule: policy.SupplementalGroupsStrategyRunAsAny,
 			},
-			AllowPrivilegeEscalation: true,
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		},
 	}
 }
@@ -1061,168 +1326,237 @@ func defaultV1Pod() *v1.Pod {
 // a pod with that type of volume and deny it, accept it explicitly, or accept it with
 // the FSTypeAll wildcard.
 func TestValidateAllowedVolumes(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	val := reflect.ValueOf(api.VolumeSource{})
 
 	for i := 0; i < val.NumField(); i++ {
 		// reflectively create the volume source
 		fieldVal := val.Type().Field(i)
 
-		volumeSource := api.VolumeSource{}
-		volumeSourceVolume := reflect.New(fieldVal.Type.Elem())
+		t.Run(fieldVal.Name, func(t *testing.T) {
+			volumeSource := api.VolumeSource{}
+			volumeSourceVolume := reflect.New(fieldVal.Type.Elem())
 
-		reflect.ValueOf(&volumeSource).Elem().FieldByName(fieldVal.Name).Set(volumeSourceVolume)
-		volume := api.Volume{VolumeSource: volumeSource}
+			reflect.ValueOf(&volumeSource).Elem().FieldByName(fieldVal.Name).Set(volumeSourceVolume)
+			volume := api.Volume{VolumeSource: volumeSource}
 
-		// sanity check before moving on
-		fsType, err := psputil.GetVolumeFSType(volume)
-		if err != nil {
-			t.Errorf("error getting FSType for %s: %s", fieldVal.Name, err.Error())
-			continue
+			// sanity check before moving on
+			fsType, err := psputil.GetVolumeFSType(volume)
+			require.NoError(t, err, "error getting FSType")
+
+			// add the volume to the pod
+			pod := defaultPod()
+			pod.Spec.Volumes = []api.Volume{volume}
+
+			// create a PSP that allows no volumes
+			psp := defaultPSP()
+
+			provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
+
+			// expect a denial for this PSP and test the error message to ensure it's related to the volumesource
+			errs := provider.ValidatePod(pod)
+			require.Len(t, errs, 1, "expected exactly 1 error")
+			assert.Contains(t, errs.ToAggregate().Error(), fmt.Sprintf("%s volumes are not allowed to be used", fsType), "did not find the expected error")
+
+			// now add the fstype directly to the psp and it should validate
+			psp.Spec.Volumes = []policy.FSType{fsType}
+			errs = provider.ValidatePod(pod)
+			assert.Empty(t, errs, "directly allowing volume expected no errors")
+
+			// now change the psp to allow any volumes and the pod should still validate
+			psp.Spec.Volumes = []policy.FSType{policy.All}
+			errs = provider.ValidatePod(pod)
+			assert.Empty(t, errs, "wildcard volume expected no errors")
+		})
+	}
+}
+
+func TestAllowPrivilegeEscalation(t *testing.T) {
+	ptr := pointer.BoolPtr
+	tests := []struct {
+		pspAPE    bool  // PSP AllowPrivilegeEscalation
+		pspDAPE   *bool // PSP DefaultAllowPrivilegeEscalation
+		podAPE    *bool // Pod AllowPrivilegeEscalation
+		expectErr bool
+		expectAPE *bool // Expected value of pod APE (if no error)
+	}{
+		// Test all valid combinations of PSP AllowPrivilegeEscalation,
+		// DefaultAllowPrivilegeEscalation, and Pod AllowPrivilegeEscalation.
+		{true, nil, nil, false, nil},
+		{true, nil, ptr(false), false, ptr(false)},
+		{true, nil, ptr(true), false, ptr(true)},
+		{true, ptr(false), nil, false, ptr(false)},
+		{true, ptr(false), ptr(false), false, ptr(false)},
+		{true, ptr(false), ptr(true), false, ptr(true)},
+		{true, ptr(true), nil, false, ptr(true)},
+		{true, ptr(true), ptr(false), false, ptr(false)},
+		{true, ptr(true), ptr(true), false, ptr(true)},
+		{false, nil, nil, false, ptr(false)},
+		{false, nil, ptr(false), false, ptr(false)},
+		{false, nil, ptr(true), true, nil},
+		{false, ptr(false), nil, false, ptr(false)},
+		{false, ptr(false), ptr(false), false, ptr(false)},
+		{false, ptr(false), ptr(true), true, nil},
+		// Invalid cases: pspAPE=false, pspDAPE=true
+	}
+
+	fmtPtr := func(b *bool) string {
+		if b == nil {
+			return "nil"
 		}
+		return strconv.FormatBool(*b)
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("pspAPE:%t_pspDAPE:%s_podAPE:%s", test.pspAPE, fmtPtr(test.pspDAPE), fmtPtr(test.podAPE)), func(t *testing.T) {
+			pod := defaultPod()
+			pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = test.podAPE
 
-		// add the volume to the pod
-		pod := defaultPod()
-		pod.Spec.Volumes = []api.Volume{volume}
+			psp := defaultPSP()
+			psp.Spec.AllowPrivilegeEscalation = &test.pspAPE
+			psp.Spec.DefaultAllowPrivilegeEscalation = test.pspDAPE
 
-		// create a PSP that allows no volumes
-		psp := defaultPSP()
+			provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err)
 
-		provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Errorf("error creating provider for %s: %s", fieldVal.Name, err.Error())
-			continue
-		}
+			err = provider.MutatePod(pod)
+			require.NoError(t, err)
 
-		// expect a denial for this PSP and test the error message to ensure it's related to the volumesource
-		errs := provider.ValidatePod(pod, field.NewPath(""))
-		if len(errs) != 1 {
-			t.Errorf("expected exactly 1 error for %s but got %v", fieldVal.Name, errs)
-		} else {
-			if !strings.Contains(errs.ToAggregate().Error(), fmt.Sprintf("%s volumes are not allowed to be used", fsType)) {
-				t.Errorf("did not find the expected error, received: %v", errs)
+			errs := provider.ValidatePod(pod)
+			if test.expectErr {
+				assert.NotEmpty(t, errs, "expected validation error")
+			} else {
+				assert.Empty(t, errs, "expected no validation errors")
+				ape := pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation
+				assert.Equal(t, test.expectAPE, ape, "expected pod AllowPrivilegeEscalation")
 			}
-		}
-
-		// now add the fstype directly to the psp and it should validate
-		psp.Spec.Volumes = []policy.FSType{fsType}
-		errs = provider.ValidatePod(pod, field.NewPath(""))
-		if len(errs) != 0 {
-			t.Errorf("directly allowing volume expected no errors for %s but got %v", fieldVal.Name, errs)
-		}
-
-		// now change the psp to allow any volumes and the pod should still validate
-		psp.Spec.Volumes = []policy.FSType{policy.All}
-		errs = provider.ValidatePod(pod, field.NewPath(""))
-		if len(errs) != 0 {
-			t.Errorf("wildcard volume expected no errors for %s but got %v", fieldVal.Name, errs)
-		}
+		})
 	}
 }
 
-// TestValidateAllowPrivilegeEscalation will test that when the podSecurityPolicy
-// AllowPrivilegeEscalation is false we cannot set a container's securityContext
-// to allowPrivilegeEscalation, but when it is true we can.
-func TestValidateAllowPrivilegeEscalation(t *testing.T) {
-	pod := defaultPod()
-	pe := true
-	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &pe
+func TestDefaultRuntimeClassName(t *testing.T) {
+	const (
+		defaultedName = "foo"
+		presetName    = "tim"
+	)
 
-	// create a PSP that does not allow privilege escalation
-	psp := defaultPSP()
-	psp.Spec.AllowPrivilegeEscalation = false
-
-	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-	if err != nil {
-		t.Errorf("error creating provider: %v", err.Error())
+	noRCS := defaultNamedPSP("nil-strategy")
+	emptyRCS := defaultNamedPSP("empty-strategy")
+	emptyRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{}
+	noDefaultRCS := defaultNamedPSP("no-default")
+	noDefaultRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{
+		AllowedRuntimeClassNames: []string{"foo", "bar"},
+	}
+	defaultRCS := defaultNamedPSP("defaulting")
+	defaultRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{
+		DefaultRuntimeClassName: pointer.StringPtr(defaultedName),
 	}
 
-	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 1 {
-		t.Errorf("expected exactly 1 error but got %v", errs)
-	} else {
-		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
-			t.Errorf("did not find the expected error, received: %v", errs)
-		}
+	noRCPod := defaultPod()
+	noRCPod.Name = "no-runtimeclass"
+	rcPod := defaultPod()
+	rcPod.Name = "preset-runtimeclass"
+	rcPod.Spec.RuntimeClassName = pointer.StringPtr(presetName)
+
+	type testcase struct {
+		psp                      *policy.PodSecurityPolicy
+		pod                      *api.Pod
+		expectedRuntimeClassName *string
+	}
+	tests := []testcase{{
+		psp:                      defaultRCS,
+		pod:                      noRCPod,
+		expectedRuntimeClassName: pointer.StringPtr(defaultedName),
+	}}
+	// Non-defaulting no-preset cases
+	for _, psp := range []*policy.PodSecurityPolicy{noRCS, emptyRCS, noDefaultRCS} {
+		tests = append(tests, testcase{psp, noRCPod, nil})
+	}
+	// Non-defaulting preset cases
+	for _, psp := range []*policy.PodSecurityPolicy{noRCS, emptyRCS, noDefaultRCS, defaultRCS} {
+		tests = append(tests, testcase{psp, rcPod, pointer.StringPtr(presetName)})
 	}
 
-	// now add allowPrivilegeEscalation to the podSecurityPolicy
-	psp.Spec.AllowPrivilegeEscalation = true
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 0 {
-		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s-psp %s-pod", test.psp.Name, test.pod.Name), func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
+
+			actualPod := test.pod.DeepCopy()
+			require.NoError(t, provider.MutatePod(actualPod))
+
+			expectedPod := test.pod.DeepCopy()
+			expectedPod.Spec.RuntimeClassName = test.expectedRuntimeClassName
+			assert.Equal(t, expectedPod, actualPod)
+		})
 	}
 }
 
-// TestValidateDefaultAllowPrivilegeEscalation will test that when the podSecurityPolicy
-// DefaultAllowPrivilegeEscalation is false we cannot set a container's
-// securityContext to allowPrivilegeEscalation but when it is true we can.
-func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
-	pod := defaultPod()
-	pe := true
-	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &pe
+func TestAllowedRuntimeClassNames(t *testing.T) {
+	const (
+		goodName = "good"
+	)
 
-	// create a PSP that does not allow privilege escalation
-	psp := defaultPSP()
-	dpe := false
-	psp.Spec.DefaultAllowPrivilegeEscalation = &dpe
-	psp.Spec.AllowPrivilegeEscalation = false
+	noRCPod := defaultPod()
+	noRCPod.Name = "no-runtimeclass"
+	rcPod := defaultPod()
+	rcPod.Name = "good-runtimeclass"
+	rcPod.Spec.RuntimeClassName = pointer.StringPtr(goodName)
+	otherPod := defaultPod()
+	otherPod.Name = "bad-runtimeclass"
+	otherPod.Spec.RuntimeClassName = pointer.StringPtr("bad")
+	allPods := []*api.Pod{noRCPod, rcPod, otherPod}
 
-	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-	if err != nil {
-		t.Errorf("error creating provider: %v", err.Error())
+	type testcase struct {
+		name        string
+		strategy    *policy.RuntimeClassStrategyOptions
+		validPods   []*api.Pod
+		invalidPods []*api.Pod
 	}
+	tests := []testcase{{
+		name:      "nil-strategy",
+		validPods: allPods,
+	}, {
+		name: "empty-strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{},
+		},
+		validPods:   []*api.Pod{noRCPod},
+		invalidPods: []*api.Pod{rcPod, otherPod},
+	}, {
+		name: "allow-all-strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*"},
+			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+		},
+		validPods: allPods,
+	}, {
+		name: "named-allowed",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{goodName},
+		},
+		validPods:   []*api.Pod{rcPod},
+		invalidPods: []*api.Pod{otherPod},
+	}}
 
-	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 1 {
-		t.Errorf("expected exactly 1 error but got %v", errs)
-	} else {
-		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
-			t.Errorf("did not find the expected error, received: %v", errs)
-		}
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			psp := defaultNamedPSP(test.name)
+			psp.Spec.RuntimeClass = test.strategy
+			provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
 
-	// now add DefaultAllowPrivilegeEscalation to the podSecurityPolicy
-	dpe = true
-	psp.Spec.DefaultAllowPrivilegeEscalation = &dpe
-	psp.Spec.AllowPrivilegeEscalation = false
-
-	// expect a denial for this PSP because we did not allowPrivilege Escalation via the PodSecurityPolicy
-	// and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 1 {
-		t.Errorf("expected exactly 1 error but got %v", errs)
-	} else {
-		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
-			t.Errorf("did not find the expected error, received: %v", errs)
-		}
-	}
-
-	// Now set AllowPrivilegeEscalation
-	psp.Spec.AllowPrivilegeEscalation = true
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 0 {
-		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
-	}
-
-	// Now set the psp spec to false and reset AllowPrivilegeEscalation
-	psp.Spec.AllowPrivilegeEscalation = false
-	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 1 {
-		t.Errorf("expected exactly 1 error but got %v", errs)
-	} else {
-		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
-			t.Errorf("did not find the expected error, received: %v", errs)
-		}
-	}
-
-	// Now unset both AllowPrivilegeEscalation
-	psp.Spec.AllowPrivilegeEscalation = true
-	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 0 {
-		t.Errorf("resetting allowing privilege escalation expected no errors but got %v", errs)
+			for _, pod := range test.validPods {
+				copy := pod.DeepCopy()
+				assert.NoError(t, provider.ValidatePod(copy).ToAggregate(), "expected valid pod %s", pod.Name)
+				assert.Equal(t, pod, copy, "validate should not mutate!")
+			}
+			for _, pod := range test.invalidPods {
+				copy := pod.DeepCopy()
+				assert.Error(t, provider.ValidatePod(copy).ToAggregate(), "expected invalid pod %s", pod.Name)
+				assert.Equal(t, pod, copy, "validate should not mutate!")
+			}
+		})
 	}
 }

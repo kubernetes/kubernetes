@@ -186,7 +186,7 @@ func (t *Table) Delete(timeout uint, options *TableOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	return checkRespCode(resp, []int{http.StatusNoContent})
 }
@@ -269,7 +269,7 @@ func (t *Table) SetPermissions(tap []TableAccessPolicy, timeout uint, options *T
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	return checkRespCode(resp, []int{http.StatusNoContent})
 }

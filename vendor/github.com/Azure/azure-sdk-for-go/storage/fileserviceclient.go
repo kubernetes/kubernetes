@@ -194,7 +194,7 @@ func (f FileServiceClient) listContent(path string, params url.Values, extraHead
 	}
 
 	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
-		readAndCloseBody(resp.Body)
+		drainRespBody(resp)
 		return nil, err
 	}
 
@@ -212,7 +212,7 @@ func (f FileServiceClient) resourceExists(path string, res resourceType) (bool, 
 
 	resp, err := f.client.exec(http.MethodHead, uri, headers, nil, f.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusOK, resp.Header, nil
 		}
@@ -226,7 +226,7 @@ func (f FileServiceClient) createResource(path string, res resourceType, urlPara
 	if err != nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return resp.Header, checkRespCode(resp, expectedResponseCodes)
 }
 
@@ -251,7 +251,7 @@ func (f FileServiceClient) getResourceHeaders(path string, comp compType, res re
 	if err != nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return nil, err
@@ -279,7 +279,7 @@ func (f FileServiceClient) deleteResource(path string, res resourceType, options
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusAccepted})
 }
 
@@ -323,7 +323,7 @@ func (f FileServiceClient) setResourceHeaders(path string, comp compType, res re
 	if err != nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	return resp.Header, checkRespCode(resp, []int{http.StatusOK})
 }

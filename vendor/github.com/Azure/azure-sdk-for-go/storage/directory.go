@@ -107,7 +107,7 @@ func (d *Directory) CreateIfNotExists(options *FileRequestOptions) (bool, error)
 	params := prepareOptions(options)
 	resp, err := d.fsc.createResourceNoClose(d.buildPath(), resourceDirectory, params, nil)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
 			if resp.StatusCode == http.StatusCreated {
 				d.updateEtagAndLastModified(resp.Header)
@@ -135,7 +135,7 @@ func (d *Directory) Delete(options *FileRequestOptions) error {
 func (d *Directory) DeleteIfExists(options *FileRequestOptions) (bool, error) {
 	resp, err := d.fsc.deleteResourceNoClose(d.buildPath(), resourceDirectory, options)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusAccepted, nil
 		}

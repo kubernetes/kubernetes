@@ -25,7 +25,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	flag "github.com/spf13/pflag"
+	"gonum.org/v1/gonum/graph"
+	"gonum.org/v1/gonum/graph/simple"
+	"gonum.org/v1/gonum/graph/topo"
 
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
@@ -33,8 +39,6 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/parser"
 	"k8s.io/gengo/types"
-
-	flag "github.com/spf13/pflag"
 )
 
 type Generator struct {
@@ -202,6 +206,18 @@ func Run(g *Generator) {
 	c.Verify = g.Common.VerifyOnly
 	c.FileTypes["protoidl"] = NewProtoFile()
 
+	// order package by imports, importees first
+	deps := deps(c, protobufNames.packages)
+	order, err := importOrder(deps)
+	if err != nil {
+		log.Fatalf("Failed to order packages by imports: %v", err)
+	}
+	topologicalPos := map[string]int{}
+	for i, p := range order {
+		topologicalPos[p] = i
+	}
+	sort.Sort(positionOrder{topologicalPos, protobufNames.packages})
+
 	var vendoredOutputPackages, localOutputPackages generator.Packages
 	for _, p := range protobufNames.packages {
 		if _, ok := nonOutputPackages[p.Name()]; ok {
@@ -346,4 +362,67 @@ func Run(g *Generator) {
 			}
 		}
 	}
+}
+
+func deps(c *generator.Context, pkgs []*protobufPackage) map[string][]string {
+	ret := map[string][]string{}
+	for _, p := range pkgs {
+		for _, d := range c.Universe[p.PackagePath].Imports {
+			ret[p.PackagePath] = append(ret[p.PackagePath], d.Path)
+		}
+	}
+	return ret
+}
+
+func importOrder(deps map[string][]string) ([]string, error) {
+	nodes := map[string]graph.Node{}
+	names := map[int64]string{}
+	g := simple.NewDirectedGraph()
+	for pkg, imports := range deps {
+		for _, imp := range imports {
+			if _, found := nodes[pkg]; !found {
+				n := g.NewNode()
+				g.AddNode(n)
+				nodes[pkg] = n
+				names[n.ID()] = pkg
+			}
+			if _, found := nodes[imp]; !found {
+				n := g.NewNode()
+				g.AddNode(n)
+				nodes[imp] = n
+				names[n.ID()] = imp
+			}
+			g.SetEdge(g.NewEdge(nodes[imp], nodes[pkg]))
+		}
+	}
+
+	ret := []string{}
+	sorted, err := topo.Sort(g)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range sorted {
+		ret = append(ret, names[n.ID()])
+		fmt.Println("topological order", names[n.ID()])
+	}
+	return ret, nil
+}
+
+type positionOrder struct {
+	pos      map[string]int
+	elements []*protobufPackage
+}
+
+func (o positionOrder) Len() int {
+	return len(o.elements)
+}
+
+func (o positionOrder) Less(i, j int) bool {
+	return o.pos[o.elements[i].PackagePath] < o.pos[o.elements[j].PackagePath]
+}
+
+func (o positionOrder) Swap(i, j int) {
+	x := o.elements[i]
+	o.elements[i] = o.elements[j]
+	o.elements[j] = x
 }

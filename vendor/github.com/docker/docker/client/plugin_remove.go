@@ -1,10 +1,10 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // PluginRemove removes a plugin
@@ -15,6 +15,6 @@ func (cli *Client) PluginRemove(ctx context.Context, name string, options types.
 	}
 
 	resp, err := cli.delete(ctx, "/plugins/"+name, query, nil)
-	ensureReaderClosed(resp)
-	return err
+	defer ensureReaderClosed(resp)
+	return wrapResponseError(err, resp, "plugin", name)
 }

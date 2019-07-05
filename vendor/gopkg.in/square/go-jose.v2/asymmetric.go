@@ -104,9 +104,9 @@ func newRSASigner(sigAlg SignatureAlgorithm, privateKey *rsa.PrivateKey) (recipi
 
 	return recipientSigInfo{
 		sigAlg: sigAlg,
-		publicKey: &JSONWebKey{
-			Key: &privateKey.PublicKey,
-		},
+		publicKey: staticPublicKey(&JSONWebKey{
+			Key: privateKey.Public(),
+		}),
 		signer: &rsaDecrypterSigner{
 			privateKey: privateKey,
 		},
@@ -123,9 +123,9 @@ func newEd25519Signer(sigAlg SignatureAlgorithm, privateKey ed25519.PrivateKey) 
 	}
 	return recipientSigInfo{
 		sigAlg: sigAlg,
-		publicKey: &JSONWebKey{
+		publicKey: staticPublicKey(&JSONWebKey{
 			Key: privateKey.Public(),
-		},
+		}),
 		signer: &edDecrypterSigner{
 			privateKey: privateKey,
 		},
@@ -168,9 +168,9 @@ func newECDSASigner(sigAlg SignatureAlgorithm, privateKey *ecdsa.PrivateKey) (re
 
 	return recipientSigInfo{
 		sigAlg: sigAlg,
-		publicKey: &JSONWebKey{
-			Key: &privateKey.PublicKey,
-		},
+		publicKey: staticPublicKey(&JSONWebKey{
+			Key: privateKey.Public(),
+		}),
 		signer: &ecDecrypterSigner{
 			privateKey: privateKey,
 		},
@@ -195,11 +195,11 @@ func (ctx rsaEncrypterVerifier) encryptKey(cek []byte, alg KeyAlgorithm) (recipi
 func (ctx rsaEncrypterVerifier) encrypt(cek []byte, alg KeyAlgorithm) ([]byte, error) {
 	switch alg {
 	case RSA1_5:
-		return rsa.EncryptPKCS1v15(randReader, ctx.publicKey, cek)
+		return rsa.EncryptPKCS1v15(RandReader, ctx.publicKey, cek)
 	case RSA_OAEP:
-		return rsa.EncryptOAEP(sha1.New(), randReader, ctx.publicKey, cek, []byte{})
+		return rsa.EncryptOAEP(sha1.New(), RandReader, ctx.publicKey, cek, []byte{})
 	case RSA_OAEP_256:
-		return rsa.EncryptOAEP(sha256.New(), randReader, ctx.publicKey, cek, []byte{})
+		return rsa.EncryptOAEP(sha256.New(), RandReader, ctx.publicKey, cek, []byte{})
 	}
 
 	return nil, ErrUnsupportedAlgorithm
@@ -285,9 +285,9 @@ func (ctx rsaDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm
 
 	switch alg {
 	case RS256, RS384, RS512:
-		out, err = rsa.SignPKCS1v15(randReader, ctx.privateKey, hash, hashed)
+		out, err = rsa.SignPKCS1v15(RandReader, ctx.privateKey, hash, hashed)
 	case PS256, PS384, PS512:
-		out, err = rsa.SignPSS(randReader, ctx.privateKey, hash, hashed, &rsa.PSSOptions{
+		out, err = rsa.SignPSS(RandReader, ctx.privateKey, hash, hashed, &rsa.PSSOptions{
 			SaltLength: rsa.PSSSaltLengthAuto,
 		})
 	}
@@ -388,7 +388,7 @@ func (ctx ecKeyGenerator) keySize() int {
 
 // Get a content encryption key for ECDH-ES
 func (ctx ecKeyGenerator) genKey() ([]byte, rawHeader, error) {
-	priv, err := ecdsa.GenerateKey(ctx.publicKey.Curve, randReader)
+	priv, err := ecdsa.GenerateKey(ctx.publicKey.Curve, RandReader)
 	if err != nil {
 		return nil, rawHeader{}, err
 	}
@@ -466,12 +466,13 @@ func (ctx ecDecrypterSigner) decryptKey(headers rawHeader, recipient *recipientI
 
 	return josecipher.KeyUnwrap(block, recipient.encryptedKey)
 }
+
 func (ctx edDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {
 	if alg != EdDSA {
 		return Signature{}, ErrUnsupportedAlgorithm
 	}
 
-	sig, err := ctx.privateKey.Sign(randReader, payload, crypto.Hash(0))
+	sig, err := ctx.privateKey.Sign(RandReader, payload, crypto.Hash(0))
 	if err != nil {
 		return Signature{}, err
 	}
@@ -521,7 +522,7 @@ func (ctx ecDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm)
 	_, _ = hasher.Write(payload)
 	hashed := hasher.Sum(nil)
 
-	r, s, err := ecdsa.Sign(randReader, ctx.privateKey, hashed)
+	r, s, err := ecdsa.Sign(RandReader, ctx.privateKey, hashed)
 	if err != nil {
 		return Signature{}, err
 	}
@@ -531,7 +532,7 @@ func (ctx ecDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm)
 		keyBytes++
 	}
 
-	// We serialize the outpus (r and s) into big-endian byte arrays and pad
+	// We serialize the outputs (r and s) into big-endian byte arrays and pad
 	// them with zeros on the left to make sure the sizes work out. Both arrays
 	// must be keyBytes long, and the output must be 2*keyBytes long.
 	rBytes := r.Bytes()

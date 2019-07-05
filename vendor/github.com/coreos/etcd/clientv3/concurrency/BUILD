@@ -10,13 +10,13 @@ go_library(
         "session.go",
         "stm.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/clientv3/concurrency",
     importpath = "github.com/coreos/etcd/clientv3/concurrency",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

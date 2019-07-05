@@ -16,16 +16,18 @@ package etcdserver
 
 import (
 	"bytes"
+	"context"
 	"sort"
 	"time"
 
+	"github.com/coreos/etcd/auth"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/lease"
 	"github.com/coreos/etcd/mvcc"
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/coreos/etcd/pkg/types"
+
 	"github.com/gogo/protobuf/proto"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -76,19 +78,39 @@ type applierV3 interface {
 	RoleList(ua *pb.AuthRoleListRequest) (*pb.AuthRoleListResponse, error)
 }
 
+type checkReqFunc func(mvcc.ReadView, *pb.RequestOp) error
+
 type applierV3backend struct {
 	s *EtcdServer
+
+	checkPut   checkReqFunc
+	checkRange checkReqFunc
+}
+
+func (s *EtcdServer) newApplierV3Backend() applierV3 {
+	base := &applierV3backend{s: s}
+	base.checkPut = func(rv mvcc.ReadView, req *pb.RequestOp) error {
+		return base.checkRequestPut(rv, req)
+	}
+	base.checkRange = func(rv mvcc.ReadView, req *pb.RequestOp) error {
+		return base.checkRequestRange(rv, req)
+	}
+	return base
 }
 
 func (s *EtcdServer) newApplierV3() applierV3 {
 	return newAuthApplierV3(
 		s.AuthStore(),
-		newQuotaApplierV3(s, &applierV3backend{s}),
+		newQuotaApplierV3(s, s.newApplierV3Backend()),
+		s.lessor,
 	)
 }
 
 func (a *applierV3backend) Apply(r *pb.InternalRaftRequest) *applyResult {
 	ar := &applyResult{}
+	defer func(start time.Time) {
+		warnOfExpensiveRequest(start, &pb.InternalRaftStringer{Request: r}, ar.resp, ar.err)
+	}(time.Now())
 
 	// call into a.s.applyV3.F instead of a.F so upper appliers can check individual calls
 	switch {
@@ -193,29 +215,27 @@ func (a *applierV3backend) Put(txn mvcc.TxnWrite, p *pb.PutRequest) (resp *pb.Pu
 func (a *applierV3backend) DeleteRange(txn mvcc.TxnWrite, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
 	resp := &pb.DeleteRangeResponse{}
 	resp.Header = &pb.ResponseHeader{}
+	end := mkGteRange(dr.RangeEnd)
 
 	if txn == nil {
 		txn = a.s.kv.Write()
 		defer txn.End()
 	}
 
-	if isGteRange(dr.RangeEnd) {
-		dr.RangeEnd = []byte{}
-	}
-
 	if dr.PrevKv {
-		rr, err := txn.Range(dr.Key, dr.RangeEnd, mvcc.RangeOptions{})
+		rr, err := txn.Range(dr.Key, end, mvcc.RangeOptions{})
 		if err != nil {
 			return nil, err
 		}
 		if rr != nil {
+			resp.PrevKvs = make([]*mvccpb.KeyValue, len(rr.KVs))
 			for i := range rr.KVs {
-				resp.PrevKvs = append(resp.PrevKvs, &rr.KVs[i])
+				resp.PrevKvs[i] = &rr.KVs[i]
 			}
 		}
 	}
 
-	resp.Deleted, resp.Header.Revision = txn.DeleteRange(dr.Key, dr.RangeEnd)
+	resp.Deleted, resp.Header.Revision = txn.DeleteRange(dr.Key, end)
 	return resp, nil
 }
 
@@ -226,10 +246,6 @@ func (a *applierV3backend) Range(txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.Rang
 	if txn == nil {
 		txn = a.s.kv.Read()
 		defer txn.End()
-	}
-
-	if isGteRange(r.RangeEnd) {
-		r.RangeEnd = []byte{}
 	}
 
 	limit := r.Limit
@@ -250,7 +266,7 @@ func (a *applierV3backend) Range(txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.Rang
 		Count: r.CountOnly,
 	}
 
-	rr, err := txn.Range(r.Key, r.RangeEnd, ro)
+	rr, err := txn.Range(r.Key, mkGteRange(r.RangeEnd), ro)
 	if err != nil {
 		return nil, err
 	}
@@ -308,11 +324,12 @@ func (a *applierV3backend) Range(txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.Rang
 
 	resp.Header.Revision = rr.Rev
 	resp.Count = int64(rr.Count)
+	resp.Kvs = make([]*mvccpb.KeyValue, len(rr.KVs))
 	for i := range rr.KVs {
 		if r.KeysOnly {
 			rr.KVs[i].Value = nil
 		}
-		resp.Kvs = append(resp.Kvs, &rr.KVs[i])
+		resp.Kvs[i] = &rr.KVs[i]
 	}
 	return resp, nil
 }
@@ -321,24 +338,19 @@ func (a *applierV3backend) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
 	isWrite := !isTxnReadonly(rt)
 	txn := mvcc.NewReadOnlyTxnWrite(a.s.KV().Read())
 
-	reqs, ok := a.compareToOps(txn, rt)
+	txnPath := compareToPath(txn, rt)
 	if isWrite {
-		if err := a.checkRequestPut(txn, reqs); err != nil {
+		if _, err := checkRequests(txn, rt, txnPath, a.checkPut); err != nil {
 			txn.End()
 			return nil, err
 		}
 	}
-	if err := checkRequestRange(txn, reqs); err != nil {
+	if _, err := checkRequests(txn, rt, txnPath, a.checkRange); err != nil {
 		txn.End()
 		return nil, err
 	}
 
-	resps := make([]*pb.ResponseOp, len(reqs))
-	txnResp := &pb.TxnResponse{
-		Responses: resps,
-		Succeeded: ok,
-		Header:    &pb.ResponseHeader{},
-	}
+	txnResp, _ := newTxnResp(rt, txnPath)
 
 	// When executing mutable txn ops, etcd must hold the txn lock so
 	// readers do not see any intermediate results. Since writes are
@@ -348,9 +360,7 @@ func (a *applierV3backend) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
 		txn.End()
 		txn = a.s.KV().Write()
 	}
-	for i := range reqs {
-		resps[i] = a.applyUnion(txn, reqs[i])
-	}
+	a.applyTxn(txn, rt, txnPath, txnResp)
 	rev := txn.Rev()
 	if len(txn.Changes()) != 0 {
 		rev++
@@ -361,62 +371,121 @@ func (a *applierV3backend) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
 	return txnResp, nil
 }
 
-func (a *applierV3backend) compareToOps(rv mvcc.ReadView, rt *pb.TxnRequest) ([]*pb.RequestOp, bool) {
-	for _, c := range rt.Compare {
-		if !applyCompare(rv, c) {
-			return rt.Failure, false
+// newTxnResp allocates a txn response for a txn request given a path.
+func newTxnResp(rt *pb.TxnRequest, txnPath []bool) (txnResp *pb.TxnResponse, txnCount int) {
+	reqs := rt.Success
+	if !txnPath[0] {
+		reqs = rt.Failure
+	}
+	resps := make([]*pb.ResponseOp, len(reqs))
+	txnResp = &pb.TxnResponse{
+		Responses: resps,
+		Succeeded: txnPath[0],
+		Header:    &pb.ResponseHeader{},
+	}
+	for i, req := range reqs {
+		switch tv := req.Request.(type) {
+		case *pb.RequestOp_RequestRange:
+			resps[i] = &pb.ResponseOp{Response: &pb.ResponseOp_ResponseRange{}}
+		case *pb.RequestOp_RequestPut:
+			resps[i] = &pb.ResponseOp{Response: &pb.ResponseOp_ResponsePut{}}
+		case *pb.RequestOp_RequestDeleteRange:
+			resps[i] = &pb.ResponseOp{Response: &pb.ResponseOp_ResponseDeleteRange{}}
+		case *pb.RequestOp_RequestTxn:
+			resp, txns := newTxnResp(tv.RequestTxn, txnPath[1:])
+			resps[i] = &pb.ResponseOp{Response: &pb.ResponseOp_ResponseTxn{ResponseTxn: resp}}
+			txnPath = txnPath[1+txns:]
+			txnCount += txns + 1
+		default:
 		}
 	}
-	return rt.Success, true
+	return txnResp, txnCount
+}
+
+func compareToPath(rv mvcc.ReadView, rt *pb.TxnRequest) []bool {
+	txnPath := make([]bool, 1)
+	ops := rt.Success
+	if txnPath[0] = applyCompares(rv, rt.Compare); !txnPath[0] {
+		ops = rt.Failure
+	}
+	for _, op := range ops {
+		tv, ok := op.Request.(*pb.RequestOp_RequestTxn)
+		if !ok || tv.RequestTxn == nil {
+			continue
+		}
+		txnPath = append(txnPath, compareToPath(rv, tv.RequestTxn)...)
+	}
+	return txnPath
+}
+
+func applyCompares(rv mvcc.ReadView, cmps []*pb.Compare) bool {
+	for _, c := range cmps {
+		if !applyCompare(rv, c) {
+			return false
+		}
+	}
+	return true
 }
 
 // applyCompare applies the compare request.
 // If the comparison succeeds, it returns true. Otherwise, returns false.
 func applyCompare(rv mvcc.ReadView, c *pb.Compare) bool {
-	rr, err := rv.Range(c.Key, nil, mvcc.RangeOptions{})
+	// TODO: possible optimizations
+	// * chunk reads for large ranges to conserve memory
+	// * rewrite rules for common patterns:
+	//	ex. "[a, b) createrev > 0" => "limit 1 /\ kvs > 0"
+	// * caching
+	rr, err := rv.Range(c.Key, mkGteRange(c.RangeEnd), mvcc.RangeOptions{})
 	if err != nil {
 		return false
 	}
-	var ckv mvccpb.KeyValue
-	if len(rr.KVs) != 0 {
-		ckv = rr.KVs[0]
-	} else {
-		// Use the zero value of ckv normally. However...
+	if len(rr.KVs) == 0 {
 		if c.Target == pb.Compare_VALUE {
-			// Always fail if we're comparing a value on a key that doesn't exist.
-			// We can treat non-existence as the empty set explicitly, such that
-			// even a key with a value of length 0 bytes is still a real key
-			// that was written that way
+			// Always fail if comparing a value on a key/keys that doesn't exist;
+			// nil == empty string in grpc; no way to represent missing value
+			return false
+		}
+		return compareKV(c, mvccpb.KeyValue{})
+	}
+	for _, kv := range rr.KVs {
+		if !compareKV(c, kv) {
 			return false
 		}
 	}
+	return true
+}
 
-	// -1 is less, 0 is equal, 1 is greater
+func compareKV(c *pb.Compare, ckv mvccpb.KeyValue) bool {
 	var result int
+	rev := int64(0)
 	switch c.Target {
 	case pb.Compare_VALUE:
-		tv, _ := c.TargetUnion.(*pb.Compare_Value)
-		if tv != nil {
-			result = bytes.Compare(ckv.Value, tv.Value)
+		v := []byte{}
+		if tv, _ := c.TargetUnion.(*pb.Compare_Value); tv != nil {
+			v = tv.Value
 		}
+		result = bytes.Compare(ckv.Value, v)
 	case pb.Compare_CREATE:
-		tv, _ := c.TargetUnion.(*pb.Compare_CreateRevision)
-		if tv != nil {
-			result = compareInt64(ckv.CreateRevision, tv.CreateRevision)
+		if tv, _ := c.TargetUnion.(*pb.Compare_CreateRevision); tv != nil {
+			rev = tv.CreateRevision
 		}
-
+		result = compareInt64(ckv.CreateRevision, rev)
 	case pb.Compare_MOD:
-		tv, _ := c.TargetUnion.(*pb.Compare_ModRevision)
-		if tv != nil {
-			result = compareInt64(ckv.ModRevision, tv.ModRevision)
+		if tv, _ := c.TargetUnion.(*pb.Compare_ModRevision); tv != nil {
+			rev = tv.ModRevision
 		}
+		result = compareInt64(ckv.ModRevision, rev)
 	case pb.Compare_VERSION:
-		tv, _ := c.TargetUnion.(*pb.Compare_Version)
-		if tv != nil {
-			result = compareInt64(ckv.Version, tv.Version)
+		if tv, _ := c.TargetUnion.(*pb.Compare_Version); tv != nil {
+			rev = tv.Version
 		}
+		result = compareInt64(ckv.Version, rev)
+	case pb.Compare_LEASE:
+		if tv, _ := c.TargetUnion.(*pb.Compare_Lease); tv != nil {
+			rev = tv.Lease
+		}
+		result = compareInt64(ckv.Lease, rev)
 	}
-
 	switch c.Result {
 	case pb.Compare_EQUAL:
 		return result == 0
@@ -430,38 +499,42 @@ func applyCompare(rv mvcc.ReadView, c *pb.Compare) bool {
 	return true
 }
 
-func (a *applierV3backend) applyUnion(txn mvcc.TxnWrite, union *pb.RequestOp) *pb.ResponseOp {
-	switch tv := union.Request.(type) {
-	case *pb.RequestOp_RequestRange:
-		if tv.RequestRange != nil {
+func (a *applierV3backend) applyTxn(txn mvcc.TxnWrite, rt *pb.TxnRequest, txnPath []bool, tresp *pb.TxnResponse) (txns int) {
+	reqs := rt.Success
+	if !txnPath[0] {
+		reqs = rt.Failure
+	}
+	for i, req := range reqs {
+		respi := tresp.Responses[i].Response
+		switch tv := req.Request.(type) {
+		case *pb.RequestOp_RequestRange:
 			resp, err := a.Range(txn, tv.RequestRange)
 			if err != nil {
 				plog.Panicf("unexpected error during txn: %v", err)
 			}
-			return &pb.ResponseOp{Response: &pb.ResponseOp_ResponseRange{ResponseRange: resp}}
-		}
-	case *pb.RequestOp_RequestPut:
-		if tv.RequestPut != nil {
+			respi.(*pb.ResponseOp_ResponseRange).ResponseRange = resp
+		case *pb.RequestOp_RequestPut:
 			resp, err := a.Put(txn, tv.RequestPut)
 			if err != nil {
 				plog.Panicf("unexpected error during txn: %v", err)
 			}
-			return &pb.ResponseOp{Response: &pb.ResponseOp_ResponsePut{ResponsePut: resp}}
-		}
-	case *pb.RequestOp_RequestDeleteRange:
-		if tv.RequestDeleteRange != nil {
+			respi.(*pb.ResponseOp_ResponsePut).ResponsePut = resp
+		case *pb.RequestOp_RequestDeleteRange:
 			resp, err := a.DeleteRange(txn, tv.RequestDeleteRange)
 			if err != nil {
 				plog.Panicf("unexpected error during txn: %v", err)
 			}
-			return &pb.ResponseOp{Response: &pb.ResponseOp_ResponseDeleteRange{ResponseDeleteRange: resp}}
+			respi.(*pb.ResponseOp_ResponseDeleteRange).ResponseDeleteRange = resp
+		case *pb.RequestOp_RequestTxn:
+			resp := respi.(*pb.ResponseOp_ResponseTxn).ResponseTxn
+			applyTxns := a.applyTxn(txn, tv.RequestTxn, txnPath[1:], resp)
+			txns += applyTxns + 1
+			txnPath = txnPath[applyTxns+1:]
+		default:
+			// empty union
 		}
-	default:
-		// empty union
-		return nil
 	}
-	return nil
-
+	return txns
 }
 
 func (a *applierV3backend) Compaction(compaction *pb.CompactionRequest) (*pb.CompactionResponse, <-chan struct{}, error) {
@@ -511,9 +584,11 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 			break
 		}
 
+		plog.Warningf("alarm %v raised by peer %s", m.Alarm, types.ID(m.MemberID))
 		switch m.Alarm {
+		case pb.AlarmType_CORRUPT:
+			a.s.applyV3 = newApplierV3Corrupt(a)
 		case pb.AlarmType_NOSPACE:
-			plog.Warningf("alarm raised %+v", m)
 			a.s.applyV3 = newApplierV3Capped(a)
 		default:
 			plog.Errorf("unimplemented alarm activation (%+v)", m)
@@ -530,7 +605,8 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 		}
 
 		switch m.Alarm {
-		case pb.AlarmType_NOSPACE:
+		case pb.AlarmType_NOSPACE, pb.AlarmType_CORRUPT:
+			// TODO: check kv hash before deactivating CORRUPT?
 			plog.Infof("alarm disarmed %+v", ar)
 			a.s.applyV3 = a.s.newApplierV3()
 		default:
@@ -580,7 +656,7 @@ func (a *applierV3backend) AuthDisable() (*pb.AuthDisableResponse, error) {
 }
 
 func (a *applierV3backend) Authenticate(r *pb.InternalAuthenticateRequest) (*pb.AuthenticateResponse, error) {
-	ctx := context.WithValue(context.WithValue(a.s.ctx, "index", a.s.consistIndex.ConsistentIndex()), "simpleToken", r.SimpleToken)
+	ctx := context.WithValue(context.WithValue(a.s.ctx, auth.AuthenticateParamIndex{}, a.s.consistIndex.ConsistentIndex()), auth.AuthenticateParamSimpleTokenPrefix{}, r.SimpleToken)
 	resp, err := a.s.AuthStore().Authenticate(ctx, r.Name, r.Password)
 	if resp != nil {
 		resp.Header = newHeader(a.s)
@@ -767,53 +843,66 @@ func (s *kvSortByValue) Less(i, j int) bool {
 	return bytes.Compare(s.kvs[i].Value, s.kvs[j].Value) < 0
 }
 
-func (a *applierV3backend) checkRequestPut(rv mvcc.ReadView, reqs []*pb.RequestOp) error {
-	for _, requ := range reqs {
-		tv, ok := requ.Request.(*pb.RequestOp_RequestPut)
-		if !ok {
-			continue
-		}
-		preq := tv.RequestPut
-		if preq == nil {
-			continue
-		}
-		if preq.IgnoreValue || preq.IgnoreLease {
-			// expects previous key-value, error if not exist
-			rr, err := rv.Range(preq.Key, nil, mvcc.RangeOptions{})
+func checkRequests(rv mvcc.ReadView, rt *pb.TxnRequest, txnPath []bool, f checkReqFunc) (int, error) {
+	txnCount := 0
+	reqs := rt.Success
+	if !txnPath[0] {
+		reqs = rt.Failure
+	}
+	for _, req := range reqs {
+		if tv, ok := req.Request.(*pb.RequestOp_RequestTxn); ok && tv.RequestTxn != nil {
+			txns, err := checkRequests(rv, tv.RequestTxn, txnPath[1:], f)
 			if err != nil {
-				return err
+				return 0, err
 			}
-			if rr == nil || len(rr.KVs) == 0 {
-				return ErrKeyNotFound
-			}
-		}
-		if lease.LeaseID(preq.Lease) == lease.NoLease {
+			txnCount += txns + 1
+			txnPath = txnPath[txns+1:]
 			continue
 		}
-		if l := a.s.lessor.Lookup(lease.LeaseID(preq.Lease)); l == nil {
+		if err := f(rv, req); err != nil {
+			return 0, err
+		}
+	}
+	return txnCount, nil
+}
+
+func (a *applierV3backend) checkRequestPut(rv mvcc.ReadView, reqOp *pb.RequestOp) error {
+	tv, ok := reqOp.Request.(*pb.RequestOp_RequestPut)
+	if !ok || tv.RequestPut == nil {
+		return nil
+	}
+	req := tv.RequestPut
+	if req.IgnoreValue || req.IgnoreLease {
+		// expects previous key-value, error if not exist
+		rr, err := rv.Range(req.Key, nil, mvcc.RangeOptions{})
+		if err != nil {
+			return err
+		}
+		if rr == nil || len(rr.KVs) == 0 {
+			return ErrKeyNotFound
+		}
+	}
+	if lease.LeaseID(req.Lease) != lease.NoLease {
+		if l := a.s.lessor.Lookup(lease.LeaseID(req.Lease)); l == nil {
 			return lease.ErrLeaseNotFound
 		}
 	}
 	return nil
 }
 
-func checkRequestRange(rv mvcc.ReadView, reqs []*pb.RequestOp) error {
-	for _, requ := range reqs {
-		tv, ok := requ.Request.(*pb.RequestOp_RequestRange)
-		if !ok {
-			continue
-		}
-		greq := tv.RequestRange
-		if greq == nil || greq.Revision == 0 {
-			continue
-		}
-
-		if greq.Revision > rv.Rev() {
-			return mvcc.ErrFutureRev
-		}
-		if greq.Revision < rv.FirstRev() {
-			return mvcc.ErrCompacted
-		}
+func (a *applierV3backend) checkRequestRange(rv mvcc.ReadView, reqOp *pb.RequestOp) error {
+	tv, ok := reqOp.Request.(*pb.RequestOp_RequestRange)
+	if !ok || tv.RequestRange == nil {
+		return nil
+	}
+	req := tv.RequestRange
+	switch {
+	case req.Revision == 0:
+		return nil
+	case req.Revision > rv.Rev():
+		return mvcc.ErrFutureRev
+	case req.Revision < rv.FirstRev():
+		return mvcc.ErrCompacted
 	}
 	return nil
 }
@@ -829,10 +918,15 @@ func compareInt64(a, b int64) int {
 	}
 }
 
-// isGteRange determines if the range end is a >= range. This works around grpc
+// mkGteRange determines if the range end is a >= range. This works around grpc
 // sending empty byte strings as nil; >= is encoded in the range end as '\0'.
-func isGteRange(rangeEnd []byte) bool {
-	return len(rangeEnd) == 1 && rangeEnd[0] == 0
+// If it is a GTE range, then []byte{} is returned to indicate the empty byte
+// string (vs nil being no byte string).
+func mkGteRange(rangeEnd []byte) []byte {
+	if len(rangeEnd) == 1 && rangeEnd[0] == 0 {
+		return []byte{}
+	}
+	return rangeEnd
 }
 
 func noSideEffect(r *pb.InternalRaftRequest) bool {

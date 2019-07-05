@@ -8,6 +8,7 @@ go_library(
         "hash.go",
         "marshal.go",
         "node.go",
+        "node_net.go",
         "sql.go",
         "time.go",
         "util.go",
@@ -15,6 +16,7 @@ go_library(
         "version1.go",
         "version4.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/uuid",
     importpath = "github.com/google/uuid",
     visibility = ["//visibility:public"],
 )

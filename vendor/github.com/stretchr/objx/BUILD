@@ -4,16 +4,17 @@ go_library(
     name = "go_default_library",
     srcs = [
         "accessors.go",
-        "constants.go",
         "conversions.go",
         "doc.go",
         "map.go",
         "mutations.go",
         "security.go",
         "tests.go",
+        "type_specific.go",
         "type_specific_codegen.go",
         "value.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/stretchr/objx",
     importpath = "github.com/stretchr/objx",
     visibility = ["//visibility:public"],
 )

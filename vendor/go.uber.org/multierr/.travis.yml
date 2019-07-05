@@ -1,0 +1,33 @@
+sudo: false
+language: go
+go_import_path: go.uber.org/multierr
+
+env:
+  global:
+    - GO15VENDOREXPERIMENT=1
+
+go:
+  - 1.7
+  - 1.8
+  - 1.9
+
+cache:
+  directories:
+    - vendor
+
+before_install:
+- go version
+
+install:
+- |
+  set -e
+  make install_ci
+
+script:
+- |
+  set -e
+  make lint
+  make test_ci
+
+after_success:
+- bash <(curl -s https://codecov.io/bash)

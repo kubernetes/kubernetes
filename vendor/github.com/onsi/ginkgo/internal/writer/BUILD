@@ -6,6 +6,7 @@ go_library(
         "fake_writer.go",
         "writer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/writer",
     importpath = "github.com/onsi/ginkgo/internal/writer",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
 )

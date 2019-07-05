@@ -17,11 +17,12 @@ limitations under the License.
 package pod
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -35,7 +36,7 @@ type MirrorClient interface {
 	CreateMirrorPod(pod *v1.Pod) error
 	// DeleteMirrorPod deletes the mirror pod with the given full name from
 	// the API server or returns an error.
-	DeleteMirrorPod(podFullName string) error
+	DeleteMirrorPod(podFullName string, uid *types.UID) (bool, error)
 }
 
 // basicMirrorClient is a functional MirrorClient.  Mirror pods are stored in
@@ -73,28 +74,44 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	return err
 }
 
-func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
+// DeleteMirrorPod deletes a mirror pod.
+// It takes the full name of the pod and optionally a UID.  If the UID
+// is non-nil, the pod is deleted only if its UID matches the supplied UID.
+// It returns whether the pod was actually deleted, and any error returned
+// while parsing the name of the pod.
+// Non-existence of the pod or UID mismatch is not treated as an error; the
+// routine simply returns false in that case.
+func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID) (bool, error) {
 	if mc.apiserverClient == nil {
-		return nil
+		return false, nil
 	}
 	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
 	if err != nil {
-		glog.Errorf("Failed to parse a pod full name %q", podFullName)
-		return err
+		klog.Errorf("Failed to parse a pod full name %q", podFullName)
+		return false, err
 	}
-	glog.V(2).Infof("Deleting a mirror pod %q", podFullName)
-	// TODO(random-liu): Delete the mirror pod with uid precondition in mirror pod manager
-	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
-		glog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
+	klog.V(2).Infof("Deleting a mirror pod %q (uid %#v)", podFullName, uid)
+	var GracePeriodSeconds int64
+	GracePeriodSeconds = 0
+	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
+		// Unfortunately, there's no generic error for failing a precondition
+		if !(errors.IsNotFound(err) || errors.IsConflict(err)) {
+			// We should return the error here, but historically this routine does
+			// not return an error unless it can't parse the pod name
+			klog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
+		}
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
+// IsStaticPod returns true if the pod is a static pod.
 func IsStaticPod(pod *v1.Pod) bool {
 	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
+// IsMirrorPod returns true if the pod is a mirror pod.
 func IsMirrorPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return ok

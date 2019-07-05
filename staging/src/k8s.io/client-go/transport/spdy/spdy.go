@@ -38,7 +38,7 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, er
 	if err != nil {
 		return nil, nil, err
 	}
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, true, false)
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, nil, err

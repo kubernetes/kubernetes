@@ -20,9 +20,10 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
@@ -33,7 +34,8 @@ type PersistentVolumeUpgradeTest struct {
 	pvc      *v1.PersistentVolumeClaim
 }
 
-func (PersistentVolumeUpgradeTest) Name() string { return "persistent-volume-upgrade [sig-storage]" }
+// Name returns the tracking name of the test.
+func (PersistentVolumeUpgradeTest) Name() string { return "[sig-storage] persistent-volume-upgrade" }
 
 const (
 	pvTestFile string = "/mnt/volume1/pv_upgrade_test"
@@ -55,8 +57,8 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	ns := f.Namespace.Name
 
-	By("Initializing PV source")
-	t.pvSource, _ = framework.CreateGCEVolume()
+	ginkgo.By("Initializing PV source")
+	t.pvSource, _ = volume.CreateGCEVolume()
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix: "pv-upgrade",
 		PVSource:   *t.pvSource,
@@ -65,12 +67,12 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	emptyStorageClass := ""
 	pvcConfig := framework.PersistentVolumeClaimConfig{StorageClassName: &emptyStorageClass}
 
-	By("Creating the PV and PVC")
+	ginkgo.By("Creating the PV and PVC")
 	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.ExpectNoError(framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc))
 
-	By("Consuming the PV before upgrade")
+	ginkgo.By("Consuming the PV before upgrade")
 	t.testPod(f, pvWriteCmd+";"+pvReadCmd)
 }
 
@@ -78,7 +80,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 // and that the volume data persists.
 func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
-	By("Consuming the PV after upgrade")
+	ginkgo.By("Consuming the PV after upgrade")
 	t.testPod(f, pvReadCmd)
 }
 
@@ -89,7 +91,7 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
-		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
+		e2elog.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
 	}
 }
 

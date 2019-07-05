@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -110,5 +111,8 @@ func (client QuobyteClient) sendRequest(method string, request interface{}, resp
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		log.Printf("Warning: HTTP status code for request is %s\n", strconv.Itoa(resp.StatusCode))
+	}
 	return decodeResponse(resp.Body, &response)
 }

@@ -11,6 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/cmd:all-srcs",
         "//test/conformance:all-srcs",
         "//test/e2e:all-srcs",
         "//test/e2e_kubeadm:all-srcs",
@@ -20,7 +21,6 @@ filegroup(
         "//test/integration:all-srcs",
         "//test/kubemark:all-srcs",
         "//test/list:all-srcs",
-        "//test/soak/cauldron:all-srcs",
         "//test/soak/serve_hostnames:all-srcs",
         "//test/typecheck:all-srcs",
         "//test/utils:all-srcs",

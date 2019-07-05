@@ -25,12 +25,12 @@ This raft implementation is a full feature implementation of Raft protocol. Feat
 - Membership changes
 - Leadership transfer extension
 - Efficient linearizable read-only queries served by both the leader and followers
- - leader checks with quorum and bypasses Raft log before processing read-only queries
- - followers asks leader to get a safe read index before processing read-only queries
+  - leader checks with quorum and bypasses Raft log before processing read-only queries
+  - followers asks leader to get a safe read index before processing read-only queries
 - More efficient lease-based linearizable read-only queries served by both the leader and followers
- - leader bypasses Raft log and processing read-only queries locally
- - followers asks leader to get a safe read index before processing read-only queries
- - this approach relies on the clock of the all the machines in raft group
+  - leader bypasses Raft log and processing read-only queries locally
+  - followers asks leader to get a safe read index before processing read-only queries
+  - this approach relies on the clock of the all the machines in raft group
 
 This raft implementation also includes a few optional enhancements:
 
@@ -112,7 +112,7 @@ After creating a Node, the user has a few responsibilities:
 
 First, read from the Node.Ready() channel and process the updates it contains. These steps may be performed in parallel, except as noted in step 2.
 
-1. Write HardState, Entries, and Snapshot to persistent storage if they are not empty. Note that when writing an Entry with Index i, any previously-persisted entries with Index >= i must be discarded.
+1. Write Entries, HardState and Snapshot to persistent storage in order, i.e. Entries first, then HardState and Snapshot if they are not empty. If persistent storage supports atomic writes then all of them can be written together. Note that when writing an Entry with Index i, any previously-persisted entries with Index >= i must be discarded.
 
 2. Send all Messages to the nodes named in the To field. It is important that no messages be sent until the latest HardState has been persisted to disk, and all Entries written by any previous Ready batch (Messages may be sent while entries from the same batch are being persisted). To reduce the I/O latency, an optimization can be applied to make leader write to disk in parallel with its followers (as explained at section 10.2.1 in Raft thesis). If any Message has type MsgSnap, call Node.ReportSnapshot() after it has been sent (these messages may be large). Note: Marshalling messages is not thread-safe; it is important to make sure that no new entries are persisted while marshalling. The easiest way to achieve this is to serialise the messages directly inside the main raft loop.
 

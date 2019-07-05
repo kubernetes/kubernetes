@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingutil "k8s.io/kubernetes/pkg/apis/scheduling/util"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
 )
 
@@ -36,7 +37,7 @@ type priorityClassStrategy struct {
 // Strategy is the default logic that applies when creating and updating PriorityClass objects.
 var Strategy = priorityClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all PriorityClasses are global.
+// NamespaceScoped returns false because all PriorityClasses are global.
 func (priorityClassStrategy) NamespaceScoped() bool {
 	return false
 }
@@ -45,12 +46,15 @@ func (priorityClassStrategy) NamespaceScoped() bool {
 func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pc := obj.(*scheduling.PriorityClass)
 	pc.Generation = 1
+	schedulingutil.DropDisabledFields(pc, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	_ = obj.(*scheduling.PriorityClass)
-	_ = old.(*scheduling.PriorityClass)
+	newClass := obj.(*scheduling.PriorityClass)
+	oldClass := old.(*scheduling.PriorityClass)
+
+	schedulingutil.DropDisabledFields(newClass, oldClass)
 }
 
 // Validate validates a new PriorityClass.

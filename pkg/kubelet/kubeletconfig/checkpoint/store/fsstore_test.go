@@ -29,9 +29,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	"k8s.io/kubelet/config/v1beta1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
@@ -83,13 +83,13 @@ func TestFsStoreInitialize(t *testing.T) {
 	}
 
 	// check that checkpoints dir exists
-	if _, err := store.fs.Stat(store.checkpointPath("")); err != nil {
-		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.checkpointPath(""), err)
+	if _, err := store.fs.Stat(filepath.Join(store.dir, checkpointsDir)); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", filepath.Join(store.dir, checkpointsDir), err)
 	}
 
-	// check that currentFile exists
-	if _, err := store.fs.Stat(store.metaPath(currentFile)); err != nil {
-		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.metaPath(currentFile), err)
+	// check that assignedFile exists
+	if _, err := store.fs.Stat(store.metaPath(assignedFile)); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.metaPath(assignedFile), err)
 	}
 
 	// check that lastKnownGoodFile exists
@@ -105,21 +105,29 @@ func TestFsStoreExists(t *testing.T) {
 	}
 
 	// checkpoint a payload
-	const uid = "uid"
-	p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: uid}})
+	const (
+		uid             = "uid"
+		resourceVersion = "1"
+	)
+	p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: uid, ResourceVersion: resourceVersion}})
 	if err != nil {
-		t.Fatalf("could not construct checkpoint, error: %v", err)
+		t.Fatalf("could not construct Payload, error: %v", err)
 	}
-	store.Save(p)
+	if err := store.Save(p); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	cases := []struct {
-		desc   string
-		uid    types.UID
-		expect bool
-		err    string
+		desc            string
+		uid             types.UID
+		resourceVersion string
+		expect          bool
+		err             string
 	}{
-		{"exists", uid, true, ""},
-		{"does not exist", "bogus-uid", false, ""},
+		{"exists", uid, resourceVersion, true, ""},
+		{"does not exist", "bogus-uid", "bogus-resourceVersion", false, ""},
+		{"ambiguous UID", "", "bogus-resourceVersion", false, "empty UID is ambiguous"},
+		{"ambiguous ResourceVersion", "bogus-uid", "", false, "empty ResourceVersion is ambiguous"},
 	}
 
 	for _, c := range cases {
@@ -129,10 +137,11 @@ func TestFsStoreExists(t *testing.T) {
 					Name:             "name",
 					Namespace:        "namespace",
 					UID:              c.uid,
+					ResourceVersion:  c.resourceVersion,
 					KubeletConfigKey: "kubelet",
 				}})
 			if err != nil {
-				t.Fatalf("error constructing remote config source: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			ok, err := store.Exists(source)
 			utiltest.ExpectError(t, err, c.err)
@@ -160,38 +169,44 @@ func TestFsStoreSave(t *testing.T) {
 		return s
 	}()
 
+	const (
+		uid             = "uid"
+		resourceVersion = "1"
+	)
+
 	cases := []struct {
-		desc  string
-		files map[string]string
-		err   string
+		desc            string
+		uid             types.UID
+		resourceVersion string
+		files           map[string]string
+		err             string
 	}{
-		{"valid payload", map[string]string{"foo": "foocontent", "bar": "barcontent"}, ""},
-		{"empty key name", map[string]string{"": "foocontent"}, "must not be empty"},
-		{"key name is not a base file name (foo/bar)", map[string]string{"foo/bar": "foocontent"}, "only base names are allowed"},
-		{"key name is not a base file name (/foo)", map[string]string{"/bar": "foocontent"}, "only base names are allowed"},
-		{"used .", map[string]string{".": "foocontent"}, "may not be '.' or '..'"},
-		{"used ..", map[string]string{"..": "foocontent"}, "may not be '.' or '..'"},
-		{"length violation", map[string]string{nameTooLong: "foocontent"}, "must be less than 255 characters"},
+		{"valid payload", uid, resourceVersion, map[string]string{"foo": "foocontent", "bar": "barcontent"}, ""},
+		{"empty key name", uid, resourceVersion, map[string]string{"": "foocontent"}, "must not be empty"},
+		{"key name is not a base file name (foo/bar)", uid, resourceVersion, map[string]string{"foo/bar": "foocontent"}, "only base names are allowed"},
+		{"key name is not a base file name (/foo)", uid, resourceVersion, map[string]string{"/bar": "foocontent"}, "only base names are allowed"},
+		{"used .", uid, resourceVersion, map[string]string{".": "foocontent"}, "may not be '.' or '..'"},
+		{"used ..", uid, resourceVersion, map[string]string{"..": "foocontent"}, "may not be '.' or '..'"},
+		{"length violation", uid, resourceVersion, map[string]string{nameTooLong: "foocontent"}, "must be less than 255 characters"},
 	}
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 			// construct the payload
 			p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{UID: "uid"},
+				ObjectMeta: metav1.ObjectMeta{UID: c.uid, ResourceVersion: c.resourceVersion},
 				Data:       c.files,
 			})
-			if err != nil {
-				t.Fatalf("error constructing payload: %v", err)
+			// if no error, save the payload, otherwise skip straight to error handler
+			if err == nil {
+				err = store.Save(p)
 			}
-			// save the payload
-			err = store.Save(p)
 			utiltest.ExpectError(t, err, c.err)
 			if err != nil {
 				return
 			}
 			// read the saved checkpoint
-			m, err := mapFromCheckpoint(store, p.UID())
+			m, err := mapFromCheckpoint(store, p.UID(), p.ResourceVersion())
 			if err != nil {
 				t.Fatalf("error loading checkpoint to map: %v", err)
 			}
@@ -220,11 +235,12 @@ func TestFsStoreLoad(t *testing.T) {
 	}
 	// construct a payload that contains the kubeletconfig
 	const (
-		uid        = "uid"
-		kubeletKey = "kubelet"
+		uid             = "uid"
+		resourceVersion = "1"
+		kubeletKey      = "kubelet"
 	)
 	p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)},
+		ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid), ResourceVersion: resourceVersion},
 		Data: map[string]string{
 			kubeletKey: string(data),
 		},
@@ -239,12 +255,15 @@ func TestFsStoreLoad(t *testing.T) {
 	}
 
 	cases := []struct {
-		desc string
-		uid  types.UID
-		err  string
+		desc            string
+		uid             types.UID
+		resourceVersion string
+		err             string
 	}{
-		{"checkpoint exists", uid, ""},
-		{"checkpoint does not exist", "bogus-uid", "no checkpoint for source"},
+		{"checkpoint exists", uid, resourceVersion, ""},
+		{"checkpoint does not exist", "bogus-uid", "bogus-resourceVersion", "no checkpoint for source"},
+		{"ambiguous UID", "", "bogus-resourceVersion", "empty UID is ambiguous"},
+		{"ambiguous ResourceVersion", "bogus-uid", "", "empty ResourceVersion is ambiguous"},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
@@ -253,10 +272,11 @@ func TestFsStoreLoad(t *testing.T) {
 					Name:             "name",
 					Namespace:        "namespace",
 					UID:              c.uid,
+					ResourceVersion:  c.resourceVersion,
 					KubeletConfigKey: kubeletKey,
 				}})
 			if err != nil {
-				t.Fatalf("error constructing remote config source: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			loaded, err := store.Load(source)
 			utiltest.ExpectError(t, err, c.err)
@@ -270,34 +290,33 @@ func TestFsStoreLoad(t *testing.T) {
 	}
 }
 
-func TestFsStoreCurrentModified(t *testing.T) {
+func TestFsStoreAssignedModified(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
 		t.Fatalf("error constructing store: %v", err)
 	}
 
-	// create an empty current file, this is good enough for testing
-	saveTestSourceFile(t, store, currentFile, nil)
+	// create an empty assigned file, this is good enough for testing
+	saveTestSourceFile(t, store, assignedFile, nil)
 
-	// set the timestamps to the current time, so we can compare to result of store.CurrentModified
-	now := time.Now()
-	err = store.fs.Chtimes(store.metaPath(currentFile), now, now)
+	// round the current time to the nearest second because some file systems do not support sub-second precision.
+	now := time.Now().Round(time.Second)
+	// set the timestamps to the current time, so we can compare to result of store.AssignedModified
+	err = store.fs.Chtimes(store.metaPath(assignedFile), now, now)
 	if err != nil {
 		t.Fatalf("could not change timestamps, error: %v", err)
 	}
 
-	// for now we hope that the system won't truncate the time to a less precise unit,
-	// if this test fails on certain systems that may be the reason.
-	modTime, err := store.CurrentModified()
+	modTime, err := store.AssignedModified()
 	if err != nil {
-		t.Fatalf("unable to determine modification time of current config source, error: %v", err)
+		t.Fatalf("unable to determine modification time of assigned config source, error: %v", err)
 	}
 	if !now.Equal(modTime) {
 		t.Errorf("expect %q but got %q", now.Format(time.RFC3339), modTime.Format(time.RFC3339))
 	}
 }
 
-func TestFsStoreCurrent(t *testing.T) {
+func TestFsStoreAssigned(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
 		t.Fatalf("error constructing store: %v", err)
@@ -325,10 +344,10 @@ func TestFsStoreCurrent(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 			// save the last known good source
-			saveTestSourceFile(t, store, currentFile, c.expect)
+			saveTestSourceFile(t, store, assignedFile, c.expect)
 
 			// load last-known-good and compare to expected result
-			source, err := store.Current()
+			source, err := store.Assigned()
 			utiltest.ExpectError(t, err, c.err)
 			if err != nil {
 				return
@@ -383,41 +402,86 @@ func TestFsStoreLastKnownGood(t *testing.T) {
 	}
 }
 
-func TestFsStoreSetCurrent(t *testing.T) {
+func TestFsStoreSetAssigned(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
 		t.Fatalf("error constructing store: %v", err)
 	}
 
-	const uid = "uid"
-	expect := fmt.Sprintf(`apiVersion: kubelet.config.k8s.io/v1beta1
+	cases := []struct {
+		desc   string
+		source *apiv1.NodeConfigSource
+		expect string
+		err    string
+	}{
+		{
+			desc:   "nil source",
+			expect: "", // empty file
+		},
+		{
+			desc: "non-nil source",
+			source: &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+				Name:             "name",
+				Namespace:        "namespace",
+				UID:              "uid",
+				ResourceVersion:  "1",
+				KubeletConfigKey: "kubelet",
+			}},
+			expect: `apiVersion: kubelet.config.k8s.io/v1beta1
 kind: SerializedNodeConfigSource
 source:
   configMap:
     kubeletConfigKey: kubelet
     name: name
     namespace: namespace
-    uid: %s
-`, uid)
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-		Name:             "name",
-		Namespace:        "namespace",
-		UID:              types.UID(uid),
-		KubeletConfigKey: "kubelet",
-	}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+    resourceVersion: "1"
+    uid: uid
+`,
+		},
+		{
+			desc: "missing UID",
+			source: &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+				Name:             "name",
+				Namespace:        "namespace",
+				ResourceVersion:  "1",
+				KubeletConfigKey: "kubelet",
+			}},
+			err: "failed to write RemoteConfigSource, empty UID is ambiguous",
+		},
+		{
+			desc: "missing ResourceVersion",
+			source: &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+				Name:             "name",
+				Namespace:        "namespace",
+				UID:              "uid",
+				KubeletConfigKey: "kubelet",
+			}},
+			err: "failed to write RemoteConfigSource, empty ResourceVersion is ambiguous",
+		},
 	}
 
-	// save the current source
-	if err := store.SetCurrent(source); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// check that the source saved as we would expect
-	data := readTestSourceFile(t, store, currentFile)
-	if expect != string(data) {
-		t.Errorf("expect current source file to contain %q, but got %q", expect, string(data))
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			var source checkpoint.RemoteConfigSource
+			if c.source != nil {
+				s, _, err := checkpoint.NewRemoteConfigSource(c.source)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				source = s
+			}
+			// save the assigned source
+			err = store.SetAssigned(source)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// check that the source saved as we would expect
+			data := readTestSourceFile(t, store, assignedFile)
+			if c.expect != string(data) {
+				t.Errorf("expect assigned source file to contain %q, but got %q", c.expect, string(data))
+			}
+		})
 	}
 }
 
@@ -427,35 +491,80 @@ func TestFsStoreSetLastKnownGood(t *testing.T) {
 		t.Fatalf("error constructing store: %v", err)
 	}
 
-	const uid = "uid"
-	expect := fmt.Sprintf(`apiVersion: kubelet.config.k8s.io/v1beta1
+	cases := []struct {
+		desc   string
+		source *apiv1.NodeConfigSource
+		expect string
+		err    string
+	}{
+		{
+			desc:   "nil source",
+			expect: "", // empty file
+		},
+		{
+			desc: "non-nil source",
+			source: &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+				Name:             "name",
+				Namespace:        "namespace",
+				UID:              "uid",
+				ResourceVersion:  "1",
+				KubeletConfigKey: "kubelet",
+			}},
+			expect: `apiVersion: kubelet.config.k8s.io/v1beta1
 kind: SerializedNodeConfigSource
 source:
   configMap:
     kubeletConfigKey: kubelet
     name: name
     namespace: namespace
-    uid: %s
-`, uid)
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-		Name:             "name",
-		Namespace:        "namespace",
-		UID:              types.UID(uid),
-		KubeletConfigKey: "kubelet",
-	}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+    resourceVersion: "1"
+    uid: uid
+`,
+		},
+		{
+			desc: "missing UID",
+			source: &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+				Name:             "name",
+				Namespace:        "namespace",
+				ResourceVersion:  "1",
+				KubeletConfigKey: "kubelet",
+			}},
+			err: "failed to write RemoteConfigSource, empty UID is ambiguous",
+		},
+		{
+			desc: "missing ResourceVersion",
+			source: &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+				Name:             "name",
+				Namespace:        "namespace",
+				UID:              "uid",
+				KubeletConfigKey: "kubelet",
+			}},
+			err: "failed to write RemoteConfigSource, empty ResourceVersion is ambiguous",
+		},
 	}
 
-	// save the last known good source
-	if err := store.SetLastKnownGood(source); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// check that the source saved as we would expect
-	data := readTestSourceFile(t, store, lastKnownGoodFile)
-	if expect != string(data) {
-		t.Errorf("expect last-known-good source file to contain %q, but got %q", expect, string(data))
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			var source checkpoint.RemoteConfigSource
+			if c.source != nil {
+				s, _, err := checkpoint.NewRemoteConfigSource(c.source)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				source = s
+			}
+			// save the assigned source
+			err = store.SetLastKnownGood(source)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// check that the source saved as we would expect
+			data := readTestSourceFile(t, store, lastKnownGoodFile)
+			if c.expect != string(data) {
+				t.Errorf("expect assigned source file to contain %q, but got %q", c.expect, string(data))
+			}
+		})
 	}
 }
 
@@ -485,7 +594,7 @@ func TestFsStoreReset(t *testing.T) {
 	}
 	cases := []struct {
 		desc          string
-		current       checkpoint.RemoteConfigSource
+		assigned      checkpoint.RemoteConfigSource
 		lastKnownGood checkpoint.RemoteConfigSource
 		updated       bool
 	}{
@@ -499,7 +608,7 @@ func TestFsStoreReset(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 			// manually save the sources to their respective files
-			saveTestSourceFile(t, store, currentFile, c.current)
+			saveTestSourceFile(t, store, assignedFile, c.assigned)
 			saveTestSourceFile(t, store, lastKnownGoodFile, c.lastKnownGood)
 
 			// reset
@@ -509,15 +618,15 @@ func TestFsStoreReset(t *testing.T) {
 			}
 
 			// make sure the files were emptied
-			if size := testSourceFileSize(t, store, currentFile); size > 0 {
-				t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, currentFile, size)
+			if size := testSourceFileSize(t, store, assignedFile); size > 0 {
+				t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, assignedFile, size)
 			}
 			if size := testSourceFileSize(t, store, lastKnownGoodFile); size > 0 {
 				t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, lastKnownGoodFile, size)
 			}
 
-			// make sure Current() and LastKnownGood() both return nil
-			current, err := store.Current()
+			// make sure Assigned() and LastKnownGood() both return nil
+			assigned, err := store.Assigned()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -525,9 +634,9 @@ func TestFsStoreReset(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if current != nil || lastKnownGood != nil {
-				t.Errorf("case %q, expect nil for current and last-known-good checkpoints, but still have %q and %q, respectively",
-					c.desc, current, lastKnownGood)
+			if assigned != nil || lastKnownGood != nil {
+				t.Errorf("case %q, expect nil for assigned and last-known-good checkpoints, but still have %q and %q, respectively",
+					c.desc, assigned, lastKnownGood)
 			}
 			if c.updated != updated {
 				t.Errorf("case %q, expect reset to return %t, but got %t", c.desc, c.updated, updated)
@@ -536,107 +645,8 @@ func TestFsStoreReset(t *testing.T) {
 	}
 }
 
-func TestFsStoreReadRemoteConfigSource(t *testing.T) {
-	store, err := newInitializedFakeFsStore()
-	if err != nil {
-		t.Fatalf("error constructing store: %v", err)
-	}
-
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
-		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-			Name:             "name",
-			Namespace:        "namespace",
-			UID:              "uid",
-			KubeletConfigKey: "kubelet",
-		}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	cases := []struct {
-		desc   string
-		expect checkpoint.RemoteConfigSource
-		err    string
-	}{
-		{"default source", nil, ""},
-		{"non-default source", source, ""},
-	}
-
-	const name = "some-source-file"
-	for _, c := range cases {
-		t.Run(c.desc, func(t *testing.T) {
-			saveTestSourceFile(t, store, name, c.expect)
-			source, err := readRemoteConfigSource(store.fs, store.metaPath(name))
-			utiltest.ExpectError(t, err, c.err)
-			if err != nil {
-				return
-			}
-			if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
-				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
-			}
-		})
-	}
-}
-
-func TestFsStoreWriteRemoteConfigSource(t *testing.T) {
-	store, err := newInitializedFakeFsStore()
-	if err != nil {
-		t.Fatalf("error constructing store: %v", err)
-	}
-
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-		Name:             "name",
-		Namespace:        "namespace",
-		UID:              "uid",
-		KubeletConfigKey: "kubelet",
-	}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	cases := []struct {
-		desc   string
-		source checkpoint.RemoteConfigSource
-	}{
-		{"nil source", nil},
-		{"non-nil source", source},
-	}
-
-	const name = "some-source-file"
-	for _, c := range cases {
-		t.Run(c.desc, func(t *testing.T) {
-			// set the source file
-			err := writeRemoteConfigSource(store.fs, store.metaPath(name), c.source)
-			if err != nil {
-				t.Fatalf("unable to set source file, error: %v", err)
-			}
-			// read back the file
-			data := readTestSourceFile(t, store, name)
-			str := string(data)
-
-			if c.source != nil {
-				// expect the contents to match the encoding of the source
-				data, err := c.source.Encode()
-				expect := string(data)
-				if err != nil {
-					t.Fatalf("couldn't encode source, error: %v", err)
-				}
-				if expect != str {
-					t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.source), expect, str)
-				}
-			} else {
-				// expect empty file
-				expect := ""
-				if expect != str {
-					t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.source), expect, str)
-				}
-			}
-		})
-	}
-}
-
-func mapFromCheckpoint(store *fsStore, uid string) (map[string]string, error) {
-	files, err := store.fs.ReadDir(store.checkpointPath(uid))
+func mapFromCheckpoint(store *fsStore, uid, resourceVersion string) (map[string]string, error) {
+	files, err := store.fs.ReadDir(store.checkpointPath(uid, resourceVersion))
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +657,7 @@ func mapFromCheckpoint(store *fsStore, uid string) (map[string]string, error) {
 			return nil, fmt.Errorf("expect only regular files in checkpoint dir %q", uid)
 		}
 		// read the file contents and build the map
-		data, err := store.fs.ReadFile(filepath.Join(store.checkpointPath(uid), f.Name()))
+		data, err := store.fs.ReadFile(filepath.Join(store.checkpointPath(uid, resourceVersion), f.Name()))
 		if err != nil {
 			return nil, err
 		}

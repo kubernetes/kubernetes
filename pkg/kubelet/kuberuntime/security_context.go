@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -30,7 +30,10 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
-		synthesized = &runtimeapi.LinuxContainerSecurityContext{}
+		synthesized = &runtimeapi.LinuxContainerSecurityContext{
+			MaskedPaths:   securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount),
+			ReadonlyPaths: securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount),
+		}
 	}
 
 	// set SeccompProfilePath.
@@ -66,6 +69,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	synthesized.NoNewPrivs = securitycontext.AddNoNewPrivileges(effectiveSc)
+
+	synthesized.MaskedPaths = securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount)
+	synthesized.ReadonlyPaths = securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount)
 
 	return synthesized
 }
@@ -107,6 +113,9 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 	}
 	if securityContext.RunAsUser != nil {
 		sc.RunAsUser = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsUser)}
+	}
+	if securityContext.RunAsGroup != nil {
+		sc.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsGroup)}
 	}
 	if securityContext.Privileged != nil {
 		sc.Privileged = *securityContext.Privileged

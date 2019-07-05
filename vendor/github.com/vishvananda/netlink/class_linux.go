@@ -5,7 +5,6 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
-	"golang.org/x/sys/unix"
 )
 
 // NOTE: function is in here because it uses other linux functions
@@ -51,7 +50,7 @@ func ClassDel(class Class) error {
 // ClassDel will delete a class from the system.
 // Equivalent to: `tc class del $class`
 func (h *Handle) ClassDel(class Class) error {
-	return h.classModify(unix.RTM_DELTCLASS, 0, class)
+	return h.classModify(syscall.RTM_DELTCLASS, 0, class)
 }
 
 // ClassChange will change a class in place
@@ -65,7 +64,7 @@ func ClassChange(class Class) error {
 // Equivalent to: `tc class change $class`
 // The parent and handle MUST NOT be changed.
 func (h *Handle) ClassChange(class Class) error {
-	return h.classModify(unix.RTM_NEWTCLASS, 0, class)
+	return h.classModify(syscall.RTM_NEWTCLASS, 0, class)
 }
 
 // ClassReplace will replace a class to the system.
@@ -83,7 +82,7 @@ func ClassReplace(class Class) error {
 // If a class already exist with this parent/handle pair, the class is changed.
 // If a class does not already exist with this parent/handle, a new class is created.
 func (h *Handle) ClassReplace(class Class) error {
-	return h.classModify(unix.RTM_NEWTCLASS, unix.NLM_F_CREATE, class)
+	return h.classModify(syscall.RTM_NEWTCLASS, syscall.NLM_F_CREATE, class)
 }
 
 // ClassAdd will add a class to the system.
@@ -96,14 +95,14 @@ func ClassAdd(class Class) error {
 // Equivalent to: `tc class add $class`
 func (h *Handle) ClassAdd(class Class) error {
 	return h.classModify(
-		unix.RTM_NEWTCLASS,
-		unix.NLM_F_CREATE|unix.NLM_F_EXCL,
+		syscall.RTM_NEWTCLASS,
+		syscall.NLM_F_CREATE|syscall.NLM_F_EXCL,
 		class,
 	)
 }
 
 func (h *Handle) classModify(cmd, flags int, class Class) error {
-	req := h.newNetlinkRequest(cmd, flags|unix.NLM_F_ACK)
+	req := h.newNetlinkRequest(cmd, flags|syscall.NLM_F_ACK)
 	base := class.Attrs()
 	msg := &nl.TcMsg{
 		Family:  nl.FAMILY_ALL,
@@ -113,12 +112,12 @@ func (h *Handle) classModify(cmd, flags int, class Class) error {
 	}
 	req.AddData(msg)
 
-	if cmd != unix.RTM_DELTCLASS {
+	if cmd != syscall.RTM_DELTCLASS {
 		if err := classPayload(req, class); err != nil {
 			return err
 		}
 	}
-	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
 	return err
 }
 
@@ -142,12 +141,12 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 		var rtab [256]uint32
 		var ctab [256]uint32
 		tcrate := nl.TcRateSpec{Rate: uint32(htb.Rate)}
-		if CalcRtable(&tcrate, rtab[:], cellLog, uint32(mtu), linklayer) < 0 {
+		if CalcRtable(&tcrate, rtab, cellLog, uint32(mtu), linklayer) < 0 {
 			return errors.New("HTB: failed to calculate rate table")
 		}
 		opt.Rate = tcrate
 		tcceil := nl.TcRateSpec{Rate: uint32(htb.Ceil)}
-		if CalcRtable(&tcceil, ctab[:], ccellLog, uint32(mtu), linklayer) < 0 {
+		if CalcRtable(&tcceil, ctab, ccellLog, uint32(mtu), linklayer) < 0 {
 			return errors.New("HTB: failed to calculate ceil rate table")
 		}
 		opt.Ceil = tcceil
@@ -170,7 +169,7 @@ func ClassList(link Link, parent uint32) ([]Class, error) {
 // Equivalent to: `tc class show`.
 // Generally returns nothing if link and parent are not specified.
 func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
-	req := h.newNetlinkRequest(unix.RTM_GETTCLASS, unix.NLM_F_DUMP)
+	req := h.newNetlinkRequest(syscall.RTM_GETTCLASS, syscall.NLM_F_DUMP)
 	msg := &nl.TcMsg{
 		Family: nl.FAMILY_ALL,
 		Parent: parent,
@@ -182,7 +181,7 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 	}
 	req.AddData(msg)
 
-	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWTCLASS)
+	msgs, err := req.Execute(syscall.NETLINK_ROUTE, syscall.RTM_NEWTCLASS)
 	if err != nil {
 		return nil, err
 	}

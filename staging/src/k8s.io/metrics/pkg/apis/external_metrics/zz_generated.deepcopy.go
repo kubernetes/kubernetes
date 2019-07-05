@@ -38,12 +38,8 @@ func (in *ExternalMetricValue) DeepCopyInto(out *ExternalMetricValue) {
 	in.Timestamp.DeepCopyInto(&out.Timestamp)
 	if in.WindowSeconds != nil {
 		in, out := &in.WindowSeconds, &out.WindowSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	out.Value = in.Value.DeepCopy()
 	return
@@ -71,7 +67,7 @@ func (in *ExternalMetricValue) DeepCopyObject() runtime.Object {
 func (in *ExternalMetricValueList) DeepCopyInto(out *ExternalMetricValueList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ExternalMetricValue, len(*in))

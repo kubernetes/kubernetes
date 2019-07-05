@@ -3,15 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "ansi_reader.go",
+        "ansi_writer.go",
+        "console.go",
         "windows.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "ansi_reader.go",
-            "ansi_writer.go",
-            "console.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/term/windows",
     importpath = "github.com/docker/docker/pkg/term/windows",
     visibility = ["//visibility:public"],
     deps = [

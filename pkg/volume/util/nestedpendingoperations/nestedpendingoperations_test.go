@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -261,6 +262,47 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 	}
 	if !IsAlreadyExists(err2) {
 		t.Fatalf("NewGoRoutine did not return alreadyExistsError, got: %v", err2)
+	}
+}
+
+func Test_NewGoRoutineMap_Negative_SecondThirdOpWithDifferentNames(t *testing.T) {
+	// Arrange
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	op1Name := "mount_volume"
+	operation1 := generateErrorFunc()
+	err1 := grm.Run(volumeName, "" /* operationSubName */, types.GeneratedOperations{OperationFunc: operation1, OperationName: op1Name})
+	if err1 != nil {
+		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err1)
+	}
+	// Shorter than exponential backoff period, so as to trigger exponential backoff error on second
+	// operation.
+	operation2 := generateErrorFunc()
+	err2 := retryWithExponentialBackOff(
+		initialOperationWaitTimeShort,
+		func() (bool, error) {
+			err := grm.Run(volumeName,
+				"", /* operationSubName */
+				types.GeneratedOperations{OperationFunc: operation2, OperationName: op1Name})
+
+			if exponentialbackoff.IsExponentialBackoff(err) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+
+	// Assert
+	if err2 != nil {
+		t.Fatalf("Expected NewGoRoutine to fail with exponential backoff for operationKey : %s and operationName : %s", volumeName, op1Name)
+	}
+
+	operation3 := generateNoopFunc()
+	op3Name := "unmount_volume"
+	// Act
+	err3 := grm.Run(volumeName, "" /*pod name*/, types.GeneratedOperations{OperationFunc: operation3, OperationName: op3Name})
+	if err3 != nil {
+		t.Fatalf("NewGoRoutine failed. Expected <no error> Actual: <%v>", err3)
 	}
 }
 
@@ -539,6 +581,12 @@ func generateWaitFunc(done <-chan interface{}) func() (error, error) {
 func generatePanicFunc() func() (error, error) {
 	return func() (error, error) {
 		panic("testing panic")
+	}
+}
+
+func generateErrorFunc() func() (error, error) {
+	return func() (error, error) {
+		return fmt.Errorf("placholder1"), fmt.Errorf("placeholder2")
 	}
 }
 

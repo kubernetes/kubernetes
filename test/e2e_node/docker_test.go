@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
+var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("docker-feature-test")
 
 	BeforeEach(func() {
@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  containerName,
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					}},
 				},
 			})

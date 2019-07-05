@@ -22,11 +22,11 @@ import (
 	"sort"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"github.com/google/gofuzz"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	roundtrip "k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -88,9 +88,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:     {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},
-		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeProxyConfiguration"}:           {},
-		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeSchedulerConfiguration"}:       {},
-		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeletConfiguration"}:             {},
 		{Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "MasterConfiguration"}:               {},
 		// This object contains only int fields which currently breaks the defaulting test because
 		// it's pretty stupid. Once we add non integer fields, we should uncomment this.
@@ -139,12 +136,20 @@ func TestDefaulting(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfigurationList"}: {},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfiguration"}:       {},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfigurationList"}:   {},
+		{Group: "auditregistration.k8s.io", Version: "v1alpha1", Kind: "AuditSink"}:                             {},
+		{Group: "auditregistration.k8s.io", Version: "v1alpha1", Kind: "AuditSinkList"}:                         {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                      {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                  {},
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                     {},
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                 {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIDriver"}:                                        {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIDriverList"}:                                    {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                          {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                      {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "VolumeAttachment"}:                                      {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "VolumeAttachmentList"}:                                  {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "VolumeAttachment"}:                                 {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "VolumeAttachmentList"}:                             {},
 		{Group: "authentication.k8s.io", Version: "v1", Kind: "TokenRequest"}:                                   {},
 	}
 

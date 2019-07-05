@@ -22,8 +22,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidManualSelector() *metav1.LabelSelector {
@@ -214,15 +217,36 @@ func TestValidateJob(t *testing.T) {
 		},
 	}
 
-	for k, v := range errorCases {
-		errs := ValidateJob(&v)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+	for _, setFeature := range []bool{true, false} {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, setFeature)()
+		ttlCase := "spec.ttlSecondsAfterFinished:must be greater than or equal to 0"
+		if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+			errorCases[ttlCase] = batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.JobSpec{
+					TTLSecondsAfterFinished: &negative,
+					Selector:                validGeneratedSelector,
+					Template:                validPodTemplateSpecForGenerated,
+				},
+			}
 		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
+			delete(errorCases, ttlCase)
+		}
+
+		for k, v := range errorCases {
+			errs := ValidateJob(&v)
+			if len(errs) == 0 {
+				t.Errorf("expected failure for %s", k)
+			} else {
+				s := strings.Split(k, ":")
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %v, expected: %s", err, k)
+				}
 			}
 		}
 	}
@@ -583,6 +607,25 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+		errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						TTLSecondsAfterFinished: &negative,
+						Template:                validPodTemplateSpec,
+					},
+				},
+			},
+		}
 	}
 
 	for k, v := range errorCases {

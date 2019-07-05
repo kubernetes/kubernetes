@@ -11,6 +11,6 @@ spec:
     spec:
       containers:
       - name: echoheaders-https
-        image: k8s.gcr.io/echoserver:1.10
+        image: gcr.io/kubernetes-e2e-test-images/echoserver:2.2
         ports:
         - containerPort: 8080

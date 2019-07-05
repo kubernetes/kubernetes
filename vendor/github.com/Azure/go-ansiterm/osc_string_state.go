@@ -5,7 +5,7 @@ type oscStringState struct {
 }
 
 func (oscState oscStringState) Handle(b byte) (s state, e error) {
-	logger.Infof("OscString::Handle %#x", b)
+	oscState.parser.logf("OscString::Handle %#x", b)
 	nextState, err := oscState.baseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err

@@ -19,97 +19,24 @@ package util
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func TestLookupContainerPortNumberByName(t *testing.T) {
-	cases := []struct {
-		name     string
-		pod      api.Pod
-		portname string
-		portnum  int32
-		err      bool
-	}{
-		{
-			name: "test success 1",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Ports: []api.ContainerPort{
-								{
-									Name:          "https",
-									ContainerPort: int32(443)},
-								{
-									Name:          "http",
-									ContainerPort: int32(80)},
-							},
-						},
-					},
-				},
-			},
-			portname: "http",
-			portnum:  int32(80),
-			err:      false,
-		},
-		{
-			name: "test faulure 1",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Ports: []api.ContainerPort{
-								{
-									Name:          "https",
-									ContainerPort: int32(443)},
-							},
-						},
-					},
-				},
-			},
-			portname: "www",
-			portnum:  int32(0),
-			err:      true,
-		},
-	}
-
-	for _, tc := range cases {
-		portnum, err := LookupContainerPortNumberByName(tc.pod, tc.portname)
-		if err != nil {
-			if tc.err {
-				continue
-			}
-
-			t.Errorf("%v: unexpected error: %v", tc.name, err)
-			continue
-		}
-
-		if tc.err {
-			t.Errorf("%v: unexpected success", tc.name)
-			continue
-		}
-
-		if portnum != tc.portnum {
-			t.Errorf("%v: expected port number %v; got %v", tc.name, tc.portnum, portnum)
-		}
-	}
-}
-
 func TestLookupContainerPortNumberByServicePort(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name          string
-		svc           api.Service
-		pod           api.Pod
+		svc           v1.Service
+		pod           v1.Pod
 		port          int32
 		containerPort int32
 		err           bool
 	}{
 		{
 			name: "test success 1 (int port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromInt(8080),
@@ -117,11 +44,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -136,10 +63,10 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test success 2 (clusterIP: None)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP: api.ClusterIPNone,
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromInt(8080),
@@ -147,11 +74,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -166,9 +93,9 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test success 3 (named port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -176,11 +103,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -195,20 +122,20 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test success (targetPort omitted)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port: 80,
 						},
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(80)},
@@ -223,9 +150,9 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test failure 1 (cannot find a matching named port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -233,11 +160,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -252,9 +179,9 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test failure 2 (cannot find a matching service port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -262,11 +189,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -281,10 +208,10 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test failure 2 (cannot find a matching service port, but ClusterIP: None)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP: api.ClusterIPNone,
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -292,11 +219,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(80)},
@@ -311,27 +238,29 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		containerPort, err := LookupContainerPortNumberByServicePort(tc.svc, tc.pod, tc.port)
-		if err != nil {
-			if tc.err {
-				if containerPort != tc.containerPort {
-					t.Errorf("%v: expected port %v; got %v", tc.name, tc.containerPort, containerPort)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			containerPort, err := LookupContainerPortNumberByServicePort(tt.svc, tt.pod, tt.port)
+			if err != nil {
+				if tt.err {
+					if containerPort != tt.containerPort {
+						t.Errorf("%v: expected port %v; got %v", tt.name, tt.containerPort, containerPort)
+					}
+					return
 				}
-				continue
+
+				t.Errorf("%v: unexpected error: %v", tt.name, err)
+				return
 			}
 
-			t.Errorf("%v: unexpected error: %v", tc.name, err)
-			continue
-		}
+			if tt.err {
+				t.Errorf("%v: unexpected success", tt.name)
+				return
+			}
 
-		if tc.err {
-			t.Errorf("%v: unexpected success", tc.name)
-			continue
-		}
-
-		if containerPort != tc.containerPort {
-			t.Errorf("%v: expected port %v; got %v", tc.name, tc.containerPort, containerPort)
-		}
+			if containerPort != tt.containerPort {
+				t.Errorf("%v: expected port %v; got %v", tt.name, tt.containerPort, containerPort)
+			}
+		})
 	}
 }

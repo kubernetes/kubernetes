@@ -28,8 +28,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+// Errors that could be returned by GetReference.
 var (
-	// Errors that could be returned by GetReference.
 	ErrNilObject  = errors.New("can't reference a nil object")
 	ErrNoSelfLink = errors.New("selfLink was empty, can't make reference")
 )
@@ -80,12 +80,12 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*api.ObjectRefere
 		if len(selfLink) == 0 {
 			return nil, ErrNoSelfLink
 		}
-		selfLinkUrl, err := url.Parse(selfLink)
+		selfLinkURL, err := url.Parse(selfLink)
 		if err != nil {
 			return nil, err
 		}
 		// example paths: /<prefix>/<version>/*
-		parts := strings.Split(selfLinkUrl.Path, "/")
+		parts := strings.Split(selfLinkURL.Path, "/")
 		if len(parts) < 3 {
 			return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", selfLink, version)
 		}

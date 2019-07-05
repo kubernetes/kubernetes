@@ -163,7 +163,7 @@ func (t *TableBatch) ExecuteBatch() error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.resp.Body)
+	defer drainRespBody(resp.resp)
 
 	if err = checkRespCode(resp.resp, []int{http.StatusAccepted}); err != nil {
 

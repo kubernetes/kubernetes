@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +56,7 @@ func (c *healthCheck) Name() string {
 
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
-// - all master Nodes are Ready
+// - all control-plane Nodes are Ready
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
@@ -67,27 +69,18 @@ func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.Stri
 			f:      apiServerHealthy,
 		},
 		&healthCheck{
-			name:   "MasterNodesReady",
+			name:   "ControlPlaneNodesReady",
 			client: client,
-			f:      masterNodesReady,
+			f:      controlPlaneNodesReady,
 		},
 		// TODO: Add a check for ComponentStatuses here?
 	}
 
-	// Run slightly different health checks depending on control plane hosting type
-	if IsControlPlaneSelfHosted(client) {
-		healthChecks = append(healthChecks, &healthCheck{
-			name:   "ControlPlaneHealth",
-			client: client,
-			f:      controlPlaneHealth,
-		})
-	} else {
-		healthChecks = append(healthChecks, &healthCheck{
-			name:   "StaticPodManifest",
-			client: client,
-			f:      staticPodManifestHealth,
-		})
-	}
+	healthChecks = append(healthChecks, &healthCheck{
+		name:   "StaticPodManifest",
+		client: client,
+		f:      staticPodManifestHealth,
+	})
 
 	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
@@ -102,43 +95,30 @@ func apiServerHealthy(client clientset.Interface) error {
 	}
 	client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
 	if healthStatus != http.StatusOK {
-		return fmt.Errorf("the API Server is unhealthy; /healthz didn't return %q", "ok")
+		return errors.Errorf("the API Server is unhealthy; /healthz didn't return %q", "ok")
 	}
 	return nil
 }
 
-// masterNodesReady checks whether all master Nodes in the cluster are in the Running state
-func masterNodesReady(client clientset.Interface) error {
+// controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
+func controlPlaneNodesReady(client clientset.Interface) error {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleMaster: "",
 	}))
-	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+	controlPlanes, err := client.CoreV1().Nodes().List(metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return fmt.Errorf("couldn't list masters in cluster: %v", err)
+		return errors.Wrap(err, "couldn't list control-planes in cluster")
 	}
 
-	if len(masters.Items) == 0 {
-		return fmt.Errorf("failed to find any nodes with master role")
+	if len(controlPlanes.Items) == 0 {
+		return errors.New("failed to find any nodes with a control-plane role")
 	}
 
-	notReadyMasters := getNotReadyNodes(masters.Items)
-	if len(notReadyMasters) != 0 {
-		return fmt.Errorf("there are NotReady masters in the cluster: %v", notReadyMasters)
-	}
-	return nil
-}
-
-// controlPlaneHealth ensures all control plane DaemonSets are healthy
-func controlPlaneHealth(client clientset.Interface) error {
-	notReadyDaemonSets, err := getNotReadyDaemonSets(client)
-	if err != nil {
-		return err
-	}
-
-	if len(notReadyDaemonSets) != 0 {
-		return fmt.Errorf("there are control plane DaemonSets in the cluster that are not ready: %v", notReadyDaemonSets)
+	notReadyControlPlanes := getNotReadyNodes(controlPlanes.Items)
+	if len(notReadyControlPlanes) != 0 {
+		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
 	return nil
 }
@@ -146,7 +126,7 @@ func controlPlaneHealth(client clientset.Interface) error {
 // staticPodManifestHealth makes sure the required static pods are presents
 func staticPodManifestHealth(_ clientset.Interface) error {
 	nonExistentManifests := []string{}
-	for _, component := range constants.MasterComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
 			nonExistentManifests = append(nonExistentManifests, manifestFile)
@@ -155,7 +135,7 @@ func staticPodManifestHealth(_ clientset.Interface) error {
 	if len(nonExistentManifests) == 0 {
 		return nil
 	}
-	return fmt.Errorf("The control plane seems to be Static Pod-hosted, but some of the manifests don't seem to exist on disk. This probably means you're running 'kubeadm upgrade' on a remote machine, which is not supported for a Static Pod-hosted cluster. Manifest files not found: %v", nonExistentManifests)
+	return errors.Errorf("The control plane seems to be Static Pod-hosted, but some of the manifests don't seem to exist on disk. This probably means you're running 'kubeadm upgrade' on a remote machine, which is not supported for a Static Pod-hosted cluster. Manifest files not found: %v", nonExistentManifests)
 }
 
 // IsControlPlaneSelfHosted returns whether the control plane is self hosted or not
@@ -165,22 +145,22 @@ func IsControlPlaneSelfHosted(client clientset.Interface) bool {
 		return false
 	}
 
-	// If there are no NotReady DaemonSets, we are using self-hosting
+	// If there are no NotReady DaemonSets, we are using selfhosting
 	return len(notReadyDaemonSets) == 0
 }
 
 // getNotReadyDaemonSets gets the amount of Ready control plane DaemonSets
 func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 	notReadyDaemonSets := []error{}
-	for _, component := range constants.MasterComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		dsName := constants.AddSelfHostedPrefix(component)
 		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
+			return nil, errors.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
 		}
 
 		if err := daemonSetHealth(&ds.Status); err != nil {
-			notReadyDaemonSets = append(notReadyDaemonSets, fmt.Errorf("DaemonSet %q not healthy: %v", dsName, err))
+			notReadyDaemonSets = append(notReadyDaemonSets, errors.Wrapf(err, "DaemonSet %q not healthy", dsName))
 		}
 	}
 	return notReadyDaemonSets, nil
@@ -189,13 +169,14 @@ func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 // daemonSetHealth is a helper function for getting the health of a DaemonSet's status
 func daemonSetHealth(dsStatus *apps.DaemonSetStatus) error {
 	if dsStatus.CurrentNumberScheduled != dsStatus.DesiredNumberScheduled {
-		return fmt.Errorf("current number of scheduled Pods ('%d') doesn't match the amount of desired Pods ('%d')", dsStatus.CurrentNumberScheduled, dsStatus.DesiredNumberScheduled)
+		return errors.Errorf("current number of scheduled Pods ('%d') doesn't match the amount of desired Pods ('%d')",
+			dsStatus.CurrentNumberScheduled, dsStatus.DesiredNumberScheduled)
 	}
 	if dsStatus.NumberAvailable == 0 {
-		return fmt.Errorf("no available Pods for DaemonSet")
+		return errors.New("no available Pods for DaemonSet")
 	}
 	if dsStatus.NumberReady == 0 {
-		return fmt.Errorf("no ready Pods for DaemonSet")
+		return errors.New("no ready Pods for DaemonSet")
 	}
 	return nil
 }

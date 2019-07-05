@@ -28,9 +28,9 @@ import (
 
 // Config contains all the settings for a Controller.
 type Config struct {
-	// The queue for your objects; either a FIFO or
-	// a DeltaFIFO. Your Process() function should accept
-	// the output of this Queue's Pop() method.
+	// The queue for your objects - has to be a DeltaFIFO due to
+	// assumptions in the implementation. Your Process() function
+	// should accept the output of this Queue's Pop() method.
 	Queue
 
 	// Something that can list and watch your objects.
@@ -285,45 +285,7 @@ func NewInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
-	// This will hold incoming changes. Note how we pass clientState in as a
-	// KeyLister, that way resync operations will result in the correct set
-	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, clientState)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(Deltas) {
-				switch d.Type {
-				case Sync, Added, Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
-						if err := clientState.Update(d.Object); err != nil {
-							return err
-						}
-						h.OnUpdate(old, d.Object)
-					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
-						}
-						h.OnAdd(d.Object)
-					}
-				case Deleted:
-					if err := clientState.Delete(d.Object); err != nil {
-						return err
-					}
-					h.OnDelete(d.Object)
-				}
-			}
-			return nil
-		},
-	}
-	return clientState, New(cfg)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
 }
 
 // NewIndexerInformer returns a Indexer and a controller for populating the index
@@ -352,6 +314,30 @@ func NewIndexerInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
+}
+
+// newInformer returns a controller for populating the store while also
+// providing event notifications.
+//
+// Parameters
+//  * lw is list and watch functions for the source of the resource you want to
+//    be informed of.
+//  * objType is an object of the type that you expect to receive.
+//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//    calls, even if nothing changed). Otherwise, re-list will be delayed as
+//    long as possible (until the upstream source closes the watch or times out,
+//    or you stop the controller).
+//  * h is the object you want notifications sent to.
+//  * clientState is the store you want to populate
+//
+func newInformer(
+	lw ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+	clientState Store,
+) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
@@ -390,5 +376,5 @@ func NewIndexerInformer(
 			return nil
 		},
 	}
-	return clientState, New(cfg)
+	return New(cfg)
 }

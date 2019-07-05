@@ -66,6 +66,9 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
 			Response: &v1beta1.AdmissionResponse{
 				Allowed: false,
+				Result: &metav1.Status{
+					Code: http.StatusForbidden,
+				},
 			},
 		})
 	case "/disallowReason":
@@ -75,6 +78,18 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Allowed: false,
 				Result: &metav1.Status{
 					Message: "you shall not pass",
+					Code:    http.StatusForbidden,
+				},
+			},
+		})
+	case "/shouldNotBeCalled":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Message: "doesn't expect labels to match object selector",
+					Code:    http.StatusForbidden,
 				},
 			},
 		})
@@ -83,11 +98,64 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
 			Response: &v1beta1.AdmissionResponse{
 				Allowed: true,
+				AuditAnnotations: map[string]string{
+					"key1": "value1",
+				},
+			},
+		})
+	case "/removeLabel":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+				AuditAnnotations: map[string]string{
+					"key1": "value1",
+				},
+			},
+		})
+	case "/addLabel":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
+		})
+	case "/invalidMutation":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "add", "CORRUPTED_KEY":}]`),
 			},
 		})
 	case "/nilResponse":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{})
+	case "/invalidAnnotation":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
+				AuditAnnotations: map[string]string{
+					"invalid*key": "value1",
+				},
+			},
+		})
+	case "/noop":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
+			},
+		})
 	default:
 		http.NotFound(w, r)
 	}

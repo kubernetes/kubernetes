@@ -21,8 +21,6 @@ package mount
 import (
 	"errors"
 	"os"
-
-	"github.com/golang/glog"
 )
 
 type Mounter struct {
@@ -48,12 +46,6 @@ func (mounter *Mounter) Unmount(target string) error {
 	return unsupportedErr
 }
 
-// GetMountRefs finds all other references to the device referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	return []string{}, unsupportedErr
-}
-
 func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, unsupportedErr
 }
@@ -62,32 +54,12 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	return (mp.Path == dir)
 }
 
-func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(mounter, dir)
-}
-
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, unsupportedErr
 }
 
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", unsupportedErr
-}
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	return "", unsupportedErr
-}
-
-func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, unsupportedErr
-}
-
-func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, unsupportedErr
-}
-
-func (mounter *Mounter) MakeRShared(path string) error {
-	return unsupportedErr
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
@@ -98,39 +70,65 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 	return true, unsupportedErr
 }
 
-func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return "", unsupportedErr
+}
+
+type hostUtil struct{}
+
+func NewHostUtil() HostUtils {
+	return &hostUtil{}
+}
+
+// DeviceOpened determines if the device is in use elsewhere
+func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
+	return false, unsupportedErr
+}
+
+// PathIsDevice determines if a path is a device.
+func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+	return true, unsupportedErr
+}
+
+// GetDeviceNameFromMount finds the device name by checking the mount path
+// to get the global mount path within its plugin directory
+func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return "", unsupportedErr
+}
+
+func (hu *hostUtil) MakeRShared(path string) error {
+	return unsupportedErr
+}
+
+func (hu *hostUtil) GetFileType(pathname string) (FileType, error) {
 	return FileType("fake"), unsupportedErr
 }
 
-func (mounter *Mounter) MakeDir(pathname string) error {
+func (hu *hostUtil) MakeFile(pathname string) error {
 	return unsupportedErr
 }
 
-func (mounter *Mounter) MakeFile(pathname string) error {
+func (hu *hostUtil) MakeDir(pathname string) error {
 	return unsupportedErr
 }
 
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	glog.Errorf("%s", unsupportedErr)
-	return true
+func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+	return true, unsupportedErr
 }
 
-func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, unsupportedErr
+// EvalHostSymlinks returns the path name after evaluating symlinks
+func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return "", unsupportedErr
 }
 
-func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
-	return unsupportedErr
+func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
+	return -1, unsupportedErr
 }
 
-func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return unsupportedErr
+func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, unsupportedErr
 }
 
-func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
+func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
+	return 0, unsupportedErr
 }

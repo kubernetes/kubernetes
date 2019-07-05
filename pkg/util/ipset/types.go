@@ -49,6 +49,8 @@ const (
 	ProtocolTCP = "tcp"
 	// ProtocolUDP represents UDP protocol.
 	ProtocolUDP = "udp"
+	// ProtocolSCTP represents SCTP protocol.
+	ProtocolSCTP = "sctp"
 )
 
 // ValidIPSetTypes defines the supported ip set type.

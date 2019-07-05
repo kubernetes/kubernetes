@@ -37,8 +37,10 @@ var (
 	warn     = flag.Bool("warn", false, "print warnings")
 )
 
+
 // test holds test locations, package names, and test names.
 type test struct {
+  
 	Loc      string
 	Name     string
 	TestName string

@@ -24,13 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
-	// NodeStatusUpdateRetry controls the number of retries of writing
-	// NodeStatus update.
-	NodeStatusUpdateRetry = 5
+	// NodeHealthUpdateRetry controls the number of retries of writing
+	// node health update.
+	NodeHealthUpdateRetry = 5
 	// NodeEvictionPeriod controls how often NodeController will try to
 	// evict Pods from non-responsive Nodes.
 	NodeEvictionPeriod = 100 * time.Millisecond
@@ -236,7 +236,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			glog.V(10).Infof("Try rate limited for value: %v", val)
+			klog.V(10).Infof("Try rate limited for value: %v", val)
 			// Try again later
 			break
 		}

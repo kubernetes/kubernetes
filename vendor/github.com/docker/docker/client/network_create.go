@@ -1,10 +1,10 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // NetworkCreate creates a new network in the docker host.
@@ -15,11 +15,11 @@ func (cli *Client) NetworkCreate(ctx context.Context, name string, options types
 	}
 	var response types.NetworkCreateResponse
 	serverResp, err := cli.post(ctx, "/networks/create", nil, networkCreateRequest, nil)
+	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return response, err
 	}
 
-	json.NewDecoder(serverResp.body).Decode(&response)
-	ensureReaderClosed(serverResp)
+	err = json.NewDecoder(serverResp.body).Decode(&response)
 	return response, err
 }

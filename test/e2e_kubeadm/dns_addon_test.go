@@ -1,0 +1,150 @@
+/*
+Copyright 2019 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package e2e_kubeadm
+
+import (
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+const (
+	dnsService = "kube-dns"
+
+	coreDNSServiceAccountName = "coredns"
+	coreDNSConfigMap          = "coredns"
+	coreDNSConfigMapKey       = "Corefile"
+	coreDNSRoleName           = "system:coredns"
+	coreDNSRoleBindingName    = coreDNSRoleName
+	coreDNSDeploymentName     = "coredns"
+
+	kubeDNSServiceAccountName = "kube-dns"
+	kubeDNSDeploymentName     = "kube-dns"
+)
+
+var (
+	dnsType = ""
+)
+
+// Define container for all the test specification aimed at verifying
+// that kubeadm configures the dns as expected
+var _ = KubeadmDescribe("DNS addon", func() {
+
+	// Get an instance of the k8s test framework
+	f := framework.NewDefaultFramework("DNS")
+
+	// Tests in this container are not expected to create new objects in the cluster
+	// so we are disabling the creation of a namespace in order to get a faster execution
+	f.SkipNamespaceCreation = true
+
+	// kubeadm supports two type of DNS addon, and so
+	// it is necessary to get it from the kubeadm-config ConfigMap before testing
+	BeforeEach(func() {
+		// if the dnsType name is already known exit
+		if dnsType != "" {
+			return
+		}
+
+		// gets the ClusterConfiguration from the kubeadm kubeadm-config ConfigMap as a untyped map
+		m := getClusterConfiguration(f.ClientSet)
+
+		// Extract the dnsType
+		dnsType = "CoreDNS"
+		if _, ok := m["dns"]; ok {
+			d := m["dns"].(map[interface{}]interface{})
+			if t, ok := d["type"]; ok {
+				dnsType = t.(string)
+			}
+		}
+	})
+
+	Context("kube-dns", func() {
+		Context("kube-dns ServiceAccount", func() {
+			It("should exist", func() {
+				if dnsType != "kube-dns" {
+					framework.Skipf("Skipping because DNS type is %s", dnsType)
+				}
+
+				ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeDNSServiceAccountName)
+			})
+		})
+
+		Context("kube-dns Deployment", func() {
+			It("should exist and be properly configured", func() {
+				if dnsType != "kube-dns" {
+					framework.Skipf("Skipping because DNS type is %s", dnsType)
+				}
+
+				d := GetDeployment(f.ClientSet, kubeSystemNamespace, kubeDNSDeploymentName)
+
+				Expect(d.Spec.Template.Spec.ServiceAccountName).To(Equal(kubeDNSServiceAccountName))
+			})
+		})
+	})
+
+	Context("CoreDNS", func() {
+		Context("CoreDNS ServiceAccount", func() {
+			It("should exist", func() {
+				if dnsType != "CoreDNS" {
+					framework.Skipf("Skipping because DNS type is %s", dnsType)
+				}
+
+				ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, coreDNSServiceAccountName)
+			})
+
+			It("should have related ClusterRole and ClusterRoleBinding", func() {
+				if dnsType != "CoreDNS" {
+					framework.Skipf("Skipping because DNS type is %s", dnsType)
+				}
+
+				ExpectClusterRole(f.ClientSet, coreDNSRoleName)
+				ExpectClusterRoleBinding(f.ClientSet, coreDNSRoleBindingName)
+			})
+		})
+
+		Context("CoreDNS ConfigMap", func() {
+			It("should exist and be properly configured", func() {
+				if dnsType != "CoreDNS" {
+					framework.Skipf("Skipping because DNS type is %s", dnsType)
+				}
+
+				cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, coreDNSConfigMap)
+
+				Expect(cm.Data).To(HaveKey(coreDNSConfigMapKey))
+			})
+		})
+
+		Context("CoreDNS Deployment", func() {
+			It("should exist and be properly configured", func() {
+				if dnsType != "CoreDNS" {
+					framework.Skipf("Skipping because DNS type is %s", dnsType)
+				}
+
+				d := GetDeployment(f.ClientSet, kubeSystemNamespace, coreDNSDeploymentName)
+
+				Expect(d.Spec.Template.Spec.ServiceAccountName).To(Equal(coreDNSServiceAccountName))
+			})
+		})
+	})
+
+	Context("DNS Service", func() {
+		It("should exist", func() {
+			ExpectService(f.ClientSet, kubeSystemNamespace, dnsService)
+		})
+	})
+})

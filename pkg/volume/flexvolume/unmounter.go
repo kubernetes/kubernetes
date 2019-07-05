@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 )
 
@@ -31,7 +31,6 @@ type flexVolumeUnmounter struct {
 	*flexVolume
 	// Runner used to teardown the volume.
 	runner exec.Interface
-	volume.MetricsNil
 }
 
 var _ volume.Unmounter = &flexVolumeUnmounter{}
@@ -43,12 +42,15 @@ func (f *flexVolumeUnmounter) TearDown() error {
 }
 
 func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
-
-	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
-		return nil
+	pathExists, pathErr := mount.PathExists(dir)
+	if pathErr != nil {
+		// only log warning here since plugins should anyways have to deal with errors
+		klog.Warningf("Error checking path: %v", pathErr)
+	} else {
+		if !pathExists {
+			klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+			return nil
+		}
 	}
 
 	call := f.plugin.NewDriverCall(unmountCmd)
@@ -62,7 +64,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
-	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		return nil

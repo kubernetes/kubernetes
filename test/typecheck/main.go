@@ -24,6 +24,7 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"io"
 	"log"
 	"os"
@@ -35,10 +36,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh/terminal"
-	// TODO(rmmh): remove this when golang/go#23712 is fixed, and the
-	// fix is the current minimum Go version to build Kubernetes.
-	"k8s.io/kubernetes/test/typecheck/srcimporter"
-	"k8s.io/kubernetes/third_party/forked/golang/go/types"
+
+	srcimporter "k8s.io/kubernetes/third_party/go-srcimporter"
 )
 
 var (

@@ -125,7 +125,7 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 
 func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
 	c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s --source-only ; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
+	args := fmt.Sprintf("source %s ; source %s; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()
@@ -143,7 +143,7 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 	}
 
 	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &c.pod); err != nil {
-		c.t.Fatalf("Failed to decode manifest: %v", err)
+		c.t.Fatalf("Failed to decode manifest:\n%s\nerror: %v", json, err)
 	}
 }
 

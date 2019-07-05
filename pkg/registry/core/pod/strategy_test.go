@@ -88,6 +88,20 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
+				Spec: api.PodSpec{ServiceAccountName: "serviceAccount1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.serviceAccountName=serviceAccount1"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{SchedulerName: "serviceAccount1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.serviceAccountName=serviceAccount2"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
 				Status: api.PodStatus{Phase: api.PodRunning},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.phase=Running"),
@@ -102,14 +116,22 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
-				Status: api.PodStatus{PodIP: "1.2.3.4"},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "1.2.3.4"},
+					},
+				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=1.2.3.4"),
 			expectMatch:   true,
 		},
 		{
 			in: &api.Pod{
-				Status: api.PodStatus{PodIP: "1.2.3.4"},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "1.2.3.4"},
+					},
+				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
 			expectMatch:   false,
@@ -127,7 +149,30 @@ func TestMatchPod(t *testing.T) {
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node2"),
 			expectMatch:   false,
-		}}
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "2001:db8::"},
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db8::"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "2001:db8::"},
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db7::"),
+			expectMatch:   false,
+		},
+	}
 	for _, testCase := range testCases {
 		m := MatchPod(labels.Everything(), testCase.fieldSelector)
 		result, err := m.Matches(testCase.in)
@@ -381,7 +426,7 @@ type mockConnectionInfoGetter struct {
 	info *client.ConnectionInfo
 }
 
-func (g mockConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*client.ConnectionInfo, error) {
+func (g mockConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*client.ConnectionInfo, error) {
 	return g.info, nil
 }
 

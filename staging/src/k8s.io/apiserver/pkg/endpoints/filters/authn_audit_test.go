@@ -33,7 +33,7 @@ func TestFailedAuthnAudit(t *testing.T) {
 	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, policyChecker)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
@@ -65,7 +65,7 @@ func TestFailedMultipleAuthnAudit(t *testing.T) {
 	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, policyChecker)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
@@ -98,7 +98,7 @@ func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
 	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, policyChecker)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
@@ -129,7 +129,7 @@ func TestFailedAuthnAuditOmitted(t *testing.T) {
 	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, []auditinternal.Stage{auditinternal.StageResponseStarted})
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, policyChecker)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)

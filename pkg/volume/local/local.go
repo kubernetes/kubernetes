@@ -23,22 +23,26 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
-	stringsutil "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/validation"
+	"k8s.io/utils/keymutex"
+	utilstrings "k8s.io/utils/strings"
 )
 
-// This is the primary entrypoint for volume plugins.
+const (
+	defaultFSType = "ext4"
+)
+
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&localVolumePlugin{}}
 }
@@ -59,7 +63,7 @@ const (
 
 func (plugin *localVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.volumeLocks = keymutex.NewKeyMutex()
+	plugin.volumeLocks = keymutex.NewHashed(0)
 	plugin.recorder = host.GetEventRecorder()
 	return nil
 }
@@ -78,12 +82,16 @@ func (plugin *localVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Local != nil)
 }
 
+func (plugin *localVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *localVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
 func (plugin *localVolumePlugin) SupportsMountOption() bool {
-	return false
+	return true
 }
 
 func (plugin *localVolumePlugin) SupportsBulkVolumeVerification() bool {
@@ -106,9 +114,19 @@ func getVolumeSource(spec *volume.Spec) (*v1.LocalVolumeSource, bool, error) {
 }
 
 func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	_, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
+	}
+
+	globalLocalPath, err := plugin.getGlobalLocalPath(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 
 	return &localVolumeMounter{
@@ -117,11 +135,13 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 			podUID:          pod.UID,
 			volName:         spec.Name(),
 			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
+			hostUtil:        kvh.GetHostUtil(),
 			plugin:          plugin,
-			globalPath:      volumeSource.Path,
-			MetricsProvider: volume.NewMetricsStatFS(volumeSource.Path),
+			globalPath:      globalLocalPath,
+			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(localVolumePluginName), spec.Name())),
 		},
-		readOnly: readOnly,
+		mountOptions: util.MountOptionFromSpec(spec),
+		readOnly:     readOnly,
 	}, nil
 
 }
@@ -169,6 +189,7 @@ func (plugin *localVolumePlugin) NewBlockVolumeUnmapper(volName string,
 
 // TODO: check if no path and no topology constraints are ok
 func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	fs := v1.PersistentVolumeFilesystem
 	localVolume := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volumeName,
@@ -179,6 +200,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 					Path: "",
 				},
 			},
+			VolumeMode: &fs,
 		},
 	}
 	return volume.NewSpecFromPersistentVolume(localVolume, false), nil
@@ -205,6 +227,177 @@ func (plugin *localVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volu
 	return volume.NewSpecFromPersistentVolume(localVolume, false), nil
 }
 
+func (plugin *localVolumePlugin) generateBlockDeviceBaseGlobalPath() string {
+	return filepath.Join(plugin.host.GetPluginDir(localVolumePluginName), util.MountsInGlobalPDPath)
+}
+
+func (plugin *localVolumePlugin) getGlobalLocalPath(spec *volume.Spec) (string, error) {
+	if spec.PersistentVolume.Spec.Local == nil || len(spec.PersistentVolume.Spec.Local.Path) == 0 {
+		return "", fmt.Errorf("local volume source is nil or local path is not set")
+	}
+
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return "", fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+
+	fileType, err := kvh.GetHostUtil().GetFileType(spec.PersistentVolume.Spec.Local.Path)
+	if err != nil {
+		return "", err
+	}
+	switch fileType {
+	case mount.FileTypeDirectory:
+		return spec.PersistentVolume.Spec.Local.Path, nil
+	case mount.FileTypeBlockDev:
+		return filepath.Join(plugin.generateBlockDeviceBaseGlobalPath(), spec.Name()), nil
+	default:
+		return "", fmt.Errorf("only directory and block device are supported")
+	}
+}
+
+var _ volume.DeviceMountableVolumePlugin = &localVolumePlugin{}
+
+type deviceMounter struct {
+	plugin   *localVolumePlugin
+	mounter  *mount.SafeFormatAndMount
+	hostUtil mount.HostUtils
+}
+
+var _ volume.DeviceMounter = &deviceMounter{}
+
+func (plugin *localVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	return &deviceMounter{
+		plugin:   plugin,
+		mounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		hostUtil: kvh.GetHostUtil(),
+	}, nil
+}
+
+func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	klog.V(4).Infof("local: mounting device %s to %s", devicePath, deviceMountPath)
+	notMnt, err := dm.mounter.IsLikelyNotMountPoint(deviceMountPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+				return err
+			}
+			notMnt = true
+		} else {
+			return err
+		}
+	}
+	if !notMnt {
+		return nil
+	}
+	fstype, err := getVolumeSourceFSType(spec)
+	if err != nil {
+		return err
+	}
+
+	ro, err := getVolumeSourceReadOnly(spec)
+	if err != nil {
+		return err
+	}
+	options := []string{}
+	if ro {
+		options = append(options, "ro")
+	}
+	mountOptions := util.MountOptionFromSpec(spec, options...)
+	err = dm.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
+	if err != nil {
+		os.Remove(deviceMountPath)
+		return fmt.Errorf("local: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
+	}
+	klog.V(3).Infof("local: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
+	return nil
+}
+
+func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if spec.PersistentVolume.Spec.Local == nil || len(spec.PersistentVolume.Spec.Local.Path) == 0 {
+		return fmt.Errorf("local volume source is nil or local path is not set")
+	}
+	fileType, err := dm.hostUtil.GetFileType(spec.PersistentVolume.Spec.Local.Path)
+	if err != nil {
+		return err
+	}
+
+	switch fileType {
+	case mount.FileTypeBlockDev:
+		// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
+		devicePath = spec.PersistentVolume.Spec.Local.Path
+		return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
+	case mount.FileTypeDirectory:
+		// if the given local volume path is of already filesystem directory, return directly
+		return nil
+	default:
+		return fmt.Errorf("only directory and block device are supported")
+	}
+}
+
+func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
+	if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Local != nil {
+		if spec.PersistentVolume.Spec.Local.FSType != nil {
+			return *spec.PersistentVolume.Spec.Local.FSType, nil
+		}
+		// if the FSType is not set in local PV spec, setting it to default ("ext4")
+		return defaultFSType, nil
+	}
+
+	return "", fmt.Errorf("spec does not reference a Local volume type")
+}
+
+func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
+	if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Local != nil {
+		// local volumes used as a PersistentVolume gets the ReadOnly flag indirectly through
+		// the persistent-claim volume used to mount the PV
+		return spec.ReadOnly, nil
+	}
+
+	return false, fmt.Errorf("spec does not reference a Local volume type")
+}
+
+func (dm *deviceMounter) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	return dm.plugin.getGlobalLocalPath(spec)
+}
+
+func (plugin *localVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return &deviceMounter{
+		plugin:  plugin,
+		mounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+	}, nil
+}
+
+func (plugin *localVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	return mounter.GetMountRefs(deviceMountPath)
+}
+
+var _ volume.DeviceUnmounter = &deviceMounter{}
+
+func (dm *deviceMounter) UnmountDevice(deviceMountPath string) error {
+	// If the local PV is a block device,
+	// The deviceMountPath is generated to the format like :/var/lib/kubelet/plugins/kubernetes.io/local-volume/mounts/localpv.spec.Name;
+	// If it is a filesystem directory, then the deviceMountPath is set directly to pvSpec.Local.Path
+	// We only need to unmount block device here, so we need to check if the deviceMountPath passed here
+	// has base mount path: /var/lib/kubelet/plugins/kubernetes.io/local-volume/mounts
+	basemountPath := dm.plugin.generateBlockDeviceBaseGlobalPath()
+	if mount.PathWithinBase(deviceMountPath, basemountPath) {
+		return mount.CleanupMountPoint(deviceMountPath, dm.mounter, false)
+	}
+
+	return nil
+}
+
 // Local volumes represent a local directory on a node.
 // The directory at the globalPath will be bind-mounted to the pod's directory
 type localVolume struct {
@@ -214,18 +407,20 @@ type localVolume struct {
 	// Global path to the volume
 	globalPath string
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
-	mounter mount.Interface
-	plugin  *localVolumePlugin
+	mounter  mount.Interface
+	hostUtil mount.HostUtils
+	plugin   *localVolumePlugin
 	volume.MetricsProvider
 }
 
 func (l *localVolume) GetPath() string {
-	return l.plugin.host.GetPodVolumeDir(l.podUID, stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName), l.volName)
+	return l.plugin.host.GetPodVolumeDir(l.podUID, utilstrings.EscapeQualifiedName(localVolumePluginName), l.volName)
 }
 
 type localVolumeMounter struct {
 	*localVolume
-	readOnly bool
+	readOnly     bool
+	mountOptions []string
 }
 
 var _ volume.Mounter = &localVolumeMounter{}
@@ -246,12 +441,12 @@ func (m *localVolumeMounter) CanMount() error {
 }
 
 // SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUp(fsGroup *int64) error {
-	return m.SetUpAt(m.GetPath(), fsGroup)
+func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return m.SetUpAt(m.GetPath(), mounterArgs)
 }
 
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
-func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	m.plugin.volumeLocks.LockKey(m.globalPath)
 	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
 
@@ -264,10 +459,10 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("invalid path: %s %v", m.globalPath, err)
 	}
 
-	notMnt, err := m.mounter.IsNotMountPoint(dir)
-	glog.V(4).Infof("LocalVolume mount setup: PodDir(%s) VolDir(%s) Mounted(%t) Error(%v), ReadOnly(%t)", dir, m.globalPath, !notMnt, err, m.readOnly)
+	notMnt, err := mount.IsNotMountPoint(m.mounter, dir)
+	klog.V(4).Infof("LocalVolume mount setup: PodDir(%s) VolDir(%s) Mounted(%t) Error(%v), ReadOnly(%t)", dir, m.globalPath, !notMnt, err, m.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 
@@ -275,17 +470,17 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 	refs, err := m.mounter.GetMountRefs(m.globalPath)
-	if fsGroup != nil {
+	if mounterArgs.FsGroup != nil {
 		if err != nil {
-			glog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
+			klog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
 			return err
 		}
 
 		// Only count mounts from other pods
 		refs = m.filterPodMounts(refs)
 		if len(refs) > 0 {
-			fsGroupNew := int64(*fsGroup)
-			fsGroupOld, err := m.mounter.GetFSGroup(m.globalPath)
+			fsGroupNew := int64(*mounterArgs.FsGroup)
+			fsGroupOld, err := m.hostUtil.GetFSGroup(m.globalPath)
 			if err != nil {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}
@@ -299,7 +494,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if runtime.GOOS != "windows" {
 		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 			return err
 		}
 	}
@@ -308,30 +503,31 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if m.readOnly {
 		options = append(options, "ro")
 	}
+	mountOptions := util.JoinMountOptions(options, m.mountOptions)
 
-	glog.V(4).Infof("attempting to mount %s", dir)
+	klog.V(4).Infof("attempting to mount %s", dir)
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	err = m.mounter.Mount(globalPath, dir, "", options)
+	err = m.mounter.Mount(globalPath, dir, "", mountOptions)
 	if err != nil {
-		glog.Errorf("Mount of volume %s failed: %v", dir, err)
-		notMnt, mntErr := m.mounter.IsNotMountPoint(dir)
+		klog.Errorf("Mount of volume %s failed: %v", dir, err)
+		notMnt, mntErr := mount.IsNotMountPoint(m.mounter, dir)
 		if mntErr != nil {
-			glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = m.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr = m.mounter.IsNotMountPoint(dir)
+			notMnt, mntErr = mount.IsNotMountPoint(m.mounter, dir)
 			if mntErr != nil {
-				glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}
@@ -341,7 +537,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !m.readOnly {
 		// Volume owner will be written only once on the first volume mount
 		if len(refs) == 0 {
-			return volume.SetVolumeOwnership(m, fsGroup)
+			return volume.SetVolumeOwnership(m, mounterArgs.FsGroup)
 		}
 	}
 	return nil
@@ -371,8 +567,8 @@ func (u *localVolumeUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (u *localVolumeUnmounter) TearDownAt(dir string) error {
-	glog.V(4).Infof("Unmounting volume %q at path %q\n", u.volName, dir)
-	return util.UnmountMountPoint(dir, u.mounter, true) /* extensiveMountPointCheck = true */
+	klog.V(4).Infof("Unmounting volume %q at path %q\n", u.volName, dir)
+	return mount.CleanupMountPoint(dir, u.mounter, true) /* extensiveMountPointCheck = true */
 }
 
 // localVolumeMapper implements the BlockVolumeMapper interface for local volumes.
@@ -386,8 +582,12 @@ var _ volume.BlockVolumeMapper = &localVolumeMapper{}
 // SetUpDevice provides physical device path for the local PV.
 func (m *localVolumeMapper) SetUpDevice() (string, error) {
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	glog.V(4).Infof("SetupDevice returning path %s", globalPath)
+	klog.V(4).Infof("SetupDevice returning path %s", globalPath)
 	return globalPath, nil
+}
+
+func (m *localVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
@@ -398,22 +598,22 @@ type localVolumeUnmapper struct {
 var _ volume.BlockVolumeUnmapper = &localVolumeUnmapper{}
 
 // TearDownDevice will undo SetUpDevice procedure. In local PV, all of this already handled by operation_generator.
-func (u *localVolumeUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	glog.V(4).Infof("local: TearDownDevice completed for: %s", mapPath)
+func (u *localVolumeUnmapper) TearDownDevice(mapPath, _ string) error {
+	klog.V(4).Infof("local: TearDownDevice completed for: %s", mapPath)
 	return nil
 }
 
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}
-func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return filepath.Join(lv.plugin.host.GetVolumeDevicePluginDir(stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)),
-		lv.volName), nil
+func (l *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return filepath.Join(l.plugin.host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(localVolumePluginName)),
+		l.volName), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name.
 // path: pods/{podUid}/volumeDevices/kubernetes.io~local-volume
 // volName: local-pv-ff0d6d4
-func (lv *localVolume) GetPodDeviceMapPath() (string, string) {
-	return lv.plugin.host.GetPodVolumeDeviceDir(lv.podUID,
-		stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)), lv.volName
+func (l *localVolume) GetPodDeviceMapPath() (string, string) {
+	return l.plugin.host.GetPodVolumeDeviceDir(l.podUID,
+		utilstrings.EscapeQualifiedName(localVolumePluginName)), l.volName
 }

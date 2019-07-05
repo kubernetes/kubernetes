@@ -22,7 +22,7 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/authentication/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -35,12 +35,8 @@ func (in *Event) DeepCopyInto(out *Event) {
 	in.User.DeepCopyInto(&out.User)
 	if in.ImpersonatedUser != nil {
 		in, out := &in.ImpersonatedUser, &out.ImpersonatedUser
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.UserInfo)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.UserInfo)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.SourceIPs != nil {
 		in, out := &in.SourceIPs, &out.SourceIPs
@@ -49,39 +45,23 @@ func (in *Event) DeepCopyInto(out *Event) {
 	}
 	if in.ObjectRef != nil {
 		in, out := &in.ObjectRef, &out.ObjectRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectReference)
-			**out = **in
-		}
+		*out = new(ObjectReference)
+		**out = **in
 	}
 	if in.ResponseStatus != nil {
 		in, out := &in.ResponseStatus, &out.ResponseStatus
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.Status)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.Status)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.RequestObject != nil {
 		in, out := &in.RequestObject, &out.RequestObject
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(runtime.Unknown)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(runtime.Unknown)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ResponseObject != nil {
 		in, out := &in.ResponseObject, &out.ResponseObject
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(runtime.Unknown)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(runtime.Unknown)
+		(*in).DeepCopyInto(*out)
 	}
 	in.RequestReceivedTimestamp.DeepCopyInto(&out.RequestReceivedTimestamp)
 	in.StageTimestamp.DeepCopyInto(&out.StageTimestamp)
@@ -117,7 +97,7 @@ func (in *Event) DeepCopyObject() runtime.Object {
 func (in *EventList) DeepCopyInto(out *EventList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Event, len(*in))
@@ -230,7 +210,7 @@ func (in *Policy) DeepCopyObject() runtime.Object {
 func (in *PolicyList) DeepCopyInto(out *PolicyList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Policy, len(*in))

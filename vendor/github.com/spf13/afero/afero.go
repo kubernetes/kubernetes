@@ -77,7 +77,7 @@ type Fs interface {
 	// happens.
 	Remove(name string) error
 
-	// RemoveAll removes a directory path and all any children it contains. It
+	// RemoveAll removes a directory path and any children it contains. It
 	// does not fail if the path does not exist (return nil).
 	RemoveAll(path string) error
 

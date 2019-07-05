@@ -1,4 +1,4 @@
-package term
+package term // import "github.com/docker/docker/pkg/term"
 
 import (
 	"golang.org/x/sys/unix"
@@ -29,6 +29,8 @@ func MakeRaw(fd uintptr) (*State, error) {
 	termios.Lflag &^= (unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN)
 	termios.Cflag &^= (unix.CSIZE | unix.PARENB)
 	termios.Cflag |= unix.CS8
+	termios.Cc[unix.VMIN] = 1
+	termios.Cc[unix.VTIME] = 0
 
 	if err := unix.IoctlSetTermios(int(fd), setTermios, termios); err != nil {
 		return nil, err

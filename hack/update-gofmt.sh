@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::verify_go_version
@@ -31,6 +31,7 @@ find_files() {
   find . -not \( \
       \( \
         -wholename './output' \
+        -o -wholename './.git' \
         -o -wholename './_output' \
         -o -wholename './_gopath' \
         -o -wholename './release' \
@@ -42,5 +43,4 @@ find_files() {
     \) -name '*.go'
 }
 
-GOFMT="gofmt -s -w"
-find_files | xargs $GOFMT
+find_files | xargs gofmt -s -w

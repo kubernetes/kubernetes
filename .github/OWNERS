@@ -1,12 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - castrojo
   - cblecker
-  - grodrigues3
+  - nikhita
   - parispittman
   - Phillels
 approvers:
   - castrojo
   - cblecker
-  - grodrigues3
+  - nikhita
   - parispittman
   - Phillels
+labels:
+  - sig/contributor-experience

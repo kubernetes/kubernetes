@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
 - thockin
 - lavalamp
@@ -17,3 +19,5 @@ reviewers:
 - david-mcmahon
 - kevin-wangzefeng
 - jianhuiz
+labels:
+- sig/apps

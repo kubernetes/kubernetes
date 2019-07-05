@@ -140,7 +140,7 @@ func (b *Blob) Exists() (bool, error) {
 	headers := b.Container.bsc.client.getStandardHeaders()
 	resp, err := b.Container.bsc.client.exec(http.MethodHead, uri, headers, nil, b.Container.bsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusOK, nil
 		}
@@ -293,7 +293,7 @@ func (b *Blob) CreateSnapshot(options *SnapshotOptions) (snapshotTimestamp *time
 	if err != nil || resp == nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	if err := checkRespCode(resp, []int{http.StatusCreated}); err != nil {
 		return nil, err
@@ -340,7 +340,7 @@ func (b *Blob) GetProperties(options *GetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
@@ -463,7 +463,7 @@ func (b *Blob) SetProperties(options *SetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusOK})
 }
 
@@ -501,7 +501,7 @@ func (b *Blob) SetMetadata(options *SetBlobMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusOK})
 }
 
@@ -538,7 +538,7 @@ func (b *Blob) GetMetadata(options *GetBlobMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
@@ -574,7 +574,7 @@ func (b *Blob) Delete(options *DeleteBlobOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusAccepted})
 }
 
@@ -585,7 +585,7 @@ func (b *Blob) Delete(options *DeleteBlobOptions) error {
 func (b *Blob) DeleteIfExists(options *DeleteBlobOptions) (bool, error) {
 	resp, err := b.delete(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusAccepted, nil
 		}
@@ -622,7 +622,7 @@ func pathForResource(container, name string) string {
 }
 
 func (b *Blob) respondCreation(resp *http.Response, bt BlobType) error {
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	err := checkRespCode(resp, []int{http.StatusCreated})
 	if err != nil {
 		return err

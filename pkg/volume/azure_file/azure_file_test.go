@@ -26,15 +26,15 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/azure"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -119,7 +119,7 @@ func TestPluginWithoutCloudProvider(t *testing.T) {
 func TestPluginWithOtherCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	cloud := &fakecloud.FakeCloud{}
+	cloud := &fakecloud.Cloud{}
 	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud))
 }
 
@@ -155,7 +155,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {

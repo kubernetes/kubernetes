@@ -62,7 +62,7 @@ func (c *FakeControllerRevisions) List(opts v1.ListOptions) (result *v1beta2.Con
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta2.ControllerRevisionList{}
+	list := &v1beta2.ControllerRevisionList{ListMeta: obj.(*v1beta2.ControllerRevisionList).ListMeta}
 	for _, item := range obj.(*v1beta2.ControllerRevisionList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeControllerRevisions) DeleteCollection(options *v1.DeleteOptions, li
 // Patch applies the patch and returns the patched controllerRevision.
 func (c *FakeControllerRevisions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, data, subresources...), &v1beta2.ControllerRevision{})
+		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, pt, data, subresources...), &v1beta2.ControllerRevision{})
 
 	if obj == nil {
 		return nil, err

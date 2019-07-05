@@ -1,3 +1,0 @@
-name: "hello"
-shortDesc: "I say hello!"
-command: "echo Hello plugins!"

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["type.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/third_party/forked/golang/reflect",
     importpath = "k8s.io/code-generator/third_party/forked/golang/reflect",
 )
 

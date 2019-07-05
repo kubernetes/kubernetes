@@ -15,32 +15,46 @@
 package spec
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
+	"sort"
 
 	"github.com/go-openapi/jsonpointer"
 	"github.com/go-openapi/swag"
 )
 
+func init() {
+	//gob.Register(map[string][]interface{}{})
+	gob.Register(map[string]interface{}{})
+	gob.Register([]interface{}{})
+}
+
+// OperationProps describes an operation
+//
+// NOTES:
+// - schemes, when present must be from [http, https, ws, wss]: see validate
+// - Security is handled as a special case: see MarshalJSON function
 type OperationProps struct {
 	Description  string                 `json:"description,omitempty"`
 	Consumes     []string               `json:"consumes,omitempty"`
 	Produces     []string               `json:"produces,omitempty"`
-	Schemes      []string               `json:"schemes,omitempty"` // the scheme, when present must be from [http, https, ws, wss]
+	Schemes      []string               `json:"schemes,omitempty"`
 	Tags         []string               `json:"tags,omitempty"`
 	Summary      string                 `json:"summary,omitempty"`
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
 	ID           string                 `json:"operationId,omitempty"`
 	Deprecated   bool                   `json:"deprecated,omitempty"`
-	Security     []map[string][]string  `json:"security,omitempty"` //Special case, see MarshalJSON function
+	Security     []map[string][]string  `json:"security,omitempty"`
 	Parameters   []Parameter            `json:"parameters,omitempty"`
 	Responses    *Responses             `json:"responses,omitempty"`
 }
 
 // MarshalJSON takes care of serializing operation properties to JSON
 //
-// We use a custom marhaller here to handle a special cases related
+// We use a custom marhaller here to handle a special cases related to
 // the Security field. We need to preserve zero length slice
-// while omiting the field when the value is nil/unset.
+// while omitting the field when the value is nil/unset.
 func (op OperationProps) MarshalJSON() ([]byte, error) {
 	type Alias OperationProps
 	if op.Security == nil {
@@ -75,10 +89,16 @@ func (o *Operation) SuccessResponse() (*Response, int, bool) {
 		return nil, 0, false
 	}
 
-	for k, v := range o.Responses.StatusCodeResponses {
-		if k/100 == 2 {
-			return &v, k, true
+	responseCodes := make([]int, 0, len(o.Responses.StatusCodeResponses))
+	for k := range o.Responses.StatusCodeResponses {
+		if k >= 200 && k < 300 {
+			responseCodes = append(responseCodes, k)
 		}
+	}
+	if len(responseCodes) > 0 {
+		sort.Ints(responseCodes)
+		v := o.Responses.StatusCodeResponses[responseCodes[0]]
+		return &v, responseCodes[0], true
 	}
 
 	return o.Responses.Default, 0, false
@@ -98,10 +118,7 @@ func (o *Operation) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &o.OperationProps); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &o.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, &o.VendorExtensible)
 }
 
 // MarshalJSON converts this items object to JSON
@@ -215,7 +232,7 @@ func (o *Operation) AddParam(param *Parameter) *Operation {
 // RemoveParam removes a parameter from the operation
 func (o *Operation) RemoveParam(name, in string) *Operation {
 	for i, p := range o.Parameters {
-		if p.Name == name && p.In == name {
+		if p.Name == name && p.In == in {
 			o.Parameters = append(o.Parameters[:i], o.Parameters[i+1:]...)
 			return o
 		}
@@ -255,4 +272,127 @@ func (o *Operation) RespondsWith(code int, response *Response) *Operation {
 	}
 	o.Responses.StatusCodeResponses[code] = *response
 	return o
+}
+
+type opsAlias OperationProps
+
+type gobAlias struct {
+	Security []map[string]struct {
+		List []string
+		Pad  bool
+	}
+	Alias           *opsAlias
+	SecurityIsEmpty bool
+}
+
+// GobEncode provides a safe gob encoder for Operation, including empty security requirements
+func (o Operation) GobEncode() ([]byte, error) {
+	raw := struct {
+		Ext   VendorExtensible
+		Props OperationProps
+	}{
+		Ext:   o.VendorExtensible,
+		Props: o.OperationProps,
+	}
+	var b bytes.Buffer
+	err := gob.NewEncoder(&b).Encode(raw)
+	return b.Bytes(), err
+}
+
+// GobDecode provides a safe gob decoder for Operation, including empty security requirements
+func (o *Operation) GobDecode(b []byte) error {
+	var raw struct {
+		Ext   VendorExtensible
+		Props OperationProps
+	}
+
+	buf := bytes.NewBuffer(b)
+	err := gob.NewDecoder(buf).Decode(&raw)
+	if err != nil {
+		return err
+	}
+	o.VendorExtensible = raw.Ext
+	o.OperationProps = raw.Props
+	return nil
+}
+
+// GobEncode provides a safe gob encoder for Operation, including empty security requirements
+func (op OperationProps) GobEncode() ([]byte, error) {
+	raw := gobAlias{
+		Alias: (*opsAlias)(&op),
+	}
+
+	var b bytes.Buffer
+	if op.Security == nil {
+		// nil security requirement
+		err := gob.NewEncoder(&b).Encode(raw)
+		return b.Bytes(), err
+	}
+
+	if len(op.Security) == 0 {
+		// empty, but non-nil security requirement
+		raw.SecurityIsEmpty = true
+		raw.Alias.Security = nil
+		err := gob.NewEncoder(&b).Encode(raw)
+		return b.Bytes(), err
+	}
+
+	raw.Security = make([]map[string]struct {
+		List []string
+		Pad  bool
+	}, 0, len(op.Security))
+	for _, req := range op.Security {
+		v := make(map[string]struct {
+			List []string
+			Pad  bool
+		}, len(req))
+		for k, val := range req {
+			v[k] = struct {
+				List []string
+				Pad  bool
+			}{
+				List: val,
+			}
+		}
+		raw.Security = append(raw.Security, v)
+	}
+
+	err := gob.NewEncoder(&b).Encode(raw)
+	return b.Bytes(), err
+}
+
+// GobDecode provides a safe gob decoder for Operation, including empty security requirements
+func (op *OperationProps) GobDecode(b []byte) error {
+	var raw gobAlias
+
+	buf := bytes.NewBuffer(b)
+	err := gob.NewDecoder(buf).Decode(&raw)
+	if err != nil {
+		return err
+	}
+	if raw.Alias == nil {
+		return nil
+	}
+
+	switch {
+	case raw.SecurityIsEmpty:
+		// empty, but non-nil security requirement
+		raw.Alias.Security = []map[string][]string{}
+	case len(raw.Alias.Security) == 0:
+		// nil security requirement
+		raw.Alias.Security = nil
+	default:
+		raw.Alias.Security = make([]map[string][]string, 0, len(raw.Security))
+		for _, req := range raw.Security {
+			v := make(map[string][]string, len(req))
+			for k, val := range req {
+				v[k] = make([]string, 0, len(val.List))
+				v[k] = append(v[k], val.List...)
+			}
+			raw.Alias.Security = append(raw.Alias.Security, v)
+		}
+	}
+
+	*op = *(*OperationProps)(raw.Alias)
+	return nil
 }

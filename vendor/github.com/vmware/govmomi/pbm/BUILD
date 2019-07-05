@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "pbm_util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/pbm",
     importpath = "github.com/vmware/govmomi/pbm",
     visibility = ["//visibility:public"],
     deps = [

@@ -64,6 +64,29 @@ func (_m *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v
 	return r0, r1, r2
 }
 
+// GetCgroupCPUAndMemoryStats provides a mock function with given fields: cgroupName, updateStats
+func (_m *StatsProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, error) {
+	ret := _m.Called(cgroupName, updateStats)
+
+	var r0 *v1alpha1.ContainerStats
+	if rf, ok := ret.Get(0).(func(string, bool) *v1alpha1.ContainerStats); ok {
+		r0 = rf(cgroupName, updateStats)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1alpha1.ContainerStats)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, bool) error); ok {
+		r1 = rf(cgroupName, updateStats)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetPodByCgroupfs provides the pod that maps to the specified cgroup, as well
 // as whether the pod was found.
 func (_m *StatsProvider) GetPodByCgroupfs(cgroupfs string) (*corev1.Pod, bool) {
@@ -231,6 +254,52 @@ func (_m *StatsProvider) ImageFsStats() (*v1alpha1.FsStats, error) {
 
 // ListPodStats provides a mock function with given fields:
 func (_m *StatsProvider) ListPodStats() ([]v1alpha1.PodStats, error) {
+	ret := _m.Called()
+
+	var r0 []v1alpha1.PodStats
+	if rf, ok := ret.Get(0).(func() []v1alpha1.PodStats); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]v1alpha1.PodStats)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListPodStatsAndUpdateCPUNanoCoreUsage provides a mock function with given fields:
+func (_m *StatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]v1alpha1.PodStats, error) {
+	ret := _m.Called()
+
+	var r0 []v1alpha1.PodStats
+	if rf, ok := ret.Get(0).(func() []v1alpha1.PodStats); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]v1alpha1.PodStats)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListPodCPUAndMemoryStats provides a mock function with given fields:
+func (_m *StatsProvider) ListPodCPUAndMemoryStats() ([]v1alpha1.PodStats, error) {
 	ret := _m.Called()
 
 	var r0 []v1alpha1.PodStats

@@ -30,9 +30,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	prometheuspb "github.com/prometheus/client_model/go"
+	"k8s.io/klog"
 )
 
 const scrapeRequestHeader = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=compact-text"
@@ -54,19 +54,22 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 		return nil, fmt.Errorf("Unable to contact metrics endpoint of master: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from master: %v", resp)
 	}
 
 	// Each line in the response body should contain all the data for a single metric.
 	var metrics []*prometheuspb.MetricFamily
 	scanner := bufio.NewScanner(resp.Body)
+	// Increase buffer size, since default one is too small for reading
+	// the /metrics contents.
+	scanner.Buffer(make([]byte, 10), 131072)
 	for scanner.Scan() {
 		var metric prometheuspb.MetricFamily
 		if err := proto.UnmarshalText(scanner.Text(), &metric); err != nil {
 			return nil, fmt.Errorf("Failed to unmarshal line of metrics response: %v", err)
 		}
-		glog.V(4).Infof("Got metric %q", metric.GetName())
+		klog.V(4).Infof("Got metric %q", metric.GetName())
 		metrics = append(metrics, &metric)
 	}
 	return metrics, nil
@@ -111,7 +114,7 @@ func TestApiserverMetrics(t *testing.T) {
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	if _, err := client.Core().Pods(metav1.NamespaceDefault).List(metav1.ListOptions{}); err != nil {
+	if _, err := client.CoreV1().Pods(metav1.NamespaceDefault).List(metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting pods: %v", err)
 	}
 
@@ -120,7 +123,8 @@ func TestApiserverMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkForExpectedMetrics(t, metrics, []string{
-		"apiserver_request_count",
-		"apiserver_request_latencies",
+		"apiserver_request_total",
+		"apiserver_request_duration_seconds",
+		"etcd_request_duration_seconds",
 	})
 }

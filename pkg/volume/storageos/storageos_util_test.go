@@ -30,7 +30,7 @@ import (
 	"testing"
 )
 
-var testApiSecretName = "storageos-api"
+var testAPISecretName = "storageos-api"
 var testVolName = "storageos-test-vol"
 var testPVName = "storageos-test-pv"
 var testNamespace = "storageos-test-namespace"
@@ -108,8 +108,8 @@ func (f fakeAPI) VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error {
 func (f fakeAPI) VolumeDelete(opts storageostypes.DeleteOptions) error {
 	return nil
 }
-func (f fakeAPI) Controller(ref string) (*storageostypes.Controller, error) {
-	return &storageostypes.Controller{}, nil
+func (f fakeAPI) Node(ref string) (*storageostypes.Node, error) {
+	return &storageostypes.Node{}, nil
 }
 
 func TestCreateVolume(t *testing.T) {
@@ -133,8 +133,8 @@ func TestCreateVolume(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		PVName: testPVName,
-		PVC:    volumetest.CreateTestPVC(fmt.Sprintf("%dGi", testSize), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVName:                        testPVName,
+		PVC:                           volumetest.CreateTestPVC(fmt.Sprintf("%dGi", testSize), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 

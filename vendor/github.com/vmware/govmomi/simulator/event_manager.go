@@ -63,17 +63,14 @@ func NewEventManager(ref types.ManagedObjectReference) object.Reference {
 	}
 }
 
-func (m *EventManager) CreateCollectorForEvents(ctx *Context, req *types.CreateCollectorForEvents) soap.HasFault {
-	body := new(methods.CreateCollectorForEventsBody)
+func (m *EventManager) createCollector(ctx *Context, req *types.CreateCollectorForEvents) (*EventHistoryCollector, *soap.Fault) {
 	size, err := validatePageSize(req.Filter.MaxCount)
 	if err != nil {
-		body.Fault_ = err
-		return body
+		return nil, err
 	}
 
 	if len(m.collectors) >= int(m.MaxCollector) {
-		body.Fault_ = Fault("Too many event collectors to create", new(types.InvalidState))
-		return body
+		return nil, Fault("Too many event collectors to create", new(types.InvalidState))
 	}
 
 	collector := &EventHistoryCollector{
@@ -83,11 +80,43 @@ func (m *EventManager) CreateCollectorForEvents(ctx *Context, req *types.CreateC
 	collector.Filter = req.Filter
 	collector.fillPage(size)
 
+	return collector, nil
+}
+
+func (m *EventManager) CreateCollectorForEvents(ctx *Context, req *types.CreateCollectorForEvents) soap.HasFault {
+	body := new(methods.CreateCollectorForEventsBody)
+	collector, err := m.createCollector(ctx, req)
+	if err != nil {
+		body.Fault_ = err
+		return body
+	}
+
 	ref := ctx.Session.Put(collector).Reference()
 	m.collectors[ref] = collector
 
 	body.Res = &types.CreateCollectorForEventsResponse{
 		Returnval: ref,
+	}
+
+	return body
+}
+
+func (m *EventManager) QueryEvents(ctx *Context, req *types.QueryEvents) soap.HasFault {
+	if Map.IsESX() {
+		return &methods.QueryEventsBody{
+			Fault_: Fault("", new(types.NotImplemented)),
+		}
+	}
+
+	body := new(methods.QueryEventsBody)
+	collector, err := m.createCollector(ctx, &types.CreateCollectorForEvents{Filter: req.Filter})
+	if err != nil {
+		body.Fault_ = err
+		return body
+	}
+
+	body.Res = &types.QueryEventsResponse{
+		Returnval: collector.GetLatestPage(),
 	}
 
 	return body
@@ -109,11 +138,13 @@ func (m *EventManager) formatMessage(event types.BaseEvent) {
 		}
 	}
 
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, event); err != nil {
-		log.Print(err)
+	if t != nil {
+		var buf bytes.Buffer
+		if err := t.Execute(&buf, event); err != nil {
+			log.Print(err)
+		}
+		e.FullFormattedMessage = buf.String()
 	}
-	e.FullFormattedMessage = buf.String()
 
 	if logEvents {
 		log.Printf("[%s] %s", id, e.FullFormattedMessage)
@@ -128,15 +159,18 @@ func (m *EventManager) PostEvent(ctx *Context, req *types.PostEvent) soap.HasFau
 	event.CreatedTime = time.Now()
 	event.UserName = ctx.Session.UserName
 
-	m.page = m.page.Next()
+	m.page = m.page.Prev()
 	m.page.Value = req.EventToPost
 	m.formatMessage(req.EventToPost)
 
 	for _, c := range m.collectors {
-		if c.eventMatches(req.EventToPost) {
-			c.page = c.page.Next()
-			c.page.Value = event
-		}
+		ctx.WithLock(c, func() {
+			if c.eventMatches(req.EventToPost) {
+				c.page = c.page.Prev()
+				c.page.Value = req.EventToPost
+				Map.Update(c, []types.PropertyChange{{Name: "latestPage", Val: c.GetLatestPage()}})
+			}
+		})
 	}
 
 	return &methods.PostEventBody{
@@ -149,6 +183,7 @@ type EventHistoryCollector struct {
 
 	m    *EventManager
 	page *ring.Ring
+	pos  int
 }
 
 // doEntityEventArgument calls f for each entity argument in the event.
@@ -296,6 +331,7 @@ func (c *EventHistoryCollector) eventMatches(event types.BaseEvent) bool {
 
 // filePage copies the manager's latest events into the collector's page with Filter applied.
 func (c *EventHistoryCollector) fillPage(size int) {
+	c.pos = 0
 	l := c.page.Len()
 	delta := size - l
 
@@ -360,6 +396,66 @@ func (c *EventHistoryCollector) SetCollectorPageSize(ctx *Context, req *types.Se
 	return body
 }
 
+func (c *EventHistoryCollector) RewindCollector(ctx *Context, req *types.RewindCollector) soap.HasFault {
+	c.pos = 0
+	return &methods.RewindCollectorBody{
+		Res: new(types.RewindCollectorResponse),
+	}
+}
+
+func (c *EventHistoryCollector) ReadNextEvents(ctx *Context, req *types.ReadNextEvents) soap.HasFault {
+	body := &methods.ReadNextEventsBody{}
+	if req.MaxCount <= 0 {
+		body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "maxCount"})
+		return body
+	}
+	body.Res = new(types.ReadNextEventsResponse)
+
+	events := c.GetLatestPage()
+	nevents := len(events)
+	if c.pos == nevents {
+		return body // already read to EOF
+	}
+
+	start := c.pos
+	end := start + int(req.MaxCount)
+	c.pos += int(req.MaxCount)
+	if end > nevents {
+		end = nevents
+		c.pos = nevents
+	}
+
+	body.Res.Returnval = events[start:end]
+
+	return body
+}
+
+func (c *EventHistoryCollector) ReadPreviousEvents(ctx *Context, req *types.ReadPreviousEvents) soap.HasFault {
+	body := &methods.ReadPreviousEventsBody{}
+	if req.MaxCount <= 0 {
+		body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "maxCount"})
+		return body
+	}
+	body.Res = new(types.ReadPreviousEventsResponse)
+
+	events := c.GetLatestPage()
+	if c.pos == 0 {
+		return body // already read to EOF
+	}
+
+	start := c.pos - int(req.MaxCount)
+	end := c.pos
+	c.pos -= int(req.MaxCount)
+	if start < 0 {
+		start = 0
+		c.pos = 0
+	}
+
+	body.Res.Returnval = events[start:end]
+
+	return body
+}
+
 func (c *EventHistoryCollector) DestroyCollector(ctx *Context, req *types.DestroyCollector) soap.HasFault {
 	ctx.Session.Remove(req.This)
 
@@ -372,15 +468,23 @@ func (c *EventHistoryCollector) DestroyCollector(ctx *Context, req *types.Destro
 	}
 }
 
-func (c *EventHistoryCollector) Get() mo.Reference {
-	clone := *c
+func (c *EventHistoryCollector) GetLatestPage() []types.BaseEvent {
+	var latestPage []types.BaseEvent
 
 	c.page.Do(func(val interface{}) {
 		if val == nil {
 			return
 		}
-		clone.LatestPage = append(clone.LatestPage, val.(types.BaseEvent))
+		latestPage = append(latestPage, val.(types.BaseEvent))
 	})
+
+	return latestPage
+}
+
+func (c *EventHistoryCollector) Get() mo.Reference {
+	clone := *c
+
+	clone.LatestPage = clone.GetLatestPage()
 
 	return &clone
 }

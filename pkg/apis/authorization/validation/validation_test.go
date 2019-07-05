@@ -51,7 +51,7 @@ func TestValidateSARSpec(t *testing.T) {
 			obj: authorizationapi.SubjectAccessReviewSpec{
 				ResourceAttributes:    &authorizationapi.ResourceAttributes{},
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
-				User: "me",
+				User:                  "me",
 			},
 			msg: "cannot be specified in combination with resourceAttributes",
 		},
@@ -183,7 +183,7 @@ func TestValidateLocalSAR(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
-					User: "user",
+					User:                  "user",
 				},
 			},
 			msg: "disallowed on this kind of request",

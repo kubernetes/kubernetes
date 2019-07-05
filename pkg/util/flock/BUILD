@@ -7,42 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "flock_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "flock_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "flock_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "flock_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "flock_other.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "flock_other.go",
+        "flock_unix.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/flock",
     deps = select({
         "@io_bazel_rules_go//go/platform:darwin": [

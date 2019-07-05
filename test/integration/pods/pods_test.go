@@ -129,13 +129,13 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		pod.Spec.ActiveDeadlineSeconds = tc.original
 		pod.ObjectMeta.Name = fmt.Sprintf("activedeadlineseconds-test-%v", i)
 
-		if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+		if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		pod.Spec.ActiveDeadlineSeconds = tc.update
 
-		_, err := client.Core().Pods(ns.Name).Update(pod)
+		_, err := client.CoreV1().Pods(ns.Name).Update(pod)
 		if tc.valid && err != nil {
 			t.Errorf("%v: failed to update pod: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
@@ -173,7 +173,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 		},
 	}
 
-	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 

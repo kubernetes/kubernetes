@@ -22,8 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bazelbuild/bazel-gazelle/internal/rules"
-	bf "github.com/bazelbuild/buildtools/build"
+	"github.com/bazelbuild/bazel-gazelle/internal/rule"
 )
 
 // Repo describes an external repository rule declared in a Bazel
@@ -62,17 +61,19 @@ type lockFileFormat int
 const (
 	unknownFormat lockFileFormat = iota
 	depFormat
+	moduleFormat
 )
 
 var lockFileParsers = map[lockFileFormat]func(string) ([]Repo, error){
-	depFormat: importRepoRulesDep,
+	depFormat:    importRepoRulesDep,
+	moduleFormat: importRepoRulesModules,
 }
 
 // ImportRepoRules reads the lock file of a vendoring tool and returns
 // a list of equivalent repository rules that can be merged into a WORKSPACE
 // file. The format of the file is inferred from its basename. Currently,
 // only Gopkg.lock is supported.
-func ImportRepoRules(filename string) ([]bf.Expr, error) {
+func ImportRepoRules(filename string) ([]*rule.Rule, error) {
 	format := getLockFileFormat(filename)
 	if format == unknownFormat {
 		return nil, fmt.Errorf(`%s: unrecognized lock file format. Expected "Gopkg.lock"`, filename)
@@ -84,7 +85,7 @@ func ImportRepoRules(filename string) ([]bf.Expr, error) {
 	}
 	sort.Stable(byName(repos))
 
-	rules := make([]bf.Expr, 0, len(repos))
+	rules := make([]*rule.Rule, 0, len(repos))
 	for _, repo := range repos {
 		rules = append(rules, GenerateRule(repo))
 	}
@@ -95,6 +96,8 @@ func getLockFileFormat(filename string) lockFileFormat {
 	switch filepath.Base(filename) {
 	case "Gopkg.lock":
 		return depFormat
+	case "go.mod":
+		return moduleFormat
 	default:
 		return unknownFormat
 	}
@@ -102,19 +105,22 @@ func getLockFileFormat(filename string) lockFileFormat {
 
 // GenerateRule returns a repository rule for the given repository that can
 // be written in a WORKSPACE file.
-func GenerateRule(repo Repo) bf.Expr {
-	attrs := []rules.KeyValue{
-		{Key: "name", Value: repo.Name},
-		{Key: "commit", Value: repo.Commit},
-		{Key: "importpath", Value: repo.GoPrefix},
+func GenerateRule(repo Repo) *rule.Rule {
+	r := rule.NewRule("go_repository", repo.Name)
+	if repo.Commit != "" {
+		r.SetAttr("commit", repo.Commit)
 	}
+	if repo.Tag != "" {
+		r.SetAttr("tag", repo.Tag)
+	}
+	r.SetAttr("importpath", repo.GoPrefix)
 	if repo.Remote != "" {
-		attrs = append(attrs, rules.KeyValue{Key: "remote", Value: repo.Remote})
+		r.SetAttr("remote", repo.Remote)
 	}
 	if repo.VCS != "" {
-		attrs = append(attrs, rules.KeyValue{Key: "vcs", Value: repo.VCS})
+		r.SetAttr("vcs", repo.VCS)
 	}
-	return rules.NewRule("go_repository", attrs)
+	return r
 }
 
 // FindExternalRepo attempts to locate the directory where Bazel has fetched
@@ -149,14 +155,9 @@ func FindExternalRepo(repoRoot, name string) (string, error) {
 //
 // The set of repositories returned is necessarily incomplete, since we don't
 // evaluate the file, and repositories may be declared in macros in other files.
-func ListRepositories(workspace *bf.File) []Repo {
+func ListRepositories(workspace *rule.File) []Repo {
 	var repos []Repo
-	for _, e := range workspace.Stmt {
-		call, ok := e.(*bf.CallExpr)
-		if !ok {
-			continue
-		}
-		r := bf.Rule{Call: call}
+	for _, r := range workspace.Rules {
 		name := r.Name()
 		if name == "" {
 			continue

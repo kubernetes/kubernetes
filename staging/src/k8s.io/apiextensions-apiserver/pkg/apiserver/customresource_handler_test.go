@@ -19,7 +19,9 @@ package apiserver
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestConvertFieldLabel(t *testing.T) {
@@ -64,12 +66,26 @@ func TestConvertFieldLabel(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			c := crdObjectConverter{
-				UnstructuredObjectConverter: unstructured.UnstructuredObjectConverter{},
-				clusterScoped:               test.clusterScoped,
+			crd := apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: "None",
+					},
+				},
 			}
 
-			label, value, err := c.ConvertFieldLabel("", "", test.label, "value")
+			if test.clusterScoped {
+				crd.Spec.Scope = apiextensions.ClusterScoped
+			} else {
+				crd.Spec.Scope = apiextensions.NamespaceScoped
+			}
+			f, err := conversion.NewCRConverterFactory(nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, c, err := f.NewConverter(&crd)
+
+			label, value, err := c.ConvertFieldLabel(schema.GroupVersionKind{}, test.label, "value")
 			if e, a := test.expectError, err != nil; e != a {
 				t.Fatalf("err: expected %t, got %t", e, a)
 			}

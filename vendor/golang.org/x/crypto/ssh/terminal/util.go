@@ -14,7 +14,7 @@
 // 	        panic(err)
 // 	}
 // 	defer terminal.Restore(0, oldState)
-package terminal
+package terminal // import "golang.org/x/crypto/ssh/terminal"
 
 import (
 	"golang.org/x/sys/unix"
@@ -108,9 +108,7 @@ func ReadPassword(fd int) ([]byte, error) {
 		return nil, err
 	}
 
-	defer func() {
-		unix.IoctlSetTermios(fd, ioctlWriteTermios, termios)
-	}()
+	defer unix.IoctlSetTermios(fd, ioctlWriteTermios, termios)
 
 	return readPasswordLine(passwordReader(fd))
 }

@@ -44,6 +44,20 @@ func TestIsServiceAccountToken(t *testing.T) {
 		},
 	}
 
+	secretTypeMistmatch := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "token-secret-2",
+			Namespace:       "default",
+			UID:             "23456",
+			ResourceVersion: "1",
+			Annotations: map[string]string{
+				v1.ServiceAccountNameKey: "default",
+				v1.ServiceAccountUIDKey:  "12345",
+			},
+		},
+		Type: v1.SecretTypeOpaque,
+	}
+
 	saIns := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "default",
@@ -89,6 +103,11 @@ func TestIsServiceAccountToken(t *testing.T) {
 		"service account uid not equal": {
 			secret: secretIns,
 			sa:     saInsUIDNotEqual,
+			expect: false,
+		},
+		"service account type not equal": {
+			secret: secretTypeMistmatch,
+			sa:     saIns,
 			expect: false,
 		},
 	}

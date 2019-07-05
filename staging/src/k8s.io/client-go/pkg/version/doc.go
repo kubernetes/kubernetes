@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:openapi-gen=true
+
 // Package version supplies version information collected at build time to
 // kubernetes components.
-// +k8s:openapi-gen=true
 package version // import "k8s.io/client-go/pkg/version"

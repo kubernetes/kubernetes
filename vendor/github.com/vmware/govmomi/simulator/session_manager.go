@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -49,33 +48,85 @@ func NewSessionManager(ref types.ManagedObjectReference) object.Reference {
 	return s
 }
 
-func (s *SessionManager) Login(ctx *Context, login *types.Login) soap.HasFault {
-	body := &methods.LoginBody{}
+func createSession(ctx *Context, name string, locale string) types.UserSession {
+	now := time.Now().UTC()
 
-	if login.Locale == "" {
-		login.Locale = session.Locale
+	if locale == "" {
+		locale = session.Locale
 	}
 
-	if login.UserName == "" || login.Password == "" || ctx.Session != nil {
+	session := Session{
+		UserSession: types.UserSession{
+			Key:            uuid.New().String(),
+			UserName:       name,
+			FullName:       name,
+			LoginTime:      now,
+			LastActiveTime: now,
+			Locale:         locale,
+			MessageLocale:  locale,
+		},
+		Registry: NewRegistry(),
+	}
+
+	ctx.SetSession(session, true)
+
+	return session.UserSession
+}
+
+func (s *SessionManager) Login(ctx *Context, req *types.Login) soap.HasFault {
+	body := new(methods.LoginBody)
+
+	if req.UserName == "" || req.Password == "" || ctx.Session != nil {
 		body.Fault_ = invalidLogin
 	} else {
-		session := Session{
-			UserSession: types.UserSession{
-				Key:            uuid.New().String(),
-				UserName:       login.UserName,
-				FullName:       login.UserName,
-				LoginTime:      time.Now(),
-				LastActiveTime: time.Now(),
-				Locale:         login.Locale,
-				MessageLocale:  login.Locale,
-			},
-			Registry: NewRegistry(),
+		body.Res = &types.LoginResponse{
+			Returnval: createSession(ctx, req.UserName, req.Locale),
+		}
+	}
+
+	return body
+}
+
+func (s *SessionManager) LoginExtensionByCertificate(ctx *Context, req *types.LoginExtensionByCertificate) soap.HasFault {
+	body := new(methods.LoginExtensionByCertificateBody)
+
+	if ctx.req.TLS == nil || len(ctx.req.TLS.PeerCertificates) == 0 {
+		body.Fault_ = Fault("", new(types.NoClientCertificate))
+		return body
+	}
+
+	if req.ExtensionKey == "" || ctx.Session != nil {
+		body.Fault_ = invalidLogin
+	} else {
+		body.Res = &types.LoginExtensionByCertificateResponse{
+			Returnval: createSession(ctx, req.ExtensionKey, req.Locale),
+		}
+	}
+
+	return body
+}
+
+func (s *SessionManager) LoginByToken(ctx *Context, req *types.LoginByToken) soap.HasFault {
+	body := new(methods.LoginByTokenBody)
+
+	if ctx.Session != nil {
+		body.Fault_ = invalidLogin
+	} else {
+		var subject struct {
+			ID string `xml:"Assertion>Subject>NameID"`
 		}
 
-		ctx.SetSession(session, true)
+		if s, ok := ctx.Header.Security.(*Element); ok {
+			_ = s.Decode(&subject)
+		}
 
-		body.Res = &types.LoginResponse{
-			Returnval: session.UserSession,
+		if subject.ID == "" {
+			body.Fault_ = invalidLogin
+			return body
+		}
+
+		body.Res = &types.LoginByTokenResponse{
+			Returnval: createSession(ctx, subject.ID, req.Locale),
 		}
 	}
 
@@ -85,6 +136,16 @@ func (s *SessionManager) Login(ctx *Context, login *types.Login) soap.HasFault {
 func (s *SessionManager) Logout(ctx *Context, _ *types.Logout) soap.HasFault {
 	session := ctx.Session
 	delete(s.sessions, session.Key)
+	pc := Map.content().PropertyCollector
+
+	for ref, obj := range ctx.Session.Registry.objects {
+		if ref == pc {
+			continue // don't unregister the PropertyCollector singleton
+		}
+		if _, ok := obj.(RegisterObject); ok {
+			ctx.Map.Remove(ref) // Remove RegisterObject handlers
+		}
+	}
 
 	ctx.postEvent(&types.UserLogoutSessionEvent{
 		IpAddress: session.IpAddress,
@@ -108,6 +169,23 @@ func (s *SessionManager) TerminateSession(ctx *Context, req *types.TerminateSess
 	}
 
 	body.Res = new(types.TerminateSessionResponse)
+	return body
+}
+
+func (s *SessionManager) SessionIsActive(ctx *Context, req *types.SessionIsActive) soap.HasFault {
+	body := new(methods.SessionIsActiveBody)
+
+	if ctx.Map.IsESX() {
+		body.Fault_ = Fault("", new(types.NotImplemented))
+		return body
+	}
+
+	body.Res = new(types.SessionIsActiveResponse)
+
+	if session, exists := s.sessions[req.SessionID]; exists {
+		body.Res.Returnval = session.UserName == req.UserName
+	}
+
 	return body
 }
 
@@ -163,6 +241,7 @@ var internalContext = &Context{
 		},
 		Registry: NewRegistry(),
 	},
+	Map: Map,
 }
 
 var invalidLogin = Fault("Login failure", new(types.InvalidLogin))
@@ -171,17 +250,19 @@ var invalidLogin = Fault("Login failure", new(types.InvalidLogin))
 type Context struct {
 	req *http.Request
 	res http.ResponseWriter
-	m   *SessionManager
+	svc *Service
 
 	context.Context
 	Session *Session
+	Header  soap.Header
 	Caller  *types.ManagedObjectReference
+	Map     *Registry
 }
 
 // mapSession maps an HTTP cookie to a Session.
 func (c *Context) mapSession() {
 	if cookie, err := c.req.Cookie(soap.SessionCookieName); err == nil {
-		if val, ok := c.m.sessions[cookie.Value]; ok {
+		if val, ok := c.svc.sm.sessions[cookie.Value]; ok {
 			c.SetSession(val, false)
 		}
 	}
@@ -193,7 +274,7 @@ func (c *Context) SetSession(session Session, login bool) {
 	session.IpAddress = strings.Split(c.req.RemoteAddr, ":")[0]
 	session.LastActiveTime = time.Now()
 
-	c.m.sessions[session.Key] = session
+	c.svc.sm.sessions[session.Key] = session
 	c.Session = &session
 
 	if login {

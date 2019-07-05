@@ -19,7 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -39,13 +41,13 @@ type ClusterTestTypeInterface interface {
 	Create(*v1.ClusterTestType) (*v1.ClusterTestType, error)
 	Update(*v1.ClusterTestType) (*v1.ClusterTestType, error)
 	UpdateStatus(*v1.ClusterTestType) (*v1.ClusterTestType, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.ClusterTestType, error)
-	List(opts meta_v1.ListOptions) (*v1.ClusterTestTypeList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.ClusterTestType, error)
+	List(opts metav1.ListOptions) (*v1.ClusterTestTypeList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterTestType, err error)
-	GetScale(clusterTestTypeName string, options meta_v1.GetOptions) (*autoscaling.Scale, error)
+	GetScale(clusterTestTypeName string, options metav1.GetOptions) (*autoscaling.Scale, error)
 	UpdateScale(clusterTestTypeName string, scale *autoscaling.Scale) (*autoscaling.Scale, error)
 
 	ClusterTestTypeExpansion
@@ -64,7 +66,7 @@ func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 }
 
 // Get takes name of the clusterTestType, and returns the corresponding clusterTestType object, and an error if there is any.
-func (c *clusterTestTypes) Get(name string, options meta_v1.GetOptions) (result *v1.ClusterTestType, err error) {
+func (c *clusterTestTypes) Get(name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Get().
 		Resource("clustertesttypes").
@@ -76,22 +78,32 @@ func (c *clusterTestTypes) Get(name string, options meta_v1.GetOptions) (result 
 }
 
 // List takes label and field selectors, and returns the list of ClusterTestTypes that match those selectors.
-func (c *clusterTestTypes) List(opts meta_v1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
+func (c *clusterTestTypes) List(opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.ClusterTestTypeList{}
 	err = c.client.Get().
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusterTestTypes.
-func (c *clusterTestTypes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *clusterTestTypes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -134,7 +146,7 @@ func (c *clusterTestTypes) UpdateStatus(clusterTestType *v1.ClusterTestType) (re
 }
 
 // Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
-func (c *clusterTestTypes) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *clusterTestTypes) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clustertesttypes").
 		Name(name).
@@ -144,10 +156,15 @@ func (c *clusterTestTypes) Delete(name string, options *meta_v1.DeleteOptions) e
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterTestTypes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *clusterTestTypes) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Resource("clustertesttypes").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()
@@ -167,7 +184,7 @@ func (c *clusterTestTypes) Patch(name string, pt types.PatchType, data []byte, s
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding autoscaling.Scale object, and an error if there is any.
-func (c *clusterTestTypes) GetScale(clusterTestTypeName string, options meta_v1.GetOptions) (result *autoscaling.Scale, err error) {
+func (c *clusterTestTypes) GetScale(clusterTestTypeName string, options metav1.GetOptions) (result *autoscaling.Scale, err error) {
 	result = &autoscaling.Scale{}
 	err = c.client.Get().
 		Resource("clustertesttypes").

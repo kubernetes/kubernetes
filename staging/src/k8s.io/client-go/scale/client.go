@@ -30,10 +30,6 @@ import (
 var scaleConverter = NewScaleConverter()
 var codecs = serializer.NewCodecFactory(scaleConverter.Scheme())
 
-// restInterfaceProvider turns a restclient.Config into a restclient.Interface.
-// It's overridable for the purposes of testing.
-type restInterfaceProvider func(*restclient.Config) (restclient.Interface, error)
-
 // scaleClient is an implementation of ScalesGetter
 // which makes use of a RESTMapper and a generic REST
 // client to support an discoverable resource.
@@ -54,9 +50,7 @@ func NewForConfig(cfg *restclient.Config, mapper PreferredResourceMapper, resolv
 	// so that the RESTClientFor doesn't complain
 	cfg.GroupVersion = &schema.GroupVersion{}
 
-	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{
-		CodecFactory: codecs,
-	}
+	cfg.NegotiatedSerializer = codecs.WithoutConversion()
 	if len(cfg.UserAgent) == 0 {
 		cfg.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}

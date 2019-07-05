@@ -9,13 +9,13 @@ go_library(
         "util.go",
         "watch.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/clientv3/namespace",
     importpath = "github.com/coreos/etcd/clientv3/namespace",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

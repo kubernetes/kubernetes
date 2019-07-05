@@ -67,7 +67,7 @@ func mathMLTextIntegrationPoint(n *Node) bool {
 	return false
 }
 
-// Section 12.2.5.5.
+// Section 12.2.6.5.
 var breakout = map[string]bool{
 	"b":          true,
 	"big":        true,
@@ -115,7 +115,7 @@ var breakout = map[string]bool{
 	"var":        true,
 }
 
-// Section 12.2.5.5.
+// Section 12.2.6.5.
 var svgTagNameAdjustments = map[string]string{
 	"altglyph":            "altGlyph",
 	"altglyphdef":         "altGlyphDef",
@@ -155,7 +155,7 @@ var svgTagNameAdjustments = map[string]string{
 	"textpath":            "textPath",
 }
 
-// Section 12.2.5.1
+// Section 12.2.6.1
 var mathMLAttributeAdjustments = map[string]string{
 	"definitionurl": "definitionURL",
 }

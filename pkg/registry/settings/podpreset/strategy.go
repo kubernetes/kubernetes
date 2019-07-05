@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/settings/validation"
 )
@@ -46,17 +45,12 @@ func (podPresetStrategy) NamespaceScoped() bool {
 func (podPresetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pip := obj.(*settings.PodPreset)
 	pip.Generation = 1
-
-	pod.DropDisabledVolumeMountsAlphaFields(pip.Spec.VolumeMounts)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (podPresetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPodPreset := obj.(*settings.PodPreset)
 	oldPodPreset := old.(*settings.PodPreset)
-
-	pod.DropDisabledVolumeMountsAlphaFields(oldPodPreset.Spec.VolumeMounts)
-	pod.DropDisabledVolumeMountsAlphaFields(newPodPreset.Spec.VolumeMounts)
 
 	// Update is not allowed
 	newPodPreset.Spec = oldPodPreset.Spec

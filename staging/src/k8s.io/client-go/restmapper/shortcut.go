@@ -19,7 +19,7 @@ package restmapper
 import (
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,12 +86,12 @@ func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []re
 	// This can return an error *and* the results it was able to find.  We don't need to fail on the error.
 	apiResList, err := e.discoveryClient.ServerResources()
 	if err != nil {
-		glog.V(1).Infof("Error loading discovery information: %v", err)
+		klog.V(1).Infof("Error loading discovery information: %v", err)
 	}
 	for _, apiResources := range apiResList {
 		gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
 		if err != nil {
-			glog.V(1).Infof("Unable to parse groupversion = %s due to = %s", apiResources.GroupVersion, err.Error())
+			klog.V(1).Infof("Unable to parse groupversion = %s due to = %s", apiResources.GroupVersion, err.Error())
 			continue
 		}
 		for _, apiRes := range apiResources.APIResources {

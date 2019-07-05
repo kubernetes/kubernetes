@@ -28,7 +28,11 @@ func UnmarshalError(r *request.Request) {
 
 	bodyBytes, err := ioutil.ReadAll(r.HTTPResponse.Body)
 	if err != nil {
-		r.Error = awserr.New("SerializationError", "failed to read from query HTTP response body", err)
+		r.Error = awserr.NewRequestFailure(
+			awserr.New("SerializationError", "failed to read from query HTTP response body", err),
+			r.HTTPResponse.StatusCode,
+			r.RequestID,
+		)
 		return
 	}
 
@@ -61,6 +65,10 @@ func UnmarshalError(r *request.Request) {
 	}
 
 	// Failed to retrieve any error message from the response body
-	r.Error = awserr.New("SerializationError",
-		"failed to decode query XML error response", decodeErr)
+	r.Error = awserr.NewRequestFailure(
+		awserr.New("SerializationError",
+			"failed to decode query XML error response", decodeErr),
+		r.HTTPResponse.StatusCode,
+		r.RequestID,
+	)
 }

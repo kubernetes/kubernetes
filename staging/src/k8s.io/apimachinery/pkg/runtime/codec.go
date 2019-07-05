@@ -76,24 +76,6 @@ func EncodeOrDie(e Encoder, obj Object) string {
 	return string(bytes)
 }
 
-// DefaultingSerializer invokes defaulting after decoding.
-type DefaultingSerializer struct {
-	Defaulter ObjectDefaulter
-	Decoder   Decoder
-	// Encoder is optional to allow this type to be used as both a Decoder and an Encoder
-	Encoder
-}
-
-// Decode performs a decode and then allows the defaulter to act on the provided object.
-func (d DefaultingSerializer) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
-	obj, gvk, err := d.Decoder.Decode(data, defaultGVK, into)
-	if err != nil {
-		return obj, gvk, err
-	}
-	d.Defaulter.Default(obj)
-	return obj, gvk, nil
-}
-
 // UseOrCreateObject returns obj if the canonical ObjectKind returned by the provided typer matches gvk, or
 // invokes the ObjectCreator to instantiate a new gvk. Returns an error if the typer cannot find the object.
 func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk schema.GroupVersionKind, obj Object) (Object, error) {
@@ -301,6 +283,7 @@ var _ GroupVersioner = multiGroupVersioner{}
 type multiGroupVersioner struct {
 	target             schema.GroupVersion
 	acceptedGroupKinds []schema.GroupKind
+	coerce             bool
 }
 
 // NewMultiGroupVersioner returns the provided group version for any kind that matches one of the provided group kinds.
@@ -310,6 +293,22 @@ func NewMultiGroupVersioner(gv schema.GroupVersion, groupKinds ...schema.GroupKi
 		return gv
 	}
 	return multiGroupVersioner{target: gv, acceptedGroupKinds: groupKinds}
+}
+
+// NewCoercingMultiGroupVersioner returns the provided group version for any incoming kind.
+// Incoming kinds that match the provided groupKinds are preferred.
+// Kind may be empty in the provided group kind, in which case any kind will match.
+// Examples:
+//   gv=mygroup/__internal, groupKinds=mygroup/Foo, anothergroup/Bar
+//   KindForGroupVersionKinds(yetanother/v1/Baz, anothergroup/v1/Bar) -> mygroup/__internal/Bar (matched preferred group/kind)
+//
+//   gv=mygroup/__internal, groupKinds=mygroup, anothergroup
+//   KindForGroupVersionKinds(yetanother/v1/Baz, anothergroup/v1/Bar) -> mygroup/__internal/Bar (matched preferred group)
+//
+//   gv=mygroup/__internal, groupKinds=mygroup, anothergroup
+//   KindForGroupVersionKinds(yetanother/v1/Baz, yetanother/v1/Bar) -> mygroup/__internal/Baz (no preferred group/kind match, uses first kind in list)
+func NewCoercingMultiGroupVersioner(gv schema.GroupVersion, groupKinds ...schema.GroupKind) GroupVersioner {
+	return multiGroupVersioner{target: gv, acceptedGroupKinds: groupKinds, coerce: true}
 }
 
 // KindForGroupVersionKinds returns the target group version if any kind matches any of the original group kinds. It will
@@ -325,6 +324,9 @@ func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersio
 			}
 			return v.target.WithKind(src.Kind), true
 		}
+	}
+	if v.coerce && len(kinds) > 0 {
+		return v.target.WithKind(kinds[0].Kind), true
 	}
 	return schema.GroupVersionKind{}, false
 }

@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
-	"golang.org/x/sys/unix"
 )
 
 // ConntrackTableType Conntrack table for the netlink operation
@@ -85,8 +85,8 @@ func (h *Handle) ConntrackTableList(table ConntrackTableType, family InetFamily)
 // conntrack -F [table]            Flush table
 // The flush operation applies to all the family types
 func (h *Handle) ConntrackTableFlush(table ConntrackTableType) error {
-	req := h.newConntrackRequest(table, unix.AF_INET, nl.IPCTNL_MSG_CT_DELETE, unix.NLM_F_ACK)
-	_, err := req.Execute(unix.NETLINK_NETFILTER, 0)
+	req := h.newConntrackRequest(table, syscall.AF_INET, nl.IPCTNL_MSG_CT_DELETE, syscall.NLM_F_ACK)
+	_, err := req.Execute(syscall.NETLINK_NETFILTER, 0)
 	return err
 }
 
@@ -102,10 +102,10 @@ func (h *Handle) ConntrackDeleteFilter(table ConntrackTableType, family InetFami
 	for _, dataRaw := range res {
 		flow := parseRawData(dataRaw)
 		if match := filter.MatchConntrackFlow(flow); match {
-			req2 := h.newConntrackRequest(table, family, nl.IPCTNL_MSG_CT_DELETE, unix.NLM_F_ACK)
+			req2 := h.newConntrackRequest(table, family, nl.IPCTNL_MSG_CT_DELETE, syscall.NLM_F_ACK)
 			// skip the first 4 byte that are the netfilter header, the newConntrackRequest is adding it already
 			req2.AddRawData(dataRaw[4:])
-			req2.Execute(unix.NETLINK_NETFILTER, 0)
+			req2.Execute(syscall.NETLINK_NETFILTER, 0)
 			matched++
 		}
 	}
@@ -127,8 +127,8 @@ func (h *Handle) newConntrackRequest(table ConntrackTableType, family InetFamily
 }
 
 func (h *Handle) dumpConntrackTable(table ConntrackTableType, family InetFamily) ([][]byte, error) {
-	req := h.newConntrackRequest(table, family, nl.IPCTNL_MSG_CT_GET, unix.NLM_F_DUMP)
-	return req.Execute(unix.NETLINK_NETFILTER, 0)
+	req := h.newConntrackRequest(table, family, nl.IPCTNL_MSG_CT_GET, syscall.NLM_F_DUMP)
+	return req.Execute(syscall.NETLINK_NETFILTER, 0)
 }
 
 // The full conntrack flow structure is very complicated and can be found in the file:

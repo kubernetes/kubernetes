@@ -17,9 +17,9 @@ limitations under the License.
 package collectors
 
 import (
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -58,17 +58,17 @@ var (
 	)
 )
 
-type volumeStatsCollecotr struct {
-	statsProvider serverstats.StatsProvider
+type volumeStatsCollector struct {
+	statsProvider serverstats.Provider
 }
 
 // NewVolumeStatsCollector creates a volume stats prometheus collector.
-func NewVolumeStatsCollector(statsProvider serverstats.StatsProvider) prometheus.Collector {
-	return &volumeStatsCollecotr{statsProvider: statsProvider}
+func NewVolumeStatsCollector(statsProvider serverstats.Provider) prometheus.Collector {
+	return &volumeStatsCollector{statsProvider: statsProvider}
 }
 
 // Describe implements the prometheus.Collector interface.
-func (collector *volumeStatsCollecotr) Describe(ch chan<- *prometheus.Desc) {
+func (collector *volumeStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- volumeStatsCapacityBytesDesc
 	ch <- volumeStatsAvailableBytesDesc
 	ch <- volumeStatsUsedBytesDesc
@@ -78,7 +78,7 @@ func (collector *volumeStatsCollecotr) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect implements the prometheus.Collector interface.
-func (collector *volumeStatsCollecotr) Collect(ch chan<- prometheus.Metric) {
+func (collector *volumeStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	podStats, err := collector.statsProvider.ListPodStats()
 	if err != nil {
 		return
@@ -87,7 +87,7 @@ func (collector *volumeStatsCollecotr) Collect(ch chan<- prometheus.Metric) {
 		lv = append([]string{pvcRef.Namespace, pvcRef.Name}, lv...)
 		metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, v, lv...)
 		if err != nil {
-			glog.Warningf("Failed to generate metric: %v", err)
+			klog.Warningf("Failed to generate metric: %v", err)
 			return
 		}
 		ch <- metric

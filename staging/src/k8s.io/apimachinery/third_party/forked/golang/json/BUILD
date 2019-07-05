@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fields.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/third_party/forked/golang/json",
     importpath = "k8s.io/apimachinery/third_party/forked/golang/json",
 )
 

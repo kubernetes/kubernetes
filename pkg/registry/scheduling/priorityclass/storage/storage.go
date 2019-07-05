@@ -27,10 +27,13 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 )
 
-// rest implements a RESTStorage for priority classes against etcd
+// REST implements a RESTStorage for priority classes against etcd
 type REST struct {
 	*genericregistry.Store
 }
@@ -45,6 +48,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		CreateStrategy: priorityclass.Strategy,
 		UpdateStrategy: priorityclass.Strategy,
 		DeleteStrategy: priorityclass.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -63,12 +68,12 @@ func (r *REST) ShortNames() []string {
 }
 
 // Delete ensures that system priority classes are not deleted.
-func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	for _, spc := range scheduling.SystemPriorityClasses() {
 		if name == spc.Name {
 			return nil, false, apierrors.NewForbidden(scheduling.Resource("priorityclasses"), spc.Name, errors.New("this is a system priority class and cannot be deleted"))
 		}
 	}
 
-	return r.Store.Delete(ctx, name, options)
+	return r.Store.Delete(ctx, name, deleteValidation, options)
 }

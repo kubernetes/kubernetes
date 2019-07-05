@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: master
-      image: k8s.gcr.io/redis:v1
+      image: gcr.io/kubernetes-e2e-test-images/redis:1.0
       env:
         - name: MASTER
           value: "true"
@@ -22,7 +22,7 @@ spec:
         - mountPath: /redis-master-data
           name: data
     - name: sentinel
-      image: kubernetes/redis:v1
+      image: gcr.io/kubernetes-e2e-test-images/redis:1.0
       env:
         - name: SENTINEL
           value: "true"

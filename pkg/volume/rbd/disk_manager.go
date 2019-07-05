@@ -26,9 +26,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -61,7 +61,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	notMnt, err := mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mountpoint: %s", globalPDPath)
+		klog.Errorf("cannot validate mountpoint: %s", globalPDPath)
 		return err
 	}
 	if notMnt {
@@ -70,7 +70,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 
 	notMnt, err = mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mountpoint: %s", volPath)
+		klog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
 	if !notMnt {
@@ -78,7 +78,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	}
 
 	if err := os.MkdirAll(volPath, 0750); err != nil {
-		glog.Errorf("failed to mkdir:%s", volPath)
+		klog.Errorf("failed to mkdir:%s", volPath)
 		return err
 	}
 	// Perform a bind mount to the full path to allow duplicate mounts of the same disk.
@@ -89,10 +89,10 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {
-		glog.Errorf("failed to bind mount:%s", globalPDPath)
+		klog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err
 	}
-	glog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
+	klog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
 
 	if !b.ReadOnly {
 		volume.SetVolumeOwnership(&b, fsGroup)
@@ -105,28 +105,28 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mountpoint: %s", volPath)
+		klog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
 	if notMnt {
-		glog.V(3).Infof("volume path %s is not a mountpoint, deleting", volPath)
+		klog.V(3).Infof("volume path %s is not a mountpoint, deleting", volPath)
 		return os.Remove(volPath)
 	}
 
 	// Unmount the bind-mount inside this pod.
 	if err := mounter.Unmount(volPath); err != nil {
-		glog.Errorf("failed to umount %s", volPath)
+		klog.Errorf("failed to umount %s", volPath)
 		return err
 	}
 
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
 	if mntErr != nil && !os.IsNotExist(mntErr) {
-		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+		klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return mntErr
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
-			glog.V(2).Info("Error removing mountpoint ", volPath, ": ", err)
+			klog.V(2).Infof("Error removing mountpoint %s: %v", volPath, err)
 			return err
 		}
 	}

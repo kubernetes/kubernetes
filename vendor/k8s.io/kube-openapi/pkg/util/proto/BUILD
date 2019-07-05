@@ -7,6 +7,7 @@ go_library(
         "document.go",
         "openapi.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-openapi/pkg/util/proto",
     importpath = "k8s.io/kube-openapi/pkg/util/proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -26,6 +27,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:all-srcs",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/validation:all-srcs",
     ],
     tags = ["automanaged"],

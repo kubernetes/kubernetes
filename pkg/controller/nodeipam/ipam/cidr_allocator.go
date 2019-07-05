@@ -21,7 +21,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,13 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
-
-type nodeAndCIDR struct {
-	cidr     *net.IPNet
-	nodeName string
-}
 
 // CIDRAllocatorType is the type of the allocator to use.
 type CIDRAllocatorType string
@@ -71,7 +66,10 @@ const (
 	cidrUpdateRetries = 3
 
 	// updateRetryTimeout is the time to wait before requeing a failed node for retry
-	updateRetryTimeout = 100 * time.Millisecond
+	updateRetryTimeout = 250 * time.Millisecond
+
+	// maxUpdateRetryTimeout is the maximum amount of time between timeouts.
+	maxUpdateRetryTimeout = 5 * time.Second
 
 	// updateMaxRetries is the max retries for a failed node
 	updateMaxRetries = 10
@@ -91,7 +89,7 @@ type CIDRAllocator interface {
 }
 
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -99,7 +97,7 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRs, serviceCIDR, nodeCIDRMaskSize, nodeList)
 	case CloudAllocatorType:
 		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:
@@ -118,7 +116,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 			LabelSelector: labels.Everything().String(),
 		})
 		if err != nil {
-			glog.Errorf("Failed to list all nodes: %v", err)
+			klog.Errorf("Failed to list all nodes: %v", err)
 			return false, nil
 		}
 		return true, nil

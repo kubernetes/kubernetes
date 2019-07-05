@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
-	"golang.org/x/sys/unix"
 )
 
 // NOTE function is here because it uses other linux functions
@@ -85,7 +84,7 @@ func QdiscDel(qdisc Qdisc) error {
 // QdiscDel will delete a qdisc from the system.
 // Equivalent to: `tc qdisc del $qdisc`
 func (h *Handle) QdiscDel(qdisc Qdisc) error {
-	return h.qdiscModify(unix.RTM_DELQDISC, 0, qdisc)
+	return h.qdiscModify(syscall.RTM_DELQDISC, 0, qdisc)
 }
 
 // QdiscChange will change a qdisc in place
@@ -99,7 +98,7 @@ func QdiscChange(qdisc Qdisc) error {
 // Equivalent to: `tc qdisc change $qdisc`
 // The parent and handle MUST NOT be changed.
 func (h *Handle) QdiscChange(qdisc Qdisc) error {
-	return h.qdiscModify(unix.RTM_NEWQDISC, 0, qdisc)
+	return h.qdiscModify(syscall.RTM_NEWQDISC, 0, qdisc)
 }
 
 // QdiscReplace will replace a qdisc to the system.
@@ -114,8 +113,8 @@ func QdiscReplace(qdisc Qdisc) error {
 // The handle MUST change.
 func (h *Handle) QdiscReplace(qdisc Qdisc) error {
 	return h.qdiscModify(
-		unix.RTM_NEWQDISC,
-		unix.NLM_F_CREATE|unix.NLM_F_REPLACE,
+		syscall.RTM_NEWQDISC,
+		syscall.NLM_F_CREATE|syscall.NLM_F_REPLACE,
 		qdisc)
 }
 
@@ -129,13 +128,13 @@ func QdiscAdd(qdisc Qdisc) error {
 // Equivalent to: `tc qdisc add $qdisc`
 func (h *Handle) QdiscAdd(qdisc Qdisc) error {
 	return h.qdiscModify(
-		unix.RTM_NEWQDISC,
-		unix.NLM_F_CREATE|unix.NLM_F_EXCL,
+		syscall.RTM_NEWQDISC,
+		syscall.NLM_F_CREATE|syscall.NLM_F_EXCL,
 		qdisc)
 }
 
 func (h *Handle) qdiscModify(cmd, flags int, qdisc Qdisc) error {
-	req := h.newNetlinkRequest(cmd, flags|unix.NLM_F_ACK)
+	req := h.newNetlinkRequest(cmd, flags|syscall.NLM_F_ACK)
 	base := qdisc.Attrs()
 	msg := &nl.TcMsg{
 		Family:  nl.FAMILY_ALL,
@@ -146,13 +145,13 @@ func (h *Handle) qdiscModify(cmd, flags int, qdisc Qdisc) error {
 	req.AddData(msg)
 
 	// When deleting don't bother building the rest of the netlink payload
-	if cmd != unix.RTM_DELQDISC {
+	if cmd != syscall.RTM_DELQDISC {
 		if err := qdiscPayload(req, qdisc); err != nil {
 			return err
 		}
 	}
 
-	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
 	return err
 }
 
@@ -249,7 +248,7 @@ func QdiscList(link Link) ([]Qdisc, error) {
 // Equivalent to: `tc qdisc show`.
 // The list can be filtered by link.
 func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
-	req := h.newNetlinkRequest(unix.RTM_GETQDISC, unix.NLM_F_DUMP)
+	req := h.newNetlinkRequest(syscall.RTM_GETQDISC, syscall.NLM_F_DUMP)
 	index := int32(0)
 	if link != nil {
 		base := link.Attrs()
@@ -262,7 +261,7 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 	}
 	req.AddData(msg)
 
-	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWQDISC)
+	msgs, err := req.Execute(syscall.NETLINK_ROUTE, syscall.RTM_NEWQDISC)
 	if err != nil {
 		return nil, err
 	}

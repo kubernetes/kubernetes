@@ -7,6 +7,7 @@ go_library(
         "vendor_check_go15.go",
         "vendor_check_go16.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/ginkgo/testsuite",
     importpath = "github.com/onsi/ginkgo/ginkgo/testsuite",
     visibility = ["//visibility:public"],
 )

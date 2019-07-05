@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - erictune
 - lavalamp
@@ -41,3 +43,5 @@ reviewers:
 - piosz
 - jsafrane
 - jbeda
+labels:
+- sig/apps

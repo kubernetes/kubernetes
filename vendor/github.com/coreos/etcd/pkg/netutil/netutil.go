@@ -17,6 +17,7 @@ package netutil
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"reflect"
@@ -73,14 +74,14 @@ func resolveTCPAddrs(ctx context.Context, urls [][]url.URL) ([][]url.URL, error)
 		for i, u := range us {
 			nu, err := url.Parse(u.String())
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %q (%v)", u.String(), err)
 			}
 			nus[i] = *nu
 		}
 		for i, u := range nus {
 			h, err := resolveURL(ctx, u)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to resolve %q (%v)", u.String(), err)
 			}
 			if h != "" {
 				nus[i].Host = h
@@ -92,15 +93,19 @@ func resolveTCPAddrs(ctx context.Context, urls [][]url.URL) ([][]url.URL, error)
 }
 
 func resolveURL(ctx context.Context, u url.URL) (string, error) {
+	if u.Scheme == "unix" || u.Scheme == "unixs" {
+		// unix sockets don't resolve over TCP
+		return "", nil
+	}
+	host, _, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		plog.Errorf("could not parse url %s during tcp resolving", u.Host)
+		return "", err
+	}
+	if host == "localhost" || net.ParseIP(host) != nil {
+		return "", nil
+	}
 	for ctx.Err() == nil {
-		host, _, err := net.SplitHostPort(u.Host)
-		if err != nil {
-			plog.Errorf("could not parse url %s during tcp resolving", u.Host)
-			return "", err
-		}
-		if host == "localhost" || net.ParseIP(host) != nil {
-			return "", nil
-		}
 		tcpAddr, err := resolveTCPAddr(ctx, u.Host)
 		if err == nil {
 			plog.Infof("resolving %s to %s", u.Host, tcpAddr.String())
@@ -119,35 +124,41 @@ func resolveURL(ctx context.Context, u url.URL) (string, error) {
 
 // urlsEqual checks equality of url.URLS between two arrays.
 // This check pass even if an URL is in hostname and opposite is in IP address.
-func urlsEqual(ctx context.Context, a []url.URL, b []url.URL) bool {
+func urlsEqual(ctx context.Context, a []url.URL, b []url.URL) (bool, error) {
 	if len(a) != len(b) {
-		return false
+		return false, fmt.Errorf("len(%q) != len(%q)", urlsToStrings(a), urlsToStrings(b))
 	}
 	urls, err := resolveTCPAddrs(ctx, [][]url.URL{a, b})
 	if err != nil {
-		return false
+		return false, err
 	}
+	preva, prevb := a, b
 	a, b = urls[0], urls[1]
 	sort.Sort(types.URLs(a))
 	sort.Sort(types.URLs(b))
 	for i := range a {
 		if !reflect.DeepEqual(a[i], b[i]) {
-			return false
+			return false, fmt.Errorf("%q(resolved from %q) != %q(resolved from %q)",
+				a[i].String(), preva[i].String(),
+				b[i].String(), prevb[i].String(),
+			)
 		}
 	}
-
-	return true
+	return true, nil
 }
 
-func URLStringsEqual(ctx context.Context, a []string, b []string) bool {
+// URLStringsEqual returns "true" if given URLs are valid
+// and resolved to same IP addresses. Otherwise, return "false"
+// and error, if any.
+func URLStringsEqual(ctx context.Context, a []string, b []string) (bool, error) {
 	if len(a) != len(b) {
-		return false
+		return false, fmt.Errorf("len(%q) != len(%q)", a, b)
 	}
 	urlsA := make([]url.URL, 0)
 	for _, str := range a {
 		u, err := url.Parse(str)
 		if err != nil {
-			return false
+			return false, fmt.Errorf("failed to parse %q", str)
 		}
 		urlsA = append(urlsA, *u)
 	}
@@ -155,12 +166,19 @@ func URLStringsEqual(ctx context.Context, a []string, b []string) bool {
 	for _, str := range b {
 		u, err := url.Parse(str)
 		if err != nil {
-			return false
+			return false, fmt.Errorf("failed to parse %q", str)
 		}
 		urlsB = append(urlsB, *u)
 	}
-
 	return urlsEqual(ctx, urlsA, urlsB)
+}
+
+func urlsToStrings(us []url.URL) []string {
+	rs := make([]string, len(us))
+	for i := range us {
+		rs[i] = us[i].String()
+	}
+	return rs
 }
 
 func IsNetworkTimeoutError(err error) bool {

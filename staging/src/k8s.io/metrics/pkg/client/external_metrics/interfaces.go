@@ -34,7 +34,7 @@ type NamespacedMetricsGetter interface {
 
 // MetricsInterface provides access to external metrics.
 type MetricsInterface interface {
-	// Get fetches the metric for the given namespace that maches the given
+	// List fetches the metric for the given namespace that maches the given
 	// metricSelector.
 	List(metricName string, metricSelector labels.Selector) (*v1beta1.ExternalMetricValueList, error)
 }

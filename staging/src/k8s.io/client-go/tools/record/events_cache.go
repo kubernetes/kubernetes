@@ -84,11 +84,6 @@ func getSpamKey(event *v1.Event) string {
 // EventFilterFunc is a function that returns true if the event should be skipped
 type EventFilterFunc func(event *v1.Event) bool
 
-// DefaultEventFilterFunc returns false for all incoming events
-func DefaultEventFilterFunc(event *v1.Event) bool {
-	return false
-}
-
 // EventSourceObjectSpamFilter is responsible for throttling
 // the amount of events a source and object can produce.
 type EventSourceObjectSpamFilter struct {
@@ -446,6 +441,52 @@ func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 
 		logger: newEventLogger(cacheSize, clock),
 	}
+}
+
+func NewEventCorrelatorWithOptions(options CorrelatorOptions) *EventCorrelator {
+	optionsWithDefaults := populateDefaults(options)
+	spamFilter := NewEventSourceObjectSpamFilter(optionsWithDefaults.LRUCacheSize,
+		optionsWithDefaults.BurstSize, optionsWithDefaults.QPS, optionsWithDefaults.Clock)
+	return &EventCorrelator{
+		filterFunc: spamFilter.Filter,
+		aggregator: NewEventAggregator(
+			optionsWithDefaults.LRUCacheSize,
+			optionsWithDefaults.KeyFunc,
+			optionsWithDefaults.MessageFunc,
+			optionsWithDefaults.MaxEvents,
+			optionsWithDefaults.MaxIntervalInSeconds,
+			optionsWithDefaults.Clock),
+		logger: newEventLogger(optionsWithDefaults.LRUCacheSize, optionsWithDefaults.Clock),
+	}
+}
+
+// populateDefaults populates the zero value options with defaults
+func populateDefaults(options CorrelatorOptions) CorrelatorOptions {
+	if options.LRUCacheSize == 0 {
+		options.LRUCacheSize = maxLruCacheEntries
+	}
+	if options.BurstSize == 0 {
+		options.BurstSize = defaultSpamBurst
+	}
+	if options.QPS == 0 {
+		options.QPS = defaultSpamQPS
+	}
+	if options.KeyFunc == nil {
+		options.KeyFunc = EventAggregatorByReasonFunc
+	}
+	if options.MessageFunc == nil {
+		options.MessageFunc = EventAggregatorByReasonMessageFunc
+	}
+	if options.MaxEvents == 0 {
+		options.MaxEvents = defaultAggregateMaxEvents
+	}
+	if options.MaxIntervalInSeconds == 0 {
+		options.MaxIntervalInSeconds = defaultAggregateIntervalInSeconds
+	}
+	if options.Clock == nil {
+		options.Clock = clock.RealClock{}
+	}
+	return options
 }
 
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events

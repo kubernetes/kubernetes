@@ -276,7 +276,8 @@ type PublicKey interface {
 	Type() string
 
 	// Marshal returns the serialized key data in SSH wire format,
-	// with the name prefix.
+	// with the name prefix. To unmarshal the returned data, use
+	// the ParsePublicKey function.
 	Marshal() []byte
 
 	// Verify that sig is a signature on the given data using this
@@ -802,7 +803,7 @@ func encryptedBlock(block *pem.Block) bool {
 }
 
 // ParseRawPrivateKey returns a private key from a PEM encoded private key. It
-// supports RSA (PKCS#1), DSA (OpenSSL), and ECDSA private keys.
+// supports RSA (PKCS#1), PKCS#8, DSA (OpenSSL), and ECDSA private keys.
 func ParseRawPrivateKey(pemBytes []byte) (interface{}, error) {
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
@@ -816,6 +817,9 @@ func ParseRawPrivateKey(pemBytes []byte) (interface{}, error) {
 	switch block.Type {
 	case "RSA PRIVATE KEY":
 		return x509.ParsePKCS1PrivateKey(block.Bytes)
+	// RFC5208 - https://tools.ietf.org/html/rfc5208
+	case "PRIVATE KEY":
+		return x509.ParsePKCS8PrivateKey(block.Bytes)
 	case "EC PRIVATE KEY":
 		return x509.ParseECPrivateKey(block.Bytes)
 	case "DSA PRIVATE KEY":
@@ -899,8 +903,8 @@ func ParseDSAPrivateKey(der []byte) (*dsa.PrivateKey, error) {
 // Implemented based on the documentation at
 // https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.key
 func parseOpenSSHPrivateKey(key []byte) (crypto.PrivateKey, error) {
-	magic := append([]byte("openssh-key-v1"), 0)
-	if !bytes.Equal(magic, key[0:len(magic)]) {
+	const magic = "openssh-key-v1\x00"
+	if len(key) < len(magic) || string(key[:len(magic)]) != magic {
 		return nil, errors.New("ssh: invalid openssh private key format")
 	}
 	remaining := key[len(magic):]

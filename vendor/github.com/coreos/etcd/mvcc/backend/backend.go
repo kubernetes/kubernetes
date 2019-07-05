@@ -54,6 +54,10 @@ type Backend interface {
 	Hash(ignores map[IgnoreKey]struct{}) (uint32, error)
 	// Size returns the current size of the backend.
 	Size() int64
+	// SizeInUse returns the current size of the backend logically in use.
+	// Since the backend can manage free space in a non-byte unit such as
+	// number of pages, the returned value can be not exactly accurate in bytes.
+	SizeInUse() int64
 	Defrag() error
 	ForceCommit()
 	Close() error
@@ -74,6 +78,10 @@ type backend struct {
 
 	// size is the number of bytes in the backend
 	size int64
+
+	// sizeInUse is the number of bytes actually used in the backend
+	sizeInUse int64
+
 	// commits counts number of commits since start
 	commits int64
 
@@ -139,8 +147,11 @@ func newBackend(bcfg BackendConfig) *backend {
 		batchInterval: bcfg.BatchInterval,
 		batchLimit:    bcfg.BatchLimit,
 
-		readTx: &readTx{buf: txReadBuffer{
-			txBuffer: txBuffer{make(map[string]*bucketBuffer)}},
+		readTx: &readTx{
+			buf: txReadBuffer{
+				txBuffer: txBuffer{make(map[string]*bucketBuffer)},
+			},
+			buckets: make(map[string]*bolt.Bucket),
 		},
 
 		stopc: make(chan struct{}),
@@ -244,6 +255,10 @@ func (b *backend) Size() int64 {
 	return atomic.LoadInt64(&b.size)
 }
 
+func (b *backend) SizeInUse() int64 {
+	return atomic.LoadInt64(&b.sizeInUse)
+}
+
 func (b *backend) run() {
 	defer close(b.donec)
 	t := time.NewTimer(b.batchInterval)
@@ -272,18 +287,12 @@ func (b *backend) Commits() int64 {
 }
 
 func (b *backend) Defrag() error {
-	err := b.defrag()
-	if err != nil {
-		return err
-	}
-
-	// commit to update metadata like db.size
-	b.batchTx.Commit()
-
-	return nil
+	return b.defrag()
 }
 
 func (b *backend) defrag() error {
+	now := time.Now()
+	
 	// TODO: make this non-blocking?
 	// lock batchTx to ensure nobody is using previous tx, and then
 	// close previous ongoing tx.
@@ -339,9 +348,16 @@ func (b *backend) defrag() error {
 		plog.Fatalf("cannot begin tx (%s)", err)
 	}
 
-	b.readTx.buf.reset()
+	b.readTx.reset()
 	b.readTx.tx = b.unsafeBegin(false)
-	atomic.StoreInt64(&b.size, b.readTx.tx.Size())
+
+	size := b.readTx.tx.Size()
+	db := b.db
+	atomic.StoreInt64(&b.size, size)
+	atomic.StoreInt64(&b.sizeInUse, size-(int64(db.Stats().FreePageN)*int64(db.Info().PageSize)))
+
+	took := time.Since(now)
+	defragDurations.Observe(took.Seconds())
 
 	return nil
 }
@@ -370,10 +386,10 @@ func defragdb(odb, tmpdb *bolt.DB, limit int) error {
 		}
 
 		tmpb, berr := tmptx.CreateBucketIfNotExists(next)
-		tmpb.FillPercent = 0.9 // for seq write in for each
 		if berr != nil {
 			return berr
 		}
+		tmpb.FillPercent = 0.9 // for seq write in for each
 
 		b.ForEach(func(k, v []byte) error {
 			count++
@@ -402,7 +418,12 @@ func (b *backend) begin(write bool) *bolt.Tx {
 	b.mu.RLock()
 	tx := b.unsafeBegin(write)
 	b.mu.RUnlock()
-	atomic.StoreInt64(&b.size, tx.Size())
+
+	size := tx.Size()
+	db := tx.DB()
+	atomic.StoreInt64(&b.size, size)
+	atomic.StoreInt64(&b.sizeInUse, size-(int64(db.Stats().FreePageN)*int64(db.Info().PageSize)))
+
 	return tx
 }
 

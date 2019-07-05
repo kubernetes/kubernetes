@@ -132,7 +132,7 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task
 				SourceDatacenter:      req.SourceDatacenter,
 				DestinationName:       dest[i],
 				DestinationDatacenter: req.DestDatacenter,
-				Force: req.Force,
+				Force:                 req.Force,
 			})
 
 			if err != nil {
@@ -168,7 +168,7 @@ func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task
 				SourceDatacenter:      req.SourceDatacenter,
 				DestinationName:       dest[i],
 				DestinationDatacenter: req.DestDatacenter,
-				Force: req.Force,
+				Force:                 req.Force,
 			})
 
 			if err != nil {
@@ -208,5 +208,12 @@ func (m *VirtualDiskManager) QueryVirtualDiskUuid(req *types.QueryVirtualDiskUui
 		Returnval: uuid.NewSHA1(uuid.NameSpaceOID, []byte(file)).String(),
 	}
 
+	return body
+}
+
+func (m *VirtualDiskManager) SetVirtualDiskUuid(req *types.SetVirtualDiskUuid) soap.HasFault {
+	body := new(methods.SetVirtualDiskUuidBody)
+	// TODO: validate uuid format and persist
+	body.Res = new(types.SetVirtualDiskUuidResponse)
 	return body
 }

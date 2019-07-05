@@ -17,25 +17,29 @@ limitations under the License.
 package cm
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-type containerManagerStub struct{}
+type containerManagerStub struct {
+	shouldResetExtendedResourceCapacity bool
+}
 
 var _ ContainerManager = &containerManagerStub{}
 
 func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
-	glog.V(2).Infof("Starting stub container manager")
+	klog.V(2).Infof("Starting stub container manager")
 	return nil
 }
 
@@ -76,6 +80,10 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 	return c
 }
 
+func (cm *containerManagerStub) GetPluginRegistrationHandler() cache.PluginHandler {
+	return nil
+}
+
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
 	return nil, nil, []string{}
 }
@@ -88,7 +96,7 @@ func (cm *containerManagerStub) GetResources(pod *v1.Pod, container *v1.Containe
 	return &kubecontainer.RunContainerOptions{}, nil
 }
 
-func (cm *containerManagerStub) UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error {
+func (cm *containerManagerStub) UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error {
 	return nil
 }
 
@@ -100,6 +108,18 @@ func (cm *containerManagerStub) GetPodCgroupRoot() string {
 	return ""
 }
 
+func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+	return nil
+}
+
+func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
+	return cm.shouldResetExtendedResourceCapacity
+}
+
 func NewStubContainerManager() ContainerManager {
-	return &containerManagerStub{}
+	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
+}
+
+func NewStubContainerManagerWithExtendedResource(shouldResetExtendedResourceCapacity bool) ContainerManager {
+	return &containerManagerStub{shouldResetExtendedResourceCapacity: shouldResetExtendedResourceCapacity}
 }

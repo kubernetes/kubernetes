@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -31,16 +32,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
-var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
+var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
 	if isAppArmorEnabled() {
 		BeforeEach(func() {
 			By("Loading AppArmor profiles for testing")
@@ -56,7 +60,7 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
 			It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					e2elog.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -67,7 +71,7 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
 			It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					e2elog.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -130,14 +134,14 @@ func loadTestProfiles() error {
 	// apparmor_parser does not always return an error code, so consider any stderr output an error.
 	if err != nil || stderr.Len() > 0 {
 		if stderr.Len() > 0 {
-			glog.Warning(stderr.String())
+			klog.Warning(stderr.String())
 		}
 		if len(out) > 0 {
-			glog.Infof("apparmor_parser: %s", out)
+			klog.Infof("apparmor_parser: %s", out)
 		}
 		return fmt.Errorf("failed to load profiles: %v", err)
 	}
-	glog.V(2).Infof("Loaded profiles: %v", out)
+	klog.V(2).Infof("Loaded profiles: %v", out)
 	return nil
 }
 
@@ -145,13 +149,15 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 	pod := createPodWithAppArmor(f, profile)
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
-		framework.ExpectNoError(framework.WaitTimeoutForPodNoLongerRunningInNamespace(
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
 		w, err := f.PodClient().Watch(metav1.SingleObject(metav1.ObjectMeta{Name: pod.Name}))
 		framework.ExpectNoError(err)
-		_, err = watch.Until(framework.PodStartTimeout, w, func(e watch.Event) (bool, error) {
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		defer cancel()
+		_, err = watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			switch e.Type {
 			case watch.Deleted:
 				return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, pod.Name)
@@ -207,7 +213,7 @@ func isAppArmorEnabled() bool {
 		if len(matches) == 2 {
 			version, err := strconv.Atoi(matches[1])
 			if err != nil {
-				glog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
+				klog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
 				return false
 			}
 			return version >= 54
