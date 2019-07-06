@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var currentTime time.Time
@@ -64,7 +66,7 @@ func TestTimer(t *testing.T) {
 			}
 		]
 	}`))
-	ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 5.5s so far
+	framework.ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 5.5s so far
 Phase 033-two: 3.5s
 `)
 
@@ -86,7 +88,7 @@ Phase 033-two: 3.5s
 			}
 		]
 	}`))
-	ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 6.5s
+	framework.ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 6.5s
 Phase 033-two: 3.5s
 `)
 }
