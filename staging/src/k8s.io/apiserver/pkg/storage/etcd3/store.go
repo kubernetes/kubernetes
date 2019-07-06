@@ -216,15 +216,19 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpDelete(key),
-		).Else(
-			clientv3.OpGet(key),
 		).Commit()
 		metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
 		if err != nil {
 			return err
 		}
 		if !txnResp.Succeeded {
-			getResp = (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
+			if len(txnResp.Responses) > 0 {
+				getResp = (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
+			} else {
+				if getResp, err = s.client.KV.Get(ctx, key); err != nil {
+					return err
+				}
+			}
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
 			continue
 		}
