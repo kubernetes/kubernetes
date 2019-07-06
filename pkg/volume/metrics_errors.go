@@ -35,7 +35,16 @@ func NewNotSupportedError() *MetricsError {
 	}
 }
 
-// NewNoPathDefined creates a new MetricsError with code NoPathDefined.
+// NewNotSupportedErrorWithDriverName creates a new MetricsError with code NotSupported.
+// driver name is added to the error message.
+func NewNotSupportedErrorWithDriverName(name string) *MetricsError {
+	return &MetricsError{
+		Code: ErrCodeNotSupported,
+		Msg:  fmt.Sprintf("metrics are not supported for %s volumes", name),
+	}
+}
+
+// NewNoPathDefinedError creates a new MetricsError with code NoPathDefined.
 func NewNoPathDefinedError() *MetricsError {
 	return &MetricsError{
 		Code: ErrCodeNoPathDefined,
