@@ -61,9 +61,11 @@ func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// if plugin doesnot support volume status, return.
 	if !volumeStatsSet {
-		return nil, nil
+		return nil, volume.NewNotSupportedErrorWithDriverName(
+			string(mc.csiClientGetter.driverName))
 	}
 	// Get Volumestatus
 	metrics, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
