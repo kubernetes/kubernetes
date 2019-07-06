@@ -64,7 +64,7 @@ func TestTimer(t *testing.T) {
 			}
 		]
 	}`))
-	framework.ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 5.5s so far
+	ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 5.5s so far
 Phase 033-two: 3.5s
 `)
 
@@ -86,7 +86,7 @@ Phase 033-two: 3.5s
 			}
 		]
 	}`))
-	framework.ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 6.5s
+	ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 6.5s
 Phase 033-two: 3.5s
 `)
 }
