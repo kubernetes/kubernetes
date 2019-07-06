@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -130,7 +129,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Checking UID to verify deployment %q survives upgrade", deploymentName))
-	gomega.Expect(deployment.UID).To(gomega.Equal(t.oldDeploymentUID))
+	framework.ExpectEqual(deployment.UID, t.oldDeploymentUID)
 
 	ginkgo.By(fmt.Sprintf("Verifying deployment %q does not create new replicasets", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
@@ -144,15 +143,15 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	switch t.oldRSUID {
 	case rss[0].UID:
-		gomega.Expect(rss[1].UID).To(gomega.Equal(t.newRSUID))
+		framework.ExpectEqual(rss[1].UID, t.newRSUID)
 	case rss[1].UID:
-		gomega.Expect(rss[0].UID).To(gomega.Equal(t.newRSUID))
+		framework.ExpectEqual(rss[0].UID, t.newRSUID)
 	default:
 		framework.ExpectNoError(fmt.Errorf("new replicasets are created during upgrade of deployment %q", deploymentName))
 	}
 
 	ginkgo.By(fmt.Sprintf("Verifying revision of the deployment %q is still 2", deploymentName))
-	gomega.Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).To(gomega.Equal("2"))
+	framework.ExpectEqual(deployment.Annotations[deploymentutil.RevisionAnnotation], "2")
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deploymentName))
 	framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(c, deployment))
