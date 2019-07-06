@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.BeNil())
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
-			gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
+			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 		})
 	})
 })
@@ -164,7 +164,7 @@ func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (
 	node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
-	gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
+	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time
 	readyCondition.LastHeartbeatTime = metav1.Time{}
 	return heartbeatTime, node.Status
