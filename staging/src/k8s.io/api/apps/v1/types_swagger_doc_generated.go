@@ -289,7 +289,7 @@ func (RollingUpdateStatefulSetStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSet = map[string]string{
-	"":       "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+	"":       "StatefulSet represents a set of Pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.\n\nFor a StatefulSet with N replicas, each Pod in the StatefulSet will be assigned an integer ordinal, from 0 up through N-1, that is unique over the Set.\n\nEach Pod is assigned two labels based on its identity:\n - statefulset.kubernetes.io/pod-name: The unique name of the Pod.\n - statefulset.kubernetes.io/pod-ordinal: The ordinal number of the Pod in the StatefulSet.\n\nMore info: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
 	"spec":   "Spec defines the desired identities of pods in this set.",
 	"status": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
 }

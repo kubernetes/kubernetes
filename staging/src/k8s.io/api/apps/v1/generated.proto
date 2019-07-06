@@ -533,12 +533,22 @@ message RollingUpdateStatefulSetStrategy {
   optional int32 partition = 1;
 }
 
-// StatefulSet represents a set of pods with consistent identities.
+// StatefulSet represents a set of Pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
 //  - Storage: As many VolumeClaims as requested.
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+//
+// For a StatefulSet with N replicas, each Pod in the StatefulSet will be
+// assigned an integer ordinal, from 0 up through N-1, that is unique
+// over the Set.
+//
+// Each Pod is assigned two labels based on its identity:
+//  - statefulset.kubernetes.io/pod-name: The unique name of the Pod.
+//  - statefulset.kubernetes.io/pod-ordinal: The ordinal number of the Pod in the StatefulSet.
+//
+// More info: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
 message StatefulSet {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
