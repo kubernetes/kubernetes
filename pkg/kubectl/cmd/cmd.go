@@ -311,9 +311,15 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// only look for suitable extension executables if
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+			err, extraArgsFound := HandlePluginCommand(pluginHandler, cmdPathPieces)
+
+			if err != nil {
 				fmt.Fprintf(errout, "%v\n", err)
 				os.Exit(1)
+			}
+
+			if extraArgsFound {
+				fmt.Fprintf(errout, "warning: extra arguments found in the command\n")
 			}
 		}
 	}
@@ -369,8 +375,9 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 
 // HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
 // a plugin executable on the PATH that satisfies the given arguments.
-func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
+func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) (err error, extraArgsFound bool) {
 	remainingArgs := []string{} // all "non-flag" arguments
+	extraArgsFound = false
 
 	for idx := range cmdArgs {
 		if strings.HasPrefix(cmdArgs[idx], "-") {
@@ -389,22 +396,26 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 			continue
 		}
 
+		if len(remainingArgs) > 0 && len(foundBinaryPath) > 0 {
+			extraArgsFound = true
+		}
+
 		foundBinaryPath = path
 		break
 	}
 
 	if len(foundBinaryPath) == 0 {
-		return nil
+		return nil, extraArgsFound
 	}
 
 	// invoke cmd binary relaying the current environment and args given
 	// remainingArgs will always have at least one element.
 	// execve will make remainingArgs[0] the "binary name".
 	if err := pluginHandler.Execute(foundBinaryPath, append([]string{foundBinaryPath}, cmdArgs[len(remainingArgs):]...), os.Environ()); err != nil {
-		return err
+		return err, extraArgsFound
 	}
 
-	return nil
+	return nil, extraArgsFound
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
