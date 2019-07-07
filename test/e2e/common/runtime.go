@@ -112,7 +112,9 @@ while true; do sleep 1; done
 					gomega.Eventually(terminateContainer.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.Phase))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
-					gomega.Expect(terminateContainer.IsReady()).Should(gomega.Equal(testCase.Ready))
+					isReady, err := terminateContainer.IsReady()
+					framework.ExpectEqual(isReady, testCase.Ready)
+					framework.ExpectNoError(err)
 
 					status, err := terminateContainer.GetStatus()
 					framework.ExpectNoError(err)

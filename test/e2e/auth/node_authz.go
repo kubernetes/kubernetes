@@ -74,17 +74,17 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 	})
 	ginkgo.It("Getting a non-existent secret should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().Secrets(ns).Get("foo", metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting an existing secret should exit with the Forbidden error", func() {
 		_, err := c.CoreV1().Secrets(ns).Get(defaultSaSecret, metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting a non-existent configmap should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().ConfigMaps(ns).Get("foo", metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting an existing configmap should exit with the Forbidden error", func() {
@@ -101,7 +101,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(configmap)
 		framework.ExpectNoError(err, "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
 		_, err = c.CoreV1().ConfigMaps(ns).Get(configmap.Name, metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting a secret for a workload the node has access to should succeed", func() {
@@ -120,7 +120,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 		ginkgo.By("Node should not get the secret")
 		_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 
 		ginkgo.By("Create a pod that use the secret")
 		pod := &v1.Pod{
@@ -175,12 +175,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		}
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
 		_, err := c.CoreV1().Nodes().Create(node)
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("A node shouldn't be able to delete another node", func() {
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
 		err := c.CoreV1().Nodes().Delete("foo", &metav1.DeleteOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 })

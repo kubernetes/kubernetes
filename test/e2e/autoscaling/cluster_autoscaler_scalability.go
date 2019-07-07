@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		coresPerNode = int((&cpu).MilliValue() / 1000)
 		memCapacityMb = int((&mem).Value() / 1024 / 1024)
 
-		gomega.Expect(nodeCount).Should(gomega.Equal(sum))
+		framework.ExpectEqual(nodeCount, sum)
 
 		if framework.ProviderIs("gke") {
 			val, err := isAutoscalerEnabled(3)
@@ -326,7 +326,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		ginkgo.By("Checking if the number of nodes is as expected")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
-		gomega.Expect(len(nodes.Items)).Should(gomega.Equal(totalNodes))
+		framework.ExpectEqual(len(nodes.Items), totalNodes)
 	})
 
 	ginkgo.Specify("CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]", func() {
