@@ -732,13 +732,13 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 		possibleLimitingReason = "the desired replica count is increasing faster than the maximum scale rate"
 	} else {
 		maximumAllowedReplicas = hpaMaxReplicas
-
 		possibleLimitingCondition = "TooManyReplicas"
 		possibleLimitingReason = "the desired replica count is more than the maximum replica count"
 	}
 
 	if desiredReplicas < minimumAllowedReplicas {
 		possibleLimitingCondition = "TooFewReplicas"
+		possibleLimitingReason = "the desired replica count is less than the minimum replica count"
 
 		return minimumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
 	} else if desiredReplicas > maximumAllowedReplicas {
