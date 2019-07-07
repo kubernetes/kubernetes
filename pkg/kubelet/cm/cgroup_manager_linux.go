@@ -51,7 +51,7 @@ const (
 
 // hugePageSizeList is useful for converting to the hugetlb canonical unit
 // which is what is expected when interacting with libcontainer
-var hugePageSizeList = []string{"B", "kB", "MB", "GB", "TB", "PB"}
+var hugePageSizeList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
 
 var RootCgroupName = CgroupName([]string{})
 
