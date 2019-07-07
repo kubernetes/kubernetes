@@ -110,9 +110,9 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			Do().Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		framework.ExpectEqual(len(pagedTable.Rows), 2)
-		gomega.Expect(pagedTable.ResourceVersion).ToNot(gomega.Equal(""))
-		gomega.Expect(pagedTable.SelfLink).ToNot(gomega.Equal(""))
-		gomega.Expect(pagedTable.Continue).ToNot(gomega.Equal(""))
+		framework.ExpectNotEqual(pagedTable.ResourceVersion, "")
+		framework.ExpectNotEqual(pagedTable.SelfLink, "")
+		framework.ExpectNotEqual(pagedTable.Continue, "")
 		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0000")
 		framework.ExpectEqual(pagedTable.Rows[1].Cells[0], "template-0001")
 
@@ -137,8 +137,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		gomega.Expect(len(table.Rows)).To(gomega.BeNumerically(">=", 1))
 		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
 		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
-		gomega.Expect(table.ResourceVersion).ToNot(gomega.Equal(""))
-		gomega.Expect(table.SelfLink).ToNot(gomega.Equal(""))
+		framework.ExpectNotEqual(table.ResourceVersion, "")
+		framework.ExpectNotEqual(table.SelfLink, "")
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))

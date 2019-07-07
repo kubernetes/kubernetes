@@ -1352,6 +1352,11 @@ func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) 
 	gomega.Expect(actual).To(gomega.Equal(extra), explain...)
 }
 
+// ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
+func ExpectNotEqual(actual interface{}, extra interface{}, explain ...interface{}) {
+	gomega.Expect(actual).NotTo(gomega.Equal(extra), explain...)
+}
+
 // ExpectError expects an error happens, otherwise an exception raises
 func ExpectError(err error, explain ...interface{}) {
 	gomega.Expect(err).To(gomega.HaveOccurred(), explain...)
