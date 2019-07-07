@@ -135,6 +135,9 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var maxCount, minCount int64
 
 	processPod := func(existingPod *v1.Pod) error {
+		if pm.firstError != nil {
+			return nil
+		}
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
