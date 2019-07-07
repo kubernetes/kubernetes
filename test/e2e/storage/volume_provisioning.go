@@ -1231,7 +1231,7 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 func getRandomClusterZone(c clientset.Interface) string {
 	zones, err := framework.GetClusterZones(c)
 	framework.ExpectNoError(err)
-	gomega.Expect(len(zones)).ToNot(gomega.Equal(0))
+	framework.ExpectNotEqual(len(zones), 0)
 
 	zonesList := zones.UnsortedList()
 	return zonesList[rand.Intn(zones.Len())]

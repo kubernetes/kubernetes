@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -146,7 +145,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
-		gomega.Expect(labelPod.Spec.NodeName).NotTo(gomega.Equal(nodeName))
+		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	ginkgo.It("Pod should avoid nodes that have avoidPod annotation", func() {
@@ -208,7 +207,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNoError(err)
 		ginkgo.By(fmt.Sprintf("Verify the pods should not scheduled to the node: %s", nodeName))
 		for _, pod := range testPods.Items {
-			gomega.Expect(pod.Spec.NodeName).NotTo(gomega.Equal(nodeName))
+			framework.ExpectNotEqual(pod.Spec.NodeName, nodeName)
 		}
 	})
 

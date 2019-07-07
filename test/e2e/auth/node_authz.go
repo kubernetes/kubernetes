@@ -31,7 +31,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -53,12 +52,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		gomega.Expect(len(nodeList.Items)).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(len(nodeList.Items), 0)
 		nodeName = nodeList.Items[0].Name
 		asUser = nodeNamePrefix + nodeName
 		saName := "default"
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
-		gomega.Expect(len(sa.Secrets)).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(len(sa.Secrets), 0)
 		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
 		defaultSaSecret = sa.Secrets[0].Name
 		ginkgo.By("Creating a kubernetes client that impersonates a node")

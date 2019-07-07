@@ -457,7 +457,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumer(nodeSelector map[strin
 // TestBindingWaitForFirstConsumerMultiPVC tests the binding with WaitForFirstConsumer mode
 func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.PersistentVolumeClaim, nodeSelector map[string]string, expectUnschedulable bool) ([]*v1.PersistentVolume, *v1.Node) {
 	var err error
-	gomega.Expect(len(claims)).ToNot(gomega.Equal(0))
+	framework.ExpectNotEqual(len(claims), 0)
 	namespace := claims[0].Namespace
 
 	ginkgo.By("creating a storage class " + t.Class.Name)

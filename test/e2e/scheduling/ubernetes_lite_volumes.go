@@ -81,7 +81,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 			break
 		}
 	}
-	gomega.Expect(extraZone).NotTo(gomega.Equal(""), fmt.Sprintf("No extra zones available in region %s", region))
+	framework.ExpectNotEqual(extraZone, "", fmt.Sprintf("No extra zones available in region %s", region))
 
 	ginkgo.By(fmt.Sprintf("starting a compute instance in unused zone: %v\n", extraZone))
 	project := framework.TestContext.CloudConfig.ProjectID
