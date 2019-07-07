@@ -18,7 +18,6 @@ package bootstrap
 
 import (
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -78,7 +77,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		signedToken, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenId]
-		gomega.Expect(ok).Should(gomega.Equal(true))
+		framework.ExpectEqual(ok, true)
 
 		ginkgo.By("update the cluster-info ConfigMap")
 		originalData := cfgMap.Data[bootstrapapi.KubeConfigKey]
