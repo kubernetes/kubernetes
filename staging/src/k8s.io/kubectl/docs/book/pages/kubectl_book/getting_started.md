@@ -15,7 +15,7 @@
 This section provides a brief overview of the most basic Kubectl commands, which are
 described in more detail in later chapters.
 
-For more background on the Kubernetes APIs themselves, see the docs at [k8s.io](k8s.io).
+For more background on the Kubernetes APIs themselves, see the docs at [k8s.io](https://k8s.io).
 
 ## Listing Kubernetes Resources
 
