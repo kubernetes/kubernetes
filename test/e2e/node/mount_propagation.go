@@ -94,7 +94,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Fail the test if the namespace is not set. We expect that the
 		// namespace is unique and we might delete user data if it's not.
 		if len(f.Namespace.Name) == 0 {
-			gomega.Expect(f.Namespace.Name).ToNot(gomega.Equal(""))
+			framework.ExpectNotEqual(f.Namespace.Name, "")
 			return
 		}
 

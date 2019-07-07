@@ -52,7 +52,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).NotTo(gomega.Equal(http.StatusOK))
+		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
 		result, err := e2enode.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
@@ -60,7 +60,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).NotTo(gomega.Equal(http.StatusOK))
+		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are closed on the public IP address

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -59,7 +58,7 @@ func networkingIPerfTest(isIPv6 bool) {
 		totalPods := len(nodes.Items)
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.
 		expectedBandwidth := int(float64(maxBandwidthBits) / float64(totalPods))
-		gomega.Expect(totalPods).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(totalPods, 0)
 		appName := "iperf-e2e"
 		_, err := f.CreateServiceForSimpleAppWithPods(
 			8001,

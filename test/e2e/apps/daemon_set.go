@@ -316,7 +316,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		waitForHistoryCreated(c, ns, label, 2)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		framework.ExpectEqual(cur.Revision, int64(2))
-		gomega.Expect(cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]).NotTo(gomega.Equal(firstHash))
+		framework.ExpectNotEqual(cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey], firstHash)
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash)
 	})
 
@@ -425,9 +425,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		if len(schedulableNodes.Items) < 2 {
 			framework.ExpectEqual(len(existingPods), 0)
 		} else {
-			gomega.Expect(len(existingPods)).NotTo(gomega.Equal(0))
+			framework.ExpectNotEqual(len(existingPods), 0)
 		}
-		gomega.Expect(len(newPods)).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(len(newPods), 0)
 
 		e2elog.Logf("Roll back the DaemonSet before rollout is complete")
 		rollbackDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *appsv1.DaemonSet) {

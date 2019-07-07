@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
@@ -80,7 +79,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 
 	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	totalPods := len(nodes.Items)
-	gomega.Expect(totalPods).NotTo(gomega.Equal(0))
+	framework.ExpectNotEqual(totalPods, 0)
 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 
