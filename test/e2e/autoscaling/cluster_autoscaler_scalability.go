@@ -349,7 +349,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, podsConfig.Name)
 
 		// Ensure that no new nodes have been added so far.
-		gomega.Expect(e2enode.TotalReady(f.ClientSet)).To(gomega.Equal(nodeCount))
+		readyNodeCount, _ := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectEqual(readyNodeCount, nodeCount)
 
 		// Start a number of schedulable pods to ensure CA reacts.
 		additionalNodes := maxNodes - nodeCount
