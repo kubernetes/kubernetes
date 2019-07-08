@@ -54,9 +54,9 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			// get all internal ips for node
 			internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
 
-			gomega.Expect(len(internalIPs)).Should(gomega.BeNumerically("==", 2))
+			framework.ExpectEqual(len(internalIPs), 2)
 			// assert 2 ips belong to different families
-			gomega.Expect(isIPv4(internalIPs[0]) != isIPv4(internalIPs[1])).Should(gomega.BeTrue())
+			framework.ExpectEqual(isIPv4(internalIPs[0]) != isIPv4(internalIPs[1]), true)
 		}
 	})
 
@@ -65,11 +65,11 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		nodeList := framework.GetReadySchedulableNodesOrDie(cs)
 
 		for _, node := range nodeList.Items {
-			gomega.Expect(len(node.Spec.PodCIDRs)).Should(gomega.BeNumerically("==", 2))
+			framework.ExpectEqual(len(node.Spec.PodCIDRs), 2)
 			// assert podCIDR is same as podCIDRs[0]
-			gomega.Expect(node.Spec.PodCIDR).Should(gomega.BeEquivalentTo(node.Spec.PodCIDRs[0]))
+			framework.ExpectEqual(node.Spec.PodCIDR, node.Spec.PodCIDRs[0])
 			// assert one is ipv4 and other is ipv6
-			gomega.Expect(isIPv4CIDR(node.Spec.PodCIDRs[0]) != isIPv4CIDR(node.Spec.PodCIDRs[1])).Should(gomega.BeTrue())
+			framework.ExpectEqual(isIPv4CIDR(node.Spec.PodCIDRs[0]) != isIPv4CIDR(node.Spec.PodCIDRs[1]), true)
 		}
 	})
 
@@ -102,11 +102,11 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		gomega.Expect(p.Status.PodIPs).ShouldNot(gomega.BeNil())
 
 		// validate there are 2 ips in podIPs
-		gomega.Expect(len(p.Status.PodIPs)).Should(gomega.BeNumerically("==", 2))
+		framework.ExpectEqual(len(p.Status.PodIPs), 2)
 		// validate first ip in PodIPs is same as PodIP
-		gomega.Expect(p.Status.PodIPs[0].IP).Should(gomega.BeEquivalentTo(p.Status.PodIP))
+		framework.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
 		// assert 2 pod ips belong to different families
-		gomega.Expect(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP)).Should(gomega.BeTrue())
+		framework.ExpectEqual(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP), true)
 
 		ginkgo.By("deleting the pod")
 		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(30))
