@@ -464,8 +464,8 @@ func (nm *NodeManager) GetHostsInZone(ctx context.Context, zoneFailureDomain str
 		return nil, err
 	}
 	klog.V(4).Infof("Node Details: %v", nodeDetails)
-	// Return those hosts that are in the given zone.
-	hosts := make([]*object.HostSystem, 0)
+	// Build a map of Host moRef to HostSystem
+	hostMap := make(map[string]*object.HostSystem)
 	for _, n := range nodeDetails {
 		// Match the provided zone failure domain with the node.
 		klog.V(9).Infof("Matching provided zone %s with node %s zone %s", zoneFailureDomain, n.NodeName, n.Zone.FailureDomain)
@@ -475,8 +475,13 @@ func (nm *NodeManager) GetHostsInZone(ctx context.Context, zoneFailureDomain str
 				klog.Errorf("Failed to get host system for VM %s. err: %+v", n.vm, err)
 				continue
 			}
-			hosts = append(hosts, host)
+			hostMap[host.Reference().Value] = host
 		}
+	}
+	// Build the unique list of hosts.
+	hosts := make([]*object.HostSystem, 0)
+	for _, value := range hostMap {
+		hosts = append(hosts, value)
 	}
 	klog.V(4).Infof("GetHostsInZone %v returning: %v", zoneFailureDomain, hosts)
 	return hosts, nil

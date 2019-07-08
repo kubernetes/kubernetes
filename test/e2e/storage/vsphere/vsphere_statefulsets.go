@@ -74,7 +74,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		ginkgo.By("Creating StorageClass for Statefulset")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters, nil)
+		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters, nil, "")
 		sc, err := client.StorageV1().StorageClasses().Create(scSpec)
 		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(sc.Name, nil)
