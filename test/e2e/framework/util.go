@@ -79,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -1943,24 +1942,13 @@ func isNodeUntainted(node *v1.Node) bool {
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
+// TODO: remove this function here when references point to e2enode.
 func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	nodes = waitListSchedulableNodesOrDie(c)
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	e2enode.Filter(nodes, func(node v1.Node) bool {
 		return isNodeSchedulable(&node) && isNodeUntainted(&node)
-	})
-	return nodes
-}
-
-// GetReadyNodesIncludingTaintedOrDie returns all ready nodes, even those which are tainted.
-// There are cases when we care about tainted nodes
-// E.g. in tests related to nodes with gpu we care about nodes despite
-// presence of nvidia.com/gpu=present:NoSchedule taint
-func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeList) {
-	nodes = waitListSchedulableNodesOrDie(c)
-	e2enode.Filter(nodes, func(node v1.Node) bool {
-		return isNodeSchedulable(&node)
 	})
 	return nodes
 }
@@ -3044,22 +3032,6 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 		}
 	}
 	return len(scheduledPods)
-}
-
-// GetMasterAndWorkerNodesOrDie will return a list masters and schedulable worker nodes
-func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeList) {
-	nodes := &v1.NodeList{}
-	masters := sets.NewString()
-	all, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	ExpectNoError(err)
-	for _, n := range all.Items {
-		if system.IsMasterNode(n.Name) {
-			masters.Insert(n.Name)
-		} else if isNodeSchedulable(&n) && isNodeUntainted(&n) {
-			nodes.Items = append(nodes.Items, n)
-		}
-	}
-	return masters, nodes
 }
 
 // ListNamespaceEvents lists the events in the given namespace.

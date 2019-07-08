@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 )
@@ -41,7 +42,8 @@ var _ = SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
-		nodeIP := framework.PickNodeIP(jig.Client)
+		nodeIP, err := e2enode.PickIP(jig.Client)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		service := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {

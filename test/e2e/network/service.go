@@ -498,7 +498,8 @@ var _ = SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
-		nodeIP := framework.PickNodeIP(jig.Client) // for later
+		nodeIP, err := e2enode.PickIP(jig.Client) // for later
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		service := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
@@ -554,7 +555,8 @@ var _ = SIGDescribe("Services", func() {
 		e2elog.Logf("namespace for UDP test: %s", ns2)
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
-		nodeIP := framework.PickNodeIP(jig.Client) // for later
+		nodeIP, err := e2enode.PickIP(jig.Client) // for later
+		framework.ExpectNoError(err)
 
 		// Test TCP and UDP Services.  Services with the same name in different
 		// namespaces should get different node ports and load balancers.
@@ -2416,7 +2418,7 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
-		podNodePairs, err := framework.PodNodePairs(cs, ns)
+		podNodePairs, err := e2enode.PodNodePairs(cs, ns)
 		e2elog.Logf("[pod,node] pairs: %+v; err: %v", podNodePairs, err)
 		framework.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.DefaultLoadBalancerName(svc)

@@ -27,7 +27,7 @@ import (
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -77,11 +77,13 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
+		var err error
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		_, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
+		_, nodeList, err = e2enode.GetMasterAndWorkerNodesOrDie(cs)
+		framework.ExpectNoError(err)
 
-		err := framework.CheckTestingNSDeletedExcept(cs, ns)
+		err = framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
 		err = e2epod.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
 		framework.ExpectNoError(err)

@@ -47,10 +47,11 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		nodeDeleteCandidates := framework.GetReadySchedulableNodesOrDie(c)
 		nodeToDelete := nodeDeleteCandidates.Items[0]
 
-		origNodes := framework.GetReadyNodesIncludingTaintedOrDie(c)
+		origNodes, err := e2enode.GetReadyNodesIncludingTaintedOrDie(c)
+		framework.ExpectNoError(err)
 		e2elog.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
-		err := framework.DeleteNodeOnCloudProvider(&nodeToDelete)
+		err = framework.DeleteNodeOnCloudProvider(&nodeToDelete)
 		if err != nil {
 			e2elog.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
