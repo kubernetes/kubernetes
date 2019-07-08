@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -55,6 +56,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	tests := []struct {
 		name          string
 		config        *admissionregistration.ValidatingWebhookConfiguration
+		gv            schema.GroupVersion
 		expectedError string
 	}{
 		{
@@ -144,6 +146,40 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				},
 			}, true),
 			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
+		},
+		{
+			name: "Webhooks must have unique names when not created via v1beta1",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
+			expectedError: `webhooks[1].name: Duplicate value: "webhook.k8s.io"`,
+		},
+		{
+			name: "Webhooks can have duplicate names when created via v1beta1",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+			expectedError: ``,
 		},
 		{
 			name: "Operations must not be empty or nil",
@@ -739,7 +775,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errs := ValidateValidatingWebhookConfiguration(test.config)
+			errs := ValidateValidatingWebhookConfiguration(test.config, test.gv)
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
@@ -765,6 +801,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 		name          string
 		oldconfig     *admissionregistration.ValidatingWebhookConfiguration
 		config        *admissionregistration.ValidatingWebhookConfiguration
+		gv            schema.GroupVersion
 		expectedError string
 	}{
 		{
@@ -845,10 +882,87 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			}, false),
 			expectedError: `Invalid value: []string{"invalid-v1"}`,
 		},
+		{
+			name: "Webhooks must have unique names when not updated via v1beta1",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, true),
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, false),
+			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
+			expectedError: `webhooks[1].name: Duplicate value: "webhook.k8s.io"`,
+		},
+		{
+			name: "Webhooks can have duplicate names when old config has duplicate names",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, true),
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
+			expectedError: ``,
+		},
+		{
+			name: "Webhooks can have duplicate names when updated via v1beta1",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, true),
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, false),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+			expectedError: ``,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errs := ValidateValidatingWebhookConfigurationUpdate(test.config, test.oldconfig)
+			errs := ValidateValidatingWebhookConfigurationUpdate(test.config, test.oldconfig, test.gv)
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
