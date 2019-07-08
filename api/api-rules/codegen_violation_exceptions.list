@@ -9,3 +9,5 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,RawExtension,Raw
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentEncoding
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentType
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
+API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example/v1,TestTypeStatus,Blah
+API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example2/v1,TestTypeStatus,Blah
