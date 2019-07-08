@@ -75,7 +75,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		})
 	})
 
-	ginkgo.It("should return chunks of results for list calls", func() {
+	/*
+		Release : v1.15
+		Testname: Return chunks of results for large numbers of objects
+		Description: List a large number of objects and verify the first three chunks
+	*/
+	framework.ConformanceIt("should return chunks of results for list calls", func() {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
