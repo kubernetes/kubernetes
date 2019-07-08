@@ -91,23 +91,24 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+	recommendedConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig := apiserver.NewConfig(*recommendedConfig,
+		apiserver.ExtraConfig{
+			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, recommendedConfig.LoopbackClientConfig),
+		},
+	)
+
+	if err := o.RecommendedOptions.ApplyTo(serverConfig.GenericConfig); err != nil {
 		return nil, err
 	}
-	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
+	if err := o.APIEnablement.ApplyTo(&serverConfig.GenericConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
 		return nil, err
 	}
 
-	config := &apiserver.Config{
-		GenericConfig: serverConfig,
-		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
-			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, serverConfig.LoopbackClientConfig),
-		},
-	}
-	return config, nil
+	serverConfig.ExtraConfig.ServiceResolver = &serviceResolver{serverConfig.GenericConfig.SharedInformerFactory.Core().V1().Services().Lister()}
+
+	return serverConfig, nil
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.

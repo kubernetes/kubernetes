@@ -113,7 +113,13 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
-	kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
+	genericConfig, versionedInformers, _, _, _, admissionPostStartHook, storageFactory, securityDefinitions, err := app.CreateGenericConfig(completedOptions, proxyTransport)
+	recommendedConfig := genericapiserver.RecommendedConfig{
+		Config:                *genericConfig,
+		SharedInformerFactory: versionedInformers,
+		ClientConfig:          genericConfig.LoopbackClientConfig,
+	}
+	kubeAPIServerConfig, err := app.CreateKubeAPIServerConfig(completedOptions, recommendedConfig, storageFactory, tunneler, proxyTransport, securityDefinitions)
 	if err != nil {
 		t.Fatal(err)
 	}
