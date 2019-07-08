@@ -267,11 +267,11 @@ func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager stri
 		if vs == nil {
 			panic(fmt.Sprintf("Found unexpected nil manager which should never happen: %s", manager))
 		}
-		newSet := vs.Set.Difference(stripSet)
+		newSet := vs.Set().Difference(stripSet)
 		if newSet.Empty() {
 			delete(managed, manager)
 		} else {
-			managed[manager] = &fieldpath.VersionedSet{Set: newSet, APIVersion: vs.APIVersion, Applied: vs.Applied}
+			managed[manager] = fieldpath.NewVersionedSet(newSet, vs.APIVersion(), vs.Applied())
 		}
 	}
 
