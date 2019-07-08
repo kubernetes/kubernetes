@@ -27,6 +27,21 @@ import (
 // containing object.
 type Path []PathElement
 
+func (fp Path) Compare(other Path) int {
+	for i, pe := range fp {
+		if i == len(other) {
+			return 1
+		}
+		if comp := pe.Compare(other[i]); comp != 0 {
+			return comp
+		}
+	}
+	if len(fp) == len(other) {
+		return 0
+	}
+	return -1
+}
+
 func (fp Path) String() string {
 	strs := make([]string, len(fp))
 	for i := range fp {

@@ -45,4 +45,5 @@ replace (
 	k8s.io/csi-translation-lib => ../csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
+	sigs.k8s.io/structured-merge-diff => github.com/apelisse/structured-merge-diff v0.0.0-20190628201129-e230a57d7a
 )

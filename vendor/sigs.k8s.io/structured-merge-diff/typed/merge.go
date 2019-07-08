@@ -17,7 +17,8 @@ limitations under the License.
 package typed
 
 import (
-	"reflect"
+	//"reflect"
+	"sort"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/schema"
@@ -73,19 +74,23 @@ func (w *mergingWalker) merge() (errs ValidationErrors) {
 		return w.errorf("schema error: no type found matching: %v", *w.typeRef.NamedType)
 	}
 
-	alhs := deduceAtom(a, w.lhs)
-	arhs := deduceAtom(a, w.rhs)
-	if reflect.DeepEqual(alhs, arhs) {
-		errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
-	} else {
-		w2 := *w
-		errs = append(errs, handleAtom(alhs, w.typeRef, &w2)...)
-		errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
-	}
-
+	// TODO: The postItemHook doesn't really need to be "post"
+	// rather than "pre". But since we need to it be done before to
+	// insert in the set in the right order.
 	if !w.inLeaf && w.postItemHook != nil {
 		w.postItemHook(w)
 	}
+
+	//alhs := deduceAtom(a, w.lhs)
+	arhs := deduceAtom(a, w.rhs)
+	// if reflect.DeepEqual(alhs, arhs) {
+	errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
+	// } else {
+	// 	w2 := *w
+	// 	errs = append(errs, handleAtom(alhs, w.typeRef, &w2)...)
+	// 	errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
+	// }
+
 	return errs
 }
 
@@ -146,32 +151,10 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 	// TODO: ordering is totally wrong.
 	// TODO: might as well make the map order work the same way.
 
-	// This is a cheap hack to at least make the output order stable.
-	rhsOrder := []fieldpath.PathElement{}
-
-	// First, collect all RHS children.
-	observedRHS := map[string]value.Value{}
-	if rhs != nil {
-		for i, child := range rhs.Items {
-			pe, err := listItemToPathElement(t, i, child)
-			if err != nil {
-				errs = append(errs, w.errorf("rhs: element %v: %v", i, err.Error())...)
-				// If we can't construct the path element, we can't
-				// even report errors deeper in the schema, so bail on
-				// this element.
-				continue
-			}
-			keyStr := pe.String()
-			if _, found := observedRHS[keyStr]; found {
-				errs = append(errs, w.errorf("rhs: duplicate entries for key %v", keyStr)...)
-			}
-			observedRHS[keyStr] = child
-			rhsOrder = append(rhsOrder, pe)
-		}
-	}
-
-	// Then merge with LHS children.
-	observedLHS := map[string]struct{}{}
+	// Collect and index all items
+	rhsItems := map[string]value.Value{}
+	lhsItems := map[string]value.Value{}
+	order := []fieldpath.PathElement{}
 	if lhs != nil {
 		for i, child := range lhs.Items {
 			pe, err := listItemToPathElement(t, i, child)
@@ -183,36 +166,68 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 				continue
 			}
 			keyStr := pe.String()
-			if _, found := observedLHS[keyStr]; found {
+			if _, found := lhsItems[keyStr]; found {
 				errs = append(errs, w.errorf("lhs: duplicate entries for key %v", keyStr)...)
 				continue
 			}
-			observedLHS[keyStr] = struct{}{}
-			w2 := w.prepareDescent(pe, t.ElementType)
-			w2.lhs = &child
-			if rchild, ok := observedRHS[keyStr]; ok {
-				w2.rhs = &rchild
+			lhsItems[keyStr] = child
+			order = append(order, pe)
+		}
+	}
+	if rhs != nil {
+		for i, child := range rhs.Items {
+			pe, err := listItemToPathElement(t, i, child)
+			if err != nil {
+				errs = append(errs, w.errorf("rhs: element %v: %v", i, err.Error())...)
+				// If we can't construct the path element, we can't
+				// even report errors deeper in the schema, so bail on
+				// this element.
+				continue
 			}
-			if newErrs := w2.merge(); len(newErrs) > 0 {
-				errs = append(errs, newErrs...)
-			} else if w2.out != nil {
-				out.Items = append(out.Items, *w2.out)
+			keyStr := pe.String()
+			if _, found := rhsItems[keyStr]; found {
+				errs = append(errs, w.errorf("rhs: duplicate entries for key %v", keyStr)...)
+				continue
 			}
-			// Keep track of children that have been handled
-			delete(observedRHS, keyStr)
+			rhsItems[keyStr] = child
+			// If the key was already in lhsItems, don't add it again.
+			if _, ok := lhsItems[keyStr]; !ok {
+				order = append(order, pe)
+			}
 		}
 	}
 
-	for _, rhsToCheck := range rhsOrder {
-		if unmergedChild, ok := observedRHS[rhsToCheck.String()]; ok {
-			w2 := w.prepareDescent(rhsToCheck, t.ElementType)
-			w2.rhs = &unmergedChild
-			if newErrs := w2.merge(); len(newErrs) > 0 {
-				errs = append(errs, newErrs...)
-			} else if w2.out != nil {
-				out.Items = append(out.Items, *w2.out)
-			}
+	sorted := []fieldpath.PathElement{}
+	for _, pe := range order {
+		sorted = append(sorted, pe)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Compare(sorted[j]) < 0
+	})
+
+	outItems := map[string]value.Value{}
+
+	// Now we want to merge the items, in sorted-order.
+	for _, pe := range sorted {
+		keyStr := pe.String()
+
+		w2 := w.prepareDescent(pe, t.ElementType)
+		if lchild, ok := lhsItems[keyStr]; ok {
+			w2.lhs = &lchild
 		}
+		if rchild, ok := rhsItems[keyStr]; ok {
+			w2.rhs = &rchild
+		}
+		if newErrs := w2.merge(); len(newErrs) > 0 {
+			errs = append(errs, newErrs...)
+		} else if w2.out != nil {
+			outItems[keyStr] = *w2.out
+		}
+	}
+
+	// Insert items in chosen order
+	for _, pe := range order {
+		out.Items = append(out.Items, outItems[pe.String()])
 	}
 
 	if len(out.Items) > 0 {
@@ -271,48 +286,44 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 		fieldTypes[f.Name] = f.Type
 	}
 
+	items := map[string]struct{}{}
 	if lhs != nil {
-		for _, litem := range lhs.Items {
-			name := litem.Name
-			fieldType := t.ElementType
-			if ft, ok := fieldTypes[name]; ok {
-				fieldType = ft
-			}
-			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, fieldType)
-			w2.lhs = &litem.Value
-			if rhs != nil {
-				if ritem, ok := rhs.Get(litem.Name); ok {
-					w2.rhs = &ritem.Value
-				}
-			}
-			if newErrs := w2.merge(); len(newErrs) > 0 {
-				errs = append(errs, newErrs...)
-			} else if w2.out != nil {
-				out.Set(name, *w2.out)
-			}
+		for _, item := range lhs.Items {
+			items[item.Name] = struct{}{}
 		}
 	}
-
 	if rhs != nil {
-		for _, ritem := range rhs.Items {
-			if lhs != nil {
-				if _, ok := lhs.Get(ritem.Name); ok {
-					continue
-				}
-			}
+		for _, item := range rhs.Items {
+			items[item.Name] = struct{}{}
+		}
+	}
+	keys := []string{}
+	for key := range items {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
 
-			name := ritem.Name
-			fieldType := t.ElementType
-			if ft, ok := fieldTypes[name]; ok {
-				fieldType = ft
+	for _, key := range keys {
+		name := key
+		fieldType := t.ElementType
+		if ft, ok := fieldTypes[name]; ok {
+			fieldType = ft
+		}
+		w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, fieldType)
+		if lhs != nil {
+			if litem, ok := lhs.Get(key); ok {
+				w2.lhs = &litem.Value
 			}
-			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, fieldType)
-			w2.rhs = &ritem.Value
-			if newErrs := w2.merge(); len(newErrs) > 0 {
-				errs = append(errs, newErrs...)
-			} else if w2.out != nil {
-				out.Set(name, *w2.out)
+		}
+		if rhs != nil {
+			if ritem, ok := rhs.Get(key); ok {
+				w2.rhs = &ritem.Value
 			}
+		}
+		if newErrs := w2.merge(); len(newErrs) > 0 {
+			errs = append(errs, newErrs...)
+		} else if w2.out != nil {
+			out.Set(name, *w2.out)
 		}
 	}
 

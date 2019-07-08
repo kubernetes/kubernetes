@@ -23,4 +23,5 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/sample-controller => ../sample-controller
+	sigs.k8s.io/structured-merge-diff => github.com/apelisse/structured-merge-diff v0.0.0-20190628201129-e230a57d7a
 )

@@ -100,7 +100,7 @@ func (v validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
 
 func (v validatingObjectWalker) visitListItems(t schema.List, list *value.List) (errs ValidationErrors) {
 	observedKeys := map[string]struct{}{}
-	for i, child := range list.Items {
+	for i, child := range list.SortedItems() {
 		pe, err := listItemToPathElement(t, i, child)
 		if err != nil {
 			errs = append(errs, v.errorf("element %v: %v", i, err.Error())...)
@@ -118,9 +118,8 @@ func (v validatingObjectWalker) visitListItems(t schema.List, list *value.List) 
 		v2.errorFormatter.descend(pe)
 		v2.value = child
 		v2.typeRef = t.ElementType
-		errs = append(errs, v2.validate()...)
-
 		v2.doNode()
+		errs = append(errs, v2.validate()...)
 	}
 	return errs
 }
@@ -153,7 +152,7 @@ func (v validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs 
 		fieldTypes[f.Name] = f.Type
 	}
 
-	for _, item := range m.Items {
+	for _, item := range m.SortedItems() {
 		v2 := v
 		name := item.Name
 		v2.errorFormatter.descend(fieldpath.PathElement{FieldName: &name})
@@ -163,9 +162,9 @@ func (v validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs 
 		if v2.typeRef, ok = fieldTypes[name]; ok {
 			errs = append(errs, v2.validate()...)
 		} else {
+			v2.doNode()
 			v2.typeRef = t.ElementType
 			errs = append(errs, v2.validate()...)
-			v2.doNode()
 		}
 	}
 	return errs

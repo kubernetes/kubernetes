@@ -17,8 +17,302 @@ limitations under the License.
 package fieldpath
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 )
+
+type LeveledElement struct {
+	Level   int
+	Element PathElement
+}
+
+// This implements the SetIterator
+type SetAsListIterator struct {
+	list    []LeveledElement
+	current int
+
+	nextPath Path
+}
+
+// Create a new set from a list of path element and their level.
+func NewSetAsListIterator(list []LeveledElement) *SetAsListIterator {
+	s := &SetAsListIterator{
+		list:     list,
+		current:  0,
+		nextPath: Path{},
+	}
+	s.nextPath, _ = s.getNext()
+	return s
+}
+
+// Peek takes a look at the next item in the list.
+// Returns nil if there are no other items.
+func (s *SetAsListIterator) Peek() Path {
+	return s.nextPath
+}
+
+func (s *SetAsListIterator) Empty() bool {
+	return s.Peek() == nil
+}
+
+// Next returns the next items in the list, and points to the next item.
+func (s *SetAsListIterator) Next() Path {
+	ret := s.nextPath
+	s.nextPath, _ = s.getNext()
+	return ret
+}
+
+// Clone the set in a new set.
+func (s SetAsListIterator) Clone() *SetAsListIterator {
+	return &s
+}
+
+// Validate that the set is
+func (s SetAsListIterator) Validate() error {
+	for {
+		p, err := s.getNext()
+		if err != nil {
+			return err
+		}
+		if p == nil {
+			return nil
+		}
+	}
+}
+
+// [1 a, 2 b, -1, 3 c, 2 d, 2 e, -1, 3 f]
+
+// ab
+// abc
+// ad
+// ae
+// aef
+
+// getNext returns a pointer to the next element. Returns nil if there
+// are no other element.
+func (s *SetAsListIterator) getNext() (Path, error) {
+	if s.current == len(s.list) {
+		return nil, nil
+	}
+	path := s.nextPath.Copy()
+
+	// We're diverging to a different path, first step back.
+	nextLevel := s.list[s.current].Level
+	if nextLevel < len(path) {
+		path = path[:nextLevel]
+	}
+
+	// Keep following the path until either we have to diverge or stop.
+	for len(path) <= nextLevel {
+		if nextLevel > len(path)+1 {
+			return nil, fmt.Errorf("Invalid jump from %d to %d", len(path), nextLevel)
+		}
+		path = append(path, s.list[s.current].Element)
+		s.current++
+		// We need to find the end and just return
+		if s.current == len(s.list) {
+			return path, nil
+		}
+		nextLevel = s.list[s.current].Level
+	}
+
+	// If we had a stop, pass the stop sign.
+	if s.current != len(s.list) && s.list[s.current].Level == -1 {
+		s.current++
+	}
+	return path, nil
+}
+
+type SetAsList struct {
+	list []LeveledElement
+	last Path
+}
+
+func NewSetAsList(paths ...Path) *SetAsList {
+	s := &SetAsList{
+		list: []LeveledElement{},
+		last: nil,
+	}
+
+	sort.Slice(paths, func(i, j int) bool {
+		return paths[i].Compare(paths[j]) < 0
+	})
+	for _, path := range paths {
+		s.Insert(path)
+	}
+
+	return s
+}
+
+func (s *SetAsList) Empty() bool {
+	return len(s.list) == 0
+}
+
+func (s *SetAsList) String() string {
+	elements := []string{}
+	for _, element := range s.list {
+		elements = append(elements, fmt.Sprintf("%d:%s", element.Level, element.Element))
+	}
+
+	it := s.Iterator()
+	path := it.Next()
+	for path != nil {
+		elements = append(elements, path.String())
+		path = it.Next()
+	}
+	return strings.Join(elements, "\n")
+}
+
+func (s *SetAsList) Equals(other *SetAsList) bool {
+	if len(s.list) != len(other.list) {
+		return false
+	}
+
+	for i, le := range s.list {
+		other := other.list[i]
+		if le.Level != other.Level {
+			return false
+		}
+		if le.Level == -1 {
+			continue
+		}
+		if comp := le.Element.Compare(other.Element); comp != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// Insert path into the set. Path MUST BE inserted in sorted order.
+func (s *SetAsList) Insert(p Path) {
+	level := 0
+	for _, pe := range s.last {
+		if level == len(p) {
+			panic(fmt.Errorf("Path inserted out-of-order: %v then %v", s.last, p))
+		}
+		if comp := pe.Compare(p[level]); comp != 0 {
+			if comp > 0 {
+				panic(fmt.Errorf("Path inserted out-of-order: %v then %v", s.last, p))
+			}
+			// PathElement are different, push the rest of the Path
+			break
+		}
+		level++
+	}
+	// If we are a super-set of the last path, we need to mark the end of the previous path.
+	if level == len(s.last) && len(s.last) != 0 {
+		if len(p) == len(s.last) {
+			// Don't insert -1 for duplicates.
+			return
+		}
+		// -1 indicates that there is an item that ends here,
+		// even though the next item is following on that
+		// exactly, e.g. foo.bar followed by foo.bar.fuz
+		s.list = append(s.list, LeveledElement{
+			Level: -1,
+		})
+	}
+
+	for i, pe := range p[level:] {
+		s.list = append(s.list, LeveledElement{
+			Element: pe,
+			Level:   level + i,
+		})
+	}
+	s.last = p
+}
+
+func (s *SetAsList) Iterator() SetIterator {
+	return NewSetAsListIterator(s.list)
+}
+
+type SetIterator interface {
+	// Returns the next path until there are none (then it returns nil)
+	Next() Path
+	// Returns empty if there are no more items in the list, by peeking.
+	Empty() bool
+}
+
+func Union(a, b SetIterator) *SetAsList {
+	set := NewSetAsList()
+
+	apath, bpath := a.Next(), b.Next()
+
+	for apath != nil && bpath != nil {
+		comp := apath.Compare(bpath)
+		if comp == 0 {
+			set.Insert(apath)
+			apath = a.Next()
+			bpath = b.Next()
+		} else if comp < 0 {
+			set.Insert(apath)
+			apath = a.Next()
+		} else {
+			set.Insert(bpath)
+			bpath = b.Next()
+		}
+	}
+
+	// Insert all of a or b now.
+	for apath != nil {
+		set.Insert(apath)
+		apath = a.Next()
+	}
+	for bpath != nil {
+		set.Insert(bpath)
+		bpath = b.Next()
+	}
+
+	return set
+}
+
+func Intersection(a, b SetIterator) *SetAsList {
+	set := NewSetAsList()
+
+	apath, bpath := a.Next(), b.Next()
+
+	for apath != nil && bpath != nil {
+		comp := apath.Compare(bpath)
+		if comp == 0 {
+			set.Insert(apath)
+			apath = a.Next()
+			bpath = b.Next()
+		} else if comp < 0 {
+			apath = a.Next()
+		} else {
+			bpath = b.Next()
+		}
+	}
+
+	return set
+}
+
+func Difference(a, b SetIterator) *SetAsList {
+	set := NewSetAsList()
+
+	apath, bpath := a.Next(), b.Next()
+	for apath != nil && bpath != nil {
+		comp := apath.Compare(bpath)
+		if comp == 0 {
+			apath = a.Next()
+			bpath = b.Next()
+		} else if comp < 0 {
+			set.Insert(apath)
+			apath = a.Next()
+		} else {
+			bpath = b.Next()
+		}
+	}
+
+	// Push everything left in A into the set
+	for apath != nil {
+		set.Insert(apath)
+		apath = a.Next()
+	}
+
+	return set
+}
 
 // Set identifies a set of fields.
 type Set struct {
@@ -93,38 +387,11 @@ func (s *Set) Difference(s2 *Set) *Set {
 	}
 }
 
-// Size returns the number of members of the set.
-func (s *Set) Size() int {
-	return s.Members.Size() + s.Children.Size()
-}
-
 // Empty returns true if there are no members of the set. It is a separate
 // function from Size since it's common to check whether size > 0, and
 // potentially much faster to return as soon as a single element is found.
 func (s *Set) Empty() bool {
-	if s.Members.Size() > 0 {
-		return false
-	}
-	return s.Children.Empty()
-}
-
-// Has returns true if the field referenced by `p` is a member of the set.
-func (s *Set) Has(p Path) bool {
-	if len(p) == 0 {
-		// No one owns "the entire object"
-		return false
-	}
-	for {
-		if len(p) == 1 {
-			return s.Members.Has(p[0])
-		}
-		var ok bool
-		s, ok = s.Children.Get(p[0])
-		if !ok {
-			return false
-		}
-		p = p[1:]
-	}
+	return s.Members.Empty() && s.Children.Empty()
 }
 
 // Equals returns true if s and s2 have exactly the same members.
@@ -146,6 +413,51 @@ func (s *Set) String() string {
 // it.
 func (s *Set) Iterate(f func(Path)) {
 	s.iteratePrefix(Path{}, f)
+}
+
+type setIterator struct {
+	c    chan Path
+	next Path
+}
+
+func (s *setIterator) Peek() Path {
+	return s.next
+}
+
+func (s *setIterator) Next() Path {
+	current := s.next
+	next, ok := <-s.c
+	if !ok {
+		s.next = nil
+		return current
+	}
+	if comp := current.Compare(next); comp > 0 {
+		panic(fmt.Errorf("Unsorted path: %v should be before %v", next, current))
+	}
+	s.next = next
+	return current
+}
+
+func (s *setIterator) Empty() bool {
+	return s.next == nil
+}
+
+// If you don't want the goroutine to leak, you should consume the iterator entirely.
+// TODO: This is not returning the things in the right order.
+func (s *Set) Iterator() SetIterator {
+	i := setIterator{
+		c: make(chan Path),
+	}
+	go func() {
+		s.Iterate(func(p Path) {
+			i.c <- p.Copy()
+		})
+		close(i.c)
+	}()
+
+	// First call doesn't return anything.
+	i.Next()
+	return &i
 }
 
 func (s *Set) iteratePrefix(prefix Path, f func(Path)) {
@@ -190,15 +502,6 @@ func (s *SetNodeMap) Descend(pe PathElement) *Set {
 		set:         ss,
 	}
 	return ss
-}
-
-// Size returns the sum of the number of members of all subsets.
-func (s *SetNodeMap) Size() int {
-	count := 0
-	for _, v := range s.members {
-		count += v.set.Size()
-	}
-	return count
 }
 
 // Empty returns false if there's at least one member in some child set.
@@ -298,8 +601,15 @@ func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap {
 
 // Iterate calls f for each PathElement in the set.
 func (s *SetNodeMap) Iterate(f func(PathElement)) {
+	pes := []PathElement{}
 	for _, n := range s.members {
-		f(n.pathElement)
+		pes = append(pes, n.pathElement)
+	}
+	sort.Slice(pes, func(i, j int) bool {
+		return pes[i].Compare(pes[j]) < 0
+	})
+	for _, pe := range pes {
+		f(pe)
 	}
 }
 

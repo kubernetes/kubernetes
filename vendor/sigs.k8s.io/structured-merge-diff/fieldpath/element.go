@@ -47,6 +47,50 @@ type PathElement struct {
 	Index *int
 }
 
+func (e PathElement) Compare(other PathElement) int {
+	if e.FieldName != nil {
+		if other.FieldName == nil {
+			return -1
+		}
+		return strings.Compare(*e.FieldName, *other.FieldName)
+	}
+	if other.FieldName != nil {
+		return 1
+	}
+
+	if e.Key != nil {
+		if other.Key == nil {
+			return -1
+		}
+		return value.Fields(e.Key).Compare(other.Key)
+	}
+	if other.Key != nil {
+		return 1
+	}
+
+	if e.Value != nil {
+		if other.Value == nil {
+			return -1
+		}
+		return e.Value.Compare(*other.Value)
+	}
+	if other.Value != nil {
+		return 1
+	}
+
+	if e.Index == nil || other.Index == nil {
+		// Should not happen, all other use-cases should have
+		// been processed.
+		panic("should not happen")
+	}
+	if *e.Index == *other.Index {
+		return 0
+	} else if *e.Index < *other.Index {
+		return -1
+	}
+	return 1
+}
+
 // String presents the path element as a human-readable string.
 func (e PathElement) String() string {
 	switch {
@@ -152,7 +196,7 @@ func (s *PathElementSet) Difference(s2 *PathElementSet) *PathElementSet {
 }
 
 // Size retuns the number of elements in the set.
-func (s *PathElementSet) Size() int { return len(s.members) }
+func (s *PathElementSet) Empty() bool { return len(s.members) == 0 }
 
 // Has returns true if pe is a member of the set.
 func (s *PathElementSet) Has(pe PathElement) bool {

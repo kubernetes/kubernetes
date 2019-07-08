@@ -7,7 +7,6 @@ go_library(
         "helpers.go",
         "merge.go",
         "parser.go",
-        "remove.go",
         "typed.go",
         "union.go",
         "validate.go",

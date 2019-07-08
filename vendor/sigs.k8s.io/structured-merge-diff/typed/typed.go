@@ -75,8 +75,8 @@ func (tv TypedValue) Validate() error {
 
 // ToFieldSet creates a set containing every leaf field and item mentioned, or
 // validation errors, if any were encountered.
-func (tv TypedValue) ToFieldSet() (*fieldpath.Set, error) {
-	s := fieldpath.NewSet()
+func (tv TypedValue) ToFieldSet() (*fieldpath.SetAsList, error) {
+	s := fieldpath.NewSetAsList()
 	w := tv.walker()
 	w.leafFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
 	w.nodeFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
@@ -109,9 +109,9 @@ func (tv TypedValue) Merge(pso *TypedValue) (*TypedValue, error) {
 // the objects don't conform to the schema.
 func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 	c = &Comparison{
-		Removed:  fieldpath.NewSet(),
-		Modified: fieldpath.NewSet(),
-		Added:    fieldpath.NewSet(),
+		Removed:  fieldpath.NewSetAsList(),
+		Modified: fieldpath.NewSetAsList(),
+		Added:    fieldpath.NewSetAsList(),
 	}
 	c.Merged, err = merge(&tv, rhs, func(w *mergingWalker) {
 		if w.lhs == nil {
@@ -137,13 +137,6 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 	}
 
 	return c, nil
-}
-
-// RemoveItems removes each provided list or map item from the value.
-func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value, _ = value.FromUnstructured(tv.value.ToUnstructured(true))
-	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef)
-	return &tv
 }
 
 // NormalizeUnions takes the new object and normalizes the union:
@@ -250,11 +243,11 @@ type Comparison struct {
 
 	// Removed contains any fields removed by rhs (the right-hand-side
 	// object in the comparison).
-	Removed *fieldpath.Set
+	Removed *fieldpath.SetAsList
 	// Modified contains fields present in both objects but different.
-	Modified *fieldpath.Set
+	Modified *fieldpath.SetAsList
 	// Added contains any fields added by rhs.
-	Added *fieldpath.Set
+	Added *fieldpath.SetAsList
 }
 
 // IsSame returns true if the comparison returned no changes (the two

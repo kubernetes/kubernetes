@@ -13,23 +13,28 @@ limitations under the License.
 
 package fieldpath
 
+import (
+	"bytes"
+	"fmt"
+)
+
 // APIVersion describes the version of an object or of a fieldset.
 type APIVersion string
 
 type VersionedSet interface {
-	Set() *Set
+	Set() SetIterator
 	APIVersion() APIVersion
 	Applied() bool
 }
 
 // VersionedSet associates a version to a set.
 type versionedSet struct {
-	set        *Set
+	set        *SetAsList
 	apiVersion APIVersion
 	applied    bool
 }
 
-func NewVersionedSet(set *Set, apiVersion APIVersion, applied bool) VersionedSet {
+func NewVersionedSet(set *SetAsList, apiVersion APIVersion, applied bool) VersionedSet {
 	return versionedSet{
 		set:        set,
 		apiVersion: apiVersion,
@@ -37,8 +42,8 @@ func NewVersionedSet(set *Set, apiVersion APIVersion, applied bool) VersionedSet
 	}
 }
 
-func (v versionedSet) Set() *Set {
-	return v.set
+func (v versionedSet) Set() SetIterator {
+	return v.set.Iterator()
 }
 
 func (v versionedSet) APIVersion() APIVersion {
@@ -52,6 +57,23 @@ func (v versionedSet) Applied() bool {
 // ManagedFields is a map from manager to VersionedSet (what they own in
 // what version).
 type ManagedFields map[string]VersionedSet
+
+func (m ManagedFields) String() string {
+	buf := bytes.Buffer{}
+	for manager, vs := range m {
+		buf.WriteString(fmt.Sprintf("%v:\n", manager))
+		buf.WriteString(fmt.Sprintf("- Applied: %v\n", vs.Applied()))
+		buf.WriteString(fmt.Sprintf("- APIVersion: %v\n", vs.APIVersion()))
+		buf.WriteString("- Set:\n")
+		it := vs.Set()
+		path := it.Next()
+		for path != nil {
+			buf.WriteString(fmt.Sprintf("  - %v\n", path))
+			path = it.Next()
+		}
+	}
+	return buf.String()
+}
 
 // Difference returns a symmetric difference between two Managers. If a
 // given user's entry has version X in lhs and version Y in rhs, then
@@ -77,7 +99,7 @@ func (lhs ManagedFields) Difference(rhs ManagedFields) ManagedFields {
 			continue
 		}
 
-		newSet := left.Set().Difference(right.Set()).Union(right.Set().Difference(left.Set()))
+		newSet := Union(Difference(left.Set(), right.Set()).Iterator(), Difference(right.Set(), left.Set()).Iterator())
 		if !newSet.Empty() {
 			diff[manager] = NewVersionedSet(newSet, right.APIVersion(), false)
 		}
