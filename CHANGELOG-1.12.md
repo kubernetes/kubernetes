@@ -355,7 +355,6 @@ filename | sha512 hash
 * Connections from Pods to Services with 0 endpoints will now ICMP reject immediately, rather than blackhole and timeout. ([#72534](https://github.com/kubernetes/kubernetes/pull/72534), [@thockin](https://github.com/thockin))
 * Services of type=LoadBalancer which have no endpoints will now immediately ICMP reject connections, rather than time out. ([#74394](https://github.com/kubernetes/kubernetes/pull/74394), [@thockin](https://github.com/thockin))
 * Ensure the backend pools are set correctly for Azure SLB with multiple backend pools (e.g. outbound rules) ([#76691](https://github.com/kubernetes/kubernetes/pull/76691), [@feiskyer](https://github.com/feiskyer))
-* Connections from Pods to Services with 0 endpoints will now ICMP reject immediately, rather than blackhole and timeout. ([#72534](https://github.com/kubernetes/kubernetes/pull/72534), [@thockin](https://github.com/thockin))
 * Services of type=LoadBalancer which have no endpoints will now immediately ICMP reject connections, rather than time out. ([#74394](https://github.com/kubernetes/kubernetes/pull/74394), [@thockin](https://github.com/thockin))
 * fix race condition issue for smb mount on windows ([#75371](https://github.com/kubernetes/kubernetes/pull/75371), [@andyzhangx](https://github.com/andyzhangx))
 * fix smb unmount issue on Windows ([#75087](https://github.com/kubernetes/kubernetes/pull/75087), [@andyzhangx](https://github.com/andyzhangx))
