@@ -124,11 +124,6 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 		if ignoreNotFound {
 			return runtime.SetZeroValue(out)
 		}
-		if len(resourceVersion) > 0 {
-			if rv, err := s.versioner.ParseResourceVersion(resourceVersion); err == nil {
-				return storage.NewKeyNotFoundError(key, int64(rv))
-			}
-		}
 		return storage.NewKeyNotFoundError(key, 0)
 	}
 	kv := getResp.Kvs[0]
