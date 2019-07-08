@@ -745,7 +745,7 @@ func TestReconcilePodStatus(t *testing.T) {
 	// If the pod status is the same, only the timestamp is in Rfc3339 format (lower precision without nanosecond),
 	// a reconciliation is not needed, syncBatch should do nothing.
 	// The StartTime should have been set in SetPodStatus().
-	// TODO(random-liu): Remove this later when api becomes consistent for timestamp.
+	// This test is done because the related issue #15262/PR #15263 to move apiserver to RFC339NANO is closed.
 	t.Logf("Syncbatch should do nothing, as a reconciliation is not required")
 	normalizedStartTime := testPod.Status.StartTime.Rfc3339Copy()
 	testPod.Status.StartTime = &normalizedStartTime
