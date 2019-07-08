@@ -154,19 +154,15 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name is empty")
 	}
 
-	addr := fmt.Sprintf(csiAddrTemplate, driverName)
-	requiresV0Client := true
 	existingDriver, driverExists := csiDrivers.Get(string(driverName))
 	if !driverExists {
 		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
-	addr = existingDriver.endpoint
-	requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
-
 	nodeV1ClientCreator := newV1NodeClient
 	nodeV0ClientCreator := newV0NodeClient
-	if requiresV0Client {
+
+	if versionRequiresV0Client(existingDriver.highestSupportedVersion) {
 		nodeV1ClientCreator = nil
 	} else {
 		nodeV0ClientCreator = nil
@@ -174,7 +170,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 
 	return &csiDriverClient{
 		driverName:          driverName,
-		addr:                csiAddr(addr),
+		addr:                csiAddr(existingDriver.endpoint),
 		nodeV1ClientCreator: nodeV1ClientCreator,
 		nodeV0ClientCreator: nodeV0ClientCreator,
 	}, nil
