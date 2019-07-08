@@ -1324,7 +1324,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 				EnvFrom: []v1.EnvFromSource{
 					{
-						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-configmap"}},
 					},
 					{
 						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
