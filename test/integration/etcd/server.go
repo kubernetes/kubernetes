@@ -117,7 +117,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		t.Fatal(err)
 	}
 
-	kubeClientConfig := restclient.CopyConfig(kubeAPIServer.LoopbackClientConfig)
+	kubeClientConfig := restclient.CopyConfig(kubeAPIServer.GenericAPIServer.LoopbackClientConfig)
 
 	// we make lots of requests, don't be slow
 	kubeClientConfig.QPS = 99999
@@ -133,7 +133,11 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 			}
 		}()
 
-		if err := kubeAPIServer.PrepareRun().Run(stopCh); err != nil {
+		prepared, err := kubeAPIServer.PrepareRun()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := prepared.Run(stopCh); err != nil {
 			t.Fatal(err)
 		}
 	}()
