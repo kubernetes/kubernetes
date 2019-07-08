@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -42,20 +40,6 @@ import (
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 )
-
-func init() {
-	// we need to add the options (like ListOptions) to empty v1
-	metav1.AddToGroupVersion(aggregatorscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
-
-	unversioned := schema.GroupVersion{Group: "", Version: "v1"}
-	aggregatorscheme.Scheme.AddUnversionedTypes(unversioned,
-		&metav1.Status{},
-		&metav1.APIVersions{},
-		&metav1.APIGroupList{},
-		&metav1.APIGroup{},
-		&metav1.APIResourceList{},
-	)
-}
 
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."

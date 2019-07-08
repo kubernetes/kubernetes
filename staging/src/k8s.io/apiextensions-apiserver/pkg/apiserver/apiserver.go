@@ -57,26 +57,14 @@ import (
 var (
 	Scheme = runtime.NewScheme()
 	Codecs = serializer.NewCodecFactory(Scheme)
-
-	// if you modify this, make sure you update the crEncoder
-	unversionedVersion = schema.GroupVersion{Group: "", Version: "v1"}
-	unversionedTypes   = []runtime.Object{
-		&metav1.Status{},
-		&metav1.WatchEvent{},
-		&metav1.APIVersions{},
-		&metav1.APIGroupList{},
-		&metav1.APIGroup{},
-		&metav1.APIResourceList{},
-	}
 )
 
 func init() {
 	install.Install(Scheme)
-
-	// we need to add the options to empty v1
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
-	Scheme.AddUnversionedTypes(unversionedVersion, unversionedTypes...)
+	// register unversioned types that must be available on CR endpoints
+	Scheme.AddUnversionedTypes(schema.GroupVersion{Group: "", Version: "v1"}, &metav1.Status{}, &metav1.WatchEvent{})
 }
 
 type ExtraConfig struct {
