@@ -5,13 +5,11 @@ go_library(
     srcs = [
         "doc.go",
         "elements.go",
-        "fromvalue.go",
         "schemaschema.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/schema",
     importpath = "sigs.k8s.io/structured-merge-diff/schema",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library"],
 )
 
 filegroup(

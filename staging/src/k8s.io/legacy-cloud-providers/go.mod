@@ -43,5 +43,6 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/cloud-provider => ../cloud-provider
 	k8s.io/csi-translation-lib => ../csi-translation-lib
+	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
 )

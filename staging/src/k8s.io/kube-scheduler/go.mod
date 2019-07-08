@@ -16,5 +16,6 @@ replace (
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/component-base => ../component-base
+	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/kube-scheduler => ../kube-scheduler
 )

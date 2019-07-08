@@ -7,7 +7,6 @@ go 1.12
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/BurntSushi/toml v0.3.0 // indirect
-	github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46 // indirect
 	github.com/coreos/bbolt v1.3.1-coreos.6 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/coreos/go-oidc v0.0.0-20180117170138-065b426bd416
@@ -62,9 +61,9 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v0.3.2
-	k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
+	k8s.io/kube-openapi v0.0.0-20190603182131-db7b694dc208
 	k8s.io/utils v0.0.0-20190221042446-c2654d5206da
-	sigs.k8s.io/structured-merge-diff v0.0.0-20190302045857-e85c7b244fd2
+	sigs.k8s.io/structured-merge-diff v0.0.0-20190628201129-059502f64143
 	sigs.k8s.io/yaml v1.1.0
 )
 
@@ -78,4 +77,5 @@ replace (
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 )

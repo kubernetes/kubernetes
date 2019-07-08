@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
@@ -36,7 +37,7 @@ func ToSchema(models proto.Models) (*schema.Schema, error) {
 	if err := c.convertAll(); err != nil {
 		return nil, err
 	}
-
+	c.addCommonTypes()
 	return c.output, nil
 }
 
@@ -95,14 +96,37 @@ func (c *convert) insertTypeDef(name string, model proto.Schema) {
 	c.output.Types = append(c.output.Types, def)
 }
 
+func (c *convert) addCommonTypes() {
+	c.output.Types = append(c.output.Types, untypedDef)
+}
+
+var untypedName string = "__untyped_atomic_"
+
+var untypedDef schema.TypeDef = schema.TypeDef{
+	Name: untypedName,
+	Atom: schema.Atom{
+		Scalar: ptr(schema.Scalar("untyped")),
+		List: &schema.List{
+			ElementType: schema.TypeRef{
+				NamedType: &untypedName,
+			},
+			ElementRelationship: schema.Atomic,
+		},
+		Map: &schema.Map{
+			ElementType: schema.TypeRef{
+				NamedType: &untypedName,
+			},
+			ElementRelationship: schema.Atomic,
+		},
+	},
+}
+
 func (c *convert) makeRef(model proto.Schema) schema.TypeRef {
 	var tr schema.TypeRef
 	if r, ok := model.(*proto.Ref); ok {
 		if r.Reference() == "io.k8s.apimachinery.pkg.runtime.RawExtension" {
 			return schema.TypeRef{
-				Inlined: schema.Atom{
-					Untyped: &schema.Untyped{},
-				},
+				NamedType: &untypedName,
 			}
 		}
 		// reference a named type
@@ -116,23 +140,135 @@ func (c *convert) makeRef(model proto.Schema) schema.TypeRef {
 
 		if tr == (schema.TypeRef{}) {
 			// emit warning?
-			tr.Inlined.Untyped = &schema.Untyped{}
+			tr.NamedType = &untypedName
 		}
 	}
 	return tr
 }
 
+func makeUnions(extensions map[string]interface{}) ([]schema.Union, error) {
+	schemaUnions := []schema.Union{}
+	if iunions, ok := extensions["x-kubernetes-unions"]; ok {
+		unions, ok := iunions.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf(`"x-kubernetes-unions" should be a list, got %#v`, unions)
+		}
+		for _, iunion := range unions {
+			union, ok := iunion.(map[interface{}]interface{})
+			if !ok {
+				return nil, fmt.Errorf(`"x-kubernetes-unions" items should be a map of string to unions, got %#v`, iunion)
+			}
+			unionMap := map[string]interface{}{}
+			for k, v := range union {
+				key, ok := k.(string)
+				if !ok {
+					return nil, fmt.Errorf(`"x-kubernetes-unions" has non-string key: %#v`, k)
+				}
+				unionMap[key] = v
+			}
+			schemaUnion, err := makeUnion(unionMap)
+			if err != nil {
+				return nil, err
+			}
+			schemaUnions = append(schemaUnions, schemaUnion)
+		}
+	}
+
+	// Make sure we have no overlap between unions
+	fs := map[string]struct{}{}
+	for _, u := range schemaUnions {
+		if u.Discriminator != nil {
+			if _, ok := fs[*u.Discriminator]; ok {
+				return nil, fmt.Errorf("%v field appears multiple times in unions", *u.Discriminator)
+			}
+			fs[*u.Discriminator] = struct{}{}
+		}
+		for _, f := range u.Fields {
+			if _, ok := fs[f.FieldName]; ok {
+				return nil, fmt.Errorf("%v field appears multiple times in unions", f.FieldName)
+			}
+			fs[f.FieldName] = struct{}{}
+		}
+	}
+
+	return schemaUnions, nil
+}
+
+func makeUnion(extensions map[string]interface{}) (schema.Union, error) {
+	union := schema.Union{
+		Fields: []schema.UnionField{},
+	}
+
+	if idiscriminator, ok := extensions["discriminator"]; ok {
+		discriminator, ok := idiscriminator.(string)
+		if !ok {
+			return schema.Union{}, fmt.Errorf(`"discriminator" must be a string, got: %#v`, idiscriminator)
+		}
+		union.Discriminator = &discriminator
+	}
+
+	if ifields, ok := extensions["fields-to-discriminateBy"]; ok {
+		fields, ok := ifields.(map[interface{}]interface{})
+		if !ok {
+			return schema.Union{}, fmt.Errorf(`"fields-to-discriminateBy" must be a map[string]string, got: %#v`, ifields)
+		}
+		// Needs sorted keys by field.
+		keys := []string{}
+		for ifield := range fields {
+			field, ok := ifield.(string)
+			if !ok {
+				return schema.Union{}, fmt.Errorf(`"fields-to-discriminateBy": field must be a string, got: %#v`, ifield)
+			}
+			keys = append(keys, field)
+
+		}
+		sort.Strings(keys)
+		reverseMap := map[string]struct{}{}
+		for _, field := range keys {
+			value := fields[field]
+			discriminated, ok := value.(string)
+			if !ok {
+				return schema.Union{}, fmt.Errorf(`"fields-to-discriminateBy"/%v: value must be a string, got: %#v`, field, value)
+			}
+			union.Fields = append(union.Fields, schema.UnionField{
+				FieldName:       field,
+				DiscriminatorValue: discriminated,
+			})
+
+			// Check that we don't have the same discriminateBy multiple times.
+			if _, ok := reverseMap[discriminated]; ok {
+				return schema.Union{}, fmt.Errorf("Multiple fields have the same discriminated name: %v", discriminated)
+			}
+			reverseMap[discriminated] = struct{}{}
+		}
+	}
+
+	if union.Discriminator != nil && len(union.Fields) == 0 {
+		return schema.Union{}, fmt.Errorf("discriminator set to %v, but no fields in union", *union.Discriminator)
+	}
+	return union, nil
+}
+
 func (c *convert) VisitKind(k *proto.Kind) {
 	a := c.top()
-	a.Struct = &schema.Struct{}
+	a.Map = &schema.Map{}
 	for _, name := range k.FieldOrder {
 		member := k.Fields[name]
 		tr := c.makeRef(member)
-		a.Struct.Fields = append(a.Struct.Fields, schema.StructField{
+		a.Map.Fields = append(a.Map.Fields, schema.StructField{
 			Name: name,
 			Type: tr,
 		})
 	}
+
+	unions, err := makeUnions(k.GetExtensions())
+	if err != nil {
+		c.reportError(err.Error())
+		return
+	}
+	// TODO: We should check that the fields and discriminator
+	// specified in the union are actual fields in the struct.
+	a.Map.Unions = unions
 
 	// TODO: Get element relationship when we start adding it to the spec.
 }
@@ -211,9 +347,10 @@ func (c *convert) VisitMap(m *proto.Map) {
 	// spec.
 }
 
+func ptr(s schema.Scalar) *schema.Scalar { return &s }
+
 func (c *convert) VisitPrimitive(p *proto.Primitive) {
 	a := c.top()
-	ptr := func(s schema.Scalar) *schema.Scalar { return &s }
 	switch p.Type {
 	case proto.Integer:
 		a.Scalar = ptr(schema.Numeric)
@@ -227,21 +364,21 @@ func (c *convert) VisitPrimitive(p *proto.Primitive) {
 			// byte really means []byte and is encoded as a string.
 			a.Scalar = ptr(schema.String)
 		case "int-or-string":
-			a.Untyped = &schema.Untyped{}
+			a.Scalar = ptr(schema.Scalar("untyped"))
 		case "date-time":
-			a.Untyped = &schema.Untyped{}
+			a.Scalar = ptr(schema.Scalar("untyped"))
 		default:
-			a.Untyped = &schema.Untyped{}
+			a.Scalar = ptr(schema.Scalar("untyped"))
 		}
 	case proto.Boolean:
 		a.Scalar = ptr(schema.Boolean)
 	default:
-		a.Untyped = &schema.Untyped{}
+		a.Scalar = ptr(schema.Scalar("untyped"))
 	}
 }
 
 func (c *convert) VisitArbitrary(a *proto.Arbitrary) {
-	c.top().Untyped = &schema.Untyped{}
+	*c.top() = untypedDef.Atom
 }
 
 func (c *convert) VisitReference(proto.Reference) {
