@@ -26,9 +26,10 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
@@ -89,6 +90,16 @@ type CompletedConfig struct {
 	*completedConfig
 }
 
+type runnable interface {
+	Run(stopCh <-chan struct{}) error
+}
+
+// preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
+type preparedAPIAggregator struct {
+	*APIAggregator
+	runnable runnable
+}
+
 // APIAggregator contains state for a Kubernetes cluster master/api server.
 type APIAggregator struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
@@ -116,6 +127,10 @@ type APIAggregator struct {
 	// Information needed to determine routing for the aggregator
 	serviceResolver ServiceResolver
 
+	// Enable swagger and/or OpenAPI if these configs are non-nil.
+	openAPIConfig *openapicommon.Config
+
+	// openAPIAggregationController downloads and merges OpenAPI specs.
 	openAPIAggregationController *openapicontroller.AggregationController
 }
 
@@ -167,6 +182,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		lister:                   informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
+		openAPIConfig:            openAPIConfig,
 	}
 
 	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
@@ -211,26 +227,42 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 
-	if openAPIConfig != nil {
-		specDownloader := openapiaggregator.NewDownloader()
-		openAPIAggregator, err := openapiaggregator.BuildAndRegisterAggregator(
-			&specDownloader,
-			delegationTarget,
-			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
-			openAPIConfig,
-			s.GenericAPIServer.Handler.NonGoRestfulMux)
-		if err != nil {
-			return nil, err
-		}
-		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+	return s, nil
+}
 
+// PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec and calling
+// the generic PrepareRun.
+func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
+	// add post start hook before generic PrepareRun in order to be before /healthz installation
+	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)
 			return nil
 		})
 	}
 
-	return s, nil
+	prepared := s.GenericAPIServer.PrepareRun()
+
+	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers
+	if s.openAPIConfig != nil {
+		specDownloader := openapiaggregator.NewDownloader()
+		openAPIAggregator, err := openapiaggregator.BuildAndRegisterAggregator(
+			&specDownloader,
+			s.GenericAPIServer.NextDelegate(),
+			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
+			s.openAPIConfig,
+			s.GenericAPIServer.Handler.NonGoRestfulMux)
+		if err != nil {
+			return preparedAPIAggregator{}, err
+		}
+		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+	}
+
+	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
+}
+
+func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
+	return s.runnable.Run(stopCh)
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
