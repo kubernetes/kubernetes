@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "apiapproval_test.go",
         "apply_test.go",
         "basic_test.go",
         "change_test.go",

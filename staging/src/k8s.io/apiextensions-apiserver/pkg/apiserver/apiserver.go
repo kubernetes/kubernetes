@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
 	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/apiapproval"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema"
@@ -199,6 +200,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
 	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
 	nonStructuralSchemaController := nonstructuralschema.NewConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
+	apiApprovalController := apiapproval.NewKubernetesAPIApprovalPolicyConformantConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
 	finalizingController := finalizer.NewCRDFinalizer(
 		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		crdClient.Apiextensions(),
@@ -226,6 +228,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)
 		go nonStructuralSchemaController.Run(5, context.StopCh)
+		go apiApprovalController.Run(5, context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
 		return nil
 	})
