@@ -110,7 +110,6 @@ pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apply
 pkg/kubectl/cmd/attach
 pkg/kubectl/cmd/autoscale
-pkg/kubectl/cmd/certificates
 pkg/kubectl/cmd/clusterinfo
 pkg/kubectl/cmd/convert
 pkg/kubectl/cmd/create
