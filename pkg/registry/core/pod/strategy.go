@@ -247,7 +247,6 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
-	// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
 
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
