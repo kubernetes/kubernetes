@@ -771,8 +771,15 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
+	/*
+				Release : v1.16
+				Testname: Ensure readiness gates are respected
+				Description: Create a pod with two readiness test conditions. Submit the pod to Kubernetes, checking the readiness MUST return false at this point.
+		        After waiting for a 10 seconds the pod's readiness state MUST return true.
+		        Finally, the state will be checked again, the state of the pod's readiness MUST NOT return false.
+	*/
 	// TODO(freehan): label the test to be [NodeConformance] after tests are proven to be stable.
-	ginkgo.It("should support pod readiness gates [NodeFeature:PodReadinessGate]", func() {
+	framework.ConformanceIt("should support pod readiness gates [NodeFeature:PodReadinessGate]", func() {
 		podName := "pod-ready"
 		readinessGate1 := "k8s.io/test-condition1"
 		readinessGate2 := "k8s.io/test-condition2"
@@ -785,9 +792,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
-						Name:    "pod-readiness-gate",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
+						Name:    "agnhost-pause",
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Command: []string{"pause"},
 					},
 				},
 				ReadinessGates: []v1.PodReadinessGate{
