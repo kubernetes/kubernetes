@@ -655,10 +655,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				kl.recorder.Eventf(pod, v1.EventTypeWarning, "InvalidEnvironmentVariableNames", "Keys [%s] from the EnvFrom secret %s/%s were skipped since they are considered invalid environment variable names.", strings.Join(invalidKeys, ", "), pod.Namespace, name)
 			}
 		}
-		if len(duplicatedKeys) > 0 {
-			sort.Strings(duplicatedKeys)
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, "DuplicatedEnvironmentVariableNames", "Keys [%s] were defined from multiple configMap/secret.", strings.Join(duplicatedKeys, ", "))
-		}
 	}
 
 	// Determine the final values of variables:
@@ -759,7 +755,15 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 		// TODO: remove this next line once all platforms use apiserver+Pods.
 		delete(serviceEnv, envVar.Name)
 
+		_, ok := tmpEnv[envVar.Name]
+		if ok {
+			duplicatedKeys = append(duplicatedKeys, envVar.Name)
+		}
 		tmpEnv[envVar.Name] = runtimeVal
+	}
+	if len(duplicatedKeys) > 0 {
+		sort.Strings(duplicatedKeys)
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, "DuplicatedEnvironmentVariableNames", "Keys [%s] were defined from multiple means.", strings.Join(duplicatedKeys, ", "))
 	}
 
 	// Append the env vars

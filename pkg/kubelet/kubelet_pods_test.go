@@ -1124,6 +1124,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "CONFIG_MAP",
 				},
 			},
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [DUPE_TEST] were defined from multiple means.",
 		},
 		{
 			name:               "configmap, service env vars",
@@ -1220,6 +1221,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "CONFIG_MAP",
 				},
 			},
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [DUPE_TEST] were defined from multiple means.",
 		},
 		{
 			name:               "configmap_missing",
@@ -1310,6 +1312,16 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			ns:                 "test",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name:  "test1",
+						Value: "1234",
+					},
+					{
+						Name:  "test4",
+						Value: "test-test",
+					},
+				},
 				EnvFrom: []v1.EnvFromSource{
 					{
 						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
@@ -1326,8 +1338,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-configmap",
 				},
 				Data: map[string]string{
-					"test":  "abc",
-					"test2": "5678",
+					"test1": "abc",
+					"test2": "abc",
+					"test3": "abc",
 				},
 			},
 			secret: &v1.Secret{
@@ -1336,25 +1349,29 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"test":  []byte("1234"),
-					"test3": []byte("9012"),
+					"test2": []byte("1234"),
+					"test3": []byte("5678"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
-					Name:  "test",
+					Name:  "test1",
 					Value: "1234",
 				},
 				{
 					Name:  "test2",
-					Value: "5678",
+					Value: "1234",
 				},
 				{
 					Name:  "test3",
-					Value: "9012",
+					Value: "5678",
+				},
+				{
+					Name:  "test4",
+					Value: "test-test",
 				},
 			},
-			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test] were defined from multiple configMap/secret.",
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test1, test2, test3] were defined from multiple means.",
 		},
 		{
 			name:               "secret",
@@ -1423,6 +1440,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "SECRET",
 				},
 			},
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [DUPE_TEST] were defined from multiple means.",
 		},
 		{
 			name:               "secret, service env vars",
@@ -1519,6 +1537,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "SECRET",
 				},
 			},
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [DUPE_TEST] were defined from multiple means.",
 		},
 		{
 			name:               "secret_missing",
