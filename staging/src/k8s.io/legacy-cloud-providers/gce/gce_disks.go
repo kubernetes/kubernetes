@@ -424,6 +424,10 @@ type Disks interface {
 	// to the node with the specified NodeName.
 	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
 
+	// BulkDisksAreAttached is a batch function to check if all corresponding disks are attached to the
+	// nodes specified with nodeName.
+	BulkDisksAreAttached(diskByNodes map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error)
+
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
 	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error
@@ -618,6 +622,37 @@ func (g *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (m
 	}
 
 	return attached, nil
+}
+
+// BulkDisksAreAttached is a batch function to check if all corresponding disks are attached to the
+// nodes specified with nodeName.
+func (g *Cloud) BulkDisksAreAttached(diskByNodes map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error) {
+	instanceNames := []string{}
+	for nodeName := range diskByNodes {
+		instanceNames = append(instanceNames, mapNodeNameToInstanceName(nodeName))
+	}
+
+	// List all instances with the given instance names
+	// Then for each instance listed, add the disks attached to that instance to a map
+	listedInstances, err := g.getFoundInstanceByNames(instanceNames)
+	if err != nil {
+		return nil, fmt.Errorf("error listing instances: %v", err)
+	}
+	listedInstanceNamesToDisks := make(map[string][]*compute.AttachedDisk)
+	for _, instance := range listedInstances {
+		listedInstanceNamesToDisks[instance.Name] = instance.Disks
+	}
+
+	verifyDisksAttached := make(map[types.NodeName]map[string]bool)
+
+	// For each node and its desired attached disks that needs to be verified
+	for nodeName, disksToVerify := range diskByNodes {
+		instanceName := canonicalizeInstanceName(mapNodeNameToInstanceName(nodeName))
+		disksActuallyAttached := listedInstanceNamesToDisks[instanceName]
+		verifyDisksAttached[nodeName] = verifyDisksAttachedToNode(disksToVerify, disksActuallyAttached)
+	}
+
+	return verifyDisksAttached, nil
 }
 
 // CreateDisk creates a new Persistent Disk, with the specified name &
@@ -989,4 +1024,21 @@ func isGCEError(err error, reason string) bool {
 		}
 	}
 	return false
+}
+
+// verifyDisksAttachedToNode takes in an slice of disks that should be attached to an instance, and the
+// slice of disks actually attached to it. It returns a map verifying if the disks are actually attached.
+func verifyDisksAttachedToNode(disksToVerify []string, disksActuallyAttached []*compute.AttachedDisk) map[string]bool {
+	verifiedDisks := make(map[string]bool)
+	diskNamesActuallyAttached := sets.NewString()
+	for _, disk := range disksActuallyAttached {
+		diskNamesActuallyAttached.Insert(disk.DeviceName)
+	}
+
+	// For every disk that's supposed to be attached, verify that it is
+	for _, diskName := range disksToVerify {
+		verifiedDisks[diskName] = diskNamesActuallyAttached.Has(diskName)
+	}
+
+	return verifiedDisks
 }
