@@ -36,7 +36,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
-	aggregatoropenapi "k8s.io/kube-aggregator/pkg/client/openapi"
+	kubeaggregatoropenapi "k8s.io/kube-aggregator/pkg/client/openapi"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
@@ -136,6 +136,17 @@ type APIAggregator struct {
 	openAPIAggregationController *openapicontroller.AggregationController
 }
 
+// NewConfig creates a kube-aggregator config based on a generic config.
+func NewConfig(genericConfig genericapiserver.RecommendedConfig, extra ExtraConfig) *Config {
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(kubeaggregatoropenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(aggregatorscheme.Scheme))
+	genericConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
+
+	return &Config{
+		GenericConfig: &genericConfig,
+		ExtraConfig:   extra,
+	}
+}
+
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (cfg *Config) Complete() CompletedConfig {
 	c := completedConfig{
@@ -148,10 +159,6 @@ func (cfg *Config) Complete() CompletedConfig {
 	c.GenericConfig.EnableDiscovery = false
 	version := version.Get()
 	c.GenericConfig.Version = &version
-
-	c.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(aggregatoropenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(aggregatorscheme.Scheme))
-	c.GenericConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
-	c.GenericConfig.OpenAPIConfig.Info.Version = "1.0"
 
 	return CompletedConfig{&c}
 }

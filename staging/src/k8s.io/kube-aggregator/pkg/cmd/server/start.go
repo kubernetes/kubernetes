@@ -26,6 +26,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -122,6 +123,10 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs)
+
+	// set openapi config early, so the ApplyTo funcs can extend it
+	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(aggregatoropenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(aggregatorscheme.Scheme))
+	serverConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err

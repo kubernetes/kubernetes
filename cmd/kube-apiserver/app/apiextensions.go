@@ -20,6 +20,8 @@ limitations under the License.
 package app
 
 import (
+	"github.com/go-openapi/spec"
+
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -32,63 +34,52 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
-	kubeexternalinformers "k8s.io/client-go/informers"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 func createAPIExtensionsConfig(
-	kubeAPIServerConfig genericapiserver.Config,
-	externalInformers kubeexternalinformers.SharedInformerFactory,
+	commandOptions completedServerRunOptions,
+	baseConfig genericapiserver.RecommendedConfig,
 	pluginInitializers []admission.PluginInitializer,
-	commandOptions *options.ServerRunOptions,
 	masterCount int,
 	serviceResolver webhook.ServiceResolver,
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	securityDefinitions *spec.SecurityDefinitions,
 ) (*apiextensionsapiserver.Config, error) {
-	// make a shallow copy to let us twiddle a few things
-	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
-	genericConfig := kubeAPIServerConfig
-
-	// override genericConfig.AdmissionControl with apiextensions' scheme,
-	// because apiextentions apiserver should use its own scheme to convert resources.
-	err := commandOptions.Admission.ApplyTo(
-		&genericConfig,
-		externalInformers,
-		genericConfig.LoopbackClientConfig,
-		pluginInitializers...)
-	if err != nil {
-		return nil, err
-	}
-
-	// copy the etcd options so we don't mutate originals.
-	etcdOptions := *commandOptions.Etcd
+	// override etcd options with apiextensions-server based scheme
+	etcdOptions := *commandOptions.Etcd // copy the etcd options so we don't mutate originals
 	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1beta1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName})
-	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+
+	c := apiextensionsapiserver.NewConfig(baseConfig, apiextensionsapiserver.ExtraConfig{
+		CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
+		MasterCount:          masterCount,
+		AuthResolverWrapper:  authResolverWrapper,
+		ServiceResolver:      serviceResolver,
+	})
+	c.GenericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+	c.GenericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
 	// override MergedResourceConfig with apiextensions defaults and registry
 	if err := commandOptions.APIEnablement.ApplyTo(
-		&genericConfig,
+		&c.GenericConfig.Config,
 		apiextensionsapiserver.DefaultAPIResourceConfigSource(),
 		apiextensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
 
-	apiextensionsConfig := &apiextensionsapiserver.Config{
-		GenericConfig: &genericapiserver.RecommendedConfig{
-			Config:                genericConfig,
-			SharedInformerFactory: externalInformers,
-		},
-		ExtraConfig: apiextensionsapiserver.ExtraConfig{
-			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
-			MasterCount:          masterCount,
-			AuthResolverWrapper:  authResolverWrapper,
-			ServiceResolver:      serviceResolver,
-		},
+	// override genericConfig.AdmissionControl with apiextensions' scheme,
+	// because apiextentions apiserver should use its own scheme to convert resources.
+	err := commandOptions.Admission.ApplyTo(
+		&c.GenericConfig.Config,
+		c.GenericConfig.SharedInformerFactory,
+		c.GenericConfig.LoopbackClientConfig,
+		pluginInitializers...)
+	if err != nil {
+		return nil, err
 	}
 
-	return apiextensionsConfig, nil
+	return c, nil
 }
 
 func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {

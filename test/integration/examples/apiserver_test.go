@@ -118,7 +118,16 @@ func TestAggregatedAPIServer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
+
+		// create generic apiserver config, shallow copied to all delegated apiservers below
+		genericConfig, versionedInformers, _, _, _, admissionPostStartHook, storageFactory, securityDefinitions, err := app.CreateGenericConfig(completedOptions, proxyTransport)
+		recommendedConfig := genericapiserver.RecommendedConfig{
+			Config:                *genericConfig,
+			SharedInformerFactory: versionedInformers,
+			ClientConfig:          genericConfig.LoopbackClientConfig,
+		}
+
+		kubeAPIServerConfig, err := app.CreateKubeAPIServerConfig(completedOptions, recommendedConfig, storageFactory, tunneler, proxyTransport, securityDefinitions)
 		if err != nil {
 			t.Fatal(err)
 		}

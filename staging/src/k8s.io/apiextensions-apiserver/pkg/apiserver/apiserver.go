@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
 	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	apiextensionsopenapi "k8s.io/apiextensions-apiserver/pkg/client/openapi"
 	"k8s.io/apiextensions-apiserver/pkg/controller/apiapproval"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -93,6 +95,17 @@ type ExtraConfig struct {
 type Config struct {
 	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
+}
+
+// NewConfig creates a apiextensions-apiserver config based on a generic config.
+func NewConfig(genericConfig genericapiserver.RecommendedConfig, extra ExtraConfig) *Config {
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(apiextensionsopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(Scheme))
+	genericConfig.OpenAPIConfig.Info.Title = "apiextensions-apiserver"
+
+	return &Config{
+		GenericConfig: &genericConfig,
+		ExtraConfig:   extra,
+	}
 }
 
 type completedConfig struct {
