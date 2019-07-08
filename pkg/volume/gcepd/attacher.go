@@ -137,6 +137,41 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 	return volumesAttachedCheck, nil
 }
 
+func (attacher *gcePersistentDiskAttacher) BulkVerifyVolumes(volumesByNode map[types.NodeName][]*volume.Spec) (map[types.NodeName]map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[types.NodeName]map[*volume.Spec]bool)
+	diskNamesByNode := make(map[types.NodeName][]string)
+	volumeSpecToDiskName := make(map[*volume.Spec]string)
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		diskNames := []string{}
+		for _, spec := range volumeSpecs {
+			volumeSource, _, err := getVolumeSource(spec)
+			if err != nil {
+				klog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+				continue
+			}
+			diskNames = append(diskNames, volumeSource.PDName)
+			volumeSpecToDiskName[spec] = volumeSource.PDName
+		}
+		diskNamesByNode[nodeName] = diskNames
+	}
+
+	attachedDisksByNode, err := attacher.gceDisks.BulkDisksAreAttached(diskNamesByNode)
+	if err != nil {
+		return nil, err
+	}
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		volumesAreAttachedToNode := make(map[*volume.Spec]bool)
+		for _, spec := range volumeSpecs {
+			diskName := volumeSpecToDiskName[spec]
+			volumesAreAttachedToNode[spec] = attachedDisksByNode[nodeName][diskName]
+		}
+		volumesAttachedCheck[nodeName] = volumesAreAttachedToNode
+	}
+	return volumesAttachedCheck, nil
+}
+
 func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
