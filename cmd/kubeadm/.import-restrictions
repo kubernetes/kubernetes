@@ -131,7 +131,7 @@
 				"github.com/json-iterator/go",
 				"github.com/MakeNowJust/heredoc",
 				"github.com/matttproud/golang_protobuf_extensions/pbutil",
-				"github.com/mholt/caddy/caddyfile",
+				"github.com/caddyserver/caddy/caddyfile",
 				"github.com/modern-go/concurrent",
 				"github.com/modern-go/reflect2",
 				"github.com/opencontainers/go-digest",

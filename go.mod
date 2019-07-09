@@ -24,6 +24,7 @@ require (
 	github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e
 	github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/caddyserver/caddy v1.0.1
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b // indirect
@@ -95,7 +96,6 @@ require (
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/mattn/go-shellwords v1.0.5 // indirect
 	github.com/mesos/mesos-go v0.0.9 // indirect
-	github.com/mholt/caddy v1.0.0
 	github.com/miekg/dns v1.1.4
 	github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 // indirect
 	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
@@ -211,6 +211,7 @@ replace (
 	github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
 	github.com/blang/semver => github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
+	github.com/caddyserver/caddy => github.com/caddyserver/caddy v1.0.1
 	github.com/cenkalti/backoff => github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/cespare/prettybench => github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
@@ -334,8 +335,7 @@ replace (
 	github.com/mattn/go-shellwords => github.com/mattn/go-shellwords v1.0.5
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.9
-	github.com/mholt/caddy => github.com/mholt/caddy v1.0.0
-	github.com/mholt/certmagic => github.com/mholt/certmagic v0.5.0
+	github.com/mholt/certmagic => github.com/mholt/certmagic v0.6.2-0.20190624175158-6a42ef9fe8c2
 	github.com/miekg/dns => github.com/miekg/dns v1.1.4
 	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2
 	github.com/mistifyio/go-zfs => github.com/mistifyio/go-zfs v2.1.1+incompatible

@@ -22,7 +22,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/mholt/caddy/caddyfile"
+	"github.com/caddyserver/caddy/caddyfile"
 	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
