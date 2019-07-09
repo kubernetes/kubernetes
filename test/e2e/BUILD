@@ -13,6 +13,7 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
+        "//test/e2e/features/steps:go_default_library",
         "//test/e2e/apimachinery:go_default_library",
         "//test/e2e/apps:go_default_library",
         "//test/e2e/auth:go_default_library",
@@ -98,6 +99,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/e2e/features/steps:all-srcs",
         "//test/e2e/apimachinery:all-srcs",
         "//test/e2e/apps:all-srcs",
         "//test/e2e/auth:all-srcs",

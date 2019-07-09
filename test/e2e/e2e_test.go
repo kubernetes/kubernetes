@@ -30,6 +30,7 @@ import (
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo"
 	"github.com/DATA-DOG/godog"
+	"k8s.io/kubernetes/test/e2e/features/steps"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -103,6 +104,7 @@ func init() {
 }
 
 func FeatureContext(s *godog.Suite) {
+	steps.FirstStepsFeatureContext(s)
 	// Do something with Suite s !!
 }
 
