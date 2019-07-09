@@ -20,8 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/mholt/caddy/telemetry"
 )
 
 // Parse parses the input just enough to group tokens, in
@@ -353,7 +351,6 @@ func (p *parser) directive() error {
 
 	// The directive itself is appended as a relevant token
 	p.block.Tokens[dir] = append(p.block.Tokens[dir], p.tokens[p.cursor])
-	telemetry.AppendUnique("directives", dir)
 
 	for p.Next() {
 		if p.Val() == "{" {
