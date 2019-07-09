@@ -150,7 +150,7 @@ kubectl api-versions
 {% panel style="info", title="Discovery" %}
 The discovery information can be viewed at `127.0.0.1:8001/` by running
 `kubectl proxy`.  The Discovery for specific API can be found under either
-`/api/v1` or `apis/<group>/<version>`, depending on the API group -
+`/api/v1` or `/apis/<group>/<version>`, depending on the API group -
 e.g. `127.0.0.1:8001/apis/apps/v1`
 {% endpanel %}
 
