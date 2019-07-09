@@ -147,25 +147,30 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
-
-	if instanceOptions.InjectedHealthzChecker != nil {
-		t.Logf("Adding health check with delay %v %v", s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker.Name())
-		server.AddDelayedHealthzChecks(s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker)
-	}
-
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
+
+	if instanceOptions.InjectedHealthzChecker != nil {
+		t.Logf("Adding health check with delay %v %v", s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker.Name())
+		if err := server.GenericAPIServer.AddDelayedHealthzChecks(s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker); err != nil {
+			return result, err
+		}
+	}
+
 	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
-		if err := server.PrepareRun().Run(stopCh); err != nil {
+		prepared, err := server.PrepareRun()
+		if err != nil {
+			errCh <- err
+		} else if err := prepared.Run(stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)
 
 	t.Logf("Waiting for /healthz to be ok...")
 
-	client, err := kubernetes.NewForConfig(server.LoopbackClientConfig)
+	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
@@ -211,7 +216,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 
 	// from here the caller must call tearDown
-	result.ClientConfig = server.LoopbackClientConfig
+	result.ClientConfig = server.GenericAPIServer.LoopbackClientConfig
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s

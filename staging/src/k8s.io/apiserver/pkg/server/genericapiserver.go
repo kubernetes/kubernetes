@@ -205,6 +205,9 @@ type DelegationTarget interface {
 
 	// NextDelegate returns the next delegationTarget in the chain of delegations
 	NextDelegate() DelegationTarget
+
+	// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
+	PrepareRun() preparedGenericAPIServer
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -253,14 +256,19 @@ func (s emptyDelegate) ListedPaths() []string {
 func (s emptyDelegate) NextDelegate() DelegationTarget {
 	return nil
 }
+func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
+	return preparedGenericAPIServer{nil}
+}
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
 	*GenericAPIServer
 }
 
-// PrepareRun does post API installation setup steps.
+// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
+	s.delegationTarget.PrepareRun()
+
 	if s.openAPIConfig != nil {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
