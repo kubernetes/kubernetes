@@ -132,7 +132,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("deleting the pod gracefully")
 			rsp, err := client.Do(req)
 			framework.ExpectNoError(err, "failed to use http client to send delete")
-			gomega.Expect(rsp.StatusCode).Should(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
+			framework.ExpectEqual(rsp.StatusCode, http.StatusOK, "failed to delete gracefully by client request")
 			var lastPod v1.Pod
 			err = json.NewDecoder(rsp.Body).Decode(&lastPod)
 			framework.ExpectNoError(err, "failed to decode graceful termination proxy response")
