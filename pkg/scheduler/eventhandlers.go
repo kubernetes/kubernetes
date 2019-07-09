@@ -157,58 +157,38 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 }
 
 func (sched *Scheduler) onCSINodeAdd(obj interface{}) {
-	csiNode, ok := obj.(*storagev1beta1.CSINode)
+	_, ok := obj.(*storagev1beta1.CSINode)
 	if !ok {
 		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", obj)
 		return
-	}
-
-	if err := sched.config.SchedulerCache.AddCSINode(csiNode); err != nil {
-		klog.Errorf("scheduler cache AddCSINode failed: %v", err)
 	}
 
 	sched.config.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
-	oldCSINode, ok := oldObj.(*storagev1beta1.CSINode)
+	_, ok := oldObj.(*storagev1beta1.CSINode)
 	if !ok {
 		klog.Errorf("cannot convert oldObj to *storagev1beta1.CSINode: %v", oldObj)
 		return
 	}
 
-	newCSINode, ok := newObj.(*storagev1beta1.CSINode)
+	_, ok = newObj.(*storagev1beta1.CSINode)
 	if !ok {
 		klog.Errorf("cannot convert newObj to *storagev1beta1.CSINode: %v", newObj)
 		return
-	}
-
-	if err := sched.config.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
-		klog.Errorf("scheduler cache UpdateCSINode failed: %v", err)
 	}
 
 	sched.config.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onCSINodeDelete(obj interface{}) {
-	var csiNode *storagev1beta1.CSINode
 	switch t := obj.(type) {
 	case *storagev1beta1.CSINode:
-		csiNode = t
 	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		csiNode, ok = t.Obj.(*storagev1beta1.CSINode)
-		if !ok {
-			klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t.Obj)
-			return
-		}
 	default:
 		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t)
 		return
-	}
-
-	if err := sched.config.SchedulerCache.RemoveCSINode(csiNode); err != nil {
-		klog.Errorf("scheduler cache RemoveCSINode failed: %v", err)
 	}
 }
 
