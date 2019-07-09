@@ -49,6 +49,7 @@ var (
 	unboundPVC          = makeTestPVC("unbound-pvc", "1G", "", pvcUnbound, "", "1", &waitClass)
 	unboundPVC2         = makeTestPVC("unbound-pvc2", "5G", "", pvcUnbound, "", "1", &waitClass)
 	preboundPVC         = makeTestPVC("prebound-pvc", "1G", "", pvcPrebound, "pv-node1a", "1", &waitClass)
+	preboundPVC2        = makeTestPVC("prebound-pvc2", "1G", "", pvcPrebound, "", "1", &waitClass)
 	preboundPVCNode1a   = makeTestPVC("unbound-pvc", "1G", "", pvcPrebound, "pv-node1a", "1", &waitClass)
 	boundPVC            = makeTestPVC("bound-pvc", "1G", "", pvcBound, "pv-bound", "1", &waitClass)
 	boundPVC2           = makeTestPVC("bound-pvc2", "1G", "", pvcBound, "pv-bound2", "1", &waitClass)
@@ -549,6 +550,8 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 		// don't fallthrough
 	case pvcBound:
 		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
+		pvc.Spec.VolumeName = pvName
+		pvc.Status.Phase = v1.ClaimBound
 		fallthrough
 	case pvcPrebound:
 		pvc.Spec.VolumeName = pvName
@@ -797,10 +800,18 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			expectedUnbound: false,
 			expectedBound:   true,
 		},
-		"one-prebound,one-unbound": {
-			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC},
+		"one-prebound,one-unbound-immediate": {
+			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, preboundPVC},
 			pvs:        []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			shouldFail: true,
+		},
+		"one-prebound,one-unbound-wait": {
+			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC2},
+			pvs:              []*v1.PersistentVolume{pvNode1a, pvNode1b},
+			shouldFail:       false,
+			expectedBound:    true,
+			expectedUnbound:  true,
+			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(preboundPVC2, pvNode1b)},
 		},
 		"immediate-bound-pvc": {
 			podPVCs:         []*v1.PersistentVolumeClaim{immediateBoundPVC},

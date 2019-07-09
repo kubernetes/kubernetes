@@ -619,11 +619,11 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 				return nil, nil, nil, err
 			}
 			// Prebound PVCs are treated as unbound immediate binding
-			if delayBindingMode && pvc.Spec.VolumeName == "" {
+			if delayBindingMode {
 				// Scheduler path
 				unboundClaimsDelayBinding = append(unboundClaimsDelayBinding, pvc)
 			} else {
-				// !delayBindingMode || pvc.Spec.VolumeName != ""
+				// !delayBindingMode
 				// Immediate binding should have already been bound
 				unboundClaimsImmediate = append(unboundClaimsImmediate, pvc)
 			}
@@ -716,6 +716,11 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 		if err != nil {
 			return false, nil, fmt.Errorf("failed to find storage class %q", className)
 		}
+		// Pre-bound claim should never reach here as
+		// no dynamic provisioning happens on it
+		if pvutil.IsPreBoundClaim(claim) {
+			return false, nil, fmt.Errorf("claim %s with VolumeName set is not eligible for provisioning", claim.Name)
+		}
 		provisioner := class.Provisioner
 		if provisioner == "" || provisioner == pvutil.NotSupportedProvisioner {
 			klog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, pvcName)
@@ -727,7 +732,6 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 			klog.V(4).Infof("Node %q cannot satisfy provisioning topology requirements of claim %q", node.Name, pvcName)
 			return false, nil, nil
 		}
-
 		// TODO: Check if capacity of the node domain in the storage class
 		// can satisfy resource requirement of given claim
 

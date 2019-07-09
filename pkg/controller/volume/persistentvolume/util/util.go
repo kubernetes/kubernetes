@@ -351,3 +351,10 @@ func GetVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
 		},
 	}
 }
+
+// IsPreBoundClaim identifies that a claim 's binding was
+// done by user not by controller
+func IsPreBoundClaim(claim *v1.PersistentVolumeClaim) bool {
+	_, ok := claim.Annotations[AnnBoundByController]
+	return !ok && claim.Spec.VolumeName != ""
+}
