@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/value"
 )
 
 // TestFieldsRoundTrip tests that a fields trie can be round tripped as a path set
@@ -104,6 +105,55 @@ func TestSetToFieldsError(t *testing.T) {
 		_, err := SetToFields(test.set)
 		if err == nil || !strings.Contains(err.Error(), test.errString) {
 			t.Fatalf("Expected error to contain %q but got: %v", test.errString, err)
+		}
+	}
+}
+
+func BenchmarkSetToFields(b *testing.B) {
+	set := fieldpath.NewSet(
+		fieldpath.MakePathOrDie("foo", 0, "bar", "baz"),
+		fieldpath.MakePathOrDie("foo", 0, "bar", "zot"),
+		fieldpath.MakePathOrDie("foo", 0, "bar"),
+		fieldpath.MakePathOrDie("foo", 0),
+		fieldpath.MakePathOrDie("foo", 1, "bar", "baz"),
+		fieldpath.MakePathOrDie("foo", 1, "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first"))),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first")), "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("second")), "bar"),
+	)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_, err := SetToFields(*set)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkFieldsToSet(b *testing.B) {
+	set := fieldpath.NewSet(
+		fieldpath.MakePathOrDie("foo", 0, "bar", "baz"),
+		fieldpath.MakePathOrDie("foo", 0, "bar", "zot"),
+		fieldpath.MakePathOrDie("foo", 0, "bar"),
+		fieldpath.MakePathOrDie("foo", 0),
+		fieldpath.MakePathOrDie("foo", 1, "bar", "baz"),
+		fieldpath.MakePathOrDie("foo", 1, "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first"))),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first")), "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("second")), "bar"),
+	)
+	fields, err := SetToFields(*set)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_, err := FieldsToSet(fields)
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }
