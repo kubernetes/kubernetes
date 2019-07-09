@@ -113,26 +113,6 @@ function setup_vertical_pod_autoscaler_component {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
-function configure_healthcheck_component {
-  # TODO: is there a reliable way to make this a no-op?
-  create-static-auth-kubeconfig-for-component "gke-master-healthcheck"
-}
-
-function configure_pdcsi_component {
-  create-static-auth-kubeconfig-for-component "pdcsi-controller"
-}
-
-function configure_controller_manager_component {
-  # TODO: is there a reliable way to make this a no-op?
-  setup-addon-manifests "addons" "rbac/gcp-controller-manager"
-  create-static-auth-kubeconfig-for-component "gcp-controller-manager"
-}
-
-function configure_tpu_operator_component {
-  setup-addon-manifests "addons" "rbac/k8s-tpu-operator"
-  create-static-auth-kubeconfig-for-component "k8s-tpu-operator"
-}
-
 function generate_vertical_pod_autoscaler_admission_controller_certs {
   local certs_dir="/etc/tls-certs" #TODO: what is the best place for certs?
   echo "Generating certs for the VPA Admission Controller in ${certs_dir}."
@@ -155,40 +135,8 @@ function create-static-auth-kubeconfig-for-component {
   create-kubeconfig ${component} ${token}
 }
 
-function create-kubeconfig {
-  local component=$1
-  local token=$2
-  echo "Creating kubeconfig file for component ${component}"
-  mkdir -p /etc/srv/kubernetes/${component}
-  cat <<EOF >/etc/srv/kubernetes/${component}/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: ${component}
-  user:
-    token: ${token}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: ${component}
-  name: ${component}
-current-context: ${component}
-EOF
-}
-
 function gke-internal-master-start {
   echo "Internal GKE configuration start"
-  configure_healthcheck_component
-  configure_pdcsi_component
-  configure_controller_manager_component
-  if [[ -n "${ENABLE_TPU:-}" ]]; then
-    configure_tpu_operator_component
-  fi
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
   start_vertical_pod_autoscaler
