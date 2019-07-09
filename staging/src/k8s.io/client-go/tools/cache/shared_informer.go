@@ -538,7 +538,7 @@ type processorListener struct {
 	// nextResync is the earliest time the listener should get a full resync
 	nextResync time.Time
 	// resyncLock guards access to resyncPeriod and nextResync
-	resyncLock sync.Mutex
+	resyncLock sync.RWMutex
 }
 
 func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
@@ -625,8 +625,8 @@ func (p *processorListener) run() {
 // shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,
 // this always returns false.
 func (p *processorListener) shouldResync(now time.Time) bool {
-	p.resyncLock.Lock()
-	defer p.resyncLock.Unlock()
+	p.resyncLock.RLock()
+	defer p.resyncLock.RUnlock()
 
 	if p.resyncPeriod == 0 {
 		return false
