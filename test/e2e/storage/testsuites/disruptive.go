@@ -139,8 +139,15 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 				defer cleanup()
 
 				var err error
+				var pvcs []*v1.PersistentVolumeClaim
+				var inlineSources []*v1.VolumeSource
+				if pattern.VolType == testpatterns.InlineVolume {
+					inlineSources = append(inlineSources, l.resource.volSource)
+				} else {
+					pvcs = append(pvcs, l.resource.pvc)
+				}
 				ginkgo.By("Creating a pod with pvc")
-				l.pod, err = framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+				l.pod, err = framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 				if pattern.VolMode == v1.PersistentVolumeBlock {

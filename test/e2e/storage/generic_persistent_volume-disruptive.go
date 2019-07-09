@@ -102,7 +102,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 	framework.ExpectEqual(len(pvs), 1)
 
 	ginkgo.By("Creating a pod with dynamically provisioned volume")
-	pod, err := framework.CreateSecPod(c, ns, pvcClaims,
+	pod, err := framework.CreateSecPod(c, ns, pvcClaims, nil,
 		false, "", false, false, framework.SELinuxLabel,
 		nil, framework.PodStartTimeout)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
