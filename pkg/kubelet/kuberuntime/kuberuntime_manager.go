@@ -473,6 +473,36 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
+func liftHostPathDeviceMountToVolumeDevices(pod *v1.Pod, container *v1.Container) {
+	vd := container.VolumeDevices
+	vm := []v1.VolumeMount{}
+	for _, mount := range container.VolumeMounts {
+		if isHostPathDevice(mount.Name, pod.Spec.Volumes) {
+			vd = append(vd, v1.VolumeDevice{Name: mount.Name, DevicePath: mount.MountPath})
+			continue
+		}
+		vm = append(vm, mount)
+	}
+
+	container.VolumeDevices = vd
+	container.VolumeMounts = vm
+}
+
+func isHostPathDevice(volumeName string, volumes []v1.Volume) bool {
+	for _, volume := range volumes {
+		if volume.Name == volumeName {
+			if volume.HostPath != nil {
+				switch *volume.HostPath.Type {
+				case v1.HostPathBlockDev, v1.HostPathCharDev:
+					return true
+				}
+			}
+			break
+		}
+	}
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
@@ -829,7 +859,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
-		start("container", containerStartSpec(&pod.Spec.Containers[idx]))
+		container := &pod.Spec.Containers[idx]
+		liftHostPathDeviceMountToVolumeDevices(pod, container)
+		start("container", containerStartSpec(container))
 	}
 
 	return
