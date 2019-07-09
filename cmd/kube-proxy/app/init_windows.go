@@ -21,7 +21,7 @@ package app
 import (
 	"k8s.io/kubernetes/pkg/windows/service"
 
-	"github.com/spf13/pflag"
+	"sigs.k8s.io/legacyflag/pkg/legacyflag"
 )
 
 const (
@@ -35,9 +35,9 @@ func initForOS(windowsService bool) error {
 	return nil
 }
 
-func (o *Options) addOSFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&o.WindowsService, "windows-service", o.WindowsService, "Enable Windows Service Control Manager API integration")
-	fs.StringVar(&o.config.Winkernel.SourceVip, "source-vip", o.config.Winkernel.SourceVip, "The IP address of the source VIP for non-DSR.")
-	fs.StringVar(&o.config.Winkernel.NetworkName, "network-name", o.config.Winkernel.NetworkName, "The name of the cluster network.")
-	fs.BoolVar(&o.config.Winkernel.EnableDSR, "enable-dsr", o.config.Winkernel.EnableDSR, "If true make kube-proxy apply DSR policies for service VIP")
+func (o *Options) addOSFlags(fs *legacyflag.FlagSet) {
+	fs.BoolVar("windows-service", o.WindowsService, "Enable Windows Service Control Manager API integration").Set(&o.WindowsService)
+	fs.StringVar("source-vip", o.config.Winkernel.SourceVip, "The IP address of the source VIP for non-DSR.").Set(&o.config.Winkernel.SourceVip)
+	fs.StringVar("network-name", o.config.Winkernel.NetworkName, "The name of the cluster network.").Set(&o.config.Winkernel.NetworkName)
+	fs.BoolVar("enable-dsr", o.config.Winkernel.EnableDSR, "If true make kube-proxy apply DSR policies for service VIP").Set(&o.config.Winkernel.EnableDSR)
 }

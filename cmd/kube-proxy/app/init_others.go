@@ -19,12 +19,12 @@ limitations under the License.
 package app
 
 import (
-	"github.com/spf13/pflag"
+	"sigs.k8s.io/legacyflag/pkg/legacyflag"
 )
 
 func initForOS(service bool) error {
 	return nil
 }
 
-func (o *Options) addOSFlags(fs *pflag.FlagSet) {
+func (o *Options) addOSFlags(fs *legacyflag.FlagSet) {
 }

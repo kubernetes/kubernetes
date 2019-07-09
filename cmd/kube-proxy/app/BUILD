@@ -65,10 +65,10 @@ go_library(
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
+        "//vendor/sigs.k8s.io/legacyflag/pkg/legacyflag:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/proxy/metrics:go_default_library",
