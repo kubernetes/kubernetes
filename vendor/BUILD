@@ -21,6 +21,7 @@ filegroup(
         "//vendor/github.com/Azure/go-autorest/autorest:all-srcs",
         "//vendor/github.com/Azure/go-autorest/logger:all-srcs",
         "//vendor/github.com/Azure/go-autorest/version:all-srcs",
+        "//vendor/github.com/DATA-DOG/godog:all-srcs",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:all-srcs",
         "//vendor/github.com/JeffAshton/win_pdh:all-srcs",
         "//vendor/github.com/MakeNowJust/heredoc:all-srcs",

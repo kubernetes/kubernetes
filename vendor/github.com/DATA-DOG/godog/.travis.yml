@@ -1,0 +1,25 @@
+language: go
+go:
+  - 1.5.x
+  - 1.6.x
+  - 1.7.x
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
+
+go_import_path: github.com/DATA-DOG/godog
+
+install: go install github.com/DATA-DOG/godog/cmd/godog
+
+script:
+  - go vet github.com/DATA-DOG/godog
+  - go vet github.com/DATA-DOG/godog/gherkin
+  - go vet github.com/DATA-DOG/godog/colors
+  - test -z "$(go fmt ./...)" # fail if not formatted properly
+  - godog -f progress
+  - go test -v -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

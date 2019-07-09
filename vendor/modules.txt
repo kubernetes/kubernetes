@@ -21,6 +21,10 @@ github.com/Azure/go-autorest/autorest/to
 github.com/Azure/go-autorest/autorest/validation
 github.com/Azure/go-autorest/logger
 github.com/Azure/go-autorest/version
+# github.com/DATA-DOG/godog v0.7.13 => github.com/DATA-DOG/godog v0.7.13
+github.com/DATA-DOG/godog
+github.com/DATA-DOG/godog/colors
+github.com/DATA-DOG/godog/gherkin
 # github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100 => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter

@@ -218,30 +218,32 @@ func gatherTestSuiteMetrics() error {
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
-	runtimeutils.ReallyCrash = true
-	logs.InitLogs()
-	defer logs.FlushLogs()
+	if !runGoDogTests {
+		runtimeutils.ReallyCrash = true
+		logs.InitLogs()
+		defer logs.FlushLogs()
 
-	gomega.RegisterFailHandler(ginkgowrapper.Fail)
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-	}
-
-	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
-	if framework.TestContext.ReportDir != "" {
-		// TODO: we should probably only be trying to create this directory once
-		// rather than once-per-Ginkgo-node.
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+		gomega.RegisterFailHandler(ginkgowrapper.Fail)
+		// Disable skipped tests unless they are explicitly requested.
+		if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
+			config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
 		}
-	}
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+		// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
+		var r []ginkgo.Reporter
+		if framework.TestContext.ReportDir != "" {
+			// TODO: we should probably only be trying to create this directory once
+			// rather than once-per-Ginkgo-node.
+			if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
+				klog.Errorf("Failed creating report directory: %v", err)
+			} else {
+				r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			}
+		}
+		klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
+
+		ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+	}
 }
 
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it

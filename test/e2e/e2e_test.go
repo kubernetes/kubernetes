@@ -29,6 +29,7 @@ import (
 	// directory contains a Ginkgo test suite.
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo"
+	"github.com/DATA-DOG/godog"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -60,7 +61,15 @@ import (
 
 var viperConfig = flag.String("viper-config", "", "The name of a viper config file (https://github.com/spf13/viper#what-is-viper). All e2e command line parameters can also be configured in such a file. May contain a path and may or may not contain the file suffix. The default is to look for an optional file with `e2e` as base name. If a file is specified explicitly, it must be present.")
 
+var (
+	runGoDogTests bool
+	stopOnFailure bool
+)
+
 func init() {
+	flag.BoolVar(&runGoDogTests, "godog", false, "Set this flag is you want to run godog BDD tests")
+	flag.BoolVar(&stopOnFailure, "stop-on-failure", false, "Stop processing on first failed scenario.. Flag is passed to godog")
+	flag.Parse()
 	// Register framework flags, then handle flags and Viper config.
 	framework.HandleFlags()
 	if err := viperconfig.ViperizeFlags(*viperConfig, "e2e"); err != nil {
@@ -91,12 +100,32 @@ func init() {
 		Asset:      generated.Asset,
 		AssetNames: generated.AssetNames,
 	})
+}
 
+func FeatureContext(s *godog.Suite) {
+	// Do something with Suite s !!
 }
 
 func TestMain(m *testing.M) {
-	rand.Seed(time.Now().UnixNano())
-	os.Exit(m.Run())
+	if !runGoDogTests {
+		rand.Seed(time.Now().UnixNano())
+		os.Exit(m.Run())
+	}
+
+	status := godog.RunWithOptions("e2e", func(s *godog.Suite) {
+		FeatureContext(s)
+	}, godog.Options{
+		Format:        "pretty",
+		Paths:         []string{"test/e2e/features"},
+		Randomize:     time.Now().UTC().UnixNano(),
+		StopOnFailure: stopOnFailure,
+	})
+
+	if st := m.Run(); st > status {
+		status = st
+	}
+
+	os.Exit(status)
 }
 
 func TestE2E(t *testing.T) {
