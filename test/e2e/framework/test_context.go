@@ -184,6 +184,8 @@ type NodeKillerConfig struct {
 	JitterFactor float64
 	// SimulatedDowntime is a duration between node is killed and recreated.
 	SimulatedDowntime time.Duration
+	// NodeKillerStopCh is a channel that is used to notify NodeKiller to stop killing nodes.
+	NodeKillerStopCh chan struct{}
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.

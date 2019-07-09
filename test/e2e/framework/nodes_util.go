@@ -324,6 +324,7 @@ type NodeKiller struct {
 
 // NewNodeKiller creates new NodeKiller.
 func NewNodeKiller(config NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
+	config.NodeKillerStopCh = make(chan struct{})
 	return &NodeKiller{config, client, provider}
 }
 
