@@ -493,32 +493,12 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		uniqueVolumeName = util.GetUniqueVolumeNameFromSpecWithPod(volume.podName, plugin, volumeSpec)
 	}
 
-	volumeMounter, newMounterErr := plugin.NewMounter(
-		volumeSpec,
-		pod,
-		volumepkg.VolumeOptions{})
-	if newMounterErr != nil {
-		return nil, fmt.Errorf(
-			"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-			uniqueVolumeName,
-			volumeSpec.Name(),
-			volume.podName,
-			pod.UID,
-			newMounterErr)
-	}
-
-	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volumeMounter.GetPath(), volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
-	if checkErr != nil {
-		return nil, checkErr
-	}
-	// If mount or symlink doesn't exist, volume reconstruction should be failed
-	if !isExist {
-		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
-	}
+	var volumeMapper volumepkg.BlockVolumeMapper
+	var volumeMounter volumepkg.Mounter
+	// Path to the mount or block device to check
+	var checkPath string
 
 	// TODO: remove feature gate check after no longer needed
-	var volumeMapper volumepkg.BlockVolumeMapper
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && volume.volumeMode == v1.PersistentVolumeBlock {
 		var newMapperErr error
 		if mapperPlugin != nil {
@@ -535,7 +515,34 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 					pod.UID,
 					newMapperErr)
 			}
+			checkPath, _ = volumeMapper.GetPodDeviceMapPath()
 		}
+	} else {
+		var err error
+		volumeMounter, err = plugin.NewMounter(
+			volumeSpec,
+			pod,
+			volumepkg.VolumeOptions{})
+		if err != nil {
+			return nil, fmt.Errorf(
+				"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				err)
+		}
+		checkPath = volumeMounter.GetPath()
+	}
+
+	// Check existence of mount point for filesystem volume or symbolic link for block volume
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, checkPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	if checkErr != nil {
+		return nil, checkErr
+	}
+	// If mount or symlink doesn't exist, volume reconstruction should be failed
+	if !isExist {
+		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
 	}
 
 	reconstructedVolume := &reconstructedVolume{
