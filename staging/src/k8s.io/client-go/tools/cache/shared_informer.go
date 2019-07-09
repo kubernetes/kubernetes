@@ -199,7 +199,7 @@ type sharedIndexInformer struct {
 	clock clock.Clock
 
 	started, stopped bool
-	startedLock      sync.Mutex
+	startedLock      sync.RWMutex
 
 	// blockDeltas gives a way to stop all event distribution so that a late event handler
 	// can safely join the shared informer.
@@ -281,8 +281,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
+	s.startedLock.RLock()
+	defer s.startedLock.RUnlock()
 
 	if s.controller == nil {
 		return false
@@ -291,8 +291,8 @@ func (s *sharedIndexInformer) HasSynced() bool {
 }
 
 func (s *sharedIndexInformer) LastSyncResourceVersion() string {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
+	s.startedLock.RLock()
+	defer s.startedLock.RUnlock()
 
 	if s.controller == nil {
 		return ""
