@@ -67,7 +67,13 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	})
 
 	SIGDescribe("ReplicationController light", func() {
-		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
+		/*
+		  Release : v1.16
+		  Testname: Up-scale pod replicas and resources
+		  Description: Pod replicas MUST increase from 1 pod to 2 pods.
+		  Pod CPU request will increase to 50%.
+		*/
+		framework.ConformanceIt("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
