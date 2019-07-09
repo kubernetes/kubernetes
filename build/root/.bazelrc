@@ -1,6 +1,8 @@
 startup --expand_configs_in_place
 
-# Force us to use python2
+# https://github.com/kubernetes/kubernetes/pull/79807
+# https://github.com/bazelbuild/rules_docker/issues/842
+# https://github.com/bazelbuild/bazel/issues/7899
 build --host_force_python=PY2
 
 # Show us information about failures.
