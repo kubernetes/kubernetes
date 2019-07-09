@@ -18,7 +18,6 @@ package vsphere
 
 import (
 	"context"
-	"os"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -45,9 +44,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		framework.ExpectNoError(err)
-		workingDir = os.Getenv("VSPHERE_WORKING_DIR")
-		gomega.Expect(workingDir).NotTo(gomega.BeEmpty())
-
+		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
 
 	ginkgo.It("node unregister", func() {
@@ -111,8 +108,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		// Sanity test that pod provisioning works
 		ginkgo.By("Sanity check for volume lifecycle")
 		scParameters := make(map[string]string)
-		storagePolicy := os.Getenv("VSPHERE_SPBM_GOLD_POLICY")
-		gomega.Expect(storagePolicy).NotTo(gomega.BeEmpty(), "Please set VSPHERE_SPBM_GOLD_POLICY system environment")
+		storagePolicy := GetAndExpectStringEnvVar("VSPHERE_SPBM_GOLD_POLICY")
 		scParameters[SpbmStoragePolicy] = storagePolicy
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
