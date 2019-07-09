@@ -236,19 +236,23 @@ function install-node-problem-detector {
 
 function install-cni-binaries {
   if [[ -n "${CNI_VERSION:-}" ]]; then
-      local -r cni_tar="${CNI_TAR_PREFIX}${CNI_VERSION}.tgz"
+      local -r cni_version="${CNI_VERSION}"
       local -r cni_sha1="${CNI_SHA1}"
   else
-      local -r cni_tar="${CNI_TAR_PREFIX}${DEFAULT_CNI_VERSION}.tgz"
+      local -r cni_version="${DEFAULT_CNI_VERSION}"
       local -r cni_sha1="${DEFAULT_CNI_SHA1}"
   fi
+
+  local -r cni_tar="${CNI_TAR_PREFIX}${cni_version}.tgz"
+  local -r cni_url="${CNI_STORAGE_URL_BASE}/${cni_version}/${cni_tar}"
+
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
   fi
 
   echo "Downloading cni binaries"
-  download-or-bust "${cni_sha1}" "${CNI_STORAGE_PATH}/${cni_tar}"
+  download-or-bust "${cni_sha1}" "${cni_url}"
   local -r cni_dir="${KUBE_HOME}/cni"
   mkdir -p "${cni_dir}/bin"
   tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite

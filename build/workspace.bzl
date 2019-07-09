@@ -53,13 +53,14 @@ def release_dependencies():
     debian_image_dependencies()
     etcd_tarballs()
 
+# TODO(justaugustus): Post-0.7.5 CNI needs a "cni-plugins-linux-" prefix
 def cni_tarballs():
     for arch, sha in _CNI_TARBALL_ARCH_SHA256.items():
         http_file(
             name = "kubernetes_cni_%s" % arch,
             downloaded_file_path = "kubernetes_cni.tgz",
             sha256 = sha,
-            urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-%s-v%s.tgz" % (arch, CNI_VERSION)),
+            urls = mirror("https://storage.googleapis.com/k8s-artifacts-cni/release/v%s/cni-plugins-%s-v%s.tgz" % (CNI_VERSION, arch, CNI_VERSION)),
         )
 
 def cri_tarballs():

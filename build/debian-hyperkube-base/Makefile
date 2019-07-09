@@ -28,6 +28,7 @@ BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
 CNI_VERSION=v0.7.5
 
 TEMP_DIR:=$(shell mktemp -d)
+# TODO(justaugustus): Post-0.7.5 CNI needs a "cni-plugins-linux-" prefix
 CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz
 
 # This option is for running docker manifest command
@@ -58,7 +59,7 @@ push-manifest:
 
 cni-tars/$(CNI_TARBALL):
 	mkdir -p cni-tars/
-	cd cni-tars/ && curl -sSLO --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/${CNI_TARBALL}
+	cd cni-tars/ && curl -sSLO --retry 5 https://storage.googleapis.com/k8s-artifacts-cni/release/${CNI_VERSION}/${CNI_TARBALL}
 
 clean:
 	rm -rf cni-tars/
