@@ -60,6 +60,7 @@ go_library(
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/controller/nodeipam:go_default_library",
+        "//pkg/controller/nodeipam/config:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
         "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/controller/podautoscaler:go_default_library",

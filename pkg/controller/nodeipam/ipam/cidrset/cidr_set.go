@@ -43,6 +43,8 @@ const (
 	// The subnet mask size cannot be greater than 16 more than the cluster mask size
 	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
 	// clusterSubnetMaxDiff limited to 16 due to the uncompressed bitmap
+	// Due to this limitation the subnet mask for IPv6 cluster cidr needs to be >= 48
+	// as default mask size for IPv6 is 64.
 	clusterSubnetMaxDiff = 16
 	// halfIPv6Len is the half of the IPv6 length
 	halfIPv6Len = net.IPv6len / 2
