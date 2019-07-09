@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -138,7 +139,7 @@ func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaS
 }
 
 type fixture struct {
-	t *testing.T
+	t testing.TB
 
 	client *fake.Clientset
 	// Objects to put in the store.
@@ -172,7 +173,7 @@ func (f *fixture) expectCreateRSAction(rs *apps.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction(schema.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t testing.TB) *fixture {
 	f := &fixture{}
 	f.t = t
 	f.objects = []runtime.Object{}
@@ -955,6 +956,51 @@ func TestDeleteReplicaSetOrphan(t *testing.T) {
 	dc.deleteReplicaSet(rs)
 	if got, want := dc.queue.Len(), 0; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func BenchmarkGetPodMapForDeployment(b *testing.B) {
+	f := newFixture(b)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	rs1 := newReplicaSet(d, "rs1", 1)
+	rs2 := newReplicaSet(d, "rs2", 1)
+
+	var pods []*v1.Pod
+	var objects []runtime.Object
+	for i := 0; i < 100; i++ {
+		p1, p2 := generatePodFromRS(rs1), generatePodFromRS(rs2)
+		p1.Name, p2.Name = p1.Name+fmt.Sprintf("-%d", i), p2.Name+fmt.Sprintf("-%d", i)
+		pods = append(pods, p1, p2)
+		objects = append(objects, p1, p2)
+	}
+
+	f.dLister = append(f.dLister, d)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.podLister = append(f.podLister, pods...)
+	f.objects = append(f.objects, d, rs1, rs2)
+	f.objects = append(f.objects, objects...)
+
+	// Start the fixture.
+	c, informers, err := f.newController()
+	if err != nil {
+		b.Fatalf("error creating Deployment controller: %v", err)
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		m, err := c.getPodMapForDeployment(d, f.rsLister)
+		if err != nil {
+			b.Fatalf("getPodMapForDeployment() error: %v", err)
+		}
+		if len(m) != 2 {
+			b.Errorf("Invalid map size, expected 2, got: %d", len(m))
+		}
 	}
 }
 
