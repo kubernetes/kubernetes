@@ -134,6 +134,8 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 			_, isSupported = driver.(PreprovisionedPVTestDriver)
 		case testpatterns.DynamicPV:
 			_, isSupported = driver.(DynamicPVTestDriver)
+		case testpatterns.CSIInlineVolume:
+			_, isSupported = driver.(EphemeralTestDriver)
 		default:
 			isSupported = false
 		}

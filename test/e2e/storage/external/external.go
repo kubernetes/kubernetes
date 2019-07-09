@@ -40,6 +40,7 @@ import (
 
 // List of testSuites to be executed for each external driver.
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitEphemeralTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
@@ -128,6 +129,9 @@ var _ testsuites.DynamicPVTestDriver = &driverDefinition{}
 // Same for snapshotting.
 var _ testsuites.SnapshottableTestDriver = &driverDefinition{}
 
+// And for ephemeral volumes.
+var _ testsuites.EphemeralTestDriver = &driverDefinition{}
+
 // runtime.DecodeInto needs a runtime.Object but doesn't do any
 // deserialization of it and therefore none of the methods below need
 // an implementation.
@@ -174,6 +178,15 @@ type driverDefinition struct {
 		// TODO (?): load from file
 	}
 
+	// InlineVolumeAttributes defines one or more set of attributes for
+	// use as inline ephemeral volumes. At least one set of attributes
+	// has to be defined to enable testing of inline ephemeral volumes.
+	// If a test needs more volumes than defined, some of the defined
+	// volumes will be used multiple times.
+	//
+	// DriverInfo.Name is used as name of the driver in the inline volume.
+	InlineVolumeAttributes []map[string]string
+
 	// ClaimSize defines the desired size of dynamically
 	// provisioned volumes. Default is "5GiB".
 	ClaimSize string
@@ -206,6 +219,8 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" {
 			supported = true
 		}
+	case testpatterns.CSIInlineVolume:
+		supported = len(d.InlineVolumeAttributes) != 0
 	}
 	if !supported {
 		framework.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
@@ -276,6 +291,17 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 
 func (d *driverDefinition) GetClaimSize() string {
 	return d.ClaimSize
+}
+
+func (d *driverDefinition) GetVolumeAttributes(config *testsuites.PerTestConfig, volumeNumber int) map[string]string {
+	if len(d.InlineVolumeAttributes) == 0 {
+		framework.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
+	}
+	return d.InlineVolumeAttributes[volumeNumber%len(d.InlineVolumeAttributes)]
+}
+
+func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) string {
+	return d.DriverInfo.Name
 }
 
 func (d *driverDefinition) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
