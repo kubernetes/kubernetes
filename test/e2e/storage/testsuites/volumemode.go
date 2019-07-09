@@ -188,7 +188,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				ginkgo.By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
-					false, "", false, false, framework.SELinuxLabel,
+					nil, false, "", false, false, framework.SELinuxLabel,
 					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
