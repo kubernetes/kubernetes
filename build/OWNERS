@@ -9,6 +9,7 @@ reviewers:
   - spiffxp
   - zmerlynn
 approvers:
+  - bentheelder
   - cblecker
   - fejta
   - jbeda
