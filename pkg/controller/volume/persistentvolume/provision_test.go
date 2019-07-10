@@ -24,6 +24,8 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -69,12 +71,36 @@ var storageClasses = []*storage.StorageClass{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
+			Name: "copper",
+		},
+		Provisioner:       mockPluginName,
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeWait,
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "external",
 		},
 		Provisioner:       "vendor.com/my-volume",
 		Parameters:        class1Parameters,
 		ReclaimPolicy:     &deleteReclaimPolicy,
 		VolumeBindingMode: &modeImmediate,
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "external-wait",
+		},
+		Provisioner:       "vendor.com/my-volume-wait",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeWait,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -442,6 +468,41 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-22", "uid11-22", "1Gi", "volume11-22", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			noevents,
 			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
+		{
+			// volume provision for PVC scheduled
+			"11-23 - skip finding PV and provision for PVC annotated with AnnSelectedNode",
+			newVolumeArray("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper),
+			[]*v1.PersistentVolume{
+				newVolume("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper),
+				newVolume("pvc-uid11-23", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, pvutil.AnnDynamicallyProvisioned, pvutil.AnnBoundByController),
+			},
+			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper)),
+			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper, pvutil.AnnStorageProvisioner)),
+			[]string{"Normal ProvisioningSucceeded"},
+			noerrors,
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+				func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+					nodesIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+					node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
+					nodesIndexer.Add(node)
+					ctrl.NodeLister = corelisters.NewNodeLister(nodesIndexer)
+				}),
+		},
+		{
+			// volume provision for PVC that scheduled
+			"11-24 - skip finding PV and wait external provisioner for PVC annotated with AnnSelectedNode",
+			newVolumeArray("volume11-24", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classExternalWait),
+			newVolumeArray("volume11-24", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classExternalWait),
+			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+				newClaimArray("claim11-24", "uid11-24", "1Gi", "", v1.ClaimPending, &classExternalWait)),
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume-wait",
+				claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+					newClaimArray("claim11-24", "uid11-24", "1Gi", "", v1.ClaimPending, &classExternalWait))),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors, testSyncClaim,
 		},
 	}
 	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
