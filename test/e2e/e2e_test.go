@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -28,11 +29,19 @@ import (
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
 	// See https://github.com/kubernetes/kubernetes/issues/74827
-	// "github.com/onsi/ginkgo"
 	"github.com/DATA-DOG/godog"
-	"k8s.io/kubernetes/test/e2e/features/steps"
+	"github.com/onsi/ginkgo"
+	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 
+	// "github.com/ess/jamaica"
+
+	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/gomega"
+	"k8s.io/component-base/logs"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/test/e2e/features/steps"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/viperconfig"
 	"k8s.io/kubernetes/test/e2e/generated"
@@ -68,9 +77,12 @@ var (
 )
 
 func init() {
+	e2elog.Logf("The FIRST thing that runs")
+	// Parse our godog flags... TODO: move to framework.HandleFlags()
 	flag.BoolVar(&runGoDogTests, "godog", false, "Set this flag is you want to run godog BDD tests")
 	flag.BoolVar(&stopOnFailure, "stop-on-failure", false, "Stop processing on first failed scenario.. Flag is passed to godog")
 	flag.Parse()
+	e2elog.Logf("runGoDogTests to %v", runGoDogTests)
 	// Register framework flags, then handle flags and Viper config.
 	framework.HandleFlags()
 	if err := viperconfig.ViperizeFlags(*viperConfig, "e2e"); err != nil {
@@ -103,23 +115,83 @@ func init() {
 	})
 }
 
-func FeatureContext(s *godog.Suite) {
-	steps.FirstStepsFeatureContext(s)
+func TestingMainFeatureContext(s *godog.Suite, m *testing.M) {
+	e2elog.Logf("Adding Before Suite")
+	s.BeforeSuite(func() {
+		e2elog.Logf("Running Before Suite")
+		// Just in case the standard logs are used
+		logs.InitLogs()
+		defer logs.FlushLogs()
+
+		/////// We needed to register the Fail Handler otherwise we get this:
+		// panic: You are trying to make an assertion, but Gomega's fail handler is nil.
+		// If you're using Ginkgo then you probably forgot to put your assertion in an It().
+		// Alternatively, you may have forgotten to register a fail handler with RegisterFailHandler() or RegisterTestingT().
+		// Depending on your vendoring solution you may be inadvertently importing gomega and subpackages (e.g. ghhtp, gexec,...) from different locations.
+		gomega.RegisterFailHandler(ginkgowrapper.Fail)
+		BeforeSuiteOnce()
+	})
+	e2elog.Logf("Adding After Suite")
+	s.AfterSuite(func() {
+		e2elog.Logf("Running After Suite Once")
+		AfterSuiteOnce()
+		e2elog.Logf("Running After Suite Many")
+		AfterSuiteMany() // not sure how per node werks here
+		// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
+		var r []ginkgo.Reporter
+		if framework.TestContext.ReportDir != "" {
+			// TODO: we should probably only be trying to create this directory once
+			// rather than once-per-Ginkgo-node.
+			if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
+				klog.Errorf("Failed creating report directory: %v", err)
+			} else {
+				r = append(r, reporters.NewJUnitReporter(
+					path.Join(framework.TestContext.ReportDir,
+						fmt.Sprintf("junit_%v-godog.xml",
+							framework.TestContext.ReportPrefix))))
+				// framework.TestContext.ReportPrefix,
+				// config.GinkgoConfig.ParallelNode))))
+			}
+		}
+		// ginkgo.globalSuite.beforeSuiteNode = nil
+		// ginkgo.globalSuite.afterSuiteNode = nil
+		// 	SynchronizedBeforeSuite(
+		// 	func() []byte {
+		// 		// Do nothing since go-ds handling the suite setup
+		// 		return nil
+		// 	},
+		// 	func(data []byte) {
+		// 		// Do nothing since go-dog is handling the suite setup
+		// 	})
+		// ginkgo.SynchronizedAfterSuite(func() {
+		// 	// Do nothing since go-dog is handling the suite teardown
+		// }, func() {
+		// 	// Do nothing since go-dog is handling the suite teardown
+		// })
+	})
+	// jamaica.SetRootCmd("echo") cmd needs to be cobra.cmd
+	// jamaica.StepUp(s)
+	e2elog.Logf("Adding FirstSteps FeatureContext")
+	steps.FirstStepsFeatureContext(s, m)
 	// Do something with Suite s !!
 }
 
 func TestMain(m *testing.M) {
+	// e2elog.Logf("TestMain being called with Testing.M: %v", m.tests)
+
+	// if not with with --godog, use our existing e2e framework as is
 	if !runGoDogTests {
 		rand.Seed(time.Now().UnixNano())
 		os.Exit(m.Run())
 	}
-
+	// otherwise let's use godog
 	status := godog.RunWithOptions("e2e", func(s *godog.Suite) {
-		FeatureContext(s)
+		// if we can pass m, we can call m.Run()
+		TestingMainFeatureContext(s, m)
 	}, godog.Options{
-		Format:        "pretty",
-		Paths:         []string{"test/e2e/features"},
-		Randomize:     time.Now().UTC().UnixNano(),
+		Format: "pretty",
+		Paths:  []string{"test/e2e/features"},
+		// Randomize:     time.Now().UTC().UnixNano(),
 		StopOnFailure: stopOnFailure,
 	})
 
@@ -131,5 +203,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2E(t *testing.T) {
-	RunE2ETests(t)
+	e2elog.Logf("TestE2E being called with testing.T")
+	if !runGoDogTests {
+		e2elog.Logf("Running existing E2E Tests")
+		RunE2ETests(t)
+	}
 }

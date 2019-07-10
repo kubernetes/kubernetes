@@ -13,13 +13,13 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//test/e2e/features/steps:go_default_library",
         "//test/e2e/apimachinery:go_default_library",
         "//test/e2e/apps:go_default_library",
         "//test/e2e/auth:go_default_library",
         "//test/e2e/autoscaling:go_default_library",
         "//test/e2e/cloud:go_default_library",
         "//test/e2e/common:go_default_library",
+        "//test/e2e/features/steps:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/framework/viperconfig:go_default_library",
@@ -39,6 +39,7 @@ go_test(
         "//test/e2e/windows:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/DATA-DOG/godog:go_default_library",
+        "//vendor/github.com/ess/jamaica:go_default_library",
     ],
 )
 
@@ -99,7 +100,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//test/e2e/features/steps:all-srcs",
         "//test/e2e/apimachinery:all-srcs",
         "//test/e2e/apps:all-srcs",
         "//test/e2e/auth:all-srcs",
@@ -107,6 +107,7 @@ filegroup(
         "//test/e2e/chaosmonkey:all-srcs",
         "//test/e2e/cloud:all-srcs",
         "//test/e2e/common:all-srcs",
+        "//test/e2e/features/steps:all-srcs",
         "//test/e2e/framework:all-srcs",
         "//test/e2e/generated:all-srcs",
         "//test/e2e/instrumentation:all-srcs",

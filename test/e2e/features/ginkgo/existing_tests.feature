@@ -8,3 +8,8 @@ Feature: Use existing ginkgo framework
     When I run the test
     Then the existing test will pass
     And this is fine
+  Scenario: Container Runtime blackbox test when running a container with a new image should be able to pull from private registry with secret
+    Given existing test "[k8s.io] Container Runtime blackbox test when running a container with a new image should be able to pull from private registry with secret [NodeConformance]"
+    When I run the test
+    Then the existing test will pass
+    And this is fine

@@ -61,16 +61,9 @@ var (
 	nodeKillerStopCh = make(chan struct{})
 )
 
-// There are certain operations we only want to run once per overall test invocation
-// (such as deleting old namespaces, or verifying that all system pods are running.
-// Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
-// to ensure that these operations only run on the first parallel Ginkgo node.
-//
-// This function takes two parameters: one function which runs on only the first Ginkgo node,
-// returning an opaque byte array, and then a second function which runs on all Ginkgo nodes,
-// accepting the byte array.
-var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
-	// Run only on Ginkgo node 1
+// This function is called once before the suite is runs
+// Either by ginkgo.SynchronizedBeforeSuite or godog.Suite.BeforeSuite
+func BeforeSuiteOnce() {
 
 	switch framework.TestContext.Provider {
 	case "gce", "gke":
@@ -151,21 +144,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		nodeKillerStopCh = make(chan struct{})
 		go nodeKiller.Run(nodeKillerStopCh)
 	}
-	return nil
+	// return nil
+}
 
-}, func(data []byte) {
-	// Run on all Ginkgo nodes
-})
-
-// Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
-// Here, the order of functions is reversed; first, the function which runs everywhere,
-// and then the function that only runs on the first Ginkgo node.
-var _ = ginkgo.SynchronizedAfterSuite(func() {
-	// Run on all Ginkgo nodes
-	e2elog.Logf("Running AfterSuite actions on all nodes")
-	framework.RunCleanupActions()
-}, func() {
-	// Run only Ginkgo on node 1
+// This function is called once after the suite is run
+// Either by ginkgo.SynchronizedAfterSuite or godog.Suite.AfterSuite
+func AfterSuiteOnce() {
 	e2elog.Logf("Running AfterSuite actions on node 1")
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
@@ -178,7 +162,17 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 	if framework.TestContext.NodeKiller.Enabled {
 		close(nodeKillerStopCh)
 	}
-})
+}
+
+// This function is called per node after the suite is run
+// I'm unsure what a ginkgo node is, but I suspect it's the parallel runs
+// Either by ginkgo.SynchronizedAfterSuite or godog.Suite.AfterSuite
+func AfterSuiteMany() {
+	e2elog.Logf("Running AfterSuite actions on all nodes")
+	framework.RunCleanupActions()
+	// use in your steps: framework.AddCleanupAction(func() { // runs after the suite }
+	// })
+}
 
 func gatherTestSuiteMetrics() error {
 	e2elog.Logf("Gathering metrics")
@@ -212,38 +206,71 @@ func gatherTestSuiteMetrics() error {
 	return nil
 }
 
+func setupGinkgoSuite() {
+	// There are certain operations we only want to run once per overall test invocation
+	// (such as deleting old namespaces, or verifying that all system pods are running.
+	// Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
+	// to ensure that these operations only run on the first parallel Ginkgo node.
+	//
+	// This function takes two parameters: one function which runs on only the first Ginkgo node,
+	// returning an opaque byte array, and then a second function which runs on all Ginkgo nodes,
+	// accepting the byte array.
+
+	var _ = ginkgo.SynchronizedBeforeSuite(
+		func() []byte {
+			// Run only on Ginkgo node 1
+			BeforeSuiteOnce()
+			return nil
+		},
+		func(data []byte) {
+			// Run on all Ginkgo nodes
+			// return
+		})
+	// Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
+	// Here, the order of functions is reversed; first, the function which runs everywhere,
+	// and then the function that only runs on the first Ginkgo node.
+	var _ = ginkgo.SynchronizedAfterSuite(func() {
+		// Run on all Ginkgo nodes
+		AfterSuiteMany()
+	}, func() {
+		// Run only Ginkgo on node 1
+		AfterSuiteOnce()
+	})
+}
+
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
 // E2E tests using the Ginkgo runner.
 // If a "report directory" is specified, one or more JUnit test reports will be
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
-	if !runGoDogTests {
-		runtimeutils.ReallyCrash = true
-		logs.InitLogs()
-		defer logs.FlushLogs()
+	// ginkgoTest = t
+	e2elog.Logf("\n\nTest Suite Metrics:\n%s\n", t.Name)
+	setupGinkgoSuite()
+	runtimeutils.ReallyCrash = true
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
-		gomega.RegisterFailHandler(ginkgowrapper.Fail)
-		// Disable skipped tests unless they are explicitly requested.
-		if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-			config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-		}
-
-		// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-		var r []ginkgo.Reporter
-		if framework.TestContext.ReportDir != "" {
-			// TODO: we should probably only be trying to create this directory once
-			// rather than once-per-Ginkgo-node.
-			if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-				klog.Errorf("Failed creating report directory: %v", err)
-			} else {
-				r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
-			}
-		}
-		klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
-
-		ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+	gomega.RegisterFailHandler(ginkgowrapper.Fail)
+	// Disable skipped tests unless they are explicitly requested.
+	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
+		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
 	}
+
+	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
+	var r []ginkgo.Reporter
+	if framework.TestContext.ReportDir != "" {
+		// TODO: we should probably only be trying to create this directory once
+		// rather than once-per-Ginkgo-node.
+		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
+			klog.Errorf("Failed creating report directory: %v", err)
+		} else {
+			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+		}
+	}
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
+
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it

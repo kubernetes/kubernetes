@@ -7,13 +7,17 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "first_steps.go",
-    ],
+    srcs = ["first_steps.go"],
     importpath = "k8s.io/kubernetes/test/e2e/features/steps",
     deps = [
+        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//test/e2e:go_default_library",
+        "//test/e2e/framework:go_default_library",
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/DATA-DOG/godog:go_default_library",
-      ],
+    ],
 )
 
 filegroup(
