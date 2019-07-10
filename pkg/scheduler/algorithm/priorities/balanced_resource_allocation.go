@@ -41,10 +41,16 @@ var (
 func balancedResourceScorer(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
 	cpuFraction := fractionOfCapacity(requested.MilliCPU, allocable.MilliCPU)
 	memoryFraction := fractionOfCapacity(requested.Memory, allocable.Memory)
+
+	if cpuFraction >= 1 || memoryFraction >= 1 {
+		// if requested >= capacity, the corresponding host should never be preferred.
+		return 0
+	}
+
 	// This to find a node which has most balanced CPU, memory and volume usage.
 	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
 		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
-		if cpuFraction >= 1 || memoryFraction >= 1 || volumeFraction >= 1 {
+		if volumeFraction >= 1 {
 			// if requested >= capacity, the corresponding host should never be preferred.
 			return 0
 		}
@@ -57,10 +63,6 @@ func balancedResourceScorer(requested, allocable *schedulernodeinfo.Resource, in
 		return int64((1 - variance) * float64(schedulerapi.MaxPriority))
 	}
 
-	if cpuFraction >= 1 || memoryFraction >= 1 {
-		// if requested >= capacity, the corresponding host should never be preferred.
-		return 0
-	}
 	// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1
 	// respectively. Multiplying the absolute value of the difference by 10 scales the value to
 	// 0-10 with 0 representing well balanced allocation and 10 poorly balanced. Subtracting it from
