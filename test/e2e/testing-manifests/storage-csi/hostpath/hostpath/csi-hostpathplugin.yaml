@@ -33,7 +33,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.1.0-rc1
+          image: quay.io/k8scsi/hostpathplugin:v1.2.0-rc3
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
