@@ -41,6 +41,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -460,7 +461,12 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		}
 	})
 
-	ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
+	/*
+	   Release : v1.16
+	   Testname: Verify preemption of pod ReplicaSets
+	   Description: MUST create pods with ReplicaSets and verify pod's replica count
+	*/
+	framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func() {
 		podNamesSeen := make(map[string]struct{})
 		stopCh := make(chan struct{})
 
