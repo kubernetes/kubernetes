@@ -81,13 +81,6 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
-func skipPersistenceTest(driver TestDriver) {
-	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapPersistence] {
-		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
-	}
-}
-
 func skipExecTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[CapExec] {
@@ -149,8 +142,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
-	ginkgo.It("should persist data across different pods", func() {
-		skipPersistenceTest(driver)
+	ginkgo.It("should store data", func() {
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			skipBlockTest(driver)
 		}
@@ -181,8 +173,12 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		volume.InjectContent(f.ClientSet, config, fsGroup, tests)
-		volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		volume.InjectContent(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		if driver.GetDriverInfo().Capabilities[CapPersistence] {
+			volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		} else {
+			ginkgo.By("Skipping persistence check for non-persistent volume")
+		}
 	})
 
 	// Exec works only on filesystem volumes

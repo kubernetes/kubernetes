@@ -500,6 +500,48 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 	return clientPod, nil
 }
 
+func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+	ginkgo.By("Checking that text file contents are perfect.")
+	for i, test := range tests {
+		if test.Mode == v1.PersistentVolumeBlock {
+			// Block: check content
+			deviceName := fmt.Sprintf("/opt/%d", i)
+			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
+			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
+
+			// Check that it's a real block device
+			utils.CheckVolumeModeOfPath(pod, test.Mode, deviceName)
+		} else {
+			// Filesystem: check content
+			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
+			commands := GenerateReadFileCmd(fileName)
+			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
+
+			// Check that a directory has been mounted
+			dirName := filepath.Dir(fileName)
+			utils.CheckVolumeModeOfPath(pod, test.Mode, dirName)
+
+			if !framework.NodeOSDistroIs("windows") {
+				// Filesystem: check fsgroup
+				if fsGroup != nil {
+					ginkgo.By("Checking fsGroup is correct.")
+					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
+				}
+
+				// Filesystem: check fsType
+				if fsType != "" {
+					ginkgo.By("Checking fsType is correct.")
+					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+				}
+			}
+		}
+	}
+}
+
 // TestVolumeClient start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple Tests can be specified to mount multiple volumes to a single
@@ -511,52 +553,13 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 
 	}
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
-
-	ginkgo.By("Checking that text file contents are perfect.")
-	for i, test := range tests {
-		if test.Mode == v1.PersistentVolumeBlock {
-			// Block: check content
-			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
-			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
-			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
-
-			// Check that it's a real block device
-			utils.CheckVolumeModeOfPath(clientPod, test.Mode, deviceName)
-		} else {
-			// Filesystem: check content
-			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands := GenerateReadFileCmd(fileName)
-			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
-			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
-
-			// Check that a directory has been mounted
-			dirName := filepath.Dir(fileName)
-			utils.CheckVolumeModeOfPath(clientPod, test.Mode, dirName)
-
-			if !framework.NodeOSDistroIs("windows") {
-				// Filesystem: check fsgroup
-				if fsGroup != nil {
-					ginkgo.By("Checking fsGroup is correct.")
-					_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
-					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
-				}
-
-				// Filesystem: check fsType
-				if fsType != "" {
-					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
-					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
-				}
-			}
-		}
-	}
+	testVolumeContent(client, clientPod, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64, tests []Test) {
+func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	injectorPod, err := runVolumeTesterPod(client, config, "injector", fsGroup, tests)
 	if err != nil {
 		e2elog.Failf("Failed to create injector pod: %v", err)
@@ -583,6 +586,10 @@ func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64
 		out, err := framework.RunKubectl(commands...)
 		framework.ExpectNoError(err, "failed: writing the contents: %s", out)
 	}
+
+	// Check that the data have been really written in this pod.
+	// This tests non-persistent volume types
+	testVolumeContent(client, injectorPod, fsGroup, fsType, tests)
 }
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.
