@@ -47,13 +47,16 @@ func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 	}
 }
 
-func GenerateTokenId() (string, error) {
+// GenerateTokenID generate TokenID
+func GenerateTokenID() (string, error) {
 	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return "", err
 	}
 	return tokenID, nil
 }
+
+// GenerateTokenSecret generate TokenSecret
 func GenerateTokenSecret() (string, error) {
 	tokenSecret, err := randBytes(TokenSecretBytes)
 	if err != nil {
@@ -75,11 +78,12 @@ func addSecretExpiration(s *v1.Secret, expiration string) {
 	s.Data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(expiration)
 }
 
+// TimeStringFromNow time conversion function
 func TimeStringFromNow(delta time.Duration) string {
 	return time.Now().Add(delta).Format(time.RFC3339)
 }
 
-func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID string) error {
+func waitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
@@ -95,7 +99,7 @@ func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID str
 	})
 }
 
-func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, tokenID string, signedToken string) error {
+func waitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, tokenID string, signedToken string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
@@ -111,7 +115,7 @@ func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, t
 	})
 }
 
-func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, tokenID string) error {
+func waitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
@@ -127,7 +131,7 @@ func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, 
 	})
 }
 
-func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID string) error {
+func waitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
 		_, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
@@ -138,7 +142,7 @@ func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID strin
 	})
 }
 
-func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID string, t time.Duration) error {
+func waitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID string, t time.Duration) error {
 	err := wait.Poll(framework.Poll, t, func() (bool, error) {
 		secret, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
 		if apierrs.IsNotFound(err) {

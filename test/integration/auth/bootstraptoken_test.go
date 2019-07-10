@@ -47,7 +47,7 @@ func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 
 // TestBootstrapTokenAuth tests the bootstrap token auth provider
 func TestBootstrapTokenAuth(t *testing.T) {
-	tokenID, err := bootstraputil.GenerateTokenId()
+	tokenID, err := bootstraputil.GenerateTokenID()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

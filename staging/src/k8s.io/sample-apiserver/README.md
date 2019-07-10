@@ -55,7 +55,7 @@ Note, however, that if you intend to
 [generate code](#changes-to-the-types) then you will also need the
 code-generator repo to exist in an old-style location.  One easy way
 to do this is to use the command `go mod vendor` to create and
-popdulate the `vendor` directory.
+populate the `vendor` directory.
 
 ### A Note on kubernetes/kubernetes
 
