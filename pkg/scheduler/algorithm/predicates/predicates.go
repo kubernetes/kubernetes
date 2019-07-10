@@ -1262,8 +1262,8 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, 
 	return true, true, nil
 }
 
-// GetPodAffinityTerms gets pod affinity terms by a pod affinity object.
-func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTerm) {
+// GetPodAffinityRequiredTerms gets pod affinity terms by a pod affinity object.
+func GetPodAffinityRequiredTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTerm) {
 	if podAffinity != nil {
 		if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
@@ -1276,8 +1276,18 @@ func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTer
 	return terms
 }
 
-// GetPodAntiAffinityTerms gets pod affinity terms by a pod anti-affinity.
-func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.PodAffinityTerm) {
+// GetPodAffinityPreferredTerms gets pod affinity terms by a pod affinity object.
+func GetPodAffinityPreferredTerms(podAffinity *v1.PodAffinity) (weightedTerms []v1.WeightedPodAffinityTerm) {
+	if podAffinity != nil {
+		if len(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0 {
+			weightedTerms = podAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
+	return weightedTerms
+}
+
+// GetPodAntiAffinityRequiredTerms gets pod affinity terms by a pod anti-affinity.
+func GetPodAntiAffinityRequiredTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.PodAffinityTerm) {
 	if podAntiAffinity != nil {
 		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
@@ -1290,6 +1300,16 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	return terms
 }
 
+// GetPodAntiAffinityPreferredTerms gets pod affinity terms by a pod anti-affinity.
+func GetPodAntiAffinityPreferredTerms(podAntiAffinity *v1.PodAntiAffinity) (weightedTerms []v1.WeightedPodAffinityTerm) {
+	if podAntiAffinity != nil {
+		if len(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0 {
+			weightedTerms = podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
+	return weightedTerms
+}
+
 // getMatchingAntiAffinityTopologyPairs calculates the following for "existingPod" on given node:
 // (1) Whether it has PodAntiAffinity
 // (2) Whether ANY AffinityTerm matches the incoming pod
@@ -1300,7 +1320,7 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 	}
 
 	topologyMaps := newTopologyPairsMaps()
-	for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+	for _, term := range GetPodAntiAffinityRequiredTerms(affinity.PodAntiAffinity) {
 		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 		if err != nil {
 			return nil, err
@@ -1314,6 +1334,81 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 		}
 	}
 	return topologyMaps, nil
+}
+
+// getMatchingAntiAffinityPreferredPairToScore calculates the following for "existingPod" on given node:
+// (1) Whether it has Preferred PodAntiAffinity
+// (2) How it effects priority scores
+func getMatchingAntiAffinityPreferredPairToScore(pairToScore *pairToScore, newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*pairToScore, error) {
+	affinity := existingPod.Spec.Affinity
+	if affinity == nil || affinity.PodAntiAffinity == nil {
+		return pairToScore, nil
+	}
+
+	for _, term := range GetPodAntiAffinityPreferredTerms(affinity.PodAntiAffinity) {
+		selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+		if err != nil {
+			return pairToScore, err
+		}
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
+			if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+				pair := internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}
+				pairToScore.addTopologyPair(pair, -int64(term.Weight))
+			}
+		}
+	}
+	return pairToScore, nil
+}
+
+// getMatchingAffinityPreferredPairToScore calculates the following for "existingPod" on given node:
+// (1) Whether it has Preferred PodAffinity
+// (2) How it effects priority scores
+func getMatchingAffinityPreferredPairToScore(pairToScore *pairToScore, newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*pairToScore, error) {
+	affinity := existingPod.Spec.Affinity
+	if affinity == nil || affinity.PodAffinity == nil {
+		return pairToScore, nil
+	}
+
+	for _, term := range GetPodAffinityPreferredTerms(affinity.PodAffinity) {
+		selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+		if err != nil {
+			return pairToScore, err
+		}
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
+			if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+				pair := internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}
+				pairToScore.addTopologyPair(pair, int64(term.Weight))
+			}
+		}
+	}
+	return pairToScore, nil
+}
+
+// getMatchingAffinityRequiredPairToScore calculates the following for "existingPod" on given node:
+// (1) Whether it has Required PodAffinity
+// (2) How it effects priority scores
+func getMatchingAffinityRequiredPairToScore(pairToScore *pairToScore, hardPodAffinityWeight int32, newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*pairToScore, error) {
+	affinity := existingPod.Spec.Affinity
+	if affinity == nil || affinity.PodAffinity == nil {
+		return pairToScore, nil
+	}
+
+	for _, term := range GetPodAffinityRequiredTerms(affinity.PodAffinity) {
+		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+		if err != nil {
+			return pairToScore, err
+		}
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
+			if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
+				pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
+				pairToScore.addTopologyPair(pair, int64(hardPodAffinityWeight))
+			}
+		}
+	}
+	return pairToScore, nil
 }
 
 func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.Pod, existingPods []*v1.Pod) (*topologyPairsMaps, error) {
@@ -1424,7 +1519,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		// Check all affinity terms.
 		topologyPairsPotentialAffinityPods := predicateMeta.topologyPairsPotentialAffinityPods
-		if affinityTerms := GetPodAffinityTerms(affinity.PodAffinity); len(affinityTerms) > 0 {
+		if affinityTerms := GetPodAffinityRequiredTerms(affinity.PodAffinity); len(affinityTerms) > 0 {
 			matchExists := c.nodeMatchesAllTopologyTerms(pod, topologyPairsPotentialAffinityPods, nodeInfo, affinityTerms)
 			if !matchExists {
 				// This pod may the first pod in a series that have affinity to themselves. In order
@@ -1441,7 +1536,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 
 		// Check all anti-affinity terms.
 		topologyPairsPotentialAntiAffinityPods := predicateMeta.topologyPairsPotentialAntiAffinityPods
-		if antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
+		if antiAffinityTerms := GetPodAntiAffinityRequiredTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
 			matchExists := c.nodeMatchesAnyTopologyTerm(pod, topologyPairsPotentialAntiAffinityPods, nodeInfo, antiAffinityTerms)
 			if matchExists {
 				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinity",
@@ -1455,8 +1550,8 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			return ErrPodAffinityRulesNotMatch, err
 		}
 
-		affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
-		antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
+		affinityTerms := GetPodAffinityRequiredTerms(affinity.PodAffinity)
+		antiAffinityTerms := GetPodAntiAffinityRequiredTerms(affinity.PodAntiAffinity)
 		matchFound, termsSelectorMatchFound := false, false
 		for _, targetPod := range filteredPods {
 			// Check all affinity terms.
