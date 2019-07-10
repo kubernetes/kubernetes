@@ -198,14 +198,14 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 }
 
 func newPairToScore(topologyInfo *internalcache.NodeTopologyInfo) *pairToScore {
-	var pm pairToScore
 	if topologyInfo != nil && len(*topologyInfo) > 0 {
-		pm = make(pairToScore, len(*topologyInfo))
+		p := make(pairToScore, len(*topologyInfo))
 		for pair := range *topologyInfo {
-			pm[pair] = new(int64)
+			p[pair] = new(int64)
 		}
+		return &p
 	}
-	return &pm
+	return nil
 }
 
 func (pairToScore *pairToScore) addTopologyPair(pair internalcache.TopologyPair, weight int64) {
@@ -215,6 +215,15 @@ func (pairToScore *pairToScore) addTopologyPair(pair internalcache.TopologyPair,
 
 	}
 	atomic.AddInt64((*pairToScore)[pair], weight)
+}
+
+func (pairToScore *pairToScore) appendMaps(toAppend *pairToScore) {
+	if toAppend == nil {
+		return
+	}
+	for pair, value := range *toAppend {
+		pairToScore.addTopologyPair(pair, *value)
+	}
 }
 
 // returns a pointer to a new topologyPairsMaps
@@ -447,9 +456,9 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	priorityTopologyMaps := newPairToScore(&topologyInfo)
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	processNode := func(i int) {
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
@@ -472,29 +481,32 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 			// calculate how existingPod effects priority
 			if len(topologyInfo) > 0 {
 				// preferred antiAffinity contributes to priority scores
-				priorityTopologyMaps, err = getMatchingAntiAffinityPreferredPairToScore(priorityTopologyMaps, pod, existingPod, node)
+				antiPreferredPairToScore, err := getMatchingAntiAffinityPreferredPairToScore(topologyInfo, pod, existingPod, node)
 				if err != nil {
 					catchError(err)
 					cancel()
 					return
 				}
+				priorityTopologyMaps.appendMaps(antiPreferredPairToScore)
 
 				// preferred affinity contributes to priority scores
-				priorityTopologyMaps, err = getMatchingAffinityPreferredPairToScore(priorityTopologyMaps, pod, existingPod, node)
+				preferredPairToScore, err := getMatchingAffinityPreferredPairToScore(topologyInfo, pod, existingPod, node)
 				if err != nil {
 					catchError(err)
 					cancel()
 					return
 				}
+				priorityTopologyMaps.appendMaps(preferredPairToScore)
 
 				// required affinity contributes to priority scores
 				if hardPodAffinityWeight > 0 {
-					priorityTopologyMaps, err = getMatchingAffinityRequiredPairToScore(priorityTopologyMaps, hardPodAffinityWeight, pod, existingPod, node)
+					requiredPairToScore, err := getMatchingAffinityRequiredPairToScore(topologyInfo, hardPodAffinityWeight, pod, existingPod, node)
 					if err != nil {
 						catchError(err)
 						cancel()
 						return
 					}
+					priorityTopologyMaps.appendMaps(requiredPairToScore)
 				}
 
 			}
@@ -598,20 +610,23 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			// calculate how incomingPod effects priority
 			if len(topologyInfo) > 0 {
 				// preferred affinity contributes to priority scores
-				priorityTopologyMaps, err = getMatchingAffinityPreferredPairToScore(priorityTopologyMaps, existingPod, pod, node)
+				preferredPairToScore, err := getMatchingAffinityPreferredPairToScore(topologyInfo, existingPod, pod, node)
 				if err != nil {
 					catchError(err)
 					cancel()
 					return
 				}
+				priorityTopologyMaps.appendMaps(preferredPairToScore)
 
 				// preferred antiAffinity contributes to priority scores
-				priorityTopologyMaps, err = getMatchingAntiAffinityPreferredPairToScore(priorityTopologyMaps, existingPod, pod, node)
+				antiPreferredPairToScore, err := getMatchingAntiAffinityPreferredPairToScore(topologyInfo, existingPod, pod, node)
 				if err != nil {
 					catchError(err)
 					cancel()
 					return
 				}
+				priorityTopologyMaps.appendMaps(antiPreferredPairToScore)
+
 			}
 
 		}
