@@ -76,9 +76,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 	})
 
 	/*
-		Release : v1.15
+		Release : v1.16
 		Testname: Return chunks of results for large numbers of objects
-		Description: List a large number of objects and verify the first three chunks
+		Description: Retrieve a large number of pre-generated objects, MUST return the first three chunks
 	*/
 	framework.ConformanceIt("should return chunks of results for list calls", func() {
 		ns := f.Namespace.Name
