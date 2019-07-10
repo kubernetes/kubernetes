@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -125,7 +126,9 @@ type TestConfig struct {
 // Test contains a volume to mount into a client pod and its
 // expected content.
 type Test struct {
-	Volume          v1.VolumeSource
+	Volume v1.VolumeSource
+	Mode   v1.PersistentVolumeMode
+	// Name of file to read/write in FileSystem mode
 	File            string
 	ExpectedContent string
 }
@@ -468,10 +471,17 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
-		clientPod.Spec.Containers[0].VolumeMounts = append(clientPod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
-			Name:      volumeName,
-			MountPath: fmt.Sprintf("/opt/%d", i),
-		})
+		if test.Mode == v1.PersistentVolumeBlock {
+			clientPod.Spec.Containers[0].VolumeDevices = append(clientPod.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{
+				Name:       volumeName,
+				DevicePath: fmt.Sprintf("/opt/%d", i),
+			})
+		} else {
+			clientPod.Spec.Containers[0].VolumeMounts = append(clientPod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+				Name:      volumeName,
+				MountPath: fmt.Sprintf("/opt/%d", i),
+			})
+		}
 		clientPod.Spec.Volumes = append(clientPod.Spec.Volumes, v1.Volume{
 			Name:         volumeName,
 			VolumeSource: test.Volume,
@@ -504,22 +514,41 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
-		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-		commands := GenerateReadFileCmd(fileName)
-		_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
-		framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
-	}
-	if !framework.NodeOSDistroIs("windows") {
-		if fsGroup != nil {
-			ginkgo.By("Checking fsGroup is correct.")
-			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
-			framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
-		}
+		if test.Mode == v1.PersistentVolumeBlock {
+			// Block: check content
+			deviceName := fmt.Sprintf("/opt/%d", i)
+			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
+			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
+			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
-		if fsType != "" {
-			ginkgo.By("Checking fsType is correct.")
-			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
-			framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+			// Check that it's a real block device
+			utils.CheckVolumeModeOfPath(clientPod, test.Mode, deviceName)
+		} else {
+			// Filesystem: check content
+			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
+			commands := GenerateReadFileCmd(fileName)
+			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
+			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
+
+			// Check that a directory has been mounted
+			dirName := filepath.Dir(fileName)
+			utils.CheckVolumeModeOfPath(clientPod, test.Mode, dirName)
+
+			if !framework.NodeOSDistroIs("windows") {
+				// Filesystem: check fsgroup
+				if fsGroup != nil {
+					ginkgo.By("Checking fsGroup is correct.")
+					_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
+				}
+
+				// Filesystem: check fsType
+				if fsType != "" {
+					ginkgo.By("Checking fsType is correct.")
+					_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+				}
+			}
 		}
 	}
 }
@@ -540,11 +569,19 @@ func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64
 
 	ginkgo.By("Writing text file contents in the container.")
 	for i, test := range tests {
-		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 		commands := []string{"exec", injectorPod.Name, fmt.Sprintf("--namespace=%v", injectorPod.Namespace), "--"}
-		commands = append(commands, GenerateWriteFileCmd(test.ExpectedContent, fileName)...)
+		if test.Mode == v1.PersistentVolumeBlock {
+			// Block: write content
+			deviceName := fmt.Sprintf("/opt/%d", i)
+			commands = append(commands, GenerateWriteBlockCmd(test.ExpectedContent, deviceName)...)
+
+		} else {
+			// Filesystem: write content
+			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
+			commands = append(commands, GenerateWriteFileCmd(test.ExpectedContent, fileName)...)
+		}
 		out, err := framework.RunKubectl(commands...)
-		framework.ExpectNoError(err, "failed: writing the contents of the mounted file %s: %s", fileName, out)
+		framework.ExpectNoError(err, "failed: writing the contents: %s", out)
 	}
 }
 
@@ -573,6 +610,18 @@ func GenerateScriptCmd(command string) []string {
 	return commands
 }
 
+// GenerateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func GenerateWriteBlockCmd(content, fullPath string) []string {
+	var commands []string
+	if !framework.NodeOSDistroIs("windows") {
+		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
+	} else {
+		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
+	}
+	return commands
+}
+
 // GenerateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateWriteFileCmd(content, fullPath string) []string {
@@ -592,6 +641,19 @@ func GenerateReadFileCmd(fullPath string) []string {
 	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"cat", fullPath}
 	} else {
+		commands = []string{"powershell", "/c", "type " + fullPath}
+	}
+	return commands
+}
+
+// GenerateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
+	var commands []string
+	if !framework.NodeOSDistroIs("windows") {
+		commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
+	} else {
+		// TODO: is there a way on windows to get the first X bytes from a device?
 		commands = []string{"powershell", "/c", "type " + fullPath}
 	}
 	return commands

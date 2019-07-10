@@ -66,6 +66,9 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.NtfsInlineVolume,
 				testpatterns.NtfsPreprovisionedPV,
 				testpatterns.NtfsDynamicPV,
+				// block volumes
+				testpatterns.BlockVolModePreprovisionedPV,
+				testpatterns.BlockVolModeDynamicPV,
 			},
 		},
 	}
@@ -89,6 +92,13 @@ func skipExecTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[CapExec] {
 		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
+	}
+}
+
+func skipBlockTest(driver TestDriver) {
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapBlock] {
+		framework.Skipf("Driver %q does not provide raw block - skipping", dInfo.Name)
 	}
 }
 
@@ -139,8 +149,12 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
-	ginkgo.It("should be mountable", func() {
+	ginkgo.It("should persist data across different pods", func() {
 		skipPersistenceTest(driver)
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			skipBlockTest(driver)
+		}
+
 		init()
 		defer func() {
 			volume.TestCleanup(f, convertTestConfig(l.config))
@@ -150,6 +164,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		tests := []volume.Test{
 			{
 				Volume: *l.resource.volSource,
+				Mode:   pattern.VolMode,
 				File:   "index.html",
 				// Must match content
 				ExpectedContent: fmt.Sprintf("Hello from %s from namespace %s",
@@ -170,13 +185,16 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
 	})
 
-	ginkgo.It("should allow exec of files on the volume", func() {
-		skipExecTest(driver)
-		init()
-		defer cleanup()
+	// Exec works only on filesystem volumes
+	if pattern.VolMode != v1.PersistentVolumeBlock {
+		ginkgo.It("should allow exec of files on the volume", func() {
+			skipExecTest(driver)
+			init()
+			defer cleanup()
 
-		testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config)
-	})
+			testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config)
+		})
+	}
 }
 
 func testScriptInPod(
