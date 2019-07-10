@@ -289,7 +289,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		dest = "standard output"
 	}
 	if dest != "-" {
-		fmt.Fprintf(o.Out, "Cluster info dumped to %s\n", dest)
+		fmt.Fprintf(o.ErrOut, "Cluster info dumped to %s\n", dest)
 	}
 	return nil
 }
