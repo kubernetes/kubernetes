@@ -151,16 +151,6 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
-	ginkgo.It("should provision storage with defaults", func() {
-		init()
-		defer cleanup()
-
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
-			PVWriteReadSingleNodeCheck(l.cs, claim, framework.NodeSelection{Name: l.config.ClientNodeName})
-		}
-		l.testCase.TestDynamicProvisioning()
-	})
-
 	ginkgo.It("should provision storage with mount options", func() {
 		if dInfo.SupportedMountOption == nil {
 			framework.Skipf("Driver %q does not define supported mount option - skipping", dInfo.Name)
@@ -172,29 +162,6 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			PVWriteReadSingleNodeCheck(l.cs, claim, framework.NodeSelection{Name: l.config.ClientNodeName})
-		}
-		l.testCase.TestDynamicProvisioning()
-	})
-
-	ginkgo.It("should access volume from different nodes", func() {
-		init()
-		defer cleanup()
-
-		// The assumption is that if the test hasn't been
-		// locked onto a single node, then the driver is
-		// usable on all of them *and* supports accessing a volume
-		// from any node.
-		if l.config.ClientNodeName != "" {
-			framework.Skipf("Driver %q only supports testing on one node - skipping", dInfo.Name)
-		}
-
-		// Ensure that we actually have more than one node.
-		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
-		if len(nodes.Items) <= 1 {
-			framework.Skipf("need more than one node - skipping")
-		}
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
-			PVMultiNodeCheck(l.cs, claim, framework.NodeSelection{Name: l.config.ClientNodeName})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
