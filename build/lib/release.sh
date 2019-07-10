@@ -358,14 +358,17 @@ function kube::release::create_docker_images_for_server() {
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}"
+      local docker_image_name=""
       if [[ ${arch} == "amd64" ]]; then
         # If we are building a amd64 docker image, preserve the original
         # image name
         docker_image_tag+="/${binary_name}:${docker_tag}"
+        docker_image_name="${binary_name}"
       else
         # If we are building a docker image for another architecture,
         # append the arch in the image tag
         docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
+        docker_image_name="${binary_name}-${arch}"
       fi
 
 
@@ -397,7 +400,7 @@ EOF
         # docker images and tag them appropriately.
         local release_docker_image_tag=""
         if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" && $docker_registry != $KUBE_DOCKER_REGISTRY ]]; then
-          release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+          release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${docker_image_name}:${KUBE_DOCKER_IMAGE_TAG}"
           kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
           "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
