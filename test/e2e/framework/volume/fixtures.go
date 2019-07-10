@@ -42,14 +42,13 @@ package volume
 import (
 	"fmt"
 	"path/filepath"
-
 	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -424,19 +423,15 @@ func TestCleanup(f *framework.Framework, config TestConfig) {
 	}
 }
 
-// TestVolumeClient start a client pod using given VolumeSource (exported by startVolumeServer())
-// and check that the pod sees expected data, e.g. from the server pod.
-// Multiple Tests can be specified to mount multiple volumes to a single
-// pod.
-func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-client"))
+func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, fsGroup *int64, tests []Test) (*v1.Pod, error) {
+	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
 
 	if !framework.NodeOSDistroIs("windows") {
-		command = "while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done "
+		command = "while true ; do sleep 2; done "
 	} else {
-		command = "while(1) {cat /opt/0/index.html ; sleep 2 ; ls /opt/; sleep 2}"
+		command = "while(1) {sleep 2}"
 	}
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
@@ -445,18 +440,18 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-client",
+			Name: config.Prefix + "-" + podSuffix,
 			Labels: map[string]string{
-				"role": config.Prefix + "-client",
+				"role": config.Prefix + "-" + podSuffix,
 			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:       config.Prefix + "-client",
+					Name:       config.Prefix + "-" + podSuffix,
 					Image:      GetTestImage(framework.BusyBoxImage),
 					WorkingDir: "/opt",
-					// An imperative and easily debuggable container which reads vol contents for
+					// An imperative and easily debuggable container which reads/writes vol contents for
 					// us to scan in the tests or by eye.
 					// We expect that /opt is empty in the minimal containers which we use in this test.
 					Command:      GenerateScriptCmd(command),
@@ -470,7 +465,6 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 			NodeSelector:                  config.NodeSelector,
 		},
 	}
-	podsNamespacer := client.CoreV1().Pods(config.Namespace)
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
@@ -483,9 +477,27 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 			VolumeSource: test.Volume,
 		})
 	}
+	podsNamespacer := client.CoreV1().Pods(config.Namespace)
 	clientPod, err := podsNamespacer.Create(clientPod)
 	if err != nil {
-		e2elog.Failf("Failed to create %s pod: %v", clientPod.Name, err)
+		return nil, err
+	}
+	err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+	if err != nil {
+		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		return nil, err
+	}
+	return clientPod, nil
+}
+
+// TestVolumeClient start a client pod using given VolumeSource (exported by startVolumeServer())
+// and check that the pod sees expected data, e.g. from the server pod.
+// Multiple Tests can be specified to mount multiple volumes to a single
+// pod.
+func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+	clientPod, err := runVolumeTesterPod(client, config, "client", fsGroup, tests)
+	if err != nil {
+		e2elog.Failf("Failed to create client pod: %v", err)
 
 	}
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
@@ -512,63 +524,28 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 	}
 }
 
-// InjectHTML inserts index.html with given content into given volume. It does so by
+// InjectContent inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
-	ginkgo.By(fmt.Sprint("starting ", config.Prefix, " injector"))
-	podClient := client.CoreV1().Pods(config.Namespace)
-	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
-	volMountName := fmt.Sprintf("%s-volume-%s", config.Prefix, rand.String(4))
-	fileName := "/mnt/index.html"
-
-	injectPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-			Labels: map[string]string{
-				"role": config.Prefix + "-injector",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    config.Prefix + "-injector",
-					Image:   GetTestImage(framework.BusyBoxImage),
-					Command: GenerateWriteFileCmd(content, fileName),
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      volMountName,
-							MountPath: "/mnt",
-						},
-					},
-					SecurityContext: GenerateSecurityContext(true),
-				},
-			},
-			SecurityContext: GeneratePodSecurityContext(fsGroup, nil),
-			RestartPolicy:   v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name:         volMountName,
-					VolumeSource: volume,
-				},
-			},
-			NodeName:     config.ClientNodeName,
-			NodeSelector: config.NodeSelector,
-		},
+func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64, tests []Test) {
+	injectorPod, err := runVolumeTesterPod(client, config, "injector", fsGroup, tests)
+	if err != nil {
+		e2elog.Failf("Failed to create injector pod: %v", err)
+		return
 	}
-
 	defer func() {
-		podClient.Delete(podName, nil)
+		e2epod.DeletePodOrFail(client, injectorPod.Namespace, injectorPod.Name)
+		e2epod.WaitForPodToDisappear(client, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 	}()
 
-	injectPod, err := podClient.Create(injectPod)
-	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
-	err = e2epod.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
-	framework.ExpectNoError(err)
+	ginkgo.By("Writing text file contents in the container.")
+	for i, test := range tests {
+		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
+		commands := []string{"exec", injectorPod.Name, fmt.Sprintf("--namespace=%v", injectorPod.Namespace), "--"}
+		commands = append(commands, GenerateWriteFileCmd(test.ExpectedContent, fileName)...)
+		out, err := framework.RunKubectl(commands...)
+		framework.ExpectNoError(err, "failed: writing the contents of the mounted file %s: %s", fileName, out)
+	}
 }
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.

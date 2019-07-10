@@ -166,7 +166,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		volume.InjectHTML(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
+		volume.InjectContent(f.ClientSet, config, fsGroup, tests)
 		volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
 	})
 
