@@ -21,8 +21,8 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	// Register the kubeadm configuration types because CLI flag generation
@@ -90,15 +90,7 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
 	cmds.AddCommand(alpha.NewCmdAlpha(in, out))
 
-	AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
+	options.AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
 
 	return cmds
-}
-
-// AddKubeadmOtherFlags adds flags that are not bound to a configuration file to the given flagset
-func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
-	flagSet.StringVar(
-		rootfsPath, "rootfs", *rootfsPath,
-		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
-	)
 }

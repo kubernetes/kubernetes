@@ -538,5 +538,5 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.Cl
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
-	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
+	options.AddConfigFlag(flagSet, cfgPath)
 }
