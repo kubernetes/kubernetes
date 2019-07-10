@@ -387,7 +387,7 @@ func (rc *reconciler) syncStates() {
 			if volumeInDSW {
 				// Some pod needs the volume, don't clean it up and hope that
 				// reconcile() calls SetUp and reconstructs the volume in ASW.
-				klog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+				klog.V(4).Infof("Could not construct volume information for (volume.SpecName %s, pod.UID %s), skipping cleaning up mounts: %s", volume.volumeSpecName, volume.podName, err)
 				continue
 			}
 			// No pod needs the volume.
