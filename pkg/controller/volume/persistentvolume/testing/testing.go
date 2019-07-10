@@ -223,7 +223,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			return true, volume.DeepCopy(), nil
 		}
 		klog.V(4).Infof("GetVolume: volume %s not found", name)
-		return true, nil, fmt.Errorf("Cannot find volume %s", name)
+		return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("get", "persistentvolumeclaims"):
 		name := action.(core.GetAction).GetName()
