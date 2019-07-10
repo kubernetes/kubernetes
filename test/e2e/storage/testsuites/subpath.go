@@ -179,6 +179,11 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		testReadFile(f, l.filePathInVolume, l.pod, 1)
 	})
 
+	/*
+	   Release : v1.16
+	   Testname: Create directory in existing path
+	   Description: MUST be able to create directory in existing path
+	*/
 	ginkgo.It("should support existing directory", func() {
 		init()
 		defer cleanup()
