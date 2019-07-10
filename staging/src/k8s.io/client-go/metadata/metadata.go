@@ -70,9 +70,9 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	return config
 }
 
-// NewConfigOrDie creates a new metadata client for the given config and
+// NewForConfigOrDie creates a new metadata client for the given config and
 // panics if there is an error in the config.
-func NewConfigOrDie(c *rest.Config) Interface {
+func NewForConfigOrDie(c *rest.Config) Interface {
 	ret, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
