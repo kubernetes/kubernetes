@@ -19,6 +19,7 @@ package hostpath
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -97,13 +98,12 @@ func TestRecycler(t *testing.T) {
 
 func TestDeleter(t *testing.T) {
 	// Deleter has a hard-coded regex for "/tmp".
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
-	defer os.RemoveAll(tempPath)
+	tempPath := fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
 		t.Fatalf("Failed to create tmp directory for deleter: %v", err)
 	}
-
+	defer os.RemoveAll(tempPath)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
@@ -154,12 +154,7 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
-	defer os.RemoveAll(tempPath)
-	err := os.MkdirAll(tempPath, 0750)
-	if err != nil {
-		t.Errorf("Failed to create tempPath %s error:%v", tempPath, err)
-	}
+	tempPath := fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
 		nil,
@@ -173,11 +168,11 @@ func TestProvisioner(t *testing.T) {
 		PVC:                           volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
-	creater, err := plug.NewProvisioner(options)
+	creator, err := plug.NewProvisioner(options)
 	if err != nil {
 		t.Errorf("Failed to make a new Provisioner: %v", err)
 	}
-	pv, err := creater.Provision(nil, nil)
+	pv, err := creator.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error creating volume: %v", err)
 	}
@@ -196,7 +191,9 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Expected reclaim policy %+v but got %+v", v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
 	}
 
-	os.RemoveAll(pv.Spec.HostPath.Path)
+	pvDir := filepath.Dir(pv.Spec.HostPath.Path)
+	os.RemoveAll(pvDir)
+
 }
 
 func TestInvalidHostPath(t *testing.T) {
