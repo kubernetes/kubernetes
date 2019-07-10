@@ -128,9 +128,9 @@ type ClientConfigLoadingRules struct {
 	// This should match the overrides passed in to ClientConfig loader.
 	DefaultClientConfig ClientConfig
 
-	//WarnIfAllMissing indicates whether the configuration files pointed by KUBECONFIG environment variable are present or not.
-	//In case of missing files, it warns the user about the missing files.
-	WarnMissingFiles bool
+	// WarnIfAllMissing indicates whether the configuration files pointed by KUBECONFIG environment variable are present or not.
+	// In case of missing files, it warns the user about the missing files.
+	WarnIfAllMissing bool
 }
 
 // ClientConfigLoadingRules implements the ClientConfigLoader interface.
@@ -140,14 +140,14 @@ var _ ClientConfigLoader = &ClientConfigLoadingRules{}
 // use this constructor
 func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	chain := []string{}
-	warnMissingFiles := false
+	warnIfAllMissing := false
 
 	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
 	if len(envVarFiles) != 0 {
 		fileList := filepath.SplitList(envVarFiles)
 		// prevent the same path load multiple times
 		chain = append(chain, deduplicate(fileList)...)
-		warnMissingFiles = true
+		warnIfAllMissing = true
 
 	} else {
 		chain = append(chain, RecommendedHomeFile)
@@ -156,7 +156,7 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	return &ClientConfigLoadingRules{
 		Precedence:       chain,
 		MigrationRules:   currentMigrationRules(),
-		WarnMissingFiles: warnMissingFiles,
+		WarnIfAllMissing: warnIfAllMissing,
 	}
 }
 
@@ -219,7 +219,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		kubeconfigs = append(kubeconfigs, config)
 	}
 
-	if rules.WarnMissingFiles && len(missingList) > 0 && len(kubeconfigs) == 0 {
+	if rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
 		klog.Warningf("Config not found: %s", strings.Join(missingList, ", "))
 	}
 
