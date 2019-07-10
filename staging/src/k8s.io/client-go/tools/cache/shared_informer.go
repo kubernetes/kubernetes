@@ -34,7 +34,7 @@ import (
 // SharedInformer provides eventually consistent linkage of its
 // clients to the authoritative state of a given collection of
 // objects.  An object is identified by its API group, kind/resource,
-// namespace, and name.  One SharedInfomer provides linkage to objects
+// namespace, and name.  One SharedInformer provides linkage to objects
 // of a particular API group and kind/resource.  The linked object
 // collection of a SharedInformer may be further restricted to one
 // namespace and/or by label selector and/or field selector.
@@ -44,7 +44,7 @@ import (
 // A state is either "absent" or present with a ResourceVersion and
 // other appropriate content.
 //
-// A SharedInformer maintains a local cache, exposed by Store(), of
+// A SharedInformer maintains a local cache, exposed by GetStore(), of
 // the state of each relevant object.  This cache is eventually
 // consistent with the authoritative state.  This means that, unless
 // prevented by persistent communication problems, if ever a
@@ -67,10 +67,10 @@ import (
 // non-absent state for some object ID and the object is eventually
 // removed from the authoritative state then eventually the object is
 // removed from the local cache (unless the SharedInformer is stopped
-// too soon, the authoritative state service emnds, or communication
+// too soon, the authoritative state service ends, or communication
 // problems persistently thwart the desired result).
 //
-// The keys in Store() are of the form namespace/name for namespaced
+// The keys in GetStore() are of the form namespace/name for namespaced
 // objects, and are simply the name for non-namespaced objects.
 //
 // A client is identified here by a ResourceEventHandler.  For every
@@ -116,6 +116,7 @@ type SharedInformer interface {
 	LastSyncResourceVersion() string
 }
 
+// SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
 type SharedIndexInformer interface {
 	SharedInformer
 	// AddIndexers add indexers to the informer before it starts.
@@ -182,7 +183,7 @@ type sharedIndexInformer struct {
 	controller Controller
 
 	processor             *sharedProcessor
-	cacheMutationDetector CacheMutationDetector
+	cacheMutationDetector MutationDetector
 
 	// This block is tracked to handle late initialization of the controller
 	listerWatcher ListerWatcher
@@ -222,7 +223,7 @@ func (v *dummyController) HasSynced() bool {
 	return v.informer.HasSynced()
 }
 
-func (c *dummyController) LastSyncResourceVersion() string {
+func (v *dummyController) LastSyncResourceVersion() string {
 	return ""
 }
 
