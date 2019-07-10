@@ -1627,6 +1627,9 @@ type CSIVolumeSource struct {
 	// +optional
 	ReadOnly *bool
 
+	// DEPRECATED. Kubernetes cannot translate FSType into something that the driver's
+	// NodePublishVolume understands.
+	//
 	// Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
 	// If not provided, the empty value is passed to the associated CSI driver
 	// which will determine the default filesystem to apply.
