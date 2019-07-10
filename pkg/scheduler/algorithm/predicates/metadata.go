@@ -140,6 +140,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
 	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, nodeNameToInfoMap)
 	if err != nil {
+		klog.Errorf("[predicate meta data generation] error finding pods whose affinity terms are matched: %v", err)
 		return nil
 	}
 	// incomingPodAffinityMap will be used later for efficient check on incoming pod's affinity
@@ -395,7 +396,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("node not found"))
+			catchError(fmt.Errorf("node %q not found", allNodeNames[i]))
 			return
 		}
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
@@ -463,7 +464,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("nodeInfo.Node is nil"))
+			catchError(fmt.Errorf("node %q not found", allNodeNames[i]))
 			return
 		}
 		nodeTopologyPairsAffinityPodsMaps := newTopologyPairsMaps()

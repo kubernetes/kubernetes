@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -83,28 +82,6 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 		},
 	}
 	return pod
-}
-
-// enableHugePagesInKubelet enables hugepages feature for kubelet
-func enableHugePagesInKubelet(f *framework.Framework) *kubeletconfig.KubeletConfiguration {
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
-	newCfg := oldCfg.DeepCopy()
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = make(map[string]bool)
-		newCfg.FeatureGates["HugePages"] = true
-	}
-
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-
-	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
-
-	return oldCfg
 }
 
 // configureHugePages attempts to allocate 100Mi of 2Mi hugepages for testing purposes
@@ -198,8 +175,6 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePage
 	f := framework.NewDefaultFramework("hugepages-test")
 
 	Context("With config updated with hugepages feature enabled", func() {
-		var oldCfg *kubeletconfig.KubeletConfiguration
-
 		BeforeEach(func() {
 			By("verifying hugepages are supported")
 			if !isHugePageSupported() {
@@ -214,8 +189,6 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePage
 				}
 				return nil
 			}, 30*time.Second, framework.Poll).Should(BeNil())
-			By("enabling hugepages in kubelet")
-			oldCfg = enableHugePagesInKubelet(f)
 			By("restarting kubelet to pick up pre-allocated hugepages")
 			restartKubelet()
 			By("by waiting for hugepages resource to become available on the local node")
@@ -235,10 +208,6 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePage
 				}
 				return nil
 			}, 30*time.Second, framework.Poll).Should(BeNil())
-			if oldCfg != nil {
-				By("Restoring old kubelet config")
-				setOldKubeletConfig(f, oldCfg)
-			}
 			By("restarting kubelet to release hugepages")
 			restartKubelet()
 			By("by waiting for hugepages resource to not appear available on the local node")

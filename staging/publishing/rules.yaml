@@ -622,6 +622,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: cli-runtime
+      branch: master
     - repository: client-go
       branch: master
   - source:

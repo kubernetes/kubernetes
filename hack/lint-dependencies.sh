@@ -34,18 +34,43 @@ fi
 kube::golang::verify_go_version
 kube::util::require-jq
 
-outdated=$(go list -m -json all | jq -r '
+case "${1:-}" in
+"--all")
+  echo "Checking all dependencies"
+  filter=''
+  ;;
+"-a")
+  echo "Checking all dependencies"
+  filter=''
+  ;;
+"")
+  # by default, skip checking golang.org/x/... dependencies... we pin to levels that match our go version for those
+  echo "Skipping golang.org/x/... dependencies, pass --all to include"
+  filter='select(.Path | startswith("golang.org/x/") | not) |'
+  ;;
+*)
+  kube::log::error "Unrecognized arg: ${1}"
+  exit 1
+  ;;
+esac
+
+outdated=$(go list -m -json all | jq -r "
   select(.Replace.Version != null) | 
   select(.Version != .Replace.Version) | 
-  "\(.Path)
+  ${filter}
+  select(.Path) |
+  \"\(.Path)
     pinned:    \(.Replace.Version)
     preferred: \(.Version)
-    hack/pin-dependency.sh \(.Path) \(.Version)"
-')
+    hack/pin-dependency.sh \(.Path) \(.Version)\"
+")
 if [[ -n "${outdated}" ]]; then
   echo "These modules are pinned to versions different than the minimal preferred version."
-  echo "That means that without require directives, a different version would be selected."
-  echo "The command to switch to the minimal preferred version is listed for each module."
+  echo "That means that without replace directives, a different version would be selected,"
+  echo "which breaks consumers of our published modules."
+  echo "1. Use hack/pin-dependency.sh to switch to the preferred version for each module"
+  echo "2. Run hack/update-vendor.sh to rebuild the vendor directory"
+  echo "3. Run hack/lint-dependencies.sh to verify no additional changes are required"
   echo ""
   echo "${outdated}"
 fi
@@ -55,7 +80,7 @@ unused=$(comm -23 \
   <(go list -m -json all | jq -r .Path | sort))
 if [[ -n "${unused}" ]]; then
   echo ""
-  echo "Pinned module versions that aren't actually used:"
+  echo "Use the given commands to remove pinned module versions that aren't actually used:"
   echo "${unused}" | xargs -L 1 echo 'GO111MODULE=on go mod edit -dropreplace'
 fi
 
@@ -63,5 +88,5 @@ if [[ -n "${unused}${outdated}" ]]; then
   exit 1
 fi
 
-echo "All pinned dependencies match their preferred version."
+echo "All pinned versions of checked dependencies match their preferred version."
 exit 0

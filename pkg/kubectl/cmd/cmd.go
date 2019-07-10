@@ -17,11 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -311,15 +313,9 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// only look for suitable extension executables if
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			err, extraArgsFound := HandlePluginCommand(pluginHandler, cmdPathPieces)
-
-			if err != nil {
+			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
 				fmt.Fprintf(errout, "%v\n", err)
 				os.Exit(1)
-			}
-
-			if extraArgsFound {
-				fmt.Fprintf(errout, "warning: extra arguments found in the command\n")
 			}
 		}
 	}
@@ -370,14 +366,30 @@ func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
 
 // Execute implements PluginHandler
 func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
-	return syscall.Exec(executablePath, cmdArgs, environment)
+
+	// Windows does not support exec syscall.
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command(executablePath, cmdArgs...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Env = environment
+		err := cmd.Run()
+		if err == nil {
+			os.Exit(0)
+		}
+		return err
+	}
+
+	// invoke cmd binary relaying the environment and args given
+	// append executablePath to cmdArgs, as execve will make first argument the "binary name".
+	return syscall.Exec(executablePath, append([]string{executablePath}, cmdArgs...), environment)
 }
 
 // HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
 // a plugin executable on the PATH that satisfies the given arguments.
-func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) (err error, extraArgsFound bool) {
+func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) (err error) {
 	remainingArgs := []string{} // all "non-flag" arguments
-	extraArgsFound = false
 
 	for idx := range cmdArgs {
 		if strings.HasPrefix(cmdArgs[idx], "-") {
@@ -396,26 +408,24 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) (err err
 			continue
 		}
 
-		if len(remainingArgs) > 0 && len(foundBinaryPath) > 0 {
-			extraArgsFound = true
-		}
-
 		foundBinaryPath = path
 		break
 	}
 
+	if len(remainingArgs) > 0 && len(foundBinaryPath) > 0 {
+		return errors.New("extra args found in the command")
+	}
+
 	if len(foundBinaryPath) == 0 {
-		return nil, extraArgsFound
+		return nil
 	}
 
 	// invoke cmd binary relaying the current environment and args given
-	// remainingArgs will always have at least one element.
-	// execve will make remainingArgs[0] the "binary name".
-	if err := pluginHandler.Execute(foundBinaryPath, append([]string{foundBinaryPath}, cmdArgs[len(remainingArgs):]...), os.Environ()); err != nil {
-		return err, extraArgsFound
+	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], os.Environ()); err != nil {
+		return err
 	}
 
-	return nil, extraArgsFound
+	return nil
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.

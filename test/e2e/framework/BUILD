@@ -97,6 +97,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
+        "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",

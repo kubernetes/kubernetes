@@ -84,7 +84,10 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 	}
 	var err error
 	var r *http.Request
-	r, _ = http.NewRequest("GET", challengeURL.String(), nil)
+	r, err = http.NewRequest("GET", challengeURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct request, got %v", err)
+	}
 	r.Header.Add(userAgentHeader, userAgent)
 
 	var challenge *http.Response
@@ -154,7 +157,10 @@ func performTokenExchange(
 
 	datac := data.Encode()
 	var r *http.Request
-	r, _ = http.NewRequest("POST", authEndpoint, bytes.NewBufferString(datac))
+	r, err = http.NewRequest("POST", authEndpoint, bytes.NewBufferString(datac))
+	if err != nil {
+		return "", fmt.Errorf("failed to construct request, got %v", err)
+	}
 	r.Header.Add(userAgentHeader, userAgent)
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", strconv.Itoa(len(datac)))

@@ -101,6 +101,7 @@ func InitNFSDriver() testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
 				testsuites.CapRWX:         true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -241,6 +242,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
 				testsuites.CapRWX:         true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -365,6 +367,7 @@ func InitISCSIDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -478,6 +481,7 @@ func InitRbdDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -601,6 +605,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
 				testsuites.CapRWX:         true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -698,6 +703,7 @@ func InitHostPathDriver() testsuites.TestDriver {
 			),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -771,6 +777,7 @@ func InitHostPathSymlinkDriver() testsuites.TestDriver {
 			),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -1149,6 +1156,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -1278,6 +1286,7 @@ func InitVSphereDriver() testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -1401,6 +1410,7 @@ func InitAzureDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -1521,6 +1531,7 @@ func InitAwsDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 		},
 	}
@@ -1624,6 +1635,7 @@ var (
 		testsuites.CapFsGroup:     true,
 		testsuites.CapBlock:       false,
 		testsuites.CapExec:        true,
+		testsuites.CapMultiPODs:   true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[testsuites.Capability]bool{
 		utils.LocalVolumeBlock: {
@@ -1631,6 +1643,7 @@ var (
 			testsuites.CapFsGroup:     true,
 			testsuites.CapBlock:       true,
 			testsuites.CapExec:        true,
+			testsuites.CapMultiPODs:   true,
 		},
 	}
 	// fstype
