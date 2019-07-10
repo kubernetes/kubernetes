@@ -3167,7 +3167,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
-						&hpa.Status.CurrentMetrics[i].External.Current.AverageValue != nil {
+						hpa.Status.CurrentMetrics[i].External.Current.AverageValue != nil {
 						current = hpa.Status.CurrentMetrics[i].External.Current.AverageValue.String()
 					}
 					w.Write(LEVEL_1, "%q (target average value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.AverageValue.String())
