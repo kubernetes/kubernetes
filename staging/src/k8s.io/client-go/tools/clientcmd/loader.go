@@ -127,6 +127,10 @@ type ClientConfigLoadingRules struct {
 	// DefaultClientConfig is an optional field indicating what rules to use to calculate a default configuration.
 	// This should match the overrides passed in to ClientConfig loader.
 	DefaultClientConfig ClientConfig
+
+	//WarnIfAllMissing indicates whether the configuration files pointed by KUBECONFIG environment variable are present or not.
+	//In case of missing files, it warns the user about the missing files.
+	WarnMissingFiles bool
 }
 
 // ClientConfigLoadingRules implements the ClientConfigLoader interface.
@@ -136,20 +140,23 @@ var _ ClientConfigLoader = &ClientConfigLoadingRules{}
 // use this constructor
 func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	chain := []string{}
+	warnMissingFiles := false
 
 	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
 	if len(envVarFiles) != 0 {
 		fileList := filepath.SplitList(envVarFiles)
 		// prevent the same path load multiple times
 		chain = append(chain, deduplicate(fileList)...)
+		warnMissingFiles = true
 
 	} else {
 		chain = append(chain, RecommendedHomeFile)
 	}
 
 	return &ClientConfigLoadingRules{
-		Precedence:     chain,
-		MigrationRules: currentMigrationRules(),
+		Precedence:       chain,
+		MigrationRules:   currentMigrationRules(),
+		WarnMissingFiles: warnMissingFiles,
 	}
 }
 
@@ -172,6 +179,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	}
 
 	errlist := []error{}
+	missingList := []string{}
 
 	kubeConfigFiles := []string{}
 
@@ -198,7 +206,8 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 		if os.IsNotExist(err) {
 			// skip missing files
-			errlist = append(errlist, fmt.Errorf("No such file or directory %s", filename))
+			// Add to the missing list to produce a warning
+			missingList = append(missingList, filename)
 			continue
 		}
 
@@ -208,6 +217,10 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 
 		kubeconfigs = append(kubeconfigs, config)
+	}
+
+	if rules.WarnMissingFiles && len(missingList) > 0 && len(kubeconfigs) == 0 {
+		klog.Warningf("Config not found: %s", strings.Join(missingList, ", "))
 	}
 
 	// first merge all of our maps
