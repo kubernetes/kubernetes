@@ -167,8 +167,6 @@ type configFactory struct {
 	client clientset.Interface
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
-	// a means to list all known scheduled pods and pods assumed to have been scheduled.
-	podLister algorithm.PodLister
 	// a means to list all nodes
 	nodeLister corelisters.NodeLister
 	// a means to list all PersistentVolumes
@@ -279,7 +277,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 
 	c := &configFactory{
 		client:                         args.Client,
-		podLister:                      schedulerCache,
 		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
@@ -569,7 +566,7 @@ func (c *configFactory) GetPredicates(predicateKeys sets.String) (map[string]pre
 
 func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 	return &PluginFactoryArgs{
-		PodLister:                      c.podLister,
+		PodLister:                      c.schedulerCache,
 		ServiceLister:                  c.serviceLister,
 		ControllerLister:               c.controllerLister,
 		ReplicaSetLister:               c.replicaSetLister,
