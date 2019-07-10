@@ -59,6 +59,12 @@ type DelegatingAuthorizationOptions struct {
 
 	// AlwaysAllowGroups are groups which are allowed to take any actions.  In kube, this is system:masters.
 	AlwaysAllowGroups []string
+
+	// AuthQPS is the QPS limit to send authorization requests to the core kubernetes server.
+	AuthQPS float32
+
+	// AuthBurst is the Burst limit to send authorization requests to the core kubernetes server.
+	AuthBurst int
 }
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
@@ -66,6 +72,8 @@ func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
 		// very low for responsiveness, but high enough to handle storms
 		AllowCacheTTL: 10 * time.Second,
 		DenyCacheTTL:  10 * time.Second,
+		AuthQPS:       200,
+		AuthBurst:     400,
 	}
 }
 
@@ -110,6 +118,12 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.AlwaysAllowPaths, "authorization-always-allow-paths", s.AlwaysAllowPaths,
 		"A list of HTTP paths to skip during authorization, i.e. these are authorized without "+
 			"contacting the 'core' kubernetes server.")
+
+	fs.Float32Var(&s.AuthQPS, "authorization-request-qps", s.AuthQPS,
+		"QPS limit to send authorization requests to the 'core' kubernetes server.")
+
+	fs.IntVar(&s.AuthBurst, "authorization-request-burst", s.AuthBurst,
+		"Burst limit to send authorization requests to the 'core' kubernetes server.")
 }
 
 func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) error {
@@ -184,8 +198,8 @@ func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, erro
 	}
 
 	// set high qps/burst limits since this will effectively limit API server responsiveness
-	clientConfig.QPS = 200
-	clientConfig.Burst = 400
+	clientConfig.QPS = s.AuthQPS
+	clientConfig.Burst = s.AuthBurst
 
 	return kubernetes.NewForConfig(clientConfig)
 }
