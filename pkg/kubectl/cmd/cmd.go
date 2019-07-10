@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -413,6 +414,8 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 
 	if len(foundBinaryPath) == 0 {
 		return nil
+	} else if len(remainingArgs) > 0 {
+		return errors.New("extra invalid args found in the command")
 	}
 
 	// invoke cmd binary relaying the current environment and args given
