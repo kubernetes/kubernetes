@@ -123,12 +123,6 @@ type DelegatingAuthenticationOptions struct {
 	// TolerateInClusterLookupFailure indicates failures to look up authentication configuration from the cluster configmap should not be fatal.
 	// Setting this can result in an authenticator that will reject all requests.
 	TolerateInClusterLookupFailure bool
-
-	// AuthQPS is the QPS limit to send authentication requests to the core kubernetes server.
-	AuthQPS float32
-
-	// AuthBurst is the Burst limit to send authentication requests to the core kubernetes server.
-	AuthBurst int
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -141,8 +135,6 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 		},
-		AuthQPS:   200,
-		AuthBurst: 400,
 	}
 }
 
@@ -176,12 +168,6 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.TolerateInClusterLookupFailure, "authentication-tolerate-lookup-failure", s.TolerateInClusterLookupFailure, ""+
 		"If true, failures to look up missing authentication configuration from the cluster are not considered fatal. "+
 		"Note that this can result in authentication that treats all requests as anonymous.")
-
-	fs.Float32Var(&s.AuthQPS, "authentication-request-qps", s.AuthQPS,
-		"QPS limit to send authentication requests to the 'core' kubernetes server.")
-
-	fs.IntVar(&s.AuthBurst, "authentication-request-burst", s.AuthBurst,
-		"Burst limit to send authentication requests to the 'core' kubernetes server.")
 }
 
 func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
@@ -408,8 +394,8 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	}
 
 	// set high qps/burst limits since this will effectively limit API server responsiveness
-	clientConfig.QPS = s.AuthQPS
-	clientConfig.Burst = s.AuthBurst
+	clientConfig.QPS = 200
+	clientConfig.Burst = 400
 
 	return kubernetes.NewForConfig(clientConfig)
 }
