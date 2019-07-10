@@ -131,94 +131,56 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		replicas := int32(len(nodeList.Items))
 
+		serverDeploymentSpec := e2edeploy.NewDeployment(serverDeploymentName,
+			replicas,
+			map[string]string{"test": "dual-stack-server"},
+			"dualstack-test-server",
+			imageutils.GetE2EImage(imageutils.TestWebserver),
+			apps.RollingUpdateDeploymentStrategyType)
+
 		// to ensure all the pods land on different nodes and we can thereby
 		// validate connectivity across all nodes.
-		serverDeploymentSpec := &apps.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   serverDeploymentName,
-				Labels: map[string]string{"test": "dualstack-test-server"},
-			},
-			Spec: apps.DeploymentSpec{
-				Replicas: &replicas,
-				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "dualstack-test-server"}},
-				Strategy: apps.DeploymentStrategy{
-					Type: apps.RollingUpdateDeploymentStrategyType,
-				},
-				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{"test": "dualstack-test-server"},
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Name:  "dualstack-test-server",
-								Image: imageutils.GetE2EImage(imageutils.TestWebserver),
-							},
-						},
-						Affinity: &v1.Affinity{
-							PodAntiAffinity: &v1.PodAntiAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchExpressions: []metav1.LabelSelectorRequirement{
-												{
-													Key:      "test",
-													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"dualstack-test-server"},
-												},
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
+		serverDeploymentSpec.Spec.Template.Spec.Affinity = &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "test",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"dualstack-test-server"},
 								},
 							},
 						},
+						TopologyKey: "kubernetes.io/hostname",
 					},
 				},
 			},
 		}
 
-		clientDeploymentSpec := &apps.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   clientDeploymentName,
-				Labels: map[string]string{"test": "dualstack-test-client"},
-			},
-			Spec: apps.DeploymentSpec{
-				Replicas: &replicas,
-				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "dualstack-test-client"}},
-				Strategy: apps.DeploymentStrategy{
-					Type: apps.RollingUpdateDeploymentStrategyType,
-				},
-				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{"test": "dualstack-test-client"},
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Name:    "dualstack-test-client",
-								Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-								Command: []string{"sleep", "3600"},
-							},
-						},
-						Affinity: &v1.Affinity{
-							PodAntiAffinity: &v1.PodAntiAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchExpressions: []metav1.LabelSelectorRequirement{
-												{
-													Key:      "test",
-													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"dualstack-test-client"},
-												},
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
+		clientDeploymentSpec := e2edeploy.NewDeployment(clientDeploymentName,
+			replicas,
+			map[string]string{"test": "dual-stack-client"},
+			"dualstack-test-client",
+			imageutils.GetE2EImage(imageutils.Agnhost),
+			apps.RollingUpdateDeploymentStrategyType)
+
+		clientDeploymentSpec.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "3600"}
+		clientDeploymentSpec.Spec.Template.Spec.Affinity = &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "test",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"dualstack-test-client"},
 								},
 							},
 						},
+						TopologyKey: "kubernetes.io/hostname",
 					},
 				},
 			},
@@ -241,18 +203,16 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		clientPods, err := e2edeploy.GetPodsForDeployment(cs, clientDeployment)
 		framework.ExpectNoError(err)
 
-		assertNetworkConnectivity(f, *serverPods, *clientPods)
+		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
 })
 
-var (
-	duration     = "10s"
-	pollInterval = "1s"
-	timeout      = 10
-)
-
-func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, clientPods v1.PodList) {
+func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, clientPods v1.PodList, containerName, port string) {
 	// curl from each client pod to all server pods to assert connectivity
+	duration := "10s"
+	pollInterval := "1s"
+	timeout := 10
+
 	var serverIPs []string
 	for _, pod := range serverPods.Items {
 		if pod.Status.PodIPs == nil || len(pod.Status.PodIPs) != 2 {
@@ -267,17 +227,17 @@ func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, cl
 	for _, clientPod := range clientPods.Items {
 		for _, ip := range serverIPs {
 			gomega.Consistently(func() error {
-				ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to server ip %s", clientPod.Name, ip))
-				cmd := checkNetworkConnectivity(ip, "80")
-				_, _, err := f.ExecCommandInContainerWithFullOutput(clientPod.Name, "dualstack-test-client", cmd...)
+				ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %s", clientPod.Name, ip, port))
+				cmd := checkNetworkConnectivity(ip, port, timeout)
+				_, _, err := f.ExecCommandInContainerWithFullOutput(clientPod.Name, containerName, cmd...)
 				return err
 			}, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 		}
 	}
 }
 
-func checkNetworkConnectivity(ip, port string) []string {
-	curl := fmt.Sprintf("curl -g --connect-timeout %v http://%s", 10, net.JoinHostPort(ip, port))
+func checkNetworkConnectivity(ip, port string, timeout int) []string {
+	curl := fmt.Sprintf("curl -g --connect-timeout %v http://%s", timeout, net.JoinHostPort(ip, port))
 	cmd := []string{"/bin/sh", "-c", curl}
 	return cmd
 }
