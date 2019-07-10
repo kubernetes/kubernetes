@@ -139,7 +139,7 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 
 	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
-		retryErr := kwait.ExponentialBackoff(c.cloud.requestBackoff(), func() (bool, error) {
+		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
 			diskOpMutex.LockKey(instanceid)
 			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
 			diskOpMutex.UnlockKey(instanceid)
