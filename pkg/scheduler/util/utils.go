@@ -18,7 +18,6 @@ package util
 
 import (
 	"sort"
-
 	"time"
 
 	"k8s.io/api/core/v1"
