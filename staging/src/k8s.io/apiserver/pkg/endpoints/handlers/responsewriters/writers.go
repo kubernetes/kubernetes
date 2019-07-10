@@ -122,10 +122,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 
 var gzipPool = &sync.Pool{
 	New: func() interface{} {
-		gw, err := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
-		if err != nil {
-			panic(err)
-		}
+		gw, _ := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
 		return gw
 	},
 }
