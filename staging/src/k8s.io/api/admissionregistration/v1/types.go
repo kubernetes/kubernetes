@@ -286,7 +286,7 @@ type ValidatingWebhook struct {
 	// the webhook call will be ignored or the API call will fail based on the
 	// failure policy.
 	// The timeout value must be between 1 and 30 seconds.
-	// Default to 30 seconds.
+	// Default to 10 seconds.
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 
@@ -418,7 +418,7 @@ type MutatingWebhook struct {
 	// the webhook call will be ignored or the API call will fail based on the
 	// failure policy.
 	// The timeout value must be between 1 and 30 seconds.
-	// Default to 30 seconds.
+	// Default to 10 seconds.
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 
