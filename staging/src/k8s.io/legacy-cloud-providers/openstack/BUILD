@@ -19,9 +19,9 @@ go_library(
         "openstack_routes.go",
         "openstack_volumes.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/openstack",
+    importpath = "k8s.io/legacy-cloud-providers/openstack",
     deps = [
-        "//pkg/util/mount:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -40,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/mount:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:go_default_library",
@@ -103,6 +104,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/file:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/io:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/mount:all-srcs",
+    ],
     tags = ["automanaged"],
 )
