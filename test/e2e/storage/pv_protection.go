@@ -120,7 +120,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		ginkgo.By("Checking that the PV status is Terminating")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "While checking PV status")
-		gomega.Expect(pv.ObjectMeta.DeletionTimestamp).NotTo(gomega.Equal(nil))
+		framework.ExpectNotEqual(pv.ObjectMeta.DeletionTimestamp, nil)
 
 		ginkgo.By("Deleting the PVC that is bound to the PV")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))

@@ -1087,7 +1087,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 		break
 	}
 	e2elog.Logf("Volume ID: %s", volumeID)
-	gomega.Expect(volumeID).NotTo(gomega.Equal(""))
+	framework.ExpectNotEqual(volumeID, "")
 	return &cinderVolume{
 		volumeName: volumeName,
 		volumeID:   volumeID,
