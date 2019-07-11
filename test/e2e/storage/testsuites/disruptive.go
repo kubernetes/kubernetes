@@ -120,11 +120,14 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			runTestFile:  utils.TestKubeletRestartsAndRestoresMount,
 			runTestBlock: utils.TestKubeletRestartsAndRestoresMap,
 		},
-		{
-			testItStmt:   "Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.",
-			runTestFile:  utils.TestVolumeUnmountsFromDeletedPod,
-			runTestBlock: utils.TestVolumeUnmapsFromDeletedPod,
-		},
+		// TODO (#79980): This test fails until #79980 is fixed.
+		/*
+			{
+				testItStmt:   "Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.",
+				runTestFile:  utils.TestVolumeUnmountsFromDeletedPod,
+				runTestBlock: utils.TestVolumeUnmapsFromDeletedPod,
+			},
+		*/
 		{
 			testItStmt:   "Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.",
 			runTestFile:  utils.TestVolumeUnmountsFromForceDeletedPod,
