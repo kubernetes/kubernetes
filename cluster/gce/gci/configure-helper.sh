@@ -992,8 +992,8 @@ users:
 clusters:
 - name: local
   cluster:
-    insecure-skip-tls-verify: true
     server: https://localhost:443
+    certificate-authority-data: ${CA_CERT_BUNDLE}
 contexts:
 - context:
     cluster: local
