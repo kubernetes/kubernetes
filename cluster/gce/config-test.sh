@@ -292,7 +292,7 @@ fi
 # Optional: Install cluster DNS.
 # Set CLUSTER_DNS_CORE_DNS to 'false' to install kube-dns instead of CoreDNS.
 CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
-ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
+ENABLE_CLUSTER_DNS="${ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
 LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
 DNS_DOMAIN="cluster.local"
