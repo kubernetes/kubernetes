@@ -69,10 +69,10 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	SIGDescribe("ReplicationController light", func() {
 		/*
 		  Release : v1.16
-		  Testname: Horizontal Pod Autoscaling, CPU Request Scale
+		  Testname: Horizontal Pod Autoscaling, CPU Target Utilization Scale
 		  Description: Given 1 Pod with 150mCPU usage
 		  And 200mCPU per Pod request
-		  And targed CPU uitilzation is 50%
+		  And targeted CPU uitilzation is 50%
 		  Then the HP Autoscaler will create another pod
 		  And the 150mCPU usage will be spread across both Pods
 		*/
