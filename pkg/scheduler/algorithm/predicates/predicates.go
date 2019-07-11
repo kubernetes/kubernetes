@@ -1346,14 +1346,9 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		topologyMaps = predicateMeta.topologyPairsAntiAffinityPodsMap
 	} else {
-		// Filter out pods whose nodeName is equal to nodeInfo.node.Name, but are not
-		// present in nodeInfo. Pods on other nodes pass the filter.
-		filteredPods, err := c.podLister.FilteredList(nodeInfo.Filter, labels.Everything())
-		if err != nil {
-			errMessage := fmt.Sprintf("Failed to get all pods: %v", err)
-			klog.Error(errMessage)
-			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
-		}
+		filteredPods := nodeInfo.Pods()
+
+		var err error
 		if topologyMaps, err = c.getMatchingAntiAffinityTopologyPairsOfPods(pod, filteredPods); err != nil {
 			errMessage := fmt.Sprintf("Failed to get all terms that match pod %s: %v", podName(pod), err)
 			klog.Error(errMessage)
