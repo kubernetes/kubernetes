@@ -55,13 +55,23 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 	// This is the cluster object we've got from the cluster-info kubeconfig file
 	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
 
+	var caCerts []byte
+	if defaultCluster.CertificateAuthority != "" {
+		caCerts, err = ioutil.ReadFile(defaultCluster.CertificateAuthority)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load CA certificate referenced by kubeconfig")
+		}
+	} else {
+		caCerts = defaultCluster.CertificateAuthorityData
+	}
+
 	// Create a new kubeconfig object from the given, just copy over the server and the CA cert
 	// We do this in order to not pick up other possible misconfigurations in the clusterinfo file
 	kubeconfig := kubeconfigutil.CreateBasic(
 		defaultCluster.Server,
 		clustername,
 		"", // no user provided
-		defaultCluster.CertificateAuthorityData,
+		caCerts,
 	)
 	// load pre-existing client certificates
 	if config.Contexts[config.CurrentContext] != nil && len(config.AuthInfos) > 0 {
@@ -92,7 +102,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 			defaultCluster.Server,
 			clustername,
 			"", // no user provided
-			defaultCluster.CertificateAuthorityData,
+			caCerts,
 			authInfo.ClientKeyData,
 			authInfo.ClientCertificateData,
 		)
