@@ -25,7 +25,7 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -115,7 +116,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 	}
 
 	// when doing a delete all of content, we will do a GET of a collection, and DELETE of a collection by default
-	dynamicClientActionSet := sets.NewString()
+	metadataClientActionSet := sets.NewString()
 	resources := testResources()
 	groupVersionResources, _ := discovery.GroupVersionResources(resources)
 	for groupVersionResource := range groupVersionResources {
@@ -127,15 +128,15 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 			namespaceName,
 			groupVersionResource.Resource,
 		}...)
-		dynamicClientActionSet.Insert((&fakeAction{method: "GET", path: urlPath}).String())
-		dynamicClientActionSet.Insert((&fakeAction{method: "DELETE", path: urlPath}).String())
+		metadataClientActionSet.Insert((&fakeAction{method: "GET", path: urlPath}).String())
+		metadataClientActionSet.Insert((&fakeAction{method: "DELETE", path: urlPath}).String())
 	}
 
 	scenarios := map[string]struct {
-		testNamespace          *v1.Namespace
-		kubeClientActionSet    sets.String
-		dynamicClientActionSet sets.String
-		gvrError               error
+		testNamespace           *v1.Namespace
+		kubeClientActionSet     sets.String
+		metadataClientActionSet sets.String
+		gvrError                error
 	}{
 		"pending-finalize": {
 			testNamespace: testNamespacePendingFinalize,
@@ -145,7 +146,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				strings.Join([]string{"list", "pods", ""}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
-			dynamicClientActionSet: dynamicClientActionSet,
+			metadataClientActionSet: metadataClientActionSet,
 		},
 		"complete-finalize": {
 			testNamespace: testNamespaceFinalizeComplete,
@@ -153,7 +154,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
-			dynamicClientActionSet: sets.NewString(),
+			metadataClientActionSet: sets.NewString(),
 		},
 		"groupVersionResourceErr": {
 			testNamespace: testNamespaceFinalizeComplete,
@@ -161,8 +162,8 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
-			dynamicClientActionSet: sets.NewString(),
-			gvrError:               fmt.Errorf("test error"),
+			metadataClientActionSet: sets.NewString(),
+			gvrError:                fmt.Errorf("test error"),
 		},
 	}
 
@@ -172,7 +173,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		defer srv.Close()
 
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		dynamicClient, err := dynamic.NewForConfig(clientConfig)
+		metadataClient, err := metadata.NewForConfig(clientConfig)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +181,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		fn := func() ([]*metav1.APIResourceList, error) {
 			return resources, nil
 		}
-		d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), dynamicClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes, true)
+		d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), metadataClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes, true)
 		if err := d.Delete(testInput.testNamespace.Name); err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
@@ -195,14 +196,14 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				testInput.kubeClientActionSet, actionSet, testInput.kubeClientActionSet.Difference(actionSet))
 		}
 
-		// validate traffic from dynamic client
+		// validate traffic from metadata client
 		actionSet = sets.NewString()
 		for _, action := range testHandler.actions {
 			actionSet.Insert(action.String())
 		}
-		if !actionSet.Equal(testInput.dynamicClientActionSet) {
-			t.Errorf("scenario %s - dynamic client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
-				testInput.dynamicClientActionSet, actionSet, testInput.dynamicClientActionSet.Difference(actionSet))
+		if !actionSet.Equal(testInput.metadataClientActionSet) {
+			t.Errorf("scenario %s - metadata client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
+				testInput.metadataClientActionSet, actionSet, testInput.metadataClientActionSet.Difference(actionSet))
 		}
 	}
 }
@@ -307,7 +308,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
 	response.Header().Set("Content-Type", runtime.ContentTypeJSON)
 	response.WriteHeader(f.statusCode)
-	response.Write([]byte("{\"kind\": \"List\",\"items\":null}"))
+	response.Write([]byte("{\"apiVersion\": \"v1\", \"kind\": \"List\",\"items\":null}"))
 }
 
 // testResources returns a mocked up set of resources across different api groups for testing namespace controller.

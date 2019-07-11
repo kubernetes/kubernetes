@@ -24,17 +24,16 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/metadata"
 )
 
 // NamespacedResourcesDeleterInterface is the interface to delete a namespace with all resources in it.
@@ -44,13 +43,13 @@ type NamespacedResourcesDeleterInterface interface {
 
 // NewNamespacedResourcesDeleter returns a new NamespacedResourcesDeleter.
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
-	dynamicClient dynamic.Interface, podsGetter v1clientset.PodsGetter,
+	metadataClient metadata.Interface, podsGetter v1clientset.PodsGetter,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
 	d := &namespacedResourcesDeleter{
-		nsClient:      nsClient,
-		dynamicClient: dynamicClient,
-		podsGetter:    podsGetter,
+		nsClient:       nsClient,
+		metadataClient: metadataClient,
+		podsGetter:     podsGetter,
 		opCache: &operationNotSupportedCache{
 			m: make(map[operationKey]bool),
 		},
@@ -69,7 +68,7 @@ type namespacedResourcesDeleter struct {
 	// Client to manipulate the namespace.
 	nsClient v1clientset.NamespaceInterface
 	// Dynamic client to list and delete all namespaced resources.
-	dynamicClient dynamic.Interface
+	metadataClient metadata.Interface
 	// Interface to get PodInterface.
 	podsGetter v1clientset.PodsGetter
 	// Cache of what operations are not supported on each group version resource.
@@ -345,7 +344,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
 	opts := &metav1.DeleteOptions{PropagationPolicy: &background}
-	err := d.dynamicClient.Resource(gvr).Namespace(namespace).DeleteCollection(opts, metav1.ListOptions{})
+	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(opts, metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -372,7 +371,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 //  the list of items in the collection (if found)
 //  a boolean if the operation is supported
 //  an error if the operation is supported but could not be completed.
-func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResource, namespace string) (*unstructured.UnstructuredList, bool, error) {
+func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResource, namespace string) (*metav1.PartialObjectMetadataList, bool, error) {
 	klog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationList, gvr: gvr}
@@ -381,9 +380,9 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 		return nil, false, nil
 	}
 
-	unstructuredList, err := d.dynamicClient.Resource(gvr).Namespace(namespace).List(metav1.ListOptions{})
+	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(metav1.ListOptions{})
 	if err == nil {
-		return unstructuredList, true, nil
+		return partialList, true, nil
 	}
 
 	// this is strange, but we need to special case for both MethodNotSupported and NotFound errors
@@ -415,7 +414,7 @@ func (d *namespacedResourcesDeleter) deleteEachItem(gvr schema.GroupVersionResou
 	for _, item := range unstructuredList.Items {
 		background := metav1.DeletePropagationBackground
 		opts := &metav1.DeleteOptions{PropagationPolicy: &background}
-		if err = d.dynamicClient.Resource(gvr).Namespace(namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
