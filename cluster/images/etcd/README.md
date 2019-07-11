@@ -34,7 +34,7 @@ version.
 Upgrades to any target version are supported. The data will be automatically upgraded
 in steps to each minor version until the target version is reached.
 
-Downgrades to the previous minor version of the 3.x series and from 3.0 to 2.3.7 are supported.
+Downgrades to the previous minor version of the 3.x series is supported.
 
 #### Permissions
 
