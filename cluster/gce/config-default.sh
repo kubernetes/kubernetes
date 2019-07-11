@@ -270,6 +270,14 @@ if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
     fi
 fi
 
+#if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
+#  RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
+#  if ! [[ "${KUBE_FEATURE_GATES:-}" =~ "VolumeSnapshotDataSource" ]]; then
+#    # If not explicitly specified, default to true.
+#    FEATURE_GATES="${FEATURE_GATES},VolumeSnapshotDataSource=true"
+#  fi
+#fi
+
 # Optional: Install cluster DNS.
 # Set CLUSTER_DNS_CORE_DNS to 'false' to install kube-dns instead of CoreDNS.
 CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
