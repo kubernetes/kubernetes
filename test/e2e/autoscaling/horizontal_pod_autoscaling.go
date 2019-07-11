@@ -69,9 +69,12 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	SIGDescribe("ReplicationController light", func() {
 		/*
 		  Release : v1.16
-		  Testname: Up-scale pod replicas and resources
-		  Description: Pod replicas MUST increase from 1 pod to 2 pods.
-		  Pod CPU request will increase to 50%.
+		  Testname: Horizontal Pod Autoscaling, CPU Request Scale
+		  Description: Given 1 Pod with 150mCPU usage
+		  And 200mCPU per Pod request
+		  And targed CPU uitilzation is 50%
+		  Then the HP Autoscaler will create another pod
+		  And the 150mCPU usage will be spread across both Pods
 		*/
 		framework.ConformanceIt("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
