@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -318,7 +319,9 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	// Construct the resulting typed, unversioned object.
 	objToUpdate := p.restPatcher.New()
 	if err := runtime.DecodeInto(p.codec, patchedObjJS, objToUpdate); err != nil {
-		return nil, err
+		return nil, errors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
+			field.Invalid(field.NewPath("patch"), string(patchedObjJS), err.Error()),
+		})
 	}
 
 	if p.fieldManager != nil {
@@ -583,7 +586,9 @@ func applyPatchToObject(
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchedObjMap, objToUpdate); err != nil {
-		return err
+		return errors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
+			field.Invalid(field.NewPath("patch"), fmt.Sprintf("%+v", patchMap), err.Error()),
+		})
 	}
 	// Decoding from JSON to a versioned object would apply defaults, so we do the same here
 	defaulter.Default(objToUpdate)
