@@ -277,15 +277,15 @@ func (cgc *containerGC) evictSandboxes(evictTerminatedPods bool) error {
 		return err
 	}
 
+	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
+	if err != nil {
+		return err
+	}
+
 	// collect all the PodSandboxId of container
 	sandboxIDs := sets.NewString()
 	for _, container := range containers {
 		sandboxIDs.Insert(container.PodSandboxId)
-	}
-
-	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
-	if err != nil {
-		return err
 	}
 
 	sandboxesByPod := make(sandboxesByPodUID)
