@@ -96,10 +96,6 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetcher(url, getReleaseVersionTimeout)
 		if err != nil {
-			// If the network operaton was successful but the server did not reply with StatusOK
-			if body != "" {
-				return "", err
-			}
 			if clientVersionErr == nil {
 				// Handle air-gapped environments by falling back to the client version.
 				klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
