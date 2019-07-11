@@ -68,7 +68,7 @@ func (az *Cloud) getConfigFromSecret() (*Config, error) {
 
 	secret, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Get(cloudConfigSecretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get secret %s: %v", cloudConfigSecretName, err)
+		return nil, fmt.Errorf("failed to get secret %s: %v", cloudConfigSecretName, err)
 	}
 
 	cloudConfigData, ok := secret.Data[cloudConfigKey]
@@ -84,7 +84,7 @@ func (az *Cloud) getConfigFromSecret() (*Config, error) {
 
 	err = yaml.Unmarshal(cloudConfigData, &config)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse Azure cloud-config: %v", err)
+		return nil, fmt.Errorf("failed to parse Azure cloud-config: %v", err)
 	}
 
 	return &config, nil

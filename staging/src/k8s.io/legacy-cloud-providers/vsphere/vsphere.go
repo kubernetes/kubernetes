@@ -1322,14 +1322,14 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 
 		// if datastoreInfo is still not determined, it is an error condition
 		if datastoreInfo == nil {
-			klog.Errorf("Ambigous datastore name %s, cannot be found among: %v", datastoreName, candidateDatastoreInfos)
-			return "", fmt.Errorf("Ambigous datastore name %s", datastoreName)
+			klog.Errorf("ambigous datastore name %s, cannot be found among: %v", datastoreName, candidateDatastoreInfos)
+			return "", fmt.Errorf("ambigous datastore name %s", datastoreName)
 		}
 		ds := datastoreInfo.Datastore
 		volumeOptions.Datastore = datastoreInfo.Info.Name
 		vmOptions, err = vs.setVMOptions(ctx, vsi.conn, ds)
 		if err != nil {
-			klog.Errorf("Failed to set VM options required to create a vsphere volume. err: %+v", err)
+			klog.Errorf("failed to set VM options required to create a vsphere volume. err: %+v", err)
 			return "", err
 		}
 		kubeVolsPath := filepath.Clean(ds.Path(VolDir)) + "/"
@@ -1605,7 +1605,7 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 	}
 	if datastore == nil {
 		klog.Errorf("Could not find %s among %v", volumePath, dsInfos)
-		return nil, fmt.Errorf("Could not find the datastore for volume: %s", volumePath)
+		return nil, fmt.Errorf("could not find the datastore for volume: %s", volumePath)
 	}
 
 	dsZones, err := vs.GetZonesForDatastore(ctx, datastore)
