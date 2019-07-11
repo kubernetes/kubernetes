@@ -41,6 +41,15 @@ const (
 // NOT be changed in normal codepaths during runtime.
 var caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates", "/usr/local/share/ca-certificates", "/etc/ca-certificates"}
 
+func mountCertificatesDirectories(mounts *controlPlaneHostPathMounts, component string, cfg *kubeadmapi.InitConfiguration) {
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+
+	// Read-only mount for the certificates directory
+	mounts.NewHostPathMount(component, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
+	// Read-only mount for the ca certs (/etc/ssl/certs) directory
+	mounts.NewHostPathMount(component, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
+}
+
 // getHostPathVolumesForTheControlPlane gets the required hostPath volumes and mounts for the control plane
 func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) controlPlaneHostPathMounts {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
@@ -48,11 +57,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) con
 	mounts := newControlPlaneHostPathMounts()
 
 	// HostPath volumes for the API Server
-	// Read-only mount for the certificates directory
-	// TODO: Always mount the K8s Certificates directory to a static path inside of the container
-	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
-	// Read-only mount for the ca certs (/etc/ssl/certs) directory
-	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
+	mountCertificatesDirectories(&mounts, kubeadmconstants.KubeAPIServer, cfg)
 
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
 	if cfg.Etcd.External != nil {
@@ -61,11 +66,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) con
 	}
 
 	// HostPath volumes for the controller manager
-	// Read-only mount for the certificates directory
-	// TODO: Always mount the K8s Certificates directory to a static path inside of the container
-	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
-	// Read-only mount for the ca certs (/etc/ssl/certs) directory
-	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
+	mountCertificatesDirectories(&mounts, kubeadmconstants.KubeControllerManager, cfg)
 	// Read-only mount for the controller manager kubeconfig file
 	controllerManagerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true, &hostPathFileOrCreate)
@@ -76,6 +77,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) con
 	}
 
 	// HostPath volumes for the scheduler
+	mountCertificatesDirectories(&mounts, kubeadmconstants.KubeScheduler, cfg)
 	// Read-only mount for the scheduler kubeconfig file
 	schedulerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	mounts.NewHostPathMount(kubeadmconstants.KubeScheduler, kubeadmconstants.KubeConfigVolumeName, schedulerKubeConfigFile, schedulerKubeConfigFile, true, &hostPathFileOrCreate)

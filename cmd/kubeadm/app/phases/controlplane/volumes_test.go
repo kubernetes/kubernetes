@@ -307,6 +307,24 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 	}
 	volMap[kubeadmconstants.KubeScheduler] = map[string]v1.Volume{}
+	volMap[kubeadmconstants.KubeScheduler]["k8s-certs"] = v1.Volume{
+		Name: "k8s-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: testCertsDir,
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap[kubeadmconstants.KubeScheduler]["ca-certs"] = v1.Volume{
+		Name: "ca-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/ssl/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
 	volMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.Volume{
 		Name: "kubeconfig",
 		VolumeSource: v1.VolumeSource{
@@ -345,6 +363,16 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		ReadOnly:  true,
 	}
 	volMountMap[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
+	volMountMap[kubeadmconstants.KubeScheduler]["k8s-certs"] = v1.VolumeMount{
+		Name:      "k8s-certs",
+		MountPath: testCertsDir,
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeScheduler]["ca-certs"] = v1.VolumeMount{
+		Name:      "ca-certs",
+		MountPath: "/etc/ssl/certs",
+		ReadOnly:  true,
+	}
 	volMountMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
 		Name:      "kubeconfig",
 		MountPath: "/etc/kubernetes/scheduler.conf",
@@ -418,6 +446,24 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 	}
 	volMap2[kubeadmconstants.KubeScheduler] = map[string]v1.Volume{}
+	volMap2[kubeadmconstants.KubeScheduler]["k8s-certs"] = v1.Volume{
+		Name: "k8s-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: testCertsDir,
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeScheduler]["ca-certs"] = v1.Volume{
+		Name: "ca-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/ssl/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
 	volMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.Volume{
 		Name: "kubeconfig",
 		VolumeSource: v1.VolumeSource{
@@ -466,6 +512,16 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		ReadOnly:  true,
 	}
 	volMountMap2[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
+	volMountMap2[kubeadmconstants.KubeScheduler]["k8s-certs"] = v1.VolumeMount{
+		Name:      "k8s-certs",
+		MountPath: testCertsDir,
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeScheduler]["ca-certs"] = v1.VolumeMount{
+		Name:      "ca-certs",
+		MountPath: "/etc/ssl/certs",
+		ReadOnly:  true,
+	}
 	volMountMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
 		Name:      "kubeconfig",
 		MountPath: "/etc/kubernetes/scheduler.conf",
