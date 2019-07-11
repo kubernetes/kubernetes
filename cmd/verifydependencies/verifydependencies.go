@@ -60,8 +60,11 @@ func main() {
 		panic(err)
 	}
 
+	mismatchErrorMessage := "ERROR: %v indicates that %v should be at version %v, but the following files didn't match:\n\n" +
+		"%v\n\nif you are changing the version of %v, make sure all of the following files are updated with the newest version including %v\n" +
+		"then run ./hack/verify-external-dependencies-version.sh\n\n"
 	externalDeps := &dependencies{}
-
+	var pathsToUpdate []string
 	err = yaml.Unmarshal(externalDepsFile, externalDeps)
 	if err != nil {
 		panic(err)
@@ -84,8 +87,11 @@ func main() {
 				}
 			}
 			if !found {
-				log.Fatalf("%v dependency: file %v doesn't contain the expected version %v or matcher %v did change. check the %v file", dep.Name, refPath.Path, dep.Version, refPath.Match, externalDepsFilePath)
+				pathsToUpdate = append(pathsToUpdate, refPath.Path)
 			}
+		}
+		if len(pathsToUpdate) > 0 {
+			log.Fatalf(mismatchErrorMessage, externalDepsFilePath, dep.Name, dep.Version, strings.Join(pathsToUpdate, "\n"), dep.Name, externalDepsFilePath)
 		}
 	}
 
