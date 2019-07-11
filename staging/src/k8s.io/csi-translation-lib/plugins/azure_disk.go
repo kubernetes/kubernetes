@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -67,6 +68,10 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 
 	azureSource := volume.AzureDisk
 	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			// A.K.A InnerVolumeSpecName required to match for Unmount
+			Name: volume.Name,
+		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
