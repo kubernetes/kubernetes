@@ -264,10 +264,15 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		}
 		dnsNodes := make(map[string]bool)
 		for _, pod := range pods.Items {
-			if (options.Nodes == MasterNodes) && !system.IsMasterNode(pod.Spec.NodeName) {
+			node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+			if err != nil {
+				e2elog.Logf("Error while get node: %v", err)
+				return nil, err
+			}
+			if (options.Nodes == MasterNodes) && !system.IsMasterNode(node) {
 				continue
 			}
-			if (options.Nodes == MasterAndDNSNodes) && !system.IsMasterNode(pod.Spec.NodeName) && pod.Labels["k8s-app"] != "kube-dns" {
+			if (options.Nodes == MasterAndDNSNodes) && !system.IsMasterNode(node) && pod.Labels["k8s-app"] != "kube-dns" {
 				continue
 			}
 			for _, container := range pod.Status.InitContainerStatuses {
@@ -287,7 +292,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		}
 
 		for _, node := range nodeList.Items {
-			if options.Nodes == AllNodes || system.IsMasterNode(node.Name) || dnsNodes[node.Name] {
+			if options.Nodes == AllNodes || system.IsMasterNode(&node) || dnsNodes[node.Name] {
 				g.workerWg.Add(1)
 				g.workers = append(g.workers, resourceGatherWorker{
 					c:                           c,

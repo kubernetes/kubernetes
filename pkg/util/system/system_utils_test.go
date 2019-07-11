@@ -24,24 +24,22 @@ import (
 )
 
 func TestIsMasterNode(t *testing.T) {
+	label1 := map[string]string{"foo": "bar"}
+	label2 := map[string]string{"foo": "bar", LabelNodeRoleMaster: ""}
+	label3 := map[string]string{"foo": "bar", "node-role.kubernetes.io/node": ""}
 	testCases := []struct {
-		input  string
+		node   *v1.Node
 		result bool
 	}{
-		{"foo-master", true},
-		{"foo-master-", false},
-		{"foo-master-a", false},
-		{"foo-master-ab", false},
-		{"foo-master-abc", true},
-		{"foo-master-abdc", false},
-		{"foo-bar", false},
+		{&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}}, false},
+		{&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}}, true},
+		{&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}}, false},
 	}
 
 	for _, tc := range testCases {
-		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: tc.input}}
-		res := IsMasterNode(node.Name)
+		res := IsMasterNode(tc.node)
 		if res != tc.result {
-			t.Errorf("case \"%s\": expected %t, got %t", tc.input, tc.result, res)
+			t.Errorf("case \"%s\": expected %t, got %t", tc.node.Name, tc.result, res)
 		}
 	}
 }

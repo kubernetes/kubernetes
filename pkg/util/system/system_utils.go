@@ -17,21 +17,16 @@ limitations under the License.
 package system
 
 import (
-	"strings"
+	"k8s.io/api/core/v1"
 )
 
+const LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
 // IsMasterNode returns true if given node is a registered master.
-// TODO: find a better way of figuring out if given node is a registered master.
-func IsMasterNode(nodeName string) bool {
-	// We are trying to capture "master(-...)?$" regexp.
-	// However, using regexp.MatchString() results even in more than 35%
-	// of all space allocations in ControllerManager spent in this function.
-	// That's why we are trying to be a bit smarter.
-	if strings.HasSuffix(nodeName, "master") {
+// use node-role.kubernetes.io/master label to figure out if given node is a registered master.
+func IsMasterNode(node *v1.Node) bool {
+	if _, ok := node.Labels[LabelNodeRoleMaster]; ok {
 		return true
-	}
-	if len(nodeName) >= 10 {
-		return strings.HasSuffix(nodeName[:len(nodeName)-3], "master-")
 	}
 	return false
 }

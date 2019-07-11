@@ -629,7 +629,7 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 
 	var masterRegistered = false
 	for _, node := range nodes.Items {
-		if system.IsMasterNode(node.Name) {
+		if system.IsMasterNode(&node) {
 			masterRegistered = true
 		}
 	}
