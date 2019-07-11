@@ -497,7 +497,7 @@ func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 		klog.Errorf("Path %q is not referring to a device.", pathname)
 		return false, nil
 	}
-	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
+	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL|unix.O_CLOEXEC, 0)
 	// If the device is in use, open will return an invalid fd.
 	// When this happens, it is expected that Close will fail and throw an error.
 	defer unix.Close(fd)
