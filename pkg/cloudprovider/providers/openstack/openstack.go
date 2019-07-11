@@ -297,13 +297,13 @@ func setConfigFromSecret(cfg *Config) error {
 	if content, ok := secret.Data["clouds.conf"]; ok {
 		err = gcfg.ReadStringInto(cfg, string(content))
 		if err != nil {
-			klog.Errorf("Cannot parse data from the secret.")
+			klog.Error("Cannot parse data from the secret.")
 			return fmt.Errorf("cannot parse data from the secret")
 		}
 		return nil
 	}
 
-	klog.Errorf("Cannot find \"clouds.conf\" key in the secret.")
+	klog.Error("Cannot find \"clouds.conf\" key in the secret.")
 	return fmt.Errorf("cannot find \"clouds.conf\" key in the secret")
 }
 
