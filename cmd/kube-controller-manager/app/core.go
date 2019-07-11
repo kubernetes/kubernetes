@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
@@ -334,7 +333,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
-		InformerFactory:           ctx.GenericInformerFactory,
+		InformerFactory:           ctx.ObjectOrMetadataInformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
@@ -423,7 +422,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, true, err
 	}
@@ -435,11 +434,11 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
-		dynamicClient,
+		metadataClient,
 		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,
-		ctx.GenericInformerFactory,
+		ctx.ObjectOrMetadataInformerFactory,
 		ctx.InformersStarted,
 	)
 	if err != nil {

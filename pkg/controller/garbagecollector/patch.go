@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -51,7 +50,7 @@ func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string
 	m, ok := gc.dependencyGraphBuilder.monitors[apiResource]
 	if !ok || m == nil {
 		// If local cache doesn't exist for mapping.Resource, send a GET request to API server
-		return gc.dynamicClient.Resource(apiResource).Namespace(namespace).Get(name, metav1.GetOptions{})
+		return gc.metadataClient.Resource(apiResource).Namespace(namespace).Get(name, metav1.GetOptions{})
 	}
 	key := name
 	if len(namespace) != 0 {
@@ -63,13 +62,22 @@ func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string
 	}
 	if !exist {
 		// If local cache doesn't contain the object, send a GET request to API server
-		return gc.dynamicClient.Resource(apiResource).Namespace(namespace).Get(name, metav1.GetOptions{})
+		return gc.metadataClient.Resource(apiResource).Namespace(namespace).Get(name, metav1.GetOptions{})
 	}
 	obj, ok := raw.(runtime.Object)
 	if !ok {
 		return nil, fmt.Errorf("expect a runtime.Object, got %v", raw)
 	}
 	return meta.Accessor(obj)
+}
+
+type objectForFinalizersPatch struct {
+	ObjectMetaForFinalizersPatch `json:"metadata"`
+}
+
+type ObjectMetaForFinalizersPatch struct {
+	ResourceVersion string   `json:"resourceVersion"`
+	Finalizers      []string `json:"finalizers"`
 }
 
 type objectForPatch struct {
@@ -87,7 +95,7 @@ type jsonMergePatchFunc func(*node) ([]byte, error)
 
 // patch tries strategic merge patch on item first, and if SMP is not supported, it fallbacks to JSON merge
 // patch.
-func (gc *GarbageCollector) patch(item *node, smp []byte, jmp jsonMergePatchFunc) (*unstructured.Unstructured, error) {
+func (gc *GarbageCollector) patch(item *node, smp []byte, jmp jsonMergePatchFunc) (*metav1.PartialObjectMetadata, error) {
 	smpResult, err := gc.patchObject(item.identity, smp, types.StrategicMergePatchType)
 	if err == nil {
 		return smpResult, nil

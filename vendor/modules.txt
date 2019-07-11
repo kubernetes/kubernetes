@@ -1315,8 +1315,6 @@ k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/cached/memory
 k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
-k8s.io/client-go/dynamic/dynamicinformer
-k8s.io/client-go/dynamic/dynamiclister
 k8s.io/client-go/dynamic/fake
 k8s.io/client-go/informers
 k8s.io/client-go/informers/admissionregistration
@@ -1477,6 +1475,8 @@ k8s.io/client-go/listers/storage/v1
 k8s.io/client-go/listers/storage/v1alpha1
 k8s.io/client-go/listers/storage/v1beta1
 k8s.io/client-go/metadata
+k8s.io/client-go/metadata/metadatainformer
+k8s.io/client-go/metadata/metadatalister
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
