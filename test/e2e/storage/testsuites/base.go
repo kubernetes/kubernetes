@@ -483,10 +483,9 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 				"namespace":    ns,
 			},
 			"spec": map[string]interface{}{
-				"snapshotClassName": snapshotClassName,
+				"volumeSnapshotClassName": snapshotClassName,
 				"source": map[string]interface{}{
-					"name": claimName,
-					"kind": "PersistentVolumeClaim",
+					"persistentVolumeClaimName": claimName,
 				},
 			},
 		},

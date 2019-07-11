@@ -349,6 +349,7 @@ const (
 
 	// owner: @xing-yang
 	// alpha: v1.12
+	// beta: v1.17
 	//
 	// Enable volume snapshot data source support.
 	VolumeSnapshotDataSource featuregate.Feature = "VolumeSnapshotDataSource"
@@ -558,7 +559,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSnapshotDataSource:       {Default: false, PreRelease: featuregate.Alpha},
+	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
