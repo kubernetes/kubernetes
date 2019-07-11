@@ -112,9 +112,10 @@ func (r *RuntimeClass) Validate(attributes admission.Attributes, o admission.Obj
 	if err != nil {
 		return err
 	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
-		err = validateOverhead(attributes, pod, runtimeClass)
+		if err = validateOverhead(attributes, pod, runtimeClass); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -136,26 +137,15 @@ func (r *RuntimeClass) prepareObjects(attributes admission.Attributes) (pod *api
 	}
 
 	// get RuntimeClass object
-	runtimeClass, err = r.getRuntimeClass(pod, pod.Spec.RuntimeClassName)
-	if err != nil {
-		return pod, nil, err
+	if pod.Spec.RuntimeClassName != nil {
+		runtimeClass, err = r.runtimeClassLister.Get(*pod.Spec.RuntimeClassName)
+		if err != nil {
+			return pod, nil, err
+		}
 	}
 
 	// return the pod and runtimeClass. If no RuntimeClass is specified in PodSpec, runtimeClass will be nil
 	return pod, runtimeClass, nil
-}
-
-// getRuntimeClass will return a reference to the RuntimeClass object if it is found. If it cannot be found, or a RuntimeClassName
-// is not provided in the pod spec, *node.RuntimeClass returned will be nil
-func (r *RuntimeClass) getRuntimeClass(pod *api.Pod, runtimeClassName *string) (runtimeClass *v1beta1.RuntimeClass, err error) {
-
-	runtimeClass = nil
-
-	if runtimeClassName != nil {
-		runtimeClass, err = r.runtimeClassLister.Get(*runtimeClassName)
-	}
-
-	return runtimeClass, err
 }
 
 func setOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.RuntimeClass) (err error) {
