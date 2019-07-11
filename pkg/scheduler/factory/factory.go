@@ -259,7 +259,9 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
-	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
+	kubernetesHandler := getKubernetesHandler(args)
+	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig,
+		framework.WithKubernetesHandler(kubernetesHandler))
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
@@ -580,6 +582,23 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil
+}
+
+func getKubernetesHandler(args *ConfigFactoryArgs) *framework.KubernetesHandler {
+	return &framework.KubernetesHandler{
+		Client:                        args.Client,
+		PodInformer:                   args.PodInformer,
+		NodeInformer:                  args.NodeInformer,
+		PvInformer:                    args.PvInformer,
+		PvcInformer:                   args.PvcInformer,
+		ServiceInformer:               args.ServiceInformer,
+		ReplicationControllerInformer: args.ReplicationControllerInformer,
+		ReplicaSetInformer:            args.ReplicaSetInformer,
+		StatefulSetInformer:           args.StatefulSetInformer,
+		PdbInformer:                   args.PdbInformer,
+		StorageClassInformer:          args.StorageClassInformer,
+		CSINodeInformer:               args.CSINodeInformer,
+	}
 }
 
 // assignedPodLister filters the pods returned from a PodLister to

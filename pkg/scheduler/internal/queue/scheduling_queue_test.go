@@ -193,6 +193,10 @@ func (*fakeFramework) GetWaitingPod(uid types.UID) framework.WaitingPod {
 	return nil
 }
 
+func (f *fakeFramework) GetKubernetesHandler() *framework.KubernetesHandler {
+	return nil
+}
+
 func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 	q := NewPriorityQueue(nil, &fakeFramework{})
 	if err := q.Add(&medPriorityPod); err != nil {

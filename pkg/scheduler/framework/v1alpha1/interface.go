@@ -24,6 +24,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -233,6 +239,34 @@ type Framework interface {
 	RunPermitPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 }
 
+// KubernetesHandler contains a kubernetes client and a set of resource informers.
+type KubernetesHandler struct {
+	// Client is a kubernetes client set
+	Client clientset.Interface
+	// NodeInformer is a node informer
+	NodeInformer coreinformers.NodeInformer
+	// PodInformer is a pod informer
+	PodInformer coreinformers.PodInformer
+	// PvInformer is a pv informer
+	PvInformer coreinformers.PersistentVolumeInformer
+	// PvcInformer is a pvc informer
+	PvcInformer coreinformers.PersistentVolumeClaimInformer
+	// ReplicationControllerInformer is a ReplicationController informer
+	ReplicationControllerInformer coreinformers.ReplicationControllerInformer
+	// ReplicaSetInformer is a ReplicaSet informer
+	ReplicaSetInformer appsinformers.ReplicaSetInformer
+	// StatefulSetInformer is a StatefulSet informer
+	StatefulSetInformer appsinformers.StatefulSetInformer
+	// ServiceInformer is a service informer
+	ServiceInformer coreinformers.ServiceInformer
+	// PdbInformer is a pdb informer
+	PdbInformer policyinformers.PodDisruptionBudgetInformer
+	// StorageClassInformer is a StorageClass informer
+	StorageClassInformer storageinformersv1.StorageClassInformer
+	// CSINodeInformer is a CSINode informer
+	CSINodeInformer storageinformersv1beta1.CSINodeInformer
+}
+
 // FrameworkHandle provides data and some tools that plugins can use. It is
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.
@@ -248,4 +282,7 @@ type FrameworkHandle interface {
 
 	// GetWaitingPod returns a waiting pod given its UID.
 	GetWaitingPod(uid types.UID) WaitingPod
+
+	// GetKubernetesHandler returns a KubernetesHandler
+	GetKubernetesHandler() *KubernetesHandler
 }

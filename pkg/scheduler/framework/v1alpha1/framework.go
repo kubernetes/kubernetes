@@ -31,17 +31,18 @@ import (
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {
-	registry         Registry
-	nodeInfoSnapshot *cache.NodeInfoSnapshot
-	waitingPods      *waitingPodsMap
-	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
-	queueSortPlugins []QueueSortPlugin
-	prefilterPlugins []PrefilterPlugin
-	reservePlugins   []ReservePlugin
-	prebindPlugins   []PrebindPlugin
-	postbindPlugins  []PostbindPlugin
-	unreservePlugins []UnreservePlugin
-	permitPlugins    []PermitPlugin
+	registry          Registry
+	nodeInfoSnapshot  *cache.NodeInfoSnapshot
+	waitingPods       *waitingPodsMap
+	kubernetesHandler *KubernetesHandler
+	plugins           map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
+	queueSortPlugins  []QueueSortPlugin
+	prefilterPlugins  []PrefilterPlugin
+	reservePlugins    []ReservePlugin
+	prebindPlugins    []PrebindPlugin
+	postbindPlugins   []PostbindPlugin
+	unreservePlugins  []UnreservePlugin
+	permitPlugins     []PermitPlugin
 }
 
 const (
@@ -51,14 +52,29 @@ const (
 
 var _ = Framework(&framework{})
 
+// Option configures a framework
+type Option func(f *framework)
+
+// WithKubernetesHandler sets kubernerHandler for framework, the default kubernerHandler is nil
+func WithKubernetesHandler(kubernerHandler *KubernetesHandler) Option {
+	return func(f *framework) {
+		f.kubernetesHandler = kubernerHandler
+	}
+}
+
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, options ...Option) (Framework, error) {
 	f := &framework{
 		registry:         r,
 		nodeInfoSnapshot: cache.NewNodeInfoSnapshot(),
 		plugins:          make(map[string]Plugin),
 		waitingPods:      newWaitingPodsMap(),
 	}
+
+	for _, option := range options {
+		option(f)
+	}
+
 	if plugins == nil {
 		return f, nil
 	}
@@ -354,6 +370,11 @@ func (f *framework) IterateOverWaitingPods(callback func(WaitingPod)) {
 // GetWaitingPod returns a reference to a WaitingPod given its UID.
 func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 	return f.waitingPods.get(uid)
+}
+
+// GetKubernetesHandler returns a KubernetesHandler
+func (f *framework) GetKubernetesHandler() *KubernetesHandler {
+	return f.kubernetesHandler
 }
 
 func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {
