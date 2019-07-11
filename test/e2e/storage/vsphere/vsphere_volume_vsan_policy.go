@@ -21,8 +21,6 @@ import (
 	"hash/fnv"
 	"time"
 
-	"strings"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -83,8 +81,6 @@ const (
    6. Wait for Disk to be attached to the node.
    7. Delete pod and Wait for Volume Disk to be detached from the Node.
    8. Delete PVC, PV and Storage Class
-
-
 */
 
 var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsphere]", func() {
@@ -111,7 +107,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 			e2elog.Failf("Unable to find ready and schedulable Node")
 		}
 		masternodes, _ := framework.GetMasterAndWorkerNodesOrDie(client)
-		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
+		gomega.Expect(masternodes).NotTo(gomega.BeEmpty(), "cluster has no master nodes")
 		masterNode = masternodes.List()[0]
 	})
 
@@ -160,10 +156,8 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
-		errorMsg := "invalid option \\\"objectSpaceReserve\\\" for volume plugin kubernetes.io/vsphere-volume"
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		errorMsg := `invalid option "objectSpaceReserve" for volume plugin kubernetes.io/vsphere-volume`
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 
 	// Invalid policy on a VSAN test bed.
@@ -176,9 +170,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "Invalid value for " + Policy_DiskStripes + "."
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 
 	// Invalid policy on a VSAN test bed.
@@ -190,9 +182,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 
 	// Specify a valid VSAN policy on a non-VSAN test bed.
@@ -207,9 +197,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		framework.ExpectError(err)
 		errorMsg := "The specified datastore: \\\"" + VmfsDatastore + "\\\" is not a VSAN datastore. " +
 			"The policy parameters will work only with VSAN Datastore."
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 
 	ginkgo.It("verify an existing and compatible SPBM policy is honored for dynamically provisioned pvc using storageclass", func() {
@@ -238,9 +226,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + tagPolicy + "\\\""
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 
 	ginkgo.It("verify if a non-existing SPBM policy is not honored for dynamically provisioned pvc using storageclass", func() {
@@ -251,48 +237,43 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "no pbm profile found with name: \\\"" + BronzeStoragePolicy + "\\"
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 
 	ginkgo.It("verify an if a SPBM policy and VSAN capabilities cannot be honored for dynamically provisioned pvc using storageclass", func() {
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s with VSAN storage capabilities", policyName))
 		scParameters[SpbmStoragePolicy] = policyName
-		gomega.Expect(scParameters[SpbmStoragePolicy]).NotTo(gomega.BeEmpty())
+		gomega.Expect(scParameters[SpbmStoragePolicy]).NotTo(gomega.BeEmpty(),
+			"storage class parameter %s is empty", SpbmStoragePolicy)
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[DiskFormat] = ThinDisk
 		e2elog.Logf("Invoking test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"
-		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
-		}
+		gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorMsg), "incorrect error message")
 	})
 })
 
 func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, namespace string, scParameters map[string]string) {
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil))
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, "failed to create storage class storagepolicysc")
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to create PVC")
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
-	var pvclaims []*v1.PersistentVolumeClaim
-	pvclaims = append(pvclaims, pvclaim)
+	pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
 	ginkgo.By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to bind PVC %s", pvclaim.Name)
 
 	ginkgo.By("Creating pod to attach PV to the node")
-	// Create pod to attach Volume to Node
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to create pod in namespace %s", namespace)
 
 	ginkgo.By("Verify the volume is accessible and available in the pod")
 	verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
@@ -307,17 +288,17 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil))
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, "failed to create storage class storagepolicysc")
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to create PVC")
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	framework.ExpectError(err)
+	framework.ExpectError(err, "binding claim should time out")
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
@@ -326,21 +307,20 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterNode string, namespace string, clusterName string, scParameters map[string]string) {
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil))
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, "failed to create storage class storagepolicysc")
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to create a PVC referencing storage class %s", storageclass.Name)
 
-	var pvclaims []*v1.PersistentVolumeClaim
-	pvclaims = append(pvclaims, pvclaim)
-	ginkgo.By("Expect claim to fail provisioning volume")
+	pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
+	ginkgo.By("Expect claim to fail provisioning volume") // misterikkit: why do we expect this?
 	_, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, 2*time.Minute)
-	framework.ExpectError(err)
+	framework.ExpectError(err, "PVC %s should have failed to bind", pvclaim.Name)
 
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(pvclaim.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "PVC %s not found", pvclaim.Name)
 	vmName := clusterName + "-dynamic-pvc-" + string(updatedClaim.UID)
 	framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 	// Wait for 6 minutes to let the vSphere Cloud Provider clean up routine delete the dummy VM
@@ -349,7 +329,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	fnvHash := fnv.New32a()
 	fnvHash.Write([]byte(vmName))
 	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
-	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
-	gomega.Expect(nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)).NotTo(gomega.BeTrue(), errorMsg)
+	gomega.Expect(nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)).NotTo(gomega.BeTrue(),
+		"dummy VM %s is still present", vmName)
 }
