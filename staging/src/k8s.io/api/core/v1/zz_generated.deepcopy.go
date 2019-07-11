@@ -4993,6 +4993,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(SessionAffinityConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TopologyKeys != nil {
+		in, out := &in.TopologyKeys, &out.TopologyKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

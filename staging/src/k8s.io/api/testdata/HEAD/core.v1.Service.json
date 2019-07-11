@@ -71,14 +71,17 @@
       "clientIP": {
         "timeoutSeconds": -1487653240
       }
-    }
+    },
+    "topologyKeys": [
+      "32"
+    ]
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "32",
-          "hostname": "33"
+          "ip": "33",
+          "hostname": "34"
         }
       ]
     }

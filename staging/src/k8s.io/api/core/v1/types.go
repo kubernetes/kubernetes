@@ -3667,6 +3667,12 @@ type ServiceSpec struct {
 	// sessionAffinityConfig contains the configurations of session affinity.
 	// +optional
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
+
+	// topologyKeys is a priority ordered list of topology keys for a Service. Only backends under the first available topology are used.
+	// If this field is specified and all topology keys have no backends, connections to the service will fail. The special topology
+	// key "*" can be used as a catch all for endpoints in all topologies.
+	// +optional
+	TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,15,opt,name=topologyKeys"`
 }
 
 // ServicePort contains information on service's port.

@@ -3307,6 +3307,12 @@ type ServiceSpec struct {
 	// of peer discovery.
 	// +optional
 	PublishNotReadyAddresses bool
+
+	// topologyKeys is a priority ordered list of topology keys for a Service. Only backends under the first available topology are used.
+	// If this field is specified and all topology keys have no backends, connections to the service will fail. The special topology
+	// key "*" can be used as a catch all for endpoints in all topologies.
+	// +optional
+	TopologyKeys []string
 }
 
 type ServicePort struct {

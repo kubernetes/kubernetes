@@ -4978,6 +4978,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.TopologyKeys != nil {
+		in, out := &in.TopologyKeys, &out.TopologyKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

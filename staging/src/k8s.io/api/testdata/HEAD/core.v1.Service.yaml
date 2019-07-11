@@ -54,9 +54,11 @@ spec:
   sessionAffinityConfig:
     clientIP:
       timeoutSeconds: -1487653240
+  topologyKeys:
+  - "32"
   type: ǡƏS$+½H
 status:
   loadBalancer:
     ingress:
-    - hostname: "33"
-      ip: "32"
+    - hostname: "34"
+      ip: "33"

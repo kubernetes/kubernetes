@@ -2138,6 +2138,7 @@ var map_ServiceSpec = map[string]string{
 	"healthCheckNodePort":      "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
 	"publishNotReadyAddresses": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery.",
 	"sessionAffinityConfig":    "sessionAffinityConfig contains the configurations of session affinity.",
+	"topologyKeys":             "topologyKeys is a priority ordered list of topology keys for a Service. Only backends under the first available topology are used. If this field is specified and all topology keys have no backends, connections to the service will fail. The special topology key \"*\" can be used as a catch all for endpoints in all topologies.",
 }
 
 func (ServiceSpec) SwaggerDoc() map[string]string {
