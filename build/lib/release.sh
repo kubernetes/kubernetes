@@ -357,17 +357,7 @@ function kube::release::create_docker_images_for_server() {
       local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
-      local docker_image_tag="${docker_registry}"
-      if [[ ${arch} == "amd64" ]]; then
-        # If we are building a amd64 docker image, preserve the original
-        # image name
-        docker_image_tag+="/${binary_name}:${docker_tag}"
-      else
-        # If we are building a docker image for another architecture,
-        # append the arch in the image tag
-        docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-      fi
-
+      local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
