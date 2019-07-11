@@ -70,11 +70,6 @@ function create-kubemark-master {
       echo "Setting ${dst_var} to '${val}'"
       export "${dst_var}"="${val}"
     done
-
-    # Append kubemark-specific "MASTER_COMPONENTS_QPS_LIMITS".
-    # TODO(mborsz): Migrate all users of KUBEMARK_MASTER_COMPONENTS_QPS_LIMITS to {SCHEDULER,CONTROLLER_MANAGER}_TEST_ARGS.
-    export CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${KUBEMARK_MASTER_COMPONENTS_QPS_LIMITS:-}"
-    export SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${KUBEMARK_MASTER_COMPONENTS_QPS_LIMITS:-}"
     
     "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
     )
