@@ -23,7 +23,6 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/glog"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -753,11 +752,11 @@ type SidecarsStatus struct {
 // GetSidecarsStatus returns the SidecarsStatus for the given pod
 func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
 	if pod == nil {
-		glog.Infof("Pod was nil, returning empty sidecar status")
+		klog.Infof("Pod was nil, returning empty sidecar status")
 		return SidecarsStatus{}
 	}
 	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
-		glog.Infof("Pod Containers or Container status was nil, returning empty sidecar status")
+		klog.Infof("Pod Containers or Container status was nil, returning empty sidecar status")
 		return SidecarsStatus{}
 	}
 	sidecarsStatus := SidecarsStatus{SidecarsPresent: false, SidecarsReady: true, ContainersWaiting: false}
@@ -767,14 +766,14 @@ func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
 				if pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", container.Name)] == "Sidecar" {
 					sidecarsStatus.SidecarsPresent = true
 					if !status.Ready {
-						glog.Infof("Pod %s: %s: sidecar not ready", format.Pod(pod), container.Name)
+						klog.Infof("Pod %s: %s: sidecar not ready", format.Pod(pod), container.Name)
 						sidecarsStatus.SidecarsReady = false
 					} else {
-						glog.Infof("Pod %s: %s: sidecar is ready", format.Pod(pod), container.Name)
+						klog.Infof("Pod %s: %s: sidecar is ready", format.Pod(pod), container.Name)
 					}
 				} else if status.State.Waiting != nil {
 					// check if non-sidecars have started
-					glog.Infof("Pod: %s: %s: non-sidecar waiting", format.Pod(pod), container.Name)
+					klog.Infof("Pod: %s: %s: non-sidecar waiting", format.Pod(pod), container.Name)
 					sidecarsStatus.ContainersWaiting = true
 				}
 			}

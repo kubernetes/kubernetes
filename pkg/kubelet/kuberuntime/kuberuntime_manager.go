@@ -25,7 +25,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
-	"k8s.io/klog/glog"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -485,7 +484,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 
 func isSidecar(pod *v1.Pod, containerName string) bool {
 	if pod == nil {
-		glog.V(5).Infof("isSidecar: pod is nil, so returning false")
+		klog.V(5).Infof("isSidecar: pod is nil, so returning false")
 		return false
 	}
 	return pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", containerName)] == "Sidecar"
@@ -514,7 +513,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	// determine sidecar status
 	sidecarStatus := status.GetSidecarsStatus(pod)
-	glog.Infof("Pod: %s, sidecars: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarNames, sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
+	klog.Infof("Pod: %s, sidecars: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarNames, sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
@@ -625,7 +624,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// - the non-sidecars have run before (i.e. they are not in a Waiting state) OR
 		// - the sidecars are ready (we're starting them for the first time)
 		if !isSidecar(pod, container.Name) && sidecarStatus.SidecarsPresent && sidecarStatus.ContainersWaiting && !sidecarStatus.SidecarsReady {
-			glog.Infof("Pod: %s, Container: %s, sidecar=%v skipped: Present=%v,Ready=%v,ContainerWaiting=%v", format.Pod(pod), container.Name, isSidecar(pod, container.Name), sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
+			klog.Infof("Pod: %s, Container: %s, sidecar=%v skipped: Present=%v,Ready=%v,ContainerWaiting=%v", format.Pod(pod), container.Name, isSidecar(pod, container.Name), sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
 			continue
 		}
 
@@ -699,7 +698,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	}
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
-		glog.Infof("Pod: %s: KillPod=true", format.Pod(pod))
+		klog.Infof("Pod: %s: KillPod=true", format.Pod(pod))
 		changes.KillPod = true
 	}
 
@@ -949,10 +948,10 @@ func (m *kubeGenericRuntimeManager) KillPod(pod *v1.Pod, runningPod kubecontaine
 	// grace period and also the sidecar status.
 	if pod == nil {
 		for _, container := range runningPod.Containers {
-			glog.Infof("Pod: %s, KillPod: pod nil, trying to restore from container %s", runningPod.Name, container.ID)
+			klog.Infof("Pod: %s, KillPod: pod nil, trying to restore from container %s", runningPod.Name, container.ID)
 			podSpec, _, err := m.restoreSpecsFromContainerLabels(container.ID)
 			if err != nil {
-				glog.Errorf("Pod: %s, KillPod: couldn't restore: %s", runningPod.Name, container.ID)
+				klog.Errorf("Pod: %s, KillPod: couldn't restore: %s", runningPod.Name, container.ID)
 				continue
 			}
 			pod = podSpec
