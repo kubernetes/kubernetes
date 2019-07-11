@@ -373,6 +373,7 @@ func buildAttributes(info user.Info, namespace, policyName, apiGroupName string)
 		Namespace:       namespace,
 		Name:            policyName,
 		APIGroup:        apiGroupName,
+		APIVersion:      "*",
 		Resource:        "podsecuritypolicies",
 		ResourceRequest: true,
 	}
