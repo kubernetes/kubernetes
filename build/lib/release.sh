@@ -359,11 +359,13 @@ function kube::release::create_docker_images_for_server() {
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}"
       local docker_image_name=""
+      local docker_tag_for_amd64=""
       if [[ ${arch} == "amd64" ]]; then
         # If we are building a amd64 docker image, preserve the original
         # image name
         docker_image_tag+="/${binary_name}:${docker_tag}"
         docker_image_name="${binary_name}"
+        docker_tag_for_amd64="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
       else
         # If we are building a docker image for another architecture,
         # append the arch in the image tag
@@ -405,7 +407,13 @@ EOF
           "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
         fi
-        "${DOCKER[@]}" save -o "${binary_dir}/${binary_name}.tar" "${docker_image_tag}" ${release_docker_image_tag}
+        # The name for 'amd64' is a special case that we don't know if we need to support.
+        # To avoid breaking systems, we will add another tag with the arch in the name.
+        # Eventually we should get rid of the legacy name and always use arch in the name.
+        if [[ -n "${docker_tag_for_amd64}" ]]; then
+          "${DOCKER[@]}" tag "${docker_image_tag}" "${docker_tag_for_amd64}" 2>/dev/null
+        fi
+        "${DOCKER[@]}" save -o "${binary_dir}/${binary_name}.tar" "${docker_image_tag}" ${release_docker_image_tag} ${docker_tag_for_amd64}
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
