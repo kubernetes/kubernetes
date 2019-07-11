@@ -455,41 +455,62 @@ func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 //   extending test time. Thus, it is recommended to keep the delta between PVs and PVCs
 //   small.
 func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
-	var actualBinds int
-	expectedBinds := len(pvols)
-	if expectedBinds > len(claims) { // want the min of # pvs or #pvcs
+	var actualBinds, expectedBinds int
+
+	if len(pvols) > len(claims) {
 		expectedBinds = len(claims)
-	}
-
-	for pvName := range pvols {
-		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
-		if err != nil && len(pvols) > len(claims) {
-			e2elog.Logf("WARN: pv %v is not bound after max wait", pvName)
-			e2elog.Logf("      This may be ok since there are more pvs than pvcs")
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("PV %q did not become Bound: %v", pvName, err)
-		}
-
-		pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("PV Get API error: %v", err)
-		}
-		cr := pv.Spec.ClaimRef
-		if cr != nil && len(cr.Name) > 0 {
-			// Assert bound pvc is a test resource. Failing assertion could
-			// indicate non-test PVC interference or a bug in the test
-			pvcKey := makePvcKey(ns, cr.Name)
-			if _, found := claims[pvcKey]; !found {
-				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
-			}
-
-			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, Poll, ClaimBindingTimeout)
+		for pvcName := range claims {
+			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvcName.Name, Poll, ClaimBindingTimeout)
 			if err != nil {
-				return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
+				return fmt.Errorf("PVC %q did not become Bound: %v", pvcName.Name, err)
 			}
-			actualBinds++
+
+			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("PVC Get API error: %v", err)
+			}
+			vn := pvc.Spec.VolumeName
+			if vn != nil && len(vn) > 0 {
+				// Assert bound PV is a test resource. Failing assertion could
+				// indicate non-test PV interference or a bug in the test
+				if _, found := pvols[vn]; !found {
+					return fmt.Errorf("internal: pvols map is missing PV %q", vn)
+				}
+
+				err := WaitForPersistentVolumePhase(v1.VolumeBound, c, vn, Poll, PVBindingTimeout)
+				if err != nil {
+					return fmt.Errorf("PV %q did not become Bound: %v", vn, err)
+				}
+				actualBinds++
+			}
+		}
+	} else {
+		expectedBinds := len(pvols)
+		for pvName := range pvols {
+			err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
+			if err != nil {
+				return fmt.Errorf("PV %q did not become Bound: %v", pvName, err)
+			}
+
+			pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("PV Get API error: %v", err)
+			}
+			cr := pv.Spec.ClaimRef
+			if cr != nil && len(cr.Name) > 0 {
+				// Assert bound pvc is a test resource. Failing assertion could
+				// indicate non-test PVC interference or a bug in the test
+				pvcKey := makePvcKey(ns, cr.Name)
+				if _, found := claims[pvcKey]; !found {
+					return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
+				}
+
+				err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, Poll, ClaimBindingTimeout)
+				if err != nil {
+					return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
+				}
+				actualBinds++
+			}
 		}
 	}
 
