@@ -196,7 +196,8 @@ def main():
 
     if options.check:
         if new_tests or outdated_tests:
-            print('ERROR: The test list has changed')
+            print()
+            print('ERROR: the test list has changed')
             sys.exit(1)
         sys.exit(0)
 
@@ -213,6 +214,7 @@ def main():
             if random_assignment and owner not in maintainers:
                 print('%-16s %s' % (owner, name))
                 owners.pop(name)
+        print()
 
     owner_counts = collections.Counter(
         owner for name, (owner, random, sig) in owners.iteritems()
