@@ -199,7 +199,7 @@ const (
 
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.2"}
+	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.4"}
 	configs[Alpine] = Config{dockerLibraryRegistry, "alpine", "3.7"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
