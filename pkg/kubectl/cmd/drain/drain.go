@@ -49,7 +49,7 @@ type DrainCmdOptions struct {
 
 	Namespace string
 
-	drainer   *drain.Helper
+	Drainer   *drain.Helper
 	nodeInfos []*resource.Info
 
 	genericclioptions.IOStreams
@@ -78,7 +78,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
 		},
 	}
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.Drainer.Selector, "selector", "l", o.Drainer.Selector, "Selector (label query) to filter on")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -106,7 +106,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
 		},
 	}
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.Drainer.Selector, "selector", "l", o.Drainer.Selector, "Selector (label query) to filter on")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -149,7 +149,7 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	return &DrainCmdOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
-		drainer: &drain.Helper{
+		Drainer: &drain.Helper{
 			GracePeriodSeconds: -1,
 			ErrOut:             ioStreams.ErrOut,
 		},
@@ -170,13 +170,13 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 			cmdutil.CheckErr(o.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
-	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&o.drainer.DeleteLocalData, "delete-local-data", o.drainer.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
-	cmd.Flags().IntVar(&o.drainer.GracePeriodSeconds, "grace-period", o.drainer.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
-	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
-	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
+	cmd.Flags().BoolVar(&o.Drainer.Force, "force", o.Drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
+	cmd.Flags().BoolVar(&o.Drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.Drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&o.Drainer.DeleteLocalData, "delete-local-data", o.Drainer.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
+	cmd.Flags().IntVar(&o.Drainer.GracePeriodSeconds, "grace-period", o.Drainer.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
+	cmd.Flags().DurationVar(&o.Drainer.Timeout, "timeout", o.Drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().StringVarP(&o.Drainer.Selector, "selector", "l", o.Drainer.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.Drainer.PodSelector, "pod-selector", "", o.Drainer.PodSelector, "Label selector to filter pods on the node")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -190,18 +190,18 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if len(args) == 0 && !cmd.Flags().Changed("selector") {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
-	if len(args) > 0 && len(o.drainer.Selector) > 0 {
+	if len(args) > 0 && len(o.Drainer.Selector) > 0 {
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
 	}
 
-	o.drainer.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.Drainer.DryRun = cmdutil.GetDryRunFlag(cmd)
 
-	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
+	if o.Drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
 	}
 
-	if len(o.drainer.PodSelector) > 0 {
-		if _, err := labels.Parse(o.drainer.PodSelector); err != nil {
+	if len(o.Drainer.PodSelector) > 0 {
+		if _, err := labels.Parse(o.Drainer.PodSelector); err != nil {
 			return errors.New("--pod-selector=<pod_selector> must be a valid label selector")
 		}
 	}
@@ -215,7 +215,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.drainer.DryRun {
+		if o.Drainer.DryRun {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
 
@@ -234,8 +234,8 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		SingleResourceType().
 		Flatten()
 
-	if len(o.drainer.Selector) > 0 {
-		builder = builder.LabelSelectorParam(o.drainer.Selector).
+	if len(o.Drainer.Selector) > 0 {
+		builder = builder.LabelSelectorParam(o.Drainer.Selector).
 			ResourceTypes("nodes")
 	}
 
@@ -274,10 +274,10 @@ func (o *DrainCmdOptions) RunDrain() error {
 
 	for _, info := range o.nodeInfos {
 		var err error
-		if !o.drainer.DryRun {
+		if !o.Drainer.DryRun {
 			err = o.deleteOrEvictPodsSimple(info)
 		}
-		if err == nil || o.drainer.DryRun {
+		if err == nil || o.Drainer.DryRun {
 			drainedNodes.Insert(info.Name)
 			printObj(info.Object, o.Out)
 		} else {
@@ -305,7 +305,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
-	list, errs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
+	list, errs := o.Drainer.GetPodsForDeletion(nodeInfo.Name)
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}
@@ -314,7 +314,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	}
 
 	if err := o.deleteOrEvictPods(list.Pods()); err != nil {
-		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
+		pendingList, newErrs := o.Drainer.GetPodsForDeletion(nodeInfo.Name)
 
 		fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
 		for _, pendingPod := range pendingList.Pods() {
@@ -334,13 +334,13 @@ func (o *DrainCmdOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 		return nil
 	}
 
-	policyGroupVersion, err := drain.CheckEvictionSupport(o.drainer.Client)
+	policyGroupVersion, err := drain.CheckEvictionSupport(o.Drainer.Client)
 	if err != nil {
 		return err
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.drainer.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return o.Drainer.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {
@@ -357,7 +357,7 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 		go func(pod corev1.Pod, returnCh chan error) {
 			for {
 				fmt.Fprintf(o.Out, "evicting pod %q\n", pod.Name)
-				err := o.drainer.EvictPod(pod, policyGroupVersion)
+				err := o.Drainer.EvictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
 				} else if apierrors.IsNotFound(err) {
@@ -385,10 +385,10 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
-	if o.drainer.Timeout == 0 {
+	if o.Drainer.Timeout == 0 {
 		globalTimeout = time.Duration(math.MaxInt64)
 	} else {
-		globalTimeout = o.drainer.Timeout
+		globalTimeout = o.Drainer.Timeout
 	}
 	globalTimeoutCh := time.After(globalTimeout)
 	numPods := len(pods)
@@ -409,13 +409,13 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 func (o *DrainCmdOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
-	if o.drainer.Timeout == 0 {
+	if o.Drainer.Timeout == 0 {
 		globalTimeout = time.Duration(math.MaxInt64)
 	} else {
-		globalTimeout = o.drainer.Timeout
+		globalTimeout = o.Drainer.Timeout
 	}
 	for _, pod := range pods {
-		err := o.drainer.DeletePod(pod)
+		err := o.Drainer.DeletePod(pod)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -488,8 +488,8 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				}
 				printObj(nodeInfo.Object, o.Out)
 			} else {
-				if !o.drainer.DryRun {
-					err, patchErr := c.PatchOrReplace(o.drainer.Client)
+				if !o.Drainer.DryRun {
+					err, patchErr := c.PatchOrReplace(o.Drainer.Client)
 					if patchErr != nil {
 						printError(patchErr)
 					}
