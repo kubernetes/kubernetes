@@ -270,25 +270,29 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 	// delete routes that are not in use
 	for _, route := range routes {
-		if rc.isResponsibleForRoute(route) {
-			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
-			if route.Blackhole || !nodeHasCidr(route.TargetNode, route.DestinationCIDR) {
-				wg.Add(1)
-				// Delete the route.
-				go func(route *cloudprovider.Route, startTime time.Time) {
-					defer wg.Done()
-					// respect the rate limiter
-					rateLimiter <- struct{}{}
-					klog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(context.TODO(), rc.clusterName, route); err != nil {
-						klog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Since(startTime), err)
-					} else {
-						klog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Since(startTime))
-					}
-					<-rateLimiter
-				}(route, time.Now())
-			}
+		if !rc.isResponsibleForRoute(route) {
+			continue
 		}
+
+		// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
+		if !route.Blackhole && nodeHasCidr(route.TargetNode, route.DestinationCIDR) {
+			continue
+		}
+
+		wg.Add(1)
+		// Delete the route.
+		go func(route *cloudprovider.Route, startTime time.Time) {
+			defer wg.Done()
+			// respect the rate limiter
+			rateLimiter <- struct{}{}
+			klog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+			if err := rc.routes.DeleteRoute(context.TODO(), rc.clusterName, route); err != nil {
+				klog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Since(startTime), err)
+			} else {
+				klog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Since(startTime))
+			}
+			<-rateLimiter
+		}(route, time.Now())
 	}
 	wg.Wait()
 
