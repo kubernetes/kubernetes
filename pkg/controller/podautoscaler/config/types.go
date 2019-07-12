@@ -23,7 +23,7 @@ import (
 // HPAControllerConfiguration contains elements describing HPAController.
 type HPAControllerConfiguration struct {
 	// horizontalPodAutoscalerSyncPeriod is the period for syncing the number of
-	// pods in horizontal pod autoscaler.
+	// HPA's in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod metav1.Duration
 	// horizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.
 	HorizontalPodAutoscalerUpscaleForbiddenWindow metav1.Duration
