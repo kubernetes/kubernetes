@@ -54,6 +54,8 @@ type KubeProxyIPVSConfiguration struct {
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
 	StrictARP bool `json:"strictARP"`
+	// excludeExternalIP disable the ipvs forwarding from pod to both ExternalIPs and LoadBalancerIPs
+	ExcludeExternalIP bool `json:"excludeExternalIP"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for

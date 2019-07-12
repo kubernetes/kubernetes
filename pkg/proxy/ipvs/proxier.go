@@ -196,21 +196,23 @@ type Proxier struct {
 	// Values are CIDR's to exclude when cleaning up IPVS rules.
 	excludeCIDRs []*net.IPNet
 	// Set to true to set sysctls arp_ignore and arp_announce
-	strictARP      bool
-	iptables       utiliptables.Interface
-	ipvs           utilipvs.Interface
-	ipset          utilipset.Interface
-	exec           utilexec.Interface
-	masqueradeAll  bool
-	masqueradeMark string
-	clusterCIDR    string
-	hostname       string
-	nodeIP         net.IP
-	portMapper     utilproxy.PortOpener
-	recorder       record.EventRecorder
-	healthChecker  healthcheck.Server
-	healthzServer  healthcheck.HealthzUpdater
-	ipvsScheduler  string
+	strictARP bool
+	// Set to true to disable the ipvs forwarding from pod to both ExternalIPs and LoadBalancerIPs
+	excludeExternalIP bool
+	iptables          utiliptables.Interface
+	ipvs              utilipvs.Interface
+	ipset             utilipset.Interface
+	exec              utilexec.Interface
+	masqueradeAll     bool
+	masqueradeMark    string
+	clusterCIDR       string
+	hostname          string
+	nodeIP            net.IP
+	portMapper        utilproxy.PortOpener
+	recorder          record.EventRecorder
+	healthChecker     healthcheck.Server
+	healthzServer     healthcheck.HealthzUpdater
+	ipvsScheduler     string
 	// Added as a member to the struct to allow injection for testing.
 	ipGetter IPGetter
 	// The following buffers are used to reuse memory and avoid allocations
@@ -303,6 +305,7 @@ func NewProxier(ipt utiliptables.Interface,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
 	strictARP bool,
+	excludeExternalIP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -413,6 +416,7 @@ func NewProxier(ipt utiliptables.Interface,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
 		excludeCIDRs:          parseExcludedCIDRs(excludeCIDRs),
+		excludeExternalIP:     excludeExternalIP,
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
@@ -940,6 +944,9 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.ipsetList[kubeExternalIPSet].activeEntries.Insert(entry.String())
 
 			// ipvs call
+			if proxier.excludeExternalIP {
+				continue
+			}
 			serv := &utilipvs.VirtualServer{
 				Address:   net.ParseIP(externalIP),
 				Port:      uint16(svcInfo.Port()),
@@ -1041,6 +1048,9 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 
 				// ipvs call
+				if proxier.excludeExternalIP {
+					continue
+				}
 				serv := &utilipvs.VirtualServer{
 					Address:   net.ParseIP(ingress),
 					Port:      uint16(svcInfo.Port()),
