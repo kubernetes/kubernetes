@@ -136,6 +136,7 @@ func getCertPhaseFlags(name string) []string {
 		options.CfgPath,
 		options.CSROnly,
 		options.CSRDir,
+		options.KubernetesVersion,
 	}
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,
