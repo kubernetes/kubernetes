@@ -698,7 +698,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "false")
 	switch internal {
 	case "true":
-		klog.V(4).Infof("Ensure an internal loadbalancer service.")
+		klog.V(4).Info("Ensure an internal loadbalancer service.")
 		internalAnnotation = true
 	case "false":
 		if len(floatingPool) != 0 {
