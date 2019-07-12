@@ -54,6 +54,7 @@ func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	return cmd
 }
 
+
 // CertificateOptions create CertificateOptions struct
 type CertificateOptions struct {
 	resource.FilenameOptions
@@ -80,6 +81,7 @@ func newCertificateOptions(ioStreams genericclioptions.IOStreams) *CertificateOp
 
 // Complete complete certificateOptions initialization
 func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+
 	o.csrNames = args
 	o.outputStyle = cmdutil.GetFlagString(cmd, "output")
 
@@ -106,16 +108,20 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	return nil
 }
 
+
 // Validate validate CertificateOptions Legitimacy
 func (o *CertificateOptions) Validate() error {
+
 	if len(o.csrNames) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("one or more CSRs must be specified as <name> or -f <filename>")
 	}
 	return nil
 }
 
+
 // NewCmdCertificateApprove creates the cmd to approve for certificate
 func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+
 	o := newCertificateOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -149,8 +155,10 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 	return cmd
 }
 
+
 // RunCertificateApprove running instructions for accepting certificates
 func (o *CertificateOptions) RunCertificateApprove(force bool) error {
+
 	return o.modifyCertificateCondition(o.builder, o.clientSet, force, func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool) {
 		var alreadyApproved bool
 		for _, c := range csr.Status.Conditions {
@@ -200,8 +208,10 @@ func newCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
+
 // RunCertificateDeny instructions to run prohibited certificates
 func (o *CertificateOptions) RunCertificateDeny(force bool) error {
+
 	return o.modifyCertificateCondition(o.builder, o.clientSet, force, func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool) {
 		var alreadyDenied bool
 		for _, c := range csr.Status.Conditions {
