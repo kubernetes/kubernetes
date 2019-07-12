@@ -3653,11 +3653,6 @@ type NodeSpec struct {
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
 	// +optional
 	ConfigSource *NodeConfigSource
-
-	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
-	// see: https://issues.k8s.io/61966
-	// +optional
-	DoNotUse_ExternalID string
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
