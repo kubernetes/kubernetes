@@ -121,6 +121,7 @@ const (
 
 	// owner: @wojtek-t
 	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
@@ -153,6 +154,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
-	WatchBookmark:           {Default: false, PreRelease: featuregate.Alpha},
+	WatchBookmark:           {Default: true, PreRelease: featuregate.Beta},
 	RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
 }
