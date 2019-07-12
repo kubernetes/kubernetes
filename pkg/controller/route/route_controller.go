@@ -229,12 +229,14 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 				defer wg.Done()
 				err := clientretry.RetryOnConflict(updateNetworkConditionBackoff, func() error {
 					startTime := time.Now()
+
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
 					klog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Since(startTime))
 					err := rc.routes.CreateRoute(context.TODO(), rc.clusterName, nameHint, route)
 					<-rateLimiter
+
 					if err != nil {
 						msg := fmt.Sprintf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Since(startTime), err)
 						if rc.recorder != nil {
@@ -265,6 +267,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	nodeHasCidr := func(nodeName types.NodeName, cidr string) bool {
 		return routesState.CIDRExists(nodeName, cidr)
 	}
+
 	// delete routes that are not in use
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
