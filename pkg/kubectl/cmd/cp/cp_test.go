@@ -30,6 +30,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/core/v1"
@@ -763,9 +764,7 @@ func TestUntar(t *testing.T) {
 	defer os.RemoveAll(testdir)
 	t.Logf("Test base: %s", testdir)
 
-	const (
-		dest = "base"
-	)
+	basedir := filepath.Join(testdir, "base")
 
 	type file struct {
 		path       string
@@ -774,26 +773,26 @@ func TestUntar(t *testing.T) {
 	}
 	files := []file{{
 		// Absolute file within dest
-		path:     filepath.Join(testdir, dest, "abs"),
-		expected: filepath.Join(testdir, dest, testdir, dest, "abs"),
+		path:     filepath.Join(basedir, "abs"),
+		expected: filepath.Join(basedir, basedir, "abs"),
 	}, { // Absolute file outside dest
 		path:     filepath.Join(testdir, "abs-out"),
-		expected: filepath.Join(testdir, dest, testdir, "abs-out"),
+		expected: filepath.Join(basedir, testdir, "abs-out"),
 	}, { // Absolute nested file within dest
-		path:     filepath.Join(testdir, dest, "nested/nest-abs"),
-		expected: filepath.Join(testdir, dest, testdir, dest, "nested/nest-abs"),
+		path:     filepath.Join(basedir, "nested/nest-abs"),
+		expected: filepath.Join(basedir, basedir, "nested/nest-abs"),
 	}, { // Absolute nested file outside dest
-		path:     filepath.Join(testdir, dest, "nested/../../nest-abs-out"),
-		expected: filepath.Join(testdir, dest, testdir, "nest-abs-out"),
+		path:     filepath.Join(basedir, "nested/../../nest-abs-out"),
+		expected: filepath.Join(basedir, testdir, "nest-abs-out"),
 	}, { // Relative file inside dest
 		path:     "relative",
-		expected: filepath.Join(testdir, dest, "relative"),
+		expected: filepath.Join(basedir, "relative"),
 	}, { // Relative file outside dest
 		path:     "../unrelative",
 		expected: "",
 	}, { // Nested relative file inside dest
 		path:     "nested/nest-rel",
-		expected: filepath.Join(testdir, dest, "nested/nest-rel"),
+		expected: filepath.Join(basedir, "nested/nest-rel"),
 	}, { // Nested relative file outside dest
 		path:     "nested/../../nest-unrelative",
 		expected: "",
@@ -805,10 +804,11 @@ func TestUntar(t *testing.T) {
 		}
 		return expected + suffix
 	}
-	mkBacktickExpectation := func(path, expected, suffix string) string {
-		linkTarget := filepath.Join(backtick(path), "link-target")
-		baseDir := filepath.Join(testdir, dest)
-		if !isDestRelative(baseDir, linkJoin(filepath.Join(baseDir, path), linkTarget)) {
+	mkBacklinkExpectation := func(expected, suffix string) string {
+		// "resolve" the back link relative to the expectation
+		targetDir := filepath.Dir(filepath.Dir(expected))
+		// If the "resolved" target is not nested in basedir, it is escaping.
+		if !filepath.HasPrefix(targetDir, basedir) {
 			return ""
 		}
 		return expected + suffix
@@ -821,17 +821,27 @@ func TestUntar(t *testing.T) {
 			expected:   mkExpectation(f.expected, "-innerlink"),
 		}, file{
 			path:       f.path + "-innerlink-abs",
-			linkTarget: filepath.Join(testdir, dest, "link-target"),
+			linkTarget: filepath.Join(basedir, "link-target"),
 			expected:   mkExpectation(f.expected, "-innerlink-abs"),
 		}, file{
-			path:       f.path + "-outerlink",
-			linkTarget: filepath.Join(backtick(f.path), "link-target"),
-			expected:   mkBacktickExpectation(f.path, f.expected, "-outerlink"),
+			path:       f.path + "-backlink",
+			linkTarget: filepath.Join("..", "link-target"),
+			expected:   mkBacklinkExpectation(f.expected, "-backlink"),
 		}, file{
 			path:       f.path + "-outerlink-abs",
 			linkTarget: filepath.Join(testdir, "link-target"),
 			expected:   "",
 		})
+
+		if f.expected != "" {
+			// outerlink is the number of backticks to escape to testdir
+			outerlink, _ := filepath.Rel(f.expected, testdir)
+			links = append(links, file{
+				path:       f.path + "outerlink",
+				linkTarget: filepath.Join(outerlink, "link-target"),
+				expected:   "",
+			})
+		}
 	}
 	files = append(files, links...)
 
@@ -840,11 +850,11 @@ func TestUntar(t *testing.T) {
 		file{
 			path:       "nested/again/back-link",
 			linkTarget: "../../nested",
-			expected:   filepath.Join(testdir, dest, "nested/again/back-link"),
+			expected:   filepath.Join(basedir, "nested/again/back-link"),
 		},
 		file{
 			path:     "nested/again/back-link/../../../back-link-file",
-			expected: filepath.Join(testdir, dest, "back-link-file"),
+			expected: filepath.Join(basedir, "back-link-file"),
 		})
 
 	// Test chaining back-tick symlinks.
@@ -852,20 +862,11 @@ func TestUntar(t *testing.T) {
 		file{
 			path:       "nested/back-link-first",
 			linkTarget: "../",
-			expected:   filepath.Join(testdir, dest, "nested/back-link-first"),
+			expected:   filepath.Join(basedir, "nested/back-link-first"),
 		},
 		file{
 			path:       "nested/back-link-first/back-link-second",
 			linkTarget: "../",
-			expected:   filepath.Join(testdir, dest, "back-link-second"),
-		},
-		file{
-			// This case is chaining together symlinks that step back, so that
-			// if you just look at the target relative to the path it appears
-			// inside the destination directory, but if you actually follow each
-			// step of the path you end up outside the destination directory.
-			path:       "nested/back-link-first/back-link-second/back-link-term",
-			linkTarget: "",
 			expected:   "",
 		})
 
@@ -905,9 +906,11 @@ func TestUntar(t *testing.T) {
 	}
 	tw.Close()
 
-	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+	// Capture warnings to stderr for debugging.
+	output := (*testWriter)(t)
+	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
 
-	require.NoError(t, opts.untarAll(buf, filepath.Join(testdir, dest), ""))
+	require.NoError(t, opts.untarAll(buf, filepath.Join(basedir), ""))
 
 	filepath.Walk(testdir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -930,10 +933,36 @@ func TestUntar(t *testing.T) {
 	}
 }
 
-// backtick returns a path to one directory up from the target
-func backtick(target string) string {
-	rel := filepath.Join(filepath.Dir(target), "../")
-	return rel
+func TestUntar_SingleFile(t *testing.T) {
+	testdir, err := ioutil.TempDir("", "test-untar")
+	require.NoError(t, err)
+	defer os.RemoveAll(testdir)
+
+	dest := filepath.Join(testdir, "target")
+
+	buf := &bytes.Buffer{}
+	tw := tar.NewWriter(buf)
+
+	const (
+		srcName = "source"
+		content = "file contents"
+	)
+	hdr := &tar.Header{
+		Name: srcName,
+		Mode: 0666,
+		Size: int64(len(content)),
+	}
+	require.NoError(t, tw.WriteHeader(hdr))
+	_, err = tw.Write([]byte(content))
+	require.NoError(t, err)
+	tw.Close()
+
+	// Capture warnings to stderr for debugging.
+	output := (*testWriter)(t)
+	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
+
+	require.NoError(t, opts.untarAll(buf, filepath.Join(dest), srcName))
+	cmpFileData(t, dest, content)
 }
 
 func createTmpFile(t *testing.T, filepath, data string) {
@@ -951,20 +980,14 @@ func createTmpFile(t *testing.T, filepath, data string) {
 }
 
 func cmpFileData(t *testing.T, filePath, data string) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	actual, err := ioutil.ReadFile(filePath)
+	require.NoError(t, err)
+	assert.EqualValues(t, data, actual)
+}
 
-	defer f.Close()
-	buff := &bytes.Buffer{}
-	if _, err := io.Copy(buff, f); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if data != string(buff.Bytes()) {
-		t.Fatalf("expected: %s, saw: %s", data, string(buff.Bytes()))
-	}
+type testWriter testing.T
+
+func (t *testWriter) Write(p []byte) (n int, err error) {
+	t.Logf(string(p))
+	return len(p), nil
 }
