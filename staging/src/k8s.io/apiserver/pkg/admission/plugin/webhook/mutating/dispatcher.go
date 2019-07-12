@@ -117,7 +117,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		t := time.Now()
 
 		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o)
-		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name)
+		configurationName := invocation.Webhook.GetConfigurationName()
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name, configurationName)
 		if changed {
 			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
 			webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()

@@ -115,7 +115,7 @@ func TestObjectSelector(t *testing.T) {
 			}}}
 
 		t.Run(testcase.name, func(t *testing.T) {
-			match, err := matcher.MatchObjectSelector(webhook.NewValidatingWebhookAccessor("mock-hook", hook), testcase.attrs)
+			match, err := matcher.MatchObjectSelector(webhook.NewValidatingWebhookAccessor("mock-hook", "test.configuration.admission", hook), testcase.attrs)
 			if err != nil {
 				t.Error(err)
 			}

@@ -23,6 +23,9 @@ import (
 
 // WebhookAccessor provides a common interface to both mutating and validating webhook types.
 type WebhookAccessor interface {
+	// GetConfigurationName gets the configuration name of the webhook.
+	GetConfigurationName() string
+
 	// GetUID gets a string that uniquely identifies the webhook.
 	GetUID() string
 
@@ -56,15 +59,19 @@ type WebhookAccessor interface {
 }
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
-func NewMutatingWebhookAccessor(uid string, h *v1beta1.MutatingWebhook) WebhookAccessor {
-	return mutatingWebhookAccessor{uid: uid, MutatingWebhook: h}
+func NewMutatingWebhookAccessor(uid string, configurationName string, h *v1beta1.MutatingWebhook) WebhookAccessor {
+	return mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h}
 }
 
 type mutatingWebhookAccessor struct {
 	*v1beta1.MutatingWebhook
-	uid string
+	configurationName string
+	uid               string
 }
 
+func (m mutatingWebhookAccessor) GetConfigurationName() string {
+	return m.configurationName
+}
 func (m mutatingWebhookAccessor) GetUID() string {
 	return m.uid
 }
@@ -108,15 +115,19 @@ func (m mutatingWebhookAccessor) GetValidatingWebhook() (*v1beta1.ValidatingWebh
 }
 
 // NewValidatingWebhookAccessor creates an accessor for a ValidatingWebhook.
-func NewValidatingWebhookAccessor(uid string, h *v1beta1.ValidatingWebhook) WebhookAccessor {
-	return validatingWebhookAccessor{uid: uid, ValidatingWebhook: h}
+func NewValidatingWebhookAccessor(uid, configurationName string, h *v1beta1.ValidatingWebhook) WebhookAccessor {
+	return validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
 }
 
 type validatingWebhookAccessor struct {
 	*v1beta1.ValidatingWebhook
-	uid string
+	configurationName string
+	uid               string
 }
 
+func (v validatingWebhookAccessor) GetConfigurationName() string {
+	return v.configurationName
+}
 func (v validatingWebhookAccessor) GetUID() string {
 	return v.uid
 }
