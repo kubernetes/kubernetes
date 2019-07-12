@@ -1019,6 +1019,7 @@ gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.2 => gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1

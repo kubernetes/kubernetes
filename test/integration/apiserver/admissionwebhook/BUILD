@@ -15,7 +15,9 @@ go_test(
     ],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//staging/src/k8s.io/api/admission/v1:go_default_library",
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
