@@ -223,6 +223,7 @@ func autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConf
 	out.Scheduler = in.Scheduler
 	out.ExcludeCIDRs = *(*[]string)(unsafe.Pointer(&in.ExcludeCIDRs))
 	out.StrictARP = in.StrictARP
+	out.ExcludeExternalIP = in.ExcludeExternalIP
 	return nil
 }
 
@@ -237,6 +238,7 @@ func autoConvert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConf
 	out.Scheduler = in.Scheduler
 	out.ExcludeCIDRs = *(*[]string)(unsafe.Pointer(&in.ExcludeCIDRs))
 	out.StrictARP = in.StrictARP
+	out.ExcludeExternalIP = in.ExcludeExternalIP
 	return nil
 }
 
