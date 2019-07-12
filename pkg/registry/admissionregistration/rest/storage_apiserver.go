@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -38,10 +39,26 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.VersionEnabled(admissionregistrationv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
+	if apiResourceConfigSource.VersionEnabled(admissionregistrationv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+	}
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+	// validatingwebhookconfigurations
+	validatingStorage := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+	storage["validatingwebhookconfigurations"] = validatingStorage
+
+	// mutatingwebhookconfigurations
+	mutatingStorage := mutatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+	storage["mutatingwebhookconfigurations"] = mutatingStorage
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// validatingwebhookconfigurations
 	validatingStorage := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
