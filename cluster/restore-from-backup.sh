@@ -24,7 +24,7 @@
 #      $ etcdctl --endpoints=<address> snapshot save
 #      produced .db file
 # - version.txt file is in the current directory (if it isn't it will be
-#     defaulted to "2.2.1/etcd2"). Based on this file, the script will
+#     defaulted to "3.0.17/etcd3"). Based on this file, the script will
 #     decide to which version we are restoring (procedures are different
 #     for etcd2 and etcd3).
 # - in case of etcd2 - *.snap and *.wal files are in current directory
@@ -40,7 +40,7 @@ set -o pipefail
 # Version file contains information about current version in the format:
 # <etcd binary version>/<etcd api mode> (e.g. "3.0.12/etcd3").
 #
-# If the file doesn't exist we assume "2.2.1/etcd2" configuration is
+# If the file doesn't exist we assume "3.0.17/etcd3" configuration is
 # the current one and create a file with such configuration.
 # The restore procedure is chosen based on this information.
 VERSION_FILE="version.txt"
@@ -51,7 +51,7 @@ if [ -n "${VERSION_CONTENTS:-}" ]; then
   echo "${VERSION_CONTENTS}" > "${VERSION_FILE}"
 fi
 if [ ! -f "${VERSION_FILE}" ]; then
-  echo "2.2.1/etcd2" > "${VERSION_FILE}"
+  echo "3.0.17/etcd3" > "${VERSION_FILE}"
 fi
 VERSION_CONTENTS="$(cat ${VERSION_FILE})"
 ETCD_VERSION="$(echo "$VERSION_CONTENTS" | cut -d '/' -f 1)"
