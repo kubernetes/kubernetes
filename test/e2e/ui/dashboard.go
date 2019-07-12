@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Kubernetes Dashboard", func() {
+var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 	ginkgo.BeforeEach(func() {
 		// TODO(kubernetes/kubernetes#61559): Enable dashboard here rather than skip the test.
 		framework.SkipIfProviderIs("gke")
