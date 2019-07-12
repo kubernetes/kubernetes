@@ -74,7 +74,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 		  targeted CPU uitilzation of 50% the HP Autoscaler MUST create another pod,
 		  spreading the 150mCPU usage across both Pods.
 		*/
-		framework.ConformanceIt("Should scale from 1 pod to 2 pods", func() {
+		framework.ConformanceIt("should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
