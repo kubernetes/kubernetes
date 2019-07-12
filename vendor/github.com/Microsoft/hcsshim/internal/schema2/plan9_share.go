@@ -10,7 +10,6 @@
 package hcsschema
 
 type Plan9Share struct {
-
 	Name string `json:"Name,omitempty"`
 
 	//  The name by which the guest operation system can access this share, via  the aname parameter in the Plan9 protocol.
@@ -30,4 +29,6 @@ type Plan9Share struct {
 	ReadOnly bool `json:"ReadOnly,omitempty"`
 
 	UseShareRootIdentity bool `json:"UseShareRootIdentity,omitempty"`
+
+	AllowedFiles []string `json:"AllowedFiles,omitempty"`
 }
