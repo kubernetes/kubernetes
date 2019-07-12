@@ -7,7 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Microsoft/hcsshim/internal/guestrequest"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/Microsoft/hcsshim/internal/logfields"
 	"github.com/sirupsen/logrus"
@@ -23,6 +22,10 @@ type Process struct {
 	callbackNumber uintptr
 
 	logctx logrus.Fields
+
+	closedWaitOnce sync.Once
+	waitBlock      chan struct{}
+	waitError      error
 }
 
 func newProcess(process hcsProcess, processID int, computeSystem *System) *Process {
@@ -34,6 +37,7 @@ func newProcess(process hcsProcess, processID int, computeSystem *System) *Proce
 			logfields.ContainerID: computeSystem.ID(),
 			logfields.ProcessID:   processID,
 		},
+		waitBlock: make(chan struct{}),
 	}
 }
 
@@ -107,7 +111,11 @@ func (process *Process) logOperationEnd(operation string, err error) {
 }
 
 // Signal signals the process with `options`.
-func (process *Process) Signal(options guestrequest.SignalProcessOptions) (err error) {
+//
+// For LCOW `guestrequest.SignalProcessOptionsLCOW`.
+//
+// For WCOW `guestrequest.SignalProcessOptionsWCOW`.
+func (process *Process) Signal(options interface{}) (err error) {
 	process.handleLock.RLock()
 	defer process.handleLock.RUnlock()
 
@@ -163,33 +171,49 @@ func (process *Process) Kill() (err error) {
 	return nil
 }
 
-// Wait waits for the process to exit.
+// waitBackground waits for the process exit notification. Once received sets
+// `process.waitError` (if any) and unblocks all `Wait` and `WaitTimeout` calls.
+//
+// This MUST be called exactly once per `process.handle` but `Wait` and
+// `WaitTimeout` are safe to call multiple times.
+func (process *Process) waitBackground() {
+	process.waitError = waitForNotification(process.callbackNumber, hcsNotificationProcessExited, nil)
+	process.closedWaitOnce.Do(func() {
+		close(process.waitBlock)
+	})
+}
+
+// Wait waits for the process to exit. If the process has already exited returns
+// the pervious error (if any).
 func (process *Process) Wait() (err error) {
 	operation := "hcsshim::Process::Wait"
 	process.logOperationBegin(operation)
 	defer func() { process.logOperationEnd(operation, err) }()
 
-	err = waitForNotification(process.callbackNumber, hcsNotificationProcessExited, nil)
-	if err != nil {
-		return makeProcessError(process, operation, err, nil)
+	<-process.waitBlock
+	if process.waitError != nil {
+		return makeProcessError(process, operation, process.waitError, nil)
 	}
-
 	return nil
 }
 
-// WaitTimeout waits for the process to exit or the duration to elapse. It returns
-// false if timeout occurs.
+// WaitTimeout waits for the process to exit or the duration to elapse. If the
+// process has already exited returns the pervious error (if any). If a timeout
+// occurs returns `ErrTimeout`.
 func (process *Process) WaitTimeout(timeout time.Duration) (err error) {
 	operation := "hcssshim::Process::WaitTimeout"
 	process.logOperationBegin(operation)
 	defer func() { process.logOperationEnd(operation, err) }()
 
-	err = waitForNotification(process.callbackNumber, hcsNotificationProcessExited, &timeout)
-	if err != nil {
-		return makeProcessError(process, operation, err, nil)
+	select {
+	case <-process.waitBlock:
+		if process.waitError != nil {
+			return makeProcessError(process, operation, process.waitError, nil)
+		}
+		return nil
+	case <-time.After(timeout):
+		return makeProcessError(process, operation, ErrTimeout, nil)
 	}
-
-	return nil
 }
 
 // ResizeConsole resizes the console of the process.
@@ -276,15 +300,20 @@ func (process *Process) ExitCode() (_ int, err error) {
 
 	properties, err := process.Properties()
 	if err != nil {
-		return 0, makeProcessError(process, operation, err, nil)
+		return -1, makeProcessError(process, operation, err, nil)
 	}
 
 	if properties.Exited == false {
-		return 0, makeProcessError(process, operation, ErrInvalidProcessState, nil)
+		return -1, makeProcessError(process, operation, ErrInvalidProcessState, nil)
 	}
 
 	if properties.LastWaitResult != 0 {
-		return 0, makeProcessError(process, operation, syscall.Errno(properties.LastWaitResult), nil)
+		logrus.WithFields(logrus.Fields{
+			logfields.ContainerID: process.SystemID(),
+			logfields.ProcessID:   process.processID,
+			"wait-result":         properties.LastWaitResult,
+		}).Warn("hcsshim::Process::ExitCode - Non-zero last wait result")
+		return -1, nil
 	}
 
 	return int(properties.ExitCode), nil
@@ -397,13 +426,18 @@ func (process *Process) Close() (err error) {
 	}
 
 	process.handle = 0
+	process.closedWaitOnce.Do(func() {
+		close(process.waitBlock)
+	})
 
 	return nil
 }
 
 func (process *Process) registerCallback() error {
 	context := &notifcationWatcherContext{
-		channels: newChannels(),
+		channels:  newProcessChannels(),
+		systemID:  process.SystemID(),
+		processID: process.processID,
 	}
 
 	callbackMapLock.Lock()
@@ -450,7 +484,7 @@ func (process *Process) unregisterCallback() error {
 	closeChannels(context.channels)
 
 	callbackMapLock.Lock()
-	callbackMap[callbackNumber] = nil
+	delete(callbackMap, callbackNumber)
 	callbackMapLock.Unlock()
 
 	handle = 0
