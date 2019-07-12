@@ -52,7 +52,6 @@ type ActivePodsFunc func() []*v1.Pod
 
 // monitorCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
-// Updated contains the most recent state of the Device.
 type monitorCallback func(resourceName string, devices []pluginapi.Device)
 
 // ManagerImpl is the structure in charge of managing Device Plugins.
@@ -192,7 +191,7 @@ func (m *ManagerImpl) checkpointFile() string {
 	return filepath.Join(m.socketdir, kubeletDeviceManagerCheckpoint)
 }
 
-// Start starts the Device Plugin Manager and start initialization of
+// Start starts the Device Plugin Manager and starts initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
@@ -609,7 +608,6 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, nil
 	}
 	klog.V(3).Infof("Needs to allocate %d %q for pod %q container %q", needed, resource, podUID, contName)
-	// Needs to allocate additional devices.
 	if _, ok := m.healthyDevices[resource]; !ok {
 		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
