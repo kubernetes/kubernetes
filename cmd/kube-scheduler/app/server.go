@@ -36,7 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/term"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
@@ -190,10 +190,11 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	// Prepare the event broadcaster.
 	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartLogging(klog.V(6).Infof)
-		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
+		cc.Broadcaster.StartRecordingToSink(stopCh)
 	}
-
+	if cc.LeaderElectionBroadcaster != nil && cc.CoreEventClient != nil {
+		cc.LeaderElectionBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
+	}
 	// Setup healthz checks.
 	var checks []healthz.HealthzChecker
 	if cc.ComponentConfig.LeaderElection.LeaderElect {
