@@ -487,7 +487,7 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectStatusCode: http.StatusInternalServerError,
-			ErrorContains:    "Webhook response was absent",
+			ErrorContains:    "webhook response was absent",
 		},
 		{
 			Name: "no match dry run",

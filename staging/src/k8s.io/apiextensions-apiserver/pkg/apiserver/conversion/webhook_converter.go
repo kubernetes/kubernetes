@@ -40,7 +40,7 @@ type webhookConverterFactory struct {
 }
 
 func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*webhookConverterFactory, error) {
-	clientManager, err := webhook.NewClientManager(v1beta1.SchemeGroupVersion, v1beta1.AddToScheme)
+	clientManager, err := webhook.NewClientManager([]schema.GroupVersion{v1beta1.SchemeGroupVersion}, v1beta1.AddToScheme)
 	if err != nil {
 		return nil, err
 	}
