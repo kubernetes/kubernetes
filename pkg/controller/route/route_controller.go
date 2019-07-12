@@ -69,6 +69,50 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
+// routesState contains a map of podCIDRs and their states belonging to each node
+type routesState struct {
+	sync.RWMutex
+
+	routes map[types.NodeName]map[string]bool
+}
+
+func newRoutesState() *routesState {
+	return &routesState{
+		routes: make(map[types.NodeName]map[string]bool),
+	}
+}
+
+func (r *routesState) SetRoute(nodeName types.NodeName, podCIDR string, created bool) {
+	r.Lock()
+	defer r.Unlock()
+
+	if r.routes[nodeName] == nil {
+		r.routes[nodeName] = make(map[string]bool)
+	}
+
+	r.routes[nodeName][podCIDR] = created
+}
+
+func (r *routesState) GetRoutes(nodeName types.NodeName) map[string]bool {
+	r.RLock()
+	defer r.RUnlock()
+
+	return r.routes[nodeName]
+}
+
+func (r *routesState) CIDRExists(nodeName types.NodeName, cidr string) bool {
+	r.RLock()
+	defer r.RUnlock()
+
+	nodeRoutes := r.routes[nodeName]
+	if nodeRoutes == nil {
+		return false
+	}
+
+	_, exist := nodeRoutes[cidr]
+	return exist
+}
+
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -137,9 +181,9 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 }
 
 func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
-	var l sync.Mutex
-	// for each node a map of podCIDRs and their created status
-	nodeRoutesStatuses := make(map[types.NodeName]map[string]bool)
+	// routesState stores the current state of node routes by the cloud provider
+	routesState := newRoutesState()
+
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName][]*cloudprovider.Route)
 	for _, route := range routes {
@@ -157,21 +201,17 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 		if len(node.Spec.PodCIDRs) == 0 {
 			continue
 		}
+
 		nodeName := types.NodeName(node.Name)
-		l.Lock()
-		nodeRoutesStatuses[nodeName] = make(map[string]bool)
-		l.Unlock()
 		// for every node, for every cidr
 		for _, podCIDR := range node.Spec.PodCIDRs {
 			// we add it to our nodeCIDRs map here because add and delete go routines run at the same time
-			l.Lock()
-			nodeRoutesStatuses[nodeName][podCIDR] = false
-			l.Unlock()
+			routesState.SetRoute(nodeName, podCIDR, false)
+
 			// ignore if already created
 			if hasRoute(routeMap, nodeName, podCIDR) {
-				l.Lock()
-				nodeRoutesStatuses[nodeName][podCIDR] = true // a route for this podCIDR is already created
-				l.Unlock()
+				// a route for this podCIDR exists
+				routesState.SetRoute(nodeName, podCIDR, true)
 				continue
 			}
 			// if we are here, then a route needs to be created for this node
@@ -209,9 +249,8 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 							return err
 						}
 					}
-					l.Lock()
-					nodeRoutesStatuses[nodeName][route.DestinationCIDR] = true
-					l.Unlock()
+
+					routesState.SetRoute(nodeName, route.DestinationCIDR, true)
 					klog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Since(startTime))
 					return nil
 				})
@@ -224,15 +263,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 	// searches our bag of node->cidrs for a match
 	nodeHasCidr := func(nodeName types.NodeName, cidr string) bool {
-		l.Lock()
-		defer l.Unlock()
-
-		nodeRoutes := nodeRoutesStatuses[nodeName]
-		if nodeRoutes == nil {
-			return false
-		}
-		_, exist := nodeRoutes[cidr]
-		return exist
+		return routesState.CIDRExists(nodeName, cidr)
 	}
 	// delete routes that are not in use
 	for _, route := range routes {
@@ -262,7 +293,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	// all nodes' statuses with the outcome
 	for _, node := range nodes {
 		wg.Add(1)
-		nodeRoutes := nodeRoutesStatuses[types.NodeName(node.Name)]
+		nodeRoutes := routesState.GetRoutes(types.NodeName(node.Name))
 		allRoutesCreated := true
 
 		if len(nodeRoutes) == 0 {
