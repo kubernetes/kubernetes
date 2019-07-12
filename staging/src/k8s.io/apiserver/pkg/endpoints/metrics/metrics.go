@@ -170,6 +170,7 @@ var (
 		DroppedRequests,
 		DeprecatedDroppedRequests,
 		RegisteredWatchers,
+		WatchEvents,
 		currentInflightRequests,
 	}
 )
