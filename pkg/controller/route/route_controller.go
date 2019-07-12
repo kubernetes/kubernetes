@@ -285,7 +285,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			defer wg.Done()
 			// respect the rate limiter
 			rateLimiter <- struct{}{}
-			klog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+			klog.Infof("Deleting route %s %s for node %s", route.Name, route.DestinationCIDR, route.TargetNode)
 			if err := rc.routes.DeleteRoute(context.TODO(), rc.clusterName, route); err != nil {
 				klog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Since(startTime), err)
 			} else {
