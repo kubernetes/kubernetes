@@ -163,6 +163,11 @@ type Config struct {
 	// elapsed, /healthz will assume that unfinished post-start hooks will complete successfully and
 	// therefore return true.
 	MaxStartupSequenceDuration time.Duration
+	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
+	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
+	// but /readyz will return failure.
+	ShutdownDelayDuration time.Duration
+
 	// The limit on the total size increase all "copy" operations in a json
 	// patch may cause.
 	// This affects all places that applies json patch in the binary.
@@ -277,6 +282,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
 		MaxStartupSequenceDuration:  time.Duration(0),
+		ShutdownDelayDuration:       time.Duration(0),
 		// 10MB is the recommended maximum client request size in bytes
 		// the etcd server should accept. See
 		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
@@ -482,10 +488,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
 		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
 
-		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
-		ShutdownTimeout:   c.RequestTimeout,
-		SecureServingInfo: c.SecureServing,
-		ExternalAddress:   c.ExternalAddress,
+		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
+		ShutdownTimeout:       c.RequestTimeout,
+		ShutdownDelayDuration: c.ShutdownDelayDuration,
+		SecureServingInfo:     c.SecureServing,
+		ExternalAddress:       c.ExternalAddress,
 
 		Handler: apiServerHandler,
 

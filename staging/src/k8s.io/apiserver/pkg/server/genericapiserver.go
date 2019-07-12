@@ -180,6 +180,11 @@ type GenericAPIServer struct {
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
 
+	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
+	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
+	// but /readyz will return failure.
+	ShutdownDelayDuration time.Duration
+
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	maxRequestBodyBytes int64
@@ -295,17 +300,31 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	err := s.NonBlockingRun(stopCh)
+	delayedStopCh := make(chan struct{})
+
+	go func() {
+		defer close(delayedStopCh)
+		<-stopCh
+
+		time.Sleep(s.ShutdownDelayDuration)
+	}()
+
+	// close socket after delayed stopCh
+	err := s.NonBlockingRun(delayedStopCh)
 	if err != nil {
 		return err
 	}
 
 	<-stopCh
 
+	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
 	err = s.RunPreShutdownHooks()
 	if err != nil {
 		return err
 	}
+
+	// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+	<-delayedStopCh
 
 	// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
 	s.HandlerChainWaitGroup.Wait()
