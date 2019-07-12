@@ -2829,7 +2829,7 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 			expectedDesiredReplicas:          1000,
 			hpaMinReplicas:                   1,
 			hpaMaxReplicas:                   2000,
-			expectedConvertedDesiredReplicas: calculateScaleUpLimit(3),
+			expectedConvertedDesiredReplicas: int32(calculateScaleUpLimit(3)),
 			expectedCondition:                "ScaleUpLimit",
 			annotation:                       "scaleUpLimit is the limit because scaleUpLimit < maxReplicas",
 		},
@@ -2837,10 +2837,10 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 
 	for _, ctc := range conversionTestCases {
 		actualConvertedDesiredReplicas, actualCondition, _ := convertDesiredReplicasWithRules(
-			ctc.currentReplicas, ctc.expectedDesiredReplicas, ctc.hpaMinReplicas, ctc.hpaMaxReplicas,
+			specReplicas(ctc.currentReplicas), specReplicas(ctc.expectedDesiredReplicas), specReplicas(ctc.hpaMinReplicas), specReplicas(ctc.hpaMaxReplicas),
 		)
 
-		assert.Equal(t, ctc.expectedConvertedDesiredReplicas, actualConvertedDesiredReplicas, ctc.annotation)
+		assert.Equal(t, specReplicas(ctc.expectedConvertedDesiredReplicas), actualConvertedDesiredReplicas, ctc.annotation)
 		assert.Equal(t, ctc.expectedCondition, actualCondition, ctc.annotation)
 	}
 }
@@ -2916,8 +2916,8 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 				tc.key: tc.recommendations,
 			},
 		}
-		r := hc.stabilizeRecommendation(tc.key, tc.prenormalizedDesiredReplicas)
-		if r != tc.expectedStabilizedReplicas {
+		r := hc.stabilizeRecommendation(tc.key, specReplicas(tc.prenormalizedDesiredReplicas))
+		if r != specReplicas(tc.expectedStabilizedReplicas) {
 			t.Errorf("[%s] got %d stabilized replicas, expected %d", tc.name, r, tc.expectedStabilizedReplicas)
 		}
 		if len(hc.recommendations[tc.key]) != tc.expectedLogLength {

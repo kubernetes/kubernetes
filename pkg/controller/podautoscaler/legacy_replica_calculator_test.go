@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -208,7 +208,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(specReplicas(tc.currentReplicas), tc.resource.targetUtilization, tc.resource.name, testNamespace, selector)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -216,13 +216,13 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 			return
 		}
 		require.NoError(t, err, "there should not have been an error calculating the replica count")
-		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
+		assert.Equal(t, specReplicas(tc.expectedReplicas), outReplicas, "replicas should be as expected")
 		assert.Equal(t, tc.resource.expectedUtilization, outUtilization, "utilization should be as expected")
 		assert.Equal(t, tc.resource.expectedValue, outRawValue, "raw value should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 
 	} else {
-		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector, nil)
+		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(specReplicas(tc.currentReplicas), tc.metric.targetUtilization, tc.metric.name, testNamespace, selector, nil)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -230,7 +230,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 			return
 		}
 		require.NoError(t, err, "there should not have been an error calculating the replica count")
-		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
+		assert.Equal(t, specReplicas(tc.expectedReplicas), outReplicas, "replicas should be as expected")
 		assert.Equal(t, tc.metric.expectedUtilization, outUtilization, "utilization should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 	}
