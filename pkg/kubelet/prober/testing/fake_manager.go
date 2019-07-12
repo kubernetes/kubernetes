@@ -19,6 +19,7 @@ package testing
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // FakeManager simulates a prober.Manager for testing.
@@ -33,7 +34,7 @@ func (FakeManager) AddPod(_ *v1.Pod) {}
 func (FakeManager) RemovePod(_ *v1.Pod) {}
 
 // CleanupPods simulates cleaning up Pods.
-func (FakeManager) CleanupPods(_ []*v1.Pod) {}
+func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
 
 // Start simulates start syncing the probe status
 func (FakeManager) Start() {}
