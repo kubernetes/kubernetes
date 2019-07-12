@@ -94,7 +94,8 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			versionedAttr := versionedAttrs[invocation.Kind]
 			t := time.Now()
 			err := d.callHook(ctx, hook, invocation, versionedAttr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
+			configurationName := invocation.Webhook.GetConfigurationName()
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name, configurationName)
 			if err == nil {
 				return
 			}

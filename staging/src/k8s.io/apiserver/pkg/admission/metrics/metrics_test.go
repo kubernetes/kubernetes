@@ -70,12 +70,13 @@ func TestObserveAdmissionController(t *testing.T) {
 
 func TestObserveWebhook(t *testing.T) {
 	Metrics.reset()
-	Metrics.ObserveWebhook(2*time.Second, false, attr, stepAdmit, "x")
+	Metrics.ObserveWebhook(2*time.Second, false, attr, stepAdmit, "x", "test.configuration.admission")
 	wantLabels := map[string]string{
-		"name":      "x",
-		"operation": string(admission.Create),
-		"type":      "admit",
-		"rejected":  "false",
+		"name":               "x",
+		"configuration_name": "test.configuration.admission",
+		"operation":          string(admission.Create),
+		"type":               "admit",
+		"rejected":           "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
 }

@@ -122,7 +122,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 
 	// Admission webhook metrics. Each webhook is identified by name.
 	webhook := newMetricSet("webhook",
-		[]string{"name", "type", "operation", "rejected"},
+		[]string{"name", "configuration_name", "type", "operation", "rejected"},
 		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	step.mustRegister()

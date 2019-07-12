@@ -36,10 +36,14 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 			// zero out any accessor type specific fields not included in the accessor
 			orig.ReinvocationPolicy = nil
 
-			uid := fmt.Sprintf("test.configuration.admission/%s/0", orig.Name)
-			accessor := NewMutatingWebhookAccessor(uid, orig)
+			configurationName := "test.configuration.admission"
+			uid := fmt.Sprintf("%s/%s/0", configurationName, orig.Name)
+			accessor := NewMutatingWebhookAccessor(uid, configurationName, orig)
 			if uid != accessor.GetUID() {
 				t.Errorf("expected GetUID to return %s, but got %s", accessor.GetUID(), uid)
+			}
+			if configurationName != accessor.GetConfigurationName() {
+				t.Errorf("expected GetConfigurationName to return %s, but got %s", accessor.GetConfigurationName(), configurationName)
 			}
 			m, ok := accessor.GetMutatingWebhook()
 			if !ok {
@@ -76,10 +80,14 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
 			orig := &v1beta1.ValidatingWebhook{}
 			f.Fuzz(orig)
-			uid := fmt.Sprintf("test.configuration.admission/%s/0", orig.Name)
-			accessor := NewValidatingWebhookAccessor(uid, orig)
+			configurationName := "test.configuration.admission"
+			uid := fmt.Sprintf("%s/%s/0", configurationName, orig.Name)
+			accessor := NewValidatingWebhookAccessor(uid, configurationName, orig)
 			if uid != accessor.GetUID() {
 				t.Errorf("expected GetUID to return %s, but got %s", accessor.GetUID(), uid)
+			}
+			if configurationName != accessor.GetConfigurationName() {
+				t.Errorf("expected GetConfigurationName to return %s, but got %s", accessor.GetConfigurationName(), configurationName)
 			}
 			m, ok := accessor.GetValidatingWebhook()
 			if !ok {
