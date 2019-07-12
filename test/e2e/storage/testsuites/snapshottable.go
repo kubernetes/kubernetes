@@ -78,7 +78,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		dInfo := driver.GetDriverInfo()
 		ok := false
 		sDriver, ok = driver.(SnapshottableTestDriver)
-		if !dInfo.Capabilities[CapDataSource] || !ok {
+		if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
 			framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
 		}
 		dDriver, ok = driver.(DynamicPVTestDriver)
