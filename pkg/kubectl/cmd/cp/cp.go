@@ -441,9 +441,14 @@ func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 
 		// basic file information
 		mode := header.FileInfo().Mode()
-		destFileName := path.Join(destDir, header.Name[len(prefix):])
-		baseName := path.Dir(destFileName)
+		destFileName := filepath.Join(destDir, header.Name[len(prefix):])
 
+		if !isDestRelative(destDir, destFileName) {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: file %q is outside target destination, skipping\n", destFileName)
+			continue
+		}
+
+		baseName := filepath.Dir(destFileName)
 		if err := os.MkdirAll(baseName, 0755); err != nil {
 			return err
 		}
@@ -457,15 +462,14 @@ func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 		// We need to ensure that the destination file is always within boundries
 		// of the destination directory. This prevents any kind of path traversal
 		// from within tar archive.
-		dir, file := filepath.Split(destFileName)
-		evaledPath, err := filepath.EvalSymlinks(dir)
+		evaledPath, err := filepath.EvalSymlinks(baseName)
 		if err != nil {
 			return err
 		}
 		// For scrutiny we verify both the actual destination as well as we follow
 		// all the links that might lead outside of the destination directory.
-		if !isDestRelative(destDir, destFileName) || !isDestRelative(destDir, filepath.Join(evaledPath, file)) {
-			fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", destFileName, header.Linkname)
+		if !isDestRelative(destDir, filepath.Join(evaledPath, filepath.Base(destFileName))) {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: file %q is outside target destination, skipping\n", destFileName)
 			continue
 		}
 
@@ -474,7 +478,11 @@ func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 			// We need to ensure that the link destination is always within boundries
 			// of the destination directory. This prevents any kind of path traversal
 			// from within tar archive.
-			if !isDestRelative(destDir, linkJoin(destFileName, linkname)) {
+			linkTarget := linkname
+			if !filepath.IsAbs(linkname) {
+				linkTarget = filepath.Join(evaledPath, linkname)
+			}
+			if !isDestRelative(destDir, linkTarget) {
 				fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", destFileName, header.Linkname)
 				continue
 			}
@@ -499,20 +507,10 @@ func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 	return nil
 }
 
-// linkJoin joins base and link to get the final path to be created.
-// It will consider whether link is an absolute path or not when returning result.
-func linkJoin(base, link string) string {
-	if filepath.IsAbs(link) {
-		return link
-	}
-	return filepath.Join(filepath.Dir(base), link)
-}
-
 // isDestRelative returns true if dest is pointing outside the base directory,
 // false otherwise.
 func isDestRelative(base, dest string) bool {
-	fullPath := dest
-	relative, err := filepath.Rel(base, fullPath)
+	relative, err := filepath.Rel(base, dest)
 	if err != nil {
 		return false
 	}
