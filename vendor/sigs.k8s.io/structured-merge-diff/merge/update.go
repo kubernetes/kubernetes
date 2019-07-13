@@ -23,7 +23,7 @@ import (
 // Converter is an interface to the conversion logic. The converter
 // needs to be able to convert objects from one version to another.
 type Converter interface {
-	Convert(object typed.TypedValue, version fieldpath.APIVersion) (typed.TypedValue, error)
+	Convert(object *typed.TypedValue, version fieldpath.APIVersion) (*typed.TypedValue, error)
 	IsMissingVersionError(error) bool
 }
 
@@ -33,15 +33,15 @@ type Updater struct {
 	Converter Converter
 }
 
-func (s *Updater) update(oldObject, newObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, error) {
+func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, error) {
 	conflicts := fieldpath.ManagedFields{}
 	removed := fieldpath.ManagedFields{}
 	type Versioned struct {
-		oldObject typed.TypedValue
-		newObject typed.TypedValue
+		oldObject *typed.TypedValue
+		newObject *typed.TypedValue
 	}
 	versions := map[fieldpath.APIVersion]Versioned{
-		version: Versioned{
+		version: {
 			oldObject: oldObject,
 			newObject: newObject,
 		},
@@ -119,16 +119,19 @@ func (s *Updater) update(oldObject, newObject typed.TypedValue, version fieldpat
 // that you intend to persist (after applying the patch if this is for a
 // PATCH call), and liveObject must be the original object (empty if
 // this is a CREATE call).
-func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (fieldpath.ManagedFields, error) {
-	var err error
+func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
+	newObject, err := liveObject.NormalizeUnions(newObject)
+	if err != nil {
+		return nil, fieldpath.ManagedFields{}, err
+	}
 	managers = shallowCopyManagers(managers)
 	managers, err = s.update(liveObject, newObject, version, managers, manager, true)
 	if err != nil {
-		return fieldpath.ManagedFields{}, err
+		return nil, fieldpath.ManagedFields{}, err
 	}
 	compare, err := liveObject.Compare(newObject)
 	if err != nil {
-		return fieldpath.ManagedFields{}, fmt.Errorf("failed to compare live and new objects: %v", err)
+		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to compare live and new objects: %v", err)
 	}
 	if _, ok := managers[manager]; !ok {
 		managers[manager] = &fieldpath.VersionedSet{
@@ -140,17 +143,25 @@ func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpa
 	if managers[manager].Set.Empty() {
 		delete(managers, manager)
 	}
-	return managers, nil
+	return newObject, managers, nil
 }
 
 // Apply should be called when Apply is run, given the current object as
 // well as the configuration that is applied. This will merge the object
 // and return it.
-func (s *Updater) Apply(liveObject, configObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (typed.TypedValue, fieldpath.ManagedFields, error) {
+func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (*typed.TypedValue, fieldpath.ManagedFields, error) {
 	managers = shallowCopyManagers(managers)
+	configObject, err := configObject.NormalizeUnionsApply(configObject)
+	if err != nil {
+		return nil, fieldpath.ManagedFields{}, err
+	}
 	newObject, err := liveObject.Merge(configObject)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
+	}
+	newObject, err = configObject.NormalizeUnionsApply(newObject)
+	if err != nil {
+		return nil, fieldpath.ManagedFields{}, err
 	}
 	lastSet := managers[manager]
 	set, err := configObject.ToFieldSet()
@@ -185,7 +196,7 @@ func shallowCopyManagers(managers fieldpath.ManagedFields) fieldpath.ManagedFiel
 // * applyingManager applied it last time
 // * applyingManager didn't apply it this time
 // * no other applier claims to manage it
-func (s *Updater) prune(merged typed.TypedValue, managers fieldpath.ManagedFields, applyingManager string, lastSet *fieldpath.VersionedSet) (typed.TypedValue, error) {
+func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFields, applyingManager string, lastSet *fieldpath.VersionedSet) (*typed.TypedValue, error) {
 	if lastSet == nil || lastSet.Set.Empty() {
 		return merged, nil
 	}
@@ -210,7 +221,7 @@ func (s *Updater) prune(merged typed.TypedValue, managers fieldpath.ManagedField
 
 // addBackOwnedItems adds back any list and map items that were removed by prune,
 // but other appliers (or the current applier's new config) claim to own.
-func (s *Updater) addBackOwnedItems(merged, pruned typed.TypedValue, managedFields fieldpath.ManagedFields, applyingManager string) (typed.TypedValue, error) {
+func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFields fieldpath.ManagedFields, applyingManager string) (*typed.TypedValue, error) {
 	var err error
 	managedAtVersion := map[fieldpath.APIVersion]*fieldpath.Set{}
 	for _, managerSet := range managedFields {
@@ -249,11 +260,10 @@ func (s *Updater) addBackOwnedItems(merged, pruned typed.TypedValue, managedFiel
 	return pruned, nil
 }
 
-
 // addBackDanglingItems makes sure that the only items removed by prune are items that were
 // previously owned by the currently applying manager. This will add back unowned items and items
 // which are owned by Updaters that shouldn't be removed.
-func (s *Updater) addBackDanglingItems(merged, pruned typed.TypedValue, lastSet *fieldpath.VersionedSet) (typed.TypedValue, error) {
+func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet *fieldpath.VersionedSet) (*typed.TypedValue, error) {
 	convertedPruned, err := s.Converter.Convert(pruned, lastSet.APIVersion)
 	if err != nil {
 		if s.Converter.IsMissingVersionError(err) {

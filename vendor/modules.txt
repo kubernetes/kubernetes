@@ -1609,7 +1609,6 @@ k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration
 k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion
 k8s.io/kube-aggregator/pkg/client/informers/internalversion/internalinterfaces
 k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion
-k8s.io/kube-aggregator/pkg/client/openapi
 k8s.io/kube-aggregator/pkg/cmd/server
 k8s.io/kube-aggregator/pkg/controllers
 k8s.io/kube-aggregator/pkg/controllers/autoregister
