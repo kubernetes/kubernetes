@@ -456,7 +456,6 @@ staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
-staging/src/k8s.io/apiserver/pkg/storage/etcd/util
 staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert
 staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
