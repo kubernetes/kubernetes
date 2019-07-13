@@ -174,6 +174,11 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) podDeleteStatus {
 			return makePodDeleteStatusWithWarning(true, err.Error())
 		}
 
+		// Requestor might not have permissions to get DaemonSets when ignoring
+		if apierrors.IsForbidden(err) && d.IgnoreAllDaemonSets {
+			return makePodDeleteStatusWithWarning(false, daemonSetWarning)
+		}
+
 		return makePodDeleteStatusWithError(err.Error())
 	}
 

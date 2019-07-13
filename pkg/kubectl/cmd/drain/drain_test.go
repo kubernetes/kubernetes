@@ -378,6 +378,27 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
+	dsPodDsForbidden := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			Labels:            labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "apps/v1",
+					Kind:               "DaemonSet",
+					Name:               "ds-forbidden",
+					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					Controller:         utilpointer.BoolPtr(true),
+				},
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+		},
+	}
+
 	orphanedDsPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
@@ -626,6 +647,17 @@ func TestDrain(t *testing.T) {
 			expectDelete:  false,
 		},
 		{
+			description: "DS-managed pod with DS.get Forbidden with --ignore-daemonsets",
+			node:        node,
+			expected:    cordonedNode,
+			pods:        []corev1.Pod{dsPodDsForbidden},
+			rcs:         []corev1.ReplicationController{rc},
+			args:        []string{"node", "--ignore-daemonsets"},
+			// expectWarning: "WARNING: ignoring DaemonSet-managed Pods: default/bar",
+			expectFatal:  false,
+			expectDelete: false,
+		},
+		{
 			description:  "Job-managed pod with local storage",
 			node:         node,
 			expected:     cordonedNode,
@@ -778,6 +810,8 @@ func TestDrain(t *testing.T) {
 							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
 							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSet{})}, nil
+						case m.isFor("GET", "/namespaces/default/daemonsets/ds-forbidden"):
+							return &http.Response{StatusCode: 403, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nil)}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
 							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
