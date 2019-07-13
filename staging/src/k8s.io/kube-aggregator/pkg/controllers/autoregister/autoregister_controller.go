@@ -304,14 +304,14 @@ func (c *autoRegisterController) AddAPIServiceToSync(in *apiregistration.APIServ
 }
 
 func (c *autoRegisterController) addAPIServiceToSync(in *apiregistration.APIService, syncType string) {
-	c.apiServicesToSyncLock.Lock()
-	defer c.apiServicesToSyncLock.Unlock()
-
 	apiService := in.DeepCopy()
 	if apiService.Labels == nil {
 		apiService.Labels = map[string]string{}
 	}
 	apiService.Labels[AutoRegisterManagedLabel] = syncType
+
+	c.apiServicesToSyncLock.Lock()
+	defer c.apiServicesToSyncLock.Unlock()
 
 	c.apiServicesToSync[apiService.Name] = apiService
 	c.queue.Add(apiService.Name)
