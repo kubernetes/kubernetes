@@ -763,6 +763,12 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOp
 		return true, nil
 	}
 
+	if volumeToMount.VolumeSpec != nil &&
+		volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
+		klog.V(4).Infof("This volume %s is a migrated inline volume and is not resizable", volumeToMount.VolumeName)
+		return true, nil
+	}
+
 	// Get expander, if possible
 	expandableVolumePlugin, _ :=
 		og.volumePluginMgr.FindNodeExpandablePluginBySpec(volumeToMount.VolumeSpec)
