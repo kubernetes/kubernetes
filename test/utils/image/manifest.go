@@ -134,8 +134,6 @@ const (
 	Etcd
 	// GBFrontend image
 	GBFrontend
-	// GBRedisSlave image
-	GBRedisSlave
 	// Httpd image
 	Httpd
 	// HttpdNew image
@@ -214,7 +212,6 @@ func initImageConfigs() map[int]Config {
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.10"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
-	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
 	configs[Invalid] = Config{gcRegistry, "invalid-image", "invalid-tag"}
