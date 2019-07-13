@@ -1144,7 +1144,7 @@ metadata:
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
 				e2elog.Logf("wait on redis-master startup in %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
+				framework.LookForStringInLog(ns, pod.Name, "redis-master", "Ready to accept connections", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -1323,7 +1323,7 @@ metadata:
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
 				ginkgo.By("checking for a matching strings")
-				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
+				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "Ready to accept connections", framework.PodStartTimeout)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("limiting log lines")
