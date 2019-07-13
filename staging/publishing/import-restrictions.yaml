@@ -142,6 +142,7 @@
   - k8s.io/client-go
   - k8s.io/code-generator
   - k8s.io/component-base
+  - k8s.io/kube-openapi
   - k8s.io/sample-apiserver
   - k8s.io/klog
 
