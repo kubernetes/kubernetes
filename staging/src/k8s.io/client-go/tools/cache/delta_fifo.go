@@ -256,22 +256,6 @@ func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {
 	f.cond.Broadcast()
 }
 
-// re-listing and watching can deliver the same update multiple times in any
-// order. This will combine the most recent two deltas if they are the same.
-func dedupDeltas(deltas Deltas) Deltas {
-	n := len(deltas)
-	if n < 2 {
-		return deltas
-	}
-	a := &deltas[n-1]
-	b := &deltas[n-2]
-	if out := isDup(a, b); out != nil {
-		d := append(Deltas{}, deltas[:n-2]...)
-		return append(d, *out)
-	}
-	return deltas
-}
-
 // If a & b represent the same event, returns the delta that ought to be kept.
 // Otherwise, returns nil.
 // TODO: is there anything other than deletions that need deduping?
@@ -317,8 +301,23 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 		return nil
 	}
 
-	newDeltas := append(f.items[id], Delta{actionType, obj})
-	newDeltas = dedupDeltas(newDeltas)
+	var newDeltas Deltas
+	addition := &Delta{actionType, obj}
+	if len(f.items[id]) < 1 {
+		newDeltas = append(Deltas{}, *addition)
+	} else {
+		// re-listing and watching can deliver the same update multiple times in any
+		// order. This will combine the most recent two deltas if they are the same.
+		n := len(f.items[id])
+		last := &f.items[id][n-1]
+		if out := isDup(last, addition); out != nil {
+			// replace the duplicate
+			f.items[id][n-1] = *out
+			newDeltas = f.items[id]
+		} else {
+			newDeltas = append(f.items[id], *addition)
+		}
+	}
 
 	if len(newDeltas) > 0 {
 		if _, exists := f.items[id]; !exists {
