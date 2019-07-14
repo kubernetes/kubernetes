@@ -123,7 +123,7 @@ type DeltaFIFO struct {
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
 	// Currently, not used to gate any of CRED operations.
 	closed     bool
-	closedLock sync.Mutex
+	closedLock sync.RWMutex
 }
 
 var (
@@ -391,8 +391,8 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 
 // Checks if the queue is closed
 func (f *DeltaFIFO) IsClosed() bool {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.closedLock.RLock()
+	defer f.closedLock.RUnlock()
 	return f.closed
 }
 
