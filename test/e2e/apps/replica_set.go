@@ -102,7 +102,14 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
-	ginkgo.It("should surface a failure condition on a common issue like exceeded quota", func() {
+	/*
+	   Release : v1.16
+	   Testname: Validate ReplicaSet pod limit restrictions
+	   Description: Apply quota to the namespace, prohibiting more than two pods.
+	   When creating a ReplicaSet of 3 of a pod, ReplicaSetConditions MUST include the failure of creating more than the quota allows.
+	   Replicas of pods will be scaled down to two MUST succeed, as the quota allows this amount of replicas to exist.
+	*/
+	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func() {
 		testReplicaSetConditionCheck(f)
 	})
 
