@@ -385,7 +385,7 @@ function load-docker-images {
   # The resource manifest is expecting something like 'registry/kube-controller-manager:v1.2.3', no arch specified.
   local -r images=$(docker images --format "{{.Repository}}:{{.Tag}}" | egrep 'kube-apiserver|kube-controller-manager|kube-scheduler|kube-proxy' | grep amd64)
   for image in $images ; do
-    local -r manifest_name="${image/-amd64/}"
+    local manifest_name="${image/-amd64/}"
     if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q ${manifest_name} ; then
       docker tag $image $manifest_name
     fi
