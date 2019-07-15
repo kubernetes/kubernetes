@@ -27,6 +27,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -108,7 +109,7 @@ func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 
 // PrintJSON returns the summary of log size data with JSON format.
 func (s *LogsSizeDataSummary) PrintJSON() string {
-	return PrettyPrintJSON(*s)
+	return e2emetrics.PrettyPrintJSON(*s)
 }
 
 // SummaryKind returns the summary of log size data summary.

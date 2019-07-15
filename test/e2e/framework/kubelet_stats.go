@@ -47,6 +47,7 @@ import (
 
 // KubeletLatencyMetric stores metrics scraped from the kubelet server's /metric endpoint.
 // TODO: Get some more structure around the metrics and this type
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 type KubeletLatencyMetric struct {
 	// eg: list, info, create
 	Operation string
@@ -59,6 +60,7 @@ type KubeletLatencyMetric struct {
 
 // KubeletLatencyMetrics implements sort.Interface for []KubeletMetric based on
 // the latency field.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 type KubeletLatencyMetrics []KubeletLatencyMetric
 
 func (a KubeletLatencyMetrics) Len() int           { return len(a) }
@@ -67,6 +69,7 @@ func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].
 
 // If a apiserver client is passed in, the function will try to get kubelet metrics from metrics grabber;
 // or else, the function will try to get kubelet metrics directly from the node.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	if c == nil {
 		return metrics.GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
@@ -80,6 +83,7 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.
 
 // getKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
 // the subsystem prefix.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 func getKubeletMetrics(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	ms, err := getKubeletMetricsFromNode(c, nodeName)
 	if err != nil {
@@ -102,6 +106,7 @@ func getKubeletMetrics(c clientset.Interface, nodeName string) (metrics.KubeletM
 // GetDefaultKubeletLatencyMetrics calls GetKubeletLatencyMetrics with a set of default metricNames
 // identifying common latency metrics.
 // Note that the KubeletMetrics passed in should not contain subsystem prefix.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 func GetDefaultKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 	latencyMetricNames := sets.NewString(
 		kubeletmetrics.PodWorkerDurationKey,
@@ -117,6 +122,7 @@ func GetDefaultKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMe
 
 // GetKubeletLatencyMetrics filters ms to include only those contained in the metricNames set,
 // then constructs a KubeletLatencyMetrics list based on the samples associated with those metrics.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics, filterMetricNames sets.String) KubeletLatencyMetrics {
 	var latencyMetrics KubeletLatencyMetrics
 	for name, samples := range ms {
@@ -266,6 +272,7 @@ func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeR
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
 	ms, err := getKubeletMetrics(c, nodeName)
 	if err != nil {
