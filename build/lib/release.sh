@@ -386,8 +386,8 @@ EOF
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local release_docker_image_tag=""
-        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" && $docker_registry != $KUBE_DOCKER_REGISTRY ]]; then
-          release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" || -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+          release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
           kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
           "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
