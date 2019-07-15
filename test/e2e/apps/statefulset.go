@@ -25,7 +25,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -762,7 +762,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}, e2esset.StatefulPodTimeout, 2*time.Second).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("should have a working scale subresource", func() {
+		/*
+						Release : v1.16
+						Testname: StatefulSet resource Replica scaling
+						Description: Create a StatefulSet resource.
+			            Newly created StatefulSet resource MUST have a scale of one.
+			            Bring the scale of the StatefulSet resource up to two. StatefulSet scale MUST be at two replicas.
+		*/
+		framework.ConformanceIt("should have a working scale subresource", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			e2esset.SetHTTPProbe(ss)
