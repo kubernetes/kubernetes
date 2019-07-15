@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	// renewInterval is the interval at which the lease is renewed
-	renewInterval = 10 * time.Second
+	// defaultRenewInterval is the default interval at which the lease is renewed
+	defaultRenewInterval = 10 * time.Second
 	// maxUpdateRetries is the number of immediate, successive retries the Kubelet will attempt
 	// when renewing the lease before it waits for the renewal interval before trying again,
 	// similar to what we do for node status retries
@@ -60,11 +60,21 @@ type controller struct {
 }
 
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func()) Controller {
+func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, nodeStatusUpdateFrequency time.Duration, onRepeatedHeartbeatFailure func()) Controller {
 	var leaseClient coordclientset.LeaseInterface
 	if client != nil {
 		leaseClient = client.CoordinationV1().Leases(corev1.NamespaceNodeLease)
 	}
+	renewInterval := defaultRenewInterval
+	// Users are able to decrease the timeout after which nodes are being
+	// marked as "Ready: Unknown" by NodeLifecycleController to values
+	// smaller than defaultRenewInterval. Until the knob to configure
+	// lease renew interval is exposed to user, we temporarily decrease
+	// renewInterval based on the NodeStatusUpdateFrequency.
+	if renewInterval > nodeStatusUpdateFrequency {
+		renewInterval = nodeStatusUpdateFrequency
+	}
+
 	return &controller{
 		client:                     client,
 		leaseClient:                leaseClient,
