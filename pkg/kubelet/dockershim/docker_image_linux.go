@@ -20,8 +20,8 @@ package dockershim
 
 import (
 	"context"
-	"path/filepath"
 	"os"
+	"path/filepath"
 	"time"
 
 	"k8s.io/klog"
@@ -44,7 +44,7 @@ func (ds *dockerService) ImageFsInfo(_ context.Context, r *runtimeapi.ImageFsInf
 
 	return &runtimeapi.ImageFsInfoResponse{
 		ImageFilesystems: []*runtimeapi.FilesystemUsage{
-			&runtimeapi.FilesystemUsage{
+			{
 				Timestamp: time.Now().Unix(),
 				FsId: &runtimeapi.FilesystemIdentifier{
 					Mountpoint: info.DockerRootDir,

@@ -95,7 +95,7 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 			Annotations: status.Annotations,
 		},
 		Cpu: &runtimeapi.CpuUsage{
-			Timestamp: timestamp,
+			Timestamp:            timestamp,
 			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: dockerStats.CPUStats.CPUUsage.TotalUsage},
 		},
 		Memory: &runtimeapi.MemoryUsage{
