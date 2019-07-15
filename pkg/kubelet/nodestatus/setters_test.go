@@ -256,6 +256,7 @@ func TestNodeAddress(t *testing.T) {
 			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
 				return testCase.nodeAddresses, nil
 			}
+			nodeStatusUpdateFrequency := 10 * time.Second
 
 			// construct setter
 			setter := NodeAddress(nodeIP,
@@ -264,7 +265,8 @@ func TestNodeAddress(t *testing.T) {
 				testCase.hostnameOverride,
 				externalCloudProvider,
 				cloud,
-				nodeAddressesFunc)
+				nodeAddressesFunc,
+				nodeStatusUpdateFrequency)
 
 			// call setter on existing node
 			err := setter(existingNode)

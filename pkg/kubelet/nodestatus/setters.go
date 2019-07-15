@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
@@ -64,6 +65,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 	externalCloudProvider bool, // typically Kubelet.externalCloudProvider
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
 	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
+	nodeStatusUpdateFrequency time.Duration, // typically Kubelet.nodeStatusUpdateFrequency
 ) Setter {
 	return func(node *v1.Node) error {
 		if nodeIP != nil {
@@ -160,16 +162,19 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			} else if addr := net.ParseIP(hostname); addr != nil {
 				ipAddr = addr
 			} else {
-				var addrs []net.IP
-				addrs, _ = net.LookupIP(node.Name)
+				ctx, cancel := context.WithTimeout(context.Background(), nodeStatusUpdateFrequency/2)
+				defer cancel()
+
+				addrs, _ := net.DefaultResolver.LookupIPAddr(ctx, node.Name)
 				for _, addr := range addrs {
-					if err = validateNodeIPFunc(addr); err == nil {
-						if addr.To4() != nil {
-							ipAddr = addr
+					ip := addr.IP
+					if err = validateNodeIPFunc(ip); err == nil {
+						if ip.To4() != nil {
+							ipAddr = ip
 							break
 						}
-						if addr.To16() != nil && ipAddr == nil {
-							ipAddr = addr
+						if ip.To16() != nil && ipAddr == nil {
+							ipAddr = ip
 						}
 					}
 				}
