@@ -797,6 +797,105 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 	}
 }
 
+func TestRotateCertUpdateKubeconf(t *testing.T) {
+	testCases := []struct {
+		description       string
+		storeCert         *certificateData
+		apiCert           *certificateData
+		failureType       fakeClientFailureType
+		kubeconfPath      string
+		updateKubeconfErr error
+		expectedRotateErr bool
+		expectedSuccess   bool
+	}{
+		{
+			description:       "CSR failed",
+			storeCert:         storeCertData,
+			apiCert:           apiServerCertData,
+			failureType:       createError,
+			kubeconfPath:      "/var/lib/kubelet/pki/kubelet-client-current.pem",
+			updateKubeconfErr: nil,
+			expectedRotateErr: true,
+			expectedSuccess:   false,
+		},
+		{
+			description:       "rotate certficiate success, update kubelet.conf failed",
+			storeCert:         storeCertData,
+			apiCert:           apiServerCertData,
+			failureType:       none,
+			kubeconfPath:      "/var/lib/kubelet/pki/kubelet-client-current.pem",
+			updateKubeconfErr: fmt.Errorf("write file failed"),
+			expectedRotateErr: true,
+			expectedSuccess:   false,
+		},
+		{
+			description:       "rotate certficiate success, update kubelet.conf success",
+			storeCert:         storeCertData,
+			apiCert:           apiServerCertData,
+			failureType:       none,
+			kubeconfPath:      "/var/lib/kubelet/pki/kubelet-client-current.pem",
+			updateKubeconfErr: nil,
+			expectedRotateErr: false,
+			expectedSuccess:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			certificateStore := &fakeStore{
+				cert:        tc.storeCert.certificate,
+				currentPath: tc.kubeconfPath,
+			}
+
+			updater := &fakeKubeconfUpdater{
+				err: tc.updateKubeconfErr,
+			}
+
+			certificateManager, err := NewManager(&Config{
+				Template: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						Organization: []string{"system:nodes"},
+						CommonName:   "system:node:fake-node-name",
+					},
+				},
+				Usages: []certificates.KeyUsage{
+					certificates.UsageDigitalSignature,
+					certificates.UsageKeyEncipherment,
+					certificates.UsageClientAuth,
+				},
+				CertificateStore: certificateStore,
+				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+					return &fakeClient{
+						certificatePEM: tc.apiCert.certificatePEM,
+						failureType:    tc.failureType,
+					}, nil
+				},
+				UpdateKubeletConfFn: updater.UpdateFn(),
+			})
+			if err != nil {
+				t.Errorf("Got %v, wanted no error.", err)
+			}
+
+			m, ok := certificateManager.(*manager)
+			if !ok {
+				t.Errorf("Expected a '*manager' from 'NewManager'")
+			}
+			success, err := m.rotateCerts()
+			if tc.expectedRotateErr && err == nil {
+			}
+			if !tc.expectedRotateErr && err != nil {
+				t.Errorf("Unexpected rotate err %v", err)
+			}
+			if tc.expectedSuccess != success {
+				t.Errorf("Expected rotate %v got %v", tc.expectedSuccess, success)
+			}
+			if tc.expectedSuccess && updater.currentPath != tc.kubeconfPath {
+				t.Errorf("Expected currentPath %s got %s", tc.kubeconfPath, updater.currentPath)
+			}
+		})
+	}
+}
+
 func TestServerHealth(t *testing.T) {
 	type certs struct {
 		storeCert               *certificateData
@@ -1040,7 +1139,8 @@ func (w *fakeWatch) ResultChan() <-chan watch.Event {
 }
 
 type fakeStore struct {
-	cert *tls.Certificate
+	cert        *tls.Certificate
+	currentPath string
 }
 
 func (s *fakeStore) Current() (*tls.Certificate, error) {
@@ -1049,6 +1149,10 @@ func (s *fakeStore) Current() (*tls.Certificate, error) {
 		return nil, &noKeyErr
 	}
 	return s.cert, nil
+}
+
+func (s *fakeStore) CurrentPath() string {
+	return s.currentPath
 }
 
 // Accepts the PEM data for the cert/key pair and makes the new cert/key
@@ -1079,6 +1183,18 @@ func (s *fakeStore) Update(certPEM, keyPEM []byte) (*tls.Certificate, error) {
 		NotAfter:  now.Add(24 * time.Hour),
 	}
 	return s.cert, nil
+}
+
+type fakeKubeconfUpdater struct {
+	currentPath string
+	err         error
+}
+
+func (u *fakeKubeconfUpdater) UpdateFn() UpdateKubeletConfFunc {
+	return func(pemFilename string) error {
+		u.currentPath = pemFilename
+		return u.err
+	}
 }
 
 func certificatesEqual(c1 *tls.Certificate, c2 *tls.Certificate) bool {

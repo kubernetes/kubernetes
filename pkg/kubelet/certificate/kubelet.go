@@ -155,6 +155,7 @@ func NewKubeletClientCertificateManager(
 	certFile string,
 	keyFile string,
 	clientFn certificate.CSRClientFunc,
+	updateFn certificate.UpdateKubeletConfFunc,
 ) (certificate.Manager, error) {
 
 	certificateStore, err := certificate.NewFileStore(
@@ -177,7 +178,8 @@ func NewKubeletClientCertificateManager(
 	prometheus.Register(certificateExpiration)
 
 	m, err := certificate.NewManager(&certificate.Config{
-		ClientFn: clientFn,
+		ClientFn:            clientFn,
+		UpdateKubeletConfFn: updateFn,
 		Template: &x509.CertificateRequest{
 			Subject: pkix.Name{
 				CommonName:   fmt.Sprintf("system:node:%s", nodeName),

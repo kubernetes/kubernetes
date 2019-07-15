@@ -53,6 +53,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
@@ -779,7 +780,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 
 		kubeClientConfigOverrides(s, clientConfig)
 
-		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
+		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.KubeConfig, s.CertDirectory, nodeName)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -836,7 +837,7 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 // buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
 // if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
 // write out).
-func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
+func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, kubeletConfigPath, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
 	newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
 		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
 		// credentials. In the future it would be desirable to change the behavior of bootstrap
@@ -853,6 +854,31 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		return client.CertificatesV1beta1().CertificateSigningRequests(), nil
 	}
 
+	updateFn := func(pemFilename string) error {
+		// if not exist just return nil
+		config, err := clientcmd.LoadFromFile(kubeletConfigPath)
+		if os.IsNotExist(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		ctx := config.Contexts[config.CurrentContext]
+		if ctx == nil {
+			return fmt.Errorf("invalide kubelet.conf context %s not exist", config.CurrentContext)
+		}
+		auth := config.AuthInfos[ctx.AuthInfo]
+		if auth != nil && auth.ClientCertificate == pemFilename && auth.ClientKey == pemFilename {
+			return nil
+		}
+		config.AuthInfos = map[string]*clientcmdapi.AuthInfo{
+			ctx.AuthInfo: {
+				ClientCertificate: pemFilename,
+				ClientKey:         pemFilename,
+			},
+		}
+		return clientcmd.WriteToFile(*config, kubeletConfigPath)
+	}
+
 	return kubeletcertificate.NewKubeletClientCertificateManager(
 		certDir,
 		nodeName,
@@ -866,6 +892,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		clientConfig.CertFile,
 		clientConfig.KeyFile,
 		newClientFn,
+		updateFn,
 	)
 }
 

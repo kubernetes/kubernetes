@@ -73,6 +73,9 @@ type Config struct {
 	// It must be set at initialization. The function will never be invoked
 	// in parallel. It is passed the current client certificate if one exists.
 	ClientFn CSRClientFunc
+	// UpdateKubeletConfFn will be used to update kubelet.conf
+	// to point to new created certificate (kubelet-client-current.pem)
+	UpdateKubeletConfFn UpdateKubeletConfFunc
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
 	// part of rotation. It follows the same rules as the template parameter of
@@ -91,7 +94,7 @@ type Config struct {
 	// CertificateStore is a persistent store where the current cert/key is
 	// kept and future cert/key pairs will be persisted after they are
 	// generated.
-	CertificateStore Store
+	CertificateStore FileStore
 	// BootstrapCertificatePEM is the certificate data that will be returned
 	// from the Manager if the CertificateStore doesn't have any cert/key pairs
 	// currently available and has not yet had a chance to get a new cert/key
@@ -146,6 +149,10 @@ type NoCertKeyError string
 // current certificate if one is available and valid.
 type CSRClientFunc func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error)
 
+// UpdateKubeletConfFunc used to update kubelet.conf to point
+// to new created pemfile
+type UpdateKubeletConfFunc func(pemFilename string) error
+
 func (e *NoCertKeyError) Error() string { return string(*e) }
 
 type manager struct {
@@ -160,7 +167,7 @@ type manager struct {
 	usages          []certificates.KeyUsage
 	forceRotation   bool
 
-	certStore Store
+	certStore FileStore
 
 	certificateExpiration Gauge
 
@@ -170,10 +177,11 @@ type manager struct {
 	serverHealth   bool
 
 	// the clientFn must only be accessed under the clientAccessLock
-	clientAccessLock sync.Mutex
-	clientFn         CSRClientFunc
-	stopCh           chan struct{}
-	stopped          bool
+	clientAccessLock    sync.Mutex
+	clientFn            CSRClientFunc
+	updateKubeletConfFn UpdateKubeletConfFunc
+	stopCh              chan struct{}
+	stopped             bool
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -196,6 +204,7 @@ func NewManager(config *Config) (Manager, error) {
 	m := manager{
 		stopCh:                make(chan struct{}),
 		clientFn:              config.ClientFn,
+		updateKubeletConfFn:   config.UpdateKubeletConfFn,
 		getTemplate:           getTemplate,
 		dynamicTemplate:       config.GetTemplate != nil,
 		usages:                config.Usages,
@@ -419,6 +428,12 @@ func (m *manager) rotateCerts() (bool, error) {
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to store the new cert/key pair: %v", err))
 		return false, nil
+	}
+	if m.updateKubeletConfFn != nil {
+		if err = m.updateKubeletConfFn(m.certStore.CurrentPath()); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Unable to update the new cert/key pair to kubelet.conf: %v", err))
+			return false, nil
+		}
 	}
 
 	m.updateCached(cert)

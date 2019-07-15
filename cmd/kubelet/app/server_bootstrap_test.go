@@ -37,6 +37,8 @@ import (
 	cfsslconfig "github.com/cloudflare/cfssl/config"
 	cfsslsigner "github.com/cloudflare/cfssl/signer"
 	cfssllocal "github.com/cloudflare/cfssl/signer/local"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	certapi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +52,7 @@ import (
 // manager that will use the bootstrap client until we get a valid cert, then use our
 // provided identity on subsequent requests.
 func Test_buildClientCertificateManager(t *testing.T) {
+	kubeconfigPath := "kubelet.conf"
 	testDir, err := ioutil.TempDir("", "kubeletcert")
 	if err != nil {
 		t.Fatal(err)
@@ -84,13 +87,12 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	}
 
 	nodeName := types.NodeName("test")
-	m, err := buildClientCertificateManager(config1, config2, testDir, nodeName)
+	m, err := buildClientCertificateManager(config1, config2, kubeconfigPath, testDir, nodeName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Stop()
 	r := m.(rotater)
-
 	// get an expired CSR (simulating historical output)
 	server.backdate = 2 * time.Hour
 	server.SetExpectUserAgent("FirstClient")
@@ -136,6 +138,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 }
 
 func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
+	kubeconfigPath := "kubelet.conf"
 	testDir, err := ioutil.TempDir("", "kubeletcert")
 	if err != nil {
 		t.Fatal(err)
@@ -152,7 +155,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 		Host:      "http://localhost",
 	}
 	nodeName := types.NodeName("test")
-	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err != nil {
+	if _, err := buildClientCertificateManager(config1, config2, kubeconfigPath, testDir, nodeName); err != nil {
 		t.Fatal(err)
 	}
 	fi := getFileInfo(testDir)
@@ -163,7 +166,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 	// an invalid cert should be ignored
 	config2.CertData = []byte("invalid contents")
 	config2.KeyData = []byte("invalid contents")
-	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err == nil {
+	if _, err := buildClientCertificateManager(config1, config2, kubeconfigPath, testDir, nodeName); err == nil {
 		t.Fatal("unexpected non error")
 	}
 	fi = getFileInfo(testDir)
@@ -174,7 +177,7 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 	// an expired client certificate should be written to disk, because the cert manager can
 	// use config1 to refresh it and the cert manager won't return it for clients.
 	config2.CertData, config2.KeyData = genClientCert(t, time.Now().Add(-2*time.Hour), time.Now().Add(-time.Hour))
-	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err != nil {
+	if _, err := buildClientCertificateManager(config1, config2, kubeconfigPath, testDir, nodeName); err != nil {
 		t.Fatal(err)
 	}
 	fi = getFileInfo(testDir)
@@ -184,14 +187,101 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 
 	// a valid, non-expired client certificate should be written to disk
 	config2.CertData, config2.KeyData = genClientCert(t, time.Now().Add(-time.Hour), time.Now().Add(24*time.Hour))
-	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err != nil {
+	if _, err := buildClientCertificateManager(config1, config2, kubeconfigPath, testDir, nodeName); err != nil {
 		t.Fatal(err)
 	}
 	fi = getFileInfo(testDir)
 	if len(fi) != 2 {
 		t.Fatalf("Unexpected directory contents: %#v", fi)
 	}
+}
 
+func Test_buildClientCertificateManager_updateKubeletConfig(t *testing.T) {
+	// prepare kubelet.conf
+	kubeletDir, err := ioutil.TempDir("", "kubernetes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { os.RemoveAll(kubeletDir) }()
+	kubeconfigPath := filepath.Join(kubeletDir, "kubelet.conf")
+	kubeconfigData := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
+			Server:                   "127.0.0.1:8080",
+			CertificateAuthorityData: []byte("xxxx"),
+		}},
+		// Define auth based on the obtained client cert.
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
+			ClientCertificateData: []byte("xxxx"),
+			ClientKeyData:         []byte("xxxx"),
+		}},
+		// Define a context that connects the auth info and cluster, and set it as the default
+		Contexts: map[string]*clientcmdapi.Context{"default-context": {
+			Cluster:   "default-cluster",
+			AuthInfo:  "default-auth",
+			Namespace: "default",
+		}},
+		CurrentContext: "default-context",
+	}
+	if err = clientcmd.WriteToFile(*kubeconfigData, kubeconfigPath); err != nil {
+		t.Fatal(err)
+	}
+
+	testDir, err := ioutil.TempDir("", "kubeletcert")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { os.RemoveAll(testDir) }()
+	clientPemPath := filepath.Join(testDir, "kubelet-client-current.pem")
+
+	serverPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverCA, err := certutil.NewSelfSignedCACert(certutil.Config{
+		CommonName: "the-test-framework",
+	}, serverPrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &csrSimulator{
+		t:                t,
+		serverPrivateKey: serverPrivateKey,
+		serverCA:         serverCA,
+	}
+	s := httptest.NewServer(server)
+	defer s.Close()
+
+	config := &restclient.Config{
+		UserAgent: "kubelet",
+		Host:      s.URL,
+	}
+	nodeName := types.NodeName("test")
+
+	// a valid, non-expired client certificate should be written to disk
+	config.CertData, config.KeyData = genClientCert(t, time.Now().Add(-time.Hour), time.Now().Add(24*time.Hour))
+	m, err := buildClientCertificateManager(config, config, kubeconfigPath, testDir, nodeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := m.(rotater)
+	if ok, err := r.RotateCerts(); !ok || err != nil {
+		t.Fatalf("unexpected rotation err: %t %v", ok, err)
+	}
+
+	fi := getFileInfo(testDir)
+	if len(fi) != 2 {
+		t.Fatalf("Unexpected directory contents: %#v", fi)
+	}
+
+	kubeconfigData, err = clientcmd.LoadFromFile(kubeconfigPath)
+	if err != nil {
+		t.Fatalf("load kubeconf from %s err:%s", kubeconfigPath, err)
+	}
+	ctx := kubeconfigData.Contexts[kubeconfigData.CurrentContext]
+	auth := kubeconfigData.AuthInfos[ctx.AuthInfo]
+	if auth.ClientCertificate != clientPemPath || auth.ClientKey != clientPemPath {
+		t.Fatalf("unexpected kubeconf clientcertificate:%s clientkey:%s", auth.ClientCertificate, auth.ClientKey)
+	}
 }
 
 func getFileInfo(dir string) map[string]os.FileInfo {
