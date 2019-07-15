@@ -743,3 +743,75 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		wg.Wait()
 	}
 }
+
+func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	// Ensure there is some budget for slowing down processing.
+	cacher.dispatchTimeoutBudget.returnUnused(50 * time.Millisecond)
+
+	makePod := func(i int) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", 1000+i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", 1000+i),
+			},
+		}
+	}
+	if err := cacher.watchCache.Add(makePod(0)); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	totalPods := 50
+
+	// Create watcher that will be blocked.
+	w1, err := cacher.Watch(context.TODO(), "pods/ns", "999", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w1.Stop()
+
+	// Create fast watcher and ensure it will get all objects.
+	w2, err := cacher.Watch(context.TODO(), "pods/ns", "999", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w2.Stop()
+
+	// Now push a ton of object to cache.
+	for i := 1; i < totalPods; i++ {
+		cacher.watchCache.Add(makePod(i))
+	}
+
+	shouldContinue := true
+	eventsCount := 0
+	for shouldContinue {
+		select {
+		case event, ok := <-w2.ResultChan():
+			if !ok {
+				shouldContinue = false
+				break
+			}
+			// Ensure there is some budget for fast watcher after slower one is blocked.
+			cacher.dispatchTimeoutBudget.returnUnused(50 * time.Millisecond)
+			if event.Type == watch.Added {
+				eventsCount++
+				if eventsCount == totalPods {
+					shouldContinue = false
+				}
+			}
+		case <-time.After(2 * time.Second):
+			shouldContinue = false
+			w2.Stop()
+		}
+	}
+	if eventsCount != totalPods {
+		t.Errorf("watcher is blocked by slower one (count: %d)", eventsCount)
+	}
+}
