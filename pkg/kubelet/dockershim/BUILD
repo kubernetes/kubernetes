@@ -94,6 +94,7 @@ go_test(
         "docker_image_test.go",
         "docker_sandbox_test.go",
         "docker_service_test.go",
+        "docker_stats_test.go",
         "helpers_linux_test.go",
         "helpers_test.go",
         "naming_test.go",
