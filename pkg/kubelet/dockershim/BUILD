@@ -17,6 +17,7 @@ go_library(
         "docker_logs.go",
         "docker_sandbox.go",
         "docker_service.go",
+        "docker_stats.go",
         "docker_stats_linux.go",
         "docker_stats_unsupported.go",
         "docker_stats_windows.go",
