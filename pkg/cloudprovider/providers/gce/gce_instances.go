@@ -426,6 +426,28 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any
 // instance is not found
 func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
+	instanceOrErrors, err := g.getInstanceOrErrorsByNames(names)
+	if err != nil {
+		return nil, err
+	}
+	var allInstances []*gceInstance
+	for _, entry := range instanceOrErrors {
+		if entry.err != nil {
+			return nil, entry.err
+		}
+		allInstances = append(allInstances, entry.instance)
+	}
+	return allInstances, nil
+}
+
+type instanceOrError struct {
+	instance *gceInstance
+	err      error
+}
+
+// Gets the named instances, returning a map of each name to either the found instances or
+// cloudprovider.InstanceNotFound if the instance is not found
+func (g *Cloud) getInstanceOrErrorsByNames(allNames []string) (map[string]*instanceOrError, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
