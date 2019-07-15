@@ -291,13 +291,13 @@ type Cacher struct {
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
 // given configuration.
-func NewCacherFromConfig(config Config) *Cacher {
+func NewCacherFromConfig(config Config) (*Cacher, error) {
 	stopCh := make(chan struct{})
 	obj := config.NewFunc()
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
 	if err := runtime.CheckCodec(config.Codec, obj); err != nil {
-		panic("storage codec doesn't seem to match given type: " + err.Error())
+		return nil, fmt.Errorf("storage codec doesn't seem to match given type: %v", err)
 	}
 
 	clock := clock.RealClock{}
@@ -363,7 +363,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 		)
 	}()
 
-	return cacher
+	return cacher, nil
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
