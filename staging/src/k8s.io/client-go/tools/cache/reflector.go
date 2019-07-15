@@ -172,6 +172,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		var err error
 		listCh := make(chan struct{}, 1)
 		panicCh := make(chan interface{}, 1)
+		defer close(panicCh)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
