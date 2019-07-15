@@ -38,7 +38,7 @@ type framework struct {
 	nodeInfoSnapshot      *cache.NodeInfoSnapshot
 	waitingPods           *waitingPodsMap
 	pluginNameToWeightMap map[string]int
-	queueSortPlugins      []QueueSortPlugin
+	queueSortPlugin       QueueSortPlugin
 	prefilterPlugins      []PrefilterPlugin
 	scorePlugins          []ScorePlugin
 	reservePlugins        []ReservePlugin
@@ -218,10 +218,10 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %v does not extend queue sort plugin", qs.Name)
 				}
-				f.queueSortPlugins = append(f.queueSortPlugins, p)
-				if len(f.queueSortPlugins) > 1 {
+				if f.queueSortPlugin != nil {
 					return nil, fmt.Errorf("only one queue sort plugin can be enabled")
 				}
+				f.queueSortPlugin = p
 			} else {
 				return nil, fmt.Errorf("queue sort plugin %v does not exist", qs.Name)
 			}
@@ -233,12 +233,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 // QueueSortFunc returns the function to sort pods in scheduling queue
 func (f *framework) QueueSortFunc() LessFunc {
-	if len(f.queueSortPlugins) == 0 {
+	if f.queueSortPlugin == nil {
 		return nil
 	}
 
-	// Only one QueueSort plugin can be enabled.
-	return f.queueSortPlugins[0].Less
+	return f.queueSortPlugin.Less
 }
 
 // RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
