@@ -139,7 +139,7 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 
 	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
-		retryErr := kwait.ExponentialBackoff(c.cloud.requestBackoff(), func() (bool, error) {
+		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
 			diskOpMutex.LockKey(instanceid)
 			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
 			diskOpMutex.UnlockKey(instanceid)
@@ -186,7 +186,7 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 			return *disk.Lun, nil
 		}
 	}
-	return -1, fmt.Errorf("Cannot find Lun for disk %s", diskName)
+	return -1, fmt.Errorf("cannot find Lun for disk %s", diskName)
 }
 
 // GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.

@@ -44,7 +44,7 @@ import k8s_io_apimachinery_pkg_runtime "k8s.io/apimachinery/pkg/runtime"
 
 import k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -228,7 +228,7 @@ func (m *Event) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Annotations {
 			keysForAnnotations = append(keysForAnnotations, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+		sortkeys.Strings(keysForAnnotations)
 		for _, k := range keysForAnnotations {
 			dAtA[i] = 0x7a
 			i++
@@ -837,7 +837,7 @@ func (this *Event) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])

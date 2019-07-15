@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -30,9 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/legacy-cloud-providers/gce"
+	netutils "k8s.io/utils/net"
 )
 
-func newTestNodeIpamController(clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int, allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
+func newTestNodeIpamController(clusterCIDR []*net.IPNet, serviceCIDR *net.IPNet, nodeCIDRMaskSize int, allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 	clientSet := fake.NewSimpleClientset()
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -67,6 +69,7 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 		wantFatal     bool
 	}{
 		{"valid_range_allocator", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.RangeAllocatorType, false},
+		{"valid_range_allocator_dualstack", "10.0.0.0/21,2000::/10", "10.1.0.0/21", 24, ipam.RangeAllocatorType, false},
 		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
 		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, false},
 		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, false},
@@ -76,11 +79,12 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, true},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			_, clusterCIDRIpNet, _ := net.ParseCIDR(tc.clusterCIDR)
+			clusterCidrs, _ := netutils.ParseCIDRs(strings.Split(tc.clusterCIDR, ","))
 			_, serviceCIDRIpNet, _ := net.ParseCIDR(tc.serviceCIDR)
+
 			if os.Getenv("EXIT_ON_FATAL") == "1" {
 				// This is the subprocess which runs the actual code.
-				newTestNodeIpamController(clusterCIDRIpNet, serviceCIDRIpNet, tc.maskSize, tc.allocatorType)
+				newTestNodeIpamController(clusterCidrs, serviceCIDRIpNet, tc.maskSize, tc.allocatorType)
 				return
 			}
 			// This is the host process that monitors the exit code of the subprocess.
@@ -96,7 +100,7 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 				gotFatal = !exitErr.Success()
 			}
 			if gotFatal != tc.wantFatal {
-				t.Errorf("newTestNodeIpamController(%v, %v, %v, %v) : gotFatal = %t ; wantFatal = %t", clusterCIDRIpNet, serviceCIDRIpNet, tc.maskSize, tc.allocatorType, gotFatal, tc.wantFatal)
+				t.Errorf("newTestNodeIpamController(%v, %v, %v, %v) : gotFatal = %t ; wantFatal = %t", clusterCidrs, serviceCIDRIpNet, tc.maskSize, tc.allocatorType, gotFatal, tc.wantFatal)
 			}
 		})
 	}

@@ -41,6 +41,7 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -64,6 +65,8 @@ type GetOptions struct {
 	Watch     bool
 	WatchOnly bool
 	ChunkSize int64
+
+	OutputWatchEvents bool
 
 	LabelSelector     string
 	FieldSelector     string
@@ -171,6 +174,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
 	cmd.Flags().Int64Var(&o.ChunkSize, "chunk-size", o.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -309,6 +313,9 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("--show-labels option cannot be used with %s printer", outputOption)
 		}
 	}
+	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
+		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
+	}
 	return nil
 }
 
@@ -439,7 +446,11 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 // TODO: remove the need to pass these arguments, like other commands.
 func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
-		return o.raw(f)
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
 		return o.watch(f, cmd, args)
@@ -564,7 +575,8 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		fmt.Fprintln(o.ErrOut, "No resources found.")
+		noResourcesFoundFormat := fmt.Sprintf("No resources found in %s namespace.", o.Namespace)
+		fmt.Fprintln(o.ErrOut, noResourcesFoundFormat)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -577,27 +589,6 @@ type trackingWriterWrapper struct {
 func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
 	t.Written += len(p)
 	return t.Delegate.Write(p)
-}
-
-// raw makes a simple HTTP request to the provided path on the server using the default
-// credentials.
-func (o *GetOptions) raw(f cmdutil.Factory) error {
-	restClient, err := f.RESTClient()
-	if err != nil {
-		return err
-	}
-
-	stream, err := restClient.Get().RequestURI(o.Raw).Stream()
-	if err != nil {
-		return err
-	}
-	defer stream.Close()
-
-	_, err = io.Copy(o.Out, stream)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	return nil
 }
 
 // watch starts a client-side watch of one or more resources.
@@ -664,6 +655,9 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		objsToPrint = append(objsToPrint, obj)
 	}
 	for _, objToPrint := range objsToPrint {
+		if o.OutputWatchEvents {
+			objToPrint = &metav1.WatchEvent{Type: string(watch.Added), Object: runtime.RawExtension{Object: objToPrint}}
+		}
 		if err := printer.PrintObj(objToPrint, writer); err != nil {
 			return fmt.Errorf("unable to output the provided object: %v", err)
 		}
@@ -688,7 +682,11 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
-			if err := printer.PrintObj(e.Object, writer); err != nil {
+			objToPrint := e.Object
+			if o.OutputWatchEvents {
+				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}
+			}
+			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
 			}
 			writer.Flush()

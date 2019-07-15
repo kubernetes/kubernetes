@@ -83,7 +83,7 @@ func TestCheckDeviceInode(t *testing.T) {
 			continue
 		}
 
-		fd, err := unix.Open(test.srcPath, unix.O_CREAT, 0644)
+		fd, err := unix.Open(test.srcPath, unix.O_CREAT|unix.O_CLOEXEC, 0644)
 		if err != nil {
 			t.Errorf("Test %q: cannot open srcPath %s: %s", test.name, test.srcPath, err)
 			continue

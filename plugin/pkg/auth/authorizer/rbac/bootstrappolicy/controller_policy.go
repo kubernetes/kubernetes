@@ -50,7 +50,7 @@ func addControllerRole(controllerRoles *[]rbacv1.ClusterRole, controllerRoleBind
 }
 
 func eventsRule() rbacv1.PolicyRule {
-	return rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie()
+	return rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie()
 }
 
 func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) {

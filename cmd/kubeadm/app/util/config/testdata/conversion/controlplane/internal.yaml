@@ -71,6 +71,7 @@ ComponentConfigs:
       SourceVip: ""
   Kubelet:
     Address: 1.2.3.4
+    AllowedUnsafeSysctls: null
     Authentication:
       Anonymous:
         Enabled: false

@@ -146,7 +146,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 		}
 
 		// When node has memory pressure and TaintNodesByCondition is enabled, check BestEffort Pod's toleration:
-		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. OutOfDisk.
+		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. DiskPressure.
 		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) &&
 			v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
 				Key:    schedulerapi.TaintNodeMemoryPressure,

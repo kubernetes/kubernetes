@@ -66,6 +66,13 @@ const (
 	CSIVolumePublished CSIVolumePhaseType = "published"
 )
 
+var (
+	deprecatedVolumeProviders = map[string]string{
+		"kubernetes.io/cinder":  "The Cinder volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/scaleio": "The ScaleIO volume provider is deprecated and will be removed in a future release",
+	}
+)
+
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner
@@ -674,6 +681,11 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
+
+	// Issue warning if the matched provider is deprecated
+	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
+	}
 	return matches[0], nil
 }
 
@@ -736,6 +748,11 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+	}
+
+	// Issue warning if the matched provider is deprecated
+	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
 	}
 	return matches[0], nil
 }

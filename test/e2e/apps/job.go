@@ -53,10 +53,34 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring pods for job exist")
 		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(int(completions)), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
+		framework.ExpectEqual(len(pods.Items), int(completions), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
 		for _, pod := range pods.Items {
-			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
+			framework.ExpectEqual(pod.Status.Phase, v1.PodSucceeded, "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
 		}
+	})
+
+	/*
+		Testcase: Ensure that the pods associated with the job are removed once the job is deleted
+		Description: Create a job and ensure the associated pod count is equal to paralellism count. Delete the
+		job and ensure if the pods associated with the job have been removed
+	*/
+	ginkgo.It("should remove pods when job is deleted", func() {
+		ginkgo.By("Creating a job")
+		job := jobutil.NewTestJob("notTerminate", "all-pods-removed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
+
+		ginkgo.By("Delete the job")
+		err = framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to delete the job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure the pods associated with the job are also deleted")
+		err = jobutil.WaitForAllJobPodsGone(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 	})
 
 	// Pods sometimes fail, but eventually succeed.
@@ -210,7 +234,7 @@ var _ = SIGDescribe("Job", func() {
 			e2elog.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
 		}
 		for _, pod := range pods.Items {
-			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodFailed))
+			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)
 		}
 	})
 })

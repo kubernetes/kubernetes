@@ -111,6 +111,7 @@ func getAddonPhaseFlags(name string) []string {
 	if name == "all" || name == "kube-proxy" {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerBindPort,
 			options.NetworkingPodSubnet,
 		)

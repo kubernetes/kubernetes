@@ -39,7 +39,7 @@ import k8s_io_apimachinery_pkg_api_resource "k8s.io/apimachinery/pkg/api/resourc
 
 import k8s_io_api_core_v1 "k8s.io/api/core/v1"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -99,7 +99,7 @@ func (m *Overhead) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.PodFixed {
 			keysForPodFixed = append(keysForPodFixed, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForPodFixed)
+		sortkeys.Strings(keysForPodFixed)
 		for _, k := range keysForPodFixed {
 			dAtA[i] = 0xa
 			i++
@@ -313,7 +313,7 @@ func (this *Overhead) String() string {
 	for k := range this.PodFixed {
 		keysForPodFixed = append(keysForPodFixed, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForPodFixed)
+	sortkeys.Strings(keysForPodFixed)
 	mapStringForPodFixed := "k8s_io_api_core_v1.ResourceList{"
 	for _, k := range keysForPodFixed {
 		mapStringForPodFixed += fmt.Sprintf("%v: %v,", k, this.PodFixed[k8s_io_api_core_v1.ResourceName(k)])

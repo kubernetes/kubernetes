@@ -23,8 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -62,19 +61,19 @@ func StartApiserver() (string, ShutdownFunc) {
 // and the shutdown function to stop it.
 func StartScheduler(clientSet clientset.Interface) (factory.Configurator, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
-
-	evtBroadcaster := record.NewBroadcaster()
-	evtWatch := evtBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
-		Interface: clientSet.CoreV1().Events("")})
-
 	stopCh := make(chan struct{})
+	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
+		Interface: clientSet.EventsV1beta1().Events("")})
+
+	evtBroadcaster.StartRecordingToSink(stopCh)
+
 	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
 
 	config, err := schedulerConfigurator.CreateFromConfig(schedulerapi.Policy{})
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
-	config.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
+	config.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, "scheduler")
 
 	sched := scheduler.NewFromConfig(config)
 	scheduler.AddAllEventHandlers(sched,
@@ -93,7 +92,6 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 
 	shutdownFunc := func() {
 		klog.Infof("destroying scheduler")
-		evtWatch.Stop()
 		close(stopCh)
 		klog.Infof("destroyed scheduler")
 	}
@@ -120,6 +118,7 @@ func createSchedulerConfigurator(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,

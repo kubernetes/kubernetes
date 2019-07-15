@@ -77,6 +77,7 @@
         "k8s.io/api/batch/v2alpha1",
         "k8s.io/apiserver/pkg/registry/rest",
         "k8s.io/api/scheduling/v1alpha1",
+        "k8s.io/api/admissionregistration/v1",
         "k8s.io/api/admissionregistration/v1beta1",
         "k8s.io/api/authorization/v1",
         "k8s.io/api/settings/v1alpha1",
@@ -104,6 +105,7 @@
         "github.com/robfig/cron",
         "github.com/spf13/pflag",
         "github.com/stretchr/testify/assert",
+        "github.com/stretchr/testify/mock",
         "github.com/stretchr/testify/require",
         "github.com/google/gofuzz",
         "github.com/golang/protobuf/ptypes/wrappers",
@@ -148,6 +150,7 @@
         "k8s.io/client-go/listers/policy/v1beta1",
         "k8s.io/client-go/listers/rbac/v1",
         "k8s.io/client-go/listers/storage/v1",
+        "k8s.io/client-go/metadata",
         "k8s.io/client-go/pkg/version",
         "k8s.io/client-go/rest",
         "k8s.io/client-go/scale",
@@ -162,7 +165,8 @@
         "k8s.io/client-go/util/flowcontrol",
         "k8s.io/client-go/util/retry",
         "k8s.io/client-go/util/workqueue",
-	"k8s.io/client-go/transport"
+        "k8s.io/client-go/util/testing",
+        "k8s.io/client-go/transport"
       ]
     },
     {

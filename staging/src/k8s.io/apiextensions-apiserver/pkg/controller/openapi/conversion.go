@@ -65,6 +65,14 @@ func ToStructuralOpenAPIV2(in *structuralschema.Structural) *structuralschema.St
 				changed = true
 			}
 
+			if s.XPreserveUnknownFields {
+				// unknown fields break if items or properties are set in kubectl
+				s.Items = nil
+				s.Properties = nil
+
+				changed = true
+			}
+
 			return changed
 		},
 		// we drop all junctors above, and hence, never reach nested value validations

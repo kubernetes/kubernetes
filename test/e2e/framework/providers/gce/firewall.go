@@ -217,7 +217,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-" + instancePrefix + "-http-alt",
+		Name:         nodeTag + "-http-alt",
 		SourceRanges: []string{"0.0.0.0/0"},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{
@@ -232,7 +232,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-" + instancePrefix + "-nodeports",
+		Name:         nodeTag + "-nodeports",
 		SourceRanges: []string{"0.0.0.0/0"},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{

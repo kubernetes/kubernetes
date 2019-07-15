@@ -113,7 +113,8 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	// Now make sure they're spread across zones
 	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	framework.ExpectNoError(err)
-	gomega.Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames.List())).To(gomega.Equal(true))
+	ret, _ := checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
+	framework.ExpectEqual(ret, true)
 }
 
 // Find the name of the zone in which a Node is running
@@ -228,5 +229,6 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, ar
 	// Now make sure they're spread across zones
 	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	framework.ExpectNoError(err)
-	gomega.Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames.List())).To(gomega.Equal(true))
+	ret, _ := checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
+	framework.ExpectEqual(ret, true)
 }

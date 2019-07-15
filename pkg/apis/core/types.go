@@ -2857,6 +2857,13 @@ type PodDNSConfigOption struct {
 	Value *string
 }
 
+// IP address information. Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within
+//        the cluster.
+type PodIP struct {
+	IP string
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -2877,11 +2884,13 @@ type PodStatus struct {
 	// give the resources on this node to a higher priority pod that is created after preemption.
 	// +optional
 	NominatedNodeName string
-
 	// +optional
 	HostIP string
+
+	// PodIPs holds all of the known IP addresses allocated to the pod. Pods may be assigned AT MOST
+	// one value for each of IPv4 and IPv6.
 	// +optional
-	PodIP string
+	PodIPs []PodIP
 
 	// Date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.
@@ -3465,10 +3474,11 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// PodCIDR represents the pod IP range assigned to the node
+	// PodCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. It may
+	// contain AT MOST one value for each of IPv4 and IPv6.
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
 	// +optional
-	PodCIDR string
+	PodCIDRs []string
 
 	// ID of the node assigned by the cloud provider
 	// Note: format is "<ProviderName>://<ProviderSpecificNodeID>"
@@ -3727,9 +3737,6 @@ type NodeConditionType string
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
-	// NodeOutOfDisk means the kubelet will not accept new pods due to insufficient free disk
-	// space on the node.
-	NodeOutOfDisk NodeConditionType = "OutOfDisk"
 	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
 	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.

@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
 			framework.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
 		ginkgo.It("should run with an image specified user ID", func() {
 			name := "implicit-nonroot-uid"
@@ -154,7 +154,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
 			framework.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
 	})
 

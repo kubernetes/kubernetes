@@ -268,8 +268,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.
 			// Reflector doesn't assume bookmarks are returned at all (if the server do not support
 			// watch bookmarks, it will ignore this field).
-			// Disabled in Alpha release of watch bookmarks feature.
-			AllowWatchBookmarks: false,
+			AllowWatchBookmarks: true,
 		}
 
 		w, err := r.listerWatcher.Watch(options)

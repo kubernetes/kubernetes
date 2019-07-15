@@ -33,7 +33,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -87,7 +87,7 @@ func (m *ExternalMetricValue) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.MetricLabels {
 			keysForMetricLabels = append(keysForMetricLabels, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForMetricLabels)
+		sortkeys.Strings(keysForMetricLabels)
 		for _, k := range keysForMetricLabels {
 			dAtA[i] = 0x12
 			i++
@@ -233,7 +233,7 @@ func (this *ExternalMetricValue) String() string {
 	for k := range this.MetricLabels {
 		keysForMetricLabels = append(keysForMetricLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForMetricLabels)
+	sortkeys.Strings(keysForMetricLabels)
 	mapStringForMetricLabels := "map[string]string{"
 	for _, k := range keysForMetricLabels {
 		mapStringForMetricLabels += fmt.Sprintf("%v: %v,", k, this.MetricLabels[k])

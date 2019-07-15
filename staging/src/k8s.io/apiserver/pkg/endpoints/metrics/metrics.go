@@ -141,6 +141,13 @@ var (
 		},
 		[]string{"group", "version", "kind"},
 	)
+	WatchEvents = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_watch_events_total",
+			Help: "Number of events sent in watch clients",
+		},
+		[]string{"group", "version", "kind"},
+	)
 	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = prometheus.NewGaugeVec(
@@ -163,6 +170,7 @@ var (
 		DroppedRequests,
 		DeprecatedDroppedRequests,
 		RegisteredWatchers,
+		WatchEvents,
 		currentInflightRequests,
 	}
 )

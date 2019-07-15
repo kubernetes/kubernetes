@@ -216,15 +216,13 @@ func TestCopyShifting(t *testing.T) {
 }
 
 func BenchmarkDelayingQueue_AddAfter(b *testing.B) {
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-
 	fakeClock := clock.NewFakeClock(time.Now())
 	q := newDelayingQueue(fakeClock, "")
 
 	// Add items
 	for n := 0; n < b.N; n++ {
 		data := fmt.Sprintf("%d", n)
-		q.AddAfter(data, time.Duration(r.Int63n(int64(10*time.Minute))))
+		q.AddAfter(data, time.Duration(rand.Int63n(int64(10*time.Minute))))
 	}
 
 	// Exercise item removal as well

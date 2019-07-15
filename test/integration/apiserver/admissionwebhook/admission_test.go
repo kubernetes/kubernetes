@@ -124,6 +124,8 @@ var (
 	admissionExemptResources = map[schema.GroupVersionResource]bool{
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   true,
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): true,
+		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):        true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):      true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{

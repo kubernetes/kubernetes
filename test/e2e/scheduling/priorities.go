@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -146,7 +145,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
-		gomega.Expect(labelPod.Spec.NodeName).NotTo(gomega.Equal(nodeName))
+		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	ginkgo.It("Pod should avoid nodes that have avoidPod annotation", func() {
@@ -195,7 +194,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 		success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
 		framework.ExpectNoError(err)
-		gomega.Expect(success).To(gomega.Equal(true))
+		framework.ExpectEqual(success, true)
 
 		defer framework.RemoveAvoidPodsOffNode(cs, nodeName)
 
@@ -208,7 +207,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNoError(err)
 		ginkgo.By(fmt.Sprintf("Verify the pods should not scheduled to the node: %s", nodeName))
 		for _, pod := range testPods.Items {
-			gomega.Expect(pod.Spec.NodeName).NotTo(gomega.Equal(nodeName))
+			framework.ExpectNotEqual(pod.Spec.NodeName, nodeName)
 		}
 	})
 
@@ -239,7 +238,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ginkgo.By("Pod should prefer scheduled to the node don't have the taint.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(tolePod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(tolePod.Spec.NodeName, nodeName)
 
 		ginkgo.By("Trying to apply 10 taint on the first node.")
 		var tolerations []v1.Toleration
@@ -259,7 +258,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err = cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(tolePod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(tolePod.Spec.NodeName, nodeName)
 	})
 })
 
@@ -284,11 +283,11 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	ratio = math.Max(maxCPUFraction, maxMemFraction)
 	for _, node := range nodes {
 		memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
-		gomega.Expect(found).To(gomega.Equal(true))
+		framework.ExpectEqual(found, true)
 		memAllocatableVal := memAllocatable.Value()
 
 		cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-		gomega.Expect(found).To(gomega.Equal(true))
+		framework.ExpectEqual(found, true)
 		cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 		needCreateResource := v1.ResourceList{}
@@ -342,7 +341,7 @@ func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 		}
 	}
 	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-	gomega.Expect(found).To(gomega.Equal(true))
+	framework.ExpectEqual(found, true)
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 	floatOne := float64(1)
@@ -351,7 +350,7 @@ func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 		cpuFraction = floatOne
 	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
-	gomega.Expect(found).To(gomega.Equal(true))
+	framework.ExpectEqual(found, true)
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
 	if memFraction > floatOne {

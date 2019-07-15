@@ -619,6 +619,9 @@ function build-linux-node-labels {
   if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
     node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
   fi
+  if [[ -n "${MASTER_NODE_LABELS:-}" && "${master}" == "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${MASTER_NODE_LABELS}"
+  fi
   echo $node_labels
 }
 
@@ -2136,9 +2139,11 @@ function kube-up() {
     create-master
     create-nodes-firewall
     create-nodes-template
-    # Windows nodes take longer to boot and setup so create them first.
-    create-windows-nodes
-    create-linux-nodes
+    if [[ "${KUBE_CREATE_NODES}" == "true" ]]; then
+      # Windows nodes take longer to boot and setup so create them first.
+      create-windows-nodes
+      create-linux-nodes
+    fi
     check-cluster
   fi
 }
@@ -2793,18 +2798,21 @@ function create-linux-nodes() {
     this_mig_size=$((${instances_left} / (${NUM_MIGS}-${i}+1)))
     instances_left=$((instances_left-${this_mig_size}))
 
-    gcloud compute instance-groups managed \
-        create "${group_name}" \
-        --project "${PROJECT}" \
-        --zone "${ZONE}" \
-        --base-instance-name "${group_name}" \
-        --size "${this_mig_size}" \
-        --template "${template_name}" || true;
-    gcloud compute instance-groups managed wait-until-stable \
-        "${group_name}" \
-        --zone "${ZONE}" \
-        --project "${PROJECT}" \
-        --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true &
+    # Run instance-groups creation in parallel.
+    {
+      gcloud compute instance-groups managed \
+          create "${group_name}" \
+          --project "${PROJECT}" \
+          --zone "${ZONE}" \
+          --base-instance-name "${group_name}" \
+          --size "${this_mig_size}" \
+          --template "${template_name}" || true;
+      gcloud compute instance-groups managed wait-until-stable \
+          "${group_name}" \
+          --zone "${ZONE}" \
+          --project "${PROJECT}" \
+          --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true
+    } &
   done
   wait
 }
@@ -3505,12 +3513,12 @@ function test-setup() {
     --target-tags "${NODE_TAG}" \
     --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
-    "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
+    "${NODE_TAG}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null; do
+  while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-http-alt" 2> /dev/null; do
     if [[ $(($start + 1200)) -lt `date +%s` ]]; then
-      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-http-alt in ${NETWORK_PROJECT}" >&2
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-http-alt in ${NETWORK_PROJECT}" >&2
       exit 1
     fi
     sleep 5
@@ -3524,12 +3532,12 @@ function test-setup() {
     --target-tags "${NODE_TAG}" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --network "${NETWORK}" \
-    "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
+    "${NODE_TAG}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null; do
+  while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-nodeports" 2> /dev/null; do
     if [[ $(($start + 1200)) -lt `date +%s` ]]; then
-      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-nodeports in ${PROJECT}" >&2
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-nodeports in ${PROJECT}" >&2
       exit 1
     fi
     sleep 5
@@ -3542,8 +3550,8 @@ function test-teardown() {
   detect-project
   echo "Shutting down test cluster in background."
   delete-firewall-rules \
-    "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" \
-    "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
+    "${NODE_TAG}-http-alt" \
+    "${NODE_TAG}-nodeports"
   if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
     local zones=( ${E2E_ZONES} )
     # tear them down in reverse order, finally tearing down the master too.

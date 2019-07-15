@@ -54,11 +54,14 @@ type NodeInfo struct {
 	podsWithAffinity []*v1.Pod
 	usedPorts        HostPortInfo
 
-	// Total requested resource of all pods on this node.
-	// It includes assumed pods which scheduler sends binding to apiserver but
-	// didn't get it as scheduled yet.
+	// Total requested resources of all pods on this node. This includes assumed
+	// pods, which scheduler has sent for binding, but may not be scheduled yet.
 	requestedResource *Resource
-	nonzeroRequest    *Resource
+	// Total requested resources of all pods on this node with a minimum value
+	// applied to each container's CPU and memory requests. This does not reflect
+	// the actual resource requests for this node, but is used to avoid scheduling
+	// many zero-request pods onto one node.
+	nonzeroRequest *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
 	allocatableResource *Resource

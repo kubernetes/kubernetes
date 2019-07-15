@@ -3,6 +3,7 @@ cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
 pkg/apis/admission
+pkg/apis/admissionregistration/v1
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
 pkg/apis/apps
@@ -157,7 +158,6 @@ pkg/kubelet/container/testing
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
-pkg/kubelet/dockershim/network/cni
 pkg/kubelet/dockershim/network/cni/testing
 pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/hostport/testing
@@ -312,6 +312,7 @@ plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 staging/src/k8s.io/api/admission/v1beta1
+staging/src/k8s.io/api/admissionregistration/v1
 staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
@@ -455,9 +456,7 @@ staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
-staging/src/k8s.io/apiserver/pkg/storage/etcd/testing
-staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert
-staging/src/k8s.io/apiserver/pkg/storage/etcd/util
+staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert
 staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
@@ -494,6 +493,7 @@ staging/src/k8s.io/client-go/kubernetes/typed/core/v1
 staging/src/k8s.io/client-go/kubernetes/typed/core/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake
+staging/src/k8s.io/client-go/metadata/fake
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc
 staging/src/k8s.io/client-go/rest
 staging/src/k8s.io/client-go/rest/fake
@@ -537,6 +537,7 @@ staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/cri-api/pkg/apis/testing
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
+staging/src/k8s.io/kube-aggregator/pkg/apiserver
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubectl/pkg/util/templates

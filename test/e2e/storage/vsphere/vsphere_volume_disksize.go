@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,6 +90,6 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		ginkgo.By("Verifying if provisioned PV has the correct size")
 		expectedCapacity := resource.MustParse(expectedDiskSize)
 		pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-		gomega.Expect(pvCapacity.Value()).To(gomega.Equal(expectedCapacity.Value()))
+		framework.ExpectEqual(pvCapacity.Value(), expectedCapacity.Value())
 	})
 })

@@ -20,7 +20,6 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	utilio "k8s.io/utils/io"
 )
 
 type sourceURL struct {
@@ -93,7 +93,7 @@ func (s *sourceURL) extractFromURL() error {
 		return err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := utilio.ReadAtMost(resp.Body, maxConfigLength)
 	if err != nil {
 		return err
 	}

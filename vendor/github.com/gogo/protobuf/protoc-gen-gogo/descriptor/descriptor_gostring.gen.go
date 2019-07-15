@@ -34,11 +34,10 @@ package descriptor
 
 import fmt "fmt"
 import strings "strings"
-import github_com_gogo_protobuf_proto "github.com/gogo/protobuf/proto"
+import proto "github.com/gogo/protobuf/proto"
 import sort "sort"
 import strconv "strconv"
 import reflect "reflect"
-import proto "github.com/gogo/protobuf/proto"
 import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -270,7 +269,7 @@ func (this *EnumDescriptorProto) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 7)
+	s := make([]string, 0, 9)
 	s = append(s, "&descriptor.EnumDescriptorProto{")
 	if this.Name != nil {
 		s = append(s, "Name: "+valueToGoStringDescriptor(this.Name, "string")+",\n")
@@ -280,6 +279,30 @@ func (this *EnumDescriptorProto) GoString() string {
 	}
 	if this.Options != nil {
 		s = append(s, "Options: "+fmt.Sprintf("%#v", this.Options)+",\n")
+	}
+	if this.ReservedRange != nil {
+		s = append(s, "ReservedRange: "+fmt.Sprintf("%#v", this.ReservedRange)+",\n")
+	}
+	if this.ReservedName != nil {
+		s = append(s, "ReservedName: "+fmt.Sprintf("%#v", this.ReservedName)+",\n")
+	}
+	if this.XXX_unrecognized != nil {
+		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *EnumDescriptorProto_EnumReservedRange) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&descriptor.EnumDescriptorProto_EnumReservedRange{")
+	if this.Start != nil {
+		s = append(s, "Start: "+valueToGoStringDescriptor(this.Start, "int32")+",\n")
+	}
+	if this.End != nil {
+		s = append(s, "End: "+valueToGoStringDescriptor(this.End, "int32")+",\n")
 	}
 	if this.XXX_unrecognized != nil {
 		s = append(s, "XXX_unrecognized:"+fmt.Sprintf("%#v", this.XXX_unrecognized)+",\n")
@@ -729,8 +752,8 @@ func valueToGoStringDescriptor(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
-func extensionToGoStringDescriptor(m github_com_gogo_protobuf_proto.Message) string {
-	e := github_com_gogo_protobuf_proto.GetUnsafeExtensionsMap(m)
+func extensionToGoStringDescriptor(m proto.Message) string {
+	e := proto.GetUnsafeExtensionsMap(m)
 	if e == nil {
 		return "nil"
 	}

@@ -54,13 +54,14 @@ const (
 	// TODO (vladimirvivien) would be nice to name socket with a .sock extension
 	// for consistency.
 	csiAddrTemplate = "/var/lib/kubelet/plugins/%v/csi.sock"
-	csiTimeout      = 15 * time.Second
+	csiTimeout      = 2 * time.Minute
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
 	fsTypeBlockName = "block"
 
+	// CsiResyncPeriod is default resync period duration
 	// TODO: increase to something useful
-	csiResyncPeriod = time.Minute
+	CsiResyncPeriod = time.Minute
 )
 
 var deprecatedSocketDirVersions = []string{"0.1.0", "0.2.0", "0.3.0", "0.4.0"}

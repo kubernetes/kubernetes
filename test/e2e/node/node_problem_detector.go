@@ -67,7 +67,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 				}
 			}
 		}
-		gomega.Expect(len(hosts)).To(gomega.Equal(len(nodes.Items)))
+		framework.ExpectEqual(len(hosts), len(nodes.Items))
 
 		isStandaloneMode := make(map[string]bool)
 		cpuUsageStats := make(map[string][]float64)

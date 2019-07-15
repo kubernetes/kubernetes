@@ -2494,7 +2494,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 								Status:             v1.ConditionTrue,
 								LastTransitionTime: *tc.lastScaleTime,
 								Reason:             "TooFewReplicas",
-								Message:            "the desired replica count is more than the maximum replica count",
+								Message:            "the desired replica count is less than the minimum replica count",
 							},
 						},
 					},

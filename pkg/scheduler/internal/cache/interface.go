@@ -110,6 +110,9 @@ type Cache interface {
 	// RemoveCSINode removes overall CSI-related information about node.
 	RemoveCSINode(csiNode *storagev1beta1.CSINode) error
 
+	// GetNodeInfo returns the node object with node string.
+	GetNodeInfo(nodeName string) (*v1.Node, error)
+
 	// List lists all cached pods (including assumed ones).
 	List(labels.Selector) ([]*v1.Pod, error)
 

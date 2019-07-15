@@ -117,7 +117,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 			framework.ExpectNoError(err)
 			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
 			gomega.Expect(found).To(gomega.BeTrue(), "PSP annotation not found")
-			gomega.Expect(validated).To(gomega.Equal(expectedPSP.Name), "Unexpected validated PSP")
+			framework.ExpectEqual(validated, expectedPSP.Name, "Unexpected validated PSP")
 		})
 	})
 })

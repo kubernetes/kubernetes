@@ -1344,13 +1344,17 @@ func LoadClientset() (*clientset.Clientset, error) {
 //       need to use such a function and can instead
 //       use the UUID utility function.
 func RandomSuffix() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return strconv.Itoa(r.Int() % 10000)
+	return strconv.Itoa(rand.Intn(10000))
 }
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.Expect(actual).To(gomega.Equal(extra), explain...)
+}
+
+// ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
+func ExpectNotEqual(actual interface{}, extra interface{}, explain ...interface{}) {
+	gomega.Expect(actual).NotTo(gomega.Equal(extra), explain...)
 }
 
 // ExpectError expects an error happens, otherwise an exception raises

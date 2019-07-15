@@ -44,7 +44,7 @@ Copy a remote file from a Pod to a local file.
 {% sample lang="yaml" %}
 
 ```bash
-kubectl cp /tmp/foo <some-pod>:/tmp/bar
+kubectl cp <some-pod>:/tmp/foo /tmp/bar
 ```
 
 {% endmethod %}

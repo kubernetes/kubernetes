@@ -696,7 +696,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if len(pod.Status.Message) > 0 {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
+		// remove when .IP field is depreciated
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
+		describePodIPs(pod, w, "")
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
@@ -751,6 +753,17 @@ func printController(controllee metav1.Object) string {
 		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
 	}
 	return ""
+}
+
+func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
+	if len(pod.Status.PodIPs) == 0 {
+		w.Write(LEVEL_0, "%sIPs:\t<none>\n", space)
+		return
+	}
+	w.Write(LEVEL_0, "%sIPs:\n", space)
+	for _, ipInfo := range pod.Status.PodIPs {
+		w.Write(LEVEL_1, "IP:\t%s\n", ipInfo.IP)
+	}
 }
 
 func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
@@ -2949,8 +2962,13 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
 		w.Write(LEVEL_0, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
+		// remove when .PodCIDR is depreciated
 		if len(node.Spec.PodCIDR) > 0 {
 			w.Write(LEVEL_0, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
+		}
+
+		if len(node.Spec.PodCIDRs) > 0 {
+			w.Write(LEVEL_0, "PodCIDRs:\t%s\n", strings.Join(node.Spec.PodCIDRs, ","))
 		}
 		if len(node.Spec.ProviderID) > 0 {
 			w.Write(LEVEL_0, "ProviderID:\t%s\n", node.Spec.ProviderID)
@@ -3149,7 +3167,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
-						&hpa.Status.CurrentMetrics[i].External.Current.AverageValue != nil {
+						hpa.Status.CurrentMetrics[i].External.Current.AverageValue != nil {
 						current = hpa.Status.CurrentMetrics[i].External.Current.AverageValue.String()
 					}
 					w.Write(LEVEL_1, "%q (target average value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.AverageValue.String())
@@ -3847,7 +3865,11 @@ func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, er
 		w.Write(LEVEL_0, "\nSettings:\n")
 
 		w.Write(LEVEL_1, "Allow Privileged:\t%t\n", psp.Spec.Privileged)
-		w.Write(LEVEL_1, "Allow Privilege Escalation:\t%v\n", psp.Spec.AllowPrivilegeEscalation)
+		if psp.Spec.AllowPrivilegeEscalation != nil {
+			w.Write(LEVEL_1, "Allow Privilege Escalation:\t%t\n", *psp.Spec.AllowPrivilegeEscalation)
+		} else {
+			w.Write(LEVEL_1, "Allow Privilege Escalation:\t<unset>\n")
+		}
 		w.Write(LEVEL_1, "Default Add Capabilities:\t%v\n", capsToString(psp.Spec.DefaultAddCapabilities))
 		w.Write(LEVEL_1, "Required Drop Capabilities:\t%s\n", capsToString(psp.Spec.RequiredDropCapabilities))
 		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))

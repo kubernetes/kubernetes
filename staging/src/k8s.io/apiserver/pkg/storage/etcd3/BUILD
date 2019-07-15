@@ -12,6 +12,7 @@ go_test(
         "api_object_versioner_test.go",
         "compact_test.go",
         "event_test.go",
+        "healthcheck_test.go",
         "lease_manager_test.go",
         "store_test.go",
         "watcher_test.go",
@@ -56,6 +57,7 @@ go_library(
         "compact.go",
         "errors.go",
         "event.go",
+        "healthcheck.go",
         "lease_manager.go",
         "logger.go",
         "store.go",
@@ -97,6 +99,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/metrics:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/preflight:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

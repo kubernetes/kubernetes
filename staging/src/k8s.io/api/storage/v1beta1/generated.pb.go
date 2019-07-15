@@ -49,7 +49,7 @@ import math "math"
 
 import k8s_io_api_core_v1 "k8s.io/api/core/v1"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -444,7 +444,7 @@ func (m *StorageClass) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Parameters {
 			keysForParameters = append(keysForParameters, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForParameters)
+		sortkeys.Strings(keysForParameters)
 		for _, k := range keysForParameters {
 			dAtA[i] = 0x1a
 			i++
@@ -727,7 +727,7 @@ func (m *VolumeAttachmentStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.AttachmentMetadata {
 			keysForAttachmentMetadata = append(keysForAttachmentMetadata, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAttachmentMetadata)
+		sortkeys.Strings(keysForAttachmentMetadata)
 		for _, k := range keysForAttachmentMetadata {
 			dAtA[i] = 0x12
 			i++
@@ -1169,7 +1169,7 @@ func (this *StorageClass) String() string {
 	for k := range this.Parameters {
 		keysForParameters = append(keysForParameters, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForParameters)
+	sortkeys.Strings(keysForParameters)
 	mapStringForParameters := "map[string]string{"
 	for _, k := range keysForParameters {
 		mapStringForParameters += fmt.Sprintf("%v: %v,", k, this.Parameters[k])
@@ -1253,7 +1253,7 @@ func (this *VolumeAttachmentStatus) String() string {
 	for k := range this.AttachmentMetadata {
 		keysForAttachmentMetadata = append(keysForAttachmentMetadata, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAttachmentMetadata)
+	sortkeys.Strings(keysForAttachmentMetadata)
 	mapStringForAttachmentMetadata := "map[string]string{"
 	for _, k := range keysForAttachmentMetadata {
 		mapStringForAttachmentMetadata += fmt.Sprintf("%v: %v,", k, this.AttachmentMetadata[k])

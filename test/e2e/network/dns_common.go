@@ -549,7 +549,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 		e2elog.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
 		return false, nil
 	}))
-	gomega.Expect(len(failed)).To(gomega.Equal(0))
+	framework.ExpectEqual(len(failed), 0)
 }
 
 func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string) {

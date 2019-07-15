@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -57,7 +58,7 @@ func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
 	}
 }
 
-func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {}
+func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]sets.Empty) {}
 
 func (f *fakePodWorkers) ForgetWorker(uid types.UID) {}
 
@@ -219,9 +220,9 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
 
-	desiredPods := map[types.UID]empty{}
-	desiredPods[types.UID(2)] = empty{}
-	desiredPods[types.UID(14)] = empty{}
+	desiredPods := map[types.UID]sets.Empty{}
+	desiredPods[types.UID(2)] = sets.Empty{}
+	desiredPods[types.UID(14)] = sets.Empty{}
 	podWorkers.ForgetNonExistingPodWorkers(desiredPods)
 	if len(podWorkers.podUpdates) != 2 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
@@ -233,7 +234,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("No updates channel for pod 14")
 	}
 
-	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]empty{})
+	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]sets.Empty{})
 	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}

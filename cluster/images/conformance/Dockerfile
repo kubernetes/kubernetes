@@ -18,6 +18,7 @@ COPY ginkgo /usr/local/bin/
 COPY e2e.test /usr/local/bin/
 COPY kubectl /usr/local/bin/
 COPY run_e2e.sh /run_e2e.sh
+COPY gorunner /gorunner
 COPY cluster /kubernetes/cluster
 WORKDIR /usr/local/bin
 

@@ -396,10 +396,17 @@ message PodSandboxStatusRequest {
     bool verbose = 2;
 }
 
+// PodIP represents an ip of a Pod
+message PodIP{
+    // an ip is a string representation of an IPv4 or an IPv6
+    string ip = 1;
+}
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
 message PodSandboxNetworkStatus {
     // IP address of the PodSandbox.
     string ip = 1;
+    // list of additional ips (not inclusive of PodSandboxNetworkStatus.Ip) of the PodSandBoxNetworkStatus
+    repeated PodIP additional_ips  = 2;
 }
 
 // Namespace contains paths to the namespaces.

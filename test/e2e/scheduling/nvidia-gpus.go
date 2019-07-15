@@ -168,11 +168,23 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	return rsgather
 }
 
+func getGPUsPerPod() int64 {
+	var gpusPerPod int64
+	gpuPod := makeCudaAdditionDevicePluginTestPod()
+	for _, container := range gpuPod.Spec.Containers {
+		if val, ok := container.Resources.Limits[gpuResourceName]; ok {
+			gpusPerPod += (&val).Value()
+		}
+	}
+	return gpusPerPod
+}
+
 func testNvidiaGPUs(f *framework.Framework) {
 	rsgather := SetupNVIDIAGPUNode(f, true)
-	e2elog.Logf("Creating as many pods as there are Nvidia GPUs and have the pods run a CUDA app")
+	gpuPodNum := getGPUsAvailable(f) / getGPUsPerPod()
+	e2elog.Logf("Creating %d pods and have the pods run a CUDA app", gpuPodNum)
 	podList := []*v1.Pod{}
-	for i := int64(0); i < getGPUsAvailable(f); i++ {
+	for i := int64(0); i < gpuPodNum; i++ {
 		podList = append(podList, f.PodClient().Create(makeCudaAdditionDevicePluginTestPod()))
 	}
 	e2elog.Logf("Wait for all test pods to succeed")

@@ -715,6 +715,12 @@ var pkgNamesInUse = make(map[string][]*FileDescriptor)
 // Pkg is the candidate name.  If f is nil, it's a builtin package like "proto" and
 // has no file descriptor.
 func RegisterUniquePackageName(pkg string, f *FileDescriptor) string {
+	if f == nil {
+		// For builtin and standard lib packages, try to use only
+		// the last component of the package path.
+		pkg = pkg[strings.LastIndex(pkg, "/")+1:]
+	}
+
 	// Convert dots to underscores before finding a unique alias.
 	pkg = strings.Map(badToUnderscore, pkg)
 
@@ -2337,7 +2343,7 @@ func (g *Generator) generateMessage(message *Descriptor) {
 		case typename == "string":
 			def = strconv.Quote(def)
 		case typename == "[]byte":
-			def = "[]byte(" + strconv.Quote(def) + ")"
+			def = "[]byte(" + strconv.Quote(unescape(def)) + ")"
 			kind = "var "
 		case def == "inf", def == "-inf", def == "nan":
 			// These names are known to, and defined by, the protocol language.
@@ -3053,6 +3059,67 @@ func (g *Generator) generateMessage(message *Descriptor) {
 	if gogoproto.ImportsGoGoProto(g.file.FileDescriptorProto) && gogoproto.RegistersGolangProto(g.file.FileDescriptorProto) {
 		g.addInitf("%s.RegisterType((*%s)(nil), %q)", g.Pkg["golang_proto"], ccTypeName, fullName)
 	}
+}
+
+var escapeChars = [256]byte{
+	'a': '\a', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', 'v': '\v', '\\': '\\', '"': '"', '\'': '\'', '?': '?',
+}
+
+// unescape reverses the "C" escaping that protoc does for default values of bytes fields.
+// It is best effort in that it effectively ignores malformed input. Seemingly invalid escape
+// sequences are conveyed, unmodified, into the decoded result.
+func unescape(s string) string {
+	// NB: Sadly, we can't use strconv.Unquote because protoc will escape both
+	// single and double quotes, but strconv.Unquote only allows one or the
+	// other (based on actual surrounding quotes of its input argument).
+
+	var out []byte
+	for len(s) > 0 {
+		// regular character, or too short to be valid escape
+		if s[0] != '\\' || len(s) < 2 {
+			out = append(out, s[0])
+			s = s[1:]
+		} else if c := escapeChars[s[1]]; c != 0 {
+			// escape sequence
+			out = append(out, c)
+			s = s[2:]
+		} else if s[1] == 'x' || s[1] == 'X' {
+			// hex escape, e.g. "\x80
+			if len(s) < 4 {
+				// too short to be valid
+				out = append(out, s[:2]...)
+				s = s[2:]
+				continue
+			}
+			v, err := strconv.ParseUint(s[2:4], 16, 8)
+			if err != nil {
+				out = append(out, s[:4]...)
+			} else {
+				out = append(out, byte(v))
+			}
+			s = s[4:]
+		} else if '0' <= s[1] && s[1] <= '7' {
+			// octal escape, can vary from 1 to 3 octal digits; e.g., "\0" "\40" or "\164"
+			// so consume up to 2 more bytes or up to end-of-string
+			n := len(s[1:]) - len(strings.TrimLeft(s[1:], "01234567"))
+			if n > 3 {
+				n = 3
+			}
+			v, err := strconv.ParseUint(s[1:1+n], 8, 8)
+			if err != nil {
+				out = append(out, s[:1+n]...)
+			} else {
+				out = append(out, byte(v))
+			}
+			s = s[1+n:]
+		} else {
+			// bad escape, just propagate the slash as-is
+			out = append(out, s[0])
+			s = s[1:]
+		}
+	}
+
+	return string(out)
 }
 
 func (g *Generator) generateExtension(ext *ExtensionDescriptor) {

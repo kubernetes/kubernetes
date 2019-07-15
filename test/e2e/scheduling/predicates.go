@@ -36,7 +36,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -108,7 +107,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, node := range nodeList.Items {
 			e2elog.Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
-			gomega.Expect(found).To(gomega.Equal(true))
+			framework.ExpectEqual(found, true)
 			totalPodCapacity += podCapacity.Value()
 		}
 
@@ -148,10 +147,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
-			gomega.Expect(found).To(gomega.Equal(true))
-			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
-			if nodeMaxAllocatable < allocatable.MilliValue() {
-				nodeMaxAllocatable = allocatable.MilliValue()
+			framework.ExpectEqual(found, true)
+			nodeToAllocatableMap[node.Name] = allocatable.Value()
+			if nodeMaxAllocatable < allocatable.Value() {
+				nodeMaxAllocatable = allocatable.Value()
 			}
 		}
 		framework.WaitForStableCluster(cs, masterNodes)
@@ -161,19 +160,20 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				e2elog.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				e2elog.Logf("Pod %v requesting local ephemeral resource =%v on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
 			}
 		}
 
 		var podsNeededForSaturation int
+		var ephemeralStoragePerPod int64
 
-		milliEphemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
+		ephemeralStoragePerPod = nodeMaxAllocatable / maxNumberOfPods
 
-		e2elog.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
+		e2elog.Logf("Using pod capacity: %v", ephemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
-			e2elog.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
-			podsNeededForSaturation += (int)(leftAllocatable / milliEphemeralStoragePerPod)
+			e2elog.Logf("Node: %v has local ephemeral resource allocatable: %v", name, leftAllocatable)
+			podsNeededForSaturation += (int)(leftAllocatable / ephemeralStoragePerPod)
 		}
 
 		ginkgo.By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster local ephemeral resource and trying to start another one", podsNeededForSaturation))
@@ -189,10 +189,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					Labels: map[string]string{"name": ""},
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+							v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 						},
 						Requests: v1.ResourceList{
-							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+							v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 						},
 					},
 				}), true, e2elog.Logf))
@@ -203,7 +203,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 				},
 			},
 		}
@@ -247,7 +247,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
 			// Find allocatable amount of CPU.
 			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-			gomega.Expect(found).To(gomega.Equal(true))
+			framework.ExpectEqual(found, true)
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
 				nodeMaxAllocatable = allocatable.MilliValue()
@@ -383,7 +383,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -470,7 +470,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -513,7 +513,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
 		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(deployedPod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -684,7 +684,7 @@ func getRequestedCPU(pod v1.Pod) int64 {
 func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
-		result += container.Resources.Requests.StorageEphemeral().MilliValue()
+		result += container.Resources.Requests.StorageEphemeral().Value()
 	}
 	return result
 }
@@ -715,7 +715,7 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, n
 	}
 	success, err := common.ObserveEventAfterAction(f, predicate, action)
 	framework.ExpectNoError(err)
-	gomega.Expect(success).To(gomega.Equal(true))
+	framework.ExpectEqual(success, true)
 }
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
@@ -733,8 +733,8 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 		return ""
 	}
 
-	gomega.Expect(len(notScheduledPods)).To(gomega.Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	gomega.Expect(len(scheduledPods)).To(gomega.Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	framework.ExpectEqual(len(scheduledPods), expectedScheduled, printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 // verifyReplicasResult is wrapper of verifyResult for a group pods with same "name: labelName" label, which means they belong to same RC
@@ -751,8 +751,8 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 		return ""
 	}
 
-	gomega.Expect(len(notScheduledPods)).To(gomega.Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	gomega.Expect(len(scheduledPods)).To(gomega.Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	framework.ExpectEqual(len(scheduledPods), expectedScheduled, printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {

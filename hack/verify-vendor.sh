@@ -83,6 +83,9 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     echo "hack/update-vendor.sh" >&2
     ret=1
   fi
+
+  # Verify we are pinned to matching levels
+  hack/lint-dependencies.sh >&2
 popd > /dev/null 2>&1
 
 if [[ ${ret} -gt 0 ]]; then

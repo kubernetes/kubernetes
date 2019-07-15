@@ -90,7 +90,7 @@ func VerifyExecInPodFail(pod *v1.Pod, bashExec string, exitCode int) {
 	if err != nil {
 		if err, ok := err.(uexec.CodeExitError); ok {
 			actualExitCode := err.ExitStatus()
-			gomega.Expect(actualExitCode).To(gomega.Equal(exitCode),
+			framework.ExpectEqual(actualExitCode, exitCode,
 				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
 				bashExec, exitCode, actualExitCode, err)
 		} else {

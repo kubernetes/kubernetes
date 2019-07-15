@@ -94,7 +94,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion
 				}
-				gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
+				framework.ExpectEqual(list.ResourceVersion, lastRV)
 				if shouldCheckRemainingItem() {
 					if list.GetContinue() == "" {
 						gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
@@ -104,7 +104,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					}
 				}
 				for _, item := range list.Items {
-					gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
+					framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
 					found++
 				}
 				if len(list.Continue) == 0 {
@@ -174,7 +174,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		opts.Continue = inconsistentToken
 		list, err = client.List(opts)
 		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
-		gomega.Expect(list.ResourceVersion).ToNot(gomega.Equal(firstRV))
+		framework.ExpectNotEqual(list.ResourceVersion, firstRV)
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
 
@@ -187,7 +187,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 		}
 		for _, item := range list.Items {
-			gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
+			framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
 			found++
 		}
 
@@ -207,9 +207,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 			e2elog.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
-			gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
+			framework.ExpectEqual(list.ResourceVersion, lastRV)
 			for _, item := range list.Items {
-				gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
+				framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
 				found++
 			}
 			if len(list.Continue) == 0 {

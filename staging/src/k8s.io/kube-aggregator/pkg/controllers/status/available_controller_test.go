@@ -90,6 +90,8 @@ func newRemoteAPIService(name string) *apiregistration.APIService {
 	return &apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: apiregistration.APIServiceSpec{
+			Group:   strings.SplitN(name, ".", 2)[0],
+			Version: strings.SplitN(name, ".", 2)[1],
 			Service: &apiregistration.ServiceReference{
 				Namespace: "foo",
 				Name:      "bar",

@@ -26,7 +26,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -95,7 +94,7 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
 
-	gomega.Expect(stderr).To(gomega.Equal("Access is denied."))
+	framework.ExpectEqual(stderr, "Access is denied.")
 
 }
 
@@ -128,12 +127,12 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	framework.ExpectNoError(errRW, msg)
 
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	gomega.Expect(stderr).To(gomega.Equal("Access is denied."))
+	framework.ExpectEqual(stderr, "Access is denied.")
 
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)
-	gomega.Expect(readout).To(gomega.Equal("windows-volume-test"))
+	framework.ExpectEqual(readout, "windows-volume-test")
 	framework.ExpectNoError(err, readmsg)
 }
 

@@ -23,7 +23,7 @@ readonly reset=$(tput sgr0)
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 ALL_TARGETS=$(make -C "${KUBE_ROOT}" PRINT_HELP=y -rpn | sed -n -e '/^$/ { n ; /^[^ .#][^ ]*:/ { s/:.*$// ; p ; } ; }' | sort)
-CMD_TARGETS=$(cd "${KUBE_ROOT}/cmd"; find . -type d -mindepth 1 -maxdepth 1 | cut -c 3-)
+CMD_TARGETS=$(cd "${KUBE_ROOT}/cmd"; find . -mindepth 1 -maxdepth 1 -type d | cut -c 3-)
 CMD_FLAG=false
 
 echo "--------------------------------------------------------------------------------"

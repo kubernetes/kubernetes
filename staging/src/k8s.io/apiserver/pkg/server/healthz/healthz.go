@@ -25,10 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/klog"
 )
 
 // HealthzChecker is a named healthz checker.
@@ -181,7 +181,7 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 		// always be verbose on failure
 		if failed {
 			klog.V(2).Infof("%vhealthz check failed", verboseOut.String())
-			http.Error(w, fmt.Sprintf("%vhealthz check failed", verboseOut.String()), http.StatusInternalServerError)
+			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%vhealthz check failed", verboseOut.String()), http.StatusInternalServerError)
 			return
 		}
 

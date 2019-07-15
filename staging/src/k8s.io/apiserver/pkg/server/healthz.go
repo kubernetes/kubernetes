@@ -36,7 +36,12 @@ func (s *GenericAPIServer) AddHealthzChecks(checks ...healthz.HealthzChecker) er
 func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthzChecker) error {
 	s.readyzLock.Lock()
 	defer s.readyzLock.Unlock()
+	return s.addReadyzChecks(checks...)
+}
 
+// addReadyzChecks allows you to add a HealthzCheck to readyz.
+// premise: readyzLock has been obtained
+func (s *GenericAPIServer) addReadyzChecks(checks ...healthz.HealthzChecker) error {
 	if s.readyzChecksInstalled {
 		return fmt.Errorf("unable to add because the readyz endpoint has already been created")
 	}
@@ -56,9 +61,9 @@ func (s *GenericAPIServer) installHealthz() {
 
 // installReadyz creates the readyz endpoint for this server.
 func (s *GenericAPIServer) installReadyz(stopCh <-chan struct{}) {
-	s.AddReadyzChecks(shutdownCheck{stopCh})
 	s.readyzLock.Lock()
 	defer s.readyzLock.Unlock()
+	s.addReadyzChecks(shutdownCheck{stopCh})
 
 	s.readyzChecksInstalled = true
 
@@ -99,7 +104,9 @@ func (s *GenericAPIServer) AddDelayedHealthzChecks(delay time.Duration, checks .
 		s.healthzChecks = append(s.healthzChecks, delayedHealthCheck(check, s.healthzClock, s.maxStartupSequenceDuration))
 	}
 
-	return s.AddReadyzChecks(checks...)
+	s.readyzLock.Lock()
+	defer s.readyzLock.Unlock()
+	return s.addReadyzChecks(checks...)
 }
 
 // delayedHealthCheck wraps a health check which will not fail until the explicitly defined delay has elapsed.

@@ -33,6 +33,8 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
+const etcdImage = "3.3.10-1"
+
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {
 	switch TestContext.Provider {
@@ -62,7 +64,7 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+targetVersion,
 		"STORAGE_BACKEND="+targetStorage,
-		"TEST_ETCD_IMAGE=3.3.10-1")
+		"TEST_ETCD_IMAGE="+etcdImage)
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -82,7 +84,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.3.10-1")
+			"TEST_ETCD_IMAGE="+etcdImage)
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
 		// implicit etcd upgrades to simulate the user entering "y".

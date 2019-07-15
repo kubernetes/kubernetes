@@ -384,7 +384,6 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 		return nil, fmt.Errorf("No SSH tunnels currently open. Were the targets able to accept an ssh-key for user %q?", l.user)
 	}
 	// Prefer same tunnel as kubelet
-	// TODO: Change l.entries to a map of address->tunnel
 	for _, entry := range l.entries {
 		if entry.Address == addr {
 			return entry.Tunnel, nil

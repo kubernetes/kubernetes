@@ -101,7 +101,7 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 		// This should never happen but if it does it could mean there was a race and instance
 		// has been deleted
 		if err != nil {
-			fetchErr := fmt.Errorf("Error fetching instance %s for volume %s", instanceID, diskName)
+			fetchErr := fmt.Errorf("error fetching instance %s for volume %s", instanceID, diskName)
 			klog.Warning(fetchErr)
 			return awsDiskInfo, false, fetchErr
 		}

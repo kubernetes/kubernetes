@@ -42,6 +42,7 @@ type DeleteFlags struct {
 	Timeout        *time.Duration
 	Wait           *bool
 	Output         *string
+	Raw            *string
 }
 
 func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) *DeleteOptions {
@@ -93,6 +94,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Wait != nil {
 		options.WaitForDeletion = *f.Wait
 	}
+	if f.Raw != nil {
+		options.Raw = *f.Raw
+	}
 
 	return options
 }
@@ -135,6 +139,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Output != nil {
 		cmd.Flags().StringVarP(f.Output, "output", "o", *f.Output, "Output mode. Use \"-o name\" for shorter output (resource/name).")
 	}
+	if f.Raw != nil {
+		cmd.Flags().StringVar(f.Raw, "raw", *f.Raw, "Raw URI to DELETE to the server.  Uses the transport specified by the kubeconfig file.")
+	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
@@ -153,6 +160,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	fieldSelector := ""
 	timeout := time.Duration(0)
 	wait := true
+	raw := ""
 
 	filenames := []string{}
 	recursive := false
@@ -175,6 +183,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		Timeout:        &timeout,
 		Wait:           &wait,
 		Output:         &output,
+		Raw:            &raw,
 	}
 }
 

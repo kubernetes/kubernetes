@@ -50,7 +50,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	}
 
 	// Start informer for CSIDrivers.
-	factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
+	factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	go factory.Start(wait.NeverStop)
@@ -77,7 +77,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
-		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
+		wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
 			return csiDriverInformer.Informer().HasSynced(), nil
 		})
 	}
@@ -935,7 +935,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach))
-			factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
+			factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,
 				client,

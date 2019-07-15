@@ -981,7 +981,7 @@ func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificat
 		if c.err != nil {
 			return nil, c.err
 		}
-		return nil, fmt.Errorf("Create error")
+		return nil, fmt.Errorf("create error")
 	}
 	csrReply := certificates.CertificateSigningRequest{}
 	csrReply.UID = "fake-uid"
@@ -993,7 +993,7 @@ func (c fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		if c.err != nil {
 			return nil, c.err
 		}
-		return nil, fmt.Errorf("Watch error")
+		return nil, fmt.Errorf("watch error")
 	}
 	return &fakeWatch{
 		failureType:    c.failureType,

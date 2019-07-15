@@ -57,6 +57,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/options/encryptionconfig:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",

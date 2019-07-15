@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsexec "k8s.io/utils/exec"
+	utilsnet "k8s.io/utils/net"
 )
 
 const (
@@ -920,7 +921,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if ip.To4() == nil && ip.To16() != nil {
+			if utilsnet.IsIPv6(ip) {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -986,7 +987,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			)
 			if !addIPv6Checks {
 				if ip := net.ParseIP(ipstr); ip != nil {
-					if ip.To4() == nil && ip.To16() != nil {
+					if utilsnet.IsIPv6(ip) {
 						addIPv6Checks = true
 					}
 				}
@@ -1015,7 +1016,7 @@ func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.Clust
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// addCommonChecks is a helper function to deplicate checks that are common between both the
+// addCommonChecks is a helper function to duplicate checks that are common between both the
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)

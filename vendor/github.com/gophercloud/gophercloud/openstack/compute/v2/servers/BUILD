@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "errors.go",
+        "microversions.go",
         "requests.go",
         "results.go",
         "urls.go",

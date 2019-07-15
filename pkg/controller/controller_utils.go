@@ -337,17 +337,17 @@ func (u *UIDTrackingControllerExpectations) GetUIDs(controllerKey string) sets.S
 
 // ExpectDeletions records expectations for the given deleteKeys, against the given controller.
 func (u *UIDTrackingControllerExpectations) ExpectDeletions(rcKey string, deletedKeys []string) error {
+	expectedUIDs := sets.NewString()
+	for _, k := range deletedKeys {
+		expectedUIDs.Insert(k)
+	}
+	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	u.uidStoreLock.Lock()
 	defer u.uidStoreLock.Unlock()
 
 	if existing := u.GetUIDs(rcKey); existing != nil && existing.Len() != 0 {
 		klog.Errorf("Clobbering existing delete keys: %+v", existing)
 	}
-	expectedUIDs := sets.NewString()
-	for _, k := range deletedKeys {
-		expectedUIDs.Insert(k)
-	}
-	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	if err := u.uidStore.Add(&UIDSet{expectedUIDs, rcKey}); err != nil {
 		return err
 	}
@@ -573,7 +573,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
-	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
+	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
 	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)

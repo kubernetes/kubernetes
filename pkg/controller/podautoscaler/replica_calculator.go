@@ -22,7 +22,7 @@ import (
 	"time"
 
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -259,19 +259,19 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 
 // GetObjectPerPodMetricReplicas calculates the desired replica count based on a target metric utilization (as a milli-value)
 // for the given object in the given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(currentReplicas int32, targetAverageUtilization int64, metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, targetAverageUtilization int64, metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
 	utilization, timestamp, err = c.metricsClient.GetObjectMetric(metricName, namespace, objectRef, metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v on %s %s/%s", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
-	replicaCount = currentReplicas
+	replicaCount = statusReplicas
 	usageRatio := float64(utilization) / (float64(targetAverageUtilization) * float64(replicaCount))
 	if math.Abs(1.0-usageRatio) > c.tolerance {
 		// update number of replicas if change is large enough
 		replicaCount = int32(math.Ceil(float64(utilization) / float64(targetAverageUtilization)))
 	}
-	utilization = int64(math.Ceil(float64(utilization) / float64(currentReplicas)))
+	utilization = int64(math.Ceil(float64(utilization) / float64(statusReplicas)))
 	return replicaCount, utilization, timestamp, nil
 }
 
@@ -334,7 +334,7 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 // GetExternalPerPodMetricReplicas calculates the desired replica count based on a
 // target metric value per pod (as a milli-value) for the external metric in the
 // given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
 	metricLabelSelector, err := metav1.LabelSelectorAsSelector(metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, err
@@ -348,13 +348,13 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 		utilization = utilization + val
 	}
 
-	replicaCount = currentReplicas
+	replicaCount = statusReplicas
 	usageRatio := float64(utilization) / (float64(targetUtilizationPerPod) * float64(replicaCount))
 	if math.Abs(1.0-usageRatio) > c.tolerance {
 		// update number of replicas if the change is large enough
 		replicaCount = int32(math.Ceil(float64(utilization) / float64(targetUtilizationPerPod)))
 	}
-	utilization = int64(math.Ceil(float64(utilization) / float64(currentReplicas)))
+	utilization = int64(math.Ceil(float64(utilization) / float64(statusReplicas)))
 	return replicaCount, utilization, timestamp, nil
 }
 
@@ -365,11 +365,18 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
 			continue
 		}
+		// Pending pods are ignored.
+		if pod.Status.Phase == v1.PodPending {
+			ignoredPods.Insert(pod.Name)
+			continue
+		}
+		// Pods missing metrics.
 		metric, found := metrics[pod.Name]
 		if !found {
 			missingPods.Insert(pod.Name)
 			continue
 		}
+		// Unready pods are ignored.
 		if resource == v1.ResourceCPU {
 			var ignorePod bool
 			_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)

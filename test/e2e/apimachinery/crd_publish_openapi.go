@@ -159,6 +159,74 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
+	ginkgo.It("works for CRD preserving unknown fields at the schema root", func() {
+		crd, err := setupCRDAndVerifySchema(f, schemaPreserveRoot, nil, "unknown-at-root", "v1")
+		if err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
+		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
+			e2elog.Failf("failed to create random CR %s for CRD that allows unknown properties at the root: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
+			e2elog.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+
+		ginkgo.By("kubectl explain works to explain CR")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, fmt.Sprintf(`(?s)KIND:.*%s`, crd.Crd.Spec.Names.Kind)); err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		if err := cleanupCRD(f, crd); err != nil {
+			e2elog.Failf("%v", err)
+		}
+	})
+
+	ginkgo.It("works for CRD preserving unknown fields in an embedded object", func() {
+		crd, err := setupCRDAndVerifySchema(f, schemaPreserveNested, nil, "unknown-in-nested", "v1")
+		if err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		randomCR := fmt.Sprintf(`{%s,"spec":{"b":[{"c":"d"}]}}`, meta)
+		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
+			e2elog.Failf("failed to create random CR %s for CRD that allows unknown properties in a nested object: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
+			e2elog.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+
+		ginkgo.By("kubectl explain works to explain CR")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*preserve-unknown-properties in nested field for Testing`); err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		if err := cleanupCRD(f, crd); err != nil {
+			e2elog.Failf("%v", err)
+		}
+	})
+
 	ginkgo.It("works for multiple CRDs of different groups", func() {
 		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
@@ -337,18 +405,23 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 })
 
 func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
+	expect := schema
+	if schema == nil {
+		// to be backwards compatible, we expect CRD controller to treat
+		// CRD with nil schema specially and publish an empty schema
+		expect = []byte(`type: object`)
+	}
+	return setupCRDAndVerifySchema(f, schema, expect, groupSuffix, versions...)
+}
+
+func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s-test-%s.k8s.io", f.BaseName, groupSuffix)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
 	}
 
-	expect := schema
 	props := &v1beta1.JSONSchemaProps{}
-	if schema == nil {
-		// to be backwards compatible, we expect CRD controller to treat
-		// CRD with nil schema specially and publish an empty schema
-		expect = []byte(`type: object`)
-	} else {
+	if schema != nil {
 		if err := yaml.Unmarshal(schema, props); err != nil {
 			return nil, err
 		}
@@ -412,7 +485,8 @@ func mustSucceedMultipleTimes(n int, f func() (bool, error)) func() (bool, error
 	}
 }
 
-// waitForDefinition waits for given definition showing up in swagger with given schema
+// waitForDefinition waits for given definition showing up in swagger with given schema.
+// If schema is nil, only the existence of the given name is checked.
 func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) error {
 	expect := spec.Schema{}
 	if err := convertJSONSchemaProps(schema, &expect); err != nil {
@@ -424,10 +498,12 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		if !ok {
 			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not found", name)
 		}
-		// drop properties and extension that we added
-		dropDefaults(&d)
-		if !apiequality.Semantic.DeepEqual(expect, d) {
-			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not match; expect: %v, actual: %v", name, expect, d)
+		if schema != nil {
+			// drop properties and extension that we added
+			dropDefaults(&d)
+			if !apiequality.Semantic.DeepEqual(expect, d) {
+				return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not match; expect: %v, actual: %v", name, expect, d)
+			}
 		}
 		return true, ""
 	})
@@ -589,6 +665,48 @@ properties:
   spec:
     description: Specification of Waldo
     type: object
+    properties:
+      dummy:
+        description: Dummy property.
+        type: object
+  status:
+    description: Status of Waldo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object`)
+
+var schemaPreserveRoot = []byte(`description: preserve-unknown-properties at root for Testing
+x-kubernetes-preserve-unknown-fields: true
+type: object
+properties:
+  spec:
+    description: Specification of Waldo
+    type: object
+    properties:
+      dummy:
+        description: Dummy property.
+        type: object
+  status:
+    description: Status of Waldo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object`)
+
+var schemaPreserveNested = []byte(`description: preserve-unknown-properties in nested field for Testing
+type: object
+properties:
+  spec:
+    description: Specification of Waldo
+    type: object
+    x-kubernetes-preserve-unknown-fields: true
     properties:
       dummy:
         description: Dummy property.

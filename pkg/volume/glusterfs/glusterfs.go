@@ -95,6 +95,9 @@ const (
 	glusterTypeAnn          = "gluster.org/type"
 	glusterDescAnn          = "Gluster-Internal: Dynamically provisioned PV"
 	heketiVolIDAnn          = "gluster.kubernetes.io/heketi-volume-id"
+
+	// Error string returned by heketi
+	errIDNotFound = "Id not found"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -371,18 +374,26 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		}
 	}
 
-	//Add backup-volfile-servers and auto_unmount options.
-	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
-	options = append(options, "auto_unmount")
-
-	mountOptions := volutil.JoinMountOptions(b.mountOptions, options)
-	// with `backup-volfile-servers` mount option in place, it is not required to
-	// iterate over all the servers in the addrlist. A mount attempt with this option
-	// will fetch all the servers mentioned in the backup-volfile-servers list.
-	// Refer to backup-volfile-servers @ http://docs.gluster.org/en/latest/Administrator%20Guide/Setting%20Up%20Clients/
-
 	if (len(addrlist) > 0) && (addrlist[0] != "") {
 		ip := addrlist[rand.Intn(len(addrlist))]
+
+		// Add backup-volfile-servers and auto_unmount options.
+		// When ip is also in backup-volfile-servers, there will be a warning:
+		// "gf_remember_backup_volfile_server] 0-glusterfs: failed to set volfile server: File exists".
+		addr.Delete(ip)
+		backups := addr.List()
+		// Avoid an invalid empty backup-volfile-servers option.
+		if len(backups) > 0 {
+			options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
+		}
+		options = append(options, "auto_unmount")
+
+		mountOptions := volutil.JoinMountOptions(b.mountOptions, options)
+		// with `backup-volfile-servers` mount option in place, it is not required to
+		// iterate over all the servers in the addrlist. A mount attempt with this option
+		// will fetch all the servers mentioned in the backup-volfile-servers list.
+		// Refer to backup-volfile-servers @ http://docs.gluster.org/en/latest/Administrator%20Guide/Setting%20Up%20Clients/
+
 		errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", mountOptions)
 		if errs == nil {
 			klog.Infof("successfully mounted directory %s", dir)
@@ -660,8 +671,11 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	}
 	err = cli.VolumeDelete(volumeID)
 	if err != nil {
-		klog.Errorf("failed to delete volume %s: %v", volumeName, err)
-		return err
+		if dstrings.TrimSpace(err.Error()) != errIDNotFound {
+			klog.Errorf("failed to delete volume %s: %v", volumeName, err)
+			return fmt.Errorf("failed to delete volume %s: %v", volumeName, err)
+		}
+		klog.V(2).Infof("volume %s not present in heketi, ignoring", volumeName)
 	}
 	klog.V(2).Infof("volume %s deleted successfully", volumeName)
 

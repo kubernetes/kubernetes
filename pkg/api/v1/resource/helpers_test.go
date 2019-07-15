@@ -63,6 +63,31 @@ func TestDefaultResourceHelpers(t *testing.T) {
 	}
 }
 
+func TestGetResourceRequest(t *testing.T) {
+	cases := []struct {
+		pod           *v1.Pod
+		res           v1.ResourceName
+		expectedValue int64
+		expectedError error
+	}{
+		{
+			pod:           getPod("foo", "9", "", "", ""),
+			res:           v1.ResourceCPU,
+			expectedValue: 9000,
+		},
+		{
+			pod:           getPod("foo", "", "", "90Mi", ""),
+			res:           v1.ResourceMemory,
+			expectedValue: 94371840,
+		},
+	}
+	as := assert.New(t)
+	for idx, tc := range cases {
+		actual := GetResourceRequest(tc.pod, tc.res)
+		as.Equal(actual, tc.expectedValue, "expected test case [%d] to return %q; got %q instead", idx, tc.expectedValue, actual)
+	}
+}
+
 func TestExtractResourceValue(t *testing.T) {
 	cases := []struct {
 		fs            *v1.ResourceFieldSelector

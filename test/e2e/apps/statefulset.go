@@ -156,9 +156,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			pod := pods.Items[0]
 			controllerRef := metav1.GetControllerOf(&pod)
 			gomega.Expect(controllerRef).ToNot(gomega.BeNil())
-			gomega.Expect(controllerRef.Kind).To(gomega.Equal(ss.Kind))
-			gomega.Expect(controllerRef.Name).To(gomega.Equal(ss.Name))
-			gomega.Expect(controllerRef.UID).To(gomega.Equal(ss.UID))
+			framework.ExpectEqual(controllerRef.Kind, ss.Kind)
+			framework.ExpectEqual(controllerRef.Name, ss.Name)
+			framework.ExpectEqual(controllerRef.UID, ss.UID)
 
 			ginkgo.By("Orphaning one of the stateful set's pods")
 			f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
@@ -297,23 +297,21 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = e2esset.WaitForStatus(c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
-					ss.Namespace, ss.Name, updateRevision, currentRevision))
+			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, updateRevision, currentRevision))
 			pods := e2esset.GetPodList(c, ss)
 			for i := range pods.Items {
-				gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-					fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-						currentRevision))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
 			}
 			newImage := NewWebserverImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
-			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
 			ss, err = e2esset.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
@@ -322,23 +320,20 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new revision")
 			ss = e2esset.WaitForStatus(c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
-				"Current revision should not equal update revision during rolling update")
+			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
 
 			ginkgo.By("Not applying an update when the partition is greater than the number of replicas")
 			for i := range pods.Items {
-				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage),
-					fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Spec.Containers[0].Image,
-						oldImage))
-				gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-					fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-						currentRevision))
+				framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					oldImage))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
 			}
 
 			ginkgo.By("Performing a canary update")
@@ -368,31 +363,27 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, pods = e2esset.WaitForPartitionedRollingUpdate(c, ss)
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
-					gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage),
-						fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Spec.Containers[0].Image,
-							oldImage))
-					gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-						fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-							currentRevision))
+					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Spec.Containers[0].Image,
+						oldImage))
+					framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+						currentRevision))
 				} else {
-					gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage),
-						fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Spec.Containers[0].Image,
-							newImage))
-					gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision),
-						fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-							updateRevision))
+					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Spec.Containers[0].Image,
+						newImage))
+					framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+						updateRevision))
 				}
 			}
 
@@ -404,31 +395,27 @@ var _ = SIGDescribe("StatefulSet", func() {
 			pods = e2esset.GetPodList(c, ss)
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
-					gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage),
-						fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Spec.Containers[0].Image,
-							oldImage))
-					gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-						fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-							currentRevision))
+					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Spec.Containers[0].Image,
+						oldImage))
+					framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+						currentRevision))
 				} else {
-					gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage),
-						fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Spec.Containers[0].Image,
-							newImage))
-					gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision),
-						fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
-							pods.Items[i].Namespace,
-							pods.Items[i].Name,
-							pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-							updateRevision))
+					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Spec.Containers[0].Image,
+						newImage))
+					framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+						updateRevision))
 				}
 			}
 
@@ -449,40 +436,35 @@ var _ = SIGDescribe("StatefulSet", func() {
 				ss, pods = e2esset.WaitForPartitionedRollingUpdate(c, ss)
 				for i := range pods.Items {
 					if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
-						gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage),
-							fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
-								pods.Items[i].Namespace,
-								pods.Items[i].Name,
-								pods.Items[i].Spec.Containers[0].Image,
-								oldImage))
-						gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-							fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
-								pods.Items[i].Namespace,
-								pods.Items[i].Name,
-								pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-								currentRevision))
+						framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
+							pods.Items[i].Namespace,
+							pods.Items[i].Name,
+							pods.Items[i].Spec.Containers[0].Image,
+							oldImage))
+						framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+							pods.Items[i].Namespace,
+							pods.Items[i].Name,
+							pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+							currentRevision))
 					} else {
-						gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage),
-							fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
-								pods.Items[i].Namespace,
-								pods.Items[i].Name,
-								pods.Items[i].Spec.Containers[0].Image,
-								newImage))
-						gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision),
-							fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
-								pods.Items[i].Namespace,
-								pods.Items[i].Name,
-								pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-								updateRevision))
+						framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
+							pods.Items[i].Namespace,
+							pods.Items[i].Name,
+							pods.Items[i].Spec.Containers[0].Image,
+							newImage))
+						framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
+							pods.Items[i].Namespace,
+							pods.Items[i].Name,
+							pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+							updateRevision))
 					}
 				}
 			}
-			gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
-					ss.Namespace,
-					ss.Name,
-					ss.Status.CurrentRevision,
-					updateRevision))
+			framework.ExpectEqual(ss.Status.CurrentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
+				ss.Namespace,
+				ss.Name,
+				ss.Status.CurrentRevision,
+				updateRevision))
 
 		})
 
@@ -500,17 +482,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = e2esset.WaitForStatus(c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
-					ss.Namespace, ss.Name, updateRevision, currentRevision))
+			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, updateRevision, currentRevision))
 			pods := e2esset.GetPodList(c, ss)
 			for i := range pods.Items {
-				gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-					fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-						currentRevision))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
 			}
 
 			ginkgo.By("Restoring Pods to the current revision")
@@ -521,18 +501,17 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss = e2esset.GetStatefulSet(c, ss.Namespace, ss.Name)
 			pods = e2esset.GetPodList(c, ss)
 			for i := range pods.Items {
-				gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-					fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-						currentRevision))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
 			}
 			newImage := NewWebserverImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
-			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
 			ss, err = e2esset.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
@@ -541,8 +520,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new revision")
 			ss = e2esset.WaitForStatus(c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
-				"Current revision should not equal update revision during rolling update")
+			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
 
 			ginkgo.By("Recreating Pods at the new revision")
 			e2esset.DeleteStatefulPodAtIndex(c, 0, ss)
@@ -552,18 +530,16 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss = e2esset.GetStatefulSet(c, ss.Namespace, ss.Name)
 			pods = e2esset.GetPodList(c, ss)
 			for i := range pods.Items {
-				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage),
-					fmt.Sprintf("Pod %s/%s has image %s not equal to new image %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Spec.Containers[0].Image,
-						newImage))
-				gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision),
-					fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-						updateRevision))
+				framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf("Pod %s/%s has image %s not equal to new image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					newImage))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					updateRevision))
 			}
 		})
 
@@ -798,8 +774,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if err != nil {
 				e2elog.Failf("Failed to get scale subresource: %v", err)
 			}
-			gomega.Expect(scale.Spec.Replicas).To(gomega.Equal(int32(1)))
-			gomega.Expect(scale.Status.Replicas).To(gomega.Equal(int32(1)))
+			framework.ExpectEqual(scale.Spec.Replicas, int32(1))
+			framework.ExpectEqual(scale.Status.Replicas, int32(1))
 
 			ginkgo.By("updating a scale subresource")
 			scale.Spec.Replicas = 2
@@ -807,14 +783,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if err != nil {
 				e2elog.Failf("Failed to put scale subresource: %v", err)
 			}
-			gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
+			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
 			if err != nil {
 				e2elog.Failf("Failed to get statefulset resource: %v", err)
 			}
-			gomega.Expect(*(ss.Spec.Replicas)).To(gomega.Equal(int32(2)))
+			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
 		})
 	})
 
@@ -1085,17 +1061,15 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 	ss = e2esset.WaitForStatus(c, ss)
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
-	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision),
-		fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
-			ss.Namespace, ss.Name, updateRevision, currentRevision))
+	framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+		ss.Namespace, ss.Name, updateRevision, currentRevision))
 	pods := e2esset.GetPodList(c, ss)
 	for i := range pods.Items {
-		gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
-			fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
-				pods.Items[i].Namespace,
-				pods.Items[i].Name,
-				pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-				currentRevision))
+		framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+			pods.Items[i].Namespace,
+			pods.Items[i].Name,
+			pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+			currentRevision))
 	}
 	e2esset.SortStatefulPods(pods)
 	err = e2esset.BreakPodHTTPProbe(ss, &pods.Items[1])
@@ -1105,7 +1079,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
-	gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+	framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
 	ss, err = e2esset.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
@@ -1114,8 +1088,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	ginkgo.By("Creating a new revision")
 	ss = e2esset.WaitForStatus(c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
-		"Current revision should not equal update revision during rolling update")
+	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Updating Pods in reverse ordinal order")
 	pods = e2esset.GetPodList(c, ss)
@@ -1124,25 +1097,22 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	framework.ExpectNoError(err)
 	ss, pods = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
 	ss, pods = e2esset.WaitForRollingUpdate(c, ss)
-	gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(updateRevision),
-		fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
-			ss.Namespace,
-			ss.Name,
-			ss.Status.CurrentRevision,
-			updateRevision))
+	framework.ExpectEqual(ss.Status.CurrentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
+		ss.Namespace,
+		ss.Name,
+		ss.Status.CurrentRevision,
+		updateRevision))
 	for i := range pods.Items {
-		gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage),
-			fmt.Sprintf(" Pod %s/%s has image %s not have new image %s",
-				pods.Items[i].Namespace,
-				pods.Items[i].Name,
-				pods.Items[i].Spec.Containers[0].Image,
-				newImage))
-		gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision),
-			fmt.Sprintf("Pod %s/%s revision %s is not equal to update revision %s",
-				pods.Items[i].Namespace,
-				pods.Items[i].Name,
-				pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-				updateRevision))
+		framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf(" Pod %s/%s has image %s not have new image %s",
+			pods.Items[i].Namespace,
+			pods.Items[i].Name,
+			pods.Items[i].Spec.Containers[0].Image,
+			newImage))
+		framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to update revision %s",
+			pods.Items[i].Namespace,
+			pods.Items[i].Name,
+			pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+			updateRevision))
 	}
 
 	ginkgo.By("Rolling back to a previous revision")
@@ -1157,10 +1127,8 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	framework.ExpectNoError(err)
 	ss = e2esset.WaitForStatus(c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
-		"Current revision should not equal update revision during roll back")
-	gomega.Expect(priorRevision).To(gomega.Equal(updateRevision),
-		"Prior revision should equal update revision during roll back")
+	framework.ExpectEqual(priorRevision, updateRevision, "Prior revision should equal update revision during roll back")
+	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during roll back")
 
 	ginkgo.By("Rolling back update in reverse ordinal order")
 	pods = e2esset.GetPodList(c, ss)
@@ -1168,25 +1136,22 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	e2esset.RestorePodHTTPProbe(ss, &pods.Items[1])
 	ss, pods = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
 	ss, pods = e2esset.WaitForRollingUpdate(c, ss)
-	gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(priorRevision),
-		fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal prior revision %s on rollback completion",
-			ss.Namespace,
-			ss.Name,
-			ss.Status.CurrentRevision,
-			updateRevision))
+	framework.ExpectEqual(ss.Status.CurrentRevision, priorRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal prior revision %s on rollback completion",
+		ss.Namespace,
+		ss.Name,
+		ss.Status.CurrentRevision,
+		updateRevision))
 
 	for i := range pods.Items {
-		gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage),
-			fmt.Sprintf("Pod %s/%s has image %s not equal to previous image %s",
-				pods.Items[i].Namespace,
-				pods.Items[i].Name,
-				pods.Items[i].Spec.Containers[0].Image,
-				oldImage))
-		gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(priorRevision),
-			fmt.Sprintf("Pod %s/%s revision %s is not equal to prior revision %s",
-				pods.Items[i].Namespace,
-				pods.Items[i].Name,
-				pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
-				priorRevision))
+		framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to previous image %s",
+			pods.Items[i].Namespace,
+			pods.Items[i].Name,
+			pods.Items[i].Spec.Containers[0].Image,
+			oldImage))
+		framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], priorRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to prior revision %s",
+			pods.Items[i].Namespace,
+			pods.Items[i].Name,
+			pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+			priorRevision))
 	}
 }

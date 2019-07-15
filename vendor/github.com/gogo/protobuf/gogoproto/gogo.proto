@@ -33,6 +33,7 @@ import "google/protobuf/descriptor.proto";
 
 option java_package = "com.google.protobuf";
 option java_outer_classname = "GoGoProtos";
+option go_package = "github.com/gogo/protobuf/gogoproto";
 
 extend google.protobuf.EnumOptions {
 	optional bool goproto_enum_prefix = 62001;

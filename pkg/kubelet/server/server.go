@@ -856,7 +856,7 @@ var statusesNoTracePred = httplog.StatusIsNot(
 
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer httplog.NewLogged(req, &w).StacktraceWhen(statusesNoTracePred).Log()
+	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred)
 
 	// monitor http requests
 	var serverType string
@@ -878,7 +878,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	startTime := time.Now()
 	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
 
-	s.restfulCont.ServeHTTP(w, req)
+	handler.ServeHTTP(w, req)
 }
 
 // prometheusHostAdapter adapts the HostInterface to the interface expected by the

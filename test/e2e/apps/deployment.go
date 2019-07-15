@@ -247,7 +247,7 @@ func testDeleteDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
 	framework.ExpectNoError(err)
-	gomega.Expect(newRS).NotTo(gomega.Equal(nilRs))
+	framework.ExpectNotEqual(newRS, nilRs)
 	stopDeployment(c, ns, deploymentName)
 }
 
@@ -297,7 +297,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
 	framework.ExpectNoError(err)
-	gomega.Expect(len(allOldRSs)).Should(gomega.Equal(1))
+	framework.ExpectEqual(len(allOldRSs), 1)
 }
 
 func testRecreateDeployment(f *framework.Framework) {
@@ -497,8 +497,8 @@ func testRolloverDeployment(f *framework.Framework) {
 }
 
 func ensureReplicas(rs *appsv1.ReplicaSet, replicas int32) {
-	gomega.Expect(*rs.Spec.Replicas).Should(gomega.Equal(replicas))
-	gomega.Expect(rs.Status.Replicas).Should(gomega.Equal(replicas))
+	framework.ExpectEqual(*rs.Spec.Replicas, replicas)
+	framework.ExpectEqual(rs.Status.Replicas, replicas)
 }
 
 func randomScale(d *appsv1.Deployment, i int) {
@@ -652,7 +652,7 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 
 	e2elog.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
 	rsList := listDeploymentReplicaSets(c, ns, podLabels)
-	gomega.Expect(len(rsList.Items)).Should(gomega.Equal(1))
+	framework.ExpectEqual(len(rsList.Items), 1)
 
 	e2elog.Logf("Obtaining the ReplicaSet's UID")
 	orphanedRSUID := rsList.Items[0].UID
@@ -683,10 +683,10 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 
 	e2elog.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
 	rsList = listDeploymentReplicaSets(c, ns, podLabels)
-	gomega.Expect(len(rsList.Items)).Should(gomega.Equal(1))
+	framework.ExpectEqual(len(rsList.Items), 1)
 
 	e2elog.Logf("Verifying the ReplicaSet has the same UID as the orphaned ReplicaSet")
-	gomega.Expect(rsList.Items[0].UID).Should(gomega.Equal(orphanedRSUID))
+	framework.ExpectEqual(rsList.Items[0].UID, orphanedRSUID)
 }
 
 // testProportionalScalingDeployment tests that when a RollingUpdate Deployment is scaled in the middle
@@ -769,7 +769,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 
 	// Second rollout's replicaset should have 0 available replicas.
 	e2elog.Logf("Verifying that the second rollout's replicaset has .status.availableReplicas = 0")
-	gomega.Expect(secondRS.Status.AvailableReplicas).Should(gomega.Equal(int32(0)))
+	framework.ExpectEqual(secondRS.Status.AvailableReplicas, int32(0))
 
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas

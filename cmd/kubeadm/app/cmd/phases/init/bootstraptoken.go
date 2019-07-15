@@ -31,7 +31,7 @@ import (
 var (
 	bootstrapTokenLongDesc = cmdutil.LongDesc(`
 		Bootstrap tokens are used for establishing bidirectional trust between a node joining
-		the cluster and a the control-plane node.
+		the cluster and a control-plane node.
 
 		This command makes all the configurations required to make bootstrap tokens works
 		and then creates an initial token.

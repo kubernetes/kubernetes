@@ -165,7 +165,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		framework.ExpectNoError(err, "error setting labels on node")
 		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
-		gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(daemonSetLabels), 1)
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, ds, []string{newNode.Name}))
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
 		err = checkDaemonStatus(f, dsName)
@@ -184,7 +184,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ds, err = c.AppsV1().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		framework.ExpectNoError(err, "error patching daemon set")
 		daemonSetLabels, _ = separateDaemonSetNodeLabels(greenNode.Labels)
-		gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(daemonSetLabels), 1)
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, ds, []string{greenNode.Name}))
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
 		err = checkDaemonStatus(f, dsName)
@@ -228,7 +228,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		framework.ExpectNoError(err, "error setting labels on node")
 		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
-		gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(daemonSetLabels), 1)
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, ds, []string{newNode.Name}))
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
 		err = checkDaemonStatus(f, dsName)
@@ -294,7 +294,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		waitForHistoryCreated(c, ns, label, 1)
 		first := curHistory(listDaemonHistories(c, ns, label), ds)
 		firstHash := first.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
-		gomega.Expect(first.Revision).To(gomega.Equal(int64(1)))
+		framework.ExpectEqual(first.Revision, int64(1))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash)
 
 		ginkgo.By("Update daemon pods image.")
@@ -315,8 +315,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectNoError(err)
 		waitForHistoryCreated(c, ns, label, 2)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
-		gomega.Expect(cur.Revision).To(gomega.Equal(int64(2)))
-		gomega.Expect(cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]).NotTo(gomega.Equal(firstHash))
+		framework.ExpectEqual(cur.Revision, int64(2))
+		framework.ExpectNotEqual(cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey], firstHash)
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash)
 	})
 
@@ -343,7 +343,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		waitForHistoryCreated(c, ns, label, 1)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		hash := cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
-		gomega.Expect(cur.Revision).To(gomega.Equal(int64(1)))
+		framework.ExpectEqual(cur.Revision, int64(1))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 
 		ginkgo.By("Update daemon pods image.")
@@ -372,7 +372,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		waitForHistoryCreated(c, ns, label, 2)
 		cur = curHistory(listDaemonHistories(c, ns, label), ds)
 		hash = cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
-		gomega.Expect(cur.Revision).To(gomega.Equal(int64(2)))
+		framework.ExpectEqual(cur.Revision, int64(2))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 	})
 
@@ -423,11 +423,11 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		}
 		schedulableNodes = framework.GetReadySchedulableNodesOrDie(c)
 		if len(schedulableNodes.Items) < 2 {
-			gomega.Expect(len(existingPods)).To(gomega.Equal(0))
+			framework.ExpectEqual(len(existingPods), 0)
 		} else {
-			gomega.Expect(len(existingPods)).NotTo(gomega.Equal(0))
+			framework.ExpectNotEqual(len(existingPods), 0)
 		}
-		gomega.Expect(len(newPods)).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(len(newPods), 0)
 
 		e2elog.Logf("Roll back the DaemonSet before rollout is complete")
 		rollbackDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *appsv1.DaemonSet) {
@@ -721,7 +721,7 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 		podHash := pod.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
 		gomega.Expect(len(podHash)).To(gomega.BeNumerically(">", 0))
 		if len(hash) > 0 {
-			gomega.Expect(podHash).To(gomega.Equal(hash))
+			framework.ExpectEqual(podHash, hash)
 		}
 	}
 }
@@ -767,7 +767,7 @@ func curHistory(historyList *appsv1.ControllerRevisionList, ds *appsv1.DaemonSet
 			foundCurHistories++
 		}
 	}
-	gomega.Expect(foundCurHistories).To(gomega.Equal(1))
+	framework.ExpectEqual(foundCurHistories, 1)
 	gomega.Expect(curHistory).NotTo(gomega.BeNil())
 	return curHistory
 }

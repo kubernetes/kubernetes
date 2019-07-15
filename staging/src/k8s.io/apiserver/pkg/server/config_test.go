@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,6 +32,39 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
+
+func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
+	// All of these should do nothing (not panic, no side-effects)
+	cfgGens := []func() *rest.Config{
+		func() *rest.Config { return nil },
+		func() *rest.Config { return &rest.Config{} },
+		func() *rest.Config { return &rest.Config{BearerToken: "mu"} },
+	}
+	authcGens := []func() *AuthenticationInfo{
+		func() *AuthenticationInfo { return nil },
+		func() *AuthenticationInfo { return &AuthenticationInfo{} },
+	}
+	authzGens := []func() *AuthorizationInfo{
+		func() *AuthorizationInfo { return nil },
+		func() *AuthorizationInfo { return &AuthorizationInfo{} },
+	}
+	for _, cfgGen := range cfgGens {
+		for _, authcGen := range authcGens {
+			for _, authzGen := range authzGens {
+				pConfig := cfgGen()
+				pAuthc := authcGen()
+				pAuthz := authzGen()
+				AuthorizeClientBearerToken(pConfig, pAuthc, pAuthz)
+				if before, after := authcGen(), pAuthc; !reflect.DeepEqual(before, after) {
+					t.Errorf("AuthorizeClientBearerToken(%v, %#+v, %v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
+				}
+				if before, after := authzGen(), pAuthz; !reflect.DeepEqual(before, after) {
+					t.Errorf("AuthorizeClientBearerToken(%v, %v, %#+v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
+				}
+			}
+		}
+	}
+}
 
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)

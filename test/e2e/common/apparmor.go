@@ -26,8 +26,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -139,7 +137,7 @@ done`, testCmd)
 
 	// Verify Pod affinity colocated the Pods.
 	loader := getRunningLoaderPod(f)
-	gomega.Expect(pod.Spec.NodeName).To(gomega.Equal(loader.Spec.NodeName))
+	framework.ExpectEqual(pod.Spec.NodeName, loader.Spec.NodeName)
 
 	return pod
 }

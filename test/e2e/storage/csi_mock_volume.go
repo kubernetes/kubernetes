@@ -463,7 +463,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
-					gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+					framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 				}
 
 				// if node expansion is not required PVC should be resized as well
@@ -476,7 +476,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 					inProgressConditions := pvc.Status.Conditions
 					if len(inProgressConditions) > 0 {
-						gomega.Expect(inProgressConditions[0].Type).To(gomega.Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
+						framework.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
 					}
 
 					ginkgo.By("Deleting the previously created pod")
@@ -548,7 +548,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
-				gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 
 			})
 		}

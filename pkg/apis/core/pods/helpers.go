@@ -24,20 +24,28 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
-// ContainerVisitorWithPath is called with each container and the field.Path to that container
-type ContainerVisitorWithPath func(container *api.Container, path *field.Path)
+// ContainerVisitorWithPath is called with each container and the field.Path to that container,
+// and returns true if visiting should continue.
+type ContainerVisitorWithPath func(container *api.Container, path *field.Path) bool
 
 // VisitContainersWithPath invokes the visitor function with a pointer to the spec
 // of every container in the given pod spec and the field.Path to that container.
-func VisitContainersWithPath(podSpec *api.PodSpec, visitor ContainerVisitorWithPath) {
+// If visitor returns false, visiting is short-circuited. VisitContainersWithPath returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainersWithPath(podSpec *api.PodSpec, visitor ContainerVisitorWithPath) bool {
 	path := field.NewPath("spec", "initContainers")
 	for i := range podSpec.InitContainers {
-		visitor(&podSpec.InitContainers[i], path.Index(i))
+		if !visitor(&podSpec.InitContainers[i], path.Index(i)) {
+			return false
+		}
 	}
 	path = field.NewPath("spec", "containers")
 	for i := range podSpec.Containers {
-		visitor(&podSpec.Containers[i], path.Index(i))
+		if !visitor(&podSpec.Containers[i], path.Index(i)) {
+			return false
+		}
 	}
+	return true
 }
 
 // ConvertDownwardAPIFieldLabel converts the specified downward API field label

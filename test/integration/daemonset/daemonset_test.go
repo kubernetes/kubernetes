@@ -37,7 +37,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-base/featuregate"
@@ -110,6 +110,7 @@ func setupScheduler(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       100,
@@ -134,14 +135,14 @@ func setupScheduler(
 		informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
+		Interface: cs.EventsV1beta1().Events(""),
+	})
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
-		v1.EventSource{Component: v1.DefaultSchedulerName},
+		v1.DefaultSchedulerName,
 	)
-	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
-		Interface: cs.CoreV1().Events(""),
-	})
+	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	algorithmprovider.ApplyFeatureGates()
 

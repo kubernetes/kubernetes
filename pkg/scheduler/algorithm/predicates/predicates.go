@@ -196,26 +196,6 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 	return c.PersistentVolumeClaims(namespace).Get(name)
 }
 
-// CachedNodeInfo implements NodeInfo
-type CachedNodeInfo struct {
-	corelisters.NodeLister
-}
-
-// GetNodeInfo returns cached data for the node 'id'.
-func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
-	node, err := c.Get(id)
-
-	if apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
-	}
-
-	return node, nil
-}
-
 // StorageClassInfo interface represents anything that can get a storage class object by class name.
 type StorageClassInfo interface {
 	GetStorageClassInfo(className string) (*storagev1.StorageClass, error)
@@ -281,11 +261,11 @@ func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 // NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
 // are already mounted. If there is already a volume mounted on that node, another pod that uses the same volume
 // can't be scheduled there.
-// This is GCE, Amazon EBS, and Ceph RBD specific for now:
+// This is GCE, Amazon EBS, ISCSI and Ceph RBD specific for now:
 // - GCE PD allows multiple mounts as long as they're all read-only
 // - AWS EBS forbids any two pods mounting the same volume ID
-// - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image.
-// - ISCSI forbids if any two pods share at least same IQN, LUN and Target
+// - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image, and the image is read-only
+// - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	for _, v := range pod.Spec.Volumes {

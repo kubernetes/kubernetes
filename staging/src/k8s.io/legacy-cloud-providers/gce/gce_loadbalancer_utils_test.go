@@ -43,7 +43,6 @@ const (
 	eventReasonManualChange = "LoadBalancerManualChange"
 	eventMsgFirewallChange  = "Firewall change required by network admin"
 	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
-	errStrLbNoHosts         = "Cannot EnsureLoadBalancer() with no hosts"
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
 )

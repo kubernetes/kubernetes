@@ -54,7 +54,7 @@ type EndpointsHandler interface {
 	// OnEndpointsUpdate is called whenever modification of an existing
 	// endpoints object is observed.
 	OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints)
-	// OnEndpointsDelete is called whever deletion of an existing endpoints
+	// OnEndpointsDelete is called whenever deletion of an existing endpoints
 	// object is observed.
 	OnEndpointsDelete(endpoints *v1.Endpoints)
 	// OnEndpointsSynced is called once all the initial event handlers were

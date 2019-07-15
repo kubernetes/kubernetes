@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
-		gomega.Expect(pvc).ToNot(gomega.Equal(nil))
+		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 
@@ -124,8 +124,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		updatedStorageMetrics := waitForDetachAndGrabMetrics(storageOpMetrics, metricsGrabber)
 
-		gomega.Expect(len(updatedStorageMetrics.latencyMetrics)).ToNot(gomega.Equal(0), "Error fetching c-m updated storage metrics")
-		gomega.Expect(len(updatedStorageMetrics.statusMetrics)).ToNot(gomega.Equal(0), "Error fetching c-m updated storage metrics")
+		framework.ExpectNotEqual(len(updatedStorageMetrics.latencyMetrics), 0, "Error fetching c-m updated storage metrics")
+		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
 
 		volumeOperations := []string{"volume_provision", "volume_detach", "volume_attach"}
 
@@ -166,7 +166,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pvc.Spec.StorageClassName = &invalidSc.Name
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err, "failed to create PVC %s/%s", pvc.Namespace, pvc.Name)
-		gomega.Expect(pvc).ToNot(gomega.Equal(nil))
+		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 
@@ -186,7 +186,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(err, "failed to get controller manager metrics")
 		updatedStorageMetrics := getControllerStorageMetrics(updatedControllerMetrics)
 
-		gomega.Expect(len(updatedStorageMetrics.statusMetrics)).ToNot(gomega.Equal(0), "Error fetching c-m updated storage metrics")
+		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
 		verifyMetricCount(storageOpMetrics, updatedStorageMetrics, "volume_provision", true)
 	})
 
@@ -194,7 +194,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
-		gomega.Expect(pvc).ToNot(gomega.Equal(nil))
+		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
@@ -251,7 +251,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
-		gomega.Expect(pvc).ToNot(gomega.Equal(nil))
+		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
@@ -282,7 +282,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
-		gomega.Expect(pvc).ToNot(gomega.Equal(nil))
+		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
@@ -312,7 +312,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
-		gomega.Expect(pvc).ToNot(gomega.Equal(nil))
+		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
@@ -415,8 +415,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// should be 4, and the elements should be bound pv count, unbound pv count, bound
 		// pvc count, unbound pvc count in turn.
 		validator := func(metricValues []map[string]int64) {
-			gomega.Expect(len(metricValues)).To(gomega.Equal(4),
-				"Wrong metric size: %d", len(metricValues))
+			framework.ExpectEqual(len(metricValues), 4, "Wrong metric size: %d", len(metricValues))
 
 			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
@@ -431,8 +430,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				// test suit are equal to expectValues.
 				actualValues := calculateRelativeValues(originMetricValues[i],
 					getPVControllerMetrics(controllerMetrics, metric.name, metric.dimension))
-				gomega.Expect(actualValues).To(gomega.Equal(expectValues),
-					"Wrong pv controller metric %s(%s): wanted %v, got %v",
+				framework.ExpectEqual(actualValues, expectValues, "Wrong pv controller metric %s(%s): wanted %v, got %v",
 					metric.name, metric.dimension, expectValues, actualValues)
 			}
 		}
@@ -660,7 +658,7 @@ func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string
 			}
 		}
 	}
-	gomega.Expect(errCount).To(gomega.Equal(0), "Found invalid samples")
+	framework.ExpectEqual(errCount, 0, "Found invalid samples")
 	return found
 }
 

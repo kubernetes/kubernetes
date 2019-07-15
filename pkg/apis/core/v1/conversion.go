@@ -35,6 +35,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err := scheme.AddConversionFuncs(
 		Convert_core_Pod_To_v1_Pod,
 		Convert_core_PodSpec_To_v1_PodSpec,
+		Convert_v1_PodStatus_To_core_PodStatus,
+		Convert_core_PodStatus_To_v1_PodStatus,
+		Convert_core_NodeSpec_To_v1_NodeSpec,
+		Convert_v1_NodeSpec_To_core_NodeSpec,
 		Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 		Convert_core_ServiceSpec_To_v1_ServiceSpec,
 		Convert_v1_Pod_To_core_Pod,
@@ -270,6 +274,40 @@ func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, 
 	return nil
 }
 
+func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
+	if err := autoConvert_v1_PodStatus_To_core_PodStatus(in, out, s); err != nil {
+		return err
+	}
+
+	// If both fields (v1.PodIPs and v1.PodIP) are provided, then test v1.PodIP == v1.PodIPs[0]
+	if (len(in.PodIP) > 0 && len(in.PodIPs) > 0) && (in.PodIP != in.PodIPs[0].IP) {
+		return fmt.Errorf("conversion Error: v1.PodIP(%v) != v1.PodIPs[0](%v)", in.PodIP, in.PodIPs[0].IP)
+	}
+	// at the this point, autoConvert copied v1.PodIPs -> core.PodIPs
+	// if v1.PodIPs was empty but v1.PodIP is not, then set core.PodIPs[0] with v1.PodIP
+	if len(in.PodIP) > 0 && len(in.PodIPs) == 0 {
+		out.PodIPs = []core.PodIP{
+			{
+				IP: in.PodIP,
+			},
+		}
+	}
+	return nil
+}
+
+func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
+	if err := autoConvert_core_PodStatus_To_v1_PodStatus(in, out, s); err != nil {
+		return err
+	}
+	// at the this point autoConvert copied core.PodIPs -> v1.PodIPs
+	//  v1.PodIP (singular value field, which does not exist in core) needs to
+	// be set with core.PodIPs[0]
+	if len(in.PodIPs) > 0 {
+		out.PodIP = in.PodIPs[0].IP
+	}
+	return nil
+}
+
 // The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
 // as an alias for ServiceAccountName.
 func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
@@ -289,6 +327,36 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
 	}
 
+	return nil
+}
+
+func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
+	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
+		return err
+	}
+	// at the this point autoConvert copied core.PodCIDRs -> v1.PodCIDRs
+	// v1.PodCIDR (singular value field, which does not exist in core) needs to
+	// be set with core.PodCIDRs[0]
+	if len(in.PodCIDRs) > 0 {
+		out.PodCIDR = in.PodCIDRs[0]
+	}
+	return nil
+}
+
+func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
+	if err := autoConvert_v1_NodeSpec_To_core_NodeSpec(in, out, s); err != nil {
+		return err
+	}
+	// If both fields (v1.PodCIDRs and v1.PodCIDR) are provided, then test v1.PodCIDR == v1.PodCIDRs[0]
+	if (len(in.PodCIDR) > 0 && len(in.PodCIDRs) > 0) && (in.PodCIDR != in.PodCIDRs[0]) {
+		return fmt.Errorf("conversion Error: v1.PodCIDR(%v) != v1.CIDRs[0](%v)", in.PodCIDR, in.PodCIDRs[0])
+	}
+
+	// at the this point, autoConvert copied v1.PodCIDRs -> core.PodCIDRs
+	// if v1.PodCIDRs was empty but v1.PodCIDR is not, then set core.PodCIDRs[0] with v1.PodCIDR
+	if len(in.PodCIDR) > 0 && len(in.PodCIDRs) == 0 {
+		out.PodCIDRs = []string{in.PodCIDR}
+	}
 	return nil
 }
 

@@ -124,7 +124,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		ginkgo.By("Checking for bound PVC")
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
@@ -159,7 +159,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 	})
 })
 
