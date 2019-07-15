@@ -36,8 +36,8 @@ func initForOS(windowsService bool) error {
 }
 
 func (o *Options) addOSFlags(fs *legacyflag.FlagSet) {
-	fs.BoolVar("windows-service", o.WindowsService, "Enable Windows Service Control Manager API integration").Set(&o.WindowsService)
-	fs.StringVar("source-vip", o.config.Winkernel.SourceVip, "The IP address of the source VIP for non-DSR.").Set(&o.config.Winkernel.SourceVip)
-	fs.StringVar("network-name", o.config.Winkernel.NetworkName, "The name of the cluster network.").Set(&o.config.Winkernel.NetworkName)
-	fs.BoolVar("enable-dsr", o.config.Winkernel.EnableDSR, "If true make kube-proxy apply DSR policies for service VIP").Set(&o.config.Winkernel.EnableDSR)
+	fs.BoolVar("windows-service", o.WindowsService, "Enable Windows Service Control Manager API integration")
+	fs.StringVar("source-vip", o.config.Winkernel.SourceVip, "The IP address of the source VIP for non-DSR.")
+	fs.StringVar("network-name", o.config.Winkernel.NetworkName, "The name of the cluster network.")
+	fs.BoolVar("enable-dsr", o.config.Winkernel.EnableDSR, "If true make kube-proxy apply DSR policies for service VIP")
 }

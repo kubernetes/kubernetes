@@ -136,21 +136,21 @@ type Options struct {
 func (o *Options) AddFlags(fs *legacyflag.FlagSet) {
 	o.addOSFlags(fs)
 
-	fs.StringVar("config", o.ConfigFile, "The path to the configuration file.").Set(&o.ConfigFile)
-	fs.StringVar("write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.").Set(&o.WriteConfigTo)
-	fs.StringVar("kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).").Set(&o.config.ClientConnection.Kubeconfig)
-	fs.StringVar("cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead").Set(&o.config.ClusterCIDR)
-	fs.StringVar("kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.").Set(&o.config.ClientConnection.ContentType)
-	fs.StringVar("master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)").Set(&o.master)
-	fs.StringVar("hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.").Set(&o.hostnameOverride)
-	fs.StringVar("ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs").Set(&o.config.IPVS.Scheduler)
+	fs.StringVar("config", o.ConfigFile, "The path to the configuration file.")
+	fs.StringVar("write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
+	fs.StringVar("kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
+	fs.StringVar("cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
+	fs.StringVar("kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
+	fs.StringVar("master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.StringVar("hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+	fs.StringVar("ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 
-	fs.StringSliceVar("ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.").Set(&o.config.IPVS.ExcludeCIDRs)
+	fs.StringSliceVar("ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
 	fs.StringSliceVar("nodeport-addresses", o.config.NodePortAddresses,
-		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.").Set(&o.config.NodePortAddresses)
+		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
 
-	fs.BoolVar("cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.").Set(&o.CleanupAndExit)
-	fs.BoolVar("cleanup-ipvs", o.CleanupIPVS, "If true and --cleanup is specified, kube-proxy will also flush IPVS rules, in addition to normal cleanup.").Set(&o.CleanupIPVS)
+	fs.BoolVar("cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
+	fs.BoolVar("cleanup-ipvs", o.CleanupIPVS, "If true and --cleanup is specified, kube-proxy will also flush IPVS rules, in addition to normal cleanup.")
 
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Var(utilflag.IPVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
@@ -160,33 +160,33 @@ func (o *Options) AddFlags(fs *legacyflag.FlagSet) {
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
-	fs.Int32Var("healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.").Set(&o.healthzPort)
-	fs.Int32Var("metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.").Set(&o.metricsPort)
-	fs.Int32Var("oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]").Set(o.config.OOMScoreAdj)
-	fs.Int32Var("iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].").Set(o.config.IPTables.MasqueradeBit)
+	fs.Int32Var("healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
+	fs.Int32Var("metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
+	fs.Int32Var("oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.Int32Var("iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.Int32Var("conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
-		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).").Set(o.config.Conntrack.MaxPerCore)
+		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
 	fs.Int32Var("conntrack-min", *o.config.Conntrack.Min,
-		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).").Set(o.config.Conntrack.Min)
-	fs.Int32Var("kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver").Set(&o.config.ClientConnection.Burst)
+		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
+	fs.Int32Var("kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
 
-	fs.DurationVar("iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.").Set(&o.config.IPTables.SyncPeriod.Duration)
-	fs.DurationVar("iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').").Set(&o.config.IPTables.MinSyncPeriod.Duration)
-	fs.DurationVar("ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.").Set(&o.config.IPVS.SyncPeriod.Duration)
-	fs.DurationVar("ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').").Set(&o.config.IPVS.MinSyncPeriod.Duration)
-	fs.DurationVar("conntrack-tcp-timeout-established", o.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)").Set(&o.config.Conntrack.TCPEstablishedTimeout.Duration)
+	fs.DurationVar("iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.DurationVar("iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
+	fs.DurationVar("ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.DurationVar("ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
+	fs.DurationVar("conntrack-tcp-timeout-established", o.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
 	fs.DurationVar(
 		"conntrack-tcp-timeout-close-wait",
 		o.config.Conntrack.TCPCloseWaitTimeout.Duration,
-		"NAT timeout for TCP connections in the CLOSE_WAIT state").Set(&o.config.Conntrack.TCPCloseWaitTimeout.Duration)
-	fs.DurationVar("config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.").Set(&o.config.ConfigSyncPeriod.Duration)
-	fs.DurationVar("udp-timeout", o.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace").Set(&o.config.UDPIdleTimeout.Duration)
+		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+	fs.DurationVar("config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
+	fs.DurationVar("udp-timeout", o.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 
-	fs.BoolVar("ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2").Set(&o.config.IPVS.StrictARP)
-	fs.BoolVar("masquerade-all", o.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)").Set(&o.config.IPTables.MasqueradeAll)
-	fs.BoolVar("profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.").Set(&o.config.EnableProfiling)
+	fs.BoolVar("ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
+	fs.BoolVar("masquerade-all", o.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
+	fs.BoolVar("profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 
-	fs.Float32Var("kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver").Set(&o.config.ClientConnection.QPS)
+	fs.Float32Var("kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
 }
 
 // NewOptions returns initialized Options
@@ -449,7 +449,7 @@ with the apiserver API to configure the proxy.`,
 		klog.Fatalf("unable to create flag defaults: %v", err)
 	}
 
-	opts.AddFlags(legacyflag.InitFlagSet(cmd.Flags()))
+	opts.AddFlags(legacyflag.NewFromPFlagSet(cmd.Flags()))
 
 	// TODO handle error
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
