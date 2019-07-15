@@ -113,12 +113,14 @@ func runDiff(flags *diffFlags, args []string) error {
 		flags.newK8sVersionStr = args[0]
 	}
 
-	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
+	_, err = version.ParseSemantic(flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
 
-	specs := controlplane.GetStaticPodSpecs(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, k8sVer)
+	cfg.ClusterConfiguration.KubernetesVersion = flags.newK8sVersionStr
+
+	specs := controlplane.GetStaticPodSpecs(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint)
 	for spec, pod := range specs {
 		var path string
 		switch spec {
