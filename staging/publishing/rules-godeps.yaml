@@ -16,7 +16,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/code-generator
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
   - source:
       branch: release-1.14
       dir: staging/src/k8s.io/code-generator
@@ -34,7 +34,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/apimachinery
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
   - source:
       branch: release-1.14
       dir: staging/src/k8s.io/apimachinery
@@ -55,7 +55,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/api
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -84,7 +84,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/client-go
     name: release-10.0
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -134,7 +134,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/apiserver
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -176,7 +176,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/kube-aggregator
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -226,7 +226,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/sample-apiserver
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -290,7 +290,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/sample-controller
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -353,7 +353,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/apiextensions-apiserver
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -406,7 +406,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/metrics
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -447,7 +447,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/csi-api
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -490,7 +490,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/cli-runtime
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: api
       branch: release-1.13
@@ -531,7 +531,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/sample-cli-plugin
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: api
       branch: release-1.13
@@ -572,7 +572,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/kube-proxy
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -603,7 +603,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/kubelet
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -638,7 +638,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/kube-scheduler
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -673,7 +673,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/kube-controller-manager
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -698,7 +698,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/cluster-bootstrap
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: apimachinery
       branch: release-1.13
@@ -721,7 +721,7 @@ rules:
       branch: release-1.13
       dir: staging/src/k8s.io/cloud-provider
     name: release-1.13
-    go: 1.11.2
+    go: 1.11.5
     dependencies:
     - repository: api
       branch: release-1.13
