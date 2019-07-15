@@ -10,6 +10,9 @@ approvers:
 - tallclair
 - vishh
 - yujuhong
+- yue9944882      # for feature-rate-limiting only
+- MikeSpreitzer   # for feature-rate-limiting only
+- aaron-prindle   # for feature-rate-limiting only
 reviewers:
 - sig-node-reviewers
 labels:
