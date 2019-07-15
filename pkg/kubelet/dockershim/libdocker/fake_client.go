@@ -71,12 +71,12 @@ type FakeDockerClient struct {
 	// Images pulled by ref (name or ID).
 	ImagesPulled []string
 
-	VersionInfo     dockertypes.Version
-	Information     dockertypes.Info
-	ExecInspect     *dockertypes.ContainerExecInspect
-	execCmd         []string
-	EnableSleep     bool
-	ImageHistoryMap map[string][]dockerimagetypes.HistoryResponseItem
+	VersionInfo       dockertypes.Version
+	Information       dockertypes.Info
+	ExecInspect       *dockertypes.ContainerExecInspect
+	execCmd           []string
+	EnableSleep       bool
+	ImageHistoryMap   map[string][]dockerimagetypes.HistoryResponseItem
 	ContainerStatsMap map[string]*dockertypes.StatsJSON
 }
 
