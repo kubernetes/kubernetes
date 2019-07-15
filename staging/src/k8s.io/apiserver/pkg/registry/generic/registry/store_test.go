@@ -1561,7 +1561,10 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			NewListFunc:    func() runtime.Object { return &example.PodList{} },
 			Codec:          sc.Codec,
 		}
-		cacher := cacherstorage.NewCacherFromConfig(config)
+		cacher, err := cacherstorage.NewCacherFromConfig(config)
+		if err != nil {
+			t.Fatalf("Couldn't create cacher: %v", err)
+		}
 		d := destroyFunc
 		s = cacher
 		destroyFunc = func() {

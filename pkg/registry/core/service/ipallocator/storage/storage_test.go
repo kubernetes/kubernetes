@@ -47,7 +47,10 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 		etcd := allocatorstore.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
 		return etcd
 	})
-	s, d := generic.NewRawStorage(etcdStorage)
+	s, d, err := generic.NewRawStorage(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create storage: %v", err)
+	}
 	destroyFunc := func() {
 		d()
 		server.Terminate(t)
