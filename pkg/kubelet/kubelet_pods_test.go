@@ -1315,11 +1315,11 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				Env: []v1.EnvVar{
 					{
 						Name:  "test1",
-						Value: "1234",
+						Value: "test",
 					},
 					{
 						Name:  "test4",
-						Value: "test-test",
+						Value: "test",
 					},
 				},
 				EnvFrom: []v1.EnvFromSource{
@@ -1340,7 +1340,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				Data: map[string]string{
 					"test1": "abc",
 					"test2": "abc",
-					"test3": "abc",
+					"test5": "abc",
 				},
 			},
 			secret: &v1.Secret{
@@ -1349,29 +1349,34 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"test2": []byte("1234"),
-					"test3": []byte("5678"),
+					"test1": []byte("1234"),
+					"test3": []byte("1234"),
+					"test5": []byte("1234"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
 					Name:  "test1",
-					Value: "1234",
+					Value: "test",
 				},
 				{
 					Name:  "test2",
-					Value: "1234",
+					Value: "abc",
 				},
 				{
 					Name:  "test3",
-					Value: "5678",
+					Value: "1234",
 				},
 				{
 					Name:  "test4",
-					Value: "test-test",
+					Value: "test",
+				},
+				{
+					Name:  "test5",
+					Value: "1234",
 				},
 			},
-			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test1, test2, test3] were defined from multiple means.",
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test1, test5] were defined from multiple means.",
 		},
 		{
 			name:               "secret",

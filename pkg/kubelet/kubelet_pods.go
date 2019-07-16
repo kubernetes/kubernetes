@@ -569,7 +569,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 		configMaps     = make(map[string]*v1.ConfigMap)
 		secrets        = make(map[string]*v1.Secret)
 		tmpEnv         = make(map[string]string)
-		duplicatedKeys = []string{}
+		duplicatedKeys = make(map[string]struct{})
 	)
 
 	// Env will override EnvFrom variables.
@@ -607,7 +607,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				}
 				_, ok := tmpEnv[k]
 				if ok {
-					duplicatedKeys = append(duplicatedKeys, k)
+					duplicatedKeys[k] = struct{}{}
 				}
 				tmpEnv[k] = v
 			}
@@ -645,8 +645,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					continue
 				}
 				_, ok := tmpEnv[k]
+
 				if ok {
-					duplicatedKeys = append(duplicatedKeys, k)
+					duplicatedKeys[k] = struct{}{}
 				}
 				tmpEnv[k] = string(v)
 			}
@@ -757,13 +758,19 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 
 		_, ok := tmpEnv[envVar.Name]
 		if ok {
-			duplicatedKeys = append(duplicatedKeys, envVar.Name)
+			duplicatedKeys[envVar.Name] = struct{}{}
 		}
 		tmpEnv[envVar.Name] = runtimeVal
 	}
 	if len(duplicatedKeys) > 0 {
-		sort.Strings(duplicatedKeys)
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, "DuplicatedEnvironmentVariableNames", "Keys [%s] were defined from multiple means.", strings.Join(duplicatedKeys, ", "))
+		keys := make([]string, len(duplicatedKeys))
+		i := 0
+		for k := range duplicatedKeys {
+			keys[i] = k
+			i++
+		}
+		sort.Strings(keys)
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, "DuplicatedEnvironmentVariableNames", "Keys [%s] were defined from multiple means.", strings.Join(keys, ", "))
 	}
 
 	// Append the env vars
