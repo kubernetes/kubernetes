@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestCanAdmitPodResult(t *testing.T) {
+func TestPolicyStrictCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		admit    bool
