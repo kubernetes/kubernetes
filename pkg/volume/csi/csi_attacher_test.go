@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -1025,6 +1026,14 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
+			testName:        "normal PV with mount options",
+			volName:         "test-vol1",
+			devicePath:      "path1",
+			deviceMountPath: "path2",
+			stageUnstageSet: true,
+			spec:            volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
+		},
+		{
 			testName:        "no vol name",
 			volName:         "",
 			devicePath:      "path1",
@@ -1132,6 +1141,9 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 			if vol.Path != tc.deviceMountPath {
 				t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
+			}
+			if !reflect.DeepEqual(vol.MountFlags, tc.spec.PersistentVolume.Spec.MountOptions) {
+				t.Errorf("expected mount options: %v, got: %v", tc.spec.PersistentVolume.Spec.MountOptions, vol.MountFlags)
 			}
 		}
 	}
