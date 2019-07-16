@@ -1979,40 +1979,6 @@ function update-node-label() {
   done
 }
 
-# Applies encryption provider config.
-# This function may be triggered in two scenarios:
-# 1. Decryption of etcd
-# 2. Encryption of etcd is added after the cluster is deployed
-# Both cases require that the existing secrets in etcd be re-proceeded.
-#
-# Assumes vars (supplied via kube-env):
-# ENCRYPTION_PROVIDER_CONFIG_FORCE
-function apply-encryption-config() {
-  if [[ "${ENCRYPTION_PROVIDER_CONFIG_FORCE:-false}" == "false" ]]; then
-    return
-  fi
-
-  # need kube-apiserver to be ready
-  until kubectl get secret; do
-    sleep ${ENCRYPTION_PROVIDER_CONFIG_FORCE_DELAY:-5}
-  done
-
-  retries=${ENCRYPTION_PROVIDER_CONFIG_FORCE_RETRIES:-5}
-  # The command below may fail when a conflict is detected during an update on a secret (something
-  # else updated the secret in the middle of our update).
-  # TODO: Retry only on errors caused by a conflict.
-  until (( retries == 0 )); do
-    # forces all secrets to be re-written to etcd, and in the process either encrypting or decrypting them
-    # https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
-    if kubectl get secrets --all-namespaces -o json | kubectl replace -f -; then
-      break
-    fi
-
-    (( retries-- ))
-    sleep "${ENCRYPTION_PROVIDER_CONFIG_FORCE_RETRY_SLEEP:-3}"
-  done
-}
-
 # Starts kubernetes controller manager.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -3051,7 +3017,6 @@ function main() {
     start-cluster-autoscaler
     start-lb-controller
     update-legacy-addon-node-labels &
-    apply-encryption-config &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy
