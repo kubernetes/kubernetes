@@ -134,8 +134,6 @@ const (
 	Etcd
 	// GBFrontend image
 	GBFrontend
-	// GBRedisSlave image
-	GBRedisSlave
 	// Httpd image
 	Httpd
 	// HttpdNew image
@@ -214,7 +212,6 @@ func initImageConfigs() map[int]Config {
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.10"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
-	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
 	configs[Invalid] = Config{gcRegistry, "invalid-image", "invalid-tag"}
@@ -234,7 +231,7 @@ func initImageConfigs() map[int]Config {
 	configs[Perl] = Config{dockerLibraryRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{e2eRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{e2eRegistry, "prometheus-to-sd", "v0.5.0"}
-	configs[Redis] = Config{dockerLibraryRegistry, "redis", "3.2.9-alpine"}
+	configs[Redis] = Config{dockerLibraryRegistry, "redis", "5.0.5-alpine"}
 	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
 	configs[ResourceController] = Config{e2eRegistry, "resource-consumer-controller", "1.0"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
