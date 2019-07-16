@@ -45,6 +45,10 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	largeCRDCount = 500
+)
+
 var (
 	crdPublishOpenAPIVersion = utilversion.MustParseSemantic("v1.14.0")
 	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
@@ -402,6 +406,42 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 			e2elog.Failf("%v", err)
 		}
 	})
+
+	ginkgo.It("should update openapi spec within xxx s when there are lots of CRDs", func() {
+		ginkgo.By(fmt.Sprintf("start creating %s CRDs with validation schema", largeCRDCount))
+		start := time.Now()
+		crds := []*crd.TestCrd{}
+		defer func() {
+			for _, testCRD := range crds {
+				if err := cleanupCRD(f, testCRD); err != nil {
+					e2elog.Failf("%v", err)
+				}
+			}
+		}()
+		for i := 0; i < largeCRDCount; i++ {
+			// create CRD with structural schema in different group and version
+			testCRD, err := setupCRD(f, schemaFoo, fmt.Sprintf("foo%d", i), fmt.Sprintf("v%d", i))
+			if err != nil {
+				e2elog.Failf("%v", err)
+			}
+			crds = append(crds, testCRD)
+		}
+		ginkgo.By(fmt.Sprintf("finished creating %s CRDs; time elapsed: %v", largeCRDCount, time.Since(start)))
+		ginkgo.By("update one CRD with different schema")
+		var err error
+		testCRD := crds[0]
+		testCRD, err = updateCRDSchema(testCRD, schemaWaldo)
+		if err != nil {
+			e2elog.Failf("%v", err)
+		}
+		ginkgo.By("verify that openapi spec gets updated in time")
+		start = time.Now()
+		if err := waitForDefinition(f.ClientSet, definitionName(testCRD, testCRD.Crd.Spec.Version), schemaWaldo); err != nil {
+			e2elog.Failf("%v", err)
+		}
+		ginkgo.By(fmt.Sprintf("finished verifying updated CRD schema; time elapsed: %v", time.Since(start)))
+	})
+
 })
 
 func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
@@ -455,6 +495,29 @@ func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, grou
 		}
 	}
 	return crd, nil
+}
+
+func updateCRDSchema(testCRD *crd.TestCrd, schema []byte) (*crd.TestCrd, error) {
+	props := &v1beta1.JSONSchemaProps{}
+	if schema != nil {
+		if err := yaml.Unmarshal(schema, props); err != nil {
+			return nil, err
+		}
+	}
+
+	var err error
+	testCRD.Crd, err = testCRD.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(testCRD.Crd.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	testCRD.Crd.Spec.Validation = &v1beta1.CustomResourceValidation{
+		OpenAPIV3Schema: props,
+	}
+	testCRD.Crd, err = testCRD.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(testCRD.Crd)
+	if err != nil {
+		return nil, err
+	}
+	return testCRD, nil
 }
 
 func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
