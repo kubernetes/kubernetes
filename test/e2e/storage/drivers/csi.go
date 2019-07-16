@@ -248,6 +248,7 @@ func InitGcePDCSIDriver() TestDriver {
 				CapFsGroup:     true,
 				CapExec:        true,
 			},
+			SupportedMountOption: sets.NewString("debug", "nouid32"),
 		},
 	}
 }
