@@ -153,8 +153,6 @@ type Configurator interface {
 	GetClient() clientset.Interface
 
 	// TODO(#80216): Remove these methods from the interface.
-	// Needs to be exposed for things like integration tests where we want to make fake nodes.
-	GetNodeLister() corelisters.NodeLister
 	// Exposed for testing
 	GetScheduledPodLister() corelisters.PodLister
 
@@ -170,8 +168,6 @@ type configFactory struct {
 	client clientset.Interface
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
-	// a means to list all nodes
-	nodeLister corelisters.NodeLister
 	// a means to list all PersistentVolumes
 	pVLister corelisters.PersistentVolumeLister
 	// a means to list all PersistentVolumeClaims
@@ -281,7 +277,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
-		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),
@@ -322,11 +317,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		c.podQueue.Close()
 	}()
 	return c
-}
-
-// GetNodeStore provides the cache to the nodes, mostly internal use, but may also be called by mock-tests.
-func (c *configFactory) GetNodeLister() corelisters.NodeLister {
-	return c.nodeLister
 }
 
 func (c *configFactory) GetHardPodAffinitySymmetricWeight() int32 {
