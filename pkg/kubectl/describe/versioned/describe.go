@@ -2070,8 +2070,11 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", job.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", job.Namespace)
-		selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		if selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector); err == nil {
+			w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		} else {
+			w.Write(LEVEL_0, "Selector:\tFailed to get selector: %s\n", err)
+		}
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
 		if controlledBy := printController(job); len(controlledBy) > 0 {
@@ -2163,8 +2166,11 @@ func describeCronJob(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (s
 
 func describeJobTemplate(jobTemplate batchv1beta1.JobTemplateSpec, w PrefixWriter) {
 	if jobTemplate.Spec.Selector != nil {
-		selector, _ := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
-		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		if selector, err := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector); err == nil {
+			w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		} else {
+			w.Write(LEVEL_0, "Selector:\tFailed to get selector: %s\n", err)
+		}
 	} else {
 		w.Write(LEVEL_0, "Selector:\t<unset>\n")
 	}
