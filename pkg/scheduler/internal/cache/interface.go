@@ -17,9 +17,8 @@ limitations under the License.
 package cache
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -59,6 +58,9 @@ import (
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
+	algorithm.PodLister
+	algorithm.NodeLister
+
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
@@ -112,12 +114,6 @@ type Cache interface {
 
 	// GetNodeInfo returns the node object with node string.
 	GetNodeInfo(nodeName string) (*v1.Node, error)
-
-	// List lists all cached pods (including assumed ones).
-	List(labels.Selector) ([]*v1.Pod, error)
-
-	// FilteredList returns all cached pods that pass the filter.
-	FilteredList(filter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
