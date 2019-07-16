@@ -57,6 +57,12 @@ const (
 	rbdImageSizeUnitMiB      = 1024 * 1024
 )
 
+// A struct contains rbd image info.
+type rbdImageInfo struct {
+	pool string
+	name string
+}
+
 func getDevFromImageAndPool(pool, image string) (string, bool) {
 	device, found := getRbdDevFromImageAndPool(pool, image)
 	if found {
@@ -788,4 +794,16 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 		klog.Warningf("rbd: no watchers on %s", b.Image)
 		return false, output, nil
 	}
+}
+
+// getRbdImageInfo try to get rbdImageInfo from deviceMountPath.
+func getRbdImageInfo(deviceMountPath string) (*rbdImageInfo, error) {
+	deviceMountedPathSeps := strings.Split(filepath.Base(deviceMountPath), "-image-")
+	if len(deviceMountedPathSeps) != 2 {
+		return nil, fmt.Errorf("Can't found devicePath for %s ", deviceMountPath)
+	}
+	return &rbdImageInfo{
+		pool: deviceMountedPathSeps[0],
+		name: deviceMountedPathSeps[1],
+	}, nil
 }
