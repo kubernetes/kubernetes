@@ -68,9 +68,7 @@ var (
 			Subsystem: kubeProxySubsystem,
 			Name:      "network_programming_duration_seconds",
 			Help:      "In Cluster Network Programming Latency in seconds",
-			// TODO(mm4tt): Reevaluate buckets before 1.14 release.
-			// The last bucket will be [0.001s*2^20 ~= 17min, +inf)
-			Buckets: prometheus.ExponentialBuckets(0.001, 2, 20),
+			Buckets:   prometheus.ExponentialBuckets(0.015, 2, 20),
 		},
 	)
 
