@@ -83,6 +83,22 @@ var parserTests = []parserTest{
 		newArray([3]ParamsEntry{{-1, true, false}, {0, true, true}, {0, false, false}})}, false},
 	{"negative index slice, equals a[1] to a[len-1]", `{[1:-1]}`, []Node{newList(),
 		newArray([3]ParamsEntry{{1, true, false}, {-1, true, false}, {0, false, false}})}, false},
+	{"unclosed array", `{[?(@.status.nodeInfo.osImage == "doesntmatter")}`,
+		[]Node{}, true},
+	{"OR operator", `{[?(@.status.nodeInfo.osImage == 'oneimage'||@.status.nodeInfo.osImage == 'otherimage')]}`,
+		[]Node{
+			newList(),
+			newLogical(newFilter(newList(), newList(), "=="), newFilter(newList(), newList(), "=="), "||"),
+		}, false},
+	{"AND operator", `{[?(@.status.nodeInfo.osImage == 'oneimage' && @.status.nodeInfo.ip == '1.1.1.1')]}`,
+		[]Node{
+			newList(),
+			newLogical(newFilter(newList(), newList(), "=="), newFilter(newList(), newList(), "=="), "&&"),
+		}, false},
+	{"logical operator that compares to value, but has parsing issues on the left", `{[?(@.status == 'haventclosedthisquote||@.status == 'thiswouldhavebeenfine')]}`, []Node{}, true},
+	{"logical operator that checks field existence, but has parsing issues on the left", `{[?(@£notparsed||@.status.nodeInfo.osImage)]}`, []Node{}, true},
+	{"logical operator that compares to value, but has parsing issues on the right", `{[?(@.status == 'thiswouldhavebeenfine'||@.status == 'haventclosedthisquote)]}`, []Node{}, true},
+	{"logical operator that checks field existence, but has parsing issues on the right", `{[?(@.status.nodeInfo.osImage||@£notparsed)]}`, []Node{}, true},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {

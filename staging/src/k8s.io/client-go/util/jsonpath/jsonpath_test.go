@@ -298,6 +298,37 @@ func TestKubernetes(t *testing.T) {
 	testJSONPathSortOutput(randomPrintOrderTests, t)
 }
 
+func TestLogicalExpressions(t *testing.T) {
+	var jsonData = []byte(`[
+		{"id": "i1", "type": "bicycle", "wheels":2, "price":"190.95"},
+		{"id": "i10", "type": "bicycle", "wheels":2, "price":"210"},
+		{"id": "i2", "type": "car", "wheels":4, "price":"2999.99"},
+		{"id": "i3", "type": "chair", "legs":4, "price": "20"},
+		{"id": "i4", "type": "book", "pages": 676, "price": "15.50"},
+		{"id": "i5", "type": "notebook", "pages": 100, "price": "5.99"}
+		]`)
+	var data interface{}
+	err := json.Unmarshal(jsonData, &data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	singleLogicalOperandTests := []jsonpathTest{
+		{"applying OR to 2 expressions, both with matches, should return all matches", "{[?(@.type=='bicycle'||@.type=='book')].id}", data, "i1 i10 i4", false},
+		{"applying OR to 2 expressions, neither with matches, should return no matches", "{[?(@.type=='house'||@.type=='boat')].id}", data, "", false},
+		{"applying AND to 2 expressions, only one with matches, should return no matches", "{[?(@.type=='bicycle'&&@.type=='book')].id}", data, "", false},
+		{"applying AND to 2 expressions with matches should return only common matches", "{[?(@.type=='bicycle' && @.price>'200')].id}", data, "i10", false},
+		{"OR operation to check field existence, either field exists (not both) in entries", "{[?(@.legs || @.pages )].id}", data, "i3 i4 i5", false},
+		{"AND operation to check field existence, either field exists (not both) in entries", "{[?(@.legs && @.pages )].id}", data, "", false},
+		{"AND operation to check field existence, both fields co-exist in entries", "{[?(@.legs && @.price )].id}", data, "i3", false},
+		{"OR operation to check field existence, one exists in entries", "{[?(@.floors || @.pages )].id}", data, "i4 i5", false},
+	}
+	testJSONPathSortOutput(singleLogicalOperandTests, t)
+
+	singleLogicalOperandErrorCasesTests := []jsonpathTest{}
+	testJSONPathSortOutput(singleLogicalOperandErrorCasesTests, t)
+}
+
 func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 	// for https://issues.k8s.io/45546
 	var input = []byte(`{

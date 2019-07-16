@@ -43,6 +43,20 @@ type Parser struct {
 	width int
 }
 
+type comparison struct {
+	leftOperand  string
+	rightOperand string
+	operator     string
+}
+
+func comparisonExpression(parsedComparisonExpression []string) comparison {
+	return comparison{
+		leftOperand:  parsedComparisonExpression[0],
+		operator:     parsedComparisonExpression[1],
+		rightOperand: parsedComparisonExpression[2],
+	}
+}
+
 var (
 	ErrSyntax        = errors.New("invalid syntax")
 	dictKeyRex       = regexp.MustCompile(`^'([^']*)'$`)
@@ -336,6 +350,28 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
+func fieldExistenceFilter(expression string) (*FilterNode, error) {
+	parser, err := parseAction("text", expression)
+	if err != nil {
+		return nil, err
+	}
+	return newFilter(parser.Root, newList(), "exists"), nil
+}
+
+func valueEqualityFilter(comparisonExpression comparison) (*FilterNode, error) {
+
+	logLeftEqLeftParser, err := parseAction("left", comparisonExpression.leftOperand)
+	if err != nil {
+		return nil, err
+	}
+	logLeftEqRightParser, err := parseAction("right", comparisonExpression.rightOperand)
+	if err != nil {
+		return nil, err
+	}
+
+	return newFilter(logLeftEqLeftParser.Root, logLeftEqRightParser.Root, comparisonExpression.operator), nil
+}
+
 // parseFilter scans filter inside array selection
 func (p *Parser) parseFilter(cur *ListNode) error {
 	p.pos += len("[?(")
@@ -372,28 +408,74 @@ Loop:
 	if p.next() != ']' {
 		return fmt.Errorf("unclosed array expect ]")
 	}
-	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
 	text := p.consumeText()
 	text = text[:len(text)-2]
-	value := reg.FindStringSubmatch(text)
-	if value == nil {
-		parser, err := parseAction("text", text)
+
+	logicalOperationPresent := regexp.MustCompile(`^([^|&]+)([|&]{2})(.+?)$`)
+
+	logicalValue := logicalOperationPresent.FindStringSubmatch(text)
+
+	if logicalValue != nil {
+		leftOperand := logicalValue[1]
+		rightOperand := logicalValue[3]
+
+		logicalOperator := logicalValue[2]
+		logLeft, err := calculate(leftOperand)
+
 		if err != nil {
 			return err
 		}
-		cur.append(newFilter(parser.Root, newList(), "exists"))
+
+		logRight, err := calculate(rightOperand)
+
+		if err != nil {
+			return err
+		}
+
+		cur.append(newLogical(logLeft, logRight, logicalOperator))
 	} else {
-		leftParser, err := parseAction("left", value[1])
-		if err != nil {
-			return err
+
+		equalityComparison := regexp.MustCompile(`^([^!<>=]+)([!<>=|&]+)(.+?)$`)
+
+		value := equalityComparison.FindStringSubmatch(text)
+		if value == nil {
+			parser, err := parseAction("text", text)
+			if err != nil {
+				return err
+			}
+			cur.append(newFilter(parser.Root, newList(), "exists"))
+		} else {
+			leftParser, err := parseAction("left", value[1])
+			if err != nil {
+				return err
+			}
+			rightParser, err := parseAction("right", value[3])
+			if err != nil {
+				return err
+			}
+			cur.append(newFilter(leftParser.Root, rightParser.Root, value[2]))
 		}
-		rightParser, err := parseAction("right", value[3])
-		if err != nil {
-			return err
-		}
-		cur.append(newFilter(leftParser.Root, rightParser.Root, value[2]))
 	}
 	return p.parseInsideAction(cur)
+}
+
+func calculate(operand string) (*FilterNode, error) {
+	equalityComparisonReg := regexp.MustCompile(`^([^!<>=]+)([!<>=|&]+)(.+?)$`)
+	logRightEqualityComp := equalityComparisonReg.FindStringSubmatch(operand)
+	var logicalNode *FilterNode
+	var err error
+	if logRightEqualityComp == nil {
+		logicalNode, err = fieldExistenceFilter(operand)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		logicalNode, err = valueEqualityFilter(comparisonExpression(logRightEqualityComp[1:]))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return logicalNode, nil
 }
 
 // parseQuote unquotes string inside double or single quote

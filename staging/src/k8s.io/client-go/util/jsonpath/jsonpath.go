@@ -162,6 +162,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalUnion(value, node)
 	case *IdentifierNode:
 		return j.evalIdentifier(value, node)
+	case *LogicalNode:
+		return j.evalLogical(value, node)
 	default:
 		return value, fmt.Errorf("unexpected Node %v", node)
 	}
@@ -437,6 +439,65 @@ func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]
 		}
 	}
 	return result, nil
+}
+
+func (j *JSONPath) evalLogical(input []reflect.Value, node *LogicalNode) ([]reflect.Value, error) {
+	if node.Operator != "&&" && node.Operator != "||" {
+		return input, fmt.Errorf("Unsupported logical operator: %s; only &&, || are supported", node.Operator)
+	}
+
+	resultsFromLeftOfLogicalOperation, err := j.evalFilter(input, node.Left)
+	if err != nil {
+		return input, err
+	}
+	resultsFromRightOfLogicalOperation, _ := j.evalFilter(input, node.Right)
+	if err != nil {
+		return input, err
+	}
+
+	switch node.Operator {
+	case "&&":
+		return intersection(resultsFromLeftOfLogicalOperation, resultsFromRightOfLogicalOperation), nil
+	default:
+		return union(resultsFromLeftOfLogicalOperation, resultsFromRightOfLogicalOperation), nil
+	}
+}
+
+func union(oneCollection, otherCollection []reflect.Value) []reflect.Value {
+	hash := make(map[reflect.Value]bool)
+	for _, item := range oneCollection {
+		hash[item] = true
+	}
+	for _, item := range otherCollection {
+		if _, alreadyAdded := hash[item]; !alreadyAdded {
+			hash[item] = true
+		}
+	}
+	return keys(hash)
+}
+
+func keys(hash map[reflect.Value]bool) []reflect.Value {
+	keys := []reflect.Value{}
+	for key := range hash {
+		keys = append(keys, key)
+	}
+
+	return keys
+}
+
+func intersection(oneCollection, otherCollection []reflect.Value) []reflect.Value {
+	resultSet := make([]reflect.Value, 0)
+	hash := make(map[reflect.Value]bool)
+	for _, item := range oneCollection {
+		hash[item] = true
+	}
+
+	for _, item := range otherCollection {
+		if _, foundBefore := hash[item]; foundBefore {
+			resultSet = append(resultSet, item)
+		}
+	}
+	return resultSet
 }
 
 // evalFilter filters array according to FilterNode

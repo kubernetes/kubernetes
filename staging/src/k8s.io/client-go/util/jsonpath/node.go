@@ -43,6 +43,7 @@ const (
 	NodeRecursive
 	NodeUnion
 	NodeBool
+	NodeLogical
 )
 
 var NodeTypeName = map[NodeType]string{
@@ -150,6 +151,26 @@ func newArray(params [3]ParamsEntry) *ArrayNode {
 
 func (a *ArrayNode) String() string {
 	return fmt.Sprintf("%s: %v", a.Type(), a.Params)
+}
+
+type LogicalNode struct {
+	NodeType
+	Left     *FilterNode
+	Right    *FilterNode
+	Operator string
+}
+
+func newLogical(left, right *FilterNode, operator string) *LogicalNode {
+	return &LogicalNode{
+		NodeType: NodeLogical,
+		Left:     left,
+		Right:    right,
+		Operator: operator,
+	}
+}
+
+func (l *LogicalNode) String() string {
+	return fmt.Sprintf("%s: %s %s %s", l.Type(), l.Left, l.Operator, l.Right)
 }
 
 // FilterNode holds operand and operator information for filter
