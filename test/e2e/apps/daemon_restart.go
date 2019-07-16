@@ -300,7 +300,11 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	ginkgo.It("Kubelet should not restart containers across restart", func() {
 
 		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
-		framework.ExpectNoError(err)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 		preRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if preRestarts != 0 {
 			e2elog.Logf("WARNING: Non-zero container restart count: %d across nodes %v", preRestarts, badNodes)

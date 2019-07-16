@@ -111,8 +111,12 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		if !(len(nodeList.Items) > 0) {
 			e2elog.Failf("Unable to find ready and schedulable Node")
 		}
-		masternodes, _, err := e2enode.GetMasterAndWorkerNodesOrDie(client)
-		framework.ExpectNoError(err)
+		masternodes, _, err := e2enode.GetMasterAndWorkerNodes(client)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
 		masterNode = masternodes.List()[0]
 	})

@@ -360,8 +360,9 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
 // TODO: remove references in framework/util.go.
+// TODO: remove "OrDie" suffix.
 func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList, err error) {
-	nodes, err = waitListSchedulableNodesOrDie(c)
+	nodes, err = checkWaitListSchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
 	}
@@ -373,12 +374,12 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList, e
 	return nodes, nil
 }
 
-// GetReadyNodesIncludingTaintedOrDie returns all ready nodes, even those which are tainted.
+// GetReadyNodesIncludingTainted returns all ready nodes, even those which are tainted.
 // There are cases when we care about tainted nodes
 // E.g. in tests related to nodes with gpu we care about nodes despite
 // presence of nvidia.com/gpu=present:NoSchedule taint
-func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeList, err error) {
-	nodes, err = waitListSchedulableNodesOrDie(c)
+func GetReadyNodesIncludingTainted(c clientset.Interface) (nodes *v1.NodeList, err error) {
+	nodes, err = checkWaitListSchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
 	}
@@ -388,8 +389,8 @@ func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeLi
 	return nodes, nil
 }
 
-// GetMasterAndWorkerNodesOrDie will return a list masters and schedulable worker nodes
-func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeList, error) {
+// GetMasterAndWorkerNodes will return a list masters and schedulable worker nodes
+func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, error) {
 	nodes := &v1.NodeList{}
 	masters := sets.NewString()
 	all, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -407,6 +408,7 @@ func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeL
 }
 
 // Test whether a fake pod can be scheduled on "node", given its current taints.
+// TODO: need to discuss wether to return bool and error type
 func isNodeUntainted(node *v1.Node) bool {
 	fakePod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{

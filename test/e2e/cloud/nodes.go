@@ -47,8 +47,13 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		nodeDeleteCandidates := framework.GetReadySchedulableNodesOrDie(c)
 		nodeToDelete := nodeDeleteCandidates.Items[0]
 
-		origNodes, err := e2enode.GetReadyNodesIncludingTaintedOrDie(c)
-		framework.ExpectNoError(err)
+		origNodes, err := e2enode.GetReadyNodesIncludingTainted(c)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
+
 		e2elog.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
 		err = framework.DeleteNodeOnCloudProvider(&nodeToDelete)

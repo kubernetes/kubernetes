@@ -198,8 +198,8 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	return nodes, nil
 }
 
-// waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c clientset.Interface) (*v1.NodeList, error) {
+// checkWaitListSchedulableNodes is a wrapper around listing nodes supporting retries.
+func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for e2e cluster", err)

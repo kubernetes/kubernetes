@@ -1226,8 +1226,12 @@ func deleteNodePool(name string) {
 
 func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, 1)
-	nodeList, err := e2enode.GetReadyNodesIncludingTaintedOrDie(f.ClientSet)
-	framework.ExpectNoError(err)
+	nodeList, err := e2enode.GetReadyNodesIncludingTainted(f.ClientSet)
+	if err != nil {
+		e2elog.Logf("Unexpected error occurred: %v", err)
+	}
+	// TODO: write a wrapper for ExpectNoErrorWithOffset()
+	framework.ExpectNoErrorWithOffset(0, err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
 			nodes = append(nodes, &node)

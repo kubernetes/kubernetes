@@ -520,8 +520,12 @@ var _ = SIGDescribe("Density", func() {
 			},
 		})
 
-		_, nodes, err = e2enode.GetMasterAndWorkerNodesOrDie(c)
-		framework.ExpectNoError(err)
+		_, nodes, err = e2enode.GetMasterAndWorkerNodes(c)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 		nodeCount = len(nodes.Items)
 		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 

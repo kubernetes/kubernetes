@@ -80,8 +80,12 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		var err error
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		_, nodeList, err = e2enode.GetMasterAndWorkerNodesOrDie(cs)
-		framework.ExpectNoError(err)
+		_, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 
 		err = framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)

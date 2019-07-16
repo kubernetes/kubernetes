@@ -499,7 +499,11 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
 		nodeIP, err := e2enode.PickIP(jig.Client) // for later
-		framework.ExpectNoError(err)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		service := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
@@ -556,7 +560,11 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
 		nodeIP, err := e2enode.PickIP(jig.Client) // for later
-		framework.ExpectNoError(err)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 
 		// Test TCP and UDP Services.  Services with the same name in different
 		// namespaces should get different node ports and load balancers.
