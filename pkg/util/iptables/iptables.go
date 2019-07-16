@@ -126,6 +126,7 @@ const MinCheckVersion = "1.4.11"
 // Minimum iptables versions supporting the -w and -w<seconds> flags
 const WaitMinVersion = "1.4.20"
 const WaitSecondsMinVersion = "1.4.22"
+const WaitRestoreMinVersion = "1.6.2"
 const WaitString = "-w"
 const WaitSecondsValue = "5"
 
@@ -167,7 +168,7 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		hasCheck:        getIPTablesHasCheckCommand(vstring),
 		hasListener:     false,
 		waitFlag:        getIPTablesWaitFlag(vstring),
-		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec, protocol),
+		restoreWaitFlag: getIPTablesRestoreWaitFlag(vstring),
 		lockfilePath:    lockfilePath,
 	}
 	return runner
@@ -580,7 +581,6 @@ func getIPTablesWaitFlag(vstring string) []string {
 		return []string{WaitString}
 	}
 	return []string{WaitString, WaitSecondsValue}
-
 }
 
 // getIPTablesVersionString runs "iptables --version" to get the version string
@@ -601,44 +601,22 @@ func getIPTablesVersionString(exec utilexec.Interface, protocol Protocol) (strin
 }
 
 // Checks if iptables-restore has a "wait" flag
-// --wait support landed in v1.6.1+ right before --version support, so
-// any version of iptables-restore that supports --version will also
-// support --wait
-func getIPTablesRestoreWaitFlag(exec utilexec.Interface, protocol Protocol) []string {
-	vstring, err := getIPTablesRestoreVersionString(exec, protocol)
-	if err != nil || vstring == "" {
-		klog.V(3).Infof("couldn't get iptables-restore version; assuming it doesn't support --wait")
-		return nil
-	}
-	if _, err := utilversion.ParseGeneric(vstring); err != nil {
-		klog.V(3).Infof("couldn't parse iptables-restore version; assuming it doesn't support --wait")
-		return nil
-	}
-
-	return []string{WaitString, WaitSecondsValue}
-}
-
-// getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
-// in the form "X.X.X"
-func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
-	// this doesn't access mutable state so we don't need to use the interface / runner
-
-	// iptables-restore hasn't always had --version, and worse complains
-	// about unrecognized commands but doesn't exit when it gets them.
-	// Work around that by setting stdin to nothing so it exits immediately.
-	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
-	cmd := exec.Command(iptablesRestoreCmd, "--version")
-	cmd.SetStdin(bytes.NewReader([]byte{}))
-	bytes, err := cmd.CombinedOutput()
+func getIPTablesRestoreWaitFlag(vstring string) []string {
+	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
-		return "", err
+		klog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		return nil
 	}
-	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
-	match := versionMatcher.FindStringSubmatch(string(bytes))
-	if match == nil {
-		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
+
+	minVersion, err := utilversion.ParseGeneric(WaitRestoreMinVersion)
+	if err != nil {
+		klog.Errorf("WaitRestoreMinVersion (%s) is not a valid version string: %v", WaitRestoreMinVersion, err)
+		return nil
 	}
-	return match[1], nil
+	if version.LessThan(minVersion) {
+		return nil
+	}
+	return []string{WaitString, WaitSecondsValue}
 }
 
 // goroutine to listen for D-Bus signals

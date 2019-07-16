@@ -46,22 +46,18 @@ func protocolStr(protocol Protocol) string {
 func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 	version := " v1.9.22"
 	iptablesCmd := iptablesCommand(protocol)
-	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
 	protoStr := protocolStr(protocol)
 
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version response (for runner instantiation)
 			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
-			// iptables-restore version response (for runner instantiation)
-			func() ([]byte, error) { return []byte(iptablesRestoreCmd + version), nil },
 			// iptables version  response (for call to runner.GetVersion())
 			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -74,18 +70,13 @@ func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 		t.Errorf("%s runner instantiate: Expected cmd '%s --version', Got '%s'", protoStr, iptablesCmd, fcmd.CombinedOutputLog[0])
 	}
 
-	// Check that proper iptables restore version command was used during runner instantiation
-	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(iptablesRestoreCmd, "--version") {
-		t.Errorf("%s runner instantiate: Expected cmd '%s --version', Got '%s'", protoStr, iptablesRestoreCmd, fcmd.CombinedOutputLog[1])
-	}
-
 	_, err := runner.GetVersion()
 	if err != nil {
 		t.Errorf("%s GetVersion: Expected success, got %v", protoStr, err)
 	}
 
 	// Check that proper iptables version command was used for runner.GetVersion
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll(iptablesCmd, "--version") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(iptablesCmd, "--version") {
 		t.Errorf("%s GetVersion: Expected cmd '%s --version', Got '%s'", protoStr, iptablesCmd, fcmd.CombinedOutputLog[2])
 	}
 }
@@ -105,8 +96,6 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Exists.
@@ -117,7 +106,6 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -134,11 +122,11 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	if exists {
 		t.Errorf("%s new chain: Expected exists = false", protoStr)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("%s new chain: Expected 3 CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("%s new chain: Expected 2 CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
 	}
 	cmd := iptablesCommand(protocol)
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("%s new chain: Expected cmd containing '%s -t nat -N FOOBAR', got %s", protoStr, cmd, fcmd.CombinedOutputLog[2])
 	}
 	// Exists.
@@ -169,8 +157,6 @@ func TestFlushChain(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
@@ -179,7 +165,6 @@ func TestFlushChain(t *testing.T) {
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -192,10 +177,10 @@ func TestFlushChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 	// Failure.
@@ -210,8 +195,6 @@ func TestDeleteChain(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
@@ -220,7 +203,6 @@ func TestDeleteChain(t *testing.T) {
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -233,10 +215,10 @@ func TestDeleteChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 	// Failure.
@@ -251,8 +233,6 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 		},
@@ -260,8 +240,6 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Success of that exec means "done".
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -276,10 +254,10 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 	if !exists {
 		t.Errorf("expected exists = true")
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -289,8 +267,6 @@ func TestEnsureRuleNew(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Status 1 on the first call.
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 			// Success on the second call.
@@ -300,8 +276,6 @@ func TestEnsureRuleNew(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -317,10 +291,10 @@ func TestEnsureRuleNew(t *testing.T) {
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	if fcmd.CombinedOutputCalls != 4 {
-		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 3 {
+		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
 }
@@ -330,8 +304,6 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Status 2 on the first call.
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
 		},
@@ -340,9 +312,38 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
+			// The second Command() call is checking the rule.  Failure of that means create it.
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
+	if err == nil {
+		t.Errorf("expected failure")
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+}
+
+func TestEnsureRuleErrorCreating(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			// Status 1 on the first call.
+			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			// Status 1 on the second call.
+			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Failure of that means create it.
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -357,48 +358,11 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 	}
 }
 
-func TestEnsureRuleErrorCreating(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
-			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
-			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
-	defer runner.Destroy()
-	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
-	if err == nil {
-		t.Errorf("expected failure")
-	}
-	if fcmd.CombinedOutputCalls != 4 {
-		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-}
-
 func TestDeleteRuleDoesNotExist(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Status 1 on the first call.
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 		},
@@ -406,8 +370,6 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Failure of that exec means "does not exist".
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -419,10 +381,10 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -432,8 +394,6 @@ func TestDeleteRuleExists(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success on the first call.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Success on the second call.
@@ -443,8 +403,6 @@ func TestDeleteRuleExists(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Success of that means delete it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -457,10 +415,10 @@ func TestDeleteRuleExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 4 {
-		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 3 {
+		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
 }
@@ -470,8 +428,6 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Status 2 on the first call.
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
 		},
@@ -479,8 +435,6 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -492,8 +446,8 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected failure")
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -502,8 +456,6 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success on the first call.
 			func() ([]byte, error) { return []byte{}, nil },
 			// Status 1 on the second call.
@@ -513,8 +465,6 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// The second Command() call is checking the rule.  Success of that means delete it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -527,8 +477,8 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected failure")
 	}
-	if fcmd.CombinedOutputCalls != 4 {
-		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 3 {
+		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -707,8 +657,6 @@ func TestWaitFlagUnavailable(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.4.19"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 		},
@@ -716,8 +664,6 @@ func TestWaitFlagUnavailable(t *testing.T) {
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
 			// iptables version check
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// iptables-restore version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -728,10 +674,10 @@ func TestWaitFlagUnavailable(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).Has(WaitString) {
+	if sets.NewString(fcmd.CombinedOutputLog[1]...).Has(WaitString) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -741,15 +687,12 @@ func TestWaitFlagOld(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.4.20"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -760,14 +703,14 @@ func TestWaitFlagOld(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", WaitString) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).Has(WaitSecondsValue) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if sets.NewString(fcmd.CombinedOutputLog[1]...).Has(WaitSecondsValue) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 }
 
@@ -776,15 +719,12 @@ func TestWaitFlagNew(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -795,11 +735,11 @@ func TestWaitFlagNew(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", WaitString, WaitSecondsValue) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 }
 
@@ -815,8 +755,6 @@ func TestReload(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 
 			// first reload
 			// EnsureChain
@@ -837,7 +775,6 @@ func TestReload(t *testing.T) {
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -877,16 +814,16 @@ func TestReload(t *testing.T) {
 	<-reloaded
 	<-reloaded
 
-	if fcmd.CombinedOutputCalls != 5 {
-		t.Errorf("expected 5 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("expected 4 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[4]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[4])
 	}
 
@@ -895,7 +832,7 @@ func TestReload(t *testing.T) {
 	dbusConn.EmitSignal("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameOwnerChanged", "io.k8s.Something", "", ":1.1")
 	<-reloaded
 
-	if fcmd.CombinedOutputCalls != 5 {
+	if fcmd.CombinedOutputCalls != 4 {
 		t.Errorf("Incorrect signal caused a reload")
 	}
 
@@ -903,16 +840,16 @@ func TestReload(t *testing.T) {
 	<-reloaded
 	<-reloaded
 
-	if fcmd.CombinedOutputCalls != 8 {
-		t.Errorf("expected 8 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 7 {
+		t.Errorf("expected 7 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[5]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
+	if !sets.NewString(fcmd.CombinedOutputLog[4]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[5])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[6]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[5]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[6])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[7]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[6]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[7])
 	}
 }
@@ -921,7 +858,6 @@ func testSaveInto(t *testing.T, protocol Protocol) {
 	version := " v1.9.22"
 	iptablesCmd := iptablesCommand(protocol)
 	iptablesSaveCmd := iptablesSaveCommand(protocol)
-	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
 	protoStr := protocolStr(protocol)
 
 	output := fmt.Sprintf(`# Generated by %s on Thu Jan 19 11:38:09 2017
@@ -938,8 +874,6 @@ COMMIT
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte(iptablesRestoreCmd + version), nil },
 		},
 		RunScript: []fakeexec.FakeRunAction{
 			func() ([]byte, []byte, error) { return []byte(output), []byte(stderrOutput), nil },
@@ -948,7 +882,6 @@ COMMIT
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -968,8 +901,8 @@ COMMIT
 		t.Errorf("%s: Expected output '%s', got '%v'", protoStr, output, string(buffer.Bytes()))
 	}
 
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("%s: Expected 2 CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 1 {
+		t.Errorf("%s: Expected 1 CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
 	}
 	if fcmd.RunCalls != 1 {
 		t.Errorf("%s: Expected 1 Run() call, got %d", protoStr, fcmd.RunCalls)
@@ -1007,8 +940,6 @@ func testRestore(t *testing.T, protocol Protocol) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte(iptablesRestoreCmd + version), nil },
 			func() ([]byte, error) { return []byte{}, nil },
 			func() ([]byte, error) { return []byte{}, nil },
 			func() ([]byte, error) { return []byte{}, nil },
@@ -1018,7 +949,6 @@ func testRestore(t *testing.T, protocol Protocol) {
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -1036,9 +966,9 @@ func testRestore(t *testing.T, protocol Protocol) {
 		t.Errorf("%s flush,restore: Expected success, got %v", protoStr, err)
 	}
 
-	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
+	commandSet := sets.NewString(fcmd.CombinedOutputLog[1]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT), "--counters") || commandSet.HasAny("--noflush") {
-		t.Errorf("%s flush, restore: Expected cmd containing '%s -T %s --counters', got '%s'", protoStr, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[2])
+		t.Errorf("%s flush, restore: Expected cmd containing '%s -T %s --counters', got '%s'", protoStr, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[1])
 	}
 
 	// FlushTables, NoRestoreCounters
@@ -1047,9 +977,9 @@ func testRestore(t *testing.T, protocol Protocol) {
 		t.Errorf("%s flush, no restore: Expected success, got %v", protoStr, err)
 	}
 
-	commandSet = sets.NewString(fcmd.CombinedOutputLog[3]...)
+	commandSet = sets.NewString(fcmd.CombinedOutputLog[2]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT)) || commandSet.HasAny("--noflush", "--counters") {
-		t.Errorf("%s flush, no restore: Expected cmd containing '--noflush' or '--counters', got '%s'", protoStr, fcmd.CombinedOutputLog[3])
+		t.Errorf("%s flush, no restore: Expected cmd containing '--noflush' or '--counters', got '%s'", protoStr, fcmd.CombinedOutputLog[2])
 	}
 
 	// NoFlushTables, RestoreCounters
@@ -1058,9 +988,9 @@ func testRestore(t *testing.T, protocol Protocol) {
 		t.Errorf("%s no flush, restore: Expected success, got %v", protoStr, err)
 	}
 
-	commandSet = sets.NewString(fcmd.CombinedOutputLog[4]...)
+	commandSet = sets.NewString(fcmd.CombinedOutputLog[3]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT), "--noflush", "--counters") {
-		t.Errorf("%s no flush, restore: Expected cmd containing '--noflush' and '--counters', got '%s'", protoStr, fcmd.CombinedOutputLog[4])
+		t.Errorf("%s no flush, restore: Expected cmd containing '--noflush' and '--counters', got '%s'", protoStr, fcmd.CombinedOutputLog[3])
 	}
 
 	// NoFlushTables, NoRestoreCounters
@@ -1069,13 +999,13 @@ func testRestore(t *testing.T, protocol Protocol) {
 		t.Errorf("%s no flush, no restore: Expected success, got %v", protoStr, err)
 	}
 
-	commandSet = sets.NewString(fcmd.CombinedOutputLog[5]...)
+	commandSet = sets.NewString(fcmd.CombinedOutputLog[4]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT), "--noflush") || commandSet.HasAny("--counters") {
-		t.Errorf("%s no flush, no restore: Expected cmd containing '%s -T %s --noflush', got '%s'", protoStr, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[5])
+		t.Errorf("%s no flush, no restore: Expected cmd containing '%s -T %s --noflush', got '%s'", protoStr, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[4])
 	}
 
-	if fcmd.CombinedOutputCalls != 6 {
-		t.Errorf("%s: Expected 6 total CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 5 {
+		t.Errorf("%s: Expected 5 total CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
 	}
 
 	// Failure.
@@ -1099,15 +1029,12 @@ func TestRestoreAll(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			func() ([]byte, error) { return []byte{}, nil },
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -1122,13 +1049,13 @@ func TestRestoreAll(t *testing.T) {
 		t.Fatalf("expected success, got %v", err)
 	}
 
-	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
+	commandSet := sets.NewString(fcmd.CombinedOutputLog[1]...)
 	if !commandSet.HasAll("iptables-restore", "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 
 	// Failure.
@@ -1144,15 +1071,12 @@ func TestRestoreAllWait(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
 			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			func() ([]byte, error) { return []byte{}, nil },
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -1167,13 +1091,13 @@ func TestRestoreAllWait(t *testing.T) {
 		t.Fatalf("expected success, got %v", err)
 	}
 
-	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
+	commandSet := sets.NewString(fcmd.CombinedOutputLog[1]...)
 	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, "--counters", "--noflush") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 
 	// Failure.
@@ -1184,21 +1108,18 @@ func TestRestoreAllWait(t *testing.T) {
 }
 
 // TestRestoreAllWaitOldIptablesRestore tests that the "wait" flag is not passed
-// to a in-compatible iptables-restore
+// to an old iptables-restore
 func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("unrecognized option: --version"), nil },
+			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
 			func() ([]byte, error) { return []byte{}, nil },
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -1213,16 +1134,16 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 		t.Fatalf("expected success, got %v", err)
 	}
 
-	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
+	commandSet := sets.NewString(fcmd.CombinedOutputLog[1]...)
 	if !commandSet.HasAll("iptables-restore", "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 	if commandSet.HasAll(WaitString, WaitSecondsValue) {
-		t.Errorf("wrong CombinedOutput() log (unexpected %s option), got %s", WaitString, fcmd.CombinedOutputLog[2])
+		t.Errorf("wrong CombinedOutput() log (unexpected %s option), got %s", WaitString, fcmd.CombinedOutputLog[1])
 	}
 
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 
 	// Failure.
@@ -1239,14 +1160,11 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("unrecognized option: --version"), nil },
+			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -1282,14 +1200,11 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			// iptables-restore version check
-			func() ([]byte, error) { return []byte("unrecognized option: --version"), nil },
+			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
