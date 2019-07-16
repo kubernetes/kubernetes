@@ -275,7 +275,6 @@ filegroup(
         "//vendor/github.com/jonboulle/clockwork:all-srcs",
         "//vendor/github.com/json-iterator/go:all-srcs",
         "//vendor/github.com/jstemmer/go-junit-report:all-srcs",
-        "//vendor/github.com/kardianos/osext:all-srcs",
         "//vendor/github.com/karrick/godirwalk:all-srcs",
         "//vendor/github.com/konsorten/go-windows-terminal-sequences:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/api:all-srcs",

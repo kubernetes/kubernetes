@@ -565,8 +565,6 @@ github.com/json-iterator/go
 github.com/jstemmer/go-junit-report
 github.com/jstemmer/go-junit-report/formatter
 github.com/jstemmer/go-junit-report/parser
-# github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22 => github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
-github.com/kardianos/osext
 # github.com/karrick/godirwalk v1.7.5 => github.com/karrick/godirwalk v1.7.5
 github.com/karrick/godirwalk
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1 => github.com/konsorten/go-windows-terminal-sequences v1.0.1

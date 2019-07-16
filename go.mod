@@ -87,7 +87,6 @@ require (
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.6
 	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
-	github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk v1.7.5 // indirect
 	github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -312,7 +311,6 @@ replace (
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.6
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
-	github.com/kardianos/osext => github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
