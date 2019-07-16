@@ -426,28 +426,19 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any
 // instance is not found
 func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
-	instanceOrErrors, err := g.getInstanceOrErrorsByNames(names)
+	foundInstances, err := g.getFoundInstanceByNames(names)
 	if err != nil {
 		return nil, err
 	}
-	var allInstances []*gceInstance
-	for _, entry := range instanceOrErrors {
-		if entry.err != nil {
-			return nil, entry.err
-		}
-		allInstances = append(allInstances, entry.instance)
+	if len(foundInstances) != len(names) {
+		return nil, cloudprovider.InstanceNotFound
 	}
-	return allInstances, nil
+	return foundInstances, nil
 }
 
-type instanceOrError struct {
-	instance *gceInstance
-	err      error
-}
-
-// Gets the named instances, returning a map of each name to either the found instances or
-// cloudprovider.InstanceNotFound if the instance is not found
-func (g *Cloud) getInstanceOrErrorsByNames(allNames []string) (map[string]*instanceOrError, error) {
+// Gets the named instances, returning a list of gceInstances it was able to find from the provided
+// list of names.
+func (g *Cloud) getFoundInstanceByNames(names []string) ([]*gceInstance, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
@@ -494,20 +485,17 @@ func (g *Cloud) getInstanceOrErrorsByNames(allNames []string) (map[string]*insta
 		}
 	}
 
-	if remaining > 0 {
-		var failed []string
-		for k := range found {
-			if found[k] == nil {
-				failed = append(failed, k)
-			}
-		}
-		klog.Errorf("Failed to retrieve instances: %v", failed)
-		return nil, cloudprovider.InstanceNotFound
-	}
-
 	var ret []*gceInstance
-	for _, instance := range found {
-		ret = append(ret, instance)
+	var failed []string
+	for name, instance := range found {
+		if instance != nil {
+			ret = append(ret, instance)
+		} else {
+			failed = append(failed, name)
+		}
+	}
+	if len(failed) > 0 {
+		klog.Errorf("Failed to retrieve instances: %v", failed)
 	}
 
 	return ret, nil
