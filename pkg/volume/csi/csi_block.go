@@ -133,7 +133,8 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		fsTypeBlockName,
 		accessMode,
 		nodeStageSecrets,
-		csiSource.VolumeAttributes)
+		csiSource.VolumeAttributes,
+		nil /* MountOptions */)
 
 	if err != nil {
 		klog.Error(log("blockMapper.stageVolumeForBlock failed: %v", err))
