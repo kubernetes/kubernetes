@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/klog"
@@ -39,7 +41,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
@@ -85,10 +86,14 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
 func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, ControlPlaneTaint bool) error {
 	var err error
-	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
-	if err != nil {
-		return err
+	cfg.Name = strings.TrimSpace(cfg.Name)
+	if cfg.Name == "" {
+		cfg.Name, err = os.Hostname()
+		if err != nil {
+			return errors.Wrap(err, "couldn't determine hostname")
+		}
 	}
+	cfg.Name = strings.ToLower(cfg.Name)
 
 	// Only if the slice is nil, we should append the control-plane taint. This allows the user to specify an empty slice for no default control-plane taint
 	if ControlPlaneTaint && cfg.Taints == nil {

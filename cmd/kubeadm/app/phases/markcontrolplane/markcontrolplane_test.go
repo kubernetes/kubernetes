@@ -22,6 +22,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -29,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 func TestMarkControlPlane(t *testing.T) {
@@ -108,10 +109,12 @@ func TestMarkControlPlane(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hostname, err := node.GetHostname("")
+			hostname, err := os.Hostname()
 			if err != nil {
-				t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
+				t.Fatalf("MarkControlPlane(%s): couldn't determine hostname: %v", tc.name, err)
 			}
+			hostname = strings.ToLower(hostname)
+
 			controlPlaneNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: hostname,
