@@ -44,6 +44,22 @@ const (
 	NonResourceAll = "*"
 )
 
+// System preset priority level names
+const (
+	PriorityLevelConfigurationNameSystemTop   = "system-top"
+	PriorityLevelConfigurationNameWorkloadLow = "workload-low"
+)
+
+// Default settings for flow-schema
+const (
+	FlowSchemaDefaultMatchingPrecedence int32 = 1000
+)
+
+// Default settings for priority-level-configuration
+const (
+	PriorityLevelConfigurationDefaultHandSize int32 = 1
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
