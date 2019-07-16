@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"strings"
 
 	mangen "github.com/cpuguy83/go-md2man/md2man"
@@ -57,7 +58,8 @@ func main() {
 
 	// Set environment variables used by command so the output is consistent,
 	// regardless of where we run.
-	os.Setenv("HOME", "/home/username")
+	user := user.Current()
+	os.Setenv("HOME", "/home/" + user.Username)
 
 	switch module {
 	case "kube-apiserver":
