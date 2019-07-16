@@ -26,6 +26,7 @@ const (
 	//
 	// alpha: v1.8 (for Services)
 	AlphaFeatureNetworkTiers = "NetworkTiers"
+	AlphaFeatureILBSubsets   = "ILBSubsets"
 )
 
 // AlphaFeatureGate contains a mapping of alpha features to whether they are enabled
