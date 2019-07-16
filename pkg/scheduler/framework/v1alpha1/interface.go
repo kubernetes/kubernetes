@@ -42,6 +42,8 @@ const (
 	Unschedulable
 	// Wait is used when a permit plugin finds a pod scheduling should wait.
 	Wait
+	// Skip is used when a bind plugin chooses to skip binding.
+	Skip
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
@@ -192,6 +194,19 @@ type PermitPlugin interface {
 	Permit(pc *PluginContext, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
+// BindPlugin is an interface that must be implemented by "bind" plugins. Bind
+// plugins are used to bind a pod to a Node.
+type BindPlugin interface {
+	Plugin
+	// Bind plugins will not be called until all pre-bind plugins have completed. Each
+	// bind plugin is called in the configured order. A bind plugin may choose whether
+	// or not to handle the given Pod. If a bind plugin chooses to handle a Pod, the
+	// remaining bind plugins are skipped. When a bind plugin does not handle a pod,
+	// it must return Skip in its Status code. If a bind plugin returns an Error, the
+	// pod is rejected and will not be bound.
+	Bind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -231,6 +246,13 @@ type Framework interface {
 	// Note that if multiple plugins asked to wait, then we wait for the minimum
 	// timeout duration.
 	RunPermitPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	// RunBindPlugins runs the set of configured bind plugins. A bind plugin may choose
+	// whether or not to handle the given Pod. If a bind plugin chooses to skip the
+	// binding, it should return code=4("skip") status. Otherwise, it should return "Error"
+	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
+	// code=4("skip") status.
+	RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is
