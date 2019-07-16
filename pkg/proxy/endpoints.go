@@ -48,7 +48,8 @@ var supportedEndpointSliceAddressTypes = sets.NewString(
 type BaseEndpointInfo struct {
 	Endpoint string // TODO: should be an endpointString type
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
-	IsLocal bool
+	IsLocal  bool
+	Topology map[string]string
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -61,6 +62,11 @@ func (info *BaseEndpointInfo) String() string {
 // GetIsLocal is part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) GetIsLocal() bool {
 	return info.IsLocal
+}
+
+// GetTopology returns the topology information of the endpoint.
+func (info *BaseEndpointInfo) GetTopology() map[string]string {
+	return info.Topology
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
@@ -78,10 +84,11 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newBaseEndpointInfo(IP string, port int, isLocal bool) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
 		IsLocal:  isLocal,
+		Topology: topology,
 	}
 }
 
@@ -358,7 +365,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {

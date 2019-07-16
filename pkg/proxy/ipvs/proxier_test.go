@@ -2951,7 +2951,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expe
 					t.Errorf("Failed to cast proxy.BaseEndpointInfo")
 					continue
 				}
-				if *newEp != *(expected[x][i]) {
+				if !reflect.DeepEqual(*newEp, *(expected[x][i])) {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
@@ -3702,7 +3702,6 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Add initial service
 	serviceName := "svc1"
 	namespaceName := "ns1"
-
 	fp.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
