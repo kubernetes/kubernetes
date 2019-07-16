@@ -23,6 +23,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	flowcontrolv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
 )
 
 func init() {
@@ -32,4 +33,5 @@ func init() {
 // Install registers the API group and adds types to a scheme
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(flowcontrol.AddToScheme(scheme))
+	utilruntime.Must(flowcontrolv1alpha1.AddToScheme(scheme))
 }
