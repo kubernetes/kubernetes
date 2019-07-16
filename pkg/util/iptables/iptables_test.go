@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -52,13 +53,10 @@ func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// iptables version response (for runner instantiation)
 			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
-			// iptables version  response (for call to runner.GetVersion())
-			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -68,16 +66,6 @@ func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 	// Check that proper iptables version command was used during runner instantiation
 	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll(iptablesCmd, "--version") {
 		t.Errorf("%s runner instantiate: Expected cmd '%s --version', Got '%s'", protoStr, iptablesCmd, fcmd.CombinedOutputLog[0])
-	}
-
-	_, err := runner.GetVersion()
-	if err != nil {
-		t.Errorf("%s GetVersion: Expected success, got %v", protoStr, err)
-	}
-
-	// Check that proper iptables version command was used for runner.GetVersion
-	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(iptablesCmd, "--version") {
-		t.Errorf("%s GetVersion: Expected cmd '%s --version', Got '%s'", protoStr, iptablesCmd, fcmd.CombinedOutputLog[2])
 	}
 }
 
@@ -485,14 +473,13 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 func TestGetIPTablesHasCheckCommand(t *testing.T) {
 	testCases := []struct {
 		Version  string
-		Err      bool
 		Expected bool
 	}{
-		{"iptables v1.4.7", false, false},
-		{"iptables v1.4.11", false, true},
-		{"iptables v1.4.19.1", false, true},
-		{"iptables v2.0.0", false, true},
-		{"total junk", true, false},
+		{"iptables v1.4.7", false},
+		{"iptables v1.4.11", true},
+		{"iptables v1.4.19.1", true},
+		{"iptables v2.0.0", true},
+		{"total junk", true},
 	}
 
 	for _, testCase := range testCases {
@@ -506,15 +493,10 @@ func TestGetIPTablesHasCheckCommand(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		version, err := getIPTablesVersionString(&fexec, ProtocolIpv4)
-		if (err != nil) != testCase.Err {
-			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
-		}
-		if err == nil {
-			check := getIPTablesHasCheckCommand(version)
-			if testCase.Expected != check {
-				t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
-			}
+		ipt := New(&fexec, nil, ProtocolIpv4)
+		runner := ipt.(*runner)
+		if testCase.Expected != runner.hasCheck {
+			t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, runner.hasCheck)
 		}
 	}
 }
@@ -645,7 +627,7 @@ func TestIPTablesWaitFlag(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		result := getIPTablesWaitFlag(testCase.Version)
+		result := getIPTablesWaitFlag(utilversion.MustParseGeneric(testCase.Version))
 		if !reflect.DeepEqual(result, testCase.Result) {
 			t.Errorf("For %s expected %v got %v", testCase.Version, testCase.Result, result)
 		}

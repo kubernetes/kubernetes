@@ -52,10 +52,6 @@ func NewFakeIPTables() *fakeIPTables {
 	}
 }
 
-func (f *fakeIPTables) GetVersion() (string, error) {
-	return "1.4.21", nil
-}
-
 func (f *fakeIPTables) getTable(tableName utiliptables.Table) (*fakeTable, error) {
 	table, ok := f.tables[string(tableName)]
 	if !ok {
