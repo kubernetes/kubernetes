@@ -59,7 +59,6 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
