@@ -1175,8 +1175,11 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 
 		if wantToRun {
 			desiredNumberScheduled++
-			if scheduled {
+			if !scheduled {
 				currentNumberScheduled++
+			} else {
+				numberMisscheduled++
+
 				// Sort the daemon pods by creation time, so that the oldest is first.
 				daemonPods, _ := nodeToDaemonPods[node.Name]
 				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
@@ -1200,6 +1203,27 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 		} else {
 			if scheduled {
 				numberMisscheduled++
+				desiredNumberScheduled++
+
+				// Sort the daemon pods by creation time, so that the oldest is first.
+				daemonPods, _ := nodeToDaemonPods[node.Name]
+				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
+				pod := daemonPods[0]
+				if podutil.IsPodReady(pod) {
+					numberReady++
+					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+						numberAvailable++
+					}
+				}
+				// If the returned error is not nil we have a parse error.
+				// The controller handles this via the hash.
+				generation, err := util.GetTemplateGeneration(ds)
+				if err != nil {
+					generation = nil
+				}
+				if util.IsPodUpdated(pod, hash, generation) {
+					updatedNumberScheduled++
+				}
 			}
 		}
 	}

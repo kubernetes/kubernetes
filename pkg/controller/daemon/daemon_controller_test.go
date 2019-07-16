@@ -644,8 +644,16 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 
 			// Make sure the single sync() updated Status already for the change made
 			// during the manage() phase.
-			if got, want := updated.Status.CurrentNumberScheduled, int32(5); got != want {
+			if got, want := updated.Status.CurrentNumberScheduled, int32(0); got != want {
 				t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
+			}
+
+			if got, want := updated.Status.DesiredNumberScheduled, int32(5); got != want {
+				t.Errorf("Status.DesiredNumberScheduled = %v, want %v", got, want)
+			}
+
+			if got, want := updated.Status.NumberMisscheduled, int32(5); got != want {
+				t.Errorf("Status.NumberMisscheduled = %v, want %v", got, want)
 			}
 		}
 	}
