@@ -647,8 +647,9 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 
 func createPDWithRetry(zone string) (string, error) {
 	var err error
+	var newDiskName string
 	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
-		newDiskName, err := createPD(zone)
+		newDiskName, err = createPD(zone)
 		if err != nil {
 			e2elog.Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
 			continue
