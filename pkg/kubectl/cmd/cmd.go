@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -422,8 +423,12 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 		return nil
 	}
 
+	// add KUBECTL_BINARY environment variable, so that downstream plugins can use this for help/examples
+	pluginEnvironment := os.Environ()
+	pluginEnvironment = append(pluginEnvironment, fmt.Sprintf("KUBECTL_BINARY=%s", filepath.Base(os.Args[0])))
+
 	// invoke cmd binary relaying the current environment and args given
-	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], os.Environ()); err != nil {
+	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], pluginEnvironment); err != nil {
 		return err
 	}
 
