@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -85,6 +86,7 @@ type PermitPlugin struct {
 	timeoutPermit       bool
 	waitAndRejectPermit bool
 	waitAndAllowPermit  bool
+	allowPermit         bool
 	fh                  framework.FrameworkHandle
 }
 
@@ -363,6 +365,9 @@ func (pp *PermitPlugin) Permit(pc *framework.PluginContext, pod *v1.Pod, nodeNam
 	if pp.timeoutPermit {
 		return framework.NewStatus(framework.Wait, ""), 3 * time.Second
 	}
+	if pp.allowPermit && pod.Name != "waiting-pod" {
+		return nil, 0
+	}
 	if pp.waitAndRejectPermit || pp.waitAndAllowPermit {
 		if pod.Name == "waiting-pod" {
 			return framework.NewStatus(framework.Wait, ""), 30 * time.Second
@@ -395,6 +400,7 @@ func (pp *PermitPlugin) reset() {
 	pp.timeoutPermit = false
 	pp.waitAndRejectPermit = false
 	pp.waitAndAllowPermit = false
+	pp.allowPermit = false
 }
 
 // NewPermitPlugin is the factory for permit plugin.
@@ -1381,4 +1387,93 @@ func TestFilterPlugin(t *testing.T) {
 		filterPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
+}
+
+// TestPreemptWithPermitPlugin tests preempt with permit plugins.
+func TestPreemptWithPermitPlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a permit plugin.
+	registry := framework.Registry{permitPluginName: NewPermitPlugin}
+
+	// Setup initial permit plugin for testing.
+	plugins := &schedulerconfig.Plugins{
+		Permit: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: permitPluginName,
+				},
+			},
+		},
+	}
+	// Set permit plugin config for testing
+	pluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: permitPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "preempt-with-permit-plugin", nil),
+		false, nil, registry, plugins, pluginConfig, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add one node.
+	nodeRes := &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+	}
+	_, err := createNodes(cs, "test-node", nodeRes, 1)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	perPlugin.failPermit = false
+	perPlugin.rejectPermit = false
+	perPlugin.timeoutPermit = false
+	perPlugin.waitAndRejectPermit = false
+	perPlugin.waitAndAllowPermit = true
+	perPlugin.allowPermit = true
+
+	lowPriority, highPriority := int32(100), int32(300)
+	resourceRequest := v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI)},
+	}
+
+	// Create two pods.
+	waitingPod, err := createPausePod(cs,
+		initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.ns.Name, Priority: &lowPriority, Resources: &resourceRequest}))
+	if err != nil {
+		t.Errorf("Error while creating the waiting pod: %v", err)
+	}
+	// Wait until the waiting-pod is actually waiting, then create a preemptor pod to preempt it.
+	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+		w := false
+		perPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
+		return w, nil
+	})
+
+	preemptorPod, err := createPausePod(cs,
+		initPausePod(cs, &pausePodConfig{Name: "preemptor-pod", Namespace: context.ns.Name, Priority: &highPriority, Resources: &resourceRequest}))
+	if err != nil {
+		t.Errorf("Error while creating the preemptor pod: %v", err)
+	}
+
+	if err = waitForPodToSchedule(cs, preemptorPod); err != nil {
+		t.Errorf("Expected the preemptor pod to be scheduled. error: %v", err)
+	}
+
+	if _, err := getPod(cs, waitingPod.Name, waitingPod.Namespace); err == nil {
+		t.Error("Expected the waiting pod to get preempted and deleted")
+	}
+
+	if perPlugin.numPermitCalled == 0 {
+		t.Errorf("Expected the permit plugin to be called.")
+	}
+
+	perPlugin.reset()
+	cleanupPods(cs, t, []*v1.Pod{waitingPod, preemptorPod})
 }
