@@ -184,6 +184,12 @@ const (
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
 
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable nodes to exclude themselves from network disruption checks
+	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
+
 	// owner: @jsafrane
 	// alpha: v1.9
 	//
@@ -508,6 +514,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUCFSQuotaPeriod:                   {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                     {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:                {Default: false, PreRelease: featuregate.Alpha},
+	NodeDisruptionExclusion:             {Default: false, PreRelease: featuregate.Alpha},
 	MountContainers:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:                   {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                         {Default: true, PreRelease: featuregate.Beta},
