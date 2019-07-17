@@ -280,6 +280,7 @@ type iscsiDisk struct {
 	Portals       []string
 	Iqn           string
 	Lun           string
+	InitIface     string
 	Iface         string
 	chapDiscovery bool
 	chapSession   bool
@@ -551,12 +552,18 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		return nil, err
 	}
 
+	initIface := iface
+	if initiatorName != "" {
+		iface = bkportal[0] + ":" + spec.Name()
+	}
+
 	return &iscsiDisk{
 		podUID:        podUID,
 		VolName:       spec.Name(),
 		Portals:       bkportal,
 		Iqn:           iqn,
 		Lun:           lun,
+		InitIface:     initIface,
 		Iface:         iface,
 		chapDiscovery: chapDiscovery,
 		chapSession:   chapSession,
