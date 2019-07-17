@@ -68,7 +68,13 @@ type FairQueuingSystem interface {
 	SetRequestWaitLimit(time.Duration)
 
 	// DoOnEmpty records a function to be called when all the queues
-	// have no requests waiting nor executing
+	// have no requests waiting nor executing.  The filter uses this
+	// for a priority level that has become undesired, setting a
+	// callback that will actually remove the priority level by
+	// establishing a new RMState whose priorityLevelStates map lacks
+	// that entry.  If the priority level becomes desired again before
+	// this is called, the filter cancels by calling `DoOnEmpty(nil)`.
+	// The callback is invoked with no mutexes locked.
 	DoOnEmpty(func())
 
 	// Wait, in the happy case, shuffle shards the given request into
