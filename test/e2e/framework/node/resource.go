@@ -30,8 +30,8 @@ import (
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/util/system"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/system"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -371,7 +371,7 @@ func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, 
 		return nil, nil, fmt.Errorf("get nodes error: %s", err)
 	}
 	for _, n := range all.Items {
-		if system.IsMasterNode(n.Name) {
+		if system.DeprecatedMightBeMasterNode(n.Name) {
 			masters.Insert(n.Name)
 		} else if isNodeSchedulable(&n) && isNodeUntainted(&n) {
 			nodes.Items = append(nodes.Items, n)

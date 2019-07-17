@@ -39,7 +39,7 @@ func TestIsMasterNode(t *testing.T) {
 
 	for _, tc := range testCases {
 		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: tc.input}}
-		res := IsMasterNode(node.Name)
+		res := DeprecatedMightBeMasterNode(node.Name)
 		if res != tc.result {
 			t.Errorf("case \"%s\": expected %t, got %t", tc.input, tc.result, res)
 		}
