@@ -19,6 +19,7 @@ package gce
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"regexp"
@@ -452,35 +453,40 @@ func (g *Cloud) getFoundInstanceByNames(names []string) ([]*gceInstance, error) 
 		escapedInstanceNames = append(escapedInstanceNames, regexp.QuoteMeta(name))
 		found[name] = nil
 	}
-	nameRegex := fmt.Sprintf("^(%s)$", strings.Join(escapedInstanceNames, "|"))
 
-	for _, zone := range g.managedZones {
-		if remaining == 0 {
-			break
-		}
-		instances, err := g.c.Instances().List(ctx, zone, filter.Regexp("name", nameRegex))
-		if err != nil {
-			return nil, err
-		}
-		for _, inst := range instances {
+	// Max instances requested per call limited to 500, so results fit on 1 page
+	for i := 0; i < len(names); i += 500 {
+		end := int(math.Min(float64(i), float64(len(names))))
+		nameRegex := fmt.Sprintf("^(%s)$", strings.Join(escapedInstanceNames[i:end], "|"))
+
+		for _, zone := range g.managedZones {
 			if remaining == 0 {
 				break
 			}
-			if _, ok := found[inst.Name]; !ok {
-				continue
+			instances, err := g.c.Instances().List(ctx, zone, filter.Regexp("name", nameRegex))
+			if err != nil {
+				return nil, err
 			}
-			if found[inst.Name] != nil {
-				klog.Errorf("Instance name %q was duplicated (in zone %q and %q)", inst.Name, zone, found[inst.Name].Zone)
-				continue
+			for _, inst := range instances {
+				if remaining == 0 {
+					break
+				}
+				if _, ok := found[inst.Name]; !ok {
+					continue
+				}
+				if found[inst.Name] != nil {
+					klog.Errorf("Instance name %q was duplicated (in zone %q and %q)", inst.Name, zone, found[inst.Name].Zone)
+					continue
+				}
+				found[inst.Name] = &gceInstance{
+					Zone:  zone,
+					Name:  inst.Name,
+					ID:    inst.Id,
+					Disks: inst.Disks,
+					Type:  lastComponent(inst.MachineType),
+				}
+				remaining--
 			}
-			found[inst.Name] = &gceInstance{
-				Zone:  zone,
-				Name:  inst.Name,
-				ID:    inst.Id,
-				Disks: inst.Disks,
-				Type:  lastComponent(inst.MachineType),
-			}
-			remaining--
 		}
 	}
 
