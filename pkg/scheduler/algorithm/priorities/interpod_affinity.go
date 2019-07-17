@@ -17,14 +17,14 @@ limitations under the License.
 package priorities
 
 import (
-	"context"
+	"errors"
+	"fmt"
+	"math"
 	"sync"
-	"sync/atomic"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -47,92 +47,86 @@ func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
-	hardPodAffinityWeight int32) PriorityFunction {
+	hardPodAffinityWeight int32) (PriorityMapFunction, PriorityReduceFunction) {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
 		nodeLister:            nodeLister,
 		podLister:             podLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
-	return interPodAffinity.CalculateInterPodAffinityPriority
+	return interPodAffinity.CalculateInterPodAffinityPriorityMap, interPodAffinity.CalculateInterPodAffinityPriorityReduce
 }
 
 type podAffinityPriorityMap struct {
 	sync.Mutex
 
-	// nodes contain all nodes that should be considered
-	nodes []*v1.Node
 	// counts store the mapping from node name to so-far computed score of
 	// the node.
-	counts map[string]*int64
-	// The first error that we faced.
-	firstError error
+	counts map[string]int64
 }
 
-func newPodAffinityPriorityMap(nodes []*v1.Node) *podAffinityPriorityMap {
+func newPodAffinityPriorityMap() *podAffinityPriorityMap {
 	return &podAffinityPriorityMap{
-		nodes:  nodes,
-		counts: make(map[string]*int64, len(nodes)),
+		counts: make(map[string]int64),
 	}
 }
 
-func (p *podAffinityPriorityMap) setError(err error) {
-	p.Lock()
-	defer p.Unlock()
-	if p.firstError == nil {
-		p.firstError = err
-	}
-}
-
-func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight int64) {
+func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, nodes []*v1.Node, weight int64) error {
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
-		p.setError(err)
-		return
+		return err
 	}
 	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
 	if match {
-		for _, node := range p.nodes {
+		for _, node := range nodes {
 			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
-				atomic.AddInt64(p.counts[node.Name], weight)
+				p.Lock()
+				p.counts[node.Name] += weight
+				p.Unlock()
 			}
 		}
 	}
+
+	return nil
 }
 
-func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int) {
+func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, nodes []*v1.Node, multiplier int) error {
 	for i := range terms {
 		term := &terms[i]
-		p.processTerm(&term.PodAffinityTerm, podDefiningAffinityTerm, podToCheck, fixedNode, int64(term.Weight*int32(multiplier)))
-	}
-}
-
-// CalculateInterPodAffinityPriority compute a sum by iterating through the elements of weightedPodAffinityTerm and adding
-// "weight" to the sum if the corresponding PodAffinityTerm is satisfied for
-// that node; the node(s) with the highest sum are the most preferred.
-// Symmetry need to be considered for preferredDuringSchedulingIgnoredDuringExecution from podAffinity & podAntiAffinity,
-// symmetry need to be considered for hard requirements from podAffinity
-func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	affinity := pod.Spec.Affinity
-	hasAffinityConstraints := affinity != nil && affinity.PodAffinity != nil
-	hasAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil
-
-	// priorityMap stores the mapping from node name to so-far computed score of
-	// the node.
-	pm := newPodAffinityPriorityMap(nodes)
-	allNodeNames := make([]string, 0, len(nodeNameToInfo))
-	lazyInit := hasAffinityConstraints || hasAntiAffinityConstraints
-	for name := range nodeNameToInfo {
-		allNodeNames = append(allNodeNames, name)
-		// if pod has affinity defined, or target node has affinityPods
-		if lazyInit || len(nodeNameToInfo[name].PodsWithAffinity()) != 0 {
-			pm.counts[name] = new(int64)
+		if err := p.processTerm(&term.PodAffinityTerm, podDefiningAffinityTerm, podToCheck, fixedNode, nodes, int64(term.Weight*int32(multiplier))); err != nil {
+			return err
 		}
 	}
 
-	// convert the topology key based weights to the node name based weights
-	var maxCount, minCount int64
+	return nil
+}
+
+// CalculateInterPodAffinityPriorityMap returns error when node not found.
+func (ipa *InterPodAffinity) CalculateInterPodAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+	}
+
+	nodes, err := ipa.nodeLister.List()
+	if err != nil {
+		return schedulerapi.HostPriority{}, err
+	}
+
+	var pm *podAffinityPriorityMap
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use affinity from there.
+		pm = priorityMeta.podAffinityPriorityMap
+	}
+
+	if pm == nil {
+		return schedulerapi.HostPriority{}, errors.New("invalid priority metadata")
+	}
+
+	affinity := pod.Spec.Affinity
+	hasAffinityConstraints := affinity != nil && affinity.PodAffinity != nil
+	hasAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil
 
 	processPod := func(existingPod *v1.Pod) error {
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
@@ -152,14 +146,18 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPods>`s node by the term`s weight.
 			terms := affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, pod, existingPod, existingPodNode, 1)
+			if err := pm.processTerms(terms, pod, existingPod, existingPodNode, nodes, 1); err != nil {
+				return err
+			}
 		}
 		if hasAntiAffinityConstraints {
 			// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 			// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>`s node by the term`s weight.
 			terms := affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, pod, existingPod, existingPodNode, -1)
+			if err := pm.processTerms(terms, pod, existingPod, existingPodNode, nodes, -1); err != nil {
+				return err
+			}
 		}
 
 		if existingHasAffinityConstraints {
@@ -173,74 +171,97 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 				//	terms = append(terms, existingPodAffinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 				//}
 				for _, term := range terms {
-					pm.processTerm(&term, existingPod, pod, existingPodNode, int64(ipa.hardPodAffinityWeight))
+					if err := pm.processTerm(&term, existingPod, pod, existingPodNode, nodes, int64(ipa.hardPodAffinityWeight)); err != nil {
+						return err
+					}
 				}
 			}
 			// For every soft pod affinity term of <existingPod>, if <pod> matches the term,
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>'s node by the term's weight.
 			terms := existingPodAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, existingPod, pod, existingPodNode, 1)
+
+			if err := pm.processTerms(terms, existingPod, pod, existingPodNode, nodes, 1); err != nil {
+				return err
+			}
 		}
 		if existingHasAntiAffinityConstraints {
 			// For every soft pod anti-affinity term of <existingPod>, if <pod> matches the term,
 			// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>'s node by the term's weight.
 			terms := existingPodAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, existingPod, pod, existingPodNode, -1)
+			if err := pm.processTerms(terms, existingPod, pod, existingPodNode, nodes, -1); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
-	processNode := func(i int) {
-		nodeInfo := nodeNameToInfo[allNodeNames[i]]
-		if nodeInfo.Node() != nil {
-			if hasAffinityConstraints || hasAntiAffinityConstraints {
-				// We need to process all the pods.
-				for _, existingPod := range nodeInfo.Pods() {
-					if err := processPod(existingPod); err != nil {
-						pm.setError(err)
-					}
-				}
-			} else {
-				// The pod doesn't have any constraints - we need to check only existing
-				// ones that have some.
-				for _, existingPod := range nodeInfo.PodsWithAffinity() {
-					if err := processPod(existingPod); err != nil {
-						pm.setError(err)
-					}
-				}
+
+	if hasAffinityConstraints || hasAntiAffinityConstraints {
+		// We need to process all the pods.
+		for _, existingPod := range nodeInfo.Pods() {
+			if err := processPod(existingPod); err != nil {
+				return schedulerapi.HostPriority{}, err
+			}
+		}
+	} else {
+		// The pod doesn't have any constraints - we need to check only existing
+		// ones that have some.
+		for _, existingPod := range nodeInfo.PodsWithAffinity() {
+			if err := processPod(existingPod); err != nil {
+				return schedulerapi.HostPriority{}, err
 			}
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
-	if pm.firstError != nil {
-		return nil, pm.firstError
+
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: 0,
+	}, nil
+}
+
+// CalculateInterPodAffinityPriorityReduce compute a sum by iterating through the elements of weightedPodAffinityTerm and adding
+// "weight" to the sum if the corresponding PodAffinityTerm is satisfied for
+// that node; the node(s) with the highest sum are the most preferred.
+// Symmetry need to be considered for preferredDuringSchedulingIgnoredDuringExecution from podAffinity & podAntiAffinity,
+// symmetry need to be considered for hard requirements from podAffinity
+func (ipa *InterPodAffinity) CalculateInterPodAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error {
+	var pm *podAffinityPriorityMap
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use affinity from there.
+		pm = priorityMeta.podAffinityPriorityMap
 	}
 
-	for _, node := range nodes {
-		if pm.counts[node.Name] == nil {
+	if pm == nil {
+		return errors.New("invalid priority metadata")
+	}
+
+	// convert the topology key based weights to the node name based weights
+	var maxCount, minCount float64
+
+	for _, hostPriority := range result {
+		currentScore, ok := pm.counts[hostPriority.Host]
+		if !ok {
 			continue
 		}
-		if *pm.counts[node.Name] > maxCount {
-			maxCount = *pm.counts[node.Name]
-		}
-		if *pm.counts[node.Name] < minCount {
-			minCount = *pm.counts[node.Name]
-		}
+
+		maxCount = math.Max(maxCount, float64(currentScore))
+		minCount = math.Min(minCount, float64(currentScore))
 	}
 
 	// calculate final priority score for each node
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	maxMinDiff := maxCount - minCount
-	for _, node := range nodes {
+	for i, hostPriority := range result {
 		fScore := float64(0)
-		if maxMinDiff > 0 && pm.counts[node.Name] != nil {
-			fScore = float64(schedulerapi.MaxPriority) * (float64(*pm.counts[node.Name]-minCount) / float64(maxCount-minCount))
+		if maxMinDiff > 0 {
+			fScore = float64(schedulerapi.MaxPriority) * (float64(pm.counts[hostPriority.Host]-int64(minCount)) / (maxCount - minCount))
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
+
+		result[i].Host = hostPriority.Host
+		result[i].Score = int(fScore)
 		if klog.V(10) {
-			klog.Infof("%v -> %v: InterPodAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
+			klog.Infof("%v -> %v: InterPodAffinityPriority, Score: (%d)", pod.Name, hostPriority.Host, int(fScore))
 		}
 	}
-	return result, nil
+	return nil
 }

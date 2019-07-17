@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -517,7 +518,16 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				podLister:             schedulertesting.FakePodLister(test.pods),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
-			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
+
+			metaDataProducer := NewPriorityMetadataFactory(
+				schedulertesting.FakeServiceLister([]*v1.Service{}),
+				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
+				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
+				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+
+			ttp := priorityFunction(interPodAffinity.CalculateInterPodAffinityPriorityMap, interPodAffinity.CalculateInterPodAffinityPriorityReduce, metaData)
+			list, err := ttp(test.pod, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -607,7 +617,15 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 				podLister:             schedulertesting.FakePodLister(test.pods),
 				hardPodAffinityWeight: test.hardPodAffinityWeight,
 			}
-			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
+			metaDataProducer := NewPriorityMetadataFactory(
+				schedulertesting.FakeServiceLister([]*v1.Service{}),
+				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
+				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
+				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+
+			ttp := priorityFunction(ipa.CalculateInterPodAffinityPriorityMap, ipa.CalculateInterPodAffinityPriorityReduce, metaData)
+			list, err := ttp(test.pod, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
