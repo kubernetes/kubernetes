@@ -99,16 +99,17 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.H
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes {
-		score := 1
-		if node.Name == "machine2" {
-			score = 10
-		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
+func machine2PrioritizerMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+	score := 1
+	if node.Name == "machine2" {
+		score = 10
 	}
-	return result, nil
+
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: score,
+	}, nil
 }
 
 type FakeExtender struct {
@@ -455,7 +456,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
+			prioritizers: []priorities.PriorityConfig{{Map: machine2PrioritizerMap, Weight: 20}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -480,7 +481,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
 			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: machine2Prioritizer, Weight: 1}},
+			prioritizers: []priorities.PriorityConfig{{Map: machine2PrioritizerMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{errorPredicateExtender},

@@ -77,42 +77,33 @@ func hasNoPodsPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata,
 	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes {
-		score, err := strconv.Atoi(node.Name)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, schedulerapi.HostPriority{
-			Host:  node.Name,
-			Score: score,
-		})
+func numericPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+	score, err := strconv.Atoi(node.Name)
+	if err != nil {
+		return schedulerapi.HostPriority{}, err
 	}
-	return result, nil
+
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: score,
+	}, nil
 }
 
-func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func reverseNumericPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error {
 	var maxScore float64
 	minScore := math.MaxFloat64
-	reverseResult := []schedulerapi.HostPriority{}
-	result, err := numericPriority(pod, nodeNameToInfo, nodes)
-	if err != nil {
-		return nil, err
-	}
 
 	for _, hostPriority := range result {
 		maxScore = math.Max(maxScore, float64(hostPriority.Score))
 		minScore = math.Min(minScore, float64(hostPriority.Score))
 	}
-	for _, hostPriority := range result {
-		reverseResult = append(reverseResult, schedulerapi.HostPriority{
-			Host:  hostPriority.Host,
-			Score: int(maxScore + minScore - float64(hostPriority.Score)),
-		})
+
+	for i, hostPriority := range result {
+		result[i].Score = int(maxScore + minScore - float64(hostPriority.Score))
 	}
 
-	return reverseResult, nil
+	return nil
 }
 
 func trueMapPriority(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
@@ -269,7 +260,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers:  []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			prioritizers:  []priorities.PriorityConfig{{Map: numericPriorityMap, Weight: 1}},
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
 			expectedHosts: sets.NewString("3"),
@@ -278,7 +269,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			predicates:    map[string]algorithmpredicates.FitPredicate{"matches": matchesPredicate},
-			prioritizers:  []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			prioritizers:  []priorities.PriorityConfig{{Map: numericPriorityMap, Weight: 1}},
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			expectedHosts: sets.NewString("2"),
@@ -286,8 +277,18 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers:  []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}, {Function: reverseNumericPriority, Weight: 2}},
+			predicates: map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			prioritizers: []priorities.PriorityConfig{
+				{
+					Map:    numericPriorityMap,
+					Weight: 1,
+				},
+				{
+					Map:    numericPriorityMap,
+					Reduce: reverseNumericPriorityReduce,
+					Weight: 2,
+				},
+			},
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			expectedHosts: sets.NewString("1"),
@@ -296,7 +297,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "false": falsePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			prioritizers: []priorities.PriorityConfig{{Map: numericPriorityMap, Weight: 1}},
 			nodes:        []string{"3", "2", "1"},
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			expectsErr:   true,
@@ -328,7 +329,7 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			prioritizers: []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			prioritizers: []priorities.PriorityConfig{{Map: numericPriorityMap, Weight: 1}},
 			nodes:        []string{"1", "2"},
 			expectsErr:   true,
 			name:         "test 8",
@@ -1838,7 +1839,7 @@ func TestPreempt(t *testing.T) {
 				internalqueue.NewSchedulingQueue(nil, nil),
 				map[string]algorithmpredicates.FitPredicate{"matches": predicate},
 				predMetaProducer,
-				[]priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+				[]priorities.PriorityConfig{{Map: numericPriorityMap, Weight: 1}},
 				priorities.EmptyPriorityMetadataProducer,
 				emptyFramework,
 				extenders,

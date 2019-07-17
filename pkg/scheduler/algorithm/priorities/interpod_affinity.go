@@ -109,11 +109,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriorityMap(pod *v1.Pod, m
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	nodes, err := ipa.nodeLister.List()
-	if err != nil {
-		return schedulerapi.HostPriority{}, err
-	}
-
+	nodes := ipa.nodeLister.ListNodes()
 	var pm *podAffinityPriorityMap
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		// We were able to parse metadata, use affinity from there.

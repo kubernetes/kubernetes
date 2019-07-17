@@ -47,10 +47,7 @@ type PriorityConfig struct {
 	Name   string
 	Map    PriorityMapFunction
 	Reduce PriorityReduceFunction
-	// TODO: Remove it after migrating all functions to
-	// Map-Reduce pattern.
-	Function PriorityFunction
-	Weight   int
+	Weight int
 }
 
 // EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.

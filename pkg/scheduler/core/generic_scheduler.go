@@ -716,32 +716,13 @@ func PrioritizeNodes(
 	}
 
 	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
-
-	// DEPRECATED: we can remove this when all priorityConfigs implement the
-	// Map-Reduce pattern.
 	for i := range priorityConfigs {
-		if priorityConfigs[i].Function != nil {
-			wg.Add(1)
-			go func(index int) {
-				defer wg.Done()
-				var err error
-				results[index], err = priorityConfigs[index].Function(pod, nodeNameToInfo, nodes)
-				if err != nil {
-					appendError(err)
-				}
-			}(i)
-		} else {
-			results[i] = make(schedulerapi.HostPriorityList, len(nodes))
-		}
+		results[i] = make(schedulerapi.HostPriorityList, len(nodes))
 	}
 
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		for i := range priorityConfigs {
-			if priorityConfigs[i].Function != nil {
-				continue
-			}
-
 			var err error
 			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
 			if err != nil {

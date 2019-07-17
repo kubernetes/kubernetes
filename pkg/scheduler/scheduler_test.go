@@ -142,8 +142,8 @@ func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sche
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{}, nil
 }
 
 type mockScheduler struct {
@@ -175,7 +175,7 @@ func TestSchedulerCreation(t *testing.T) {
 
 	defaultBindTimeout := int64(30)
 	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	factory.RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
 	factory.RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	stopCh := make(chan struct{})

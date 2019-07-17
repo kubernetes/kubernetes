@@ -62,12 +62,12 @@ func PredicateTwo(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sche
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{}, nil
 }
 
 // TestSchedulerCreationFromConfigMap verifies that scheduler can be created
@@ -87,8 +87,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
 	factory.RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+	factory.RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
+	factory.RegisterPriorityMapReduceFunction("PriorityTwo", PriorityTwo, nil, 1)
 
 	for i, test := range []struct {
 		policy               string
