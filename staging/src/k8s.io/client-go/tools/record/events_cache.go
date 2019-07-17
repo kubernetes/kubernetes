@@ -275,6 +275,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string)
 			Namespace: newEvent.Namespace,
 		},
 		Count:          1,
+		EventTime:      (metav1.MicroTime)(now),
 		FirstTimestamp: now,
 		InvolvedObject: newEvent.InvolvedObject,
 		LastTimestamp:  now,

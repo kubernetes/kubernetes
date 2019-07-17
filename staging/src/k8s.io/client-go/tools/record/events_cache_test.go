@@ -50,6 +50,7 @@ func makeEvent(reason, message string, involvedObject v1.ObjectReference) v1.Eve
 			Host:      "kublet.node1",
 		},
 		Count:          1,
+		EventTime:      (metav1.MicroTime)(eventTime),
 		FirstTimestamp: eventTime,
 		LastTimestamp:  eventTime,
 		Type:           v1.EventTypeNormal,
@@ -102,6 +103,7 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	}
 	actualFirstTimestamp := recvEvent.FirstTimestamp
 	actualLastTimestamp := recvEvent.LastTimestamp
+	actualEventTime := recvEvent.EventTime
 	if actualFirstTimestamp.Equal(&actualLastTimestamp) {
 		if expectCompression {
 			t.Errorf("%v - FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", messagePrefix, actualFirstTimestamp, actualLastTimestamp, recvEvent)
@@ -114,6 +116,7 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
 	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
 	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
+	recvEvent.EventTime = expectedEvent.EventTime
 	// Check that name has the right prefix.
 	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
 		t.Errorf("%v - Name '%v' does not contain prefix '%v'", messagePrefix, n, en)
@@ -124,6 +127,7 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	}
 	recvEvent.FirstTimestamp = actualFirstTimestamp
 	recvEvent.LastTimestamp = actualLastTimestamp
+	recvEvent.EventTime = actualEventTime
 	return actualEvent, nil
 }
 
@@ -240,6 +244,7 @@ func TestEventCorrelator(t *testing.T) {
 			now := metav1.NewTime(clock.Now())
 			event.FirstTimestamp = now
 			event.LastTimestamp = now
+			testInput.newEvent.EventTime = (metav1.MicroTime)(now)
 			result, err := correlator.EventCorrelate(&event)
 			if err != nil {
 				t.Errorf("scenario %v: unexpected error playing back prevEvents %v", testScenario, err)
@@ -254,6 +259,7 @@ func TestEventCorrelator(t *testing.T) {
 		now := metav1.NewTime(clock.Now())
 		testInput.newEvent.FirstTimestamp = now
 		testInput.newEvent.LastTimestamp = now
+		testInput.newEvent.EventTime = (metav1.MicroTime)(now)
 		result, err := correlator.EventCorrelate(&testInput.newEvent)
 		if err != nil {
 			t.Errorf("scenario %v: unexpected error correlating input event %v", testScenario, err)

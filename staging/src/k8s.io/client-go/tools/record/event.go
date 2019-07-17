@@ -340,6 +340,7 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map
 		InvolvedObject: *ref,
 		Reason:         reason,
 		Message:        message,
+		EventTime:      (metav1.MicroTime)(t),
 		FirstTimestamp: t,
 		LastTimestamp:  t,
 		Count:          1,
