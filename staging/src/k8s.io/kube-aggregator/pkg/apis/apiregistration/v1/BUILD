@@ -39,6 +39,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper:all-srcs",
+    ],
     tags = ["automanaged"],
 )
