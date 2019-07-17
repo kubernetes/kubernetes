@@ -222,7 +222,7 @@ spec:
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	var r typed.TypedValue
+	var r *typed.TypedValue
 	for i := 0; i < b.N; i++ {
 		var err error
 		r, err = tc.ObjectToTyped(obj)
@@ -230,5 +230,5 @@ spec:
 			b.Fatalf("Failed to convert object to typed: %v", err)
 		}
 	}
-	result = r
+	result = *r
 }

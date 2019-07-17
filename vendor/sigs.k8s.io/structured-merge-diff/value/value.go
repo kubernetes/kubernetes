@@ -84,6 +84,18 @@ func (m *Map) Set(key string, value Value) {
 	m.index = nil // Since the append might have reallocated
 }
 
+// Delete removes the key from the set.
+func (m *Map) Delete(key string) {
+	items := []Field{}
+	for i := range m.Items {
+		if m.Items[i].Name != key {
+			items = append(items, m.Items[i])
+		}
+	}
+	m.Items = items
+	m.index = nil // Since the list has changed
+}
+
 // StringValue returns s as a scalar string Value.
 func StringValue(s string) Value {
 	s2 := String(s)

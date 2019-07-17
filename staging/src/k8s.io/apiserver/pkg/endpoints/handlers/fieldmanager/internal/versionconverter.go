@@ -60,7 +60,7 @@ func NewCRDVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema
 }
 
 // Convert implements sigs.k8s.io/structured-merge-diff/merge.Converter
-func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.APIVersion) (typed.TypedValue, error) {
+func (v *versionConverter) Convert(object *typed.TypedValue, version fieldpath.APIVersion) (*typed.TypedValue, error) {
 	// Convert the smd typed value to a kubernetes object.
 	objectToConvert, err := v.typeConverter.TypedToObject(object)
 	if err != nil {
