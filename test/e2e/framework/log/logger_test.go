@@ -29,7 +29,6 @@ import (
 	"github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -46,7 +45,7 @@ var _ = ginkgo.Describe("log", func() {
 		gomega.Expect(false).To(gomega.Equal(true), "false is never true")
 	})
 	ginkgo.It("error", func() {
-		err := errors.New("I'm an error, nice to meet to.")
+		err := errors.New("an error with a long, useless description")
 		framework.ExpectNoError(err, "hard-coded error")
 	})
 	ginkgo.AfterEach(func() {
@@ -60,39 +59,50 @@ func TestFailureOutput(t *testing.T) {
 	// reporter in adddition to the default one. To see what the full
 	// Ginkgo report looks like, run this test with "go test -v".
 	config.DefaultReporterConfig.FullTrace = true
-	gomega.RegisterFailHandler(ginkgowrapper.Fail)
+	gomega.RegisterFailHandler(log.Fail)
 	fakeT := &testing.T{}
 	reporter := reporters.NewFakeReporter()
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(fakeT, "Logging Suite", []ginkgo.Reporter{reporter})
 
 	// Now check the output.
+	// TODO: all of the stacks are currently broken because Ginkgo doesn't properly skip
+	// over the initial entries returned by runtime.Stack. Fix is pending in
+	// https://github.com/onsi/ginkgo/pull/590, "stack" texts need to be updated
+	// when updating to a fixed Ginkgo.
 	g := gomega.NewGomegaWithT(t)
-	g.Expect(normalizeReport(*reporter)).To(gomega.Equal(suiteResults{
+	actual := normalizeReport(*reporter)
+	expected := suiteResults{
 		testResult{
-			name: "[Top Level] log asserts",
-			// TODO: also log the failed assertion as it happens
-			output:  "INFO: before\nINFO: after\n",
+			name:    "[Top Level] log asserts",
+			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
 			failure: "false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true",
-			// TODO: ginkowrapper.Fail should also prune this stack.
-			stack: "\tassertion.go:75\nk8s.io/kubernetes/vendor/github.com/onsi/gomega/internal/assertion.(*Assertion).To()\n\tassertion.go:38\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:46\nk8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes.(*runner).runSync()\n\tlogger_test.go:66\n",
+			// TODO: should start with k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()
+			stack: "\tassertion.go:75\nk8s.io/kubernetes/vendor/github.com/onsi/gomega/internal/assertion.(*Assertion).To()\n\tassertion.go:38\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:45\nk8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes.(*runner).runSync()\n\tlogger_test.go:65\n",
 		},
 		testResult{
-			name: "[Top Level] log error",
-			// TODO: the additional information about the error should be logged
-			output:  "INFO: before\nINFO: Unexpected error occurred: I'm an error, nice to meet to.\nINFO: after\n",
-			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"I'm an error, nice to meet to.\",\n    }\n    I'm an error, nice to meet to.\noccurred",
-			// TODO: ginkowrapper.Fail should also prune this stack.
+			name:    "[Top Level] log error",
+			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
+			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred",
+			// TODO: should start with k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()
 			stack: "\tutil.go:1362\nk8s.io/kubernetes/test/e2e/framework.ExpectNoError()\n\tutil.go:1356\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:49\nk8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes.(*runner).runSync()\n\tlogger_test.go:65\n",
 		},
 		testResult{
-			name: "[Top Level] log fails",
-			// TODO: why is the failure log as "INFO"?
-			output:  "INFO: before\nINFO: I'm failing.\nINFO: after\n",
+			name:    "[Top Level] log fails",
+			output:  "INFO: before\nFAIL: I'm failing.\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
 			failure: "I'm failing.",
-			// TODO: ginkowrapper.Fail should also prune this stack.
+			// TODO: should start with k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)
 			stack: "\tlogger.go:52\nk8s.io/kubernetes/test/e2e/framework/log.Failf()\n\tlogger.go:44\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:41\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:42\nk8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes.(*runner).runSync()\n\tlogger_test.go:65\n",
 		},
-	}))
+	}
+	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
+	g.Expect(len(actual)).To(gomega.Equal(len(expected)), "%d entries in %v", len(expected), actual)
+	for i, a := range actual {
+		b := expected[i]
+		g.Expect(a.name).To(gomega.Equal(b.name), "name in %d", i)
+		g.Expect(a.output).To(gomega.Equal(b.output), "output in %d", i)
+		g.Expect(a.failure).To(gomega.Equal(b.failure), "failure in %d", i)
+		g.Expect(a.stack).To(gomega.Equal(b.stack), "stack in %d", i)
+	}
 }
 
 type testResult struct {
