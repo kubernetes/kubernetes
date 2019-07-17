@@ -477,7 +477,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 
 	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
-	succeeded, failed := getStatus(pods)
+	succeeded, failed := filterPods(pods, v1.PodSucceeded, v1.PodFailed)
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -671,13 +671,6 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	}
 }
 
-// getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
-	succeeded = int32(filterPods(pods, v1.PodSucceeded))
-	failed = int32(filterPods(pods, v1.PodFailed))
-	return
-}
-
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
@@ -859,12 +852,11 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 }
 
 // filterPods returns pods based on their phase.
-func filterPods(pods []*v1.Pod, phase v1.PodPhase) int {
-	result := 0
+func filterPods(pods []*v1.Pod, phase1, phase2 v1.PodPhase) (result1, result2 int32) {
+	result1, result2 = 0, 0
+	results := map[v1.PodPhase]int32{}
 	for i := range pods {
-		if phase == pods[i].Status.Phase {
-			result++
-		}
+		results[pods[i].Status.Phase] = results[pods[i].Status.Phase] + 1
 	}
-	return result
+	return results[phase1], results[phase2]
 }
