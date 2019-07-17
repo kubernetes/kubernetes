@@ -19,6 +19,8 @@ respective D-Bus equivalents:
      bool        | BOOLEAN
      int16       | INT16
      uint16      | UINT16
+     int         | INT32
+     uint        | UINT32
      int32       | INT32
      uint32      | UINT32
      int64       | INT64
@@ -28,6 +30,7 @@ respective D-Bus equivalents:
      ObjectPath  | OBJECT_PATH
      Signature   | SIGNATURE
      Variant     | VARIANT
+     interface{} | VARIANT
      UnixFDIndex | UNIX_FD
 
 Slices and arrays encode as ARRAYs of their element type.
@@ -40,6 +43,9 @@ exported fields. Fields whose tags contain `dbus:"-"` and unexported fields will
 be skipped.
 
 Pointers encode as the value they're pointed to.
+
+Types convertible to one of the base types above will be mapped as the
+base type.
 
 Trying to encode any other type or a slice, map or struct containing an
 unsupported type will result in an InvalidTypeError.

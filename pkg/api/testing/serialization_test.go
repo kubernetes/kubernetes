@@ -217,6 +217,7 @@ func TestRoundTripTypes(t *testing.T) {
 func TestEncodePtr(t *testing.T) {
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
+	preemptNever := api.PreemptNever
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
@@ -230,6 +231,7 @@ func TestEncodePtr(t *testing.T) {
 			SecurityContext:    &api.PodSecurityContext{},
 			SchedulerName:      api.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
+			PreemptionPolicy:   &preemptNever,
 		},
 	}
 	obj := runtime.Object(pod)
@@ -387,7 +389,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
 		outEvent := &metav1.WatchEvent{}
-		res, _, err = sr.Decode(nil, outEvent)
+		_, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {
 			t.Fatalf("%v: %#v", err, outEvent)
 		}

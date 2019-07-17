@@ -62,6 +62,15 @@ const (
 	Overlay     NetworkType = "Overlay"
 )
 
+// NetworkFlags are various network flags.
+type NetworkFlags uint32
+
+// NetworkFlags const
+const (
+	None                NetworkFlags = 0
+	EnableNonPersistent NetworkFlags = 8
+)
+
 // HostComputeNetwork represents a network
 type HostComputeNetwork struct {
 	Id            string          `json:"ID,omitempty"`
@@ -71,7 +80,7 @@ type HostComputeNetwork struct {
 	MacPool       MacPool         `json:",omitempty"`
 	Dns           Dns             `json:",omitempty"`
 	Ipams         []Ipam          `json:",omitempty"`
-	Flags         uint32          `json:",omitempty"` // 0: None
+	Flags         NetworkFlags    `json:",omitempty"` // 0: None
 	SchemaVersion SchemaVersion   `json:",omitempty"`
 }
 

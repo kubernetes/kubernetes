@@ -33,6 +33,7 @@ var (
 		"request",         // API function that is being invoked
 		"resource_group",  // Resource group of the resource being monitored
 		"subscription_id", // Subscription ID of the resource being monitored
+		"source",          // Oeration source(optional)
 	}
 
 	apiMetrics = registerAPIMetrics(metricLabels...)
@@ -43,19 +44,21 @@ type metricContext struct {
 	attributes []string
 }
 
-func newMetricContext(prefix, request, resourceGroup, subscriptionID string) *metricContext {
+func newMetricContext(prefix, request, resourceGroup, subscriptionID, source string) *metricContext {
 	return &metricContext{
 		start:      time.Now(),
-		attributes: []string{prefix + "_" + request, strings.ToLower(resourceGroup), subscriptionID},
+		attributes: []string{prefix + "_" + request, strings.ToLower(resourceGroup), subscriptionID, source},
 	}
 }
 
-func (mc *metricContext) Observe(err error) {
+func (mc *metricContext) Observe(err error) error {
 	apiMetrics.latency.WithLabelValues(mc.attributes...).Observe(
 		time.Since(mc.start).Seconds())
 	if err != nil {
 		apiMetrics.errors.WithLabelValues(mc.attributes...).Inc()
 	}
+
+	return err
 }
 
 func registerAPIMetrics(attributes ...string) *apiCallMetrics {

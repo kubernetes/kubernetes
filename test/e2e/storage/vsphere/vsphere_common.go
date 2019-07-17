@@ -20,7 +20,7 @@ import (
 	"os"
 	"strconv"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -67,7 +67,7 @@ const (
 
 func GetAndExpectStringEnvVar(varName string) string {
 	varValue := os.Getenv(varName)
-	Expect(varValue).NotTo(BeEmpty(), "ENV "+varName+" is not set")
+	gomega.Expect(varValue).NotTo(gomega.BeEmpty(), "ENV "+varName+" is not set")
 	return varValue
 }
 

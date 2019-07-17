@@ -18,6 +18,7 @@ go_test(
         "rbac_test.go",
         "svcaccttoken_test.go",
     ],
+    rundir = ".",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
@@ -77,7 +78,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
@@ -90,6 +90,7 @@ go_test(
         "//staging/src/k8s.io/client-go/transport:go_default_library",
         "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//test/e2e/lifecycle/bootstrap:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",

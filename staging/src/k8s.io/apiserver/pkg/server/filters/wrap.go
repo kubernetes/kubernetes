@@ -34,13 +34,11 @@ func WithPanicRecovery(handler http.Handler) http.Handler {
 }
 
 func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{})) http.Handler {
+	handler = httplog.WithLogging(handler, httplog.DefaultStacktracePred)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			crashHandler(w, req, err)
 		})
-
-		logger := httplog.NewLogged(req, &w)
-		defer logger.Log()
 
 		// Dispatch to the internal handler
 		handler.ServeHTTP(w, req)

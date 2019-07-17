@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
@@ -127,6 +128,7 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 	if endpoints == nil {
 		return false
 	}
+	metrics.EndpointChangesTotal.Inc()
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 
 	ect.lock.Lock()
@@ -154,6 +156,8 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		// should be exported.
 		delete(ect.lastChangeTriggerTimes, namespacedName)
 	}
+
+	metrics.EndpointChangesPending.Set(float64(len(ect.items)))
 	return len(ect.items) > 0
 }
 
@@ -197,18 +201,18 @@ type UpdateEndpointMapResult struct {
 }
 
 // UpdateEndpointsMap updates endpointsMap base on the given changes.
-func UpdateEndpointsMap(endpointsMap EndpointsMap, changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
+func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
 	result.StaleEndpoints = make([]ServiceEndpoint, 0)
 	result.StaleServiceNames = make([]ServicePortName, 0)
 	result.LastChangeTriggerTimes = make([]time.Time, 0)
 
-	endpointsMap.apply(
+	em.apply(
 		changes, &result.StaleEndpoints, &result.StaleServiceNames, &result.LastChangeTriggerTimes)
 
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := GetLocalEndpointIPs(endpointsMap)
+	localIPs := em.getLocalEndpointIPs()
 	for nsn, ips := range localIPs {
 		result.HCEndpointsLocalIPSize[nsn] = len(ips)
 	}
@@ -290,11 +294,12 @@ func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]S
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
-		em.Unmerge(change.previous)
-		em.Merge(change.current)
+		em.unmerge(change.previous)
+		em.merge(change.current)
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
 	}
 	changes.items = make(map[types.NamespacedName]*endpointsChange)
+	metrics.EndpointChangesPending.Set(0)
 	for _, lastChangeTriggerTime := range changes.lastChangeTriggerTimes {
 		*lastChangeTriggerTimes = append(*lastChangeTriggerTimes, lastChangeTriggerTime...)
 	}
@@ -302,23 +307,23 @@ func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]S
 }
 
 // Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
-func (em EndpointsMap) Merge(other EndpointsMap) {
+func (em EndpointsMap) merge(other EndpointsMap) {
 	for svcPortName := range other {
 		em[svcPortName] = other[svcPortName]
 	}
 }
 
 // Unmerge removes the <service, endpoints> pairs from the current EndpointsMap which are contained in the EndpointsMap passed in.
-func (em EndpointsMap) Unmerge(other EndpointsMap) {
+func (em EndpointsMap) unmerge(other EndpointsMap) {
 	for svcPortName := range other {
 		delete(em, svcPortName)
 	}
 }
 
 // GetLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
-func GetLocalEndpointIPs(endpointsMap EndpointsMap) map[types.NamespacedName]sets.String {
+func (em EndpointsMap) getLocalEndpointIPs() map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
-	for svcPortName, epList := range endpointsMap {
+	for svcPortName, epList := range em {
 		for _, ep := range epList {
 			if ep.GetIsLocal() {
 				nsn := svcPortName.NamespacedName

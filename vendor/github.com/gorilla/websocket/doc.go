@@ -30,10 +30,12 @@
 //  for {
 //      messageType, p, err := conn.ReadMessage()
 //      if err != nil {
+//          log.Println(err)
 //          return
 //      }
 //      if err := conn.WriteMessage(messageType, p); err != nil {
-//          return err
+//          log.Println(err)
+//          return
 //      }
 //  }
 //
@@ -84,20 +86,26 @@
 // and pong. Call the connection WriteControl, WriteMessage or NextWriter
 // methods to send a control message to the peer.
 //
-// Connections handle received close messages by sending a close message to the
-// peer and returning a *CloseError from the the NextReader, ReadMessage or the
-// message Read method.
+// Connections handle received close messages by calling the handler function
+// set with the SetCloseHandler method and by returning a *CloseError from the
+// NextReader, ReadMessage or the message Read method. The default close
+// handler sends a close message to the peer.
 //
-// Connections handle received ping and pong messages by invoking callback
-// functions set with SetPingHandler and SetPongHandler methods. The callback
-// functions are called from the NextReader, ReadMessage and the message Read
-// methods.
+// Connections handle received ping messages by calling the handler function
+// set with the SetPingHandler method. The default ping handler sends a pong
+// message to the peer.
 //
-// The default ping handler sends a pong to the peer. The application's reading
-// goroutine can block for a short time while the handler writes the pong data
-// to the connection.
+// Connections handle received pong messages by calling the handler function
+// set with the SetPongHandler method. The default pong handler does nothing.
+// If an application sends ping messages, then the application should set a
+// pong handler to receive the corresponding pong.
 //
-// The application must read the connection to process ping, pong and close
+// The control message handler functions are called from the NextReader,
+// ReadMessage and message reader Read methods. The default close and ping
+// handlers can block these methods for a short time when the handler writes to
+// the connection.
+//
+// The application must read the connection to process close, ping and pong
 // messages sent from the peer. If the application is not otherwise interested
 // in messages from the peer, then the application should start a goroutine to
 // read and discard messages from the peer. A simple example is:
@@ -136,15 +144,8 @@
 // method fails the WebSocket handshake with HTTP status 403.
 //
 // If the CheckOrigin field is nil, then the Upgrader uses a safe default: fail
-// the handshake if the Origin request header is present and not equal to the
-// Host request header.
-//
-// An application can allow connections from any origin by specifying a
-// function that always returns true:
-//
-//  var upgrader = websocket.Upgrader{
-//      CheckOrigin: func(r *http.Request) bool { return true },
-//  }
+// the handshake if the Origin request header is present and the Origin host is
+// not equal to the Host request header.
 //
 // The deprecated package-level Upgrade function does not perform origin
 // checking. The application is responsible for checking the Origin header

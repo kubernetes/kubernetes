@@ -17,7 +17,7 @@ limitations under the License.
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 
-		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
+		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			testsuites.DefineTestSuite(curDriver, testSuites)
 		})
 	}

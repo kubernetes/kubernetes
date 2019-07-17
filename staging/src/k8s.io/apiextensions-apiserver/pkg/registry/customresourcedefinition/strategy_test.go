@@ -25,7 +25,7 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
@@ -77,7 +77,7 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 				}
 				t.Run(fmt.Sprintf("validation feature enabled=%v, old CRD %v, new CRD %v", validationEnabled, oldCRDInfo.name, newCRDInfo.name),
 					func(t *testing.T) {
-						defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceValidation, validationEnabled)()
+						defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceValidation, validationEnabled)()
 						var oldCRDSpec *apiextensions.CustomResourceDefinitionSpec
 						if oldCRD != nil {
 							oldCRDSpec = &oldCRD.Spec
@@ -156,8 +156,7 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 				}
 				t.Run(fmt.Sprintf("subresources feature enabled=%v, old CRD %v, new CRD %v", validationEnabled, oldCRDInfo.name, newCRDInfo.name),
 					func(t *testing.T) {
-						defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceSubresources, validationEnabled)()
-						defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+						defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceSubresources, validationEnabled)()
 						var oldCRDSpec *apiextensions.CustomResourceDefinitionSpec
 						if oldCRD != nil {
 							oldCRDSpec = &oldCRD.Spec
@@ -250,8 +249,8 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					}
 					t.Run(fmt.Sprintf("validation feature enabled=%v, old CRD %v, new CRD %v", validationEnabled, oldCRDInfo.name, newCRDInfo.name),
 						func(t *testing.T) {
-							defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceValidation, validationEnabled)()
-							defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, conversionEnabled)()
+							defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceValidation, validationEnabled)()
+							defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, conversionEnabled)()
 							var oldCRDSpec *apiextensions.CustomResourceDefinitionSpec
 							if oldCRD != nil {
 								oldCRDSpec = &oldCRD.Spec
@@ -347,8 +346,8 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					}
 					t.Run(fmt.Sprintf("subresources feature enabled=%v, old CRD %v, new CRD %v", validationEnabled, oldCRDInfo.name, newCRDInfo.name),
 						func(t *testing.T) {
-							defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceSubresources, validationEnabled)()
-							defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, conversionEnabled)()
+							defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceSubresources, validationEnabled)()
+							defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, conversionEnabled)()
 							var oldCRDSpec *apiextensions.CustomResourceDefinitionSpec
 							if oldCRD != nil {
 								oldCRDSpec = &oldCRD.Spec
@@ -436,7 +435,7 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 				}
 				t.Run(fmt.Sprintf("subresources feature enabled=%v, old CRD %v, new CRD %v", validationEnabled, oldCRDInfo.name, newCRDInfo.name),
 					func(t *testing.T) {
-						defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, validationEnabled)()
+						defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, validationEnabled)()
 						var oldCRDSpec *apiextensions.CustomResourceDefinitionSpec
 						if oldCRD != nil {
 							oldCRDSpec = &oldCRD.Spec

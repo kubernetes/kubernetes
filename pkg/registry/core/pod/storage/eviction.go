@@ -124,7 +124,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
 	// There is no need to check for pdb.
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
+		_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	}
 	var rtStatus *metav1.Status
 	var pdbName string
-	err = retry.RetryOnConflict(EvictionsRetry, func() error {
+	err = func() error {
 		pdbs, err := r.getPodDisruptionBudgets(ctx, pod)
 		if err != nil {
 			return err
@@ -146,19 +146,33 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 				Code:    500,
 			}
 			return nil
-		} else if len(pdbs) == 1 {
-			pdb := pdbs[0]
-			pdbName = pdb.Name
+		}
+		if len(pdbs) == 0 {
+			return nil
+		}
+
+		pdb := &pdbs[0]
+		pdbName = pdb.Name
+		refresh := false
+		err = retry.RetryOnConflict(EvictionsRetry, func() error {
+			if refresh {
+				pdb, err = r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).Get(pdbName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+			}
 			// Try to verify-and-decrement
 
 			// If it was false already, or if it becomes false during the course of our retries,
 			// raise an error marked as a 429.
-			if err := r.checkAndDecrement(pod.Namespace, pod.Name, pdb, dryrun.IsDryRun(deletionOptions.DryRun)); err != nil {
+			if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, dryrun.IsDryRun(deletionOptions.DryRun)); err != nil {
+				refresh = true
 				return err
 			}
-		}
-		return nil
-	})
+			return nil
+		})
+		return err
+	}()
 	if err == wait.ErrWaitTimeout {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodDisruptionBudget %q due to conflicts", pdbName), 10)
 	}
@@ -173,7 +187,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
+	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -206,13 +220,13 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	pdb.Status.PodDisruptionsAllowed--
-	if pdb.Status.DisruptedPods == nil {
-		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
-	}
-
 	// If this is a dry-run, we don't need to go any further than that.
 	if dryRun == true {
 		return nil
+	}
+
+	if pdb.Status.DisruptedPods == nil {
+		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
 	}
 
 	// Eviction handler needs to inform the PDB controller that it is about to delete a pod

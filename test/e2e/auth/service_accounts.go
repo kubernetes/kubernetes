@@ -19,6 +19,8 @@ package auth
 import (
 	"fmt"
 	"path"
+	"regexp"
+	"strings"
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -31,10 +33,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
@@ -42,11 +44,11 @@ var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
-	It("should ensure a single API token exists", func() {
+	ginkgo.It("should ensure a single API token exists", func() {
 		// wait for the service account to reference a single secret
 		var secrets []v1.ObjectReference
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
-			By("waiting for a single token reference")
+			ginkgo.By("waiting for a single token reference")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("default service account was not found")
@@ -71,20 +73,20 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// make sure the reference doesn't flutter
 		{
-			By("ensuring the single token reference persists")
+			ginkgo.By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(sa.Secrets).To(Equal(secrets))
+			framework.ExpectEqual(sa.Secrets, secrets)
 		}
 
 		// delete the referenced secret
-		By("deleting the service account token")
+		ginkgo.By("deleting the service account token")
 		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secrets[0].Name, nil))
 
 		// wait for the referenced secret to be removed, and another one autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("waiting for a new token reference")
+			ginkgo.By("waiting for a new token reference")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
 				e2elog.Logf("error getting default service account: %v", err)
@@ -109,15 +111,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// make sure the reference doesn't flutter
 		{
-			By("ensuring the single token reference persists")
+			ginkgo.By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(sa.Secrets).To(Equal(secrets))
+			framework.ExpectEqual(sa.Secrets, secrets)
 		}
 
 		// delete the reference from the service account
-		By("deleting the reference to the service account token")
+		ginkgo.By("deleting the reference to the service account token")
 		{
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -128,7 +130,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// wait for another one to be autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("waiting for a new token to be created and added")
+			ginkgo.By("waiting for a new token to be created and added")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
 				e2elog.Logf("error getting default service account: %v", err)
@@ -149,11 +151,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// make sure the reference doesn't flutter
 		{
-			By("ensuring the single token reference persists")
+			ginkgo.By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(sa.Secrets).To(Equal(secrets))
+			framework.ExpectEqual(sa.Secrets, secrets)
 		}
 	})
 
@@ -174,7 +176,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("getting the auto-created API token")
+			ginkgo.By("getting the auto-created API token")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("mount-test", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("mount-test service account was not found")
@@ -221,7 +223,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 		mountedToken, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
 		framework.ExpectNoError(err)
@@ -231,19 +233,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 
 		// CA and namespace should be identical
-		Expect(mountedCA).To(Equal(rootCAContent))
-		Expect(mountedNamespace).To(Equal(f.Namespace.Name))
+		framework.ExpectEqual(mountedCA, rootCAContent)
+		framework.ExpectEqual(mountedNamespace, f.Namespace.Name)
 		// Token should be a valid credential that identifies the pod's service account
 		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
 		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(tokenReview)
 		framework.ExpectNoError(err)
-		Expect(tokenReview.Status.Authenticated).To(Equal(true))
-		Expect(tokenReview.Status.Error).To(Equal(""))
-		Expect(tokenReview.Status.User.Username).To(Equal("system:serviceaccount:" + f.Namespace.Name + ":" + sa.Name))
+		framework.ExpectEqual(tokenReview.Status.Authenticated, true)
+		framework.ExpectEqual(tokenReview.Status.Error, "")
+		framework.ExpectEqual(tokenReview.Status.User.Username, "system:serviceaccount:"+f.Namespace.Name+":"+sa.Name)
 		groups := sets.NewString(tokenReview.Status.User.Groups...)
-		Expect(groups.Has("system:authenticated")).To(Equal(true), fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
-		Expect(groups.Has("system:serviceaccounts")).To(Equal(true), fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
-		Expect(groups.Has("system:serviceaccounts:"+f.Namespace.Name)).To(Equal(true), fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
+		framework.ExpectEqual(groups.Has("system:authenticated"), true, fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
+		framework.ExpectEqual(groups.Has("system:serviceaccounts"), true, fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
+		framework.ExpectEqual(groups.Has("system:serviceaccounts:"+f.Namespace.Name), true, fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
 	})
 
 	/*
@@ -285,7 +287,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("getting the auto-created API token")
+			ginkgo.By("getting the auto-created API token")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(mountSA.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("mount service account was not found")
@@ -404,10 +406,145 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 
 			if hasServiceAccountTokenVolume != tc.ExpectTokenVolume {
-				framework.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
+				e2elog.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
 			} else {
 				e2elog.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
 		}
 	})
+
+	ginkgo.It("should support InClusterConfig with token rotation [Slow] [Feature:TokenRequestProjection]", func() {
+		cfg, err := framework.LoadConfig()
+		framework.ExpectNoError(err)
+
+		if _, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "kube-root-ca.crt",
+			},
+			Data: map[string]string{
+				"ca.crt": string(cfg.TLSClientConfig.CAData),
+			},
+		}); err != nil && !apierrors.IsAlreadyExists(err) {
+			e2elog.Failf("Unexpected err creating kube-ca-crt: %v", err)
+		}
+
+		tenMin := int64(10 * 60)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "inclusterclient"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "inclusterclient",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"inclusterclient"},
+					VolumeMounts: []v1.VolumeMount{{
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+						Name:      "kube-api-access-e2e",
+						ReadOnly:  true,
+					}},
+				}},
+				RestartPolicy:      v1.RestartPolicyNever,
+				ServiceAccountName: "default",
+				Volumes: []v1.Volume{{
+					Name: "kube-api-access-e2e",
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
+								{
+									ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+										Path:              "token",
+										ExpirationSeconds: &tenMin,
+									},
+								},
+								{
+									ConfigMap: &v1.ConfigMapProjection{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "kube-root-ca.crt",
+										},
+										Items: []v1.KeyToPath{
+											{
+												Key:  "ca.crt",
+												Path: "ca.crt",
+											},
+										},
+									},
+								},
+								{
+									DownwardAPI: &v1.DownwardAPIProjection{
+										Items: []v1.DownwardAPIVolumeFile{
+											{
+												Path: "namespace",
+												FieldRef: &v1.ObjectFieldSelector{
+													APIVersion: "v1",
+													FieldPath:  "metadata.namespace",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+			},
+		}
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
+
+		e2elog.Logf("created pod")
+		if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
+			e2elog.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
+		}
+
+		e2elog.Logf("pod is ready")
+
+		var logs string
+		if err := wait.Poll(1*time.Minute, 20*time.Minute, func() (done bool, err error) {
+			e2elog.Logf("polling logs")
+			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
+			if err != nil {
+				e2elog.Logf("Error pulling logs: %v", err)
+				return false, nil
+			}
+			tokenCount, err := parseInClusterClientLogs(logs)
+			if err != nil {
+				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
+			}
+			if tokenCount < 2 {
+				e2elog.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
+			e2elog.Failf("Unexpected error: %v\n%s", err, logs)
+		}
+	})
 })
+
+var reportLogsParser = regexp.MustCompile("([a-zA-Z0-9-_]*)=([a-zA-Z0-9-_]*)$")
+
+func parseInClusterClientLogs(logs string) (int, error) {
+	seenTokens := map[string]struct{}{}
+
+	lines := strings.Split(logs, "\n")
+	for _, line := range lines {
+		parts := reportLogsParser.FindStringSubmatch(line)
+		if len(parts) != 3 {
+			continue
+		}
+
+		key, value := parts[1], parts[2]
+		switch key {
+		case "authz_header":
+			if value == "<empty>" {
+				return 0, fmt.Errorf("saw empty Authorization header")
+			}
+			seenTokens[value] = struct{}{}
+		case "status":
+			if value == "failed" {
+				return 0, fmt.Errorf("saw status=failed")
+			}
+		}
+	}
+
+	return len(seenTokens), nil
+}

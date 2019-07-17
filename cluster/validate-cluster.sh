@@ -51,7 +51,11 @@ ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
 CLUSTER_READY_ADDITIONAL_TIME_SECONDS="${CLUSTER_READY_ADDITIONAL_TIME_SECONDS:-30}"
 
 if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
-  EXPECTED_NUM_NODES="$(get-num-nodes)"
+  if [[ "${KUBE_CREATE_NODES}" == "true" ]]; then
+    EXPECTED_NUM_NODES="$(get-num-nodes)"
+  else
+    EXPECTED_NUM_NODES="0"
+  fi
   echo "Validating gce cluster, MULTIZONE=${MULTIZONE:-}"
   # In multizone mode we need to add instances for all nodes in the region.
   if [[ "${MULTIZONE:-}" == "true" ]]; then
@@ -104,7 +108,7 @@ while true; do
   # which are important for line counting.
   # Use trick from https://unix.stackexchange.com/a/383411 to avoid
   # newline truncation.
-  node=$(kubectl_retry get nodes --chunk-size=0 --no-headers; ret=$?; echo .; exit "$ret") && res="$?" || res="$?"
+  node=$(kubectl_retry get nodes --no-headers; ret=$?; echo .; exit "$ret") && res="$?" || res="$?"
   node="${node%.}"
   if [ "${res}" -ne "0" ]; then
     if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then

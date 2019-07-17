@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 )
 
@@ -54,7 +56,7 @@ func newEsLogProvider(f *framework.Framework) (*esLogProvider, error) {
 func (p *esLogProvider) Init() error {
 	f := p.Framework
 	// Check for the existence of the Elasticsearch service.
-	framework.Logf("Checking the Elasticsearch service exists.")
+	e2elog.Logf("Checking the Elasticsearch service exists.")
 	s := f.ClientSet.CoreV1().Services(api.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
@@ -63,14 +65,14 @@ func (p *esLogProvider) Init() error {
 		if _, err = s.Get("elasticsearch-logging", meta_v1.GetOptions{}); err == nil {
 			break
 		}
-		framework.Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
+		e2elog.Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
 	}
 	if err != nil {
 		return err
 	}
 
 	// Wait for the Elasticsearch pods to enter the running state.
-	framework.Logf("Checking to make sure the Elasticsearch pods are running")
+	e2elog.Logf("Checking to make sure the Elasticsearch pods are running")
 	labelSelector := fields.SelectorFromSet(fields.Set(map[string]string{"k8s-app": "elasticsearch-logging"})).String()
 	options := meta_v1.ListOptions{LabelSelector: labelSelector}
 	pods, err := f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)
@@ -78,13 +80,13 @@ func (p *esLogProvider) Init() error {
 		return err
 	}
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
+		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, &pod)
 		if err != nil {
 			return err
 		}
 	}
 
-	framework.Logf("Checking to make sure we are talking to an Elasticsearch service.")
+	e2elog.Logf("Checking to make sure we are talking to an Elasticsearch service.")
 	// Perform a few checks to make sure this looks like an Elasticsearch cluster.
 	var statusCode int
 	err = nil
@@ -92,7 +94,7 @@ func (p *esLogProvider) Init() error {
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
 		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if errProxy != nil {
-			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			e2elog.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
 		}
 		// Query against the root URL for Elasticsearch.
@@ -103,11 +105,11 @@ func (p *esLogProvider) Init() error {
 		response.StatusCode(&statusCode)
 
 		if err != nil {
-			framework.Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
+			e2elog.Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
 			continue
 		}
 		if int(statusCode) != 200 {
-			framework.Logf("After %v Elasticsearch cluster has a bad status: %v", time.Since(start), statusCode)
+			e2elog.Logf("After %v Elasticsearch cluster has a bad status: %v", time.Since(start), statusCode)
 			continue
 		}
 		break
@@ -116,17 +118,17 @@ func (p *esLogProvider) Init() error {
 		return err
 	}
 	if int(statusCode) != 200 {
-		framework.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
+		e2elog.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
-	framework.Logf("Checking health of Elasticsearch service.")
+	e2elog.Logf("Checking health of Elasticsearch service.")
 	healthy := false
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
 		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if errProxy != nil {
-			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			e2elog.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
 		}
 		body, err = proxyRequest.Namespace(api.NamespaceSystem).
@@ -140,17 +142,17 @@ func (p *esLogProvider) Init() error {
 		health := make(map[string]interface{})
 		err := json.Unmarshal(body, &health)
 		if err != nil {
-			framework.Logf("Bad json response from elasticsearch: %v", err)
+			e2elog.Logf("Bad json response from elasticsearch: %v", err)
 			continue
 		}
 		statusIntf, ok := health["status"]
 		if !ok {
-			framework.Logf("No status field found in cluster health response: %v", health)
+			e2elog.Logf("No status field found in cluster health response: %v", health)
 			continue
 		}
 		status := statusIntf.(string)
 		if status != "green" && status != "yellow" {
-			framework.Logf("Cluster health has bad status: %v", health)
+			e2elog.Logf("Cluster health has bad status: %v", health)
 			continue
 		}
 		if err == nil && ok {
@@ -174,12 +176,12 @@ func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 
 	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 	if errProxy != nil {
-		framework.Logf("Failed to get services proxy request: %v", errProxy)
+		e2elog.Logf("Failed to get services proxy request: %v", errProxy)
 		return nil
 	}
 
 	query := fmt.Sprintf("kubernetes.pod_name:%s AND kubernetes.namespace_name:%s", name, f.Namespace.Name)
-	framework.Logf("Sending a search request to Elasticsearch with the following query: %s", query)
+	e2elog.Logf("Sending a search request to Elasticsearch with the following query: %s", query)
 
 	// Ask Elasticsearch to return all the log lines that were tagged with the
 	// pod name. Ask for ten times as many log lines because duplication is possible.
@@ -191,26 +193,26 @@ func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 		Param("size", strconv.Itoa(searchPageSize)).
 		DoRaw()
 	if err != nil {
-		framework.Logf("Failed to make proxy call to elasticsearch-logging: %v", err)
+		e2elog.Logf("Failed to make proxy call to elasticsearch-logging: %v", err)
 		return nil
 	}
 
 	var response map[string]interface{}
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		framework.Logf("Failed to unmarshal response: %v", err)
+		e2elog.Logf("Failed to unmarshal response: %v", err)
 		return nil
 	}
 
 	hits, ok := response["hits"].(map[string]interface{})
 	if !ok {
-		framework.Logf("response[hits] not of the expected type: %T", response["hits"])
+		e2elog.Logf("response[hits] not of the expected type: %T", response["hits"])
 		return nil
 	}
 
 	h, ok := hits["hits"].([]interface{})
 	if !ok {
-		framework.Logf("Hits not of the expected type: %T", hits["hits"])
+		e2elog.Logf("Hits not of the expected type: %T", hits["hits"])
 		return nil
 	}
 
@@ -219,13 +221,13 @@ func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 	for _, e := range h {
 		l, ok := e.(map[string]interface{})
 		if !ok {
-			framework.Logf("Element of hit not of expected type: %T", e)
+			e2elog.Logf("Element of hit not of expected type: %T", e)
 			continue
 		}
 
 		source, ok := l["_source"].(map[string]interface{})
 		if !ok {
-			framework.Logf("_source not of the expected type: %T", l["_source"])
+			e2elog.Logf("_source not of the expected type: %T", l["_source"])
 			continue
 		}
 
@@ -241,7 +243,7 @@ func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 			continue
 		}
 
-		framework.Logf("Log is of unknown type, got %v, want string or object in field 'log'", source)
+		e2elog.Logf("Log is of unknown type, got %v, want string or object in field 'log'", source)
 	}
 
 	return entries

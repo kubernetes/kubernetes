@@ -257,7 +257,6 @@ function load-docker-images {
 # Computes command line arguments to be passed to kubelet.
 function compute-kubelet-params {
 	local params="${KUBELET_TEST_ARGS:-}"
-	params+=" --allow-privileged=true"
 	params+=" --cgroup-root=/"
 	params+=" --cloud-provider=gce"
 	params+=" --pod-manifest-path=/etc/kubernetes/manifests"

@@ -23,12 +23,12 @@ import (
 )
 
 func TestAzureMetricLabelCardinality(t *testing.T) {
-	mc := newMetricContext("test", "create", "resource_group", "subscription_id")
+	mc := newMetricContext("test", "create", "resource_group", "subscription_id", "source")
 	assert.Len(t, mc.attributes, len(metricLabels), "cardinalities of labels and values must match")
 }
 
 func TestAzureMetricLabelPrefix(t *testing.T) {
-	mc := newMetricContext("prefix", "request", "resource_group", "subscription_id")
+	mc := newMetricContext("prefix", "request", "resource_group", "subscription_id", "source")
 	found := false
 	for _, attribute := range mc.attributes {
 		if attribute == "prefix_request" {

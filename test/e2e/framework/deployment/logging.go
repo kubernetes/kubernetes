@@ -17,16 +17,16 @@ limitations under the License.
 package deployment
 
 import (
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-func logReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) {
+func logReplicaSetsOfDeployment(deployment *appsv1.Deployment, allOldRSs []*appsv1.ReplicaSet, newRS *appsv1.ReplicaSet) {
 	testutils.LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, e2elog.Logf)
 }
 
-func logPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsList []*apps.ReplicaSet) {
+func logPodsOfDeployment(c clientset.Interface, deployment *appsv1.Deployment, rsList []*appsv1.ReplicaSet) {
 	testutils.LogPodsOfDeployment(c, deployment, rsList, e2elog.Logf)
 }

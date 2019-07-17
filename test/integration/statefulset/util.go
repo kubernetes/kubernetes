@@ -43,9 +43,6 @@ import (
 const (
 	pollInterval = 100 * time.Millisecond
 	pollTimeout  = 60 * time.Second
-
-	fakeImageName = "fake-name"
-	fakeImage     = "fakeimage"
 )
 
 func labelMap() map[string]string {

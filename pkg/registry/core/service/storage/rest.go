@@ -220,9 +220,9 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	return out, err
 }
 
-func (rs *REST) Delete(ctx context.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	// TODO: handle graceful
-	obj, _, err := rs.services.Delete(ctx, id, options)
+	obj, _, err := rs.services.Delete(ctx, id, deleteValidation, options)
 	if err != nil {
 		return nil, false, err
 	}
@@ -233,7 +233,7 @@ func (rs *REST) Delete(ctx context.Context, id string, options *metav1.DeleteOpt
 	if !dryrun.IsDryRun(options.DryRun) {
 		// TODO: can leave dangling endpoints, and potentially return incorrect
 		// endpoints if a new service is created with the same name
-		_, _, err = rs.endpoints.Delete(ctx, id, &metav1.DeleteOptions{})
+		_, _, err = rs.endpoints.Delete(ctx, id, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return nil, false, err
 		}
@@ -539,8 +539,8 @@ func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Ge
 	if pod == nil {
 		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
-	if pod.Status.PodIP != addr.IP {
-		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+	if pod.Status.PodIPs[0].IP != addr.IP {
+		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIPs[0].IP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
 	return nil
 }

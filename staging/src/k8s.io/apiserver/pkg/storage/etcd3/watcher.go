@@ -56,7 +56,13 @@ func testingDeferOnDecodeError() {
 
 func init() {
 	// check to see if we are running in a test environment
+	TestOnlySetFatalOnDecodeError(true)
 	fatalOnDecodeError, _ = strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
+}
+
+// TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
+func TestOnlySetFatalOnDecodeError(b bool) {
+	fatalOnDecodeError = b
 }
 
 type watcher struct {

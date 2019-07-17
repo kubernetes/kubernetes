@@ -69,6 +69,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 									Name:      "data",
 								},
 							},
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},

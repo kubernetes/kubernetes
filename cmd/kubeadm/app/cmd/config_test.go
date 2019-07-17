@@ -106,10 +106,8 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-				},
+			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
 			})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
@@ -135,61 +133,41 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta2.InitConfiguration
+		cfg            kubeadmapiv1beta2.ClusterConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					Etcd: kubeadmapiv1beta2.Etcd{
-						External: &kubeadmapiv1beta2.ExternalEtcd{
-							Endpoints: []string{"https://some.etcd.com:2379"},
-						},
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				Etcd: kubeadmapiv1beta2.Etcd{
+					External: &kubeadmapiv1beta2.ExternalEtcd{
+						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
-					KubernetesVersion: dummyKubernetesVersion,
 				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
+				KubernetesVersion: dummyKubernetesVersion,
 			},
 			expectedImages: defaultNumberOfImages - 1,
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
 			},
 			expectedImages: defaultNumberOfImages,
 		},
 		{
 			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-					DNS: kubeadmapiv1beta2.DNS{
-						Type: kubeadmapiv1beta2.KubeDNS,
-					},
-				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
+				DNS: kubeadmapiv1beta2.DNS{
+					Type: kubeadmapiv1beta2.KubeDNS,
 				},
 			},
 			expectedImages: defaultNumberOfImages + 2,

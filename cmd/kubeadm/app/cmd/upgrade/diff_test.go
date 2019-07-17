@@ -32,6 +32,7 @@ func TestRunDiff(t *testing.T) {
 		out:     ioutil.Discard,
 	}
 
+	// TODO: Add test cases for empty cfgPath, it should automatically fetch cfg from cluster
 	testCases := []struct {
 		name            string
 		args            []string

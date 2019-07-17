@@ -9,12 +9,13 @@ func (n *Namespace) Syscall() int {
 }
 
 var namespaceInfo = map[NamespaceType]int{
-	NEWNET:  unix.CLONE_NEWNET,
-	NEWNS:   unix.CLONE_NEWNS,
-	NEWUSER: unix.CLONE_NEWUSER,
-	NEWIPC:  unix.CLONE_NEWIPC,
-	NEWUTS:  unix.CLONE_NEWUTS,
-	NEWPID:  unix.CLONE_NEWPID,
+	NEWNET:    unix.CLONE_NEWNET,
+	NEWNS:     unix.CLONE_NEWNS,
+	NEWUSER:   unix.CLONE_NEWUSER,
+	NEWIPC:    unix.CLONE_NEWIPC,
+	NEWUTS:    unix.CLONE_NEWUTS,
+	NEWPID:    unix.CLONE_NEWPID,
+	NEWCGROUP: unix.CLONE_NEWCGROUP,
 }
 
 // CloneFlags parses the container's Namespaces options to set the correct

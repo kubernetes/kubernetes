@@ -104,10 +104,6 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Initializers are a deprecated alpha field and should not be saved
-	oldMeta.SetInitializers(nil)
-	objectMeta.SetInitializers(nil)
-
 	// Ensure managedFields state is removed unless ServerSideApply is enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		oldMeta.SetManagedFields(nil)
@@ -271,6 +267,7 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)

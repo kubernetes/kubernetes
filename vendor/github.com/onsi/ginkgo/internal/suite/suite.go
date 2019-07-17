@@ -175,6 +175,13 @@ func (suite *Suite) PushJustBeforeEachNode(body interface{}, codeLocation types.
 	suite.currentContainer.PushSetupNode(leafnodes.NewJustBeforeEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
+func (suite *Suite) PushJustAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
+	if suite.running {
+		suite.failer.Fail("You may only call JustAfterEach from within a Describe or Context", codeLocation)
+	}
+	suite.currentContainer.PushSetupNode(leafnodes.NewJustAfterEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
+}
+
 func (suite *Suite) PushAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
 		suite.failer.Fail("You may only call AfterEach from within a Describe, Context or When", codeLocation)

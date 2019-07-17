@@ -19,8 +19,10 @@ package replace
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,13 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/validation"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var (
@@ -82,6 +85,7 @@ type ReplaceOptions struct {
 
 	Namespace        string
 	EnforceNamespace bool
+	Raw              string
 
 	Recorder genericclioptions.Recorder
 
@@ -109,7 +113,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.Run(f))
 		},
 	}
 
@@ -119,6 +123,8 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
+
+	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 
 	return cmd
 }
@@ -197,10 +203,38 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
 	}
 
+	if len(o.Raw) > 0 {
+		if len(o.DeleteOptions.FilenameOptions.Filenames) != 1 {
+			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+		}
+		if strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "https://") == 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+		}
+		if o.DeleteOptions.FilenameOptions.Recursive {
+			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+		}
+		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		}
+		if _, err := url.ParseRequestURI(o.Raw); err != nil {
+			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+		}
+	}
+
 	return nil
 }
 
-func (o *ReplaceOptions) Run() error {
+func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
+	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
+	// the validator enforces this, so
+	if len(o.Raw) > 0 {
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+		return rawhttp.RawPut(restClient, o.IOStreams, o.Raw, o.DeleteOptions.Filenames[0])
+	}
+
 	if o.DeleteOptions.ForceDeletion {
 		return o.forceReplace()
 	}

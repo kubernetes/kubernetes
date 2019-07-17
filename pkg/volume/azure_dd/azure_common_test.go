@@ -183,57 +183,42 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 	}
 }
 
-func TestGetDiskLUN(t *testing.T) {
+func TestGetDiskNum(t *testing.T) {
 	tests := []struct {
 		deviceInfo  string
-		expectedLUN int32
+		expectedNum string
 		expectError bool
 	}{
 		{
-			deviceInfo:  "0",
-			expectedLUN: 0,
+			deviceInfo:  "/dev/disk0",
+			expectedNum: "0",
 			expectError: false,
 		},
 		{
-			deviceInfo:  "10",
-			expectedLUN: 10,
+			deviceInfo:  "/dev/disk99",
+			expectedNum: "99",
 			expectError: false,
 		},
 		{
-			deviceInfo:  "11d",
-			expectedLUN: -1,
+			deviceInfo:  "",
+			expectedNum: "",
+			expectError: true,
+		},
+		{
+			deviceInfo:  "/dev/disk",
+			expectedNum: "",
 			expectError: true,
 		},
 		{
 			deviceInfo:  "999",
-			expectedLUN: -1,
-			expectError: true,
-		},
-		{
-			deviceInfo:  "",
-			expectedLUN: -1,
-			expectError: true,
-		},
-		{
-			deviceInfo:  "/dev/disk/azure/scsi1/lun2",
-			expectedLUN: 2,
-			expectError: false,
-		},
-		{
-			deviceInfo:  "/dev/disk/azure/scsi0/lun12",
-			expectedLUN: 12,
-			expectError: false,
-		},
-		{
-			deviceInfo:  "/dev/disk/by-id/scsi1/lun2",
-			expectedLUN: -1,
+			expectedNum: "",
 			expectError: true,
 		},
 	}
 
 	for _, test := range tests {
-		result, err := getDiskLUN(test.deviceInfo)
-		assert.Equal(t, result, test.expectedLUN)
+		result, err := getDiskNum(test.deviceInfo)
+		assert.Equal(t, result, test.expectedNum)
 		assert.Equal(t, err != nil, test.expectError, fmt.Sprintf("error msg: %v", err))
 	}
 }

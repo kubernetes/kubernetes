@@ -21,6 +21,7 @@ import (
 	"io"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -52,7 +53,7 @@ func NewPlugin() *Plugin {
 type Plugin struct {
 	*admission.Handler
 	// allows overriding for testing
-	features utilfeature.FeatureGate
+	features featuregate.FeatureGate
 }
 
 var (

@@ -18,6 +18,7 @@ package stateful
 
 import (
 	"fmt"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,7 @@ import (
 type MultipointExample struct {
 	mpState map[int]string
 	numRuns int
+	mu      sync.RWMutex
 }
 
 var _ = framework.ReservePlugin(&MultipointExample{})
@@ -46,12 +48,16 @@ func (mp *MultipointExample) Name() string {
 
 // Reserve is the functions invoked by the framework at "reserve" extension point.
 func (mp *MultipointExample) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	// Reserve is not called concurrently, and so we don't need to lock.
 	mp.numRuns++
 	return nil
 }
 
 // Prebind is the functions invoked by the framework at "prebind" extension point.
 func (mp *MultipointExample) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	// Prebind could be called concurrently for different pods.
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
 	mp.numRuns++
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod must not be nil")

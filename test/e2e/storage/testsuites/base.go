@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -88,8 +88,8 @@ func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 		suite := testSuiteInit()
 		for _, pattern := range suite.getTestSuiteInfo().testPatterns {
 			p := pattern
-			Context(getTestNameStr(suite, p), func() {
-				BeforeEach(func() {
+			ginkgo.Context(getTestNameStr(suite, p), func() {
+				ginkgo.BeforeEach(func() {
 					// Skip unsupported tests to avoid unnecessary resource initialization
 					skipUnsupportedTest(driver, p)
 				})
@@ -146,7 +146,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 		if !dInfo.SupportedFsType.Has(pattern.FsType) {
 			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
 		}
-		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci") {
+		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
 			framework.Skipf("Distro doesn't support xfs -- skipping")
 		}
 		if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
@@ -214,7 +214,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			claimSize := dDriver.GetClaimSize()
 			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
 
-			By("creating a StorageClass " + r.sc.Name)
+			ginkgo.By("creating a StorageClass " + r.sc.Name)
 			var err error
 			r.sc, err = cs.StorageV1().StorageClasses().Create(r.sc)
 			framework.ExpectNoError(err)
@@ -226,7 +226,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
 	default:
-		framework.Failf("genericVolumeTestResource doesn't support: %s", volType)
+		e2elog.Failf("genericVolumeTestResource doesn't support: %s", volType)
 	}
 
 	if r.volSource == nil {
@@ -244,15 +244,15 @@ func (r *genericVolumeTestResource) cleanupResource() {
 	if r.pvc != nil || r.pv != nil {
 		switch volType {
 		case testpatterns.PreprovisionedPV:
-			By("Deleting pv and pvc")
+			ginkgo.By("Deleting pv and pvc")
 			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
-				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 			}
 		case testpatterns.DynamicPV:
-			By("Deleting pvc")
+			ginkgo.By("Deleting pvc")
 			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
 			if r.pv != nil && r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
-				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
+				e2elog.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
 					r.pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.pvc != nil {
@@ -264,12 +264,12 @@ func (r *genericVolumeTestResource) cleanupResource() {
 				}
 			}
 		default:
-			framework.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
+			e2elog.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
 		}
 	}
 
 	if r.sc != nil {
-		By("Deleting sc")
+		ginkgo.By("Deleting sc")
 		deleteStorageClass(f.ClientSet, r.sc.Name)
 	}
 
@@ -330,7 +330,7 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 	cs := f.ClientSet
 	ns := f.Namespace.Name
 
-	By("creating a claim")
+	ginkgo.By("creating a claim")
 	pvc := getClaim(claimSize, ns)
 	pvc.Spec.StorageClassName = &sc.Name
 	if volMode != "" {
@@ -455,12 +455,12 @@ func StartPodLogs(f *framework.Framework) func() {
 	ns := f.Namespace
 
 	to := podlogs.LogOutput{
-		StatusWriter: GinkgoWriter,
+		StatusWriter: ginkgo.GinkgoWriter,
 	}
 	if framework.TestContext.ReportDir == "" {
-		to.LogWriter = GinkgoWriter
+		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
-		test := CurrentGinkgoTestDescription()
+		test := ginkgo.CurrentGinkgoTestDescription()
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
 		// We end the prefix with a slash to ensure that all logs
 		// end up in a directory named after the current test.
@@ -476,7 +476,7 @@ func StartPodLogs(f *framework.Framework) func() {
 	// after a failed test. Logging them live is only useful for interactive
 	// debugging, not when we collect reports.
 	if framework.TestContext.ReportDir == "" {
-		podlogs.WatchPods(ctx, cs, ns.Name, GinkgoWriter)
+		podlogs.WatchPods(ctx, cs, ns.Name, ginkgo.GinkgoWriter)
 	}
 
 	return cancel
@@ -507,16 +507,21 @@ func getVolumeOpsFromMetricsForPlugin(ms metrics.Metrics, pluginName string) opC
 }
 
 func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
+	if !framework.ProviderIs("gce", "gke", "aws") {
+		return opCounts{}
+	}
+
 	nodeLimit := 25
 
 	metricsGrabber, err := metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
 
 	if err != nil {
-		framework.Failf("Error creating metrics grabber : %v", err)
+		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}
 
 	if !metricsGrabber.HasRegisteredMaster() {
-		framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+		e2elog.Logf("Warning: Environment does not support getting controller-manager metrics")
+		return opCounts{}
 	}
 
 	controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
@@ -569,15 +574,14 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 			migratedOps = getVolumeOpCounts(cs, csiName)
 		}
 		return getVolumeOpCounts(cs, pluginName), migratedOps
-	} else {
-		// Not an in-tree driver
-		e2elog.Logf("Test running for native CSI Driver, not checking metrics")
-		return opCounts{}, opCounts{}
 	}
+	// Not an in-tree driver
+	e2elog.Logf("Test running for native CSI Driver, not checking metrics")
+	return opCounts{}, opCounts{}
 }
 
 func getTotOps(ops opCounts) int64 {
-	var tot int64 = 0
+	var tot = int64(0)
 	for _, count := range ops {
 		tot += count
 	}
@@ -596,7 +600,7 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 
 		for op, count := range newInTreeOps {
 			if count != oldInTreeOps[op] {
-				framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
+				e2elog.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
 			}
 		}
 		// We don't check for migrated metrics because some negative test cases

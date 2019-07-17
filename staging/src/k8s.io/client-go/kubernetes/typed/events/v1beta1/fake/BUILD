@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "fake_event.go",
+        "fake_event_expansion.go",
         "fake_events_client.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/events/v1beta1/fake",

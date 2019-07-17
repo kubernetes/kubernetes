@@ -1,9 +1,8 @@
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 go:
-- '1.9'
-- 1.10.x
 - 1.11.x
+- 1.12.x
 install:
 - go get -u github.com/axw/gocov/gocov
 - go get -u gopkg.in/matm/v1/gocov-html

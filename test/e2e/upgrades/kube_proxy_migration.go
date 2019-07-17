@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,7 +30,6 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -50,7 +49,8 @@ func (KubeProxyUpgradeTest) Name() string { return "[sig-network] kube-proxy-upg
 // Setup verifies kube-proxy static pods is running before upgrade.
 func (t *KubeProxyUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Waiting for kube-proxy static pods running and ready")
-	gomega.Expect(waitForKubeProxyStaticPodsRunning(f.ClientSet)).NotTo(gomega.HaveOccurred())
+	err := waitForKubeProxyStaticPodsRunning(f.ClientSet)
+	framework.ExpectNoError(err)
 }
 
 // Test validates if kube-proxy is migrated from static pods to DaemonSet.
@@ -62,10 +62,12 @@ func (t *KubeProxyUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	<-done
 
 	ginkgo.By("Waiting for kube-proxy static pods disappear")
-	gomega.Expect(waitForKubeProxyStaticPodsDisappear(c)).NotTo(gomega.HaveOccurred())
+	err := waitForKubeProxyStaticPodsDisappear(c)
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
-	gomega.Expect(waitForKubeProxyDaemonSetRunning(c)).NotTo(gomega.HaveOccurred())
+	err = waitForKubeProxyDaemonSetRunning(c)
+	framework.ExpectNoError(err)
 }
 
 // Teardown does nothing.
@@ -82,7 +84,8 @@ func (KubeProxyDowngradeTest) Name() string { return "[sig-network] kube-proxy-d
 // Setup verifies kube-proxy DaemonSet is running before upgrade.
 func (t *KubeProxyDowngradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
-	gomega.Expect(waitForKubeProxyDaemonSetRunning(f.ClientSet)).NotTo(gomega.HaveOccurred())
+	err := waitForKubeProxyDaemonSetRunning(f.ClientSet)
+	framework.ExpectNoError(err)
 }
 
 // Test validates if kube-proxy is migrated from DaemonSet to static pods.
@@ -94,10 +97,12 @@ func (t *KubeProxyDowngradeTest) Test(f *framework.Framework, done <-chan struct
 	<-done
 
 	ginkgo.By("Waiting for kube-proxy DaemonSet disappear")
-	gomega.Expect(waitForKubeProxyDaemonSetDisappear(c)).NotTo(gomega.HaveOccurred())
+	err := waitForKubeProxyDaemonSetDisappear(c)
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Waiting for kube-proxy static pods running and ready")
-	gomega.Expect(waitForKubeProxyStaticPodsRunning(c)).NotTo(gomega.HaveOccurred())
+	err = waitForKubeProxyStaticPodsRunning(c)
+	framework.ExpectNoError(err)
 }
 
 // Teardown does nothing.
@@ -216,7 +221,7 @@ func getKubeProxyStaticPods(c clientset.Interface) (*v1.PodList, error) {
 	return c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
 }
 
-func getKubeProxyDaemonSet(c clientset.Interface) (*apps.DaemonSetList, error) {
+func getKubeProxyDaemonSet(c clientset.Interface) (*appsv1.DaemonSetList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterAddonLabelKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
 	return c.AppsV1().DaemonSets(metav1.NamespaceSystem).List(listOpts)

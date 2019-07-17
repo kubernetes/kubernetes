@@ -4,11 +4,11 @@ metadata:
   name: kube-addon-manager
   namespace: kube-system
   annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
     seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   labels:
     component: kube-addon-manager
 spec:
+  priorityClassName: system-node-critical
   hostNetwork: true
   containers:
   - name: kube-addon-manager

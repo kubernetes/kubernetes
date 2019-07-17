@@ -144,6 +144,10 @@ message CSINodeDriver {
   // This can be empty if driver does not support topology.
   // +optional
   repeated string topologyKeys = 3;
+
+  // allocatable represents the volume resources of a node that are available for scheduling.
+  // +optional
+  optional VolumeNodeResources allocatable = 4;
 }
 
 // CSINodeList is a collection of CSINode objects.
@@ -265,6 +269,15 @@ message VolumeAttachmentSource {
   // Name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
+
+  // inlineVolumeSpec contains all the information necessary to attach
+  // a persistent volume defined by a pod's inline VolumeSource. This field
+  // is populated only for the CSIMigration feature. It contains
+  // translated fields from a pod's inline VolumeSource to a
+  // PersistentVolumeSpec. This field is alpha-level and is only
+  // honored by servers that enabled the CSIMigration feature.
+  // +optional
+  optional k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
@@ -319,5 +332,15 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+message VolumeNodeResources {
+  // Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+  // A volume that is both attached and mounted on a node is considered to be used once, not twice.
+  // The same rule applies for a unique volume that is shared among multiple pods on the same node.
+  // If this field is nil, then the supported number of volumes on this node is unbounded.
+  // +optional
+  optional int32 count = 1;
 }
 

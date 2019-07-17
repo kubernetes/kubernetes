@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -43,7 +44,6 @@ type MySQLUpgradeTest struct {
 	ip               string
 	successfulWrites int
 	nextWrite        int
-	ssTester         *framework.StatefulSetTester
 }
 
 // Name returns the tracking name of the test.
@@ -84,13 +84,12 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
-	t.ssTester = framework.NewStatefulSetTester(f.ClientSet)
 
 	ginkgo.By("Creating a configmap")
 	mysqlKubectlCreate(ns, "configmap.yaml")
 
 	ginkgo.By("Creating a mysql StatefulSet")
-	t.ssTester.CreateStatefulSet(mysqlManifestPath, ns)
+	e2esset.CreateStatefulSet(f.ClientSet, mysqlManifestPath, ns)
 
 	ginkgo.By("Creating a mysql-test-server deployment")
 	mysqlKubectlCreate(ns, "tester.yaml")
@@ -110,13 +109,15 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
-	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
-	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
 	framework.ExpectNoError(err)
-	gomega.Expect(count).To(gomega.Equal(2))
+	framework.ExpectEqual(count, 2)
 }
 
 // Test continually polls the db using the read and write connections, inserting data, and checking
@@ -157,10 +158,10 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	readRatio := float64(readSuccess) / float64(readSuccess+readFailure)
 	writeRatio := float64(writeSuccess) / float64(writeSuccess+writeFailure)
 	if readRatio < 0.75 {
-		framework.Failf("Too many failures reading data. Success ratio: %f", readRatio)
+		e2elog.Failf("Too many failures reading data. Success ratio: %f", readRatio)
 	}
 	if writeRatio < 0.75 {
-		framework.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
+		e2elog.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
 	}
 }
 

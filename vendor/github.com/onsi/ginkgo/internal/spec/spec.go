@@ -163,6 +163,18 @@ func (spec *Spec) runSample(sample int, writer io.Writer) {
 	defer func() {
 		for i := innerMostContainerIndexToUnwind; i >= 0; i-- {
 			container := spec.containers[i]
+			for _, justAfterEach := range container.SetupNodesOfType(types.SpecComponentTypeJustAfterEach) {
+				spec.announceSetupNode(writer, "JustAfterEach", container, justAfterEach)
+				justAfterEachState, justAfterEachFailure := justAfterEach.Run()
+				if justAfterEachState != types.SpecStatePassed && spec.state == types.SpecStatePassed {
+					spec.state = justAfterEachState
+					spec.failure = justAfterEachFailure
+				}
+			}
+		}
+
+		for i := innerMostContainerIndexToUnwind; i >= 0; i-- {
+			container := spec.containers[i]
 			for _, afterEach := range container.SetupNodesOfType(types.SpecComponentTypeAfterEach) {
 				spec.announceSetupNode(writer, "AfterEach", container, afterEach)
 				afterEachState, afterEachFailure := afterEach.Run()

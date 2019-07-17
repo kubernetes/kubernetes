@@ -35,7 +35,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 type durations []time.Duration
@@ -95,7 +95,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		}
 		if n < 2 {
 			failing.Insert("Less than two runs succeeded; aborting.")
-			framework.Failf(strings.Join(failing.List(), "\n"))
+			e2elog.Failf(strings.Join(failing.List(), "\n"))
 		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
@@ -122,7 +122,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		if failing.Len() > 0 {
 			errList := strings.Join(failing.List(), "\n")
 			helpfulInfo := fmt.Sprintf("\n50, 90, 99 percentiles: %v %v %v", p50, p90, p99)
-			framework.Failf(errList + helpfulInfo)
+			e2elog.Failf(errList + helpfulInfo)
 		}
 	})
 })
@@ -161,7 +161,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	blocker := make(chan struct{}, inParallel)
 	for i := 0; i < total; i++ {
 		go func() {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
 			if d, err := singleServiceLatency(f, cfg.Name, endpointQueries); err != nil {

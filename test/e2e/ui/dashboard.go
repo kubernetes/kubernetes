@@ -26,12 +26,13 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Kubernetes Dashboard", func() {
+var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 	ginkgo.BeforeEach(func() {
 		// TODO(kubernetes/kubernetes#61559): Enable dashboard here rather than skip the test.
 		framework.SkipIfProviderIs("gke")
@@ -63,7 +64,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 			var status int
 			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 			if errProxy != nil {
-				framework.Logf("Get services proxy request failed: %v", errProxy)
+				e2elog.Logf("Get services proxy request failed: %v", errProxy)
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
@@ -79,12 +80,12 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 				Error()
 			if err != nil {
 				if ctx.Err() != nil {
-					framework.Failf("Request to kubernetes-dashboard failed: %v", err)
+					e2elog.Failf("Request to kubernetes-dashboard failed: %v", err)
 					return true, err
 				}
-				framework.Logf("Request to kubernetes-dashboard failed: %v", err)
+				e2elog.Logf("Request to kubernetes-dashboard failed: %v", err)
 			} else if status != http.StatusOK {
-				framework.Logf("Unexpected status from kubernetes-dashboard: %v", status)
+				e2elog.Logf("Unexpected status from kubernetes-dashboard: %v", status)
 			}
 			// Don't return err here as it aborts polling.
 			return status == http.StatusOK, nil

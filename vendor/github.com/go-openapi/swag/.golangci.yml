@@ -18,3 +18,5 @@ linters:
   disable:
     - maligned
     - lll
+    - gochecknoinits
+    - gochecknoglobals

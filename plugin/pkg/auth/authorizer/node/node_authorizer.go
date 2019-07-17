@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
@@ -53,7 +54,7 @@ type NodeAuthorizer struct {
 	nodeRules  []rbacv1.PolicyRule
 
 	// allows overriding for testing
-	features utilfeature.FeatureGate
+	features featuregate.FeatureGate
 }
 
 // NewAuthorizer returns a new node authorizer
@@ -107,10 +108,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
 		case vaResource:
-			if r.features.Enabled(features.CSIPersistentVolume) {
-				return r.authorizeGet(nodeName, vaVertexType, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
+			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
 			if r.features.Enabled(features.TokenRequest) {
 				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
@@ -122,10 +120,10 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
 		case csiNodeResource:
-			if r.features.Enabled(features.KubeletPluginsWatcher) && r.features.Enabled(features.CSINodeInfo) {
+			if r.features.Enabled(features.CSINodeInfo) {
 				return r.authorizeCSINode(nodeName, attrs)
 			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo), nil
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s", features.CSINodeInfo), nil
 		}
 
 	}

@@ -38,7 +38,7 @@ var (
 		// server_type aims to differentiate the readonly server and the readwrite server.
 		// long_running marks whether the request is long-running or not.
 		// Currently, long-running requests include exec/attach/portforward/debug.
-		[]string{"method", "path", "host", "server_type", "long_running"},
+		[]string{"method", "path", "server_type", "long_running"},
 	)
 	// HTTPRequestsDuration tracks the duration in seconds to serve http requests.
 	HTTPRequestsDuration = prometheus.NewHistogramVec(
@@ -49,7 +49,7 @@ var (
 			// Use DefBuckets for now, will customize the buckets if necessary.
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"method", "path", "host", "server_type", "long_running"},
+		[]string{"method", "path", "server_type", "long_running"},
 	)
 	// HTTPInflightRequests tracks the number of the inflight http requests.
 	HTTPInflightRequests = prometheus.NewGaugeVec(
@@ -58,7 +58,7 @@ var (
 			Name:      "http_inflight_requests",
 			Help:      "Number of the inflight http requests",
 		},
-		[]string{"method", "path", "host", "server_type", "long_running"},
+		[]string{"method", "path", "server_type", "long_running"},
 	)
 )
 

@@ -22,26 +22,27 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("crictl", func() {
 	f := framework.NewDefaultFramework("crictl")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// `crictl` is not available on all cloud providers.
 		framework.SkipUnlessProviderIs("gce", "gke")
 		// The test requires $HOME/.ssh/id_rsa key to be present.
 		framework.SkipUnlessSSHKeyPresent()
 	})
 
-	It("should be able to run crictl on the node", func() {
+	ginkgo.It("should be able to run crictl on the node", func() {
 		// Get all nodes' external IPs.
-		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := framework.NodeSSHHosts(f.ClientSet)
+		ginkgo.By("Getting all nodes' SSH-able IP addresses")
+		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
 		if err != nil {
-			framework.Failf("Error getting node hostnames: %v", err)
+			e2elog.Failf("Error getting node hostnames: %v", err)
 		}
 
 		testCases := []struct {
@@ -54,12 +55,12 @@ var _ = SIGDescribe("crictl", func() {
 		for _, testCase := range testCases {
 			// Choose an arbitrary node to test.
 			host := hosts[0]
-			By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
+			ginkgo.By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
 
-			result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
+			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
-				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
+				e2elog.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
 			}
 			// Log the stdout/stderr output.
 			// TODO: Verify the output.

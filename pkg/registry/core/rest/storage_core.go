@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	restclient "k8s.io/client-go/rest"
@@ -284,7 +284,7 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 			TLSConfig:   machine.TLSConfig,
 			Port:        port,
 			Path:        "/health",
-			Validate:    etcdutil.EtcdHealthCheck,
+			Validate:    etcd3.EtcdHealthCheck,
 		}
 	}
 	return serversToValidate

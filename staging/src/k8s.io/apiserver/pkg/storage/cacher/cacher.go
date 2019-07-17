@@ -154,10 +154,10 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 		klog.Warningf("Terminating all watchers from cacher %v", objectType)
 	}
 	i.allWatchers.terminateAll(done)
-	for index, watchers := range i.valueWatchers {
+	for _, watchers := range i.valueWatchers {
 		watchers.terminateAll(done)
-		delete(i.valueWatchers, index)
 	}
+	i.valueWatchers = map[string]watchersMap{}
 }
 
 // As we don't need a high precision here, we keep all watchers timeout within a
@@ -276,6 +276,8 @@ type Cacher struct {
 	// watchersBuffer is a list of watchers potentially interested in currently
 	// dispatched event.
 	watchersBuffer []*cacheWatcher
+	// blockedWatchers is a list of watchers whose buffer is currently full.
+	blockedWatchers []*cacheWatcher
 	// watchersToStop is a list of watchers that were supposed to be stopped
 	// during current dispatching, but stopping was deferred to the end of
 	// dispatching that event to avoid race with closing channels in watchers.
@@ -289,13 +291,13 @@ type Cacher struct {
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
 // given configuration.
-func NewCacherFromConfig(config Config) *Cacher {
+func NewCacherFromConfig(config Config) (*Cacher, error) {
 	stopCh := make(chan struct{})
 	obj := config.NewFunc()
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
 	if err := runtime.CheckCodec(config.Codec, obj); err != nil {
-		panic("storage codec doesn't seem to match given type: " + err.Error())
+		return nil, fmt.Errorf("storage codec doesn't seem to match given type: %v", err)
 	}
 
 	clock := clock.RealClock{}
@@ -351,6 +353,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 	cacher.stopWg.Add(1)
 	go func() {
 		defer cacher.stopWg.Done()
+		defer cacher.terminateAllWatchers()
 		wait.Until(
 			func() {
 				if !cacher.isStopped() {
@@ -360,7 +363,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 		)
 	}()
 
-	return cacher
+	return cacher, nil
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
@@ -402,8 +405,8 @@ func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object
 }
 
 // Delete implements storage.Interface.
-func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions) error {
-	return c.storage.Delete(ctx, key, out, preconditions)
+func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
+	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion)
 }
 
 // Watch implements storage.Interface.
@@ -604,7 +607,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		}
 	}
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", 0); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err
 		}
 	}
@@ -679,7 +682,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", 0); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err
 		}
 	}
@@ -788,13 +791,45 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
 
 	// Since add() can block, we explicitly add when cacher is unlocked.
+	// Dispatching event in nonblocking way first, which make faster watchers
+	// not be blocked by slower ones.
 	if event.Type == watch.Bookmark {
 		for _, watcher := range c.watchersBuffer {
 			watcher.nonblockingAdd(event)
 		}
 	} else {
+		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
-			watcher.add(event, c.timer, c.dispatchTimeoutBudget)
+			if !watcher.nonblockingAdd(event) {
+				c.blockedWatchers = append(c.blockedWatchers, watcher)
+			}
+		}
+
+		if len(c.blockedWatchers) > 0 {
+			// dispatchEvent is called very often, so arrange
+			// to reuse timers instead of constantly allocating.
+			startTime := time.Now()
+			timeout := c.dispatchTimeoutBudget.takeAvailable()
+			c.timer.Reset(timeout)
+
+			// Make sure every watcher will try to send event without blocking first,
+			// even if the timer has already expired.
+			timer := c.timer
+			for _, watcher := range c.blockedWatchers {
+				if !watcher.add(event, timer) {
+					// fired, clean the timer by set it to nil.
+					timer = nil
+				}
+			}
+
+			// Stop the timer if it is not fired
+			if timer != nil && !timer.Stop() {
+				// Consume triggered (but not yet received) timer event
+				// so that future reuse does not get a spurious timeout.
+				<-timer.C
+			}
+
+			c.dispatchTimeoutBudget.returnUnused(timeout - time.Since(startTime))
 		}
 	}
 }
@@ -1077,7 +1112,6 @@ func (c *cacheWatcher) stop() {
 }
 
 func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
-	// If we can't send it, don't block on it.
 	select {
 	case c.input <- event:
 		return true
@@ -1086,28 +1120,14 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 	}
 }
 
-func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer, budget *timeBudget) {
+// Nil timer means that add will not block (if it can't send event immediately, it will break the watcher)
+func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	// Try to send the event immediately, without blocking.
 	if c.nonblockingAdd(event) {
-		return
+		return true
 	}
 
-	// OK, block sending, but only for up to <timeout>.
-	// cacheWatcher.add is called very often, so arrange
-	// to reuse timers instead of constantly allocating.
-	startTime := time.Now()
-	timeout := budget.takeAvailable()
-
-	timer.Reset(timeout)
-
-	select {
-	case c.input <- event:
-		if !timer.Stop() {
-			// Consume triggered (but not yet received) timer event
-			// so that future reuse does not get a spurious timeout.
-			<-timer.C
-		}
-	case <-timer.C:
+	closeFunc := func() {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
@@ -1115,7 +1135,19 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer, budget *ti
 		c.forget()
 	}
 
-	budget.returnUnused(timeout - time.Since(startTime))
+	if timer == nil {
+		closeFunc()
+		return false
+	}
+
+	// OK, block sending, but only until timer fires.
+	select {
+	case c.input <- event:
+		return true
+	case <-timer.C:
+		closeFunc()
+		return false
+	}
 }
 
 func (c *cacheWatcher) nextBookmarkTime(now time.Time) (time.Time, bool) {

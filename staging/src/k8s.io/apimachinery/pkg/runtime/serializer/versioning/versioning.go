@@ -113,13 +113,6 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 
 	// if we specify a target, use generic conversion.
 	if into != nil {
-		if into == obj {
-			if isVersioned {
-				return versioned, gvk, nil
-			}
-			return into, gvk, nil
-		}
-
 		// perform defaulting if requested
 		if c.defaulter != nil {
 			// create a copy to ensure defaulting is not applied to the original versioned objects
@@ -131,6 +124,14 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 			if isVersioned {
 				versioned.Objects = []runtime.Object{obj}
 			}
+		}
+
+		// Short-circuit conversion if the into object is same object
+		if into == obj {
+			if isVersioned {
+				return versioned, gvk, nil
+			}
+			return into, gvk, nil
 		}
 
 		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {

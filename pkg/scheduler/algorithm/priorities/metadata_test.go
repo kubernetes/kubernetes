@@ -38,6 +38,12 @@ func TestPriorityMetadata(t *testing.T) {
 	specifiedReqs.MilliCPU = 200
 	specifiedReqs.Memory = 2000
 
+	nonPodLimits := &schedulernodeinfo.Resource{}
+
+	specifiedPodLimits := &schedulernodeinfo.Resource{}
+	specifiedPodLimits.MilliCPU = 200
+	specifiedPodLimits.Memory = 2000
+
 	tolerations := []v1.Toleration{{
 		Key:      "foo",
 		Operator: v1.TolerationOpEqual,
@@ -104,6 +110,10 @@ func TestPriorityMetadata(t *testing.T) {
 					Image:           "image",
 					ImagePullPolicy: "Always",
 					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("2000"),
+						},
 						Requests: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("200m"),
 							v1.ResourceMemory: resource.MustParse("2000"),
@@ -128,6 +138,7 @@ func TestPriorityMetadata(t *testing.T) {
 			pod: podWithTolerationsAndAffinity,
 			expected: &priorityMetadata{
 				nonZeroRequest: nonZeroReqs,
+				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       podAffinity,
 			},
@@ -137,6 +148,7 @@ func TestPriorityMetadata(t *testing.T) {
 			pod: podWithTolerationsAndRequests,
 			expected: &priorityMetadata{
 				nonZeroRequest: specifiedReqs,
+				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       nil,
 			},
@@ -146,6 +158,7 @@ func TestPriorityMetadata(t *testing.T) {
 			pod: podWithAffinityAndRequests,
 			expected: &priorityMetadata{
 				nonZeroRequest: specifiedReqs,
+				podLimits:      specifiedPodLimits,
 				podTolerations: nil,
 				affinity:       podAffinity,
 			},

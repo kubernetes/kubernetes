@@ -33,6 +33,7 @@ import (
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -68,6 +69,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
+
+		ShouldDeleteDuringUpdate: ShouldDeleteNamespaceDuringUpdate,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -122,7 +125,7 @@ func (r *REST) Export(ctx context.Context, name string, opts metav1.ExportOption
 }
 
 // Delete enforces life-cycle rules for namespace termination
-func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	nsObj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -174,6 +177,9 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 				if !ok {
 					// wrong type
 					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
+				}
+				if err := deleteValidation(existingNamespace); err != nil {
+					return nil, err
 				}
 				// Set the deletion timestamp if needed
 				if existingNamespace.DeletionTimestamp.IsZero() {
@@ -235,7 +241,17 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
 		return nil, false, err
 	}
-	return r.store.Delete(ctx, name, options)
+	return r.store.Delete(ctx, name, deleteValidation, options)
+}
+
+// ShouldDeleteNamespaceDuringUpdate adds namespace-specific spec.finalizer checks on top of the default generic ShouldDeleteDuringUpdate behavior
+func ShouldDeleteNamespaceDuringUpdate(ctx context.Context, key string, obj, existing runtime.Object) bool {
+	ns, ok := obj.(*api.Namespace)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected type %T", obj))
+		return false
+	}
+	return len(ns.Spec.Finalizers) == 0 && genericregistry.ShouldDeleteDuringUpdate(ctx, key, obj, existing)
 }
 
 func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalizer bool) bool {

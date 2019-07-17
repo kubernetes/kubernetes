@@ -24,9 +24,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var testConfigTempl = template.Must(template.New("test").Parse(`apiVersion: v1
@@ -60,7 +60,7 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 		},
 		{
 			"if both create and update errors, return error",
-			apierrors.NewAlreadyExists(api.Resource("configmaps"), "test"),
+			apierrors.NewAlreadyExists(schema.GroupResource{Resource: "configmaps"}, "test"),
 			apierrors.NewUnauthorized("go away!"),
 			true,
 		},

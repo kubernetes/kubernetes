@@ -17,10 +17,13 @@ limitations under the License.
 package common
 
 import (
+	"github.com/onsi/gomega"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -33,9 +36,17 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 		Description: Default command and arguments from the docker image entrypoint MUST be used when Pod does not specify the container command
 	*/
 	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
-		f.TestContainerOutput("use defaults", entrypointTestPod(), 0, []string{
-			"[/ep default arguments]",
-		})
+		pod := f.PodClient().Create(entrypointTestPod())
+		err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Expected pod %q to be running, got error: %v", pod.Name, err)
+
+		pollLogs := func() (string, error) {
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+		}
+
+		// The agnhost's image default entrypoint / args are: "/agnhost pause"
+		// which will print out "Paused".
+		gomega.Eventually(pollLogs, 3, framework.Poll).Should(gomega.ContainSubstring("Paused"))
 	})
 
 	/*
@@ -45,10 +56,10 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	*/
 	framework.ConformanceIt("should be able to override the image's default arguments (docker cmd) [NodeConformance]", func() {
 		pod := entrypointTestPod()
-		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
+		pod.Spec.Containers[0].Args = []string{"entrypoint-tester", "override", "arguments"}
 
 		f.TestContainerOutput("override arguments", pod, 0, []string{
-			"[/ep override arguments]",
+			"[/agnhost entrypoint-tester override arguments]",
 		})
 	})
 
@@ -61,10 +72,10 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	*/
 	framework.ConformanceIt("should be able to override the image's default command (docker entrypoint) [NodeConformance]", func() {
 		pod := entrypointTestPod()
-		pod.Spec.Containers[0].Command = []string{"/ep-2"}
+		pod.Spec.Containers[0].Command = []string{"/agnhost-2", "entrypoint-tester"}
 
 		f.TestContainerOutput("override command", pod, 0, []string{
-			"[/ep-2]",
+			"[/agnhost-2 entrypoint-tester]",
 		})
 	})
 
@@ -75,11 +86,11 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	*/
 	framework.ConformanceIt("should be able to override the image's default command and arguments [NodeConformance]", func() {
 		pod := entrypointTestPod()
-		pod.Spec.Containers[0].Command = []string{"/ep-2"}
-		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
+		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
+		pod.Spec.Containers[0].Args = []string{"entrypoint-tester", "override", "arguments"}
 
 		f.TestContainerOutput("override all", pod, 0, []string{
-			"[/ep-2 override arguments]",
+			"[/agnhost-2 entrypoint-tester override arguments]",
 		})
 	})
 })
@@ -99,7 +110,7 @@ func entrypointTestPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  testContainerName,
-					Image: imageutils.GetE2EImage(imageutils.EntrypointTester),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 				},
 			},
 			RestartPolicy:                 v1.RestartPolicyNever,

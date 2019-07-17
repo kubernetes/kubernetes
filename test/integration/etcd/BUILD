@@ -76,5 +76,6 @@ go_library(
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3/concurrency:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

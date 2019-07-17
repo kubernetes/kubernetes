@@ -112,7 +112,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 
 	for tci, tc := range testCases {
 		// outputs
-		localIPs := GetLocalEndpointIPs(tc.endpointsMap)
+		localIPs := tc.endpointsMap.getLocalEndpointIPs()
 
 		if !reflect.DeepEqual(localIPs, tc.expected) {
 			t.Errorf("[%d] expected %#v, got %#v", tci, tc.expected, localIPs)
@@ -1213,7 +1213,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				fp.addEndpoints(tc.previousEndpoints[i])
 			}
 		}
-		UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		fp.endpointsMap.Update(fp.endpointsChanges)
 		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 		// Now let's call appropriate handlers to get to state we want to be.
@@ -1233,7 +1233,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				fp.updateEndpoints(prev, curr)
 			}
 		}
-		result := UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		result := fp.endpointsMap.Update(fp.endpointsChanges)
 		newMap := fp.endpointsMap
 		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
 		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
@@ -1373,7 +1373,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 
 		tc.scenario(fp)
 
-		result := UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		result := fp.endpointsMap.Update(fp.endpointsChanges)
 		got := result.LastChangeTriggerTimes
 		sortTimeSlice(got)
 		sortTimeSlice(tc.expected)

@@ -20,7 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -218,4 +219,53 @@ func TestNeedsHealthCheck(t *testing.T) {
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
+}
+
+func TestHasLBFinalizer(t *testing.T) {
+	testCases := []struct {
+		desc         string
+		svc          *v1.Service
+		hasFinalizer bool
+	}{
+		{
+			desc:         "service without finalizer",
+			svc:          &v1.Service{},
+			hasFinalizer: false,
+		},
+		{
+			desc: "service with unrelated finalizer",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{"unrelated"},
+				},
+			},
+			hasFinalizer: false,
+		},
+		{
+			desc: "service with one finalizer",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{LoadBalancerCleanupFinalizer},
+				},
+			},
+			hasFinalizer: true,
+		},
+		{
+			desc: "service with multiple finalizers",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{LoadBalancerCleanupFinalizer, "unrelated"},
+				},
+			},
+			hasFinalizer: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if hasFinalizer := HasLBFinalizer(tc.svc); hasFinalizer != tc.hasFinalizer {
+				t.Errorf("HasLBFinalizer() = %t, want %t", hasFinalizer, tc.hasFinalizer)
+			}
+		})
+	}
 }

@@ -55,6 +55,37 @@ type JSONSchemaProps struct {
 	Definitions          JSONSchemaDefinitions
 	ExternalDocs         *ExternalDocumentation
 	Example              *JSON
+
+	// x-kubernetes-preserve-unknown-fields stops the API server
+	// decoding step from pruning fields which are not specified
+	// in the validation schema. This affects fields recursively,
+	// but switches back to normal pruning behaviour if nested
+	// properties or additionalProperties are specified in the schema.
+	// This can either be true or undefined. False is forbidden.
+	XPreserveUnknownFields *bool
+
+	// x-kubernetes-embedded-resource defines that the value is an
+	// embedded Kubernetes runtime.Object, with TypeMeta and
+	// ObjectMeta. The type must be object. It is allowed to further
+	// restrict the embedded object. Both ObjectMeta and TypeMeta
+	// are validated automatically. x-kubernetes-preserve-unknown-fields
+	// must be true.
+	XEmbeddedResource bool
+
+	// x-kubernetes-int-or-string specifies that this value is
+	// either an integer or a string. If this is true, an empty
+	// type is allowed and type as child of anyOf is permitted
+	// if following one of the following patterns:
+	//
+	// 1) anyOf:
+	//    - type: integer
+	//    - type: string
+	// 2) allOf:
+	//    - anyOf:
+	//      - type: integer
+	//      - type: string
+	//    - ... zero or more
+	XIntOrString bool
 }
 
 // JSON represents any valid JSON value.

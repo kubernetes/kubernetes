@@ -29,11 +29,11 @@ subjects:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: event-exporter-v0.2.4
+  name: event-exporter-v0.2.5
   namespace: kube-system
   labels:
     k8s-app: event-exporter
-    version: v0.2.4
+    version: v0.2.5
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
@@ -41,17 +41,17 @@ spec:
   selector:
     matchLabels:
       k8s-app: event-exporter
-      version: v0.2.4
+      version: v0.2.5
   template:
     metadata:
       labels:
         k8s-app: event-exporter
-        version: v0.2.4
+        version: v0.2.5
     spec:
       serviceAccountName: event-exporter-sa
       containers:
       - name: event-exporter
-        image: k8s.gcr.io/event-exporter:v0.2.4
+        image: k8s.gcr.io/event-exporter:v0.2.5
         command:
         - /event-exporter
         - -sink-opts=-stackdriver-resource-model={{ exporter_sd_resource_model }}

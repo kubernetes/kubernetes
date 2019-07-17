@@ -39,12 +39,12 @@ var scheme = runtime.NewScheme()
 var ParameterCodec = runtime.NewParameterCodec(scheme)
 
 func init() {
-	if err := AddToScheme(scheme); err != nil {
+	if err := AddMetaToScheme(scheme); err != nil {
 		panic(err)
 	}
 }
 
-func AddToScheme(scheme *runtime.Scheme) error {
+func AddMetaToScheme(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Table{},
 		&TableOptions{},

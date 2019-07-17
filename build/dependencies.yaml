@@ -1,0 +1,84 @@
+dependencies:
+  - name: "etcd"
+    version: 3.3.10
+    refPaths:
+    - path: cluster/gce/manifests/etcd.manifest
+      match: etcd_docker_tag|etcd_version      
+    - path: build/workspace.bzl
+      match: ETCD_VERSION 
+    - path: cluster/gce/manifests/etcd-empty-dir-cleanup.yaml
+      match: k8s.gcr.io/etcd-empty-dir-cleanup
+    - path: cluster/gce/upgrade-aliases.sh
+      match: ETCD_IMAGE|ETCD_VERSION
+    - path: cluster/images/etcd-empty-dir-cleanup/Makefile
+      match: ETCD_VERSION|TAG
+    - path: cluster/images/etcd/Makefile
+      match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
+    - path: cluster/images/etcd/migrate-if-needed.sh
+      match: BUNDLED_VERSIONS=
+    - path: cmd/kubeadm/app/constants/constants.go
+    - path: hack/lib/etcd.sh
+      match: ETCD_VERSION=
+    - path: staging/src/k8s.io/sample-apiserver/artifacts/example/rc.yaml
+      match: quay.io/coreos/etcd
+    - path: test/e2e/framework/nodes_util.go
+      match: const etcdImage      
+
+  - name: "docker"
+    version: 18.09
+    refPaths:
+    - path: cmd/kubeadm/app/util/system/docker_validator.go
+      match: latestValidatedDockerVersion
+    - path: cmd/kubeadm/app/util/system/docker_validator_test.go
+      match: ServerVersion
+      
+
+  - name: "golang"
+    version: 1.12.7
+    refPaths:
+    - path: build/build-image/cross/Dockerfile
+      match: "golang:"
+    - path: build/build-image/cross/VERSION
+    - path: build/root/WORKSPACE
+      match: go_version
+    - path: test/images/Makefile
+      match: GOLANG_VERSION
+      
+
+  - name: "cni"
+    version: 0.7.5
+    refPaths:
+    - path: build/debian-hyperkube-base/Makefile
+      match: CNI_VERSION=
+    - path: build/rpms/kubeadm.spec
+      match: kubernetes-cni
+    - path: build/rpms/kubelet.spec
+      match: kubernetes-cni
+    - path: build/workspace.bzl
+      match: CNI_VERSION =
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CNI_VERSION=
+    - path: test/e2e_node/remote/utils.go
+      match: cniVersion[\t\n\f\r ]*=
+      
+
+  - name: "coredns"
+    version: 1.3.1
+    refPaths:
+    - path: cluster/addons/dns/coredns/coredns.yaml.base
+      match: k8s.gcr.io/coredns
+    - path: cluster/addons/dns/coredns/coredns.yaml.in
+      match: k8s.gcr.io/coredns
+    - path: cluster/addons/dns/coredns/coredns.yaml.sed
+      match: k8s.gcr.io/coredns
+    - path: cmd/kubeadm/app/constants/constants.go
+      match: CoreDNSVersion =
+
+  - name: "crictl"
+    version: 1.14.0 
+    refPaths:
+    - path: build/workspace.bzl
+      match: CRI_TOOLS_VERSION =
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CRICTL_VERSION=
+      

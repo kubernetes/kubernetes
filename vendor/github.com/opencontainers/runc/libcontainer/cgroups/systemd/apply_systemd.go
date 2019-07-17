@@ -5,6 +5,7 @@ package systemd
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -71,13 +72,11 @@ const (
 )
 
 var (
-	connLock                        sync.Mutex
-	theConn                         *systemdDbus.Conn
-	hasStartTransientUnit           bool
-	hasStartTransientSliceUnit      bool
-	hasTransientDefaultDependencies bool
-	hasDelegateScope                bool
-	hasDelegateSlice                bool
+	connLock                   sync.Mutex
+	theConn                    *systemdDbus.Conn
+	hasStartTransientUnit      bool
+	hasStartTransientSliceUnit bool
+	hasDelegateSlice           bool
 )
 
 func newProp(name string, units interface{}) systemdDbus.Property {
@@ -111,53 +110,6 @@ func UseSystemd() bool {
 				if dbusError.Name == "org.freedesktop.DBus.Error.UnknownMethod" {
 					hasStartTransientUnit = false
 					return hasStartTransientUnit
-				}
-			}
-		}
-
-		// Ensure the scope name we use doesn't exist. Use the Pid to
-		// avoid collisions between multiple libcontainer users on a
-		// single host.
-		scope := fmt.Sprintf("libcontainer-%d-systemd-test-default-dependencies.scope", os.Getpid())
-		testScopeExists := true
-		for i := 0; i <= testScopeWait; i++ {
-			if _, err := theConn.StopUnit(scope, "replace", nil); err != nil {
-				if dbusError, ok := err.(dbus.Error); ok {
-					if strings.Contains(dbusError.Name, "org.freedesktop.systemd1.NoSuchUnit") {
-						testScopeExists = false
-						break
-					}
-				}
-			}
-			time.Sleep(time.Millisecond)
-		}
-
-		// Bail out if we can't kill this scope without testing for DefaultDependencies
-		if testScopeExists {
-			return hasStartTransientUnit
-		}
-
-		// Assume StartTransientUnit on a scope allows DefaultDependencies
-		hasTransientDefaultDependencies = true
-		ddf := newProp("DefaultDependencies", false)
-		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{ddf}, nil); err != nil {
-			if dbusError, ok := err.(dbus.Error); ok {
-				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") {
-					hasTransientDefaultDependencies = false
-				}
-			}
-		}
-
-		// Not critical because of the stop unit logic above.
-		theConn.StopUnit(scope, "replace", nil)
-
-		// Assume StartTransientUnit on a scope allows Delegate
-		hasDelegateScope = true
-		dlScope := newProp("Delegate", true)
-		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dlScope}, nil); err != nil {
-			if dbusError, ok := err.(dbus.Error); ok {
-				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") {
-					hasDelegateScope = false
 				}
 			}
 		}
@@ -206,10 +158,21 @@ func UseSystemd() bool {
 		}
 
 		// Not critical because of the stop unit logic above.
-		theConn.StopUnit(scope, "replace", nil)
 		theConn.StopUnit(slice, "replace", nil)
 	}
 	return hasStartTransientUnit
+}
+
+func NewSystemdCgroupsManager() (func(config *configs.Cgroup, paths map[string]string) cgroups.Manager, error) {
+	if !systemdUtil.IsRunningSystemd() {
+		return nil, fmt.Errorf("systemd not running on this host, can't use systemd as a cgroups.Manager")
+	}
+	return func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		return &Manager{
+			Cgroups: config,
+			Paths:   paths,
+		}
+	}, nil
 }
 
 func (m *Manager) Apply(pid int) error {
@@ -267,9 +230,8 @@ func (m *Manager) Apply(pid int) error {
 			properties = append(properties, newProp("Delegate", true))
 		}
 	} else {
-		if hasDelegateScope {
-			properties = append(properties, newProp("Delegate", true))
-		}
+		// Assume scopes always support delegation.
+		properties = append(properties, newProp("Delegate", true))
 	}
 
 	// Always enable accounting, this gets us the same behaviour as the fs implementation,
@@ -279,10 +241,9 @@ func (m *Manager) Apply(pid int) error {
 		newProp("CPUAccounting", true),
 		newProp("BlockIOAccounting", true))
 
-	if hasTransientDefaultDependencies {
-		properties = append(properties,
-			newProp("DefaultDependencies", false))
-	}
+	// Assume DefaultDependencies= will always work (the check for it was previously broken.)
+	properties = append(properties,
+		newProp("DefaultDependencies", false))
 
 	if c.Resources.Memory != 0 {
 		properties = append(properties,
@@ -470,7 +431,7 @@ func ExpandSlice(slice string) (string, error) {
 }
 
 func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
-	mountpoint, err := cgroups.FindCgroupMountpoint(subsystem)
+	mountpoint, err := cgroups.FindCgroupMountpoint(c.Path, subsystem)
 	if err != nil {
 		return "", err
 	}
@@ -589,6 +550,15 @@ func setKernelMemory(c *configs.Cgroup) error {
 
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return err
+	}
+	// do not try to enable the kernel memory if we already have
+	// tasks in the cgroup.
+	content, err := ioutil.ReadFile(filepath.Join(path, "tasks"))
+	if err != nil {
+		return err
+	}
+	if len(content) > 0 {
+		return nil
 	}
 	return fs.EnableKernelMemoryAccounting(path)
 }

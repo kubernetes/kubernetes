@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/apps/daemonset"
 )
 
-// rest implements a RESTStorage for DaemonSets
+// REST implements a RESTStorage for DaemonSets
 type REST struct {
 	*genericregistry.Store
 	categories []string
@@ -76,6 +76,7 @@ func (r *REST) Categories() []string {
 	return r.categories
 }
 
+// WithCategories sets categories for REST.
 func (r *REST) WithCategories(categories []string) *REST {
 	r.categories = categories
 	return r
@@ -86,6 +87,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new DaemonSet object.
 func (r *StatusREST) New() runtime.Object {
 	return &apps.DaemonSet{}
 }

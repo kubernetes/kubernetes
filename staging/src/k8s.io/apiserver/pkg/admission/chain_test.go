@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -63,6 +64,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		name      string
 		ns        string
 		operation Operation
+		options   runtime.Object
 		chain     chainAdmissionHandler
 		accept    bool
 		calls     map[string]bool
@@ -71,6 +73,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "all accept",
 			ns:        sysns,
 			operation: Create,
+			options:   &metav1.CreateOptions{},
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", true, Delete, Create),
@@ -83,6 +86,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "ignore handler",
 			ns:        otherns,
 			operation: Create,
+			options:   &metav1.CreateOptions{},
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
@@ -95,6 +99,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "ignore all",
 			ns:        sysns,
 			operation: Connect,
+			options:   nil,
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
@@ -107,6 +112,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "reject one",
 			ns:        otherns,
 			operation: Delete,
+			options:   &metav1.DeleteOptions{},
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
@@ -119,7 +125,7 @@ func TestAdmitAndValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil), nil)
+		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of admit call: %v", accepted)
@@ -140,7 +146,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil), nil)
+		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		accepted = (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of validate call: %v\n", accepted)

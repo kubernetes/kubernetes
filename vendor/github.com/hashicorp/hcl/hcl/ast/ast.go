@@ -156,7 +156,8 @@ func (o *ObjectKey) Pos() token.Pos {
 type LiteralType struct {
 	Token token.Token
 
-	// associated line comment, only when used in a list
+	// comment types, only used when in a list
+	LeadComment *CommentGroup
 	LineComment *CommentGroup
 }
 
@@ -214,4 +215,5 @@ func (c *CommentGroup) Pos() token.Pos {
 // GoStringer
 //-------------------------------------------------------------------
 
-func (o *ObjectKey) GoString() string { return fmt.Sprintf("*%#v", *o) }
+func (o *ObjectKey) GoString() string  { return fmt.Sprintf("*%#v", *o) }
+func (o *ObjectList) GoString() string { return fmt.Sprintf("*%#v", *o) }

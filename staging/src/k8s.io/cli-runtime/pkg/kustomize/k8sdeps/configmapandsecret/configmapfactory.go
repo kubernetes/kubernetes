@@ -23,7 +23,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kv"
@@ -96,7 +95,7 @@ func (f *ConfigMapFactory) MakeConfigMap(
 
 // addKvToConfigMap adds the given key and data to the given config map.
 // Error if key invalid, or already exists.
-func addKvToConfigMap(configMap *v1.ConfigMap, keyName, data string) error {
+func addKvToConfigMap(configMap *corev1.ConfigMap, keyName, data string) error {
 	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys.
 	if errs := validation.IsConfigMapKey(keyName); len(errs) != 0 {
 		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))

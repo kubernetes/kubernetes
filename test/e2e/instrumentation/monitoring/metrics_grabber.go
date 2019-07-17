@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
@@ -71,7 +72,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 			}
 		}
 		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
+			e2elog.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
 			return
 		}
 		response, err := grabber.GrabFromScheduler()
@@ -92,7 +93,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 			}
 		}
 		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
+			e2elog.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
 			return
 		}
 		response, err := grabber.GrabFromControllerManager()

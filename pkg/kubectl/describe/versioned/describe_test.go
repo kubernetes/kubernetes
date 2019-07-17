@@ -28,7 +28,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -1506,9 +1505,9 @@ func TestDescribeDeployment(t *testing.T) {
 		Spec: appsv1.DeploymentSpec{
 			Replicas: utilpointer.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{},
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
 						{Image: "mytest-image:latest"},
 					},
 				},
@@ -2684,6 +2683,7 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 	expected := []string{
 		"Name:\\s*mypsp",
 		"Allow Privileged:\\s*false",
+		"Allow Privilege Escalation:\\s*false",
 		"Default Add Capabilities:\\s*<none>",
 		"Required Drop Capabilities:\\s*<none>",
 		"Allowed Capabilities:\\s*<none>",
@@ -2705,13 +2705,15 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 		"Supplemental Groups Strategy: RunAsAny",
 	}
 
+	falseVal := false
 	fake := fake.NewSimpleClientset(&policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mypsp",
 		},
 		Spec: policyv1beta1.PodSecurityPolicySpec{
-			AllowedUnsafeSysctls: []string{"kernel.*", "net.ipv4.ip_local_port_range"},
-			ForbiddenSysctls:     []string{"net.ipv4.ip_default_ttl"},
+			AllowPrivilegeEscalation: &falseVal,
+			AllowedUnsafeSysctls:     []string{"kernel.*", "net.ipv4.ip_local_port_range"},
+			ForbiddenSysctls:         []string{"net.ipv4.ip_default_ttl"},
 			SELinux: policyv1beta1.SELinuxStrategyOptions{
 				Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 			},

@@ -67,6 +67,7 @@ func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtim
 		table.ResourceVersion = m.GetResourceVersion()
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
+		table.RemainingItemCount = m.GetRemainingItemCount()
 	} else {
 		if m, err := meta.CommonAccessor(object); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()

@@ -22,7 +22,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/mholt/caddy/caddyfile"
+	"github.com/caddyserver/caddy/caddyfile"
 	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	utilsnet "k8s.io/utils/net"
 )
 
 const (
@@ -95,7 +96,7 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	}
 
 	var dnsBindAddr, dnsProbeAddr string
-	if dnsip.To4() == nil {
+	if utilsnet.IsIPv6(dnsip) {
 		dnsBindAddr = "::1"
 		dnsProbeAddr = "[" + dnsBindAddr + "]"
 	} else {

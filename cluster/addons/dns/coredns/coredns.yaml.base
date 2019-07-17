@@ -120,7 +120,7 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            memory: 170Mi
+            memory: __PILLAR__DNS__MEMORY__LIMIT__
           requests:
             cpu: 100m
             memory: 70Mi

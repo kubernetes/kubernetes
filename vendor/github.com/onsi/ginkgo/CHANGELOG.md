@@ -1,3 +1,23 @@
+## 1.8.0
+
+### New Features
+- allow config of the vet flag for `go test` (#562) [3cd45fa]
+- Support projects using go modules [d56ee76]
+
+### Fixes and Minor Improvements
+- chore(godoc): fixes typos in Measurement funcs [dbaca8e]
+- Optimize focus to avoid allocations [f493786]
+- Ensure generated test file names are underscored [505cc35]
+
+## 1.7.0
+
+### New Features
+- Add JustAfterEach (#484) [0d4f080]
+
+### Fixes
+- Correctly round suite time in junit reporter [2445fc1]
+- Avoid using -i argument to go test for Golang 1.10+ [46bbc26]
+
 ## 1.6.0
 
 ### New Features

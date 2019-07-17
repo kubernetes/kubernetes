@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +groupName=metrics.k8s.io
 
-package v1beta1
+// Package v1beta1 is the v1beta1 version of the metrics API.
+package v1beta1 // import "k8s.io/metrics/pkg/apis/metrics/v1beta1"

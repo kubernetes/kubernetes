@@ -227,7 +227,7 @@ func Revision(obj runtime.Object) (int64, error) {
 
 // SetNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
-func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.ReplicaSet, newRevision string, exists bool) bool {
+func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.ReplicaSet, newRevision string, exists bool, revHistoryLimitInChars int) bool {
 	// First, copy deployment's annotations (except for apply and revision annotations)
 	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, newRS)
 	// Then, update replica set's revision annotation
@@ -261,14 +261,25 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	// If a revision annotation already existed and this replica set was updated with a new revision
 	// then that means we are rolling back to this replica set. We need to preserve the old revisions
 	// for historical information.
-	if ok && annotationChanged {
+	if ok && oldRevisionInt < newRevisionInt {
 		revisionHistoryAnnotation := newRS.Annotations[RevisionHistoryAnnotation]
 		oldRevisions := strings.Split(revisionHistoryAnnotation, ",")
 		if len(oldRevisions[0]) == 0 {
 			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
 		} else {
-			oldRevisions = append(oldRevisions, oldRevision)
-			newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+			totalLen := len(revisionHistoryAnnotation) + len(oldRevision) + 1
+			// index for the starting position in oldRevisions
+			start := 0
+			for totalLen > revHistoryLimitInChars && start < len(oldRevisions) {
+				totalLen = totalLen - len(oldRevisions[start]) - 1
+				start++
+			}
+			if totalLen <= revHistoryLimitInChars {
+				oldRevisions = append(oldRevisions[start:], oldRevision)
+				newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+			} else {
+				klog.Warningf("Not appending revision due to length limit of %v reached", revHistoryLimitInChars)
+			}
 		}
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.

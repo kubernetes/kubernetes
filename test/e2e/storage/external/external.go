@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 
@@ -48,7 +50,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 }
 
 func init() {
-	flag.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
+	config.Flags.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
 }
 
 // testDriverParameter is used to hook loading of the driver
@@ -67,7 +69,14 @@ func (t testDriverParameter) String() string {
 }
 
 func (t testDriverParameter) Set(filename string) error {
-	driver, err := t.loadDriverDefinition(filename)
+	return AddDriverDefinition(filename)
+}
+
+// AddDriverDefinition defines ginkgo tests for CSI driver definition file.
+// Either --storage.testdriver cmdline argument or AddDriverDefinition can be used
+// to define the tests.
+func AddDriverDefinition(filename string) error {
+	driver, err := loadDriverDefinition(filename)
 	if err != nil {
 		return err
 	}
@@ -83,7 +92,7 @@ func (t testDriverParameter) Set(filename string) error {
 	return nil
 }
 
-func (t testDriverParameter) loadDriverDefinition(filename string) (*driverDefinition, error) {
+func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, errors.New("missing file name")
 	}
@@ -235,13 +244,16 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 
 	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
 	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-	gomega.Expect(len(items)).To(gomega.Equal(1), "exactly one item from %s", d.StorageClass.FromFile)
+	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
 	err = f.PatchItems(items...)
 	framework.ExpectNoError(err, "patch items")
 
 	sc, ok := items[0].(*storagev1.StorageClass)
 	gomega.Expect(ok).To(gomega.BeTrue(), "storage class from %s", d.StorageClass.FromFile)
+	// Ensure that we can load more than once as required for
+	// GetDynamicProvisionStorageClass by adding a random suffix.
+	sc.Name = names.SimpleNameGenerator.GenerateName(sc.Name + "-")
 	if fsType != "" {
 		if sc.Parameters == nil {
 			sc.Parameters = map[string]string{}

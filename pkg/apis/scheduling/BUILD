@@ -17,6 +17,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/scheduling",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -36,6 +37,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/scheduling/fuzzer:all-srcs",
         "//pkg/apis/scheduling/install:all-srcs",
+        "//pkg/apis/scheduling/util:all-srcs",
         "//pkg/apis/scheduling/v1:all-srcs",
         "//pkg/apis/scheduling/v1alpha1:all-srcs",
         "//pkg/apis/scheduling/v1beta1:all-srcs",

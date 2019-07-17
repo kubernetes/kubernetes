@@ -19,7 +19,7 @@ package qos
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -116,6 +116,16 @@ func TestGetPodQOS(t *testing.T) {
 			}),
 			expected: v1.PodQOSBestEffort,
 		},
+		{
+			pod: newPodWithInitContainers("init-container",
+				[]v1.Container{
+					newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				},
+				[]v1.Container{
+					newContainer("burstable", getResourceList("10m", "100Mi"), getResourceList("100m", "200Mi")),
+				}),
+			expected: v1.PodQOSBurstable,
+		},
 	}
 	for id, testCase := range testCases {
 		if actual := GetPodQOS(testCase.pod); testCase.expected != actual {
@@ -169,6 +179,18 @@ func newPod(name string, containers []v1.Container) *v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			Containers: containers,
+		},
+	}
+}
+
+func newPodWithInitContainers(name string, containers []v1.Container, initContainers []v1.Container) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers:     containers,
+			InitContainers: initContainers,
 		},
 	}
 }

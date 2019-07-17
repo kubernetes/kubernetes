@@ -40,7 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -50,10 +49,9 @@ const (
 )
 
 type APIInstaller struct {
-	group                        *APIGroupVersion
-	prefix                       string // Path prefix where API resources are to be registered.
-	minRequestTimeout            time.Duration
-	enableAPIResponseCompression bool
+	group             *APIGroupVersion
+	prefix            string // Path prefix where API resources are to be registered.
+	minRequestTimeout time.Duration
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", "PROXY", etc).
@@ -532,6 +530,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		UnsafeConvertor: a.group.UnsafeConvertor,
 		Authorizer:      a.group.Authorizer,
 
+		EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
+
 		// TODO: Check for the interface on storage
 		TableConvertor: tableProvider,
 
@@ -628,9 +628,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			}
 
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
 			doc := "read the specified " + kind
 			if isSubresource {
 				doc = "read " + subresource + " of the specified " + kind
@@ -660,9 +657,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -806,6 +800,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
+			if isCollectionDeleter {
+				route.Reads(versionedDeleterObject)
+				route.ParameterNamed("body").Required(false)
+				if err := AddObjectParams(ws, route, versionedDeleteOptions); err != nil {
+					return nil, err
+				}
+			}
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
 			}
@@ -917,6 +918,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Version = gvk.Version
 		apiResource.Kind = gvk.Kind
 	}
+
+	// Record the existence of the GVR and the corresponding GVK
+	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
 	return &apiResource, nil
 }

@@ -26,8 +26,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	systemdutil "github.com/coreos/go-systemd/util"
@@ -45,7 +46,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
 			By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -151,7 +152,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
-				framework.Logf("Host not running systemd; expecting 'misc' system container.")
+				e2elog.Logf("Host not running systemd; expecting 'misc' system container.")
 				miscContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 				// Misc processes are system-dependent, so relax the memory constraints.
 				miscContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
@@ -381,16 +382,16 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 // Mapping function for gstruct.MatchAllElements
 func summaryObjectID(element interface{}) string {
 	switch el := element.(type) {
-	case stats.PodStats:
+	case kubeletstatsv1alpha1.PodStats:
 		return fmt.Sprintf("%s::%s", el.PodRef.Namespace, el.PodRef.Name)
-	case stats.ContainerStats:
+	case kubeletstatsv1alpha1.ContainerStats:
 		return el.Name
-	case stats.VolumeStats:
+	case kubeletstatsv1alpha1.VolumeStats:
 		return el.Name
-	case stats.UserDefinedMetric:
+	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
-		framework.Failf("Unknown type: %T", el)
+		e2elog.Failf("Unknown type: %T", el)
 		return "???"
 	}
 }
@@ -418,7 +419,7 @@ func recent(d time.Duration) types.GomegaMatcher {
 func recordSystemCgroupProcesses() {
 	cfg, err := getCurrentKubeletConfig()
 	if err != nil {
-		framework.Logf("Failed to read kubelet config: %v", err)
+		e2elog.Logf("Failed to read kubelet config: %v", err)
 		return
 	}
 	cgroups := map[string]string{
@@ -427,24 +428,24 @@ func recordSystemCgroupProcesses() {
 	}
 	for name, cgroup := range cgroups {
 		if cgroup == "" {
-			framework.Logf("Skipping unconfigured cgroup %s", name)
+			e2elog.Logf("Skipping unconfigured cgroup %s", name)
 			continue
 		}
 
 		pids, err := ioutil.ReadFile(fmt.Sprintf("/sys/fs/cgroup/cpu/%s/cgroup.procs", cgroup))
 		if err != nil {
-			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
+			e2elog.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
 		}
 
-		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
+		e2elog.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
 			cmd, err := ioutil.ReadFile(path)
 			if err != nil {
-				framework.Logf("  Failed to read %s: %v", path, err)
+				e2elog.Logf("  Failed to read %s: %v", path, err)
 			} else {
-				framework.Logf("  %s", cmd)
+				e2elog.Logf("  %s", cmd)
 			}
 		}
 	}

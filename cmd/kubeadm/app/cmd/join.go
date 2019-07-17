@@ -133,7 +133,7 @@ type joinOptions struct {
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ phases.JoinData = &joinData{}
 
-// joinData defines all the runtime information used when running the kubeadm join worklow;
+// joinData defines all the runtime information used when running the kubeadm join workflow;
 // this data is shared across all the phases that are included in the workflow.
 type joinData struct {
 	cfg                   *kubeadmapi.JoinConfiguration
@@ -349,12 +349,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		}
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opt.ignorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return nil, err
 	}
 
@@ -382,6 +377,13 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	if err != nil {
 		return nil, err
 	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opt.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, err
+	}
+	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
 	// override node name and CRI socket from the command line opt
 	if opt.externalcfg.NodeRegistration.Name != "" {

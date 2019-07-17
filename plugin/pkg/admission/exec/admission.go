@@ -26,6 +26,7 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
@@ -146,21 +147,16 @@ func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces
 
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *corev1.Pod) bool {
-	for _, c := range pod.Spec.InitContainers {
+	var privileged bool
+	podutil.VisitContainers(&pod.Spec, func(c *corev1.Container) bool {
 		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
-			continue
-		}
-		if *c.SecurityContext.Privileged {
 			return true
 		}
-	}
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
-			continue
-		}
 		if *c.SecurityContext.Privileged {
-			return true
+			privileged = true
+			return false
 		}
-	}
-	return false
+		return true
+	})
+	return privileged
 }

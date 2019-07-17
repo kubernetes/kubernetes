@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
-        "//pkg/version:go_default_library",
+        "//cmd/kubeadm/app/version:go_default_library",
     ],
 )
 
@@ -17,7 +17,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
-        "//pkg/version:go_default_library",
+        "//cmd/kubeadm/app/version:go_default_library",
     ],
 )
 
@@ -34,6 +34,8 @@ filegroup(
         ":package-srcs",
         "//cmd/kubeadm/app/cmd/phases/init:all-srcs",
         "//cmd/kubeadm/app/cmd/phases/join:all-srcs",
+        "//cmd/kubeadm/app/cmd/phases/reset:all-srcs",
+        "//cmd/kubeadm/app/cmd/phases/upgrade/node:all-srcs",
         "//cmd/kubeadm/app/cmd/phases/workflow:all-srcs",
     ],
     tags = ["automanaged"],

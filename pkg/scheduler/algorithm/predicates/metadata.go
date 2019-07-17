@@ -140,6 +140,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
 	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, nodeNameToInfoMap)
 	if err != nil {
+		klog.Errorf("[predicate meta data generation] error finding pods whose affinity terms are matched: %v", err)
 		return nil
 	}
 	// incomingPodAffinityMap will be used later for efficient check on incoming pod's affinity
@@ -371,22 +372,14 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		allNodeNames = append(allNodeNames, name)
 	}
 
+	errCh := schedutil.NewErrorChannel()
 	var lock sync.Mutex
-	var firstError error
-
 	topologyMaps := newTopologyPairsMaps()
 
 	appendTopologyPairsMaps := func(toAppend *topologyPairsMaps) {
 		lock.Lock()
 		defer lock.Unlock()
 		topologyMaps.appendMaps(toAppend)
-	}
-	catchError := func(err error) {
-		lock.Lock()
-		defer lock.Unlock()
-		if firstError == nil {
-			firstError = err
-		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -395,21 +388,25 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("node not found"))
+			klog.Errorf("node %q not found", allNodeNames[i])
 			return
 		}
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
 			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
 			if err != nil {
-				catchError(err)
-				cancel()
+				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
 			appendTopologyPairsMaps(existingPodTopologyMaps)
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
-	return topologyMaps, firstError
+
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, err
+	}
+
+	return topologyMaps, nil
 }
 
 // getTPMapMatchingIncomingAffinityAntiAffinity finds existing Pods that match affinity terms of the given "pod".
@@ -427,8 +424,9 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		allNodeNames = append(allNodeNames, name)
 	}
 
+	errCh := schedutil.NewErrorChannel()
+
 	var lock sync.Mutex
-	var firstError error
 	topologyPairsAffinityPodsMaps = newTopologyPairsMaps()
 	topologyPairsAntiAffinityPodsMaps = newTopologyPairsMaps()
 	appendResult := func(nodeName string, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps *topologyPairsMaps) {
@@ -442,19 +440,12 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		}
 	}
 
-	catchError := func(err error) {
-		lock.Lock()
-		defer lock.Unlock()
-		if firstError == nil {
-			firstError = err
-		}
-	}
-
 	affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
 	affinityProperties, err := getAffinityTermProperties(pod, affinityTerms)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -463,7 +454,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("nodeInfo.Node is nil"))
+			klog.Errorf("node %q not found", allNodeNames[i])
 			return
 		}
 		nodeTopologyPairsAffinityPodsMaps := newTopologyPairsMaps()
@@ -483,8 +474,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
 				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
-					catchError(err)
-					cancel()
+					errCh.SendErrorWithCancel(err, cancel)
 					return
 				}
 				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
@@ -495,12 +485,18 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				}
 			}
 		}
+
 		if len(nodeTopologyPairsAffinityPodsMaps.topologyPairToPods) > 0 || len(nodeTopologyPairsAntiAffinityPodsMaps.topologyPairToPods) > 0 {
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
-	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, firstError
+
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, nil, err
+	}
+
+	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, nil
 }
 
 // targetPodMatchesAffinityOfPod returns true if "targetPod" matches ALL affinity terms of

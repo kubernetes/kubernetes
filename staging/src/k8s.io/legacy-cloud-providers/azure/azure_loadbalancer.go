@@ -30,7 +30,7 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
@@ -74,6 +74,7 @@ const (
 
 	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
 	// to specify a list of allowed service tags separated by comma
+	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for all supported service tags.
 	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
 
 	// ServiceAnnotationLoadBalancerIdleTimeout is the annotation used on the service
@@ -83,13 +84,11 @@ const (
 	// ServiceAnnotationLoadBalancerMixedProtocols is the annotation used on the service
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
-)
 
-var (
-	// supportedServiceTags holds a list of supported service tags on Azure.
-	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for more information.
-	supportedServiceTags = sets.NewString("VirtualNetwork", "VIRTUAL_NETWORK", "AzureLoadBalancer", "AZURE_LOADBALANCER",
-		"Internet", "INTERNET", "AzureTrafficManager", "Storage", "Sql")
+	// serviceTagKey is the service key applied for public IP tags.
+	serviceTagKey = "service"
+	// clusterNameKey is the cluster name key applied for public IP tags.
+	clusterNameKey = "kubernetes-cluster-name"
 )
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -147,7 +146,8 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 		return nil, err
 	}
 
-	if _, err := az.reconcilePublicIP(clusterName, updateService, lb, true /* wantLb */); err != nil {
+	// lb is not reused here because the ETAG may be changed in above operations, hence reconcilePublicIP() would get lb again from cache.
+	if _, err := az.reconcilePublicIP(clusterName, updateService, to.String(lb.Name), true /* wantLb */); err != nil {
 		return nil, err
 	}
 
@@ -203,7 +203,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 		}
 	}
 
-	if _, err := az.reconcilePublicIP(clusterName, service, nil, false /* wantLb */); err != nil {
+	if _, err := az.reconcilePublicIP(clusterName, service, "", false /* wantLb */); err != nil {
 		if ignoreErrors(err) != nil {
 			return err
 		}
@@ -465,7 +465,7 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 	return lbStatus.Ingress[0].IP, nil
 }
 
-func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel string) (*network.PublicIPAddress, error) {
+func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel, clusterName string) (*network.PublicIPAddress, error) {
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 	pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 	if err != nil {
@@ -486,7 +486,10 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 			DomainNameLabel: &domainNameLabel,
 		}
 	}
-	pip.Tags = map[string]*string{"service": &serviceName}
+	pip.Tags = map[string]*string{
+		serviceTagKey:  &serviceName,
+		clusterNameKey: &clusterName,
+	}
 	if az.useStandardLoadBalancer() {
 		pip.Sku = &network.PublicIPAddressSku{
 			Name: network.PublicIPAddressSkuNameStandard,
@@ -711,7 +714,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 					return nil, err
 				}
 				domainNameLabel := getPublicIPDomainNameLabel(service)
-				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel)
+				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel, clusterName)
 				if err != nil {
 					return nil, err
 				}
@@ -1019,10 +1022,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if err != nil {
 		return nil, err
 	}
-	serviceTags, err := getServiceTags(service)
-	if err != nil {
-		return nil, err
-	}
+	serviceTags := getServiceTags(service)
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
@@ -1323,9 +1323,10 @@ func deduplicate(collection *[]string) *[]string {
 }
 
 // This reconciles the PublicIP resources similar to how the LB is reconciled.
-func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *network.LoadBalancer, wantLb bool) (*network.PublicIPAddress, error) {
+func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbName string, wantLb bool) (*network.PublicIPAddress, error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
+	var lb *network.LoadBalancer
 	var desiredPipName string
 	var err error
 	if !isInternal && wantLb {
@@ -1333,6 +1334,14 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if lbName != "" {
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName)
+		if err != nil {
+			return nil, err
+		}
+		lb = &loadBalancer
 	}
 
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
@@ -1344,9 +1353,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *
 
 	for i := range pips {
 		pip := pips[i]
-		if pip.Tags != nil &&
-			(pip.Tags)["service"] != nil &&
-			*(pip.Tags)["service"] == serviceName {
+		if serviceOwnsPublicIP(&pip, clusterName, serviceName) {
 			// We need to process for pips belong to this service
 			pipName := *pip.Name
 			if wantLb && !isInternal && pipName == desiredPipName {
@@ -1369,7 +1376,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *
 		// Confirm desired public ip resource exists
 		var pip *network.PublicIPAddress
 		domainNameLabel := getPublicIPDomainNameLabel(service)
-		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel); err != nil {
+		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel, clusterName); err != nil {
 			return nil, err
 		}
 		return pip, nil
@@ -1536,7 +1543,10 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 
 func (az *Cloud) getPublicIPAddressResourceGroup(service *v1.Service) string {
 	if resourceGroup, found := service.Annotations[ServiceAnnotationLoadBalancerResourceGroup]; found {
-		return resourceGroup
+		resourceGroupName := strings.TrimSpace(resourceGroup)
+		if len(resourceGroupName) > 0 {
+			return resourceGroupName
+		}
 	}
 
 	return az.ResourceGroup
@@ -1593,22 +1603,44 @@ func useSharedSecurityRule(service *v1.Service) bool {
 	return false
 }
 
-func getServiceTags(service *v1.Service) ([]string, error) {
+func getServiceTags(service *v1.Service) []string {
+	if service == nil {
+		return nil
+	}
+
 	if serviceTags, found := service.Annotations[ServiceAnnotationAllowedServiceTag]; found {
+		result := []string{}
 		tags := strings.Split(strings.TrimSpace(serviceTags), ",")
 		for _, tag := range tags {
-			// Storage and Sql service tags support setting regions with suffix ".Region"
-			if strings.HasPrefix(tag, "Storage.") || strings.HasPrefix(tag, "Sql.") {
-				continue
-			}
-
-			if !supportedServiceTags.Has(tag) {
-				return nil, fmt.Errorf("only %q are allowed in service tags", supportedServiceTags.List())
+			serviceTag := strings.TrimSpace(tag)
+			if serviceTag != "" {
+				result = append(result, serviceTag)
 			}
 		}
 
-		return tags, nil
+		return result
 	}
 
-	return nil, nil
+	return nil
+}
+
+func serviceOwnsPublicIP(pip *network.PublicIPAddress, clusterName, serviceName string) bool {
+	if pip != nil && pip.Tags != nil {
+		serviceTag := pip.Tags[serviceTagKey]
+		clusterTag := pip.Tags[clusterNameKey]
+
+		if serviceTag != nil && *serviceTag == serviceName {
+			// Backward compatible for clusters upgraded from old releases.
+			// In such case, only "service" tag is set.
+			if clusterTag == nil {
+				return true
+			}
+
+			// If cluster name tag is set, then return true if it matches.
+			if *clusterTag == clusterName {
+				return true
+			}
+		}
+	}
+	return false
 }

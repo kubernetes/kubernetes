@@ -67,7 +67,8 @@ func TestHTTPProbeProxy(t *testing.T) {
 	defer unsetEnv("no_proxy")()
 	defer unsetEnv("NO_PROXY")()
 
-	prober := New(true)
+	followNonLocalRedirects := true
+	prober := New(followNonLocalRedirects)
 
 	go func() {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +123,8 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 	}
 
-	prober := New(true)
+	followNonLocalRedirects := true
+	prober := New(followNonLocalRedirects)
 	testCases := []struct {
 		handler    func(w http.ResponseWriter, r *http.Request)
 		reqHeaders http.Header
@@ -299,18 +301,70 @@ func TestHTTPProbeChecker_NonLocalRedirects(t *testing.T) {
 	}
 	for desc, test := range testCases {
 		t.Run(desc+"-local", func(t *testing.T) {
-			prober := New(false)
+			followNonLocalRedirects := false
+			prober := New(followNonLocalRedirects)
 			target, err := url.Parse(server.URL + "/redirect?loc=" + url.QueryEscape(test.redirect))
 			require.NoError(t, err)
 			result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectLocalResult, result)
 		})
 		t.Run(desc+"-nonlocal", func(t *testing.T) {
-			prober := New(true)
+			followNonLocalRedirects := true
+			prober := New(followNonLocalRedirects)
 			target, err := url.Parse(server.URL + "/redirect?loc=" + url.QueryEscape(test.redirect))
 			require.NoError(t, err)
 			result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectNonLocalResult, result)
+		})
+	}
+}
+
+func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
+	successHostHeader := "www.success.com"
+	failHostHeader := "www.fail.com"
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redirect":
+			http.Redirect(w, r, "/success", http.StatusFound)
+		case "/success":
+			if r.Host == successHostHeader {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				http.Error(w, "", http.StatusBadRequest)
+			}
+		default:
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	testCases := map[string]struct {
+		hostHeader     string
+		expectedResult probe.Result
+	}{
+		"success": {successHostHeader, probe.Success},
+		"fail":    {failHostHeader, probe.Failure},
+	}
+	for desc, test := range testCases {
+		headers := http.Header{}
+		headers.Add("Host", test.hostHeader)
+		t.Run(desc+"local", func(t *testing.T) {
+			followNonLocalRedirects := false
+			prober := New(followNonLocalRedirects)
+			target, err := url.Parse(server.URL + "/redirect")
+			require.NoError(t, err)
+			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
+			assert.Equal(t, test.expectedResult, result)
+		})
+		t.Run(desc+"nonlocal", func(t *testing.T) {
+			followNonLocalRedirects := true
+			prober := New(followNonLocalRedirects)
+			target, err := url.Parse(server.URL + "/redirect")
+			require.NoError(t, err)
+			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
+			assert.Equal(t, test.expectedResult, result)
 		})
 	}
 }

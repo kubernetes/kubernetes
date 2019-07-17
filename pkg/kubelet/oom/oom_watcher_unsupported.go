@@ -19,16 +19,16 @@ limitations under the License.
 package oom
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 )
 
 type oomWatcherUnsupported struct{}
 
-var _ OOMWatcher = new(oomWatcherUnsupported)
+var _ Watcher = new(oomWatcherUnsupported)
 
-// NewOOMWatcher creates a fake one here
-func NewOOMWatcher(_ record.EventRecorder) OOMWatcher {
+// NewWatcher creates a fake one here
+func NewWatcher(_ record.EventRecorder) Watcher {
 	return &oomWatcherUnsupported{}
 }
 

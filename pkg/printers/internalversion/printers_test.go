@@ -235,6 +235,8 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
+	// our decoder defaults, so we should default our expected object as well
+	legacyscheme.Scheme.Default(obj)
 	buf.Reset()
 	printer.PrintObj(obj, buf)
 	var objOut v1.Pod
@@ -1099,7 +1101,8 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyTable(t, table)
-	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+	printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+	if err := printer.PrintObj(table, buff); err != nil {
 		t.Fatal(err)
 	}
 	output := string(buff.Bytes())
@@ -1233,7 +1236,8 @@ func TestPrintHumanReadableService(t *testing.T) {
 				t.Fatal(err)
 			}
 			verifyTable(t, table)
-			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+			printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+			if err := printer.PrintObj(table, buff); err != nil {
 				t.Fatal(err)
 			}
 			output := string(buff.Bytes())
@@ -1699,8 +1703,49 @@ func TestPrintPodwide(t *testing.T) {
 							Status: api.ConditionTrue,
 						},
 					},
-					Phase: "podPhase",
-					PodIP: "1.1.1.1",
+					Phase:  "podPhase",
+					PodIPs: []api.PodIP{{IP: "1.1.1.1"}},
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+					NominatedNodeName: "node1",
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+		},
+		{
+			// Test when the NodeName and PodIP are not none
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   "test1",
+					ReadinessGates: []api.PodReadinessGate{
+						{
+							ConditionType: api.PodConditionType(condition1),
+						},
+						{
+							ConditionType: api.PodConditionType(condition2),
+						},
+						{
+							ConditionType: api.PodConditionType(condition3),
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodConditionType(condition1),
+							Status: api.ConditionFalse,
+						},
+						{
+							Type:   api.PodConditionType(condition2),
+							Status: api.ConditionTrue,
+						},
+					},
+					Phase:  "podPhase",
+					PodIPs: []api.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{RestartCount: 3},
@@ -1720,7 +1765,6 @@ func TestPrintPodwide(t *testing.T) {
 				},
 				Status: api.PodStatus{
 					Phase: "podPhase",
-					PodIP: "",
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
@@ -2043,8 +2087,8 @@ func TestPrintDeployment(t *testing.T) {
 					UnavailableReplicas: 4,
 				},
 			},
-			"test1\t0/5\t2\t1\t0s\n",
-			"test1\t0/5\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1   0/5   2     1     0s\n",
+			"test1   0/5   2     1     0s    fake-container1,fake-container2   fake-image1,fake-image2   foo=bar\n",
 		},
 	}
 
@@ -2055,7 +2099,8 @@ func TestPrintDeployment(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -2065,7 +2110,8 @@ func TestPrintDeployment(t *testing.T) {
 		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{Wide: true})
 		verifyTable(t, table)
 		// print deployment with '-o wide' option
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
+		printer = printers.NewTablePrinter(printers.PrintOptions{Wide: true, NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.wideExpect {
@@ -2099,7 +2145,7 @@ func TestPrintDaemonSet(t *testing.T) {
 					NumberAvailable:        0,
 				},
 			},
-			"test1\t3\t2\t1\t2\t0\t<none>\t0s\n",
+			"test1   3     2     1     2     0     <none>   0s",
 		},
 	}
 
@@ -2110,7 +2156,8 @@ func TestPrintDaemonSet(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.HasPrefix(buf.String(), test.startsWith) {
@@ -2140,7 +2187,7 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 1,
 				},
 			},
-			"job1\t1/2\t\t0s\n",
+			"job1   1/2         0s\n",
 		},
 		{
 			batch.Job{
@@ -2155,7 +2202,7 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 0,
 				},
 			},
-			"job2\t0/1\t\t10y\n",
+			"job2   0/1         10y\n",
 		},
 		{
 			batch.Job{
@@ -2172,7 +2219,7 @@ func TestPrintJob(t *testing.T) {
 					CompletionTime: &metav1.Time{Time: now.Add(31 * time.Minute)},
 				},
 			},
-			"job3\t0/1\t30m\t10y\n",
+			"job3   0/1   30m   10y\n",
 		},
 		{
 			batch.Job{
@@ -2188,7 +2235,7 @@ func TestPrintJob(t *testing.T) {
 					StartTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
 				},
 			},
-			"job4\t0/1\t20m\t10y\n",
+			"job4   0/1   20m   10y\n",
 		},
 	}
 
@@ -2199,11 +2246,12 @@ func TestPrintJob(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -2237,7 +2285,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <none>   <unset>   10    4     <unknown>\n",
 		},
 		// external source type, target average value (no current)
 		{
@@ -2271,7 +2319,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m (avg)\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m (avg)   2     10    4     <unknown>\n",
 		},
 		// external source type, target average value
 		{
@@ -2319,7 +2367,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m (avg)\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m (avg)   2     10    4     <unknown>\n",
 		},
 		// external source type, target value (no current)
 		{
@@ -2353,7 +2401,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// external source type, target value
 		{
@@ -2400,7 +2448,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// pods source type (no current)
 		{
@@ -2433,7 +2481,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// pods source type
 		{
@@ -2479,7 +2527,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// object source type (no current)
 		{
@@ -2516,7 +2564,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// object source type
 		{
@@ -2570,7 +2618,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetVal (no current)
 		{
@@ -2601,7 +2649,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetVal
 		{
@@ -2643,7 +2691,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetUtil (no current)
 		{
@@ -2674,7 +2722,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/80%   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetUtil
 		{
@@ -2717,7 +2765,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50%/80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50%/80%   2     10    4     <unknown>\n",
 		},
 		// multiple specs
 		{
@@ -2795,7 +2843,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m, 50%/80% + 1 more...\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m, 50%/80% + 1 more...   2     10    4     <unknown>\n",
 		},
 	}
 
@@ -2806,7 +2854,8 @@ func TestPrintHPA(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buff); err != nil {
 			t.Fatal(err)
 		}
 		if buff.String() != test.expected {
@@ -2901,7 +2950,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test1\tClusterIP\t10.9.8.7\t<none>\t2233/tcp\t<unknown>\n",
+			"test1   ClusterIP   10.9.8.7   <none>   2233/tcp   <unknown>\n",
 		},
 		{
 			// Test NodePort service
@@ -2919,7 +2968,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test2\tNodePort\t10.9.8.7\t<none>\t8888:9999/tcp\t<unknown>\n",
+			"test2   NodePort   10.9.8.7   <none>   8888:9999/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service
@@ -2936,7 +2985,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test3\tLoadBalancer\t10.9.8.7\t<pending>\t8888/tcp\t<unknown>\n",
+			"test3   LoadBalancer   10.9.8.7   <pending>   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP and no LoadBalancerStatus
@@ -2954,7 +3003,7 @@ func TestPrintService(t *testing.T) {
 					ExternalIPs: singleExternalIP,
 				},
 			},
-			"test4\tLoadBalancer\t10.9.8.7\t80.11.12.10\t8888/tcp\t<unknown>\n",
+			"test4   LoadBalancer   10.9.8.7   80.11.12.10   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP
@@ -2982,7 +3031,7 @@ func TestPrintService(t *testing.T) {
 					},
 				},
 			},
-			"test5\tLoadBalancer\t10.9.8.7\t3.4.5.6,80.11.12.10\t8888/tcp\t<unknown>\n",
+			"test5   LoadBalancer   10.9.8.7   3.4.5.6,80.11.12.10   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service with mul ExternalIPs
@@ -3014,7 +3063,7 @@ func TestPrintService(t *testing.T) {
 					},
 				},
 			},
-			"test6\tLoadBalancer\t10.9.8.7\t2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11\t8888/tcp\t<unknown>\n",
+			"test6   LoadBalancer   10.9.8.7   2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test ExternalName service
@@ -3025,7 +3074,7 @@ func TestPrintService(t *testing.T) {
 					ExternalName: "my.database.example.com",
 				},
 			},
-			"test7\tExternalName\t<none>\tmy.database.example.com\t<none>\t<unknown>\n",
+			"test7   ExternalName   <none>   my.database.example.com   <none>   <unknown>\n",
 		},
 	}
 
@@ -3036,12 +3085,13 @@ func TestPrintService(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		// We ignore time
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3068,7 +3118,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					PodDisruptionsAllowed: 5,
 				},
 			},
-			"pdb1\t22\tN/A\t5\t0s\n",
+			"pdb1   22    N/A   5     0s\n",
 		},
 		{
 			policy.PodDisruptionBudget{
@@ -3084,7 +3134,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					PodDisruptionsAllowed: 5,
 				},
 			},
-			"pdb2\tN/A\t11\t5\t0s\n",
+			"pdb2   N/A   11    5     0s\n",
 		}}
 
 	buf := bytes.NewBuffer([]byte{})
@@ -3094,11 +3144,12 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3125,7 +3176,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 1,
 			},
-			"test1\tdaemonset.apps/foo\t1\t0s\n",
+			"test1   daemonset.apps/foo   1     0s\n",
 		},
 		{
 			apps.ControllerRevision{
@@ -3142,7 +3193,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 2,
 			},
-			"test2\t<none>\t2\t0s\n",
+			"test2   <none>   2     0s\n",
 		},
 		{
 			apps.ControllerRevision{
@@ -3153,7 +3204,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 3,
 			},
-			"test3\t<none>\t3\t0s\n",
+			"test3   <none>   3     0s\n",
 		},
 		{
 			apps.ControllerRevision{
@@ -3164,7 +3215,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 4,
 			},
-			"test4\t<none>\t4\t0s\n",
+			"test4   <none>   4     0s\n",
 		},
 	}
 
@@ -3175,11 +3226,12 @@ func TestPrintControllerRevision(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3224,8 +3276,8 @@ func TestPrintReplicaSet(t *testing.T) {
 					ReadyReplicas: 2,
 				},
 			},
-			"test1\t5\t5\t2\t0s\n",
-			"test1\t5\t5\t2\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1   5     5     2     0s\n",
+			"test1   5     5     2     0s    fake-container1,fake-container2   fake-image1,fake-image2   foo=bar\n",
 		},
 	}
 
@@ -3236,11 +3288,12 @@ func TestPrintReplicaSet(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 
@@ -3249,11 +3302,12 @@ func TestPrintReplicaSet(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
+		printer = printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true, Wide: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.wideExpect {
-			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.wideExpect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3287,7 +3341,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeBound,
 				},
 			},
-			"test1\t4Gi\tROX\t\tBound\tdefault/test\t\t\t<unknown>\n",
+			"test1   4Gi   ROX         Bound   default/test               <unknown>\n",
 		},
 		{
 			// // Test failed
@@ -3306,7 +3360,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeFailed,
 				},
 			},
-			"test2\t4Gi\tROX\t\tFailed\tdefault/test\t\t\t<unknown>\n",
+			"test2   4Gi   ROX         Failed   default/test               <unknown>\n",
 		},
 		{
 			// Test pending
@@ -3325,7 +3379,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumePending,
 				},
 			},
-			"test3\t10Gi\tRWX\t\tPending\tdefault/test\t\t\t<unknown>\n",
+			"test3   10Gi   RWX         Pending   default/test               <unknown>\n",
 		},
 		{
 			// Test pending, storageClass
@@ -3345,7 +3399,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumePending,
 				},
 			},
-			"test4\t10Gi\tRWO\t\tPending\tdefault/test\tmy-scn\t\t<unknown>\n",
+			"test4   10Gi   RWO         Pending   default/test   my-scn         <unknown>\n",
 		},
 		{
 			// Test available
@@ -3365,7 +3419,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeAvailable,
 				},
 			},
-			"test5\t10Gi\tRWO\t\tAvailable\tdefault/test\tmy-scn\t\t<unknown>\n",
+			"test5   10Gi   RWO         Available   default/test   my-scn         <unknown>\n",
 		},
 		{
 			// Test released
@@ -3385,7 +3439,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeReleased,
 				},
 			},
-			"test6\t10Gi\tRWO\t\tReleased\tdefault/test\tmy-scn\t\t<unknown>\n",
+			"test6   10Gi   RWO         Released   default/test   my-scn         <unknown>\n",
 		},
 	}
 	buf := bytes.NewBuffer([]byte{})
@@ -3395,13 +3449,12 @@ func TestPrintPersistentVolume(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			fmt.Println(buf.String())
-			fmt.Println(test.expect)
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3432,7 +3485,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test1\tBound\tmy-volume\t4Gi\tROX\t\t<unknown>\tFilesystem\n",
+			"test1   Bound   my-volume   4Gi   ROX         <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3451,7 +3504,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test2\tLost\t\t\t\t\t<unknown>\tFilesystem\n",
+			"test2   Lost                           <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3471,7 +3524,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test3\tPending\tmy-volume\t10Gi\tRWX\t\t<unknown>\tFilesystem\n",
+			"test3   Pending   my-volume   10Gi   RWX         <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3492,7 +3545,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test4\tPending\tmy-volume\t10Gi\tRWO\tmy-scn\t<unknown>\tFilesystem\n",
+			"test4   Pending   my-volume   10Gi   RWO   my-scn   <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3512,7 +3565,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test5\tPending\tmy-volume\t10Gi\tRWO\tmy-scn\t<unknown>\t<unset>\n",
+			"test5   Pending   my-volume   10Gi   RWO   my-scn   <unknown>   <unset>\n",
 		},
 	}
 	buf := bytes.NewBuffer([]byte{})
@@ -3522,13 +3575,12 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true, Wide: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			fmt.Println(buf.String())
-			fmt.Println(test.expect)
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3554,7 +3606,7 @@ func TestPrintCronJob(t *testing.T) {
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 			},
-			"cronjob1\t0/5 * * * ?\tFalse\t0\t0s\t0s\n",
+			"cronjob1   0/5 * * * ?   False   0     0s    0s\n",
 		},
 		{
 			batch.CronJob{
@@ -3570,7 +3622,7 @@ func TestPrintCronJob(t *testing.T) {
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(-3e10)},
 				},
 			},
-			"cronjob2\t0/5 * * * ?\tFalse\t0\t30s\t5m\n",
+			"cronjob2   0/5 * * * ?   False   0     30s   5m\n",
 		},
 		{
 			batch.CronJob{
@@ -3584,7 +3636,7 @@ func TestPrintCronJob(t *testing.T) {
 				},
 				Status: batch.CronJobStatus{},
 			},
-			"cronjob3\t0/5 * * * ?\tFalse\t0\t<none>\t5m\n",
+			"cronjob3   0/5 * * * ?   False   0     <none>   5m\n",
 		},
 	}
 
@@ -3595,11 +3647,12 @@ func TestPrintCronJob(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3618,7 +3671,7 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/glusterfs",
 			},
-			"sc1\tkubernetes.io/glusterfs\t0s\n",
+			"sc1   kubernetes.io/glusterfs   0s\n",
 		},
 		{
 			storage.StorageClass{
@@ -3628,7 +3681,7 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/nfs",
 			},
-			"sc2\tkubernetes.io/nfs\t5m\n",
+			"sc2   kubernetes.io/nfs   5m\n",
 		},
 	}
 
@@ -3639,11 +3692,12 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3666,7 +3720,7 @@ func TestPrintLease(t *testing.T) {
 					HolderIdentity: &holder1,
 				},
 			},
-			"lease1\tholder1\t0s\n",
+			"lease1   holder1   0s\n",
 		},
 		{
 			coordination.Lease{
@@ -3678,7 +3732,7 @@ func TestPrintLease(t *testing.T) {
 					HolderIdentity: &holder2,
 				},
 			},
-			"lease2\tholder2\t5m\n",
+			"lease2   holder2   5m\n",
 		},
 	}
 
@@ -3688,11 +3742,12 @@ func TestPrintLease(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3711,7 +3766,7 @@ func TestPrintPriorityClass(t *testing.T) {
 				},
 				Value: 1,
 			},
-			"pc1\t1\tfalse\t0s\n",
+			"pc1   1     false   0s\n",
 		},
 		{
 			scheduling.PriorityClass{
@@ -3722,7 +3777,7 @@ func TestPrintPriorityClass(t *testing.T) {
 				Value:         1000000000,
 				GlobalDefault: true,
 			},
-			"pc2\t1000000000\ttrue\t5m\n",
+			"pc2   1000000000   true   5m\n",
 		},
 	}
 
@@ -3733,11 +3788,12 @@ func TestPrintPriorityClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3756,7 +3812,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 				},
 				Handler: "h1",
 			},
-			"rc1\th1\t0s\n",
+			"rc1   h1    0s\n",
 		},
 		{
 			nodeapi.RuntimeClass{
@@ -3766,7 +3822,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 				},
 				Handler: "h2",
 			},
-			"rc2\th2\t5m\n",
+			"rc2   h2    5m\n",
 		},
 	}
 
@@ -3777,11 +3833,12 @@ func TestPrintRuntimeClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}

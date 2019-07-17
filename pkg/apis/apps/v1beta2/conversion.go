@@ -407,7 +407,7 @@ func Convert_v1beta2_Deployment_To_apps_Deployment(in *appsv1beta2.Deployment, o
 
 	// Copy annotation to deprecated rollbackTo field for roundtrip
 	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
-	if revision, _ := in.Annotations[appsv1beta2.DeprecatedRollbackTo]; revision != "" {
+	if revision := in.Annotations[appsv1beta2.DeprecatedRollbackTo]; revision != "" {
 		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
 			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", appsv1beta2.DeprecatedRollbackTo, revision, err)
 		} else {

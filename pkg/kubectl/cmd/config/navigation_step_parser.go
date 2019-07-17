@@ -76,6 +76,8 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			steps = append(steps, navigationStep{nextPart, fieldType})
 			currPartIndex += len(strings.Split(nextPart, "."))
 			currType = fieldType
+		default:
+			return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
 		}
 	}
 

@@ -6,6 +6,7 @@ go_library(
         "clone.go",
         "decode.go",
         "decode_gogo.go",
+        "discard.go",
         "duration.go",
         "duration_gogo.go",
         "encode.go",

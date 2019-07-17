@@ -1,3 +1,38 @@
+# 1.4.2
+  * Fixes build break for plan9, nacl, solaris
+# 1.4.1
+This new release introduces:
+  * Enhance TextFormatter to not print caller information when they are empty (#944)
+  * Remove dependency on golang.org/x/crypto (#932, #943) 
+
+Fixes:
+  * Fix Entry.WithContext method to return a copy of the initial entry (#941)
+
+# 1.4.0
+This new release introduces:
+  * Add `DeferExitHandler`, similar to `RegisterExitHandler` but prepending the handler to the list of handlers (semantically like `defer`) (#848).
+  * Add `CallerPrettyfier` to `JSONFormatter` and `TextFormatter (#909, #911)
+  * Add `Entry.WithContext()` and `Entry.Context`, to set a context on entries to be used e.g. in hooks (#919).
+
+Fixes:
+  * Fix wrong method calls `Logger.Print` and `Logger.Warningln` (#893).
+  * Update `Entry.Logf` to not do string formatting unless the log level is enabled (#903)
+  * Fix infinite recursion on unknown `Level.String()` (#907)
+  * Fix race condition in `getCaller` (#916).
+
+
+# 1.3.0
+This new release introduces:
+  * Log, Logf, Logln functions for Logger and Entry that take a Level
+
+Fixes:
+  * Building prometheus node_exporter on AIX (#840)
+  * Race condition in TextFormatter (#468)
+  * Travis CI import path (#868)
+  * Remove coloured output on Windows (#862)
+  * Pointer to func as field in JSONFormatter (#870)
+  * Properly marshal Levels (#873)
+
 # 1.2.0
 This new release introduces:
   * A new method `SetReportCaller` in the `Logger` to enable the file, line and calling function from which the trace has been issued

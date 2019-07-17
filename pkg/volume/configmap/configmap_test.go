@@ -365,8 +365,10 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -423,8 +425,10 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -485,8 +489,10 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -582,8 +588,10 @@ func TestPluginKeysOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -660,8 +668,10 @@ func TestInvalidConfigMapSetup(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err == nil {
 		t.Errorf("Expected setup to fail")
 	}

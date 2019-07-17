@@ -33,19 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilpointer "k8s.io/utils/pointer"
 )
-
-type fakeNodeInterface struct {
-	node api.Node
-}
-
-func (fake *fakeNodeInterface) Get(hostname string, options metav1.GetOptions) (*api.Node, error) {
-	return &fake.node, nil
-}
 
 type fakeIPTablesVersioner struct {
 	version string // what to return
@@ -119,23 +110,12 @@ func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
 	testCases := []struct {
 		min        int32
-		max        int32
 		maxPerCore int32
 		expected   int
 		err        string
 	}{
 		{
 			expected: 0,
-		},
-		{
-			max:      12345,
-			expected: 12345,
-		},
-		{
-			max:        12345,
-			maxPerCore: 67890,
-			expected:   -1,
-			err:        "mutually exclusive",
 		},
 		{
 			maxPerCore: 67890, // use this if Max is 0
@@ -157,7 +137,6 @@ func TestGetConntrackMax(t *testing.T) {
 	for i, tc := range testCases {
 		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
 			Min:        utilpointer.Int32Ptr(tc.min),
-			Max:        utilpointer.Int32Ptr(tc.max),
 			MaxPerCore: utilpointer.Int32Ptr(tc.maxPerCore),
 		}
 		x, e := getConntrackMax(cfg)
@@ -187,7 +166,6 @@ clientConnection:
 clusterCIDR: "%s"
 configSyncPeriod: 15s
 conntrack:
-  max: 4
   maxPerCore: 2
   min: 1
   tcpCloseWaitTimeout: 10s
@@ -210,7 +188,6 @@ metricsBindAddress: "%s"
 mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
-resourceContainer: /foo
 udpIdleTimeout: 123ms
 nodePortAddresses:
   - "10.20.30.40/16"
@@ -302,7 +279,6 @@ nodePortAddresses:
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   utilpointer.Int32Ptr(4),
 				MaxPerCore:            utilpointer.Int32Ptr(2),
 				Min:                   utilpointer.Int32Ptr(1),
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
@@ -326,7 +302,6 @@ nodePortAddresses:
 			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
 			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
-			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 		}
@@ -437,7 +412,6 @@ clientConnection:
 clusterCIDR: 10.244.0.0/16
 configSyncPeriod: 15m0s
 conntrack:
-  max: null
   maxPerCore: 32768
   min: 131072
   tcpCloseWaitTimeout: 1h0m0s
@@ -461,7 +435,6 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
-resourceContainer: /kube-proxy
 udpIdleTimeout: 250ms`)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)

@@ -31,8 +31,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -93,7 +93,7 @@ func TestMounterGetPath(t *testing.T) {
 }
 
 func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, podInfoEnabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, podInfoEnabled)()
 	tests := []struct {
 		name                  string
 		driver                string
@@ -203,8 +203,10 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			}
 
 			// Mounter.SetUp()
+			var mounterArgs volume.MounterArgs
 			fsGroup := int64(2000)
-			if err := csiMounter.SetUp(&fsGroup); err != nil {
+			mounterArgs.FsGroup = &fsGroup
+			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -344,7 +346,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(nil); err != nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -382,7 +384,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 }
 
 func TestMounterSetUpWithInline(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
 	fakeClient := fakeclient.NewSimpleClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
@@ -475,7 +477,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(nil); err != nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -621,12 +623,14 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		}
 
 		// Mounter.SetUp()
+		var mounterArgs volume.MounterArgs
 		var fsGroupPtr *int64
 		if tc.setFsGroup {
 			fsGroup := tc.fsGroup
 			fsGroupPtr = &fsGroup
 		}
-		if err := csiMounter.SetUp(fsGroupPtr); err != nil {
+		mounterArgs.FsGroup = fsGroupPtr
+		if err := csiMounter.SetUp(mounterArgs); err != nil {
 			t.Fatalf("mounter.Setup failed: %v", err)
 		}
 

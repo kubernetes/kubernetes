@@ -218,6 +218,15 @@ message CSIPersistentVolumeSource {
   // secret object contains more than one secret, all secrets are passed.
   // +optional
   optional SecretReference nodePublishSecretRef = 8;
+
+  // ControllerExpandSecretRef is a reference to the secret object containing
+  // sensitive information to pass to the CSI driver to complete the CSI
+  // ControllerExpandVolume call.
+  // This is an alpha field and requires enabling ExpandCSIVolumes feature gate.
+  // This field is optional, and may be empty if no secret is required. If the
+  // secret object contains more than one secret, all secrets are passed.
+  // +optional
+  optional SecretReference controllerExpandSecretRef = 9;
 }
 
 // Represents a source location of a volume to mount, managed by an external CSI driver
@@ -487,7 +496,7 @@ message ConfigMapKeySelector {
   // The key to select.
   optional string key = 2;
 
-  // Specify whether the ConfigMap or it's key must be defined
+  // Specify whether the ConfigMap or its key must be defined
   // +optional
   optional bool optional = 3;
 }
@@ -547,7 +556,7 @@ message ConfigMapProjection {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Specify whether the ConfigMap or it's keys must be defined
+  // Specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -579,7 +588,7 @@ message ConfigMapVolumeSource {
   // +optional
   optional int32 defaultMode = 3;
 
-  // Specify whether the ConfigMap or it's keys must be defined
+  // Specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -2075,6 +2084,13 @@ message NodeSpec {
   // +optional
   optional string podCIDR = 1;
 
+  // podCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. If this
+  // field is specified, the 0th entry must match the podCIDR field. It may contain at most 1 value for
+  // each of IPv4 and IPv6.
+  // +optional
+  // +patchStrategy=merge
+  repeated string podCIDRs = 7;
+
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
   // +optional
   optional string providerID = 3;
@@ -2127,6 +2143,9 @@ message NodeStatus {
   // List of addresses reachable to the node.
   // Queried from cloud provider, if available.
   // More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses
+  // Note: This field is declared as mergeable, but the merge key is not sufficiently
+  // unique, which can cause data corruption when it is merged. Callers should instead
+  // use a full-replacement patch. See http://pr.k8s.io/79391 for an example.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -2833,6 +2852,14 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
+// IP address information for entries in the (plural) PodIPs field.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within the cluster.
+message PodIP {
+  // ip is an IP address (IPv4 or IPv6) assigned to the pod
+  optional string ip = 1;
+}
+
 // PodList is a list of Pods.
 message PodList {
   // Standard list metadata.
@@ -3199,6 +3226,24 @@ message PodSpec {
   // Optional: Defaults to true.
   // +optional
   optional bool enableServiceLinks = 30;
+
+  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // Defaults to PreemptLowerPriority if unset.
+  // This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+  // +optional
+  optional string preemptionPolicy = 31;
+
+  // Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
+  // This field will be autopopulated at admission time by the RuntimeClass admission controller. If
+  // the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests.
+  // The RuntimeClass admission controller will reject Pod create requests which have the overhead already
+  // set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value
+  // defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
+  // More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
+  // This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> overhead = 32;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -3260,6 +3305,14 @@ message PodStatus {
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
+
+  // podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must
+  // match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list
+  // is empty if no IPs have been allocated yet.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=ip
+  repeated PodIP podIPs = 12;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
@@ -3977,7 +4030,7 @@ message SecretKeySelector {
   // The key of the secret to select from.  Must be a valid secret key.
   optional string key = 2;
 
-  // Specify whether the Secret or it's key must be defined
+  // Specify whether the Secret or its key must be defined
   // +optional
   optional bool optional = 3;
 }
@@ -4059,7 +4112,7 @@ message SecretVolumeSource {
   // +optional
   optional int32 defaultMode = 3;
 
-  // Specify whether the Secret or it's keys must be defined
+  // Specify whether the Secret or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -4854,5 +4907,16 @@ message WeightedPodAffinityTerm {
 
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 message WindowsSecurityContextOptions {
+  // GMSACredentialSpecName is the name of the GMSA credential spec to use.
+  // This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
+  // +optional
+  optional string gmsaCredentialSpecName = 1;
+
+  // GMSACredentialSpec is where the GMSA admission webhook
+  // (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+  // GMSA credential spec named by the GMSACredentialSpecName field.
+  // This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
+  // +optional
+  optional string gmsaCredentialSpec = 2;
 }
 

@@ -48,13 +48,12 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
-var _ = Describe("[sig-storage] GCP Volumes", func() {
+var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	f := framework.NewDefaultFramework("gcp-volume")
 
 	// note that namespace deletion is handled by delete-namespace flag
@@ -62,7 +61,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	var namespace *v1.Namespace
 	var c clientset.Interface
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 
 		namespace = f.Namespace
@@ -72,8 +71,8 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// NFS
 	////////////////////////////////////////////////////////////////////////
-	Describe("NFSv4", func() {
-		It("should be mountable for NFSv4", func() {
+	ginkgo.Describe("NFSv4", func() {
+		ginkgo.It("should be mountable for NFSv4", func() {
 			config, _, serverIP := volume.NewNFSServer(c, namespace.Name, []string{})
 			defer volume.TestCleanup(f, config)
 
@@ -96,8 +95,8 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 		})
 	})
 
-	Describe("NFSv3", func() {
-		It("should be mountable for NFSv3", func() {
+	ginkgo.Describe("NFSv3", func() {
+		ginkgo.It("should be mountable for NFSv3", func() {
 			config, _, serverIP := volume.NewNFSServer(c, namespace.Name, []string{})
 			defer volume.TestCleanup(f, config)
 
@@ -122,15 +121,15 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
-	Describe("GlusterFS", func() {
-		It("should be mountable", func() {
+	ginkgo.Describe("GlusterFS", func() {
+		ginkgo.It("should be mountable", func() {
 			// create gluster server and endpoints
 			config, _, _ := volume.NewGlusterfsServer(c, namespace.Name)
 			name := config.Prefix + "-server"
 			defer func() {
 				volume.TestCleanup(f, config)
 				err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
-				Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
+				framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 			}()
 
 			tests := []volume.Test{

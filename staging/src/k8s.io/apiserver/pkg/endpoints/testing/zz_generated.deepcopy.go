@@ -86,7 +86,7 @@ func (in *SimpleGetOptions) DeepCopyObject() runtime.Object {
 func (in *SimpleList) DeepCopyInto(out *SimpleList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Simple, len(*in))

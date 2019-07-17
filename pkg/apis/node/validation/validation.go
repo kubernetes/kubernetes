@@ -19,7 +19,11 @@ package validation
 import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateRuntimeClass validates the RuntimeClass
@@ -28,6 +32,10 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 
 	for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
+	}
+
+	if rc.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...)
 	}
 
 	return allErrs
@@ -40,4 +48,9 @@ func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...)
 
 	return allErrs
+}
+
+func validateOverhead(overhead *node.Overhead, fldPath *field.Path) field.ErrorList {
+	// reuse the ResourceRequirements validation logic
+	return corevalidation.ValidateResourceRequirements(&core.ResourceRequirements{Limits: overhead.PodFixed}, fldPath)
 }

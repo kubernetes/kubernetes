@@ -126,6 +126,30 @@ func TestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationContro
 	return pods, svc, rc
 }
 
+// EmptyTestData returns no pod, service, or replication controller
+func EmptyTestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
+	pods := &corev1.PodList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "15",
+		},
+		Items: []corev1.Pod{},
+	}
+	svc := &corev1.ServiceList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "16",
+		},
+		Items: []corev1.Service{},
+	}
+
+	rc := &corev1.ReplicationControllerList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "17",
+		},
+		Items: []corev1.ReplicationController{},
+	}
+	return pods, svc, rc
+}
+
 func GenResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, error) {
 	jsonBytes, err := json.Marshal(bodyStruct)
 	if err != nil {

@@ -211,15 +211,17 @@ func TestEventChannelFull(t *testing.T) {
 		}},
 	}
 	pleg.relist()
-	// event channel is full, discard events
-	expected = []*PodLifecycleEvent{
+	allEvents := []*PodLifecycleEvent{
 		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
 		{ID: "1234", Type: ContainerDied, Data: "c2"},
 		{ID: "1234", Type: ContainerStarted, Data: "c3"},
 		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
+		{ID: "4567", Type: ContainerStarted, Data: "c4"},
 	}
+	// event channel is full, discard events
 	actual = getEventsFromChannel(ch)
-	verifyEvents(t, expected, actual)
+	assert.True(t, len(actual) == 4, "channel length should be 4")
+	assert.Subsetf(t, allEvents, actual, "actual events should in all events")
 }
 
 func TestDetectingContainerDeaths(t *testing.T) {
@@ -571,56 +573,73 @@ func TestRelistingWithSandboxes(t *testing.T) {
 }
 
 func TestRelistIPChange(t *testing.T) {
-	pleg, runtimeMock := newTestGenericPLEGWithRuntimeMock()
-	ch := pleg.Watch()
-
-	id := types.UID("test-pod-0")
-	cState := kubecontainer.ContainerStateRunning
-	container := createTestContainer("c0", cState)
-	pod := &kubecontainer.Pod{
-		ID:         id,
-		Containers: []*kubecontainer.Container{container},
+	testCases := []struct {
+		name   string
+		podID  string
+		podIPs []string
+	}{
+		{
+			name:   "test-0",
+			podID:  "test-pod-0",
+			podIPs: []string{"192.168.1.5"},
+		},
+		{
+			name:   "tets-1",
+			podID:  "test-pod-1",
+			podIPs: []string{"192.168.1.5/24", "2000::"},
+		},
 	}
-	ipAddr := "192.168.1.5/24"
-	status := &kubecontainer.PodStatus{
-		ID:                id,
-		IP:                ipAddr,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+	for _, tc := range testCases {
+		pleg, runtimeMock := newTestGenericPLEGWithRuntimeMock()
+		ch := pleg.Watch()
+
+		id := types.UID(tc.podID)
+		cState := kubecontainer.ContainerStateRunning
+		container := createTestContainer("c0", cState)
+		pod := &kubecontainer.Pod{
+			ID:         id,
+			Containers: []*kubecontainer.Container{container},
+		}
+		status := &kubecontainer.PodStatus{
+			ID:                id,
+			IPs:               tc.podIPs,
+			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+		}
+		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
+
+		runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
+		runtimeMock.On("GetPodStatus", pod.ID, "", "").Return(status, nil).Once()
+
+		pleg.relist()
+		actualEvents := getEventsFromChannel(ch)
+		actualStatus, actualErr := pleg.cache.Get(pod.ID)
+		assert.Equal(t, status, actualStatus, tc.name)
+		assert.Nil(t, actualErr, tc.name)
+		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
+
+		// Clear the IP address and mark the container terminated
+		container = createTestContainer("c0", kubecontainer.ContainerStateExited)
+		pod = &kubecontainer.Pod{
+			ID:         id,
+			Containers: []*kubecontainer.Container{container},
+		}
+		status = &kubecontainer.PodStatus{
+			ID:                id,
+			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
+		}
+		event = &PodLifecycleEvent{ID: pod.ID, Type: ContainerDied, Data: container.ID.ID}
+		runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
+		runtimeMock.On("GetPodStatus", pod.ID, "", "").Return(status, nil).Once()
+
+		pleg.relist()
+		actualEvents = getEventsFromChannel(ch)
+		actualStatus, actualErr = pleg.cache.Get(pod.ID)
+		// Must copy status to compare since its pointer gets passed through all
+		// the way to the event
+		statusCopy := *status
+		statusCopy.IPs = tc.podIPs
+		assert.Equal(t, &statusCopy, actualStatus, tc.name)
+		assert.Nil(t, actualErr, tc.name)
+		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 	}
-	event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
-
-	runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
-	runtimeMock.On("GetPodStatus", pod.ID, "", "").Return(status, nil).Once()
-
-	pleg.relist()
-	actualEvents := getEventsFromChannel(ch)
-	actualStatus, actualErr := pleg.cache.Get(pod.ID)
-	assert.Equal(t, status, actualStatus, "test0")
-	assert.Nil(t, actualErr, "test0")
-	assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
-
-	// Clear the IP address and mark the container terminated
-	container = createTestContainer("c0", kubecontainer.ContainerStateExited)
-	pod = &kubecontainer.Pod{
-		ID:         id,
-		Containers: []*kubecontainer.Container{container},
-	}
-	status = &kubecontainer.PodStatus{
-		ID:                id,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
-	}
-	event = &PodLifecycleEvent{ID: pod.ID, Type: ContainerDied, Data: container.ID.ID}
-	runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
-	runtimeMock.On("GetPodStatus", pod.ID, "", "").Return(status, nil).Once()
-
-	pleg.relist()
-	actualEvents = getEventsFromChannel(ch)
-	actualStatus, actualErr = pleg.cache.Get(pod.ID)
-	// Must copy status to compare since its pointer gets passed through all
-	// the way to the event
-	statusCopy := *status
-	statusCopy.IP = ipAddr
-	assert.Equal(t, &statusCopy, actualStatus, "test0")
-	assert.Nil(t, actualErr, "test0")
-	assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 }

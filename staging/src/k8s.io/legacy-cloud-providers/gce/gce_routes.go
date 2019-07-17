@@ -74,6 +74,7 @@ func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 		return mc.Observe(err)
 	}
 	cr := &compute.Route{
+		// TODO(thockin): generate a unique name for node + route cidr. Don't depend on name hints.
 		Name:            truncateClusterName(clusterName) + "-" + nameHint,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", targetInstance.Zone, targetInstance.Name),

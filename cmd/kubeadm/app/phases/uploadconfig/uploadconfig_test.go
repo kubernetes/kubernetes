@@ -69,9 +69,6 @@ func TestUploadConfiguration(t *testing.T) {
 				LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
-				},
 				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
 						Token: &kubeadmapiv1beta2.BootstrapTokenString{
@@ -85,7 +82,10 @@ func TestUploadConfiguration(t *testing.T) {
 					CRISocket: "/var/run/custom-cri.sock",
 				},
 			}
-			cfg, err := configutil.DefaultedInitConfiguration(initialcfg)
+			clustercfg := &kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
+			}
+			cfg, err := configutil.DefaultedInitConfiguration(initialcfg, clustercfg)
 
 			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
 			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}

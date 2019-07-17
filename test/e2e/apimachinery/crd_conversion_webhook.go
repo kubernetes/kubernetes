@@ -19,11 +19,12 @@ package apimachinery
 import (
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,12 +34,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/test/integration"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -58,11 +61,28 @@ var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: true,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"hostPort": {Type: "string"},
+				},
+			},
+		},
 	},
 	{
 		Name:    "v2",
 		Served:  true,
 		Storage: false,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"host": {Type: "string"},
+					"port": {Type: "string"},
+				},
+			},
+		},
 	},
 }
 
@@ -71,15 +91,32 @@ var alternativeAPIVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: false,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"hostPort": {Type: "string"},
+				},
+			},
+		},
 	},
 	{
 		Name:    "v2",
 		Served:  true,
 		Storage: true,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"host": {Type: "string"},
+					"port": {Type: "string"},
+				},
+			},
+		},
 	},
 }
 
-var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebhookConversion]", func() {
+var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 	var context *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
 
@@ -97,7 +134,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 		context = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.CRDConversionWebhook), context)
+		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -105,15 +142,22 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 	})
 
 	ginkgo.It("Should be able to convert from CR v1 to CR v2", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", apiVersions,
-			&v1beta1.WebhookClientConfig{
-				CABundle: context.signingCert,
-				Service: &v1beta1.ServiceReference{
-					Namespace: f.Namespace.Name,
-					Name:      serviceCRDName,
-					Path:      pointer.StringPtr("/crdconvert"),
-					Port:      pointer.Int32Ptr(serviceCRDPort),
-				}})
+		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+			crd.Spec.Versions = apiVersions
+			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
+				Strategy: v1beta1.WebhookConverter,
+				WebhookClientConfig: &v1beta1.WebhookClientConfig{
+					CABundle: context.signingCert,
+					Service: &v1beta1.ServiceReference{
+						Namespace: f.Namespace.Name,
+						Name:      serviceCRDName,
+						Path:      pointer.StringPtr("/crdconvert"),
+						Port:      pointer.Int32Ptr(serviceCRDPort),
+					},
+				},
+			}
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
+		})
 		if err != nil {
 			return
 		}
@@ -122,15 +166,22 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 	})
 
 	ginkgo.It("Should be able to convert a non homogeneous list of CRs", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", apiVersions,
-			&v1beta1.WebhookClientConfig{
-				CABundle: context.signingCert,
-				Service: &v1beta1.ServiceReference{
-					Namespace: f.Namespace.Name,
-					Name:      serviceCRDName,
-					Path:      pointer.StringPtr("/crdconvert"),
-					Port:      pointer.Int32Ptr(serviceCRDPort),
-				}})
+		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+			crd.Spec.Versions = apiVersions
+			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
+				Strategy: v1beta1.WebhookConverter,
+				WebhookClientConfig: &v1beta1.WebhookClientConfig{
+					CABundle: context.signingCert,
+					Service: &v1beta1.ServiceReference{
+						Namespace: f.Namespace.Name,
+						Name:      serviceCRDName,
+						Path:      pointer.StringPtr("/crdconvert"),
+						Port:      pointer.Int32Ptr(serviceCRDPort),
+					},
+				},
+			}
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
+		})
 		if err != nil {
 			return
 		}
@@ -169,7 +220,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 		},
 	})
 	if err != nil && errors.IsAlreadyExists(err) {
-		framework.Logf("role binding %s already exists", roleBindingCRDName)
+		e2elog.Logf("role binding %s already exists", roleBindingCRDName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
 	}
@@ -218,27 +269,27 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			Name:         "sample-crd-conversion-webhook",
 			VolumeMounts: mounts,
 			Args: []string{
+				"crd-conversion-webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
 				"--alsologtostderr",
 				"-v=4",
-				"2>&1",
 			},
 			Image: image,
 		},
 	}
-	d := &apps.Deployment{
+	d := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   deploymentCRDName,
 			Labels: podLabels,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,
 			},
-			Strategy: apps.DeploymentStrategy{
-				Type: apps.RollingUpdateDeploymentStrategyType,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -373,6 +424,8 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	// After changing a CRD, the resources for versions will be re-created that can be result in
 	// cancelled connection (e.g. "grpc connection closed" or "context canceled").
 	// Just retrying fixes that.
+	//
+	// TODO: we have to wait for the storage version to become effective. Storage version changes are not instant.
 	for i := 0; i < 5; i++ {
 		_, err = customResourceClients["v1"].Create(crInstance, metav1.CreateOptions{})
 		if err == nil {

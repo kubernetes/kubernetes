@@ -536,7 +536,7 @@ func (f *FakeDockerClient) normalSleep(mean, stdDev, cutOffMillis int) {
 		return
 	}
 	cutoff := (time.Duration)(cutOffMillis) * time.Millisecond
-	delay := (time.Duration)(rand.NormFloat64()*float64(stdDev)+float64(mean)) * time.Millisecond
+	delay := (time.Duration)(f.RandGenerator.NormFloat64()*float64(stdDev)+float64(mean)) * time.Millisecond
 	if delay < cutoff {
 		delay = cutoff
 	}

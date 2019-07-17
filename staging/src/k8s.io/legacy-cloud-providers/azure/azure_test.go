@@ -35,7 +35,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/auth"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 )
@@ -879,13 +879,13 @@ func TestReconcilePublicIPWithNewService(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, nil, true /* wantLb*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 	validatePublicIP(t, pip, &svc, true)
 
-	pip2, err := az.reconcilePublicIP(testClusterName, &svc, nil, true /* wantLb */)
+	pip2, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -900,7 +900,7 @@ func TestReconcilePublicIPRemoveService(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, nil, true /* wantLb*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -908,7 +908,7 @@ func TestReconcilePublicIPRemoveService(t *testing.T) {
 	validatePublicIP(t, pip, &svc, true)
 
 	// Remove the service
-	pip, err = az.reconcilePublicIP(testClusterName, &svc, nil, false /* wantLb */)
+	pip, err = az.reconcilePublicIP(testClusterName, &svc, "", false /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -920,7 +920,7 @@ func TestReconcilePublicIPWithInternalService(t *testing.T) {
 	az := getTestCloud()
 	svc := getInternalTestService("servicea", 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, nil, true /* wantLb*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -932,7 +932,7 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 	az := getTestCloud()
 	svc := getInternalTestService("servicea", 80, 443)
 
-	pip, err := az.reconcilePublicIP(testClusterName, &svc, nil, true /* wantLb*/)
+	pip, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -940,14 +940,14 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 
 	// Update to external service
 	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
-	pip, err = az.reconcilePublicIP(testClusterName, &svcUpdated, nil, true /* wantLb*/)
+	pip, err = az.reconcilePublicIP(testClusterName, &svcUpdated, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 	validatePublicIP(t, pip, &svcUpdated, true)
 
 	// Update to internal service again
-	pip, err = az.reconcilePublicIP(testClusterName, &svc, nil, true /* wantLb*/)
+	pip, err = az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -996,6 +996,7 @@ func getTestCloud() (az *Cloud) {
 	az.lbCache, _ = az.newLBCache()
 	az.nsgCache, _ = az.newNSGCache()
 	az.rtCache, _ = az.newRouteTableCache()
+	az.controllerCommon = &controllerCommon{cloud: az}
 
 	return az
 }
@@ -1108,7 +1109,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 
 		vmCtx, vmCancel := getContextWithCancel()
 		defer vmCancel()
-		_, err := az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM)
+		_, err := az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM, "")
 		if err != nil {
 		}
 		// add to kubernetes
@@ -1367,14 +1368,23 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 		t.Errorf("Expected publicIP resource exists, when it is not an internal service")
 	}
 
-	if publicIP.Tags == nil || publicIP.Tags["service"] == nil {
-		t.Errorf("Expected publicIP resource has tags[service]")
+	if publicIP.Tags == nil || publicIP.Tags[serviceTagKey] == nil {
+		t.Errorf("Expected publicIP resource has tags[%s]", serviceTagKey)
 	}
 
 	serviceName := getServiceName(service)
-	if serviceName != *(publicIP.Tags["service"]) {
-		t.Errorf("Expected publicIP resource has matching tags[service]")
+	if serviceName != *(publicIP.Tags[serviceTagKey]) {
+		t.Errorf("Expected publicIP resource has matching tags[%s]", serviceTagKey)
 	}
+
+	if publicIP.Tags[clusterNameKey] == nil {
+		t.Errorf("Expected publicIP resource has tags[%s]", clusterNameKey)
+	}
+
+	if *(publicIP.Tags[clusterNameKey]) != testClusterName {
+		t.Errorf("Expected publicIP resource has matching tags[%s]", clusterNameKey)
+	}
+
 	// We cannot use service.Spec.LoadBalancerIP to compare with
 	// Public IP's IPAddress
 	// Because service properties are updated outside of cloudprovider code
@@ -2693,6 +2703,12 @@ func TestGetResourceGroupFromDiskURI(t *testing.T) {
 	}{
 		{
 			diskURL:        "/subscriptions/4be8920b-2978-43d7-axyz-04d8549c1d05/resourceGroups/azure-k8s1102/providers/Microsoft.Compute/disks/andy-mghyb1102-dynamic-pvc-f7f014c9-49f4-11e8-ab5c-000d3af7b38e",
+			expectedResult: "azure-k8s1102",
+			expectError:    false,
+		},
+		{
+			// case insentive check
+			diskURL:        "/subscriptions/4be8920b-2978-43d7-axyz-04d8549c1d05/resourcegroups/azure-k8s1102/providers/Microsoft.Compute/disks/andy-mghyb1102-dynamic-pvc-f7f014c9-49f4-11e8-ab5c-000d3af7b38e",
 			expectedResult: "azure-k8s1102",
 			expectError:    false,
 		},

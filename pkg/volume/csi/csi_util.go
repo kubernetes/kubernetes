@@ -34,8 +34,10 @@ import (
 )
 
 const (
-	testInformerSyncPeriod  = 100 * time.Millisecond
-	testInformerSyncTimeout = 30 * time.Second
+	// TestInformerSyncPeriod is informer sync period duration for testing
+	TestInformerSyncPeriod = 100 * time.Millisecond
+	// TestInformerSyncTimeout is informer timeout duration for testing
+	TestInformerSyncTimeout = 30 * time.Second
 )
 
 func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {

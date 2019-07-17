@@ -497,7 +497,9 @@ func SetAssignedConfig(source *corev1.NodeConfigSource) error {
 		return err
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	AssignedConfig.Delete(assignedConfigLabels)
+	if !AssignedConfig.Delete(assignedConfigLabels) {
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", assignedConfigLabels)
+	}
 	// record the new timeseries
 	assignedConfigLabels = labels
 	// expose the new timeseries with a constant count of 1
@@ -515,7 +517,9 @@ func SetActiveConfig(source *corev1.NodeConfigSource) error {
 		return err
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	ActiveConfig.Delete(activeConfigLabels)
+	if !ActiveConfig.Delete(activeConfigLabels) {
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", activeConfigLabels)
+	}
 	// record the new timeseries
 	activeConfigLabels = labels
 	// expose the new timeseries with a constant count of 1
@@ -533,7 +537,9 @@ func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
 		return err
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels)
+	if !LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels) {
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", lastKnownGoodConfigLabels)
+	}
 	// record the new timeseries
 	lastKnownGoodConfigLabels = labels
 	// expose the new timeseries with a constant count of 1

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
@@ -115,11 +116,15 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	internal.RemoveObjectManagedFields(newObjVersioned)
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create typed new object: %v", err)
+		// Return newObj and just by-pass fields update. This really shouldn't happen.
+		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object: %v", err)
+		return newObj, nil
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create typed live object: %v", err)
+		// Return newObj and just by-pass fields update. This really shouldn't happen.
+		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object: %v", err)
+		return newObj, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	manager, err = f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
@@ -127,7 +132,8 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
 
-	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
+	// TODO(apelisse) use the first return value when unions are implemented
+	_, managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
@@ -242,6 +248,7 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 var stripSet = fieldpath.NewSet(
 	fieldpath.MakePathOrDie("apiVersion"),
 	fieldpath.MakePathOrDie("kind"),
+	fieldpath.MakePathOrDie("metadata"),
 	fieldpath.MakePathOrDie("metadata", "name"),
 	fieldpath.MakePathOrDie("metadata", "namespace"),
 	fieldpath.MakePathOrDie("metadata", "creationTimestamp"),
@@ -260,9 +267,11 @@ func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager stri
 		if vs == nil {
 			panic(fmt.Sprintf("Found unexpected nil manager which should never happen: %s", manager))
 		}
-		vs.Set = vs.Set.Difference(stripSet)
-		if vs.Set.Empty() {
+		newSet := vs.Set.Difference(stripSet)
+		if newSet.Empty() {
 			delete(managed, manager)
+		} else {
+			managed[manager] = &fieldpath.VersionedSet{Set: newSet, APIVersion: vs.APIVersion, Applied: vs.Applied}
 		}
 	}
 

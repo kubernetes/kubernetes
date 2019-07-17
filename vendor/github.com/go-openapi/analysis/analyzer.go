@@ -104,6 +104,38 @@ func (p *patternAnalysis) addSchemaPattern(key, pattern string) {
 	p.addPattern(key, pattern)
 }
 
+type enumAnalysis struct {
+	parameters map[string][]interface{}
+	headers    map[string][]interface{}
+	items      map[string][]interface{}
+	schemas    map[string][]interface{}
+	allEnums   map[string][]interface{}
+}
+
+func (p *enumAnalysis) addEnum(key string, enum []interface{}) {
+	p.allEnums["#"+key] = enum
+}
+
+func (p *enumAnalysis) addParameterEnum(key string, enum []interface{}) {
+	p.parameters["#"+key] = enum
+	p.addEnum(key, enum)
+}
+
+func (p *enumAnalysis) addHeaderEnum(key string, enum []interface{}) {
+	p.headers["#"+key] = enum
+	p.addEnum(key, enum)
+}
+
+func (p *enumAnalysis) addItemsEnum(key string, enum []interface{}) {
+	p.items["#"+key] = enum
+	p.addEnum(key, enum)
+}
+
+func (p *enumAnalysis) addSchemaEnum(key string, enum []interface{}) {
+	p.schemas["#"+key] = enum
+	p.addEnum(key, enum)
+}
+
 // New takes a swagger spec object and returns an analyzed spec document.
 // The analyzed document contains a number of indices that make it easier to
 // reason about semantics of a swagger specification for use in code generation
@@ -134,6 +166,13 @@ func New(doc *spec.Swagger) *Spec {
 			schemas:     make(map[string]string, 150),
 			allPatterns: make(map[string]string, 150),
 		},
+		enums: enumAnalysis{
+			parameters: make(map[string][]interface{}, 150),
+			headers:    make(map[string][]interface{}, 150),
+			items:      make(map[string][]interface{}, 150),
+			schemas:    make(map[string][]interface{}, 150),
+			allEnums:   make(map[string][]interface{}, 150),
+		},
 	}
 	a.initialize()
 	return a
@@ -149,6 +188,7 @@ type Spec struct {
 	operations  map[string]map[string]*spec.Operation
 	references  referenceAnalysis
 	patterns    patternAnalysis
+	enums       enumAnalysis
 	allSchemas  map[string]SchemaRef
 	allOfs      map[string]SchemaRef
 }
@@ -173,6 +213,11 @@ func (s *Spec) reset() {
 	s.patterns.items = make(map[string]string, 150)
 	s.patterns.schemas = make(map[string]string, 150)
 	s.patterns.allPatterns = make(map[string]string, 150)
+	s.enums.parameters = make(map[string][]interface{}, 150)
+	s.enums.headers = make(map[string][]interface{}, 150)
+	s.enums.items = make(map[string][]interface{}, 150)
+	s.enums.schemas = make(map[string][]interface{}, 150)
+	s.enums.allEnums = make(map[string][]interface{}, 150)
 }
 
 func (s *Spec) reload() {
@@ -207,6 +252,9 @@ func (s *Spec) initialize() {
 		if parameter.Pattern != "" {
 			s.patterns.addParameterPattern(refPref, parameter.Pattern)
 		}
+		if len(parameter.Enum) > 0 {
+			s.enums.addParameterEnum(refPref, parameter.Enum)
+		}
 	}
 
 	for name, response := range s.spec.Responses {
@@ -218,6 +266,9 @@ func (s *Spec) initialize() {
 			}
 			if v.Pattern != "" {
 				s.patterns.addHeaderPattern(hRefPref, v.Pattern)
+			}
+			if len(v.Enum) > 0 {
+				s.enums.addHeaderEnum(hRefPref, v.Enum)
 			}
 		}
 		if response.Schema != nil {
@@ -256,6 +307,9 @@ func (s *Spec) analyzeOperations(path string, pi *spec.PathItem) {
 		if param.Pattern != "" {
 			s.patterns.addParameterPattern(refPref, param.Pattern)
 		}
+		if len(param.Enum) > 0 {
+			s.enums.addParameterEnum(refPref, param.Enum)
+		}
 		if param.Items != nil {
 			s.analyzeItems("items", param.Items, refPref, "parameter")
 		}
@@ -276,6 +330,9 @@ func (s *Spec) analyzeItems(name string, items *spec.Items, prefix, location str
 	}
 	if items.Pattern != "" {
 		s.patterns.addItemsPattern(refPref, items.Pattern)
+	}
+	if len(items.Enum) > 0 {
+		s.enums.addItemsEnum(refPref, items.Enum)
 	}
 }
 
@@ -307,6 +364,9 @@ func (s *Spec) analyzeOperation(method, path string, op *spec.Operation) {
 		}
 		if param.Pattern != "" {
 			s.patterns.addParameterPattern(refPref, param.Pattern)
+		}
+		if len(param.Enum) > 0 {
+			s.enums.addParameterEnum(refPref, param.Enum)
 		}
 		s.analyzeItems("items", param.Items, refPref, "parameter")
 		if param.In == "body" && param.Schema != nil {
@@ -341,6 +401,9 @@ func (s *Spec) analyzeOperation(method, path string, op *spec.Operation) {
 				if v.Pattern != "" {
 					s.patterns.addHeaderPattern(hRefPref, v.Pattern)
 				}
+				if len(v.Enum) > 0 {
+					s.enums.addHeaderEnum(hRefPref, v.Enum)
+				}
 			}
 			if res.Schema != nil {
 				s.analyzeSchema("schema", *res.Schema, refPref)
@@ -365,6 +428,9 @@ func (s *Spec) analyzeSchema(name string, schema spec.Schema, prefix string) {
 	}
 	if schema.Pattern != "" {
 		s.patterns.addSchemaPattern(refURI, schema.Pattern)
+	}
+	if len(schema.Enum) > 0 {
+		s.enums.addSchemaEnum(refURI, schema.Enum)
 	}
 
 	for k, v := range schema.Definitions {
@@ -861,6 +927,14 @@ func cloneStringMap(source map[string]string) map[string]string {
 	return res
 }
 
+func cloneEnumMap(source map[string][]interface{}) map[string][]interface{} {
+	res := make(map[string][]interface{}, len(source))
+	for k, v := range source {
+		res[k] = v
+	}
+	return res
+}
+
 // ParameterPatterns returns all the patterns found in parameters
 // the map is cloned to avoid accidental changes
 func (s *Spec) ParameterPatterns() map[string]string {
@@ -889,4 +963,34 @@ func (s *Spec) SchemaPatterns() map[string]string {
 // the map is cloned to avoid accidental changes
 func (s *Spec) AllPatterns() map[string]string {
 	return cloneStringMap(s.patterns.allPatterns)
+}
+
+// ParameterEnums returns all the enums found in parameters
+// the map is cloned to avoid accidental changes
+func (s *Spec) ParameterEnums() map[string][]interface{} {
+	return cloneEnumMap(s.enums.parameters)
+}
+
+// HeaderEnums returns all the enums found in response headers
+// the map is cloned to avoid accidental changes
+func (s *Spec) HeaderEnums() map[string][]interface{} {
+	return cloneEnumMap(s.enums.headers)
+}
+
+// ItemsEnums returns all the enums found in simple array items
+// the map is cloned to avoid accidental changes
+func (s *Spec) ItemsEnums() map[string][]interface{} {
+	return cloneEnumMap(s.enums.items)
+}
+
+// SchemaEnums returns all the enums found in schemas
+// the map is cloned to avoid accidental changes
+func (s *Spec) SchemaEnums() map[string][]interface{} {
+	return cloneEnumMap(s.enums.schemas)
+}
+
+// AllEnums returns all the enums found in the spec
+// the map is cloned to avoid accidental changes
+func (s *Spec) AllEnums() map[string][]interface{} {
+	return cloneEnumMap(s.enums.allEnums)
 }

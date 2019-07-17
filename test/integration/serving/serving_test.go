@@ -31,11 +31,11 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/fake"
 	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -321,5 +321,5 @@ func intPtr(x int) *int {
 }
 
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
-	return &fake.FakeCloud{}, nil
+	return &fake.Cloud{}, nil
 }

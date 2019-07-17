@@ -354,10 +354,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				c.Fuzz(&sc.Capabilities.Add)
 				c.Fuzz(&sc.Capabilities.Drop)
 			}
-			if sc.ProcMount == nil {
-				defProcMount := core.DefaultProcMount
-				sc.ProcMount = &defProcMount
-			}
 		},
 		func(s *core.Secret, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again

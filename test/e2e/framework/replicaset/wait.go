@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -53,7 +53,7 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 }
 
 // WaitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
-func WaitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, replicaSet *apps.ReplicaSet) error {
+func WaitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, replicaSet *appsv1.ReplicaSet) error {
 	desiredGeneration := replicaSet.Generation
 	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
 		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
@@ -69,7 +69,7 @@ func WaitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, rep
 }
 
 // WaitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
-func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *apps.ReplicaSet, targetReplicaNum int32) error {
+func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
 	desiredGeneration := replicaSet.Generation
 	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
@@ -85,7 +85,7 @@ func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *apps
 }
 
 // WaitForReplicaSetTargetAvailableReplicas waits for .status.availableReplicas of a RS to equal targetReplicaNum
-func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *apps.ReplicaSet, targetReplicaNum int32) error {
+func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
 	desiredGeneration := replicaSet.Generation
 	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})

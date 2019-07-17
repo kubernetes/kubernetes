@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 // GetEtcdStorageData returns etcd data for all persisted objects.
@@ -412,6 +413,19 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1
+		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"): {
+			Stub:             `{"metadata":{"name":"hook2","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"Unknown","admissionReviewVersions":["v1beta1"]}]}`,
+			ExpectedEtcdPath: "/registry/validatingwebhookconfigurations/hook2",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "ValidatingWebhookConfiguration"),
+		},
+		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"): {
+			Stub:             `{"metadata":{"name":"hook2","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"Unknown","admissionReviewVersions":["v1beta1"]}]}`,
+			ExpectedEtcdPath: "/registry/mutatingwebhookconfigurations/hook2",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingWebhookConfiguration"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
@@ -484,6 +498,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			Stub:             `{"kind": "Panda", "apiVersion": "awesome.bears.com/v3", "metadata": {"name": "cr4panda"}, "spec":{"replicas": 300}}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
 			ExpectedEtcdPath: "/registry/awesome.bears.com/pandas/cr4panda",
 			ExpectedGVK:      gvkP("awesome.bears.com", "v1", "Panda"),
+		},
+		gvr("random.numbers.com", "v1", "integers"): {
+			Stub:             `{"kind": "Integer", "apiVersion": "random.numbers.com/v1", "metadata": {"name": "fortytwo"}, "value": 42, "garbage": "oiujnasdf"}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
+			ExpectedEtcdPath: "/registry/random.numbers.com/integers/fortytwo",
 		},
 		// --
 
@@ -578,6 +596,32 @@ func GetCustomResourceDefinitionData() []*apiextensionsv1beta1.CustomResourceDef
 					Plural: "pants",
 					Kind:   "Pant",
 				},
+			},
+		},
+		// cluster scoped with legacy version field and pruning.
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "integers.random.numbers.com",
+			},
+			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+				Group:   "random.numbers.com",
+				Version: "v1",
+				Scope:   apiextensionsv1beta1.ClusterScoped,
+				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+					Plural: "integers",
+					Kind:   "Integer",
+				},
+				Validation: &apiextensionsv1beta1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+							"value": {
+								Type: "number",
+							},
+						},
+					},
+				},
+				PreserveUnknownFields: pointer.BoolPtr(false),
 			},
 		},
 		// cluster scoped with versions field

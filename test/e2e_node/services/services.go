@@ -24,7 +24,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/kardianos/osext"
 	"k8s.io/klog"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -121,13 +120,13 @@ func RunE2EServices(t *testing.T) {
 const (
 	// services.log is the combined log of all services
 	servicesLogFile = "services.log"
-	// LOG_VERBOSITY_LEVEL is consistent with the level used in a cluster e2e test.
-	LOG_VERBOSITY_LEVEL = "4"
+	// LogVerbosityLevel is consistent with the level used in a cluster e2e test.
+	LogVerbosityLevel = "4"
 )
 
 // startInternalServices starts the internal services in a separate process.
 func (e *E2EServices) startInternalServices() (*server, error) {
-	testBin, err := osext.Executable()
+	testBin, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}

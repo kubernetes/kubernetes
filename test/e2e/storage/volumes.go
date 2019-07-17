@@ -15,14 +15,16 @@ limitations under the License.
 */
 
 // This test is volumes test for configmap.
+
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -36,13 +38,13 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	var cs clientset.Interface
 	var namespace *v1.Namespace
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		namespace = f.Namespace
 	})
 
-	Describe("ConfigMap", func() {
-		It("should be mountable", func() {
+	ginkgo.Describe("ConfigMap", func() {
+		ginkgo.It("should be mountable", func() {
 			config := volume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",
@@ -64,7 +66,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
-				framework.Failf("unable to create test configmap: %v", err)
+				e2elog.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
 				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)

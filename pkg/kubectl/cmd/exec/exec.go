@@ -24,7 +24,6 @@ import (
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -32,13 +31,14 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+
+	"k8s.io/kubectl/pkg/util/interrupt"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/interrupt"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/util/term"
 )
 
 var (
@@ -82,7 +82,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] -- COMMAND [args...]",
+		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Execute a command in a container"),
 		Long:                  "Execute a command in a container.",
@@ -95,8 +95,6 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
-	cmd.Flags().StringVarP(&options.PodName, "pod", "p", options.PodName, "Pod name")
-	cmd.Flags().MarkDeprecated("pod", "This flag is deprecated and will be removed in future. Use exec POD_NAME instead.")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
@@ -151,8 +149,8 @@ type ExecOptions struct {
 	ResourceName string
 	Command      []string
 
-	FullCmdName       string
-	SuggestedCmdUsage string
+	ParentCommandName       string
+	EnableSuggestedCmdUsage bool
 
 	Builder          func() *resource.Builder
 	ExecutablePodFn  polymorphichelpers.AttachablePodForObjectFunc
@@ -168,18 +166,12 @@ type ExecOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
-	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
+	if len(argsIn) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
-	if len(p.PodName) != 0 {
-		if len(argsIn) < 1 {
-			return cmdutil.UsageErrorf(cmd, execUsageStr)
-		}
-		p.Command = argsIn
-	} else {
-		p.ResourceName = argsIn[0]
-		p.Command = argsIn[1:]
-	}
+
+	p.ResourceName = argsIn[0]
+	p.Command = argsIn[1:]
 
 	var err error
 
@@ -200,10 +192,10 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
-		p.FullCmdName = cmdParent.CommandPath()
+		p.ParentCommandName = cmdParent.CommandPath()
 	}
-	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe %s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.ResourceName, p.Namespace)
+	if len(p.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.EnableSuggestedCmdUsage = true
 	}
 
 	p.Config, err = f.ToRESTConfig()
@@ -322,11 +314,10 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			usageString := fmt.Sprintf("Defaulting container name to %s.", pod.Spec.Containers[0].Name)
-			if len(p.SuggestedCmdUsage) > 0 {
-				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
+			if p.EnableSuggestedCmdUsage {
+				fmt.Fprintf(p.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", p.ParentCommandName, pod.Name, p.Namespace)
 			}
-			fmt.Fprintf(p.ErrOut, "%s\n", usageString)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}

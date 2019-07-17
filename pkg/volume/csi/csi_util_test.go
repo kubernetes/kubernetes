@@ -42,6 +42,12 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func makeTestPVWithMountOptions(name string, sizeGig int, driverName, volID string, mountOptions []string) *api.PersistentVolume {
+	pv := makeTestPV(name, sizeGig, driverName, volID)
+	pv.Spec.MountOptions = mountOptions
+	return pv
+}
+
 func makeTestPV(name string, sizeGig int, driverName, volID string) *api.PersistentVolume {
 	return &api.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{

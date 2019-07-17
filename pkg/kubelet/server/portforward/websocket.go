@@ -113,7 +113,7 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
-	_, streams, err := conn.Open(httplog.Unlogged(w), req)
+	_, streams, err := conn.Open(httplog.Unlogged(req, w), req)
 	if err != nil {
 		err = fmt.Errorf("Unable to upgrade websocket connection: %v", err)
 		return err

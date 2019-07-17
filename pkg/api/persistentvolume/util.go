@@ -28,6 +28,23 @@ func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Persist
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeModeInUse(oldPVSpec) {
 		pvSpec.VolumeMode = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) && !hasExpansionSecrets(oldPVSpec) {
+		if pvSpec.CSI != nil {
+			pvSpec.CSI.ControllerExpandSecretRef = nil
+		}
+	}
+}
+
+func hasExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
+	if oldPVSpec == nil || oldPVSpec.CSI == nil {
+		return false
+	}
+
+	if oldPVSpec.CSI.ControllerExpandSecretRef != nil {
+		return true
+	}
+	return false
 }
 
 func volumeModeInUse(oldPVSpec *api.PersistentVolumeSpec) bool {

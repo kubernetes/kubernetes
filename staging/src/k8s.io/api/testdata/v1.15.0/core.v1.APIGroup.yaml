@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: APIGroup
+name: "2"
+preferredVersion:
+  groupVersion: "5"
+  version: "6"
+serverAddressByClientCIDRs:
+- clientCIDR: "7"
+  serverAddress: "8"
+versions:
+- groupVersion: "3"
+  version: "4"

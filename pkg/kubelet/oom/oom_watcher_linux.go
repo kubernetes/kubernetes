@@ -19,7 +19,7 @@ limitations under the License.
 package oom
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
@@ -28,23 +28,23 @@ import (
 	"github.com/google/cadvisor/utils/oomparser"
 )
 
-type realOOMWatcher struct {
+type realWatcher struct {
 	recorder record.EventRecorder
 }
 
-var _ OOMWatcher = &realOOMWatcher{}
+var _ Watcher = &realWatcher{}
 
-// NewOOMWatcher creates and initializes a OOMWatcher based on parameters.
-func NewOOMWatcher(recorder record.EventRecorder) OOMWatcher {
-	return &realOOMWatcher{
+// NewWatcher creates and initializes a OOMWatcher based on parameters.
+func NewWatcher(recorder record.EventRecorder) Watcher {
+	return &realWatcher{
 		recorder: recorder,
 	}
 }
 
 const systemOOMEvent = "SystemOOM"
 
-// Watches for system oom's and records an event for every system oom encountered.
-func (ow *realOOMWatcher) Start(ref *v1.ObjectReference) error {
+// Start watches for system oom's and records an event for every system oom encountered.
+func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
 	oomLog, err := oomparser.New()
 	if err != nil {
 		return err

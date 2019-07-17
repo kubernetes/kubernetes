@@ -24,7 +24,9 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	"k8s.io/kubernetes/pkg/features"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -108,19 +110,16 @@ func (s *simpleProvider) MutatePod(pod *api.Pod) error {
 		pod.Spec.RuntimeClassName = s.psp.Spec.RuntimeClass.DefaultRuntimeClassName
 	}
 
-	for i := range pod.Spec.InitContainers {
-		if err := s.mutateContainer(pod, &pod.Spec.InitContainers[i]); err != nil {
-			return err
+	var retErr error
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+		retErr = s.mutateContainer(pod, c)
+		if retErr != nil {
+			return false
 		}
-	}
+		return true
+	})
 
-	for i := range pod.Spec.Containers {
-		if err := s.mutateContainer(pod, &pod.Spec.Containers[i]); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return retErr
 }
 
 // mutateContainer sets the default values of the required but not filled fields.
@@ -233,6 +232,23 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 
 	allErrs = append(allErrs, s.strategies.SysctlsStrategy.Validate(pod)...)
 
+	allErrs = append(allErrs, s.validatePodVolumes(pod)...)
+
+	if s.psp.Spec.RuntimeClass != nil {
+		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
+	}
+
+	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, p *field.Path) bool {
+		allErrs = append(allErrs, s.validateContainer(pod, c, p)...)
+		return true
+	})
+
+	return allErrs
+}
+
+func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
+	allErrs := field.ErrorList{}
+
 	if len(pod.Spec.Volumes) > 0 {
 		allowsAllVolumeTypes := psputil.PSPAllowsAllVolumes(s.psp)
 		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
@@ -250,7 +266,8 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 				continue
 			}
 
-			if fsType == policy.HostPath {
+			switch fsType {
+			case policy.HostPath:
 				allows, mustBeReadOnly := psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path)
 				if !allows {
 					allErrs = append(allErrs, field.Invalid(
@@ -258,59 +275,53 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 						fmt.Sprintf("is not allowed to be used")))
 				} else if mustBeReadOnly {
 					// Ensure all the VolumeMounts that use this volume are read-only
-					for i, c := range pod.Spec.InitContainers {
-						for j, cv := range c.VolumeMounts {
+					pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, p *field.Path) bool {
+						for i, cv := range c.VolumeMounts {
 							if cv.Name == v.Name && !cv.ReadOnly {
-								allErrs = append(allErrs, field.Invalid(
-									field.NewPath("spec", "initContainers").Index(i).Child("volumeMounts").Index(j).Child("readOnly"),
-									cv.ReadOnly, "must be read-only"),
-								)
+								allErrs = append(allErrs, field.Invalid(p.Child("volumeMounts").Index(i).Child("readOnly"), cv.ReadOnly, "must be read-only"))
 							}
 						}
-					}
-					for i, c := range pod.Spec.Containers {
-						for j, cv := range c.VolumeMounts {
-							if cv.Name == v.Name && !cv.ReadOnly {
-								allErrs = append(allErrs, field.Invalid(
-									field.NewPath("spec", "containers").Index(i).Child("volumeMounts").Index(j).Child("readOnly"),
-									cv.ReadOnly, "must be read-only"),
-								)
-							}
-						}
-					}
+						return true
+					})
 				}
-			}
 
-			if fsType == policy.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
-				found := false
-				driver := v.FlexVolume.Driver
-				for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
-					if driver == allowedFlexVolume.Driver {
-						found = true
-						break
+			case policy.FlexVolume:
+				if len(s.psp.Spec.AllowedFlexVolumes) > 0 {
+					found := false
+					driver := v.FlexVolume.Driver
+					for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
+						if driver == allowedFlexVolume.Driver {
+							found = true
+							break
+						}
+					}
+					if !found {
+						allErrs = append(allErrs,
+							field.Invalid(field.NewPath("spec", "volumes").Index(i).Child("driver"), driver,
+								"Flexvolume driver is not allowed to be used"))
 					}
 				}
-				if !found {
-					allErrs = append(allErrs,
-						field.Invalid(field.NewPath("spec", "volumes").Index(i).Child("driver"), driver,
-							"Flexvolume driver is not allowed to be used"))
+
+			case policy.CSI:
+				if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+					if len(s.psp.Spec.AllowedCSIDrivers) > 0 {
+						found := false
+						driver := v.CSI.Driver
+						for _, allowedCSIDriver := range s.psp.Spec.AllowedCSIDrivers {
+							if driver == allowedCSIDriver.Name {
+								found = true
+								break
+							}
+						}
+						if !found {
+							allErrs = append(allErrs,
+								field.Invalid(field.NewPath("spec", "volumes").Index(i).Child("csi", "driver"), driver,
+									"Inline CSI driver is not allowed to be used"))
+						}
+					}
 				}
 			}
 		}
-	}
-
-	if s.psp.Spec.RuntimeClass != nil {
-		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
-	}
-
-	fldPath := field.NewPath("spec", "initContainers")
-	for i := range pod.Spec.InitContainers {
-		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.InitContainers[i], fldPath.Index(i))...)
-	}
-
-	fldPath = field.NewPath("spec", "containers")
-	for i := range pod.Spec.Containers {
-		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.Containers[i], fldPath.Index(i))...)
 	}
 
 	return allErrs

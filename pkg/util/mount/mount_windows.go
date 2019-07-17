@@ -185,7 +185,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		if err != nil {
 			return true, fmt.Errorf("readlink error: %v", err)
 		}
-		exists, err := mounter.ExistsPath(target)
+		hu := NewHostUtil()
+		exists, err := hu.ExistsPath(target)
 		if err != nil {
 			return true, err
 		}
@@ -195,90 +196,19 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// GetDeviceNameFromMount given a mnt point, find the device
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
-}
-
-// getDeviceNameFromMount find the device(drive) name in which
-// the mount path reference should match the given plugin mount directory. In case no mount path reference
-// matches, returns the volume name taken from its given mountPath
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	refs, err := mounter.GetMountRefs(mountPath)
-	if err != nil {
-		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
-		return "", err
+// GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	windowsPath := normalizeWindowsPath(pathname)
+	pathExists, pathErr := PathExists(windowsPath)
+	if !pathExists {
+		return []string{}, nil
+	} else if IsCorruptedMnt(pathErr) {
+		klog.Warningf("GetMountRefs found corrupted mount at %s, treating as unmounted path", windowsPath)
+		return []string{}, nil
+	} else if pathErr != nil {
+		return nil, fmt.Errorf("error checking path %s: %v", windowsPath, pathErr)
 	}
-	if len(refs) == 0 {
-		return "", fmt.Errorf("directory %s is not mounted", mountPath)
-	}
-	basemountPath := normalizeWindowsPath(pluginMountDir)
-	for _, ref := range refs {
-		if strings.Contains(ref, basemountPath) {
-			volumeID, err := filepath.Rel(normalizeWindowsPath(basemountPath), ref)
-			if err != nil {
-				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
-				return "", err
-			}
-			return volumeID, nil
-		}
-	}
-
-	return path.Base(mountPath), nil
-}
-
-// DeviceOpened determines if the device is in use elsewhere
-func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-
-// PathIsDevice determines if a path is a device.
-func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return false, nil
-}
-
-// MakeRShared checks that given path is on a mount with 'rshared' mount
-// propagation. Empty implementation here.
-func (mounter *Mounter) MakeRShared(path string) error {
-	return nil
-}
-
-// GetFileType checks for sockets/block/character devices
-func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	return getFileType(pathname)
-}
-
-// MakeFile creates a new directory
-func (mounter *Mounter) MakeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-// MakeFile creates an empty file
-func (mounter *Mounter) MakeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-// ExistsPath checks whether the path exists
-func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
-}
-
-// EvalHostSymlinks returns the path name after evaluating symlinks
-func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
-	return filepath.EvalSymlinks(pathname)
+	return []string{pathname}, nil
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
@@ -379,33 +309,110 @@ func getAllParentLinks(path string) ([]string, error) {
 	return links, nil
 }
 
-// GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
-func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	windowsPath := normalizeWindowsPath(pathname)
-	pathExists, pathErr := PathExists(windowsPath)
-	if !pathExists {
-		return []string{}, nil
-	} else if IsCorruptedMnt(pathErr) {
-		klog.Warningf("GetMountRefs found corrupted mount at %s, treating as unmounted path", windowsPath)
-		return []string{}, nil
-	} else if pathErr != nil {
-		return nil, fmt.Errorf("error checking path %s: %v", windowsPath, pathErr)
+type hostUtil struct{}
+
+func NewHostUtil() HostUtils {
+	return &hostUtil{}
+}
+
+// GetDeviceNameFromMount given a mnt point, find the device
+func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
+}
+
+// getDeviceNameFromMount find the device(drive) name in which
+// the mount path reference should match the given plugin mount directory. In case no mount path reference
+// matches, returns the volume name taken from its given mountPath
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	refs, err := mounter.GetMountRefs(mountPath)
+	if err != nil {
+		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		return "", err
 	}
-	return []string{pathname}, nil
+	if len(refs) == 0 {
+		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+	}
+	basemountPath := normalizeWindowsPath(pluginMountDir)
+	for _, ref := range refs {
+		if strings.Contains(ref, basemountPath) {
+			volumeID, err := filepath.Rel(normalizeWindowsPath(basemountPath), ref)
+			if err != nil {
+				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			return volumeID, nil
+		}
+	}
+
+	return path.Base(mountPath), nil
+}
+
+// DeviceOpened determines if the device is in use elsewhere
+func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+
+// PathIsDevice determines if a path is a device.
+func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+	return false, nil
+}
+
+// MakeRShared checks that given path is on a mount with 'rshared' mount
+// propagation. Empty implementation here.
+func (hu *hostUtil) MakeRShared(path string) error {
+	return nil
+}
+
+// GetFileType checks for sockets/block/character devices
+func (hu *(hostUtil)) GetFileType(pathname string) (FileType, error) {
+	return getFileType(pathname)
+}
+
+// MakeFile creates a new directory
+func (hu *hostUtil) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// MakeFile creates an empty file
+func (hu *hostUtil) MakeFile(pathname string) error {
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// ExistsPath checks whether the path exists
+func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
+}
+
+// EvalHostSymlinks returns the path name after evaluating symlinks
+func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return filepath.EvalSymlinks(pathname)
 }
 
 // Note that on windows, it always returns 0. We actually don't set FSGroup on
 // windows platform, see SetVolumeOwnership implementation.
-func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
 	return 0, nil
 }
 
-func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	// Windows does not support SELinux.
 	return false, nil
 }
 
-func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {
 		return 0, err

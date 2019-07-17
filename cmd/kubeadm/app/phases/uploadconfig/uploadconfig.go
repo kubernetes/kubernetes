@@ -29,7 +29,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 const (
@@ -101,6 +100,10 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
 		},
 	}, func(cm *v1.ConfigMap) error {
+		// Upgrade will call to UploadConfiguration with a modified KubernetesVersion reflecting the new
+		// Kubernetes version. In that case, the mutation path will take place.
+		cm.Data[kubeadmconstants.ClusterConfigurationConfigMapKey] = string(clusterConfigurationYaml)
+		// Mutate the ClusterStatus now
 		return mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
 			// Handle a nil APIEndpoints map. Should only happen if someone manually
 			// interacted with the ConfigMap.
@@ -123,7 +126,12 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeadmConfigConfigMap).RuleOrDie(),
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{""},
+				Resources:     []string{"configmaps"},
+				ResourceNames: []string{kubeadmconstants.KubeadmConfigConfigMap},
+			},
 		},
 	})
 	if err != nil {

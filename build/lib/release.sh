@@ -115,7 +115,7 @@ function kube::release::package_src_tarball() {
           \) -prune \
         \))
     )
-    "${TAR}" czf "${src_tarball}" -C "${KUBE_ROOT}" "${source_files[@]}"
+    "${TAR}" czf "${src_tarball}" --transform 's|^\.|kubernetes|' -C "${KUBE_ROOT}" "${source_files[@]}"
   fi
 }
 
@@ -357,17 +357,7 @@ function kube::release::create_docker_images_for_server() {
       local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
-      local docker_image_tag="${docker_registry}"
-      if [[ ${arch} == "amd64" ]]; then
-        # If we are building a amd64 docker image, preserve the original
-        # image name
-        docker_image_tag+="/${binary_name}:${docker_tag}"
-      else
-        # If we are building a docker image for another architecture,
-        # append the arch in the image tag
-        docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-      fi
-
+      local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
@@ -393,26 +383,21 @@ EOF
             docker_build_opts+=("--pull")
         fi
         "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
+        # If we are building an official/alpha/beta release we want to keep
+        # docker images and tag them appropriately.
+        local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
+        if [[ "${release_docker_image_tag}" != "${docker_image_tag}" ]]; then
+          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
+          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+        fi
+        "${DOCKER[@]}" save -o "${binary_dir}/${binary_name}.tar" "${docker_image_tag}" ${release_docker_image_tag}
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
-        # If we are building an official/alpha/beta release we want to keep
-        # docker images and tag them appropriately.
-        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-          local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-          # Only rmi and tag if name is different
-          if [[ $docker_image_tag != $release_docker_image_tag ]]; then
-            kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-            "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
-            "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
-          fi
-        else
-          # not a release
-          kube::log::status "Deleting docker image ${docker_image_tag}"
-          "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-        fi
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
       ) &
     done
 

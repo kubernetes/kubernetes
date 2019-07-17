@@ -24,7 +24,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -54,7 +57,7 @@ func TestKMSPluginLateStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer f.server.Stop()
+	defer f.Stop()
 
 	data := []byte("test data")
 	_, err = service.Encrypt(data)
@@ -140,7 +143,7 @@ func TestTimeouts(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to start test KMS provider server, error: %v", err)
 				}
-				defer f.server.Stop()
+				defer f.Stop()
 				kmsPluginWG.Done()
 				// Keeping plugin up to process requests.
 				testCompletedWG.Wait()
@@ -195,7 +198,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 
 	// Stop KMS Plugin - simulating connection loss
 	t.Log("KMS Plugin is stopping")
-	f.server.Stop()
+	f.Stop()
 	time.Sleep(2 * time.Second)
 
 	wg1.Add(1)
@@ -218,7 +221,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer f.server.Stop()
+	defer f.Stop()
 	t.Log("Restarted KMS Plugin")
 
 	wg2.Wait()
@@ -235,7 +238,7 @@ func TestUnsupportedVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %ver", err)
 	}
-	defer f.server.Stop()
+	defer f.Stop()
 
 	s, err := NewGRPCService(endpoint, 1*time.Second)
 	if err != nil {
@@ -273,7 +276,7 @@ func TestGRPCService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer f.server.Stop()
+	defer f.Stop()
 
 	// Create the gRPC client service.
 	service, err := NewGRPCService(endpoint, 1*time.Second)
@@ -309,7 +312,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer f.server.Stop()
+	defer f.Stop()
 
 	// Create the gRPC client service.
 	service, err := NewGRPCService(endpoint, 15*time.Second)
@@ -365,7 +368,7 @@ func TestInvalidConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer f.server.Stop()
+	defer f.Stop()
 
 	invalidConfigs := []struct {
 		name       string
@@ -399,7 +402,7 @@ func startFakeKMSProvider(version, endpoint string) (*fakeKMSPlugin, error) {
 	}
 
 	s := grpc.NewServer()
-	f := &fakeKMSPlugin{apiVersion: version, server: s}
+	f := &fakeKMSPlugin{apiVersion: version, server: s, sockFile: sockFile}
 	kmsapi.RegisterKeyManagementServiceServer(s, f)
 	go s.Serve(listener)
 	return f, nil
@@ -410,6 +413,16 @@ func startFakeKMSProvider(version, endpoint string) (*fakeKMSPlugin, error) {
 type fakeKMSPlugin struct {
 	apiVersion string
 	server     *grpc.Server
+	sockFile   string
+}
+
+func (s *fakeKMSPlugin) Stop() {
+	// Stop the server
+	s.server.Stop()
+	// If this isn't a Linux abstract namespace socket, or if we're on a non-linux platform, clean up the socket file
+	if !strings.HasPrefix(s.sockFile, "@") || runtime.GOOS != "linux" {
+		os.Remove(s.sockFile)
+	}
 }
 
 func (s *fakeKMSPlugin) Version(ctx context.Context, request *kmsapi.VersionRequest) (*kmsapi.VersionResponse, error) {

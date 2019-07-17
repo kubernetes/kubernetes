@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"k8s.io/utils/pointer"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,9 +32,10 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 const (
@@ -90,10 +92,12 @@ func newRemoteAPIService(name string) *apiregistration.APIService {
 	return &apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: apiregistration.APIServiceSpec{
+			Group:   strings.SplitN(name, ".", 2)[0],
+			Version: strings.SplitN(name, ".", 2)[1],
 			Service: &apiregistration.ServiceReference{
 				Namespace: "foo",
 				Name:      "bar",
-				Port:      testServicePort,
+				Port:      pointer.Int32Ptr(testServicePort),
 			},
 		},
 	}
@@ -247,7 +251,7 @@ func TestSync(t *testing.T) {
 			defer testServer.Close()
 
 			c := AvailableConditionController{
-				apiServiceClient: fakeClient.Apiregistration(),
+				apiServiceClient: fakeClient.ApiregistrationV1(),
 				apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
 				serviceLister:    v1listers.NewServiceLister(serviceIndexer),
 				endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
@@ -302,13 +306,13 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
 
 	fakeClient := fake.NewSimpleClientset()
-	updateAPIServiceStatus(fakeClient.Apiregistration(), foo, foo)
+	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
-	updateAPIServiceStatus(fakeClient.Apiregistration(), foo, bar)
+	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}

@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "bootstraptokenstring.go",
+        "conversion.go",
         "defaults.go",
         "defaults_unix.go",
         "defaults_windows.go",

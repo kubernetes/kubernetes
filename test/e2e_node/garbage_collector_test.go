@@ -144,7 +144,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	BeforeEach(func() {
 		var err error
 		runtime, _, err = getCRIClient()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use CRI runtime client.

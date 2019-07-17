@@ -29,8 +29,6 @@ import (
 func Test_getProxyMode(t *testing.T) {
 	var cases = []struct {
 		flag            string
-		annotationKey   string
-		annotationVal   string
 		iptablesVersion string
 		ipsetVersion    string
 		kmods           []string

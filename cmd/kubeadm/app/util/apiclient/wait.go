@@ -30,7 +30,6 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -77,7 +76,7 @@ func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
 func (w *KubeWaiter) WaitForAPI() error {
 	start := time.Now()
-	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		healthStatus := 0
 		w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
 		if healthStatus != http.StatusOK {
@@ -94,7 +93,7 @@ func (w *KubeWaiter) WaitForAPI() error {
 func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 
 	lastKnownPodNumber := -1
-	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		listOpts := metav1.ListOptions{LabelSelector: kvLabel}
 		pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
 		if err != nil {
@@ -123,7 +122,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 
 // WaitForPodToDisappear blocks until it timeouts or gets a "NotFound" response from the API Server when getting the Static Pod in question
 func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
-	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
@@ -187,8 +186,8 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 	componentHash := ""
 	var err error
 	mirrorPodHashes := map[string]string{}
-	for _, component := range constants.ControlPlaneComponents {
-		err = wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	for _, component := range kubeadmconstants.ControlPlaneComponents {
+		err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 			componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 			if err != nil {
 				return false, nil
@@ -209,7 +208,7 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 
 	componentPodHash := ""
 	var err error
-	err = wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {
 			return false, nil
@@ -223,7 +222,7 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 // WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
-	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 
 		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {

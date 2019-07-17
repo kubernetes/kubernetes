@@ -136,8 +136,8 @@ func (ds *dockerService) updateCreateConfig(
 	return nil
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
-	return ""
+func (ds *dockerService) determinePodIPBySandboxID(uid string) []string {
+	return nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {

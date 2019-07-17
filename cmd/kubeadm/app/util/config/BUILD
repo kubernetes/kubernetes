@@ -23,6 +23,7 @@ go_library(
         "//cmd/kubeadm/app/componentconfigs:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config/strict:go_default_library",
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//pkg/util/node:go_default_library",

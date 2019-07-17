@@ -188,6 +188,16 @@ func (s CPUSet) ToSlice() []int {
 	return result
 }
 
+// ToSliceNoSort returns a slice of integers that contains all elements from
+// this set.
+func (s CPUSet) ToSliceNoSort() []int {
+	result := []int{}
+	for cpu := range s.elems {
+		result = append(result, cpu)
+	}
+	return result
+}
+
 // String returns a new string representation of the elements in this CPU set
 // in canonical linux CPU list format.
 //

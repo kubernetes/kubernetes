@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/utils/nsenter"
 )
 
@@ -74,8 +75,9 @@ func TestParseFindMnt(t *testing.T) {
 	}
 }
 
-func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *Mounter, rootfsPath string, varlibPath string, err error) {
-	rootfsPath = filepath.Join(tmpdir, "rootfs")
+func newFakeNsenterHostUtil(tmpdir string, t *testing.T) (mount.HostUtils, string, string, error) {
+	rootfsPath := filepath.Join(tmpdir, "rootfs")
+
 	if err := os.Mkdir(rootfsPath, 0755); err != nil {
 		return nil, "", "", err
 	}
@@ -84,12 +86,14 @@ func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *Mounter, rootf
 		return nil, "", "", err
 	}
 
-	varlibPath = filepath.Join(tmpdir, "/var/lib/kubelet")
+	varlibPath := filepath.Join(tmpdir, "var/lib/kubelet")
 	if err := os.MkdirAll(varlibPath, 0755); err != nil {
 		return nil, "", "", err
 	}
 
-	return NewMounter(varlibPath, ne), rootfsPath, varlibPath, nil
+	hu := NewHostUtil(ne, varlibPath)
+
+	return hu, rootfsPath, varlibPath, nil
 }
 
 func TestNsenterExistsFile(t *testing.T) {
@@ -262,7 +266,7 @@ func TestNsenterExistsFile(t *testing.T) {
 			continue
 		}
 
-		mounter, rootfs, _, err := newFakeNsenterMounter(tmpdir, t)
+		hu, rootfs, _, err := newFakeNsenterHostUtil(tmpdir, t)
 		if err != nil {
 			t.Error(err)
 			continue
@@ -274,7 +278,7 @@ func TestNsenterExistsFile(t *testing.T) {
 			continue
 		}
 
-		out, err := mounter.ExistsPath(path)
+		out, err := hu.ExistsPath(path)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error: %s", test.name, err)
 		}
@@ -387,7 +391,7 @@ func TestNsenterGetMode(t *testing.T) {
 			continue
 		}
 
-		mounter, rootfs, _, err := newFakeNsenterMounter(tmpdir, t)
+		hu, rootfs, _, err := newFakeNsenterHostUtil(tmpdir, t)
 		if err != nil {
 			t.Error(err)
 			continue
@@ -399,7 +403,7 @@ func TestNsenterGetMode(t *testing.T) {
 			continue
 		}
 
-		mode, err := mounter.GetMode(path)
+		mode, err := hu.GetMode(path)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error: %s", test.name, err)
 		}

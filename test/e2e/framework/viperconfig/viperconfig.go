@@ -25,12 +25,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	viperFileNotFound = "Unsupported Config Type \"\""
-)
-
-// ViperizeFlags checks whether a configuration file was specified, reads it, and updates
-// the configuration variables accordingly. Must be called after framework.HandleFlags()
+// ViperizeFlags checks whether a configuration file was specified,
+// reads it, and updates the configuration variables in the specified
+// flag set accordingly. Must be called after framework.HandleFlags()
 // and before framework.AfterReadingAllFlags().
 //
 // The logic is so that a required configuration file must be present. If empty,
@@ -38,7 +35,7 @@ const (
 //
 // Files can be specified with just a base name ("e2e", matches "e2e.json/yaml/..." in
 // the current directory) or with path and suffix.
-func ViperizeFlags(requiredConfig, optionalConfig string) error {
+func ViperizeFlags(requiredConfig, optionalConfig string, flags *flag.FlagSet) error {
 	viperConfig := optionalConfig
 	required := false
 	if requiredConfig != "" {
@@ -68,7 +65,7 @@ func ViperizeFlags(requiredConfig, optionalConfig string) error {
 		// of file suffices. Therefore try once more without
 		// suffix.
 		ext := filepath.Ext(viperConfig)
-		if ext != "" && err.Error() == viperFileNotFound {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok && ext != "" {
 			viper.SetConfigName(filepath.Base(viperConfig[0 : len(viperConfig)-len(ext)]))
 			err = viper.ReadInConfig()
 		}
@@ -78,10 +75,16 @@ func ViperizeFlags(requiredConfig, optionalConfig string) error {
 			// "file not found". Unfortunately error
 			// messages are sometimes hard to understand,
 			// so try to help the user a bit.
-			switch err.Error() {
-			case viperFileNotFound:
+			switch err.(type) {
+			case viper.ConfigFileNotFoundError:
 				if required {
-					return wrapError(errors.New("not found or not using a supported file format"))
+					return wrapError(errors.New("not found"))
+				}
+				// Proceed without config.
+				return nil
+			case viper.UnsupportedConfigError:
+				if required {
+					return wrapError(errors.New("not using a supported file format"))
 				}
 				// Proceed without config.
 				return nil
@@ -97,24 +100,24 @@ func ViperizeFlags(requiredConfig, optionalConfig string) error {
 	// something like viper.Unmarshal(&TestContext) because we
 	// want to support all values, regardless where they are
 	// stored.
-	return wrapError(viperUnmarshal())
+	return wrapError(viperUnmarshal(flags))
 }
 
-// viperUnmarshall updates all command line flags with the corresponding values found
+// viperUnmarshall updates all flags with the corresponding values found
 // via Viper, regardless whether the flag value is stored in TestContext, some other
 // context or a local variable.
-func viperUnmarshal() error {
+func viperUnmarshal(flags *flag.FlagSet) error {
 	var result error
 	set := make(map[string]bool)
 
 	// Determine which values were already set explicitly via
 	// flags. Those we don't overwrite because command line
 	// flags have a higher priority.
-	flag.Visit(func(f *flag.Flag) {
+	flags.Visit(func(f *flag.Flag) {
 		set[f.Name] = true
 	})
 
-	flag.VisitAll(func(f *flag.Flag) {
+	flags.VisitAll(func(f *flag.Flag) {
 		if result != nil ||
 			set[f.Name] ||
 			!viper.IsSet(f.Name) {

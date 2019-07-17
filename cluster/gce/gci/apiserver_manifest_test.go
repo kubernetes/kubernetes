@@ -49,6 +49,7 @@ readonly APISERVER_SERVER_KEY_PATH=/foo/bar
 readonly APISERVER_CLIENT_CERT_PATH=/foo/bar
 readonly CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
 readonly CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
+readonly INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
 readonly DOCKER_REGISTRY="k8s.gcr.io"
 readonly ENABLE_LEGACY_ABAC=false
 readonly ETC_MANIFESTS=${KUBE_HOME}/etc/kubernetes/manifests
@@ -93,12 +94,11 @@ func (c *kubeAPIServerManifestTestCase) invokeTest(e kubeAPIServerEnv, kubeEnv s
 
 func TestEncryptionProviderFlag(t *testing.T) {
 	var (
-		//  command": [
-		//   "/usr/local/bin/kube-apiserver " - Index 0,
-		//   "--flag1=val1",   - Index 1,
-		//   "--flag2=val2",   - Index 2,
-		//   ...
-		//   "--flagN=valN",   - Index N,
+		//	command": [
+		//   "/bin/sh", - Index 0
+		//   "-c",      - Index 1
+		//   "exec /usr/local/bin/kube-apiserver " - Index 2
+		execArgsIndex        = 2
 		encryptionConfigFlag = "--encryption-provider-config"
 	)
 
@@ -132,15 +132,10 @@ func TestEncryptionProviderFlag(t *testing.T) {
 
 			c.invokeTest(e, deployHelperEnv)
 
-			var flagIsInArg bool
-			var flag, execArgs string
-			for _, execArgs = range c.pod.Spec.Containers[0].Args[1:] {
-				if strings.Contains(execArgs, encryptionConfigFlag) {
-					flagIsInArg = true
-					flag = fmt.Sprintf("%s=%s", encryptionConfigFlag, e.EncryptionProviderConfigPath)
-					break
-				}
-			}
+			execArgs := c.pod.Spec.Containers[0].Command[execArgsIndex]
+			flagIsInArg := strings.Contains(execArgs, encryptionConfigFlag)
+			flag := fmt.Sprintf("%s=%s", encryptionConfigFlag, e.EncryptionProviderConfigPath)
+
 			switch {
 			case tc.wantFlag && !flagIsInArg:
 				t.Fatalf("Got %q,\n want flags to contain %q", execArgs, flag)

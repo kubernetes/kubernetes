@@ -33,15 +33,23 @@ import (
 )
 
 const (
+	// IPv4ZeroCIDR is the CIDR block for the whole IPv4 address space
 	IPv4ZeroCIDR = "0.0.0.0/0"
+
+	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
 )
 
 var (
+	// ErrAddressNotAllowed indicates the address is not allowed
 	ErrAddressNotAllowed = errors.New("address not allowed")
-	ErrNoAddresses       = errors.New("No addresses for hostname")
+
+	// ErrNoAddresses indicates there are no addresses for the hostname
+	ErrNoAddresses = errors.New("No addresses for hostname")
 )
 
+// IsZeroCIDR checks whether the input CIDR string is either
+// the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
 	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
 		return true
@@ -89,6 +97,8 @@ func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) 
 	return nil
 }
 
+// IsLocalIP checks if a given IP address is bound to an interface
+// on the local system
 func IsLocalIP(ip string) (bool, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -106,6 +116,7 @@ func IsLocalIP(ip string) (bool, error) {
 	return false, nil
 }
 
+// ShouldSkipService checks if a given service should skip proxying
 func ShouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {

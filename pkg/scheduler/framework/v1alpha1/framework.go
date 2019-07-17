@@ -17,55 +17,287 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {
-	registry         Registry
-	nodeInfoSnapshot *cache.NodeInfoSnapshot
-	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
-	reservePlugins   []ReservePlugin
-	prebindPlugins   []PrebindPlugin
+	registry              Registry
+	nodeInfoSnapshot      *cache.NodeInfoSnapshot
+	waitingPods           *waitingPodsMap
+	pluginNameToWeightMap map[string]int
+	queueSortPlugins      []QueueSortPlugin
+	prefilterPlugins      []PrefilterPlugin
+	scorePlugins          []ScorePlugin
+	reservePlugins        []ReservePlugin
+	prebindPlugins        []PrebindPlugin
+	bindPlugins           []BindPlugin
+	postbindPlugins       []PostbindPlugin
+	unreservePlugins      []UnreservePlugin
+	permitPlugins         []PermitPlugin
 }
+
+const (
+	// Specifies the maximum timeout a permit plugin can return.
+	maxTimeout time.Duration = 15 * time.Minute
+)
 
 var _ = Framework(&framework{})
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, _ *runtime.Unknown) (Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
 	f := &framework{
-		registry:         r,
-		nodeInfoSnapshot: cache.NewNodeInfoSnapshot(),
-		plugins:          make(map[string]Plugin),
+		registry:              r,
+		nodeInfoSnapshot:      cache.NewNodeInfoSnapshot(),
+		pluginNameToWeightMap: make(map[string]int),
+		waitingPods:           newWaitingPodsMap(),
+	}
+	if plugins == nil {
+		return f, nil
 	}
 
-	// TODO: The framework needs to read the scheduler config and initialize only
-	// needed plugins. In this initial version of the code, we initialize all.
+	// get needed plugins from config
+	pg := pluginsNeeded(plugins)
+	if len(pg) == 0 {
+		return f, nil
+	}
+
+	pluginConfig := pluginNameToConfig(args)
+	pluginsMap := make(map[string]Plugin)
 	for name, factory := range r {
-		// TODO: 'nil' should be replaced by plugin config.
-		p, err := factory(nil, f)
+		// initialize only needed plugins
+		if _, ok := pg[name]; !ok {
+			continue
+		}
+
+		// find the config args of a plugin
+		pc := pluginConfig[name]
+
+		p, err := factory(pc, f)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing plugin %v: %v", name, err)
 		}
-		f.plugins[name] = p
+		pluginsMap[name] = p
 
-		// TODO: For now, we assume any plugins that implements an extension
-		// point wants to be called at that extension point. We should change this
-		// later and add these plugins based on the configuration.
-		if rp, ok := p.(ReservePlugin); ok {
-			f.reservePlugins = append(f.reservePlugins, rp)
-		}
-		if pp, ok := p.(PrebindPlugin); ok {
-			f.prebindPlugins = append(f.prebindPlugins, pp)
+		// A weight of zero is not permitted, plugins can be disabled explicitly
+		// when configured.
+		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
+		if f.pluginNameToWeightMap[name] == 0 {
+			f.pluginNameToWeightMap[name] = 1
 		}
 	}
+
+	if plugins.PreFilter != nil {
+		for _, pf := range plugins.PreFilter.Enabled {
+			if pg, ok := pluginsMap[pf.Name]; ok {
+				p, ok := pg.(PrefilterPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend prefilter plugin", pf.Name)
+				}
+				f.prefilterPlugins = append(f.prefilterPlugins, p)
+			} else {
+				return nil, fmt.Errorf("prefilter plugin %v does not exist", pf.Name)
+			}
+		}
+	}
+
+	if plugins.Score != nil {
+		for _, sc := range plugins.Score.Enabled {
+			if pg, ok := pluginsMap[sc.Name]; ok {
+				p, ok := pg.(ScorePlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend score plugin", sc.Name)
+				}
+				f.scorePlugins = append(f.scorePlugins, p)
+			} else {
+				return nil, fmt.Errorf("score plugin %v does not exist", sc.Name)
+			}
+		}
+	}
+
+	if plugins.Reserve != nil {
+		for _, r := range plugins.Reserve.Enabled {
+			if pg, ok := pluginsMap[r.Name]; ok {
+				p, ok := pg.(ReservePlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend reserve plugin", r.Name)
+				}
+				f.reservePlugins = append(f.reservePlugins, p)
+			} else {
+				return nil, fmt.Errorf("reserve plugin %v does not exist", r.Name)
+			}
+		}
+	}
+
+	if plugins.PreBind != nil {
+		for _, pb := range plugins.PreBind.Enabled {
+			if pg, ok := pluginsMap[pb.Name]; ok {
+				p, ok := pg.(PrebindPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend prebind plugin", pb.Name)
+				}
+				f.prebindPlugins = append(f.prebindPlugins, p)
+			} else {
+				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
+			}
+		}
+	}
+
+	if plugins.Bind != nil {
+		for _, pb := range plugins.Bind.Enabled {
+			if pg, ok := pluginsMap[pb.Name]; ok {
+				p, ok := pg.(BindPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend bind plugin", pb.Name)
+				}
+				f.bindPlugins = append(f.bindPlugins, p)
+			} else {
+				return nil, fmt.Errorf("bind plugin %v does not exist", pb.Name)
+			}
+		}
+	}
+
+	if plugins.PostBind != nil {
+		for _, pb := range plugins.PostBind.Enabled {
+			if pg, ok := pluginsMap[pb.Name]; ok {
+				p, ok := pg.(PostbindPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend postbind plugin", pb.Name)
+				}
+				f.postbindPlugins = append(f.postbindPlugins, p)
+			} else {
+				return nil, fmt.Errorf("postbind plugin %v does not exist", pb.Name)
+			}
+		}
+	}
+
+	if plugins.Unreserve != nil {
+		for _, ur := range plugins.Unreserve.Enabled {
+			if pg, ok := pluginsMap[ur.Name]; ok {
+				p, ok := pg.(UnreservePlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend unreserve plugin", ur.Name)
+				}
+				f.unreservePlugins = append(f.unreservePlugins, p)
+			} else {
+				return nil, fmt.Errorf("unreserve plugin %v does not exist", ur.Name)
+			}
+		}
+	}
+
+	if plugins.Permit != nil {
+		for _, pr := range plugins.Permit.Enabled {
+			if pg, ok := pluginsMap[pr.Name]; ok {
+				p, ok := pg.(PermitPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend permit plugin", pr.Name)
+				}
+				f.permitPlugins = append(f.permitPlugins, p)
+			} else {
+				return nil, fmt.Errorf("permit plugin %v does not exist", pr.Name)
+			}
+		}
+	}
+
+	if plugins.QueueSort != nil {
+		for _, qs := range plugins.QueueSort.Enabled {
+			if pg, ok := pluginsMap[qs.Name]; ok {
+				p, ok := pg.(QueueSortPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend queue sort plugin", qs.Name)
+				}
+				f.queueSortPlugins = append(f.queueSortPlugins, p)
+				if len(f.queueSortPlugins) > 1 {
+					return nil, fmt.Errorf("only one queue sort plugin can be enabled")
+				}
+			} else {
+				return nil, fmt.Errorf("queue sort plugin %v does not exist", qs.Name)
+			}
+		}
+	}
+
 	return f, nil
+}
+
+// QueueSortFunc returns the function to sort pods in scheduling queue
+func (f *framework) QueueSortFunc() LessFunc {
+	if len(f.queueSortPlugins) == 0 {
+		return nil
+	}
+
+	// Only one QueueSort plugin can be enabled.
+	return f.queueSortPlugins[0].Less
+}
+
+// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+// *Status and its code is set to non-success if any of the plugins returns
+// anything but Success. If a non-success status is returned, then the scheduling
+// cycle is aborted.
+func (f *framework) RunPrefilterPlugins(
+	pc *PluginContext, pod *v1.Pod) *Status {
+	for _, pl := range f.prefilterPlugins {
+		status := pl.Prefilter(pc, pod)
+		if !status.IsSuccess() {
+			if status.Code() == Unschedulable {
+				msg := fmt.Sprintf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
+				klog.V(4).Infof(msg)
+				return NewStatus(status.Code(), msg)
+			}
+			msg := fmt.Sprintf("error while running %v prefilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
+		}
+	}
+	return nil
+}
+
+// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
+// stores for each scoring plugin name the corresponding NodeScoreList(s).
+// It also returns *Status, which is set to non-success if any of the plugins returns
+// a non-success status.
+func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status) {
+	pluginToNodeScoreMap := make(PluginToNodeScoreMap, len(f.scorePlugins))
+	for _, pl := range f.scorePlugins {
+		pluginToNodeScoreMap[pl.Name()] = make(NodeScoreList, len(nodes))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := schedutil.NewErrorChannel()
+	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
+		for _, pl := range f.scorePlugins {
+			weight, weightExists := f.pluginNameToWeightMap[pl.Name()]
+			if !weightExists {
+				err := fmt.Errorf("weight does not exist for plugin %v", pl.Name())
+				errCh.SendErrorWithCancel(err, cancel)
+				return
+			}
+			score, status := pl.Score(pc, pod, nodes[index].Name)
+			if !status.IsSuccess() {
+				errCh.SendErrorWithCancel(fmt.Errorf(status.Message()), cancel)
+				return
+			}
+			pluginToNodeScoreMap[pl.Name()][index] = score * weight
+		}
+	})
+
+	if err := errCh.ReceiveError(); err != nil {
+		msg := fmt.Sprintf("error while running score plugin for pod %v: %v", pod.Name, err)
+		klog.Error(msg)
+		return nil, NewStatus(Error, msg)
+	}
+
+	return pluginToNodeScoreMap, nil
 }
 
 // RunPrebindPlugins runs the set of configured prebind plugins. It returns a
@@ -89,6 +321,35 @@ func (f *framework) RunPrebindPlugins(
 	return nil
 }
 
+// RunBindPlugins runs the set of configured bind plugins until one returns a non `Skip` status.
+func (f *framework) RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
+	if len(f.bindPlugins) == 0 {
+		return NewStatus(Skip, "")
+	}
+	var status *Status
+	for _, bp := range f.bindPlugins {
+		status = bp.Bind(pc, pod, nodeName)
+		if status != nil && status.Code() == Skip {
+			continue
+		}
+		if !status.IsSuccess() {
+			msg := fmt.Sprintf("bind plugin %v failed to bind pod %v/%v: %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
+		}
+		return status
+	}
+	return status
+}
+
+// RunPostbindPlugins runs the set of configured postbind plugins.
+func (f *framework) RunPostbindPlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) {
+	for _, pl := range f.postbindPlugins {
+		pl.Postbind(pc, pod, nodeName)
+	}
+}
+
 // RunReservePlugins runs the set of configured reserve plugins. If any of these
 // plugins returns an error, it does not continue running the remaining ones and
 // returns the error. In such case, pod will not be scheduled.
@@ -105,10 +366,130 @@ func (f *framework) RunReservePlugins(
 	return nil
 }
 
+// RunUnreservePlugins runs the set of configured unreserve plugins.
+func (f *framework) RunUnreservePlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) {
+	for _, pl := range f.unreservePlugins {
+		pl.Unreserve(pc, pod, nodeName)
+	}
+}
+
+// RunPermitPlugins runs the set of configured permit plugins. If any of these
+// plugins returns a status other than "Success" or "Wait", it does not continue
+// running the remaining plugins and returns an error. Otherwise, if any of the
+// plugins returns "Wait", then this function will block for the timeout period
+// returned by the plugin, if the time expires, then it will return an error.
+// Note that if multiple plugins asked to wait, then we wait for the minimum
+// timeout duration.
+func (f *framework) RunPermitPlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
+	timeout := maxTimeout
+	statusCode := Success
+	for _, pl := range f.permitPlugins {
+		status, d := pl.Permit(pc, pod, nodeName)
+		if !status.IsSuccess() {
+			if status.Code() == Unschedulable {
+				msg := fmt.Sprintf("rejected by %v at permit: %v", pl.Name(), status.Message())
+				klog.V(4).Infof(msg)
+				return NewStatus(status.Code(), msg)
+			}
+			if status.Code() == Wait {
+				// Use the minimum timeout duration.
+				if timeout > d {
+					timeout = d
+				}
+				statusCode = Wait
+			} else {
+				msg := fmt.Sprintf("error while running %v permit plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+				klog.Error(msg)
+				return NewStatus(Error, msg)
+			}
+		}
+	}
+
+	// We now wait for the minimum duration if at least one plugin asked to
+	// wait (and no plugin rejected the pod)
+	if statusCode == Wait {
+		w := newWaitingPod(pod)
+		f.waitingPods.add(w)
+		defer f.waitingPods.remove(pod.UID)
+		timer := time.NewTimer(timeout)
+		klog.V(4).Infof("waiting for %v for pod %v at permit", timeout, pod.Name)
+		select {
+		case <-timer.C:
+			msg := fmt.Sprintf("pod %v rejected due to timeout after waiting %v at permit", pod.Name, timeout)
+			klog.V(4).Infof(msg)
+			return NewStatus(Unschedulable, msg)
+		case s := <-w.s:
+			if !s.IsSuccess() {
+				if s.Code() == Unschedulable {
+					msg := fmt.Sprintf("rejected while waiting at permit: %v", s.Message())
+					klog.V(4).Infof(msg)
+					return NewStatus(s.Code(), msg)
+				}
+				msg := fmt.Sprintf("error received while waiting at permit for pod %v: %v", pod.Name, s.Message())
+				klog.Error(msg)
+				return NewStatus(Error, msg)
+			}
+		}
+	}
+
+	return nil
+}
+
 // NodeInfoSnapshot returns the latest NodeInfo snapshot. The snapshot
 // is taken at the beginning of a scheduling cycle and remains unchanged until a
 // pod finishes "Reserve". There is no guarantee that the information remains
 // unchanged after "Reserve".
 func (f *framework) NodeInfoSnapshot() *cache.NodeInfoSnapshot {
 	return f.nodeInfoSnapshot
+}
+
+// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
+func (f *framework) IterateOverWaitingPods(callback func(WaitingPod)) {
+	f.waitingPods.iterate(callback)
+}
+
+// GetWaitingPod returns a reference to a WaitingPod given its UID.
+func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
+	return f.waitingPods.get(uid)
+}
+
+func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {
+	pc := make(map[string]*runtime.Unknown, 0)
+	for _, p := range args {
+		pc[p.Name] = &p.Args
+	}
+	return pc
+}
+
+func pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
+	pgMap := make(map[string]config.Plugin, 0)
+
+	if plugins == nil {
+		return pgMap
+	}
+
+	find := func(pgs *config.PluginSet) {
+		if pgs == nil {
+			return
+		}
+		for _, pg := range pgs.Enabled {
+			pgMap[pg.Name] = pg
+		}
+	}
+	find(plugins.QueueSort)
+	find(plugins.PreFilter)
+	find(plugins.Filter)
+	find(plugins.PostFilter)
+	find(plugins.Score)
+	find(plugins.NormalizeScore)
+	find(plugins.Reserve)
+	find(plugins.Permit)
+	find(plugins.PreBind)
+	find(plugins.Bind)
+	find(plugins.PostBind)
+	find(plugins.Unreserve)
+
+	return pgMap
 }

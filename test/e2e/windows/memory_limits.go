@@ -97,7 +97,7 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
 
 	// sanity check against stated allocatable
-	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0))
+	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
@@ -187,7 +187,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList.Size()).NotTo(gomega.Equal(0))
+	framework.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 
@@ -277,7 +277,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 	output := string(buf[:n])
 	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 	match := proxyRegexp.FindStringSubmatch(output)
-	gomega.Expect(len(match)).To(gomega.Equal(2))
+	framework.ExpectEqual(len(match), 2)
 	port, err := strconv.Atoi(match[1])
 	framework.ExpectNoError(err)
 	ginkgo.By("http requesting node kubelet /configz")

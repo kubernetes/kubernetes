@@ -328,7 +328,7 @@ func TestValidateLogOptions(t *testing.T) {
 				return o
 			},
 			args:     []string{"foo"},
-			expected: "must be greater than or equal to 0",
+			expected: "--tail must be greater than or equal to -1",
 		},
 		{
 			name: "container name combined with --all-containers",

@@ -37,11 +37,79 @@ func TestInternalToVersionedInitConfigurationConversion(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		"ignorePreflightErrors set causes an error": {
+			in: kubeadm.InitConfiguration{
+				NodeRegistration: kubeadm.NodeRegistrationOptions{
+					IgnorePreflightErrors: []string{"SomeUndesirableError"},
+				},
+			},
+			expectedError: true,
+		},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			versioned := &InitConfiguration{}
 			err := Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(&tc.in, versioned, nil)
+			if err == nil && tc.expectedError {
+				t.Error("unexpected success")
+			} else if err != nil && !tc.expectedError {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestInternalToVersionedJoinConfigurationConversion(t *testing.T) {
+	testcases := map[string]struct {
+		in            kubeadm.JoinConfiguration
+		expectedError bool
+	}{
+		"conversion succeeds": {
+			in:            kubeadm.JoinConfiguration{},
+			expectedError: false,
+		},
+		"ignorePreflightErrors set causes an error": {
+			in: kubeadm.JoinConfiguration{
+				NodeRegistration: kubeadm.NodeRegistrationOptions{
+					IgnorePreflightErrors: []string{"SomeUndesirableError"},
+				},
+			},
+			expectedError: true,
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			versioned := &JoinConfiguration{}
+			err := Convert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(&tc.in, versioned, nil)
+			if err == nil && tc.expectedError {
+				t.Error("unexpected success")
+			} else if err != nil && !tc.expectedError {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestInternalToVersionedNodeRegistrationOptionsConversion(t *testing.T) {
+	testcases := map[string]struct {
+		in            kubeadm.NodeRegistrationOptions
+		expectedError bool
+	}{
+		"conversion succeeds": {
+			in:            kubeadm.NodeRegistrationOptions{},
+			expectedError: false,
+		},
+		"ignorePreflightErrors set causes an error": {
+			in: kubeadm.NodeRegistrationOptions{
+				IgnorePreflightErrors: []string{"SomeUndesirableError"},
+			},
+			expectedError: true,
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			versioned := &NodeRegistrationOptions{}
+			err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")
 			} else if err != nil && !tc.expectedError {

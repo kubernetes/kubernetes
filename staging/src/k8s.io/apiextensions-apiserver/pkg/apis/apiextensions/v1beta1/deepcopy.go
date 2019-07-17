@@ -234,5 +234,15 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 		}
 	}
 
+	if in.XPreserveUnknownFields != nil {
+		in, out := &in.XPreserveUnknownFields, &out.XPreserveUnknownFields
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
+
 	return out
 }

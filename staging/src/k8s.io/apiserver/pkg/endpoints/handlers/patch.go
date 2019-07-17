@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -118,6 +119,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			scope.err(err, w, req)
 			return
 		}
+		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PatchOptions"))
 
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
@@ -151,6 +153,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			scope.Resource,
 			scope.Subresource,
 			admission.Create,
+			patchToCreateOptions(options),
 			dryrun.IsDryRun(options.DryRun),
 			userInfo)
 		staticUpdateAttributes := admission.NewAttributesRecord(
@@ -162,6 +165,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			scope.Resource,
 			scope.Subresource,
 			admission.Update,
+			patchToUpdateOptions(options),
 			dryrun.IsDryRun(options.DryRun),
 			userInfo,
 		)
@@ -315,7 +319,9 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	// Construct the resulting typed, unversioned object.
 	objToUpdate := p.restPatcher.New()
 	if err := runtime.DecodeInto(p.codec, patchedObjJS, objToUpdate); err != nil {
-		return nil, err
+		return nil, errors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
+			field.Invalid(field.NewPath("patch"), string(patchedObjJS), err.Error()),
+		})
 	}
 
 	if p.fieldManager != nil {
@@ -489,9 +495,9 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 	return objToUpdate, nil
 }
 
-func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation) admission.Attributes {
+func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, p.dryRun, userInfo)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo)
 }
 
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,
@@ -500,16 +506,19 @@ func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime
 func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
 	p.trace.Step("About to check admission control")
 	var operation admission.Operation
+	var options runtime.Object
 	if hasUID, err := hasUID(currentObject); err != nil {
 		return nil, err
 	} else if !hasUID {
 		operation = admission.Create
 		currentObject = nil
+		options = patchToCreateOptions(p.options)
 	} else {
 		operation = admission.Update
+		options = patchToUpdateOptions(p.options)
 	}
 	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
-		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation)
+		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation, options)
 		return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
 	}
 	return patchedObject, nil
@@ -551,11 +560,8 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
-		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
-		options, err := patchToUpdateOptions(p.options)
-		if err != nil {
-			return nil, err
-		}
+		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
+		options := patchToUpdateOptions(p.options)
 		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, options)
 		wasCreated = created
 		return updateObject, updateErr
@@ -580,7 +586,9 @@ func applyPatchToObject(
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchedObjMap, objToUpdate); err != nil {
-		return err
+		return errors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
+			field.Invalid(field.NewPath("patch"), fmt.Sprintf("%+v", patchMap), err.Error()),
+		})
 	}
 	// Decoding from JSON to a versioned object would apply defaults, so we do the same here
 	defaulter.Default(objToUpdate)
@@ -600,12 +608,28 @@ func interpretStrategicMergePatchError(err error) error {
 	}
 }
 
-func patchToUpdateOptions(po *metav1.PatchOptions) (*metav1.UpdateOptions, error) {
-	b, err := json.Marshal(po)
-	if err != nil {
-		return nil, err
+// patchToUpdateOptions creates an UpdateOptions with the same field values as the provided PatchOptions.
+func patchToUpdateOptions(po *metav1.PatchOptions) *metav1.UpdateOptions {
+	if po == nil {
+		return nil
 	}
-	uo := metav1.UpdateOptions{}
-	err = json.Unmarshal(b, &uo)
-	return &uo, err
+	uo := &metav1.UpdateOptions{
+		DryRun:       po.DryRun,
+		FieldManager: po.FieldManager,
+	}
+	uo.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("UpdateOptions"))
+	return uo
+}
+
+// patchToCreateOptions creates an CreateOptions with the same field values as the provided PatchOptions.
+func patchToCreateOptions(po *metav1.PatchOptions) *metav1.CreateOptions {
+	if po == nil {
+		return nil
+	}
+	co := &metav1.CreateOptions{
+		DryRun:       po.DryRun,
+		FieldManager: po.FieldManager,
+	}
+	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
+	return co
 }

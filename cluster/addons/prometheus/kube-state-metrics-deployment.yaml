@@ -19,8 +19,6 @@ spec:
       labels:
         k8s-app: kube-state-metrics
         version: v1.3.0
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: kube-state-metrics
@@ -39,7 +37,7 @@ spec:
           initialDelaySeconds: 5
           timeoutSeconds: 5
       - name: addon-resizer
-        image: k8s.gcr.io/addon-resizer:1.8.4
+        image: k8s.gcr.io/addon-resizer:1.8.5
         resources:
           limits:
             cpu: 100m

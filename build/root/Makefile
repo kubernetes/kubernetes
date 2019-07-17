@@ -78,10 +78,11 @@ define ALL_HELP_INFO
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
-#   make all GOGCFLAGS="-N -l"
-#     Note: Use the -N -l options to disable compiler optimizations an inlining.
-#           Using these build options allows you to subsequently use source
-#           debugging tools like delve.
+#   make all GOLDFLAGS=""
+#     Note: Specify GOLDFLAGS as an empty string for building unstripped binaries, which allows
+#           you to use code debugging tools like delve. When GOLDFLAGS is unspecified, it defaults
+#           to "-s -w" which strips debug information. Other flags that can be used for GOLDFLAGS 
+#           are documented at https://golang.org/cmd/link/
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)

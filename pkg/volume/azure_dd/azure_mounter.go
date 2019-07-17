@@ -62,15 +62,15 @@ func (m *azureDiskMounter) CanMount() error {
 	return nil
 }
 
-func (m *azureDiskMounter) SetUp(fsGroup *int64) error {
-	return m.SetUpAt(m.GetPath(), fsGroup)
+func (m *azureDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return m.SetUpAt(m.GetPath(), mounterArgs)
 }
 
 func (m *azureDiskMounter) GetPath() string {
 	return getPath(m.dataDisk.podUID, m.dataDisk.volumeName, m.plugin.host)
 }
 
-func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
 	volumeSource, _, err := getVolumeSource(m.spec)
 
@@ -161,7 +161,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if volumeSource.ReadOnly == nil || !*volumeSource.ReadOnly {
-		volume.SetVolumeOwnership(m, fsGroup)
+		volume.SetVolumeOwnership(m, mounterArgs.FsGroup)
 	}
 
 	klog.V(2).Infof("azureDisk - successfully mounted disk %s on %s", diskName, dir)
