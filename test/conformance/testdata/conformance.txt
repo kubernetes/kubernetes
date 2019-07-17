@@ -38,7 +38,6 @@ test/e2e/apps/statefulset.go: "Burst scaling should run to completion even with 
 test/e2e/apps/statefulset.go: "Should recreate evicted statefulset"
 test/e2e/auth/service_accounts.go: "should mount an API token into pods"
 test/e2e/auth/service_accounts.go: "should allow opting out of API token automount"
-test/e2e/autoscaling/horizontal_pod_autoscaling.go: "should scale from 1 pod to 2 pods"
 test/e2e/common/configmap.go: "should be consumable via environment variable"
 test/e2e/common/configmap.go: "should be consumable via the environment"
 test/e2e/common/configmap.go: "should fail to create ConfigMap with empty key"
