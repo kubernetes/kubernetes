@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -355,8 +356,20 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *appsv1.StatefulSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	case *appsv1.DaemonSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("missing support for patching item of type %T", item)
 	}
