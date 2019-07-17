@@ -746,6 +746,9 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
 			diff = 0
 		}
+		if diff == 0 {
+			return active, nil
+		}
 		jm.expectations.ExpectCreations(jobKey, int(diff))
 		errCh = make(chan error, diff)
 		klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
