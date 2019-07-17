@@ -29,8 +29,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/flowcontrol/bootstrap:all-srcs",
         "//pkg/apis/flowcontrol/install:all-srcs",
         "//pkg/apis/flowcontrol/v1alpha1:all-srcs",
+        "//pkg/apis/flowcontrol/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
