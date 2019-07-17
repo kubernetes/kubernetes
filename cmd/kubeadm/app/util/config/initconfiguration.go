@@ -39,7 +39,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
@@ -85,7 +84,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
 func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, ControlPlaneTaint bool) error {
 	var err error
-	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
+	cfg.Name, err = kubeadmutil.GetHostname(cfg.Name)
 	if err != nil {
 		return err
 	}
