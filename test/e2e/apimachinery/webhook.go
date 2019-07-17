@@ -131,6 +131,12 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testWebhook(f)
 	})
 
+	ginkgo.It("Should be able to deny configmap creation, update or deletion", func() {
+		webhookCleanup := registerWebhookForConfigmap(f, context)
+		defer webhookCleanup()
+		testBlockingConfigmap(f)
+	})
+
 	ginkgo.It("Should be able to deny attaching pod", func() {
 		webhookCleanup := registerWebhookForAttachingPod(f, context)
 		defer webhookCleanup()
@@ -420,10 +426,6 @@ func registerWebhook(f *framework.Framework, context *certContext) func() {
 
 	namespace := f.Namespace.Name
 	configName := webhookConfigName
-	// A webhook that cannot talk to server, with fail-open policy
-	failOpenHook := failingWebhook(namespace, "fail-open.k8s.io")
-	policyIgnore := admissionregistrationv1.Ignore
-	failOpenHook.FailurePolicy = &policyIgnore
 	sideEffectsNone := admissionregistrationv1.SideEffectClassNone
 
 	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(&admissionregistrationv1.ValidatingWebhookConfiguration{
@@ -453,6 +455,35 @@ func registerWebhook(f *framework.Framework, context *certContext) func() {
 				SideEffects:             &sideEffectsNone,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
+		},
+	})
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+
+	return func() {
+		client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(configName, nil)
+	}
+}
+
+func registerWebhookForConfigmap(f *framework.Framework, context *certContext) func() {
+	client := f.ClientSet
+	ginkgo.By("Registering the webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := webhookConfigName
+	// A webhook that cannot talk to server, with fail-open policy
+	failOpenHook := failingWebhook(namespace, "fail-open.k8s.io")
+	policyIgnore := admissionregistrationv1.Ignore
+	failOpenHook.FailurePolicy = &policyIgnore
+	sideEffectsNone := admissionregistrationv1.SideEffectClassNone
+
+	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(&admissionregistrationv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
 				Name: "deny-unwanted-configmap-data.k8s.io",
 				Rules: []admissionregistrationv1.RuleWithOperations{{
@@ -741,11 +772,14 @@ func testWebhook(f *framework.Framework) {
 	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !errors.IsNotFound(err) {
 		e2elog.Failf("expect notfound error looking for rejected pod, got %v", err)
 	}
+}
 
+func testBlockingConfigmap(f *framework.Framework) {
 	ginkgo.By("create a configmap that should be denied by the webhook")
 	// Creating the configmap, the request should be rejected
+	client := f.ClientSet
 	configmap := nonCompliantConfigMap(f)
-	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
+	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
 	framework.ExpectError(err, "create configmap %s in namespace %s should have been denied by the webhook", configmap.Name, f.Namespace.Name)
 	expectedErrMsg := "the configmap contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -801,13 +835,10 @@ func testWebhook(f *framework.Framework) {
 	configmap = nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(skippedNamespaceName).Create(configmap)
 	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
-}
 
-func testBlockingConfigmapDeletion(f *framework.Framework) {
 	ginkgo.By("create a configmap that should be denied by the webhook when deleting")
-	client := f.ClientSet
-	configmap := nonDeletableConfigmap(f)
-	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
+	configmap = nonDeletableConfigmap(f)
+	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
 	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("deleting the configmap should be denied by the webhook")
