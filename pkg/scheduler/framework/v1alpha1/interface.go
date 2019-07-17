@@ -30,6 +30,12 @@ import (
 // Code is the Status code/type which is returned from plugins.
 type Code int
 
+// NodeScoreList declares a list of nodes and their scores.
+type NodeScoreList []int
+
+// PluginToNodeScoreMap declares a map from plugin name to its NodeScoreList.
+type PluginToNodeScoreMap map[string]NodeScoreList
+
 // These are predefined codes used in a Status.
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
@@ -137,6 +143,16 @@ type PrefilterPlugin interface {
 	Prefilter(pc *PluginContext, p *v1.Pod) *Status
 }
 
+// ScorePlugin is an interface that must be implemented by "score" plugins to rank
+// nodes that passed the filtering phase.
+type ScorePlugin interface {
+	Plugin
+	// Score is called on each filtered node. It must return success and an integer
+	// indicating the rank of the node. All scoring plugins must return success or
+	// the pod will be rejected.
+	Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status)
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -219,6 +235,12 @@ type Framework interface {
 	// anything but Success. If a non-success status is returned, then the scheduling
 	// cycle is aborted.
 	RunPrefilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
+
+	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
+	// stores for each scoring plugin name the corresponding NodeScoreList(s).
+	// It also returns *Status, which is set to non-success if any of the plugins returns
+	// a non-success status.
+	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status)
 
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns

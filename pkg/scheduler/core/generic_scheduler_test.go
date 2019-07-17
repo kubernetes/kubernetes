@@ -720,7 +720,7 @@ func TestZeroRequest(t *testing.T) {
 
 			list, err := PrioritizeNodes(
 				test.pod, nodeNameToInfo, metaData, priorityConfigs,
-				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
+				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{}, emptyFramework, nil)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

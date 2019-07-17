@@ -36,6 +36,12 @@ type PrefilterPlugin struct {
 	rejectPrefilter    bool
 }
 
+type ScorePlugin struct {
+	failScore     bool
+	numCalled     int
+	highScoreNode string
+}
+
 type ReservePlugin struct {
 	numReserveCalled int
 	failReserve      bool
@@ -79,6 +85,7 @@ type PermitPlugin struct {
 
 const (
 	prefilterPluginName = "prefilter-plugin"
+	scorePluginName     = "score-plugin"
 	reservePluginName   = "reserve-plugin"
 	prebindPluginName   = "prebind-plugin"
 	unreservePluginName = "unreserve-plugin"
@@ -87,12 +94,45 @@ const (
 )
 
 var _ = framework.PrefilterPlugin(&PrefilterPlugin{})
+var _ = framework.ScorePlugin(&ScorePlugin{})
 var _ = framework.ReservePlugin(&ReservePlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
 var _ = framework.BindPlugin(&BindPlugin{})
 var _ = framework.PostbindPlugin(&PostbindPlugin{})
 var _ = framework.UnreservePlugin(&UnreservePlugin{})
 var _ = framework.PermitPlugin(&PermitPlugin{})
+
+// Name returns name of the score plugin.
+func (sp *ScorePlugin) Name() string {
+	return scorePluginName
+}
+
+// reset returns name of the score plugin.
+func (sp *ScorePlugin) reset() {
+	sp.failScore = false
+	sp.numCalled = 0
+	sp.highScoreNode = ""
+}
+
+var scPlugin = &ScorePlugin{}
+
+// Score returns the score of scheduling a pod on a specific node.
+func (sp *ScorePlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName string) (int, *framework.Status) {
+	sp.numCalled++
+	if sp.failScore {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
+	}
+	score := 10
+	if nodeName == sp.highScoreNode {
+		score = 100
+	}
+	return score, nil
+}
+
+// NewScorePlugin is the factory for score plugin.
+func NewScorePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return scPlugin, nil
+}
 
 // Name returns name of the plugin.
 func (rp *ReservePlugin) Name() string {
@@ -402,6 +442,73 @@ func TestPrefilterPlugin(t *testing.T) {
 	}
 }
 
+// TestScorePlugin tests invocation of score plugins.
+func TestScorePlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a score plugin.
+	registry := framework.Registry{scorePluginName: NewScorePlugin}
+
+	// Setup initial score plugin for testing.
+	plugins := &schedulerconfig.Plugins{
+		Score: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: scorePluginName,
+				},
+			},
+		},
+	}
+	// Set empty plugin config for testing
+	emptyPluginConfig := []schedulerconfig.PluginConfig{}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "score-plugin", nil),
+		false, nil, registry, plugins, emptyPluginConfig, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add multiple nodes, one of them will be scored much higher than the others.
+	nodes, err := createNodes(cs, "test-node", nil, 10)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+	scPlugin.highScoreNode = nodes[3].Name
+
+	for i, fail := range []bool{false, true} {
+		scPlugin.failScore = fail
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Fatalf("Error while creating a test pod: %v", err)
+		}
+
+		if fail {
+			if err = waitForPodUnschedulable(cs, pod); err != nil {
+				t.Errorf("test #%v: Didn't expect the pod to be scheduled. error: %v", i, err)
+			}
+		} else {
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("Expected the pod to be scheduled. error: %v", err)
+			} else {
+				p, err := getPod(cs, pod.Name, pod.Namespace)
+				if err != nil {
+					t.Errorf("Failed to retrieve the pod. error: %v", err)
+				} else if p.Spec.NodeName != scPlugin.highScoreNode {
+					t.Errorf("Expected the pod to be scheduled on node %q, got %q", scPlugin.highScoreNode, p.Spec.NodeName)
+				}
+			}
+		}
+
+		if scPlugin.numCalled == 0 {
+			t.Errorf("Expected the reserve plugin to be called.")
+		}
+
+		scPlugin.reset()
+		cleanupPods(cs, t, []*v1.Pod{pod})
+	}
+}
+
 // TestReservePlugin tests invocation of reserve plugins.
 func TestReservePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a reserve plugin.
@@ -444,7 +551,7 @@ func TestReservePlugin(t *testing.T) {
 
 		if fail {
 			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err != nil {
-				t.Errorf("Didn't expected the pod to be scheduled. error: %v", err)
+				t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 			}
 		} else {
 			if err = waitForPodToSchedule(cs, pod); err != nil {
