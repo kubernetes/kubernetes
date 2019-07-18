@@ -151,7 +151,7 @@ func TestConvertCPUValue(t *testing.T) {
 func TestGetCPUUsageNanoCores(t *testing.T) {
 	p := perfCounterNodeStatsClient{}
 	p.cpuUsageCoreNanoSecondsCache = cpuUsageCoreNanoSecondsCache{
-		latestValue: uint64(5000000000),
+		latestValue:   uint64(5000000000),
 		previousValue: uint64(2000000000),
 	}
 	cpuUsageNanoCores := p.getCPUUsageNanoCores()
