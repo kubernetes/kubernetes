@@ -122,8 +122,11 @@ func (sp *ScorePlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName st
 	if sp.failScore {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
 	}
+
 	score := 10
-	if nodeName == sp.highScoreNode {
+	if sp.numCalled == 1 {
+		// The first node is scored the highest, the rest is scored lower.
+		sp.highScoreNode = nodeName
 		score = 100
 	}
 	return score, nil
@@ -468,11 +471,10 @@ func TestScorePlugin(t *testing.T) {
 
 	cs := context.clientSet
 	// Add multiple nodes, one of them will be scored much higher than the others.
-	nodes, err := createNodes(cs, "test-node", nil, 10)
+	_, err := createNodes(cs, "test-node", nil, 10)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
-	scPlugin.highScoreNode = nodes[3].Name
 
 	for i, fail := range []bool{false, true} {
 		scPlugin.failScore = fail
