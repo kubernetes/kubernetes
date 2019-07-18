@@ -76,7 +76,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	projectID := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
-	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	client, _ := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 
 	// Hack for running tests locally
 	// If this is your use case, create application default credentials:
