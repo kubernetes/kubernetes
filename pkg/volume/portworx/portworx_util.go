@@ -23,8 +23,9 @@ import (
 	osdclient "github.com/libopenstorage/openstorage/api/client"
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
+	"github.com/libopenstorage/openstorage/pkg/options"
 	volumeapi "github.com/libopenstorage/openstorage/volume"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -153,7 +154,8 @@ func (util *portworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
 		return err
 	}
 
-	err = driver.Detach(u.volName, false /*doNotForceDetach*/)
+	// by forcing a detach the volume will not be unmounted first
+	err = driver.Detach(u.volName, map[string]string{options.OptionsForceDetach: "true"})
 	if err != nil {
 		klog.Errorf("Error detaching Portworx Volume (%v): %v", u.volName, err)
 		return err
@@ -169,7 +171,7 @@ func (util *portworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath 
 		return err
 	}
 
-	err = driver.Mount(m.volName, mountPath)
+	err = driver.Mount(m.volName, mountPath, map[string]string{})
 	if err != nil {
 		klog.Errorf("Error mounting Portworx Volume (%v) on Path (%v): %v", m.volName, mountPath, err)
 		return err
@@ -185,7 +187,7 @@ func (util *portworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountP
 		return err
 	}
 
-	err = driver.Unmount(u.volName, mountPath)
+	err = driver.Unmount(u.volName, mountPath, map[string]string{})
 	if err != nil {
 		klog.Errorf("Error unmounting Portworx Volume (%v) on Path (%v): %v", u.volName, mountPath, err)
 		return err
