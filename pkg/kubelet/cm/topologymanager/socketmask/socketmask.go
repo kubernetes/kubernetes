@@ -39,6 +39,12 @@ type SocketMask interface {
 
 type socketMask uint64
 
+//NewEmptySocketMask creates a new, empty SocketMask
+func NewEmptySocketMask() SocketMask {
+	s := socketMask(0)
+	return &s
+}
+
 //NewSocketMask creates a new SocketMask
 func NewSocketMask(sockets ...int) (SocketMask, error) {
 	s := socketMask(0)
