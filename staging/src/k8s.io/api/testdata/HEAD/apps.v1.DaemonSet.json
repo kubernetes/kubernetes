@@ -1051,35 +1051,53 @@
         "preemptionPolicy": "ʕW6¯ȗŮ·俦磊ʝʅ¸Ư竱=沚ʧ",
         "overhead": {
           "硑Ț匡婲#ɛ蛳j惧鷋簡SļŽɣB矗E": "667"
-        }
+        },
+        "topologySpreadConstraints": [
+          {
+            "maxSkew": 1008427374,
+            "topologyKey": "351",
+            "whenUnsatisfiable": "揃_ftvĩĚƂ蚅郦抷qTfZ",
+            "labelSelector": {
+              "matchLabels": {
+                "fY6T4g_-.._Lf2t_m...CqrN7_B__--v-3-BzO5z80n_Ht5W_._._-2M2Z": "i_P..w-W_-nE...-__--.k47M7y-Dy__3wc.q.8_00.0_._.-_L-__bJ"
+              },
+              "matchExpressions": [
+                {
+                  "key": "7Pn-W23-_.z_.._s--_F-BR-.h_-2-s",
+                  "operator": "Exists"
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     "updateStrategy": {
-      "type": "乾毛ĥu疾4姺剟ź魊塾ɖ$",
+      "type": "tŧK剛Ʀ魨练脨,Ƃ3貊",
       "rollingUpdate": {
         
       }
     },
-    "minReadySeconds": 108452964,
-    "revisionHistoryLimit": -1556813247
+    "minReadySeconds": 527722852,
+    "revisionHistoryLimit": -1109287817
   },
   "status": {
-    "currentNumberScheduled": -699990187,
-    "numberMisscheduled": 1494873941,
-    "desiredNumberScheduled": -150888717,
-    "numberReady": 159036358,
-    "observedGeneration": 8572471297015927631,
-    "updatedNumberScheduled": 2017039887,
-    "numberAvailable": -1370389893,
-    "numberUnavailable": -1065451254,
-    "collisionCount": 256213209,
+    "currentNumberScheduled": -227159566,
+    "numberMisscheduled": 1555151820,
+    "desiredNumberScheduled": -1757808404,
+    "numberReady": 957711740,
+    "observedGeneration": -725266266422306482,
+    "updatedNumberScheduled": -1461365428,
+    "numberAvailable": -886586171,
+    "numberUnavailable": -496491540,
+    "collisionCount": -918715115,
     "conditions": [
       {
-        "type": "ŜĂ",
-        "status": "!ń1ċƹ|慼櫁色苆试揯遐",
-        "lastTransitionTime": "2058-09-30T18:21:51Z",
-        "reason": "351",
-        "message": "352"
+        "type": "Ķ餍4Y鳲Jɡj瓇ɽ丿Y",
+        "status": "媴h5ƅȸȓɻ猶N嫡",
+        "lastTransitionTime": "2153-11-03T10:00:52Z",
+        "reason": "358",
+        "message": "359"
       }
     ]
   }
