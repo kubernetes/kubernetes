@@ -72,7 +72,7 @@ func TestRoundTrip(t *testing.T) {
 		if err := json.Unmarshal(openAPIJSON, &j); err != nil {
 			t.Fatal(err)
 		}
-		j = convertNullTypeToNullable(j)
+		j = stripIntOrStringType(j)
 		openAPIJSON, err = json.Marshal(j)
 		if err != nil {
 			t.Fatal(err)
@@ -96,42 +96,24 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-func convertNullTypeToNullable(x interface{}) interface{} {
+func stripIntOrStringType(x interface{}) interface{} {
 	switch x := x.(type) {
 	case map[string]interface{}:
 		if t, found := x["type"]; found {
 			switch t := t.(type) {
 			case []interface{}:
-				for i, typ := range t {
-					if s, ok := typ.(string); !ok || s != "null" {
-						continue
-					}
-					t = append(t[:i], t[i+1:]...)
-					switch len(t) {
-					case 0:
-						delete(x, "type")
-					case 1:
-						x["type"] = t[0]
-					default:
-						x["type"] = t
-					}
-					x["nullable"] = true
-					break
-				}
-			case string:
-				if t == "null" {
+				if len(t) == 2 && t[0] == "integer" && t[1] == "string" && x["x-kubernetes-int-or-string"] == true {
 					delete(x, "type")
-					x["nullable"] = true
 				}
 			}
 		}
 		for k := range x {
-			x[k] = convertNullTypeToNullable(x[k])
+			x[k] = stripIntOrStringType(x[k])
 		}
 		return x
 	case []interface{}:
 		for i := range x {
-			x[i] = convertNullTypeToNullable(x[i])
+			x[i] = stripIntOrStringType(x[i])
 		}
 		return x
 	default:
@@ -139,7 +121,207 @@ func convertNullTypeToNullable(x interface{}) interface{} {
 	}
 }
 
-func TestNullable(t *testing.T) {
+func TestValidateCustomResource(t *testing.T) {
+	tests := []struct {
+		name           string
+		schema         apiextensions.JSONSchemaProps
+		objects        []interface{}
+		failingObjects []interface{}
+	}{
+		{name: "!nullable",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Type:     "object",
+						Nullable: false,
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": map[string]interface{}{}},
+			},
+			failingObjects: []interface{}{
+				map[string]interface{}{"field": "foo"},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "nullable",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Type:     "object",
+						Nullable: true,
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": map[string]interface{}{}},
+				map[string]interface{}{"field": nil},
+			},
+			failingObjects: []interface{}{
+				map[string]interface{}{"field": "foo"},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "nullable and no type",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Nullable: true,
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": map[string]interface{}{}},
+				map[string]interface{}{"field": nil},
+				map[string]interface{}{"field": "foo"},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "x-kubernetes-int-or-string",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						XIntOrString: true,
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": "foo"},
+			},
+			failingObjects: []interface{}{
+				map[string]interface{}{"field": nil},
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": map[string]interface{}{}},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "nullable and x-kubernetes-int-or-string",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Nullable:     true,
+						XIntOrString: true,
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": "foo"},
+				map[string]interface{}{"field": nil},
+			},
+			failingObjects: []interface{}{
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": map[string]interface{}{}},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "nullable, x-kubernetes-int-or-string and user-provided anyOf",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Nullable:     true,
+						XIntOrString: true,
+						AnyOf: []apiextensions.JSONSchemaProps{
+							{Type: "integer"},
+							{Type: "string"},
+						},
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": nil},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": "foo"},
+			},
+			failingObjects: []interface{}{
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": map[string]interface{}{}},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "nullable, x-kubernetes-int-or-string and user-provider allOf",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Nullable:     true,
+						XIntOrString: true,
+						AllOf: []apiextensions.JSONSchemaProps{
+							{
+								AnyOf: []apiextensions.JSONSchemaProps{
+									{Type: "integer"},
+									{Type: "string"},
+								},
+							},
+						},
+					},
+				},
+			},
+			objects: []interface{}{
+				map[string]interface{}{},
+				map[string]interface{}{"field": nil},
+				map[string]interface{}{"field": 42},
+				map[string]interface{}{"field": "foo"},
+			},
+			failingObjects: []interface{}{
+				map[string]interface{}{"field": true},
+				map[string]interface{}{"field": 1.2},
+				map[string]interface{}{"field": map[string]interface{}{}},
+				map[string]interface{}{"field": []interface{}{}},
+			},
+		},
+		{name: "invalid regex",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Type:    "string",
+						Pattern: "+",
+					},
+				},
+			},
+			failingObjects: []interface{}{map[string]interface{}{"field": "foo"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.schema})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, obj := range tt.objects {
+				if err := ValidateCustomResource(obj, validator); err != nil {
+					t.Errorf("unexpected validation error for %v: %v", obj, err)
+				}
+			}
+			for _, obj := range tt.failingObjects {
+				if err := ValidateCustomResource(obj, validator); err == nil {
+					t.Errorf("missing error for %v", obj)
+				}
+			}
+		})
+	}
+}
+
+func TestItemsProperty(t *testing.T) {
 	type args struct {
 		schema apiextensions.JSONSchemaProps
 		object interface{}
@@ -149,91 +331,34 @@ func TestNullable(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"!nullable against non-null", args{
+		{"items in object", args{
 			apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Type:     "object",
-						Nullable: false,
+					"spec": {
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"replicas": {
+								Type: "integer",
+							},
+						},
 					},
 				},
 			},
-			map[string]interface{}{"field": map[string]interface{}{}},
+			map[string]interface{}{"spec": map[string]interface{}{"replicas": 1, "items": []string{"1", "2"}}},
 		}, false},
-		{"!nullable against null", args{
+		{"items in array", args{
 			apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Type:     "object",
-						Nullable: false,
+					"secrets": {
+						Type: "array",
+						Items: &apiextensions.JSONSchemaPropsOrArray{
+							Schema: &apiextensions.JSONSchemaProps{
+								Type: "string",
+							},
+						},
 					},
 				},
 			},
-			map[string]interface{}{"field": nil},
-		}, true},
-		{"!nullable against undefined", args{
-			apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Type:     "object",
-						Nullable: false,
-					},
-				},
-			},
-			map[string]interface{}{},
-		}, false},
-		{"nullable against non-null", args{
-			apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Type:     "object",
-						Nullable: true,
-					},
-				},
-			},
-			map[string]interface{}{"field": map[string]interface{}{}},
-		}, false},
-		{"nullable against null", args{
-			apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Type:     "object",
-						Nullable: true,
-					},
-				},
-			},
-			map[string]interface{}{"field": nil},
-		}, false},
-		{"!nullable against undefined", args{
-			apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Type:     "object",
-						Nullable: true,
-					},
-				},
-			},
-			map[string]interface{}{},
-		}, false},
-		{"nullable and no type against non-nil", args{
-			apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Nullable: true,
-					},
-				},
-			},
-			map[string]interface{}{"field": 42},
-		}, false},
-		{"nullable and no type against nil", args{
-			apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
-					"field": {
-						Nullable: true,
-					},
-				},
-			},
-			map[string]interface{}{"field": nil},
+			map[string]interface{}{"secrets": []string{"1", "2"}},
 		}, false},
 	}
 	for _, tt := range tests {

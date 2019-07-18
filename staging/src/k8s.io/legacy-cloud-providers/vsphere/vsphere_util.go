@@ -279,7 +279,7 @@ func getDatastoresForZone(ctx context.Context, nodeManager *NodeManager, selecte
 				}
 			}
 			if dcMoref == nil {
-				return nil, fmt.Errorf("Failed to find the Datacenter of host %s", host)
+				return nil, fmt.Errorf("failed to find the Datacenter of host %s", host)
 			}
 
 			dc := object.NewDatacenter(host.Client(), *dcMoref)
@@ -658,13 +658,13 @@ func GetVMUUID() (string, error) {
 	uuid := strings.TrimSpace(uuidFromFile)
 	// check the uuid starts with "VMware-"
 	if !strings.HasPrefix(uuid, UUIDPrefix) {
-		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
+		return "", fmt.Errorf("failed to match Prefix, UUID read from the file is %v", uuidFromFile)
 	}
 	// Strip the prefix and white spaces and -
 	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
 	uuid = strings.Replace(uuid, "-", "", -1)
 	if len(uuid) != 32 {
-		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
+		return "", fmt.Errorf("length check failed, UUID read from the file is %v", uuidFromFile)
 	}
 	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
 	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])

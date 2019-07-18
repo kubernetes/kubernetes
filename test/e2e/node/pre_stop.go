@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -50,7 +53,8 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:  "server",
-					Image: imageutils.GetE2EImage(imageutils.Nettest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"nettest"},
 					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
@@ -67,13 +71,15 @@ func testPreStop(c clientset.Interface, ns string) {
 	}()
 
 	ginkgo.By("Waiting for pods to come up.")
-	err = framework.WaitForPodRunningInNamespace(c, podDescr)
+	err = e2epod.WaitForPodRunningInNamespace(c, podDescr)
 	framework.ExpectNoError(err, "waiting for server pod to start")
 
 	val := "{\"Source\": \"prestop\"}"
 
 	podOut, err := c.CoreV1().Pods(ns).Get(podDescr.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "getting pod info")
+
+	podURL := net.JoinHostPort(podOut.Status.PodIP, "8080")
 
 	preStopDescr := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -89,7 +95,7 @@ func testPreStop(c clientset.Interface, ns string) {
 						PreStop: &v1.Handler{
 							Exec: &v1.ExecAction{
 								Command: []string{
-									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
+									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s/write", podURL),
 								},
 							},
 						},
@@ -112,7 +118,7 @@ func testPreStop(c clientset.Interface, ns string) {
 		}
 	}()
 
-	err = framework.WaitForPodRunningInNamespace(c, preStopDescr)
+	err = e2epod.WaitForPodRunningInNamespace(c, preStopDescr)
 	framework.ExpectNoError(err, "waiting for tester pod to start")
 
 	// Delete the pod with the preStop handler.
@@ -140,7 +146,7 @@ func testPreStop(c clientset.Interface, ns string) {
 
 		if err != nil {
 			if ctx.Err() != nil {
-				framework.Failf("Error validating prestop: %v", err)
+				e2elog.Failf("Error validating prestop: %v", err)
 				return true, err
 			}
 			ginkgo.By(fmt.Sprintf("Error validating prestop: %v", err))
@@ -203,7 +209,7 @@ var _ = SIGDescribe("PreStop", func() {
 		ginkgo.By("verifying the pod running state after graceful termination")
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-			client, err := framework.NodeProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
+			client, err := e2enode.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
 			framework.ExpectNoError(err, "failed to get the pods of the node")
 			err = client.Into(result)
 			framework.ExpectNoError(err, "failed to parse the pods of the node")

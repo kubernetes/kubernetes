@@ -190,7 +190,7 @@ message CarpStatus {
   optional string message = 3;
 
   // A brief CamelCase message indicating details about why the carp is in this state.
-  // e.g. 'OutOfDisk'
+  // e.g. 'DiskPressure'
   // +optional
   optional string reason = 4;
 

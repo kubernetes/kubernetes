@@ -193,10 +193,8 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
-	pod := obj.(*api.Pod)
-	result := storage.MatchValue{IndexName: "spec.nodeName", Value: pod.Spec.NodeName}
-	return []storage.MatchValue{result}
+func NodeNameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Pod).Spec.NodeName
 }
 
 // PodToSelectableFields returns a field set that represents the object
@@ -212,7 +210,12 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
-	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
+	// TODO: add podIPs as a downward API value(s) with proper format
+	podIP := ""
+	if len(pod.Status.PodIPs) > 0 {
+		podIP = string(pod.Status.PodIPs[0].IP)
+	}
+	podSpecificFieldsSet["status.podIP"] = podIP
 	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
@@ -242,7 +245,6 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
-	// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
 
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
@@ -259,7 +261,7 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 		}
 	}
 
-	if err := proxyutil.IsProxyableIP(pod.Status.PodIP); err != nil {
+	if err := proxyutil.IsProxyableIP(pod.Status.PodIPs[0].IP); err != nil {
 		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
@@ -267,9 +269,9 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 		Scheme: scheme,
 	}
 	if port == "" {
-		loc.Host = pod.Status.PodIP
+		loc.Host = pod.Status.PodIPs[0].IP
 	} else {
-		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
+		loc.Host = net.JoinHostPort(pod.Status.PodIPs[0].IP, port)
 	}
 	return loc, rt, nil
 }
@@ -361,17 +363,15 @@ func LogLocation(
 }
 
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
-	for _, c := range pod.Spec.Containers {
+	var hasContainer bool
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
 		if c.Name == containerName {
-			return true
+			hasContainer = true
+			return false
 		}
-	}
-	for _, c := range pod.Spec.InitContainers {
-		if c.Name == containerName {
-			return true
-		}
-	}
-	return false
+		return true
+	})
+	return hasContainer
 }
 
 func streamParams(params url.Values, opts runtime.Object) error {

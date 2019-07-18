@@ -48,10 +48,11 @@ type handlerEntry struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap  map[reflect.Type]*handlerEntry
-	options     PrintOptions
-	lastType    interface{}
-	lastColumns []metav1beta1.TableColumnDefinition
+	handlerMap     map[reflect.Type]*handlerEntry
+	options        PrintOptions
+	lastType       interface{}
+	lastColumns    []metav1beta1.TableColumnDefinition
+	printedHeaders bool
 }
 
 var _ TableGenerator = &HumanReadablePrinter{}

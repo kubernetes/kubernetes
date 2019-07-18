@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -70,10 +70,10 @@ func observeCreation(w watch.Interface) {
 	select {
 	case event, _ := <-w.ResultChan():
 		if event.Type != watch.Added {
-			framework.Failf("Failed to observe the creation: %v", event)
+			e2elog.Failf("Failed to observe the creation: %v", event)
 		}
 	case <-time.After(30 * time.Second):
-		framework.Failf("Timeout while waiting for observing the creation")
+		e2elog.Failf("Timeout while waiting for observing the creation")
 	}
 }
 
@@ -94,7 +94,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 		}
 	}
 	if !updated {
-		framework.Failf("Failed to observe pod update")
+		e2elog.Failf("Failed to observe pod update")
 	}
 	return
 }
@@ -113,22 +113,22 @@ var _ = SIGDescribe("Generated clientset", func() {
 		options := metav1.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
+			e2elog.Failf("Failed to query for pods: %v", err)
 		}
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(options)
 		if err != nil {
-			framework.Failf("Failed to set up watch: %v", err)
+			e2elog.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the pod")
 		pod, err = podClient.Create(pod)
 		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
+			e2elog.Failf("Failed to create pod: %v", err)
 		}
 
 		ginkgo.By("verifying the pod is in kubernetes")
@@ -138,9 +138,9 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		pods, err = podClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
+			e2elog.Failf("Failed to query for pods: %v", err)
 		}
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		observeCreation(w)
@@ -152,7 +152,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
 		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
-			framework.Failf("Failed to delete pod: %v", err)
+			e2elog.Failf("Failed to delete pod: %v", err)
 		}
 
 		ginkgo.By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
@@ -229,22 +229,22 @@ var _ = SIGDescribe("Generated clientset", func() {
 		options := metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err := cronJobClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for cronJobs: %v", err)
+			e2elog.Failf("Failed to query for cronJobs: %v", err)
 		}
-		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(cronJobs.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
 		w, err := cronJobClient.Watch(options)
 		if err != nil {
-			framework.Failf("Failed to set up watch: %v", err)
+			e2elog.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the cronJob")
 		cronJob, err = cronJobClient.Create(cronJob)
 		if err != nil {
-			framework.Failf("Failed to create cronJob: %v", err)
+			e2elog.Failf("Failed to create cronJob: %v", err)
 		}
 
 		ginkgo.By("verifying the cronJob is in kubernetes")
@@ -254,9 +254,9 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for cronJobs: %v", err)
+			e2elog.Failf("Failed to query for cronJobs: %v", err)
 		}
-		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(cronJobs.Items), 1)
 
 		ginkgo.By("verifying cronJob creation was observed")
 		observeCreation(w)
@@ -265,14 +265,14 @@ var _ = SIGDescribe("Generated clientset", func() {
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
 		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
-			framework.Failf("Failed to delete cronJob: %v", err)
+			e2elog.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
+			e2elog.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
-		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(cronJobs.Items), 0)
 	})
 })

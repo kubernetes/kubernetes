@@ -14,6 +14,7 @@ go_library(
         "histogram.go",
         "metric.go",
         "opts.go",
+        "processstarttime.go",
         "registry.go",
         "summary.go",
         "version_parser.go",
@@ -26,6 +27,7 @@ go_library(
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
+        "//vendor/github.com/prometheus/procfs:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

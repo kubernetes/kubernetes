@@ -35,6 +35,7 @@ go_test(
     srcs = [
         "event_test.go",
         "events_cache_test.go",
+        "main_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

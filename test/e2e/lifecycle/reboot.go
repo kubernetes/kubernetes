@@ -31,6 +31,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -166,7 +168,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 				e2elog.Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
 			}
 		}
-		framework.Failf("Test failed; at least one node failed to reboot in the time given.")
+		e2elog.Failf("Test failed; at least one node failed to reboot in the time given.")
 	}
 }
 
@@ -197,7 +199,7 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 		// Print the log of the containers if pod is not running and ready.
 		for _, container := range p.Status.ContainerStatuses {
 			cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
-			log, err := framework.GetPodLogs(c, p.Namespace, p.Name, container.Name)
+			log, err := e2epod.GetPodLogs(c, p.Namespace, p.Name, container.Name)
 			printFn(cIdentifer, log, err, false)
 			// Get log from the previous container.
 			if container.RestartCount > 0 {
@@ -236,7 +238,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	}
 
 	// Node sanity check: ensure it is "ready".
-	if !framework.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
+	if !e2enode.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
 		return false
 	}
 
@@ -260,7 +262,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// or succeeded now, as that's what we'll be checking later.
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, pods)
 		return false
 	}
@@ -272,18 +274,18 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !framework.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
+	if !e2enode.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
 		return false
 	}
 
 	// Wait for some kind of "ready" status.
-	if !framework.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
+	if !e2enode.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
 		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy, or succeeded.
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
 		return false

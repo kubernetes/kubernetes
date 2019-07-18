@@ -19,7 +19,7 @@ package results
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -43,7 +43,10 @@ type Manager interface {
 type Result bool
 
 const (
+	// Success is encoded as "true" (type Result)
 	Success Result = true
+
+	// Failure is encoded as "false" (type Result)
 	Failure Result = false
 )
 

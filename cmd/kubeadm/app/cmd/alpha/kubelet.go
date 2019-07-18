@@ -29,18 +29,17 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 	utilsexec "k8s.io/utils/exec"
 )
 
 var (
-	kubeletConfigDownloadLongDesc = normalizer.LongDesc(`
+	kubeletConfigDownloadLongDesc = cmdutil.LongDesc(`
 		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. Either kubeadm autodetects the kubelet version by exec-ing
 		"kubelet --version" or respects the --kubelet-version parameter.
 		` + cmdutil.AlphaDisclaimer)
 
-	kubeletConfigDownloadExample = normalizer.Examples(fmt.Sprintf(`
+	kubeletConfigDownloadExample = cmdutil.Examples(fmt.Sprintf(`
 		# Download the kubelet configuration from the ConfigMap in the cluster. Autodetect the kubelet version.
 		kubeadm alpha phase kubelet config download
 
@@ -48,7 +47,7 @@ var (
 		kubeadm alpha phase kubelet config download --kubelet-version %s
 		`, constants.CurrentKubernetesVersion))
 
-	kubeletConfigEnableDynamicLongDesc = normalizer.LongDesc(`
+	kubeletConfigEnableDynamicLongDesc = cmdutil.LongDesc(`
 		Enable or update dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
 		where X is the minor version of the desired kubelet version.
 
@@ -57,7 +56,7 @@ var (
 
 		` + cmdutil.AlphaDisclaimer)
 
-	kubeletConfigEnableDynamicExample = normalizer.Examples(fmt.Sprintf(`
+	kubeletConfigEnableDynamicExample = cmdutil.Examples(fmt.Sprintf(`
 		# Enable dynamic kubelet configuration for a Node.
 		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version %s
 

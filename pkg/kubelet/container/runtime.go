@@ -273,8 +273,8 @@ type PodStatus struct {
 	Name string
 	// Namespace of the pod.
 	Namespace string
-	// IP of the pod.
-	IP string
+	// All IPs assigned to this pod
+	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
 	// Status of the pod sandbox.

@@ -464,9 +464,9 @@ func TestGenericScheduler(t *testing.T) {
 				schedulertesting.FakePDBLister{},
 				test.alwaysCheckAllPredicates,
 				false,
-				schedulerapi.DefaultPercentageOfNodesToScore)
-			result, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
-
+				schedulerapi.DefaultPercentageOfNodesToScore,
+				false)
+			result, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)), framework.NewPluginContext())
 			if !reflect.DeepEqual(err, test.wErr) {
 				t.Errorf("Unexpected error: %v, expected: %v", err, test.wErr)
 			}
@@ -494,7 +494,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		priorities.EmptyPriorityMetadataProducer,
 		emptyFramework,
 		nil, nil, nil, nil, false, false,
-		schedulerapi.DefaultPercentageOfNodesToScore)
+		schedulerapi.DefaultPercentageOfNodesToScore, false)
 	cache.UpdateNodeInfoSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 
@@ -720,7 +720,7 @@ func TestZeroRequest(t *testing.T) {
 
 			list, err := PrioritizeNodes(
 				test.pod, nodeNameToInfo, metaData, priorityConfigs,
-				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
+				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{}, emptyFramework, nil)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -977,6 +977,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			assignDefaultStartTime(test.pods)
+
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				node := makeNode(n, 1000*5, priorityutil.DefaultMemoryRequest*5)
@@ -1198,6 +1200,8 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			assignDefaultStartTime(test.pods)
+
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
@@ -1332,6 +1336,10 @@ func TestPreempt(t *testing.T) {
 	for i := 1; i < 4; i++ {
 		nodeNames = append(nodeNames, fmt.Sprintf("machine%d", i))
 	}
+	var (
+		preemptLowerPriority = v1.PreemptLowerPriority
+		preemptNever         = v1.PreemptNever
+	)
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
@@ -1343,8 +1351,9 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "basic preemption logic",
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
-				Containers: veryLargeContainers,
-				Priority:   &highPriority},
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptLowerPriority},
 			},
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
@@ -1358,8 +1367,9 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "One node doesn't need any preemption",
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
-				Containers: veryLargeContainers,
-				Priority:   &highPriority},
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptLowerPriority},
 			},
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
@@ -1373,8 +1383,9 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "Scheduler extenders allow only machine1, otherwise machine3 would have been chosen",
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
-				Containers: veryLargeContainers,
-				Priority:   &highPriority},
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptLowerPriority},
 			},
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
@@ -1396,8 +1407,9 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "Scheduler extenders do not allow any preemption",
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
-				Containers: veryLargeContainers,
-				Priority:   &highPriority},
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptLowerPriority},
 			},
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
@@ -1416,8 +1428,9 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "One scheduler extender allows only machine1, the other returns error but ignorable. Only machine1 would be chosen",
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
-				Containers: veryLargeContainers,
-				Priority:   &highPriority},
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptLowerPriority},
 			},
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
@@ -1440,8 +1453,9 @@ func TestPreempt(t *testing.T) {
 		{
 			name: "One scheduler extender allows only machine1, but it is not interested in given pod, otherwise machine1 would have been chosen",
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
-				Containers: veryLargeContainers,
-				Priority:   &highPriority},
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptLowerPriority},
 			},
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
@@ -1460,6 +1474,38 @@ func TestPreempt(t *testing.T) {
 			},
 			expectedNode: "machine3",
 			expectedPods: []string{},
+		},
+		{
+			name: "no preempting in pod",
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: &preemptNever},
+			},
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			expectedNode: "",
+			expectedPods: nil,
+		},
+		{
+			name: "PreemptionPolicy is nil",
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
+				Containers:       veryLargeContainers,
+				Priority:         &highPriority,
+				PreemptionPolicy: nil},
+			},
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			expectedNode: "machine1",
+			expectedPods: []string{"m1.1", "m1.2"},
 		},
 	}
 
@@ -1501,7 +1547,8 @@ func TestPreempt(t *testing.T) {
 				schedulertesting.FakePDBLister{},
 				false,
 				false,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+				schedulerapi.DefaultPercentageOfNodesToScore,
+				true)
 			scheduler.(*genericScheduler).snapshot()
 			// Call Preempt and check the expected results.
 			node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
@@ -1596,5 +1643,15 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
+	}
+}
+
+func assignDefaultStartTime(pods []*v1.Pod) {
+	now := metav1.Now()
+	for i := range pods {
+		pod := pods[i]
+		if pod.Status.StartTime == nil {
+			pod.Status.StartTime = &now
+		}
 	}
 }

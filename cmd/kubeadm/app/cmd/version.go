@@ -28,7 +28,7 @@ import (
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/cmd/kubeadm/app/version"
 )
 
 // Version provides the version information of kubeadm.

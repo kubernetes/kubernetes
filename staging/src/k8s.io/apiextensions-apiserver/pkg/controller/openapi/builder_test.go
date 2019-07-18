@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/go-openapi/spec"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -57,6 +58,18 @@ func TestNewBuilder(t *testing.T) {
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+		},
+		{"preserve unknown at root v2",
+			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			true,
+		},
+		{"preserve unknown at root v3",
+			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
+			`{"type":"object","x-kubernetes-preserve-unknown-fields":true,"properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			false,
 		},
 		{"with extensions",
 			`
@@ -154,7 +167,7 @@ func TestNewBuilder(t *testing.T) {
     "embedded-object": {
       "x-kubernetes-embedded-resource": true,
       "x-kubernetes-preserve-unknown-fields": true,
-      "type": "object"
+      "type":"object"
     }
   },
   "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
@@ -305,7 +318,22 @@ func TestNewBuilder(t *testing.T) {
     "embedded-object": {
       "x-kubernetes-embedded-resource": true,
       "x-kubernetes-preserve-unknown-fields": true,
-      "type": "object"
+      "type": "object",
+      "required":["kind","apiVersion"],
+      "properties":{
+        "apiVersion":{
+          "description":"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type":"string"
+        },
+        "kind":{
+          "description":"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type":"string"
+        },
+        "metadata":{
+          "description":"Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+          "$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        }
+      }
     }
   },
   "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
@@ -373,7 +401,7 @@ func TestNewBuilder(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(&wantedSchema, got.schema) {
-				t.Errorf("unexpected schema: %s\nwant = %#v\ngot = %#v", diff.ObjectDiff(&wantedSchema, got.schema), &wantedSchema, got.schema)
+				t.Errorf("unexpected schema: %s\nwant = %#v\ngot = %#v", schemaDiff(&wantedSchema, got.schema), &wantedSchema, got.schema)
 			}
 
 			gotListProperties := properties(got.listSchema.Properties)
@@ -383,7 +411,7 @@ func TestNewBuilder(t *testing.T) {
 
 			gotListSchema := got.listSchema.Properties["items"].Items.Schema
 			if !reflect.DeepEqual(&wantedItemsSchema, gotListSchema) {
-				t.Errorf("unexpected list schema: %s (want/got)", diff.ObjectDiff(&wantedItemsSchema, &gotListSchema))
+				t.Errorf("unexpected list schema: %s (want/got)", schemaDiff(&wantedItemsSchema, gotListSchema))
 			}
 		})
 	}
@@ -395,4 +423,16 @@ func properties(p map[string]spec.Schema) sets.String {
 		ret.Insert(k)
 	}
 	return ret
+}
+
+func schemaDiff(a, b *spec.Schema) string {
+	as, err := json.Marshal(a)
+	if err != nil {
+		panic(err)
+	}
+	bs, err := json.Marshal(b)
+	if err != nil {
+		panic(err)
+	}
+	return diff.StringDiff(string(as), string(bs))
 }

@@ -15,6 +15,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ingress:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
+        "//test/utils/image:go_default_library",
     ],
 )
 

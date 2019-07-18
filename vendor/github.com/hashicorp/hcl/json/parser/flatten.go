@@ -48,6 +48,12 @@ func flattenListType(
 	item *ast.ObjectItem,
 	items []*ast.ObjectItem,
 	frontier []*ast.ObjectItem) ([]*ast.ObjectItem, []*ast.ObjectItem) {
+	// If the list is empty, keep the original list
+	if len(ot.List) == 0 {
+		items = append(items, item)
+		return items, frontier
+	}
+
 	// All the elements of this object must also be objects!
 	for _, subitem := range ot.List {
 		if _, ok := subitem.(*ast.ObjectType); !ok {

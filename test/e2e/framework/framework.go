@@ -46,7 +46,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -110,7 +112,7 @@ type Framework struct {
 	TestSummaries []TestDataSummary
 
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
-	clusterAutoscalerMetricsBeforeTest metrics.Collection
+	clusterAutoscalerMetricsBeforeTest e2emetrics.Collection
 }
 
 // TestDataSummary is an interface for managing test data.
@@ -222,7 +224,7 @@ func (f *Framework) BeforeEach() {
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
 			ExpectNoError(err)
 		} else {
-			Logf("Skipping waiting for service account")
+			e2elog.Logf("Skipping waiting for service account")
 		}
 		f.UniqueName = f.Namespace.GetName()
 	} else {
@@ -250,7 +252,7 @@ func (f *Framework) BeforeEach() {
 			PrintVerboseLogs:            false,
 		}, nil)
 		if err != nil {
-			Logf("Error while creating NewResourceUsageGatherer: %v", err)
+			e2elog.Logf("Error while creating NewResourceUsageGatherer: %v", err)
 		} else {
 			go f.gatherer.StartGatheringData()
 		}
@@ -269,15 +271,15 @@ func (f *Framework) BeforeEach() {
 
 	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "master"
 	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics)
+		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
-			Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
+			e2elog.Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
 		} else {
 			f.clusterAutoscalerMetricsBeforeTest, err = grabber.Grab()
 			if err != nil {
-				Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
+				e2elog.Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
 			} else {
-				Logf("Gathered ClusterAutoscaler metrics before test")
+				e2elog.Logf("Gathered ClusterAutoscaler metrics before test")
 			}
 		}
 
@@ -308,15 +310,15 @@ func (f *Framework) AfterEach() {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 					} else {
-						Logf("Namespace %v was already deleted", ns.Name)
+						e2elog.Logf("Namespace %v was already deleted", ns.Name)
 					}
 				}
 			}
 		} else {
 			if !TestContext.DeleteNamespace {
-				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+				e2elog.Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 			} else {
-				Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
+				e2elog.Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
 			}
 		}
 
@@ -331,7 +333,7 @@ func (f *Framework) AfterEach() {
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
-			Failf(strings.Join(messages, ","))
+			e2elog.Failf(strings.Join(messages, ","))
 		}
 	}()
 
@@ -361,16 +363,16 @@ func (f *Framework) AfterEach() {
 		ginkgo.By("Gathering metrics")
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
 		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
+		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
-			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
+			e2elog.Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
 			received, err := grabber.Grab()
 			if err != nil {
-				Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
+				e2elog.Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
 			}
-			(*MetricsForE2E)(&received).computeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
-			f.TestSummaries = append(f.TestSummaries, (*MetricsForE2E)(&received))
+			(*e2emetrics.MetricsForE2E)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
+			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.MetricsForE2E)(&received))
 		}
 	}
 
@@ -388,7 +390,7 @@ func (f *Framework) AfterEach() {
 	// This is explicitly done at the very end of the test, to avoid
 	// e.g. not removing namespace in case of this failure.
 	if err := AllNodesReady(f.ClientSet, 3*time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
+		e2elog.Failf("All nodes should be ready after test, %v", err)
 	}
 }
 
@@ -430,34 +432,34 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
 func (f *Framework) WaitForPodTerminated(podName, reason string) error {
-	return waitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
+	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
 }
 
 // WaitForPodNotFound waits for the pod to be completely terminated (not "Get-able").
 func (f *Framework) WaitForPodNotFound(podName string, timeout time.Duration) error {
-	return waitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
+	return e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
 }
 
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
-	return WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
 }
 
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
-	return waitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
+	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.
 // It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
 func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return waitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
+	return e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
 }
 
 // WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
 // success or failure.
 func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+	return e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
 }
 
 // TestContainerOutput runs the given pod in the given namespace and waits
@@ -487,7 +489,7 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
-		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		e2elog.Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return err
 }
@@ -498,7 +500,7 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
 	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		e2elog.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
 }
@@ -509,7 +511,7 @@ func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path strin
 
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "ls", "-l", path)
 	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		e2elog.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
 }
@@ -546,7 +548,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 			TargetPort: intstr.FromInt(contPort),
 		}}
 	}
-	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
+	e2elog.Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
@@ -572,7 +574,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 	for i, node := range nodes.Items {
 		// one per node, but no more than maxCount.
 		if i <= maxCount {
-			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
+			e2elog.Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
 			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
@@ -643,19 +645,19 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
 	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
 		if numRetries > 0 {
-			Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
+			e2elog.Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
 		}
 
 		stdOutBytes, stdErrBytes, err := kubectlExec(namespace, podName, containerName, args...)
 		if err != nil {
 			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
 				// Retry on "i/o timeout" errors
-				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				e2elog.Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				continue
 			}
 			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
 				// Retry on "container not found" errors
-				Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				e2elog.Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -680,7 +682,7 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	cmd := KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
+	e2elog.Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
 	err := cmd.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
 }
@@ -787,7 +789,7 @@ func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Names
 
 	ns := namespace.Name
 	pl, err := filterLabels(p.Selectors, c, ns) // Build an v1.PodList to operate against.
-	Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
+	e2elog.Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
 	if len(pl.Items) == 0 || err != nil {
 		return pl.Items, err
 	}
@@ -802,7 +804,7 @@ ReturnPodsSoFar:
 		}
 		passesVerify, err := passesVerifyFilter(pod, p.Verify)
 		if err != nil {
-			Logf("Error detected on %v : %v !", pod.Name, err)
+			e2elog.Logf("Error detected on %v : %v !", pod.Name, err)
 			break ReturnPodsSoFar
 		}
 		if passesVerify {
@@ -823,12 +825,12 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 
 		// Failure
 		if returnedErr != nil {
-			Logf("Cutting polling short: We got an error from the pod filtering layer.")
+			e2elog.Logf("Cutting polling short: We got an error from the pod filtering layer.")
 			// stop polling if the pod filtering returns an error.  that should never happen.
 			// it indicates, for example, that the client is broken or something non-pod related.
 			return false, returnedErr
 		}
-		Logf("Found %v / %v", len(pods), atLeast)
+		e2elog.Logf("Found %v / %v", len(pods), atLeast)
 
 		// Success
 		if len(pods) >= atLeast {
@@ -837,7 +839,7 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 		// Keep trying...
 		return false, nil
 	})
-	Logf("WaitFor completed with timeout %v.  Pods found = %v out of %v", timeout, len(pods), atLeast)
+	e2elog.Logf("WaitFor completed with timeout %v.  Pods found = %v out of %v", timeout, len(pods), atLeast)
 	return pods, err
 }
 
@@ -845,7 +847,7 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration) {
 	pods, err := cl.WaitFor(atLeast, timeout)
 	if err != nil || len(pods) < atLeast {
-		Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
+		e2elog.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 	}
 }
 
@@ -858,26 +860,26 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	pods, err := cl.podState.filter(cl.client, cl.namespace)
 	if err == nil {
 		if len(pods) == 0 {
-			Failf("No pods matched the filter.")
+			e2elog.Failf("No pods matched the filter.")
 		}
-		Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
+		e2elog.Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
 		for _, p := range pods {
 			podFunc(p)
 		}
 	} else {
-		Logf("ForEach: Something went wrong when filtering pods to execute against: %v", err)
+		e2elog.Logf("ForEach: Something went wrong when filtering pods to execute against: %v", err)
 	}
 
 	return err
 }
 
 // GetLogToFileFunc is a convenience function that returns a function that have the same interface as
-// Logf, but writes to a specified file.
+// e2elog.Logf, but writes to a specified file.
 func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
 	return func(format string, args ...interface{}) {
 		writer := bufio.NewWriter(file)
 		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
-			Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
+			e2elog.Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
 		}
 		writer.Flush()
 	}

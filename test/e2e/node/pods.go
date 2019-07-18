@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -80,7 +80,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err := podClient.List(options)
 			framework.ExpectNoError(err, "failed to query for pod")
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+			framework.ExpectEqual(len(pods.Items), 0)
 			options = metav1.ListOptions{
 				LabelSelector:   selector.String(),
 				ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -94,7 +94,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(options)
 			framework.ExpectNoError(err, "failed to query for pod")
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+			framework.ExpectEqual(len(pods.Items), 1)
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
@@ -117,7 +117,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			output := string(buf[:n])
 			proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 			match := proxyRegexp.FindStringSubmatch(output)
-			gomega.Expect(len(match)).To(gomega.Equal(2))
+			framework.ExpectEqual(len(match), 2)
 			port, err := strconv.Atoi(match[1])
 			framework.ExpectNoError(err, "failed to convert port into string")
 
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("deleting the pod gracefully")
 			rsp, err := client.Do(req)
 			framework.ExpectNoError(err, "failed to use http client to send delete")
-			gomega.Expect(rsp.StatusCode).Should(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
+			framework.ExpectEqual(rsp.StatusCode, http.StatusOK, "failed to delete gracefully by client request")
 			var lastPod v1.Pod
 			err = json.NewDecoder(rsp.Body).Decode(&lastPod)
 			framework.ExpectNoError(err, "failed to decode graceful termination proxy response")
@@ -169,7 +169,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(options)
 			framework.ExpectNoError(err, "failed to query for pods")
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+			framework.ExpectEqual(len(pods.Items), 0)
 
 		})
 	})
@@ -179,12 +179,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
+
 		/*
 			Release : v1.9
 			Testname: Pods, QOS
-			Description:  Create a Pod with CPU and Memory request and limits. Pos status MUST have QOSClass set to PodQOSGuaranteed.
+			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
 		*/
-		framework.ConformanceIt("should be submitted and removed ", func() {
+		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
 			ginkgo.By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{

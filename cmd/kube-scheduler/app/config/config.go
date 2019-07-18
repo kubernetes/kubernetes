@@ -22,7 +22,9 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/record"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -45,9 +47,14 @@ type Config struct {
 	Client          clientset.Interface
 	InformerFactory informers.SharedInformerFactory
 	PodInformer     coreinformers.PodInformer
-	EventClient     v1core.EventsGetter
-	Recorder        record.EventRecorder
-	Broadcaster     record.EventBroadcaster
+	EventClient     v1beta1.EventsGetter
+
+	// TODO: Remove the following after fully migrating to the new events api.
+	CoreEventClient           v1core.EventsGetter
+	LeaderElectionBroadcaster record.EventBroadcaster
+
+	Recorder    events.EventRecorder
+	Broadcaster events.EventBroadcaster
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig

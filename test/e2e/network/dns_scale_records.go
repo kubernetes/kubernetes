@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -45,7 +46,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 
 	ginkgo.BeforeEach(func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
-		framework.WaitForAllNodesHealthy(f.ClientSet, time.Minute)
+		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)

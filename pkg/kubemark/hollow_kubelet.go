@@ -48,19 +48,13 @@ type HollowKubelet struct {
 }
 
 func NewHollowKubelet(
-	nodeName string,
+	flags *options.KubeletFlags,
+	config *kubeletconfig.KubeletConfiguration,
 	client *clientset.Clientset,
+	heartbeatClient *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
 	dockerClientConfig *dockershim.ClientConfig,
-	kubeletPort, kubeletReadOnlyPort int,
-	containerManager cm.ContainerManager,
-	maxPods int, podsPerCore int,
-) *HollowKubelet {
-	// -----------------
-	// Static config
-	// -----------------
-	f, c := GetHollowKubeletConfig(nodeName, kubeletPort, kubeletReadOnlyPort, maxPods, podsPerCore)
-
+	containerManager cm.ContainerManager) *HollowKubelet {
 	// -----------------
 	// Injected objects
 	// -----------------
@@ -69,7 +63,7 @@ func NewHollowKubelet(
 	volumePlugins = append(volumePlugins, projected.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:         client,
-		HeartbeatClient:    client,
+		HeartbeatClient:    heartbeatClient,
 		DockerClientConfig: dockerClientConfig,
 		CAdvisorInterface:  cadvisorInterface,
 		Cloud:              nil,
@@ -80,11 +74,12 @@ func NewHollowKubelet(
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
 		Mounter:            mount.New("" /* default mount path */),
 		Subpather:          &subpath.FakeSubpath{},
+		HostUtil:           &mount.FakeHostUtil{},
 	}
 
 	return &HollowKubelet{
-		KubeletFlags:         f,
-		KubeletConfiguration: c,
+		KubeletFlags:         flags,
+		KubeletConfiguration: config,
 		KubeletDeps:          d,
 	}
 }
@@ -138,6 +133,7 @@ func GetHollowKubeletConfig(
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
+	c.NodeStatusReportFrequency.Duration = time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(maxPods)

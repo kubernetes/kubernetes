@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 
-package testing
+package testing // import "k8s.io/apimachinery/pkg/runtime/serializer/testing"

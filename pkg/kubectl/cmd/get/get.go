@@ -24,37 +24,36 @@ import (
 	"net/url"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util/interrupt"
+	utilprinters "k8s.io/kubectl/pkg/util/printers"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/interrupt"
-	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // GetOptions contains the input to the get command.
 type GetOptions struct {
 	PrintFlags             *PrintFlags
-	ToPrinter              func(*meta.RESTMapping, bool, bool) (printers.ResourcePrinterFunc, error)
+	ToPrinter              func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 	PrintWithOpenAPICols   bool
 
@@ -66,6 +65,8 @@ type GetOptions struct {
 	Watch     bool
 	WatchOnly bool
 	ChunkSize int64
+
+	OutputWatchEvents bool
 
 	LabelSelector     string
 	FieldSelector     string
@@ -173,6 +174,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
 	cmd.Flags().Int64Var(&o.ChunkSize, "chunk-size", o.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -230,7 +232,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.IsHumanReadablePrinter = true
 	}
 
-	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
+	o.ToPrinter = func(mapping *meta.RESTMapping, outputObjects *bool, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
 
@@ -256,6 +258,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 		if o.Sort {
 			printer = &SortingPrinter{Delegate: printer, SortField: sortBy}
+		}
+		if outputObjects != nil {
+			printer = &skipPrinter{delegate: printer, output: outputObjects}
 		}
 		if o.ServerPrint {
 			printer = &TablePrinter{Delegate: printer}
@@ -307,6 +312,9 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 		if outputOption != "" && outputOption != "wide" {
 			return fmt.Errorf("--show-labels option cannot be used with %s printer", outputOption)
 		}
+	}
+	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
+		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
 	}
 	return nil
 }
@@ -408,7 +416,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 	return &RuntimeSorter{
 		field:   parsedField,
-		decoder: legacyscheme.Codecs.UniversalDecoder(),
+		decoder: kubernetesscheme.Codecs.UniversalDecoder(),
 		objects: objects,
 	}
 }
@@ -438,7 +446,11 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 // TODO: remove the need to pass these arguments, like other commands.
 func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
-		return o.raw(f)
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
 		return o.watch(f, cmd, args)
@@ -510,6 +522,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	// track if we write any output
 	trackingWriter := &trackingWriterWrapper{Delegate: o.Out}
 
+	// remember how much we've written
+	written := 0
+
 	w := utilprinters.GetNewTabWriter(trackingWriter)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
@@ -532,14 +547,17 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			w.Flush()
 			w.SetRememberedWidths(nil)
 
-			// TODO: this doesn't belong here
 			// add linebreak between resource groups (if there is more than one)
 			// skip linebreak above first resource group
 			if lastMapping != nil && !o.NoHeaders {
-				fmt.Fprintln(o.ErrOut)
+				// If we've written output since the last time we started a new set of headers, write an empty line to separate object types
+				if written != trackingWriter.Written {
+					fmt.Fprintln(w)
+					written = trackingWriter.Written
+				}
 			}
 
-			printer, err = o.ToPrinter(mapping, printWithNamespace, printWithKind)
+			printer, err = o.ToPrinter(mapping, nil, printWithNamespace, printWithKind)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -558,19 +576,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			continue
 		}
 
-		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
-		if err != nil {
-			// if there's an error, try to print what you have (mirrors old behavior).
-			klog.V(1).Info(err)
-			printer.PrintObj(info.Object, w)
-		} else {
-			printer.PrintObj(internalObj, w)
-		}
+		printer.PrintObj(info.Object, w)
 	}
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		fmt.Fprintln(o.ErrOut, "No resources found.")
+		noResourcesFoundFormat := fmt.Sprintf("No resources found in %s namespace.", o.Namespace)
+		fmt.Fprintln(o.ErrOut, noResourcesFoundFormat)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -583,27 +595,6 @@ type trackingWriterWrapper struct {
 func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
 	t.Written += len(p)
 	return t.Delegate.Write(p)
-}
-
-// raw makes a simple HTTP request to the provided path on the server using the default
-// credentials.
-func (o *GetOptions) raw(f cmdutil.Factory) error {
-	restClient, err := f.RESTClient()
-	if err != nil {
-		return err
-	}
-
-	stream, err := restClient.Get().RequestURI(o.Raw).Stream()
-	if err != nil {
-		return err
-	}
-	defer stream.Close()
-
-	_, err = io.Copy(o.Out, stream)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	return nil
 }
 
 // watch starts a client-side watch of one or more resources.
@@ -635,7 +626,8 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	printer, err := o.ToPrinter(mapping, o.AllNamespaces, false)
+	outputObjects := utilpointer.BoolPtr(!o.WatchOnly)
+	printer, err := o.ToPrinter(mapping, outputObjects, o.AllNamespaces, false)
 	if err != nil {
 		return err
 	}
@@ -661,28 +653,28 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 
 	writer := utilprinters.GetNewTabWriter(o.Out)
 
-	tableGK := metainternal.SchemeGroupVersion.WithKind("Table").GroupKind()
-
 	// print the current object
-	if !o.WatchOnly {
-		var objsToPrint []runtime.Object
-
-		if isList {
-			objsToPrint, _ = meta.ExtractList(obj)
-		} else {
-			objsToPrint = append(objsToPrint, obj)
+	var objsToPrint []runtime.Object
+	if isList {
+		objsToPrint, _ = meta.ExtractList(obj)
+	} else {
+		objsToPrint = append(objsToPrint, obj)
+	}
+	for _, objToPrint := range objsToPrint {
+		if o.OutputWatchEvents {
+			objToPrint = &metav1.WatchEvent{Type: string(watch.Added), Object: runtime.RawExtension{Object: objToPrint}}
 		}
-		for _, objToPrint := range objsToPrint {
-			if o.IsHumanReadablePrinter && objToPrint.GetObjectKind().GroupVersionKind().GroupKind() != tableGK {
-				// printing anything other than tables always takes the internal version, but the watch event uses externals
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
-			}
-			if err := printer.PrintObj(objToPrint, writer); err != nil {
-				return fmt.Errorf("unable to output the provided object: %v", err)
-			}
+		if err := printer.PrintObj(objToPrint, writer); err != nil {
+			return fmt.Errorf("unable to output the provided object: %v", err)
 		}
-		writer.Flush()
+	}
+	writer.Flush()
+	if isList {
+		// we can start outputting objects now, watches started from lists don't emit synthetic added events
+		*outputObjects = true
+	} else {
+		// suppress output, since watches started for individual items emit a synthetic ADDED event first
+		*outputObjects = false
 	}
 
 	// print watched changes
@@ -691,44 +683,26 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	first := true
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
-			if !isList && first {
-				// drop the initial watch event in the single resource case
-				first = false
-				return false, nil
-			}
-
-			// printing always takes the internal version, but the watch event uses externals
-			// TODO fix printing to use server-side or be version agnostic
 			objToPrint := e.Object
-			if o.IsHumanReadablePrinter && objToPrint.GetObjectKind().GroupVersionKind().GroupKind() != tableGK {
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
+			if o.OutputWatchEvents {
+				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}
 			}
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
 			}
 			writer.Flush()
+			// after processing at least one event, start outputting objects
+			*outputObjects = true
 			return false, nil
 		})
 		return err
 	})
 	return nil
-}
-
-// attemptToConvertToInternal tries to convert to an internal type, but returns the original if it can't
-func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConvertor, targetVersion schema.GroupVersion) runtime.Object {
-	internalObject, err := converter.ConvertToVersion(obj, targetVersion)
-	if err != nil {
-		klog.V(1).Infof("Unable to convert %T to %v: %v", obj, targetVersion, err)
-		return obj
-	}
-	return internalObject
 }
 
 func (o *GetOptions) printGeneric(r *resource.Result) error {
@@ -750,7 +724,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
-	printer, err := o.ToPrinter(nil, false, false)
+	printer, err := o.ToPrinter(nil, nil, false, false)
 	if err != nil {
 		return err
 	}

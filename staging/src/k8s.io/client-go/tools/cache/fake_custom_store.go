@@ -25,7 +25,7 @@ type FakeCustomStore struct {
 	ListKeysFunc func() []string
 	GetFunc      func(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKeyFunc func(key string) (item interface{}, exists bool, err error)
-	ReplaceFunc  func(list []interface{}, resourceVerion string) error
+	ReplaceFunc  func(list []interface{}, resourceVersion string) error
 	ResyncFunc   func() error
 }
 

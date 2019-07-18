@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -74,7 +73,7 @@ func NewIPerf(csvLine string) *IPerfResult {
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
 	if len(slice) != 9 {
-		framework.Failf("Incorrect fields in the output: %v (%v out of 9)", slice, len(slice))
+		e2elog.Failf("Incorrect fields in the output: %v (%v out of 9)", slice, len(slice))
 	}
 	i := IPerfResult{}
 	i.date = slice.get(0)
@@ -103,7 +102,7 @@ func (s StrSlice) get(i int) string {
 func intOrFail(debugName string, rawValue string) int64 {
 	value, err := strconv.ParseInt(rawValue, 10, 64)
 	if err != nil {
-		framework.Failf("Failed parsing value %v from the string '%v' as an integer", debugName, rawValue)
+		e2elog.Failf("Failed parsing value %v from the string '%v' as an integer", debugName, rawValue)
 	}
 	return value
 }

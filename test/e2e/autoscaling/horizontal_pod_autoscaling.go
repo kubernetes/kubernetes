@@ -67,7 +67,14 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	})
 
 	SIGDescribe("ReplicationController light", func() {
-		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
+		/*
+		  Release : v1.16
+		  Testname: Horizontal Pod Autoscaling, CPU Target Utilization Scale
+		  Description: Given 1 Pod with 150mCPU usage, 200mCPU per Pod request, and
+		  targeted CPU uitilzation of 50% the HP Autoscaler MUST create another pod,
+		  spreading the 150mCPU usage across both Pods.
+		*/
+		framework.ConformanceIt("should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
@@ -79,7 +86,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 			}
 			scaleTest.run("rc-light", common.KindRC, rc, f)
 		})
-		ginkgo.It("Should scale from 2 pods to 1 pod", func() {
+		ginkgo.It("Should scale from 2 pods to 1 pod [Slow]", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    2,
 				totalInitialCPUUsage:        50,

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package value
 import (
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/status"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -53,12 +55,23 @@ var (
 		},
 		[]string{"transformation_type"},
 	)
-	transformerFailuresTotal = prometheus.NewCounterVec(
+
+	transformerOperationsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "transformation_operations_total",
+			Help:      "Total number of transformations.",
+		},
+		[]string{"transformation_type", "status"},
+	)
+
+	deprecatedTransformerFailuresTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "transformation_failures_total",
-			Help:      "Total number of failed transformation operations.",
+			Help:      "(Deprecated) Total number of failed transformation operations.",
 		},
 		[]string{"transformation_type"},
 	)
@@ -106,7 +119,8 @@ func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(transformerLatencies)
 		prometheus.MustRegister(deprecatedTransformerLatencies)
-		prometheus.MustRegister(transformerFailuresTotal)
+		prometheus.MustRegister(transformerOperationsTotal)
+		prometheus.MustRegister(deprecatedTransformerFailuresTotal)
 		prometheus.MustRegister(envelopeTransformationCacheMissTotal)
 		prometheus.MustRegister(dataKeyGenerationLatencies)
 		prometheus.MustRegister(deprecatedDataKeyGenerationLatencies)
@@ -115,14 +129,17 @@ func RegisterMetrics() {
 }
 
 // RecordTransformation records latencies and count of TransformFromStorage and TransformToStorage operations.
+// Note that transformation_failures_total metric is deprecated, use transformation_operations_total instead.
 func RecordTransformation(transformationType string, start time.Time, err error) {
-	if err != nil {
-		transformerFailuresTotal.WithLabelValues(transformationType).Inc()
-		return
-	}
+	transformerOperationsTotal.WithLabelValues(transformationType, status.Code(err).String()).Inc()
 
-	transformerLatencies.WithLabelValues(transformationType).Observe(sinceInSeconds(start))
-	deprecatedTransformerLatencies.WithLabelValues(transformationType).Observe(sinceInMicroseconds(start))
+	switch {
+	case err == nil:
+		transformerLatencies.WithLabelValues(transformationType).Observe(sinceInSeconds(start))
+		deprecatedTransformerLatencies.WithLabelValues(transformationType).Observe(sinceInMicroseconds(start))
+	default:
+		deprecatedTransformerFailuresTotal.WithLabelValues(transformationType).Inc()
+	}
 }
 
 // RecordCacheMiss records a miss on Key Encryption Key(KEK) - call to KMS was required to decrypt KEK.

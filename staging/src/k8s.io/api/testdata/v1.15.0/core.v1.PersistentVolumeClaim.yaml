@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fields:
+      "18":
+        "19": null
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "16964250748386560239"
+  selfLink: "5"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+spec:
+  accessModes:
+  - 脽ěĂ凗蓏Ŋ蛊ĉy緅縕
+  dataSource:
+    apiGroup: "32"
+    kind: "33"
+    name: "34"
+  resources:
+    limits:
+      p:籀帊: "219"
+    requests:
+      骀Šĸ: "986"
+  selector:
+    matchExpressions:
+    - key: g0d--o82-g50-u--25cu87--r7p-w1e67-8j/42M--n1-p5.3___47._49pIB_o61ISU4--N
+      operator: In
+      values:
+      - t_k-_v.6
+    matchLabels:
+      p-g8c2-k-912e5-c-e63-n-3n.c83-b-w7ld-6cs06xj-x5yv0wm-k1-87-3s-g3/9_-.-W._AAn---v_-5-_8LXP-o-9..1m: JTrcd-2.-__E_Sv__26KX_R_.-N
+  storageClassName: "31"
+  volumeMode: e0ɔȖ脵鴈Ōƾ焁yǠ/淹\韲翁&
+  volumeName: "30"
+status:
+  accessModes:
+  - '曢\%枅:'
+  capacity:
+    ǛƓɥ踓Ǻǧ湬淊kŪ睴: "659"
+  conditions:
+  - lastProbeTime: "2197-07-19T07:02:22Z"
+    lastTransitionTime: "2641-12-26T14:46:27Z"
+    message: "36"
+    reason: "35"
+    status: ĪȸŹăȲĻ¤Ħʅ芝
+    type: 3fƻfʣ繡楙¯ĦE
+  phase: s

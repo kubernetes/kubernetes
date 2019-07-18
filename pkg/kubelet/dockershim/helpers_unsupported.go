@@ -45,9 +45,9 @@ func (ds *dockerService) updateCreateConfig(
 	return nil
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
+func (ds *dockerService) determinePodIPBySandboxID(uid string) []string {
 	klog.Warningf("determinePodIPBySandboxID is unsupported in this build")
-	return ""
+	return nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {

@@ -35,6 +35,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
@@ -45,11 +47,12 @@ type customResourceStrategy struct {
 
 	namespaceScoped bool
 	validator       customResourceValidator
+	schemas         map[string]*structuralschema.Structural
 	status          *apiextensions.CustomResourceSubresourceStatus
 	scale           *apiextensions.CustomResourceSubresourceScale
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, schemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
 	return customResourceStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
@@ -62,6 +65,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			schemaValidator:       schemaValidator,
 			statusSchemaValidator: statusSchemaValidator,
 		},
+		schemas: schemas,
 	}
 }
 
@@ -129,7 +133,16 @@ func copyNonMetadata(original map[string]interface{}) map[string]interface{} {
 
 // Validate validates a new CustomResource.
 func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return a.validator.Validate(ctx, obj, a.scale)
+	var errs field.ErrorList
+	errs = append(errs, a.validator.Validate(ctx, obj, a.scale)...)
+
+	// validate embedded resources
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		v := obj.GetObjectKind().GroupVersionKind().Version
+		errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.schemas[v], false)...)
+	}
+
+	return errs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -149,7 +162,16 @@ func (customResourceStrategy) AllowUnconditionalUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return a.validator.ValidateUpdate(ctx, obj, old, a.scale)
+	var errs field.ErrorList
+	errs = append(errs, a.validator.ValidateUpdate(ctx, obj, old, a.scale)...)
+
+	// Checks the embedded objects. We don't make a difference between update and create for those.
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		v := obj.GetObjectKind().GroupVersionKind().Version
+		errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.schemas[v], false)...)
+	}
+
+	return errs
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

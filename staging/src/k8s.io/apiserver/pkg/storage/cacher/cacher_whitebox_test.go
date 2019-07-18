@@ -217,7 +217,7 @@ type testVersioner struct{}
 func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
 	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
 }
-func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count int64) error {
+func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count *int64) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err
@@ -257,7 +257,7 @@ func init() {
 	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
-func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner) {
+func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	config := Config{
 		CacheCapacity:  cap,
@@ -270,7 +270,8 @@ func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner) {
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}
-	return NewCacherFromConfig(config), testVersioner{}
+	cacher, err := NewCacherFromConfig(config)
+	return cacher, testVersioner{}, err
 }
 
 type dummyStorage struct {
@@ -328,7 +329,10 @@ func (d *dummyStorage) Count(_ string) (int64, error) {
 
 func TestListWithLimitAndRV0(t *testing.T) {
 	backingStorage := &dummyStorage{}
-	cacher, _ := newTestCacher(backingStorage, 0)
+	cacher, _, err := newTestCacher(backingStorage, 0)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	pred := storage.SelectionPredicate{
@@ -341,7 +345,7 @@ func TestListWithLimitAndRV0(t *testing.T) {
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.err = errDummy
-	err := cacher.List(context.TODO(), "pods/ns", "0", pred, result)
+	err = cacher.List(context.TODO(), "pods/ns", "0", pred, result)
 	if err != nil {
 		t.Errorf("List with Limit and RV=0 should be served from cache: %v", err)
 	}
@@ -354,7 +358,10 @@ func TestListWithLimitAndRV0(t *testing.T) {
 
 func TestGetToListWithLimitAndRV0(t *testing.T) {
 	backingStorage := &dummyStorage{}
-	cacher, _ := newTestCacher(backingStorage, 0)
+	cacher, _, err := newTestCacher(backingStorage, 0)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	pred := storage.SelectionPredicate{
@@ -367,7 +374,7 @@ func TestGetToListWithLimitAndRV0(t *testing.T) {
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.err = errDummy
-	err := cacher.GetToList(context.TODO(), "pods/ns", "0", pred, result)
+	err = cacher.GetToList(context.TODO(), "pods/ns", "0", pred, result)
 	if err != nil {
 		t.Errorf("GetToList with Limit and RV=0 should be served from cache: %v", err)
 	}
@@ -380,7 +387,10 @@ func TestGetToListWithLimitAndRV0(t *testing.T) {
 
 func TestWatcherNotGoingBackInTime(t *testing.T) {
 	backingStorage := &dummyStorage{}
-	cacher, _ := newTestCacher(backingStorage, 1000)
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
@@ -498,7 +508,10 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 
 func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 	backingStorage := &dummyStorage{}
-	cacher, _ := newTestCacher(backingStorage, 1000)
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
@@ -577,7 +590,10 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 func testCacherSendBookmarkEvents(t *testing.T, watchCacheEnabled, allowWatchBookmarks, expectedBookmarks bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, watchCacheEnabled)()
 	backingStorage := &dummyStorage{}
-	cacher, _ := newTestCacher(backingStorage, 1000)
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
@@ -676,7 +692,10 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
 	backingStorage := &dummyStorage{}
-	cacher, _ := newTestCacher(backingStorage, 1000)
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
@@ -686,7 +705,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
 
 	resourceVersion := uint64(1000)
-	err := cacher.watchCache.Add(&examplev1.Pod{
+	err = cacher.watchCache.Add(&examplev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            fmt.Sprintf("pod-0"),
 			Namespace:       "ns",
@@ -741,5 +760,80 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		}
 		w.Stop()
 		wg.Wait()
+	}
+}
+
+func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	// Ensure there is some budget for slowing down processing.
+	cacher.dispatchTimeoutBudget.returnUnused(50 * time.Millisecond)
+
+	makePod := func(i int) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", 1000+i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", 1000+i),
+			},
+		}
+	}
+	if err := cacher.watchCache.Add(makePod(0)); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	totalPods := 50
+
+	// Create watcher that will be blocked.
+	w1, err := cacher.Watch(context.TODO(), "pods/ns", "999", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w1.Stop()
+
+	// Create fast watcher and ensure it will get all objects.
+	w2, err := cacher.Watch(context.TODO(), "pods/ns", "999", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w2.Stop()
+
+	// Now push a ton of object to cache.
+	for i := 1; i < totalPods; i++ {
+		cacher.watchCache.Add(makePod(i))
+	}
+
+	shouldContinue := true
+	eventsCount := 0
+	for shouldContinue {
+		select {
+		case event, ok := <-w2.ResultChan():
+			if !ok {
+				shouldContinue = false
+				break
+			}
+			// Ensure there is some budget for fast watcher after slower one is blocked.
+			cacher.dispatchTimeoutBudget.returnUnused(50 * time.Millisecond)
+			if event.Type == watch.Added {
+				eventsCount++
+				if eventsCount == totalPods {
+					shouldContinue = false
+				}
+			}
+		case <-time.After(2 * time.Second):
+			shouldContinue = false
+			w2.Stop()
+		}
+	}
+	if eventsCount != totalPods {
+		t.Errorf("watcher is blocked by slower one (count: %d)", eventsCount)
 	}
 }

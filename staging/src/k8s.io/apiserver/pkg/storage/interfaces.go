@@ -44,8 +44,8 @@ type Versioner interface {
 	// database. continueValue is optional and indicates that more results are available if the client
 	// passes that value to the server in a subsequent call. remainingItemCount indicates the number
 	// of remaining objects if the list is partial. The remainingItemCount field is omitted during
-	// serialization if it is set to 0.
-	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, remainingItemCount int64) error
+	// serialization if it is set to nil.
+	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, remainingItemCount *int64) error
 	// PrepareObjectForStorage should set SelfLink and ResourceVersion to the empty value. Should
 	// return an error if the specified object cannot be updated.
 	PrepareObjectForStorage(obj runtime.Object) error
@@ -73,16 +73,15 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
-type MatchValue struct {
-	IndexName string
-	Value     string
-}
+// TriggerPublisherFunc is a function that for a given object computes
+// <value of an index> for a particular <index>.
+// TODO(wojtek-t): Rename to IndexerFunc?
+type TriggerPublisherFunc func(obj runtime.Object) string
 
-// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
-// (<index name>, <index value for the given object>) for all indexes known
-// to that function.
-type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+// TriggerPublisherFuncs is a mapping from <index name> to function that
+// for a given object computes <value for that index>.
+// TODO(wojtek-t): Rename to IndexerFuncs?
+type TriggerPublisherFuncs map[string]TriggerPublisherFunc
 
 // Everything accepts all objects.
 var Everything = SelectionPredicate{

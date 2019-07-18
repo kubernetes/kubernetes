@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"reflect"
-	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -41,7 +39,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
@@ -87,7 +84,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
 func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, ControlPlaneTaint bool) error {
 	var err error
-	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
+	cfg.Name, err = kubeadmutil.GetHostname(cfg.Name)
 	if err != nil {
 		return err
 	}
@@ -162,13 +159,16 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 }
 
 // DefaultedInitConfiguration takes a versioned init config (often populated by flags), defaults it and converts it into internal InitConfiguration
-func DefaultedInitConfiguration(defaultversionedcfg *kubeadmapiv1beta2.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
+func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
 	internalcfg := &kubeadmapi.InitConfiguration{}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
 	// static default values to cfg only for values not provided with flags
-	kubeadmscheme.Scheme.Default(defaultversionedcfg)
-	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Default(versionedInitCfg)
+	kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil)
+
+	kubeadmscheme.Scheme.Default(versionedClusterCfg)
+	kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil)
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
@@ -194,18 +194,18 @@ func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 }
 
 // LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
-// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
-// Then the external, versioned configuration is defaulted and converted to the internal type.
+// If cfgPath is specified, the versioned configs will always get overridden with the one in the file (specified by cfgPath).
+// The the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultInitConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1beta2.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
+func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags
 		return LoadInitConfigurationFromFile(cfgPath)
 	}
 
-	return DefaultedInitConfiguration(defaultversionedcfg)
+	return DefaultedInitConfiguration(versionedInitCfg, versionedClusterCfg)
 }
 
 // BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
@@ -339,68 +339,11 @@ func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schem
 	// Exception: If the specified groupversion is targeting the internal type, don't print embedded ClusterConfiguration contents
 	// This is mostly used for unit testing. In a real scenario the internal version of the API is never marshalled as-is.
 	if gv.Version != runtime.APIVersionInternal {
-		clusterbytes, err := MarshalClusterConfigurationToBytes(&cfg.ClusterConfiguration, gv)
+		clusterbytes, err := kubeadmutil.MarshalToYamlForCodecs(&cfg.ClusterConfiguration, gv, kubeadmscheme.Codecs)
 		if err != nil {
 			return []byte{}, err
 		}
 		allFiles = append(allFiles, clusterbytes)
 	}
 	return bytes.Join(allFiles, []byte(kubeadmconstants.YAMLDocumentSeparator)), nil
-}
-
-// MarshalClusterConfigurationToBytes marshals the internal ClusterConfiguration object to bytes. It writes the embedded
-// ComponentConfiguration objects out as separate YAML documents
-func MarshalClusterConfigurationToBytes(clustercfg *kubeadmapi.ClusterConfiguration, gv schema.GroupVersion) ([]byte, error) {
-	clusterbytes, err := kubeadmutil.MarshalToYamlForCodecs(clustercfg, gv, kubeadmscheme.Codecs)
-	if err != nil {
-		return []byte{}, err
-	}
-	allFiles := [][]byte{clusterbytes}
-	componentConfigContent := map[string][]byte{}
-	defaultedcfg := defaultedInternalConfig()
-
-	for kind, registration := range componentconfigs.Known {
-		// If the ComponentConfig struct for the current registration is nil, skip it when marshalling
-		realobj, ok := registration.GetFromInternalConfig(clustercfg)
-		if !ok {
-			continue
-		}
-
-		defaultedobj, ok := registration.GetFromInternalConfig(defaultedcfg)
-		// Invalid: The caller asked to not print the componentconfigs if defaulted, but defaultComponentConfigs() wasn't able to create default objects to use for reference
-		if !ok {
-			return []byte{}, errors.New("couldn't create a default componentconfig object")
-		}
-
-		// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
-		if !reflect.DeepEqual(realobj, defaultedobj) {
-			contentBytes, err := registration.Marshal(realobj)
-			if err != nil {
-				return []byte{}, err
-			}
-			componentConfigContent[string(kind)] = contentBytes
-		}
-	}
-
-	// Sort the ComponentConfig files by kind when marshalling
-	sortedComponentConfigFiles := consistentOrderByteSlice(componentConfigContent)
-	allFiles = append(allFiles, sortedComponentConfigFiles...)
-	return bytes.Join(allFiles, []byte(kubeadmconstants.YAMLDocumentSeparator)), nil
-}
-
-// consistentOrderByteSlice takes a map of a string key and a byte slice, and returns a byte slice of byte slices
-// with consistent ordering, where the keys in the map determine the ordering of the return value. This has to be
-// done as the order of a for...range loop over a map in go is undeterministic, and could otherwise lead to flakes
-// in e.g. unit tests when marshalling content with a random order
-func consistentOrderByteSlice(content map[string][]byte) [][]byte {
-	keys := []string{}
-	sortedContent := [][]byte{}
-	for key := range content {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		sortedContent = append(sortedContent, content[key])
-	}
-	return sortedContent
 }

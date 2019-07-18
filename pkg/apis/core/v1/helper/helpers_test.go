@@ -756,7 +756,7 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 
 // TestMatchNodeSelectorTermsStateless ensures MatchNodeSelectorTerms()
 // is invoked in a "stateless" manner, i.e. nodeSelectorTerms should NOT
-// be deeply modifed after invoking
+// be deeply modified after invoking
 func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 	type args struct {
 		nodeSelectorTerms []v1.NodeSelectorTerm

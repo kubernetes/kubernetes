@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // getNestedMountpoints returns a list of mountpoint directories that should be created
@@ -70,16 +71,19 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 		}
 		return nil
 	}
-	for _, container := range pod.Spec.InitContainers {
-		if err := checkContainer(&container); err != nil {
-			return nil, err
+
+	var retErr error
+	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+		retErr = checkContainer(c)
+		if retErr != nil {
+			return false
 		}
+		return true
+	})
+	if retErr != nil {
+		return nil, retErr
 	}
-	for _, container := range pod.Spec.Containers {
-		if err := checkContainer(&container); err != nil {
-			return nil, err
-		}
-	}
+
 	return retval, nil
 }
 

@@ -124,8 +124,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		klog.Fatalf("cloud provider is nil")
 	}
 
-	if cloud.HasClusterID() == false {
-		if c.ComponentConfig.KubeCloudShared.AllowUntaggedCloud == true {
+	if !cloud.HasClusterID() {
+		if c.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
 			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
 			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")

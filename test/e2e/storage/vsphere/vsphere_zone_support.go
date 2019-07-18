@@ -111,7 +111,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		zones = make([]string, 0)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
+			e2elog.Failf("Unable to find ready and schedulable Node")
 		}
 	})
 

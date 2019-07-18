@@ -396,6 +396,7 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
 			klog.Errorf("ListPVs: %v", &errWrongType{"v1.PersistentVolume", obj})
+			continue
 		}
 		pvs = append(pvs, pv)
 	}

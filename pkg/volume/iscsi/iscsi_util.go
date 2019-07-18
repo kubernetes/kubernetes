@@ -52,6 +52,9 @@ const (
 	// How many seconds to wait for a multipath device if at least two paths are available.
 	multipathDeviceTimeout = 10
 
+	// How many seconds to wait for a device/path to appear before giving up.
+	deviceDiscoveryTimeout = 30
+
 	// 'iscsiadm' error code stating that a session is logged in
 	// See https://github.com/open-iscsi/open-iscsi/blob/7d121d12ad6ba7783308c25ffd338a9fa0cc402b/include/iscsi_err.h#L37-L38
 	iscsiadmErrorSessExists = 15
@@ -293,9 +296,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var iscsiTransport string
 	var lastErr error
 
-	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "show")
+	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
-		klog.Errorf("iscsi: could not read iface %s error: %s", b.Iface, string(out))
+		klog.Errorf("iscsi: could not read iface %s error: %s", b.InitIface, string(out))
 		return "", err
 	}
 
@@ -303,17 +306,13 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 	bkpPortal := b.Portals
 
-	// create new iface and copy parameters from pre-configured iface to the created iface
+	// If the initiator name was set, the iface isn't created yet,
+	// so create it and copy parameters from the pre-configured one
 	if b.InitiatorName != "" {
-		// new iface name is <target portal>:<volume name>
-		newIface := bkpPortal[0] + ":" + b.VolName
-		err = cloneIface(b, newIface)
-		if err != nil {
-			klog.Errorf("iscsi: failed to clone iface: %s error: %v", b.Iface, err)
+		if err = cloneIface(b); err != nil {
+			klog.Errorf("iscsi: failed to clone iface: %s error: %v", b.InitIface, err)
 			return "", err
 		}
-		// update iface name
-		b.Iface = newIface
 	}
 
 	// Lock the target while we login to avoid races between 2 volumes that share the same
@@ -417,10 +416,10 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
 			}
 
-			if exist := waitForPathToExist(&devicePath, multipathDeviceTimeout, iscsiTransport); !exist {
-				klog.Errorf("Could not attach disk: Timeout after %ds", multipathDeviceTimeout)
+			if exist := waitForPathToExist(&devicePath, deviceDiscoveryTimeout, iscsiTransport); !exist {
+				klog.Errorf("Could not attach disk: Timeout after %ds", deviceDiscoveryTimeout)
 				// update last error
-				lastErr = fmt.Errorf("Could not attach disk: Timeout after %ds", multipathDeviceTimeout)
+				lastErr = fmt.Errorf("Could not attach disk: Timeout after %ds", deviceDiscoveryTimeout)
 				continue
 			} else {
 				devicePaths[tp] = devicePath
@@ -456,8 +455,8 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	}
 	// Try to find a multipath device for the volume
 	if len(bkpPortal) > 1 {
-		// Multipath volume was requested. Wait up to 10 seconds for the multipath device to appear.
-		devicePath = waitForMultiPathToExist(devicePathList, 10, b.deviceUtil)
+		// Multipath volume was requested. Wait up to multipathDeviceTimeout seconds for the multipath device to appear.
+		devicePath = waitForMultiPathToExist(devicePathList, multipathDeviceTimeout, b.deviceUtil)
 	} else {
 		// For PVs with 1 portal, just try one time to find the multipath device. This
 		// avoids a long pause when the multipath device will never get created, and
@@ -857,10 +856,13 @@ func parseIscsiadmShow(output string) (map[string]string, error) {
 	return params, nil
 }
 
-func cloneIface(b iscsiDiskMounter, newIface string) error {
+func cloneIface(b iscsiDiskMounter) error {
 	var lastErr error
+	if b.InitIface == b.Iface {
+		return fmt.Errorf("iscsi: cannot clone iface with same name: %s", b.InitIface)
+	}
 	// get pre-configured iface records
-	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "show")
+	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
 		lastErr = fmt.Errorf("iscsi: failed to show iface records: %s (%v)", string(out), err)
 		return lastErr
@@ -874,11 +876,11 @@ func cloneIface(b iscsiDiskMounter, newIface string) error {
 	// update initiatorname
 	params["iface.initiatorname"] = b.InitiatorName
 	// create new iface
-	out, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "new")
+	out, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "new")
 	if err != nil {
 		exit, ok := err.(utilexec.ExitError)
 		if ok && exit.ExitStatus() == iscsiadmErrorSessExists {
-			klog.Infof("iscsi: there is a session already logged in with iface %s", newIface)
+			klog.Infof("iscsi: there is a session already logged in with iface %s", b.Iface)
 		} else {
 			lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", string(out), err)
 			return lastErr
@@ -886,10 +888,10 @@ func cloneIface(b iscsiDiskMounter, newIface string) error {
 	}
 	// update new iface records
 	for key, val := range params {
-		_, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "update", "-n", key, "-v", val)
+		_, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", val)
 		if err != nil {
-			b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "delete")
-			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.Iface)
+			b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
+			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.InitIface)
 			break
 		}
 	}

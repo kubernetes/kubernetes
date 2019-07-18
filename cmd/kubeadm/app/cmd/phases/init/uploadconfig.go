@@ -31,28 +31,27 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	uploadKubeadmConfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+	uploadKubeadmConfigLongDesc = fmt.Sprintf(cmdutil.LongDesc(`
 		Upload the kubeadm ClusterConfiguration to a ConfigMap called %s in the %s namespace.
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.
 		`), kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
-	uploadKubeadmConfigExample = normalizer.Examples(`
+	uploadKubeadmConfigExample = cmdutil.Examples(`
 		# upload the configuration of your cluster
 		kubeadm init phase upload-config --config=myConfig.yaml
 		`)
 
-	uploadKubeletConfigLongDesc = normalizer.LongDesc(`
+	uploadKubeletConfigLongDesc = cmdutil.LongDesc(`
 		Upload kubelet configuration extracted from the kubeadm InitConfiguration object to a ConfigMap
 		of the form kubelet-config-1.X in the cluster, where X is the minor version of the current (API Server) Kubernetes version.
 		`)
 
-	uploadKubeletConfigExample = normalizer.Examples(`
+	uploadKubeletConfigExample = cmdutil.Examples(`
 		# Upload the kubelet configuration from the kubeadm Config file to a ConfigMap in the cluster.
 		kubeadm init phase upload-config kubelet --config kubeadm.yaml
 		`)

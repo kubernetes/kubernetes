@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/api/core/v1"
@@ -458,6 +458,29 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 	}
 
 	return privateIP, publicIP, nil
+}
+
+// returns a list of private ips assigned to node
+// TODO (khenidak): This should read all nics, not just the primary
+// allowing users to split ipv4/v6 on multiple nics
+func (as *availabilitySet) GetPrivateIPsByNodeName(name string) ([]string, error) {
+	ips := make([]string, 0)
+	nic, err := as.GetPrimaryInterface(name)
+	if err != nil {
+		return ips, err
+	}
+
+	if nic.IPConfigurations == nil {
+		return ips, fmt.Errorf("nic.IPConfigurations for nic (nicname=%q) is nil", *nic.Name)
+	}
+
+	for _, ipConfig := range *(nic.IPConfigurations) {
+		if ipConfig.PrivateIPAddress != nil {
+			ips = append(ips, *(ipConfig.PrivateIPAddress))
+		}
+	}
+
+	return ips, nil
 }
 
 // getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds

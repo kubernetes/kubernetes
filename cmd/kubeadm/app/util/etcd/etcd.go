@@ -29,12 +29,22 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
+
+// Exponential backoff for MemberAdd/Remove (values exclude jitter):
+// 0, 50, 150, 350, 750, 1550, 3150, 6350, 12750 ms
+var addRemoveBackoff = wait.Backoff{
+	Steps:    8,
+	Duration: 50 * time.Millisecond,
+	Factor:   2.0,
+	Jitter:   0.1,
+}
 
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
@@ -187,11 +197,18 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	defer cli.Close()
 
 	// Remove an existing member from the cluster
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	resp, err := cli.MemberRemove(ctx, id)
-	cancel()
+	var lastError error
+	var resp *clientv3.MemberRemoveResponse
+	err = wait.ExponentialBackoff(addRemoveBackoff, func() (bool, error) {
+		resp, err = cli.MemberRemove(context.Background(), id)
+		if err == nil {
+			return true, nil
+		}
+		lastError = err
+		return false, nil
+	})
 	if err != nil {
-		return nil, err
+		return nil, lastError
 	}
 
 	// Returns the updated list of etcd members
@@ -224,11 +241,18 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	defer cli.Close()
 
 	// Adds a new member to the cluster
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	resp, err := cli.MemberAdd(ctx, []string{peerAddrs})
-	cancel()
+	var lastError error
+	var resp *clientv3.MemberAddResponse
+	err = wait.ExponentialBackoff(addRemoveBackoff, func() (bool, error) {
+		resp, err = cli.MemberAdd(context.Background(), []string{peerAddrs})
+		if err == nil {
+			return true, nil
+		}
+		lastError = err
+		return false, nil
+	})
 	if err != nil {
-		return nil, err
+		return nil, lastError
 	}
 
 	// Returns the updated list of etcd members

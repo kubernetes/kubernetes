@@ -30,6 +30,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -153,7 +155,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.AfterEach(func() {
 				e2elog.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -220,7 +222,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 					for _, e := range errs {
 						errmsg = append(errmsg, e.Error())
 					}
-					framework.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
+					e2elog.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
 				}
 			})
 
@@ -269,7 +271,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.AfterEach(func() {
 				e2elog.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -281,7 +283,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
 				ginkgo.By("Deleting the claim")
 				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
@@ -299,7 +301,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 				e2elog.Logf("Pod exited without failure; the volume has been recycled.")
 			})
@@ -310,7 +312,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
 
 			ginkgo.AfterEach(func() {
-				framework.DeleteAllStatefulSets(c, ns)
+				e2esset.DeleteAllStatefulSets(c, ns)
 			})
 
 			ginkgo.It("should be reschedulable [Slow]", func() {
@@ -318,7 +320,6 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
 
 				numVols := 4
-				ssTester := framework.NewStatefulSetTester(c)
 
 				ginkgo.By("Creating a StatefulSet pod to initialize data")
 				writeCmd := "true"
@@ -351,13 +352,13 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
 				ss, err := c.AppsV1().StatefulSets(ns).Create(spec)
 				framework.ExpectNoError(err)
-				ssTester.WaitForRunningAndReady(1, ss)
+				e2esset.WaitForRunningAndReady(c, 1, ss)
 
 				ginkgo.By("Deleting the StatefulSet but not the volumes")
 				// Scale down to 0 first so that the Delete is quick
-				ss, err = ssTester.Scale(ss, 0)
+				ss, err = e2esset.Scale(c, ss, 0)
 				framework.ExpectNoError(err)
-				ssTester.WaitForStatusReplicas(ss, 0)
+				e2esset.WaitForStatusReplicas(c, ss, 0)
 				err = c.AppsV1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 
@@ -371,7 +372,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
 				ss, err = c.AppsV1().StatefulSets(ns).Create(spec)
 				framework.ExpectNoError(err)
-				ssTester.WaitForRunningAndReady(1, ss)
+				e2esset.WaitForRunningAndReady(c, 1, ss)
 			})
 		})
 	})

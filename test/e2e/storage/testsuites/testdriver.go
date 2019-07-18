@@ -112,6 +112,7 @@ type SnapshottableTestDriver interface {
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
+// Constants related to capability
 const (
 	CapPersistence Capability = "persistence" // data is persisted across pod restarts
 	CapBlock       Capability = "block"       // raw block mode

@@ -47,7 +47,7 @@ var _ = SIGDescribe("SSH", func() {
 		ginkgo.By("Getting all nodes' SSH-able IP addresses")
 		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
 		if err != nil {
-			framework.Failf("Error getting node hostnames: %v", err)
+			e2elog.Failf("Error getting node hostnames: %v", err)
 		}
 
 		testCases := []struct {
@@ -82,16 +82,16 @@ var _ = SIGDescribe("SSH", func() {
 				result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 				if err != testCase.expectedError {
-					framework.Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
+					e2elog.Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
 				}
 				if testCase.checkStdout && stdout != testCase.expectedStdout {
-					framework.Failf("Ran %s on %s, got stdout '%s', expected '%s'", testCase.cmd, host, stdout, testCase.expectedStdout)
+					e2elog.Failf("Ran %s on %s, got stdout '%s', expected '%s'", testCase.cmd, host, stdout, testCase.expectedStdout)
 				}
 				if stderr != testCase.expectedStderr {
-					framework.Failf("Ran %s on %s, got stderr '%s', expected '%s'", testCase.cmd, host, stderr, testCase.expectedStderr)
+					e2elog.Failf("Ran %s on %s, got stderr '%s', expected '%s'", testCase.cmd, host, stderr, testCase.expectedStderr)
 				}
 				if result.Code != testCase.expectedCode {
-					framework.Failf("Ran %s on %s, got exit code %d, expected %d", testCase.cmd, host, result.Code, testCase.expectedCode)
+					e2elog.Failf("Ran %s on %s, got exit code %d, expected %d", testCase.cmd, host, result.Code, testCase.expectedCode)
 				}
 				// Show stdout, stderr for logging purposes.
 				if len(stdout) > 0 {
@@ -106,7 +106,7 @@ var _ = SIGDescribe("SSH", func() {
 		// Quickly test that SSH itself errors correctly.
 		ginkgo.By("SSH'ing to a nonexistent host")
 		if _, err = e2essh.SSH(`echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
-			framework.Failf("Expected error trying to SSH to nonexistent host.")
+			e2elog.Failf("Expected error trying to SSH to nonexistent host.")
 		}
 	})
 })

@@ -30,6 +30,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -101,7 +103,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
 	ginkgo.It("[Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func() {
-		numNodes, err := framework.NumberOfRegisteredNodes(c)
+		numNodes, err := e2enode.TotalRegistered(c)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
@@ -114,7 +116,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 			ginkgo.By("Wait for number of running and ready kube-dns pods recover")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSLabelName}))
-			_, err := framework.WaitForPodsWithLabelRunningReady(c, metav1.NamespaceSystem, label, originDNSReplicasCount, DNSdefaultTimeout)
+			_, err := e2epod.WaitForPodsWithLabelRunningReady(c, metav1.NamespaceSystem, label, originDNSReplicasCount, DNSdefaultTimeout)
 			framework.ExpectNoError(err)
 		}()
 		ginkgo.By("Wait for kube-dns scaled to expected number")
@@ -156,7 +158,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 		ginkgo.By("Restoring cluster size")
 		setMigSizes(originalSizes)
-		err = framework.WaitForReadyNodes(c, numNodes, scaleDownTimeout)
+		err = e2enode.WaitForReadyNodes(c, numNodes, scaleDownTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Wait for kube-dns scaled to expected number")

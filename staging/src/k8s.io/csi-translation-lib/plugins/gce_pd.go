@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudvolume "k8s.io/cloud-provider/volume"
 )
@@ -141,20 +142,82 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *st
 // plugin never supported ReadWriteMany but also did not validate or enforce
 // this access mode for pre-provisioned volumes. The GCE PD CSI Driver validates
 // and enforces (fails) ReadWriteMany. Therefore we treat all in-tree
-// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes.
+// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes. It also
+// takes [ReadWriteOnce, ReadOnlyMany] and makes it ReadWriteOnce. This is
+// because the in-tree plugin does not enforce access modes and just attaches
+// the disk in ReadWriteOnce mode; however, the CSI external-attacher will fail
+// this combination because technically [ReadWriteOnce, ReadOnlyMany] is not
+// supportable on an attached volume
+// See: https://github.com/kubernetes-csi/external-attacher/issues/153
 func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
 	if ams == nil {
 		return nil
 	}
-	newAM := []v1.PersistentVolumeAccessMode{}
+
+	s := map[v1.PersistentVolumeAccessMode]bool{}
+	var newAM []v1.PersistentVolumeAccessMode
+
 	for _, am := range ams {
 		if am == v1.ReadWriteMany {
-			newAM = append(newAM, v1.ReadWriteOnce)
+			// ReadWriteMany is unsupported in CSI, but in-tree did no
+			// validation and treated it as ReadWriteOnce
+			s[v1.ReadWriteOnce] = true
 		} else {
-			newAM = append(newAM, am)
+			s[am] = true
 		}
 	}
+
+	switch {
+	case s[v1.ReadOnlyMany] && s[v1.ReadWriteOnce]:
+		// ROX,RWO is unsupported in CSI, but in-tree did not validation and
+		// treated it as ReadWriteOnce
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	case s[v1.ReadWriteOnce]:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	case s[v1.ReadOnlyMany]:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
+	default:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+
 	return newAM
+}
+
+// TranslateInTreeInlineVolumeToCSI takes a Volume with GCEPersistentDisk set from in-tree
+// and converts the GCEPersistentDisk source to a CSIPersistentVolumeSource
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+	if volume == nil || volume.GCEPersistentDisk == nil {
+		return nil, fmt.Errorf("volume is nil or GCE PD not defined on volume")
+	}
+
+	pdSource := volume.GCEPersistentDisk
+
+	partition := ""
+	if pdSource.Partition != 0 {
+		partition = strconv.Itoa(int(pdSource.Partition))
+	}
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			// A.K.A InnerVolumeSpecName required to match for Unmount
+			Name: volume.Name,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:       GCEPDDriverName,
+					VolumeHandle: fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, pdSource.PDName),
+					ReadOnly:     pdSource.ReadOnly,
+					FSType:       pdSource.FSType,
+					VolumeAttributes: map[string]string{
+						"partition": partition,
+					},
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+	}
+	return pv, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
@@ -241,11 +304,18 @@ func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.Persisten
 	return pv, nil
 }
 
-// CanSupport tests whether the plugin supports a given volume
+// CanSupport tests whether the plugin supports a given persistent volume
 // specification from the API.  The spec pointer should be considered
 // const.
 func (g *gcePersistentDiskCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.GCEPersistentDisk != nil
+}
+
+// CanSupportInline tests whether the plugin supports a given inline volume
+// specification from the API.  The spec pointer should be considered
+// const.
+func (g *gcePersistentDiskCSITranslator) CanSupportInline(volume *v1.Volume) bool {
+	return volume != nil && volume.GCEPersistentDisk != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver

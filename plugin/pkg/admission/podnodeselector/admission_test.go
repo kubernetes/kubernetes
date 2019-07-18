@@ -194,7 +194,7 @@ func TestHandles(t *testing.T) {
 }
 
 // newHandlerForTest returns the admission controller configured for testing.
-func newHandlerForTest(c kubernetes.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c kubernetes.Interface) (*Plugin, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewPodNodeSelector(nil)
 	pluginInitializer := genericadmissioninitializer.New(c, f, nil)

@@ -19,12 +19,13 @@ package create
 import (
 	"github.com/spf13/cobra"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -36,7 +37,10 @@ var (
 		kubectl create priorityclass high-priority --value=1000 --description="high priority"
 
 		# Create a priorityclass named default-priority that considered as the global default priority
-		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"`))
+		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"
+		
+		# Create a priorityclass named high-priority that can not preempt pods with lower priority
+		kubectl create priorityclass high-priority --value=1000 --description="high priority" --preemption-policy="Never"`))
 )
 
 // PriorityClassOpts holds the options for 'create priorityclass' sub command
@@ -67,11 +71,12 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.PriorityClassV1Alpha1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.PriorityClassV1GeneratorName)
 
 	cmd.Flags().Int32("value", 0, i18n.T("the value of this priority class."))
 	cmd.Flags().Bool("global-default", false, i18n.T("global-default specifies whether this PriorityClass should be considered as the default priority."))
 	cmd.Flags().String("description", "", i18n.T("description is an arbitrary string that usually provides guidelines on when this priority class should be used."))
+	cmd.Flags().String("preemption-policy", "", i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
 	return cmd
 }
 
@@ -84,12 +89,13 @@ func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 
 	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.PriorityClassV1Alpha1GeneratorName:
+	case generateversioned.PriorityClassV1GeneratorName:
 		generator = &generateversioned.PriorityClassV1Generator{
-			Name:          name,
-			Value:         cmdutil.GetFlagInt32(cmd, "value"),
-			GlobalDefault: cmdutil.GetFlagBool(cmd, "global-default"),
-			Description:   cmdutil.GetFlagString(cmd, "description"),
+			Name:             name,
+			Value:            cmdutil.GetFlagInt32(cmd, "value"),
+			GlobalDefault:    cmdutil.GetFlagBool(cmd, "global-default"),
+			Description:      cmdutil.GetFlagString(cmd, "description"),
+			PreemptionPolicy: apiv1.PreemptionPolicy(cmdutil.GetFlagString(cmd, "preemption-policy")),
 		}
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)

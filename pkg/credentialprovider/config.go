@@ -60,7 +60,7 @@ var (
 	preferredPathLock sync.Mutex
 	preferredPath     = ""
 	workingDirPath    = ""
-	homeDirPath       = os.Getenv("HOME")
+	homeDirPath, _    = os.UserHomeDir()
 	rootDirPath       = "/"
 	homeJsonDirPath   = filepath.Join(homeDirPath, ".docker")
 	rootJsonDirPath   = filepath.Join(rootDirPath, ".docker")

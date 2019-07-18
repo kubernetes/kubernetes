@@ -28,8 +28,13 @@ type InTreePlugin interface {
 	// and translates them to a volume options consumable by CSI plugin
 	TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error)
 
+	// TranslateInTreeInlineVolumeToCSI takes a inline volume and will translate
+	// the in-tree inline volume source to a CSIPersistentVolumeSource
+	// A PV object containing the CSIPersistentVolumeSource in it's spec is returned
+	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error)
+
 	// TranslateInTreePVToCSI takes a persistent volume and will translate
-	// the in-tree source to a CSI Source. The input persistent volume can be modified
+	// the in-tree pv source to a CSI Source. The input persistent volume can be modified
 	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
 
 	// TranslateCSIPVToInTree takes a PV with a CSI PersistentVolume Source and will translate
@@ -37,9 +42,13 @@ type InTreePlugin interface {
 	// by the `Driver` field in the CSI Source. The input PV object can be modified
 	TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
 
-	// CanSupport tests whether the plugin supports a given volume
+	// CanSupport tests whether the plugin supports a given persistent volume
 	// specification from the API.
 	CanSupport(pv *v1.PersistentVolume) bool
+
+	// CanSupportInline tests whether the plugin supports a given inline volume
+	// specification from the API.
+	CanSupportInline(vol *v1.Volume) bool
 
 	// GetInTreePluginName returns the in-tree plugin name this migrates
 	GetInTreePluginName() string

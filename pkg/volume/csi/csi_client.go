@@ -32,9 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	csipbv0 "k8s.io/kubernetes/pkg/volume/csi/csiv0"
 )
@@ -72,6 +70,7 @@ type csiClient interface {
 		accessMode api.PersistentVolumeAccessMode,
 		secrets map[string]string,
 		volumeContext map[string]string,
+		mountOptions []string,
 	) error
 
 	NodeGetVolumeStats(
@@ -156,21 +155,15 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name is empty")
 	}
 
-	addr := fmt.Sprintf(csiAddrTemplate, driverName)
-	requiresV0Client := true
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		existingDriver, driverExists := csiDrivers.Get(string(driverName))
-		if !driverExists {
-			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
-		}
-
-		addr = existingDriver.endpoint
-		requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
+	existingDriver, driverExists := csiDrivers.Get(string(driverName))
+	if !driverExists {
+		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
 	nodeV1ClientCreator := newV1NodeClient
 	nodeV0ClientCreator := newV0NodeClient
-	if requiresV0Client {
+
+	if versionRequiresV0Client(existingDriver.highestSupportedVersion) {
 		nodeV1ClientCreator = nil
 	} else {
 		nodeV0ClientCreator = nil
@@ -178,7 +171,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 
 	return &csiDriverClient{
 		driverName:          driverName,
-		addr:                csiAddr(addr),
+		addr:                csiAddr(existingDriver.endpoint),
 		nodeV1ClientCreator: nodeV1ClientCreator,
 		nodeV0ClientCreator: nodeV0ClientCreator,
 	}, nil
@@ -515,6 +508,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
@@ -525,9 +519,9 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	}
 
 	if c.nodeV1ClientCreator != nil {
-		return c.nodeStageVolumeV1(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext)
+		return c.nodeStageVolumeV1(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext, mountOptions)
 	} else if c.nodeV0ClientCreator != nil {
-		return c.nodeStageVolumeV0(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext)
+		return c.nodeStageVolumeV0(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext, mountOptions)
 	}
 
 	return fmt.Errorf("failed to call NodeStageVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
@@ -542,6 +536,7 @@ func (c *csiDriverClient) nodeStageVolumeV1(
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
 	if err != nil {
@@ -569,7 +564,8 @@ func (c *csiDriverClient) nodeStageVolumeV1(
 	} else {
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
 			Mount: &csipbv1.VolumeCapability_MountVolume{
-				FsType: fsType,
+				FsType:     fsType,
+				MountFlags: mountOptions,
 			},
 		}
 	}
@@ -587,6 +583,7 @@ func (c *csiDriverClient) nodeStageVolumeV0(
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
 	if err != nil {
@@ -614,7 +611,8 @@ func (c *csiDriverClient) nodeStageVolumeV0(
 	} else {
 		req.VolumeCapability.AccessType = &csipbv0.VolumeCapability_Mount{
 			Mount: &csipbv0.VolumeCapability_MountVolume{
-				FsType: fsType,
+				FsType:     fsType,
+				MountFlags: mountOptions,
 			},
 		}
 	}

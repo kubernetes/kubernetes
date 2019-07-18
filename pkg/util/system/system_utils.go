@@ -20,6 +20,7 @@ import (
 	"strings"
 )
 
+// IsMasterNode returns true if given node is a registered master.
 // TODO: find a better way of figuring out if given node is a registered master.
 func IsMasterNode(nodeName string) bool {
 	// We are trying to capture "master(-...)?$" regexp.

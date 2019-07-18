@@ -26,7 +26,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -144,7 +144,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 })
 
 // Wait until the pod failed over to a different node, or time out after 3 minutes
-func waitForPodToFailover(client clientset.Interface, deployment *apps.Deployment, oldNode string) (string, error) {
+func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deployment, oldNode string) (string, error) {
 	var (
 		err      error
 		newNode  string
@@ -179,7 +179,7 @@ func waitForPodToFailover(client clientset.Interface, deployment *apps.Deploymen
 }
 
 // getNodeForDeployment returns node name for the Deployment
-func getNodeForDeployment(client clientset.Interface, deployment *apps.Deployment) (string, error) {
+func getNodeForDeployment(client clientset.Interface, deployment *appsv1.Deployment) (string, error) {
 	podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
 	if err != nil {
 		return "", err

@@ -1,4 +1,4 @@
-# lumberjack  [![GoDoc](https://godoc.org/gopkg.in/natefinch/lumberjack.v2?status.png)](https://godoc.org/gopkg.in/natefinch/lumberjack.v2) [![Build Status](https://drone.io/github.com/natefinch/lumberjack/status.png)](https://drone.io/github.com/natefinch/lumberjack/latest) [![Build status](https://ci.appveyor.com/api/projects/status/00gchpxtg4gkrt5d)](https://ci.appveyor.com/project/natefinch/lumberjack) [![Coverage Status](https://coveralls.io/repos/natefinch/lumberjack/badge.svg?branch=v2.0)](https://coveralls.io/r/natefinch/lumberjack?branch=v2.0)
+# lumberjack  [![GoDoc](https://godoc.org/gopkg.in/natefinch/lumberjack.v2?status.png)](https://godoc.org/gopkg.in/natefinch/lumberjack.v2) [![Build Status](https://travis-ci.org/natefinch/lumberjack.svg?branch=v2.0)](https://travis-ci.org/natefinch/lumberjack) [![Build status](https://ci.appveyor.com/api/projects/status/00gchpxtg4gkrt5d)](https://ci.appveyor.com/project/natefinch/lumberjack) [![Coverage Status](https://coveralls.io/repos/natefinch/lumberjack/badge.svg?branch=v2.0)](https://coveralls.io/r/natefinch/lumberjack?branch=v2.0)
 
 ### Lumberjack is a Go package for writing logs to rolling files.
 
@@ -37,6 +37,7 @@ log.SetOutput(&lumberjack.Logger{
     MaxSize:    500, // megabytes
     MaxBackups: 3,
     MaxAge:     28, //days
+    Compress:   true, // disabled by default
 })
 ```
 
@@ -70,6 +71,10 @@ type Logger struct {
     // backup files is the computer's local time.  The default is to use UTC
     // time.
     LocalTime bool `json:"localtime" yaml:"localtime"`
+
+    // Compress determines if the rotated log files should be compressed
+    // using gzip. The default is not to perform compression.
+    Compress bool `json:"compress" yaml:"compress"`
     // contains filtered or unexported fields
 }
 ```
@@ -86,6 +91,14 @@ Whenever a write would cause the current log file exceed MaxSize megabytes,
 the current file is closed, renamed, and a new log file created with the
 original name. Thus, the filename you give Logger is always the "current" log
 file.
+
+Backups use the log file name given to Logger, in the form `name-timestamp.ext`
+where name is the filename without the extension, timestamp is the time at which
+the log was rotated formatted with the time.Time format of
+`2006-01-02T15-04-05.000` and the extension is the original extension.  For
+example, if your Logger.Filename is `/var/log/foo/server.log`, a backup created
+at 6:30pm on Nov 11 2016 would use the filename
+`/var/log/foo/server-2016-11-04T18-30-00.000.log`
 
 ### Cleaning Up Old Log Files
 Whenever a new logfile gets created, old log files may be deleted.  The most

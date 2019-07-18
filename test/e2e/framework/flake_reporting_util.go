@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
 // FlakeReport is a struct for managing the flake report.
@@ -57,7 +60,7 @@ func (f *FlakeReport) RecordFlakeIfError(err error, optionalDescription ...inter
 	if desc != "" {
 		msg = fmt.Sprintf("%v (Description: %v)", msg, desc)
 	}
-	Logf(msg)
+	e2elog.Logf(msg)
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.Flakes = append(f.Flakes, msg)
@@ -88,7 +91,7 @@ func (f *FlakeReport) PrintHumanReadable() string {
 func (f *FlakeReport) PrintJSON() string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	return PrettyPrintJSON(f)
+	return e2emetrics.PrettyPrintJSON(f)
 }
 
 // SummaryKind returns the summary of flake report.

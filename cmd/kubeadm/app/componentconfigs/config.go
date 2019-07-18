@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
@@ -34,7 +35,7 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 
 	// Read the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(version)
-	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	kubeletCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +61,7 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Version) (runtime.Object, error) {
 
 	// Read the ConfigMap from the cluster
-	kubeproxyCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeProxyConfigMap, metav1.GetOptions{})
+	kubeproxyCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, kubeadmconstants.KubeProxyConfigMap)
 	if err != nil {
 		return nil, err
 	}

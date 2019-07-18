@@ -204,7 +204,7 @@ const (
 	addonNsName           = metav1.NamespaceSystem
 )
 
-var serveHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
+var serveHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 type stringPair struct {
 	data, fileName string
@@ -388,7 +388,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
 	framework.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
-	gomega.Expect(rc).To(gomega.Equal(0), "error return code from executing command on the cluster: %s", cmd)
+	framework.ExpectEqual(rc, 0, "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {

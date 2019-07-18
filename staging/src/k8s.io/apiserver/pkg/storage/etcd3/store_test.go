@@ -35,6 +35,7 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,10 +44,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd"
-	storagetests "k8s.io/apiserver/pkg/storage/tests"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var scheme = runtime.NewScheme()
@@ -688,13 +692,13 @@ func TestTransformationFailure(t *testing.T) {
 		key: "/one-level/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec:       storagetests.DeepEqualSafePodSpec(),
+			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}, {
 		key: "/two-level/1/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
-			Spec:       storagetests.DeepEqualSafePodSpec(),
+			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}}
 	for i, ps := range preset[:1] {
@@ -750,6 +754,7 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
@@ -831,7 +836,7 @@ func TestList(t *testing.T) {
 		pred                       storage.SelectionPredicate
 		expectedOut                []*example.Pod
 		expectContinue             bool
-		expectedRemainingItemCount int64
+		expectedRemainingItemCount *int64
 		expectError                bool
 	}{
 		{
@@ -884,7 +889,7 @@ func TestList(t *testing.T) {
 			},
 			expectedOut:                []*example.Pod{preset[1].storedObj},
 			expectContinue:             true,
-			expectedRemainingItemCount: 1,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 		},
 		{
 			name:          "test List with limit when paging disabled",
@@ -1062,8 +1067,8 @@ func TestList(t *testing.T) {
 			t.Errorf("(%s): length of list want=%d, got=%d", tt.name, len(tt.expectedOut), len(out.Items))
 			continue
 		}
-		if e, a := tt.expectedRemainingItemCount, out.ListMeta.RemainingItemCount; e != a {
-			t.Errorf("(%s): remainingItemCount want=%d, got=%d", tt.name, e, a)
+		if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); (e == nil) != (a == nil) || (e != nil && a != nil && *e != *a) {
+			t.Errorf("(%s): remainingItemCount want=%#v, got=%#v", tt.name, e, a)
 		}
 		for j, wantPod := range tt.expectedOut {
 			getPod := &out.Items[j]
@@ -1275,7 +1280,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// compact to latest revision.
-	versioner := etcd.APIObjectVersioner{}
+	versioner := APIObjectVersioner{}
 	lastRVString := preset[2].storedObj.ResourceVersion
 	lastRV, err := versioner.ParseResourceVersion(lastRVString)
 	if err != nil {
@@ -1348,7 +1353,11 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
-	err := store.conditionalDelete(ctx, key, &example.Pod{}, reflect.ValueOf(example.Pod{}), nil, storage.ValidateAllObjectFunc)
+	v, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		panic("unable to convert output object to pointer")
+	}
+	err = store.conditionalDelete(ctx, key, &example.Pod{}, v, nil, storage.ValidateAllObjectFunc)
 	if err != nil && !storage.IsNotFound(err) {
 		t.Fatalf("Cleanup failed: %v", err)
 	}

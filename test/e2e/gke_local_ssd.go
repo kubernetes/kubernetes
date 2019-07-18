@@ -52,7 +52,7 @@ func createNodePoolWithLocalSsds(nodePoolName string) {
 		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
 		"--local-ssd-count=1").CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))
+		e2elog.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))
 	}
 	e2elog.Logf("Successfully created node pool %s:\n%v", nodePoolName, string(out))
 }

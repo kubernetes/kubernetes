@@ -85,7 +85,8 @@ type CustomResourceDefinitionSpec struct {
 type CustomResourceConversion struct {
 	// `strategy` specifies the conversion strategy. Allowed values are:
 	// - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
-	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information is needed for this option.
+	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
+	//   is needed for this option. This requires spec.preserveUnknownFields to be false.
 	Strategy ConversionStrategyType
 
 	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.

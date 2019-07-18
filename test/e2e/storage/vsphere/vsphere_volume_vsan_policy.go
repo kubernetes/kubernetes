@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters = make(map[string]string)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
+			e2elog.Failf("Unable to find ready and schedulable Node")
 		}
 		masternodes, _ := framework.GetMasterAndWorkerNodesOrDie(client)
 		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())

@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -72,4 +72,7 @@ type VMSet interface {
 
 	// GetPowerStatusByNodeName returns the power state of the specified node.
 	GetPowerStatusByNodeName(name string) (string, error)
+
+	// GetPrivateIPsByNodeName returns a slice of all private ips assigned to node (ipv6 and ipv4)
+	GetPrivateIPsByNodeName(name string) ([]string, error)
 }

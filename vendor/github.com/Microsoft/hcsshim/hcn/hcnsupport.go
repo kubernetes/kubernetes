@@ -9,6 +9,7 @@ type SupportedFeatures struct {
 	Acl          AclFeatures `json:"ACL"`
 	Api          ApiSupport  `json:"API"`
 	RemoteSubnet bool        `json:"RemoteSubnet"`
+	HostRoute    bool        `json:"HostRoute"`
 	DSR          bool        `json:"DSR"`
 }
 
@@ -50,6 +51,7 @@ func GetSupportedFeatures() SupportedFeatures {
 	}
 
 	features.RemoteSubnet = isFeatureSupported(globals.Version, RemoteSubnetVersion)
+	features.HostRoute = isFeatureSupported(globals.Version, HostRouteVersion)
 	features.DSR = isFeatureSupported(globals.Version, DSRVersion)
 
 	return features

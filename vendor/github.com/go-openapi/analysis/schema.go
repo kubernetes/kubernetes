@@ -1,6 +1,8 @@
 package analysis
 
 import (
+	"fmt"
+
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 )
@@ -16,6 +18,10 @@ type SchemaOpts struct {
 // Schema analysis, will classify the schema according to known
 // patterns.
 func Schema(opts SchemaOpts) (*AnalyzedSchema, error) {
+	if opts.Schema == nil {
+		return nil, fmt.Errorf("no schema to analyze")
+	}
+
 	a := &AnalyzedSchema{
 		schema:   opts.Schema,
 		root:     opts.Root,

@@ -27,7 +27,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/cmd/kubeadm/app/version"
 )
 
 // VersionGetter defines an interface for fetching different versions.

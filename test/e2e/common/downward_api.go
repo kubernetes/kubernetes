@@ -26,10 +26,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
-var _ = Describe("[sig-node] Downward API", func() {
+var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
@@ -235,12 +235,12 @@ var _ = Describe("[sig-node] Downward API", func() {
 var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
-	Context("Downward API tests for local ephemeral storage", func() {
-		BeforeEach(func() {
+	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
+		ginkgo.BeforeEach(func() {
 			framework.SkipUnlessLocalEphemeralStorageEnabled()
 		})
 
-		It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {
+		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{
@@ -268,7 +268,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 			testDownwardAPIForEphemeralStorage(f, podName, env, expectations)
 		})
 
-		It("should provide default limits.ephemeral-storage from node allocatable", func() {
+		ginkgo.It("should provide default limits.ephemeral-storage from node allocatable", func() {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{

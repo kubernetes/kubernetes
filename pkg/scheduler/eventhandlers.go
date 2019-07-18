@@ -18,15 +18,20 @@ package scheduler
 
 import (
 	"fmt"
-	"k8s.io/klog"
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	storageinformers "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
@@ -150,6 +155,63 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		klog.Errorf("scheduler cache RemoveNode failed: %v", err)
 	}
 }
+
+func (sched *Scheduler) onCSINodeAdd(obj interface{}) {
+	csiNode, ok := obj.(*storagev1beta1.CSINode)
+	if !ok {
+		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", obj)
+		return
+	}
+
+	if err := sched.config.SchedulerCache.AddCSINode(csiNode); err != nil {
+		klog.Errorf("scheduler cache AddCSINode failed: %v", err)
+	}
+
+	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+}
+
+func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
+	oldCSINode, ok := oldObj.(*storagev1beta1.CSINode)
+	if !ok {
+		klog.Errorf("cannot convert oldObj to *storagev1beta1.CSINode: %v", oldObj)
+		return
+	}
+
+	newCSINode, ok := newObj.(*storagev1beta1.CSINode)
+	if !ok {
+		klog.Errorf("cannot convert newObj to *storagev1beta1.CSINode: %v", newObj)
+		return
+	}
+
+	if err := sched.config.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
+		klog.Errorf("scheduler cache UpdateCSINode failed: %v", err)
+	}
+
+	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+}
+
+func (sched *Scheduler) onCSINodeDelete(obj interface{}) {
+	var csiNode *storagev1beta1.CSINode
+	switch t := obj.(type) {
+	case *storagev1beta1.CSINode:
+		csiNode = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		csiNode, ok = t.Obj.(*storagev1beta1.CSINode)
+		if !ok {
+			klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t.Obj)
+			return
+		}
+	default:
+		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t)
+		return
+	}
+
+	if err := sched.config.SchedulerCache.RemoveCSINode(csiNode); err != nil {
+		klog.Errorf("scheduler cache RemoveCSINode failed: %v", err)
+	}
+}
+
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	if err := sched.config.SchedulingQueue.Add(obj.(*v1.Pod)); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
@@ -324,7 +386,8 @@ func AddAllEventHandlers(
 	pvInformer coreinformers.PersistentVolumeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	serviceInformer coreinformers.ServiceInformer,
-	storageClassInformer storageinformers.StorageClassInformer,
+	storageClassInformer storageinformersv1.StorageClassInformer,
+	csiNodeInformer storageinformersv1beta1.CSINodeInformer,
 ) {
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
@@ -384,6 +447,16 @@ func AddAllEventHandlers(
 			DeleteFunc: sched.deleteNodeFromCache,
 		},
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiNodeInformer.Informer().AddEventHandler(
+			cache.ResourceEventHandlerFuncs{
+				AddFunc:    sched.onCSINodeAdd,
+				UpdateFunc: sched.onCSINodeUpdate,
+				DeleteFunc: sched.onCSINodeDelete,
+			},
+		)
+	}
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume

@@ -582,13 +582,11 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 	return true
 }
 
-// We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
-// apiserver has no nanosecond information. However, the timestamp returned by metav1.Now() contains nanosecond,
-// so when we do comparison between status from apiserver and cached status, isPodStatusByKubeletEqual() will always return false.
-// There is related issue #15262 and PR #15263 about this.
-// In fact, the best way to solve this is to do it on api side. However, for now, we normalize the status locally in
-// kubelet temporarily.
-// TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
+// normalizeStatus normalizes nanosecond precision timestamps in podStatus
+// down to second precision (*RFC339NANO* -> *RFC3339*). This must be done
+// before comparing podStatus to the status returned by apiserver because
+// apiserver does not support RFC339NANO.
+// Related issue #15262/PR #15263 to move apiserver to RFC339NANO is closed.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
 	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers); containers > 0 {

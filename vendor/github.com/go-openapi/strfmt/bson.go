@@ -125,3 +125,18 @@ func (id *ObjectId) SetBSON(raw bson.Raw) error {
 
 	return errors.New("couldn't unmarshal bson raw value as ObjectId")
 }
+
+// DeepCopyInto copies the receiver and writes its value into out.
+func (id *ObjectId) DeepCopyInto(out *ObjectId) {
+	*out = *id
+}
+
+// DeepCopy copies the receiver into a new ObjectId.
+func (id *ObjectId) DeepCopy() *ObjectId {
+	if id == nil {
+		return nil
+	}
+	out := new(ObjectId)
+	id.DeepCopyInto(out)
+	return out
+}

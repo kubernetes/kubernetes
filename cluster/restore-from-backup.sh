@@ -24,7 +24,7 @@
 #      $ etcdctl --endpoints=<address> snapshot save
 #      produced .db file
 # - version.txt file is in the current directory (if it isn't it will be
-#     defaulted to "2.2.1/etcd2"). Based on this file, the script will
+#     defaulted to "3.0.17/etcd3"). Based on this file, the script will
 #     decide to which version we are restoring (procedures are different
 #     for etcd2 and etcd3).
 # - in case of etcd2 - *.snap and *.wal files are in current directory
@@ -40,7 +40,7 @@ set -o pipefail
 # Version file contains information about current version in the format:
 # <etcd binary version>/<etcd api mode> (e.g. "3.0.12/etcd3").
 #
-# If the file doesn't exist we assume "2.2.1/etcd2" configuration is
+# If the file doesn't exist we assume "3.0.17/etcd3" configuration is
 # the current one and create a file with such configuration.
 # The restore procedure is chosen based on this information.
 VERSION_FILE="version.txt"
@@ -51,11 +51,11 @@ if [ -n "${VERSION_CONTENTS:-}" ]; then
   echo "${VERSION_CONTENTS}" > "${VERSION_FILE}"
 fi
 if [ ! -f "${VERSION_FILE}" ]; then
-  echo "2.2.1/etcd2" > "${VERSION_FILE}"
+  echo "3.0.17/etcd3" > "${VERSION_FILE}"
 fi
 VERSION_CONTENTS="$(cat ${VERSION_FILE})"
-ETCD_VERSION="$(echo $VERSION_CONTENTS | cut -d '/' -f 1)"
-ETCD_API="$(echo $VERSION_CONTENTS | cut -d '/' -f 2)"
+ETCD_VERSION="$(echo "$VERSION_CONTENTS" | cut -d '/' -f 1)"
+ETCD_API="$(echo "$VERSION_CONTENTS" | cut -d '/' -f 2)"
 
 # Name is used only in case of etcd3 mode, to appropriate set the metadata
 # for the etcd data.
@@ -76,9 +76,9 @@ wait_for_etcd_up() {
   # {"health": "true"} on /health endpoint in healthy case.
   # However, we should come with a regex for it to avoid future break.
   health_ok="{\"health\": \"true\"}"
-  for i in $(seq 120); do
+  for _ in $(seq 120); do
     # TODO: Is it enough to look into /health endpoint?
-    health=$(curl --silent http://127.0.0.1:${port}/health)
+    health=$(curl --silent "http://127.0.0.1:${port}/health")
     if [ "${health}" == "${health_ok}" ]; then
       return 0
     fi
@@ -89,7 +89,7 @@ wait_for_etcd_up() {
 
 # Wait until apiserver is up.
 wait_for_cluster_healthy() {
-  for i in $(seq 120); do
+  for _ in $(seq 120); do
     cs_status=$(kubectl get componentstatuses -o template --template='{{range .items}}{{with index .conditions 0}}{{.type}}:{{.status}}{{end}}{{"\n"}}{{end}}') || true
     componentstatuses=$(echo "${cs_status}" | grep -c 'Healthy:') || true
     healthy=$(echo "${cs_status}" | grep -c 'Healthy:True') || true
@@ -103,13 +103,13 @@ wait_for_cluster_healthy() {
 
 # Wait until etcd and apiserver pods are down.
 wait_for_etcd_and_apiserver_down() {
-  for i in $(seq 120); do
-    etcd=$(docker ps | grep etcd-server | wc -l)
-    apiserver=$(docker ps | grep apiserver | wc -l)
+  for _ in $(seq 120); do
+    etcd=$(docker ps | grep -c etcd-server)
+    apiserver=$(docker ps | grep -c apiserver)
     # TODO: Theoretically it is possible, that apiserver and or etcd
     # are currently down, but Kubelet is now restarting them and they
     # will reappear again. We should avoid it.
-    if [ "${etcd}" -eq "0" -a "${apiserver}" -eq "0" ]; then
+    if [ "${etcd}" -eq "0" ] && [ "${apiserver}" -eq "0" ]; then
       return 0
     fi
     sleep 1
@@ -153,16 +153,15 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   mkdir -p "${BACKUP_DIR}/member/snap"
   mkdir -p "${BACKUP_DIR}/member/wal"
   # If the cluster is relatively new, there can be no .snap file.
-  mv *.snap "${BACKUP_DIR}/member/snap/" || true
-  mv *.wal "${BACKUP_DIR}/member/wal/"
+  mv ./*.snap "${BACKUP_DIR}/member/snap/" || true
+  mv ./*.wal "${BACKUP_DIR}/member/wal/"
 
   # TODO(jsz): This won't work with HA setups (e.g. do we need to set --name flag)?
   echo "Starting etcd ${ETCD_VERSION} to restore data"
-  image=$(docker run -d -v ${BACKUP_DIR}:/var/etcd/data \
+  if ! image=$(docker run -d -v ${BACKUP_DIR}:/var/etcd/data \
     --net=host -p ${etcd_port}:${etcd_port} \
     "k8s.gcr.io/etcd:${ETCD_VERSION}" /bin/sh -c \
-    "/usr/local/bin/etcd --data-dir /var/etcd/data --force-new-cluster")
-  if [ "$?" -ne "0" ]; then
+    "/usr/local/bin/etcd --data-dir /var/etcd/data --force-new-cluster"); then
     echo "Docker container didn't started correctly"
     exit 1
   fi
@@ -185,15 +184,14 @@ elif [ "${ETCD_API}" == "etcd3" ]; then
     echo "Incorrect number of *.db files - expected 1"
     exit 1
   fi
-  mv *.db "${BACKUP_DIR}/"
+  mv ./*.db "${BACKUP_DIR}/"
   snapshot="$(ls ${BACKUP_DIR})"
 
   # Run etcdctl snapshot restore command and wait until it is finished.
   # setting with --name in the etcd manifest file and then it seems to work.
-  docker run -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
+  if ! docker run -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
     "k8s.gcr.io/etcd:${ETCD_VERSION}" /bin/sh -c \
-    "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${INITIAL_CLUSTER} --initial-advertise-peer-urls ${INITIAL_ADVERTISE_PEER_URLS}; mv /${NAME}.etcd/member /var/tmp/backup/"
-  if [ "$?" -ne "0" ]; then
+    "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${INITIAL_CLUSTER} --initial-advertise-peer-urls ${INITIAL_ADVERTISE_PEER_URLS}; mv /${NAME}.etcd/member /var/tmp/backup/"; then
     echo "Docker container didn't started correctly"
     exit 1
   fi

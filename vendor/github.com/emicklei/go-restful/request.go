@@ -51,6 +51,11 @@ func (r *Request) QueryParameter(name string) string {
 	return r.Request.FormValue(name)
 }
 
+// QueryParameters returns the all the query parameters values by name
+func (r *Request) QueryParameters(name string) []string {
+	return r.Request.URL.Query()[name]
+}
+
 // BodyParameter parses the body of the request (once for typically a POST or a PUT) and returns the value of the given name or an error.
 func (r *Request) BodyParameter(name string) (string, error) {
 	err := r.Request.ParseForm()

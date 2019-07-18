@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
 
@@ -80,7 +81,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 			break
 		}
 	}
-	gomega.Expect(extraZone).NotTo(gomega.Equal(""), fmt.Sprintf("No extra zones available in region %s", region))
+	framework.ExpectNotEqual(extraZone, "", fmt.Sprintf("No extra zones available in region %s", region))
 
 	ginkgo.By(fmt.Sprintf("starting a compute instance in unused zone: %v\n", extraZone))
 	project := framework.TestContext.CloudConfig.ProjectID
@@ -144,7 +145,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil {
-				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
 	}
@@ -164,7 +165,6 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 		// Get the related PV
 		pv, err := c.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		framework.ExpectNoError(err)
 
 		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
@@ -200,10 +200,10 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	defer func() {
 		ginkgo.By("Cleaning up pods and PVs")
 		for _, config := range configs {
-			framework.DeletePodOrFail(c, ns, config.pod.Name)
+			e2epod.DeletePodOrFail(c, ns, config.pod.Name)
 		}
 		for _, config := range configs {
-			framework.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
+			e2epod.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
 			framework.PVPVCCleanup(c, ns, config.pv, config.pvc)
 			err = framework.DeletePVSource(config.pvSource)
 			framework.ExpectNoError(err)
@@ -241,7 +241,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 
 	ginkgo.By("Waiting for all pods to be running")
 	for _, config := range configs {
-		err = framework.WaitForPodRunningInNamespace(c, config.pod)
+		err = e2epod.WaitForPodRunningInNamespace(c, config.pod)
 		framework.ExpectNoError(err)
 	}
 }

@@ -11,6 +11,7 @@ go_library(
     importpath = "k8s.io/client-go/kubernetes/fake",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
@@ -56,6 +57,8 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",

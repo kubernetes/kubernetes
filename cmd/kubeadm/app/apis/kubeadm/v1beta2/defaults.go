@@ -67,7 +67,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_InitConfiguration assigns default values for the InitConfiguration
 func SetDefaults_InitConfiguration(obj *InitConfiguration) {
-	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 }

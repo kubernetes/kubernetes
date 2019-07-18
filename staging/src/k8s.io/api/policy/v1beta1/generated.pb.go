@@ -55,7 +55,7 @@ import k8s_io_apimachinery_pkg_apis_meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v
 
 import k8s_io_apimachinery_pkg_util_intstr "k8s.io/apimachinery/pkg/util/intstr"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -523,7 +523,7 @@ func (m *PodDisruptionBudgetStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.DisruptedPods {
 			keysForDisruptedPods = append(keysForDisruptedPods, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForDisruptedPods)
+		sortkeys.Strings(keysForDisruptedPods)
 		for _, k := range keysForDisruptedPods {
 			dAtA[i] = 0x12
 			i++
@@ -1574,7 +1574,7 @@ func (this *PodDisruptionBudgetStatus) String() string {
 	for k := range this.DisruptedPods {
 		keysForDisruptedPods = append(keysForDisruptedPods, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForDisruptedPods)
+	sortkeys.Strings(keysForDisruptedPods)
 	mapStringForDisruptedPods := "map[string]k8s_io_apimachinery_pkg_apis_meta_v1.Time{"
 	for _, k := range keysForDisruptedPods {
 		mapStringForDisruptedPods += fmt.Sprintf("%v: %v,", k, this.DisruptedPods[k])

@@ -52,6 +52,7 @@ const (
 	// The value must be true to have this annotation take effect
 	EnforceMountableSecretsAnnotation = "kubernetes.io/enforce-mountable-secrets"
 
+	// ServiceAccountVolumeName is the prefix name that will be added to volumes that mount ServiceAccount secrets
 	ServiceAccountVolumeName = "kube-api-access"
 
 	// DefaultAPITokenMountPath is the path that ServiceAccountToken secrets are automounted to.
@@ -70,9 +71,10 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-var _ = admission.Interface(&serviceAccount{})
+var _ = admission.Interface(&Plugin{})
 
-type serviceAccount struct {
+// Plugin contains the client used by the admission controller
+type Plugin struct {
 	*admission.Handler
 
 	// LimitSecretReferences rejects pods that reference secrets their service accounts do not reference
@@ -92,10 +94,10 @@ type serviceAccount struct {
 	featureGate featuregate.FeatureGate
 }
 
-var _ admission.MutationInterface = &serviceAccount{}
-var _ admission.ValidationInterface = &serviceAccount{}
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&serviceAccount{})
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&serviceAccount{})
+var _ admission.MutationInterface = &Plugin{}
+var _ admission.ValidationInterface = &Plugin{}
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
@@ -103,8 +105,8 @@ var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&serviceAcc
 // 3. If LimitSecretReferences is true, it rejects the pod if the pod references Secret objects which the pod's ServiceAccount does not reference
 // 4. If the pod does not contain any ImagePullSecrets, the ImagePullSecrets of the service account are added.
 // 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
-func NewServiceAccount() *serviceAccount {
-	return &serviceAccount{
+func NewServiceAccount() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create),
 		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
 		LimitSecretReferences: false,
@@ -119,11 +121,13 @@ func NewServiceAccount() *serviceAccount {
 	}
 }
 
-func (s *serviceAccount) SetExternalKubeClientSet(cl kubernetes.Interface) {
+// SetExternalKubeClientSet sets the client for the plugin
+func (s *Plugin) SetExternalKubeClientSet(cl kubernetes.Interface) {
 	s.client = cl
 }
 
-func (s *serviceAccount) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetExternalKubeInformerFactory registers informers with the plugin
+func (s *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	serviceAccountInformer := f.Core().V1().ServiceAccounts()
 	s.serviceAccountLister = serviceAccountInformer.Lister()
 
@@ -136,7 +140,7 @@ func (s *serviceAccount) SetExternalKubeInformerFactory(f informers.SharedInform
 }
 
 // ValidateInitialization ensures an authorizer is set.
-func (s *serviceAccount) ValidateInitialization() error {
+func (s *Plugin) ValidateInitialization() error {
 	if s.client == nil {
 		return fmt.Errorf("missing client")
 	}
@@ -149,7 +153,8 @@ func (s *serviceAccount) ValidateInitialization() error {
 	return nil
 }
 
-func (s *serviceAccount) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+// Admit verifies if the pod should be admitted
+func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -190,7 +195,8 @@ func (s *serviceAccount) Admit(a admission.Attributes, o admission.ObjectInterfa
 	return s.Validate(a, o)
 }
 
-func (s *serviceAccount) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+// Validate the data we obtained
+func (s *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -271,7 +277,7 @@ func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) bool {
 
 // enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account
 // A global setting of true will override any flag set on the individual service account
-func (s *serviceAccount) enforceMountableSecrets(serviceAccount *corev1.ServiceAccount) bool {
+func (s *Plugin) enforceMountableSecrets(serviceAccount *corev1.ServiceAccount) bool {
 	if s.LimitSecretReferences {
 		return true
 	}
@@ -285,7 +291,7 @@ func (s *serviceAccount) enforceMountableSecrets(serviceAccount *corev1.ServiceA
 }
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
-func (s *serviceAccount) getServiceAccount(namespace string, name string) (*corev1.ServiceAccount, error) {
+func (s *Plugin) getServiceAccount(namespace string, name string) (*corev1.ServiceAccount, error) {
 	serviceAccount, err := s.serviceAccountLister.ServiceAccounts(namespace).Get(name)
 	if err == nil {
 		return serviceAccount, nil
@@ -318,7 +324,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*core
 }
 
 // getReferencedServiceAccountToken returns the name of the first referenced secret which is a ServiceAccountToken for the service account
-func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *corev1.ServiceAccount) (string, error) {
+func (s *Plugin) getReferencedServiceAccountToken(serviceAccount *corev1.ServiceAccount) (string, error) {
 	if len(serviceAccount.Secrets) == 0 {
 		return "", nil
 	}
@@ -343,7 +349,7 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *corev1
 }
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
-func (s *serviceAccount) getServiceAccountTokens(serviceAccount *corev1.ServiceAccount) ([]*corev1.Secret, error) {
+func (s *Plugin) getServiceAccountTokens(serviceAccount *corev1.ServiceAccount) ([]*corev1.Secret, error) {
 	secrets, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -363,7 +369,7 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *corev1.ServiceA
 	return tokens, nil
 }
 
-func (s *serviceAccount) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
+func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
 	mountableSecrets := sets.NewString()
 	for _, s := range serviceAccount.Secrets {
@@ -413,7 +419,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *corev1.ServiceAcc
 	return nil
 }
 
-func (s *serviceAccount) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
+func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Find the name of a referenced ServiceAccountToken secret we can mount
 	serviceAccountToken, err := s.getReferencedServiceAccountToken(serviceAccount)
 	if err != nil {
@@ -502,7 +508,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *corev1.Service
 	return nil
 }
 
-func (s *serviceAccount) createVolume(tokenVolumeName, secretName string) api.Volume {
+func (s *Plugin) createVolume(tokenVolumeName, secretName string) api.Volume {
 	if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
 		return api.Volume{
 			Name: tokenVolumeName,

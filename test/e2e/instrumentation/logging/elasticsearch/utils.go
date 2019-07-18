@@ -27,6 +27,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 )
 
@@ -79,7 +80,7 @@ func (p *esLogProvider) Init() error {
 		return err
 	}
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
+		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, &pod)
 		if err != nil {
 			return err
 		}
@@ -117,7 +118,7 @@ func (p *esLogProvider) Init() error {
 		return err
 	}
 	if int(statusCode) != 200 {
-		framework.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
+		e2elog.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.

@@ -28,10 +28,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,6 +44,10 @@ import (
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -58,15 +58,18 @@ func checks(checkers ...Checker) []Checker {
 	return checkers
 }
 
-func TestWebhookConverter(t *testing.T) {
-	testWebhookConverter(t, false)
+func TestWebhookConverterWithWatchCache(t *testing.T) {
+	testWebhookConverter(t, false, true)
+}
+func TestWebhookConverterWithoutWatchCache(t *testing.T) {
+	testWebhookConverter(t, false, false)
 }
 
-func TestWebhookConverterWithPruning(t *testing.T) {
-	testWebhookConverter(t, true)
+func TestWebhookConverterWithDefaulting(t *testing.T) {
+	testWebhookConverter(t, true, true)
 }
 
-func testWebhookConverter(t *testing.T, pruning bool) {
+func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 	tests := []struct {
 		group   string
 		handler http.Handler
@@ -80,12 +83,22 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 		{
 			group:   "nontrivial-converter",
 			handler: NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning),
+			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
+		},
+		{
+			group:   "metadata-mutating-converter",
+			handler: NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
+			checks:  checks(validateObjectMetaMutation),
+		},
+		{
+			group:   "metadata-uid-mutating-converter",
+			handler: NewObjectConverterWebhookHandler(t, uidMutatingConverter),
+			checks:  checks(validateUIDMutation),
 		},
 		{
 			group:   "empty-response",
 			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
-			checks:  checks(expectConversionFailureMessage("empty-response", "expected 1 converted objects")),
+			checks:  checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
 		},
 		{
 			group:   "failure-message",
@@ -100,8 +113,12 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
-	tearDown, config, options, err := fixtures.StartDefaultServer(t)
+	// enable necessary features
+	if defaulting {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceDefaulting, true)()
+	}
+
+	tearDown, config, options, err := fixtures.StartDefaultServer(t, fmt.Sprintf("--watch-cache=%v", watchCache))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +137,12 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 	defer tearDown()
 
 	crd := multiVersionFixture.DeepCopy()
-	crd.Spec.PreserveUnknownFields = pointer.BoolPtr(!pruning)
+
+	if !defaulting {
+		for i := range crd.Spec.Versions {
+			delete(crd.Spec.Versions[i].Schema.OpenAPIV3Schema.Properties, "defaults")
+		}
+	}
 
 	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
@@ -301,6 +323,28 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 				}
 				verifyMultiVersionObject(t, getVersion.Name, obj)
 			}
+
+			// send a non-trivial patch to the main resource to verify the oldObject is in the right version
+			if _, err := client.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"main":"true"}}}`), metav1.PatchOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			// verify that the right, pruned version is in storage
+			obj, err = ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyMultiVersionObject(t, "v1beta1", obj)
+
+			// send a non-trivial patch to the status subresource to verify the oldObject is in the right version
+			if _, err := client.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"status":"true"}}}`), metav1.PatchOptions{}, "status"); err != nil {
+				t.Fatal(err)
+			}
+			// verify that the right, pruned version is in storage
+			obj, err = ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyMultiVersionObject(t, "v1beta1", obj)
 		})
 	}
 }
@@ -403,6 +447,193 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 				}
 
 				verifyMultiVersionObject(t, getVersion.Name, obj)
+			}
+		})
+	}
+}
+
+func validateObjectMetaMutation(t *testing.T, ctc *conversionTestContext) {
+	ns := ctc.namespace
+
+	t.Logf("Creating object in storage version v1beta1")
+	storageVersion := "v1beta1"
+	ctc.setAndWaitStorageVersion(t, storageVersion)
+	name := "objectmeta-mutation-" + storageVersion
+	client := ctc.versionedClient(ns, storageVersion)
+	obj, err := client.Create(newConversionMultiVersionFixture(ns, name, storageVersion), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validateObjectMetaMutationObject(t, false, false, obj)
+
+	t.Logf("Getting object in other version v1beta2")
+	client = ctc.versionedClient(ns, "v1beta2")
+	obj, err = client.Get(name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validateObjectMetaMutationObject(t, true, true, obj)
+
+	t.Logf("Creating object in non-storage version")
+	name = "objectmeta-mutation-v1beta2"
+	client = ctc.versionedClient(ns, "v1beta2")
+	obj, err = client.Create(newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validateObjectMetaMutationObject(t, true, true, obj)
+
+	t.Logf("Listing objects in non-storage version")
+	client = ctc.versionedClient(ns, "v1beta2")
+	list, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, obj := range list.Items {
+		validateObjectMetaMutationObject(t, true, true, &obj)
+	}
+}
+
+func validateObjectMetaMutationObject(t *testing.T, expectAnnotations, expectLabels bool, obj *unstructured.Unstructured) {
+	if expectAnnotations {
+		if _, found := obj.GetAnnotations()["from"]; !found {
+			t.Errorf("expected 'from=stable.example.com/v1beta1' annotation")
+		}
+		if _, found := obj.GetAnnotations()["to"]; !found {
+			t.Errorf("expected 'to=stable.example.com/v1beta2' annotation")
+		}
+	} else {
+		if v, found := obj.GetAnnotations()["from"]; found {
+			t.Errorf("unexpected 'from' annotation: %s", v)
+		}
+		if v, found := obj.GetAnnotations()["to"]; found {
+			t.Errorf("unexpected 'to' annotation: %s", v)
+		}
+	}
+	if expectLabels {
+		if _, found := obj.GetLabels()["from"]; !found {
+			t.Errorf("expected 'from=stable.example.com.v1beta1' label")
+		}
+		if _, found := obj.GetLabels()["to"]; !found {
+			t.Errorf("expected 'to=stable.example.com.v1beta2' label")
+		}
+	} else {
+		if v, found := obj.GetLabels()["from"]; found {
+			t.Errorf("unexpected 'from' label: %s", v)
+		}
+		if v, found := obj.GetLabels()["to"]; found {
+			t.Errorf("unexpected 'to' label: %s", v)
+		}
+	}
+	if sets.NewString(obj.GetFinalizers()...).Has("foo") {
+		t.Errorf("unexpected 'foo' finalizer")
+	}
+	if obj.GetGeneration() == 42 {
+		t.Errorf("unexpected generation 42")
+	}
+	if v, found, err := unstructured.NestedString(obj.Object, "metadata", "garbage"); err != nil {
+		t.Errorf("unexpected error accessing 'metadata.garbage': %v", err)
+	} else if found {
+		t.Errorf("unexpected 'metadata.garbage': %s", v)
+	}
+}
+
+func validateUIDMutation(t *testing.T, ctc *conversionTestContext) {
+	ns := ctc.namespace
+
+	t.Logf("Creating object in non-storage version v1beta1")
+	storageVersion := "v1beta1"
+	ctc.setAndWaitStorageVersion(t, storageVersion)
+	name := "uid-mutation-" + storageVersion
+	client := ctc.versionedClient(ns, "v1beta2")
+	obj, err := client.Create(newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
+	if err == nil {
+		t.Fatalf("expected creation error, but got: %v", obj)
+	} else if !strings.Contains(err.Error(), "must have the same UID") {
+		t.Errorf("expected 'must have the same UID' error message, but got: %v", err)
+	}
+}
+
+func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
+	if _, defaulting := ctc.crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["defaults"]; !defaulting {
+		return
+	}
+
+	ns := ctc.namespace
+	storageVersion := "v1beta1"
+
+	for _, createVersion := range ctc.crd.Spec.Versions {
+		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
+			name := "defaulting-" + createVersion.Name
+			client := ctc.versionedClient(ns, createVersion.Name)
+
+			fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
+			if err := unstructured.SetNestedField(fixture.Object, map[string]interface{}{}, "defaults"); err != nil {
+				t.Fatal(err)
+			}
+			created, err := client.Create(fixture, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// check that defaulting happens
+			// - in the request version when doing no-op conversion when deserializing
+			// - when reading back from storage in the storage version
+			// only the first is persisted.
+			defaults, found, err := unstructured.NestedMap(created.Object, "defaults")
+			if err != nil {
+				t.Fatal(err)
+			} else if !found {
+				t.Fatalf("expected .defaults to exist")
+			}
+			expectedLen := 1
+			if !createVersion.Storage {
+				expectedLen++
+			}
+			if len(defaults) != expectedLen {
+				t.Fatalf("after %s create expected .defaults to have %d values, but got: %v", createVersion.Name, expectedLen, defaults)
+			}
+			if _, found := defaults[createVersion.Name].(bool); !found {
+				t.Errorf("after %s create expected .defaults[%s] to be true, but .defaults is: %v", createVersion.Name, createVersion.Name, defaults)
+			}
+			if _, found := defaults[storageVersion].(bool); !found {
+				t.Errorf("after %s create expected .defaults[%s] to be true because it is the storage version, but .defaults is: %v", createVersion.Name, storageVersion, defaults)
+			}
+
+			// verify that only the request version default is persisted
+			persisted, err := ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, found, err := unstructured.NestedBool(persisted.Object, "defaults", storageVersion); err != nil {
+				t.Fatal(err)
+			} else if createVersion.Name != storageVersion && found {
+				t.Errorf("after %s create .defaults[storage version %s] not to be persisted, but got in etcd: %v", createVersion.Name, storageVersion, defaults)
+			}
+
+			// check that when reading any other version, we do not default that version, but only the (non-persisted) storage version default
+			for _, v := range ctc.crd.Spec.Versions {
+				if v.Name == createVersion.Name {
+					// create version is persisted anyway, nothing to verify
+					continue
+				}
+
+				got, err := ctc.versionedClient(ns, v.Name).Get(created.GetName(), metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if _, found, err := unstructured.NestedBool(got.Object, "defaults", v.Name); err != nil {
+					t.Fatal(err)
+				} else if v.Name != storageVersion && found {
+					t.Errorf("after %s GET expected .defaults[%s] not to be true because only storage version %s is defaulted on read, but .defaults is: %v", v.Name, v.Name, storageVersion, defaults)
+				}
+
+				if _, found, err := unstructured.NestedBool(got.Object, "defaults", storageVersion); err != nil {
+					t.Fatal(err)
+				} else if !found {
+					t.Errorf("after non-create, non-storage %s GET expected .defaults[storage version %s] to be true, but .defaults is: %v", v.Name, storageVersion, defaults)
+				}
 			}
 		})
 	}
@@ -525,6 +756,87 @@ func nontrivialConverter(desiredAPIVersion string, obj runtime.RawExtension) (ru
 	} else if currentAPIVersion != desiredAPIVersion {
 		return runtime.RawExtension{}, fmt.Errorf("cannot convert from %s to %s", currentAPIVersion, desiredAPIVersion)
 	}
+	u.Object["apiVersion"] = desiredAPIVersion
+	raw, err := json.Marshal(u)
+	if err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to serialize object: %v with error: %v", u, err)
+	}
+	return runtime.RawExtension{Raw: raw}, nil
+}
+
+func metadataMutatingConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
+	obj, err := nontrivialConverter(desiredAPIVersion, obj)
+	if err != nil {
+		return runtime.RawExtension{}, err
+	}
+
+	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := json.Unmarshal(obj.Raw, u); err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to deserialize object: %s with error: %v", string(obj.Raw), err)
+	}
+
+	// do not mutate the marker or the probe objects
+	if !strings.Contains(u.GetName(), "mutation") {
+		return obj, nil
+	}
+
+	currentAPIVersion := u.GetAPIVersion()
+
+	// mutate annotations. This should be persisted.
+	annotations := u.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations["from"] = currentAPIVersion
+	annotations["to"] = desiredAPIVersion
+	u.SetAnnotations(annotations)
+
+	// mutate labels. This should be persisted.
+	labels := u.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels["from"] = strings.Replace(currentAPIVersion, "/", ".", 1) // replace / with . because label values do not allow /
+	labels["to"] = strings.Replace(desiredAPIVersion, "/", ".", 1)
+	u.SetLabels(labels)
+
+	// mutate other fields. This should be ignored.
+	u.SetGeneration(42)
+	u.SetOwnerReferences([]metav1.OwnerReference{{
+		APIVersion:         "v1",
+		Kind:               "Namespace",
+		Name:               "default",
+		UID:                "1234",
+		Controller:         nil,
+		BlockOwnerDeletion: nil,
+	}})
+	u.SetResourceVersion("42")
+	u.SetFinalizers([]string{"foo"})
+	if err := unstructured.SetNestedField(u.Object, "foo", "metadata", "garbage"); err != nil {
+		return runtime.RawExtension{}, err
+	}
+
+	raw, err := json.Marshal(u)
+	if err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to serialize object: %v with error: %v", u, err)
+	}
+	return runtime.RawExtension{Raw: raw}, nil
+}
+
+func uidMutatingConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
+	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := json.Unmarshal(obj.Raw, u); err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to deserialize object: %s with error: %v", string(obj.Raw), err)
+	}
+
+	// do not mutate the marker or the probe objects
+	if strings.Contains(u.GetName(), "mutation") {
+		// mutate other fields. This should be ignored.
+		if err := unstructured.SetNestedField(u.Object, "42", "metadata", "uid"); err != nil {
+			return runtime.RawExtension{}, err
+		}
+	}
+
 	u.Object["apiVersion"] = desiredAPIVersion
 	raw, err := json.Marshal(u)
 	if err != nil {
@@ -701,7 +1013,8 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 			ListKind:   "MultiVersionList",
 			Categories: []string{"all"},
 		},
-		Scope: apiextensionsv1beta1.NamespaceScoped,
+		Scope:                 apiextensionsv1beta1.NamespaceScoped,
+		PreserveUnknownFields: pointer.BoolPtr(false),
 		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 			{
 				// storage version, same schema as v1alpha1
@@ -723,6 +1036,14 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
+								},
+							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean"},
+									"v1beta1":  {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta2":  {Type: "boolean"},
 								},
 							},
 						},
@@ -751,6 +1072,14 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 									"num2": {Type: "integer"},
 								},
 							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta1":  {Type: "boolean"},
+									"v1beta2":  {Type: "boolean"},
+								},
+							},
 						},
 					},
 				},
@@ -775,6 +1104,14 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
+								},
+							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean"},
+									"v1beta1":  {Type: "boolean"},
+									"v1beta2":  {Type: "boolean", Default: jsonPtr(true)},
 								},
 							},
 						},
@@ -895,4 +1232,13 @@ func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
 		})
 		h.ServeHTTP(w, r)
 	})
+}
+
+func jsonPtr(x interface{}) *apiextensionsv1beta1.JSON {
+	bs, err := json.Marshal(x)
+	if err != nil {
+		panic(err)
+	}
+	ret := apiextensionsv1beta1.JSON{Raw: bs}
+	return &ret
 }

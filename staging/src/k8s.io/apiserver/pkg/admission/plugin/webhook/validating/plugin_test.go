@@ -51,7 +51,7 @@ func TestValidate(t *testing.T) {
 		}
 
 		ns := "webhook-test"
-		client, informer := webhooktesting.NewFakeDataSource(ns, tt.Webhooks, false, stopCh)
+		client, informer := webhooktesting.NewFakeValidatingDataSource(ns, tt.Webhooks, stopCh)
 
 		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
 		wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
@@ -116,7 +116,7 @@ func TestValidateCachedClient(t *testing.T) {
 
 	for _, tt := range webhooktesting.NewCachedClientTestcases(serverURL) {
 		ns := "webhook-test"
-		client, informer := webhooktesting.NewFakeDataSource(ns, tt.Webhooks, false, stopCh)
+		client, informer := webhooktesting.NewFakeValidatingDataSource(ns, tt.Webhooks, stopCh)
 
 		// override the webhook source. The client cache will stay the same.
 		cacheMisses := new(int32)

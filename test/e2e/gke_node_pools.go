@@ -51,21 +51,21 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 		"--num-nodes=2").CombinedOutput()
 	e2elog.Logf("\n%s", string(out))
 	if err != nil {
-		framework.Failf("Failed to create node pool %q. Err: %v\n%v", poolName, err, string(out))
+		e2elog.Failf("Failed to create node pool %q. Err: %v\n%v", poolName, err, string(out))
 	}
 	e2elog.Logf("Successfully created node pool %q.", poolName)
 
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		e2elog.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
 	}
 	e2elog.Logf("Node pools:\n%s", string(out))
 
 	e2elog.Logf("Checking that 2 nodes have the correct node pool label.")
 	nodeCount := nodesWithPoolLabel(f, poolName)
 	if nodeCount != 2 {
-		framework.Failf("Wanted 2 nodes with node pool label, got: %v", nodeCount)
+		e2elog.Failf("Wanted 2 nodes with node pool label, got: %v", nodeCount)
 	}
 	e2elog.Logf("Success, found 2 nodes with correct node pool labels.")
 
@@ -76,21 +76,21 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 		"-q").CombinedOutput()
 	e2elog.Logf("\n%s", string(out))
 	if err != nil {
-		framework.Failf("Failed to delete node pool %q. Err: %v\n%v", poolName, err, string(out))
+		e2elog.Failf("Failed to delete node pool %q. Err: %v\n%v", poolName, err, string(out))
 	}
 	e2elog.Logf("Successfully deleted node pool %q.", poolName)
 
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		framework.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		e2elog.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
 	}
 	e2elog.Logf("\nNode pools:\n%s", string(out))
 
 	e2elog.Logf("Checking that no nodes have the deleted node pool's label.")
 	nodeCount = nodesWithPoolLabel(f, poolName)
 	if nodeCount != 0 {
-		framework.Failf("Wanted 0 nodes with node pool label, got: %v", nodeCount)
+		e2elog.Failf("Wanted 0 nodes with node pool label, got: %v", nodeCount)
 	}
 	e2elog.Logf("Success, found no nodes with the deleted node pool's label.")
 }

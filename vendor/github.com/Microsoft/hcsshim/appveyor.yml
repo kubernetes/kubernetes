@@ -6,13 +6,14 @@ clone_folder: c:\gopath\src\github.com\Microsoft\hcsshim
 
 environment:
   GOPATH: c:\gopath
-  PATH: C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%GOPATH%\bin;%PATH%
+  PATH: C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%GOPATH%\bin;C:\gometalinter-2.0.12-windows-amd64;%PATH%
+
+stack: go 1.11
 
 build_script:
-  - go get -u github.com/alecthomas/gometalinter
-  - gometalinter.exe --install
+  - appveyor DownloadFile https://github.com/alecthomas/gometalinter/releases/download/v2.0.12/gometalinter-2.0.12-windows-amd64.zip
+  - 7z x gometalinter-2.0.12-windows-amd64.zip -y -oC:\ > NUL
   - gometalinter.exe --config .gometalinter.json ./...
-  - go get -v -d -t -tags "functional integration admin" ./...
   - go build ./cmd/wclayer
   - go build ./cmd/runhcs
   - go build ./cmd/tar2ext4

@@ -143,7 +143,7 @@ func TestCounterVec(t *testing.T) {
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "counter help",
+			expectedHelp:              "[ALPHA] counter help",
 		},
 		{
 			desc: "Test deprecated",
@@ -156,7 +156,7 @@ func TestCounterVec(t *testing.T) {
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "(Deprecated since 1.15.0) counter help",
+			expectedHelp:              "[ALPHA] (Deprecated since 1.15.0) counter help",
 		},
 		{
 			desc: "Test hidden",
@@ -170,6 +170,19 @@ func TestCounterVec(t *testing.T) {
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 0,
 			expectedHelp:              "counter help",
+		},
+		{
+			desc: "Test alpha",
+			CounterOpts: &CounterOpts{
+				StabilityLevel: ALPHA,
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "counter help",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[ALPHA] counter help",
 		},
 	}
 

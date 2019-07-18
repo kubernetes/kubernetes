@@ -109,41 +109,42 @@ func (jm *Controller) syncAll() {
 	jobListFunc := func(opts metav1.ListOptions) (runtime.Object, error) {
 		return jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(opts)
 	}
-	jlTmp, err := pager.New(pager.SimplePageFunc(jobListFunc)).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
-		return
-	}
-	jl, ok := jlTmp.(*batchv1.JobList)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expected type *batchv1.JobList, got type %T", jlTmp))
-		return
-	}
-	js := jl.Items
-	klog.V(4).Infof("Found %d jobs", len(js))
 
+	js := make([]batchv1.Job, 0)
+	err := pager.New(pager.SimplePageFunc(jobListFunc)).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
+		jobTmp, ok := object.(*batchv1.Job)
+		if !ok {
+			return fmt.Errorf("expected type *batchv1.Job, got type %T", jobTmp)
+		}
+		js = append(js, *jobTmp)
+		return nil
+	})
+
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Failed to extract job list: %v", err))
+		return
+	}
+
+	klog.V(4).Infof("Found %d jobs", len(js))
 	cronJobListFunc := func(opts metav1.ListOptions) (runtime.Object, error) {
 		return jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(opts)
 	}
-	sjlTmp, err := pager.New(pager.SimplePageFunc(cronJobListFunc)).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
-		return
-	}
-	sjl, ok := sjlTmp.(*batchv1beta1.CronJobList)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expected type *batchv1beta1.CronJobList, got type %T", sjlTmp))
-		return
-	}
-	sjs := sjl.Items
-	klog.V(4).Infof("Found %d cronjobs", len(sjs))
 
 	jobsBySj := groupJobsByParent(js)
 	klog.V(4).Infof("Found %d groups", len(jobsBySj))
+	err = pager.New(pager.SimplePageFunc(cronJobListFunc)).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
+		sj, ok := object.(*batchv1beta1.CronJob)
+		if !ok {
+			return fmt.Errorf("expected type *batchv1beta1.CronJob, got type %T", sj)
+		}
+		syncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.recorder)
+		cleanupFinishedJobs(sj, jobsBySj[sj.UID], jm.jobControl, jm.sjControl, jm.recorder)
+		return nil
+	})
 
-	for _, sj := range sjs {
-		syncOne(&sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.recorder)
-		cleanupFinishedJobs(&sj, jobsBySj[sj.UID], jm.jobControl, jm.sjControl, jm.recorder)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Failed to extract cronJobs list: %v", err))
+		return
 	}
 }
 

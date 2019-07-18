@@ -331,7 +331,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.5.0"
+	CoreDNSVersion = "1.3.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -354,6 +354,18 @@ const (
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
+
+	// KubeletPort is the default port for the kubelet server on each host machine.
+	// May be overridden by a flag at startup.
+	KubeletPort = 10250
+	// InsecureSchedulerPort is the default port for the scheduler status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeSchedulerPort instead.
+	InsecureSchedulerPort = 10251
+	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeControllerManagerPort instead.
+	InsecureKubeControllerManagerPort = 10252
 )
 
 var (

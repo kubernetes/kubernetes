@@ -124,7 +124,7 @@ func (in *DaemonSetCondition) DeepCopy() *DaemonSetCondition {
 func (in *DaemonSetList) DeepCopyInto(out *DaemonSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]DaemonSet, len(*in))
@@ -280,7 +280,7 @@ func (in *DeploymentCondition) DeepCopy() *DeploymentCondition {
 func (in *DeploymentList) DeepCopyInto(out *DeploymentList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Deployment, len(*in))
@@ -595,7 +595,7 @@ func (in *IngressBackend) DeepCopy() *IngressBackend {
 func (in *IngressList) DeepCopyInto(out *IngressList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Ingress, len(*in))
@@ -826,7 +826,7 @@ func (in *NetworkPolicyIngressRule) DeepCopy() *NetworkPolicyIngressRule {
 func (in *NetworkPolicyList) DeepCopyInto(out *NetworkPolicyList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NetworkPolicy, len(*in))
@@ -979,7 +979,7 @@ func (in *PodSecurityPolicy) DeepCopyObject() runtime.Object {
 func (in *PodSecurityPolicyList) DeepCopyInto(out *PodSecurityPolicyList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PodSecurityPolicy, len(*in))
@@ -1152,7 +1152,7 @@ func (in *ReplicaSetCondition) DeepCopy() *ReplicaSetCondition {
 func (in *ReplicaSetList) DeepCopyInto(out *ReplicaSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ReplicaSet, len(*in))

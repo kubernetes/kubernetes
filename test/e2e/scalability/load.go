@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// DEPRECATED.
+// We already migrated all periodic and presubmit tests to ClusterLoader2.
+// We are still keeping this file for optional functionality, but once
+// this is supported in ClusterLoader2 tests, this test will be removed
+// (hopefully in 1.16 release).
+// Please don't add new functionality to this file and instead see:
+// https://github.com/kubernetes/perf-tests/tree/master/clusterloader2
+
 package scalability
 
 import (
@@ -51,11 +59,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -102,7 +111,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
@@ -111,14 +120,14 @@ var _ = SIGDescribe("Load capacity", func() {
 		wg.Wait()
 
 		// Verify latency metrics
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
+		highLatencyRequests, metrics, err := e2emetrics.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries := make([]framework.TestDataSummary, 0, 2)
 			summaries = append(summaries, metrics)
 			summaries = append(summaries, testPhaseDurations)
 			framework.PrintSummaries(summaries, testCaseBaseName)
-			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+			gomega.Expect(highLatencyRequests).NotTo(gomega.BeNumerically(">", 0), "There should be no high-latency requests")
 		}
 	})
 
@@ -141,14 +150,14 @@ var _ = SIGDescribe("Load capacity", func() {
 	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		testPhaseDurations = timer.NewTestPhaseTimer()
 		clientset = f.ClientSet
 
 		ns = f.Namespace.Name
 		nodes := framework.GetReadySchedulableNodesOrDie(clientset)
 		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
+		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
@@ -156,7 +165,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		err := framework.CheckTestingNSDeletedExcept(clientset, ns)
 		framework.ExpectNoError(err)
 
-		framework.ExpectNoError(framework.ResetMetrics(clientset))
+		framework.ExpectNoError(e2emetrics.ResetMetrics(clientset))
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
@@ -176,24 +185,25 @@ var _ = SIGDescribe("Load capacity", func() {
 		quotas           bool
 	}
 
+	serveHostnameCmd := []string{"/agnhost", "serve-hostname"}
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: api.Kind("ReplicationController")},
 		// Tests for other resource types
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment")},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: batch.Kind("Job")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: batch.Kind("Job")},
 		// Test scheduling when daemons are preset
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Test with configmaps
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: randomKind},
 		// Test with quotas
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), quotas: true},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind, quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: api.Kind("ReplicationController"), quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: randomKind, quotas: true},
 	}
 
 	isCanonical := func(test *Load) bool {
@@ -219,7 +229,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
-		It(name, func() {
+		ginkgo.It(name, func() {
 			// Create a number of namespaces.
 			namespaceCount := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
 			namespaces, err := CreateNamespaces(f, namespaceCount, fmt.Sprintf("load-%v-nodepods", itArg.podsPerNode), testPhaseDurations.StartPhase(110, "namespace creation"))
@@ -240,7 +250,7 @@ var _ = SIGDescribe("Load capacity", func() {
 				e2elog.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
-					defer GinkgoRecover()
+					defer ginkgo.GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
 				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
@@ -250,7 +260,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					defer serviceCleanupPhase.End()
 					e2elog.Logf("Starting to delete services...")
 					deleteService := func(i int) {
-						defer GinkgoRecover()
+						defer ginkgo.GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
 					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
@@ -318,7 +328,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
 
 			createAllResources(configs, creatingTime, testPhaseDurations.StartPhase(200, "load pods creation"))
-			By("============================================================================")
+			ginkgo.By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
 			// to make it possible to create/schedule & delete them in the meantime.
@@ -329,7 +339,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
 			e2elog.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
-			By("============================================================================")
+			ginkgo.By("============================================================================")
 
 			// Cleanup all created replication controllers.
 			// Currently we assume <throughput> pods/second average deletion throughput.
@@ -489,6 +499,7 @@ func generateConfigs(
 	return configs, secretConfigs, configMapConfigs
 }
 
+// GenerateConfigsForGroup generates the configuration needed for a group
 func GenerateConfigsForGroup(
 	nss []*v1.Namespace,
 	groupName string,
@@ -577,7 +588,7 @@ func GenerateConfigsForGroup(
 		case batch.Kind("Job"):
 			config = &testutils.JobConfig{RCConfig: *baseConfig}
 		default:
-			framework.Failf("Unsupported kind for config creation: %v", kind)
+			e2elog.Failf("Unsupported kind for config creation: %v", kind)
 		}
 		configs = append(configs, config)
 	}
@@ -643,7 +654,7 @@ func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.D
 }
 
 func createResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, creatingTime time.Duration) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(creatingTime)
@@ -663,7 +674,7 @@ func scaleAllResources(configs []testutils.RunObjectConfig, scalingTime time.Dur
 // Scales RC to a random size within [0.5*size, 1.5*size] and lists all the pods afterwards.
 // Scaling happens always based on original size, not the current size.
 func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scalingTime time.Duration) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(scalingTime)
@@ -711,7 +722,7 @@ func deleteAllResources(configs []testutils.RunObjectConfig, deletingTime time.D
 }
 
 func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deletingTime time.Duration) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)
@@ -720,6 +731,7 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 		fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 }
 
+// CreateNamespaces creates a namespace
 func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string, testPhase *timer.Phase) ([]*v1.Namespace, error) {
 	defer testPhase.End()
 	namespaces := []*v1.Namespace{}
@@ -733,6 +745,7 @@ func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix str
 	return namespaces, nil
 }
 
+// CreateQuotas creates quotas
 func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount int, testPhase *timer.Phase) error {
 	defer testPhase.End()
 	quotaTemplate := &v1.ResourceQuota{

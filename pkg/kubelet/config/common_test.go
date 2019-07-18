@@ -63,6 +63,14 @@ func TestDecodeSinglePod(t *testing.T) {
 			SchedulerName:      core.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
 	}
 	json, err := runtime.Encode(testapi.Default.Codec(), pod)
 	if err != nil {
@@ -127,6 +135,14 @@ func TestDecodePodList(t *testing.T) {
 			SecurityContext:    &v1.PodSecurityContext{},
 			SchedulerName:      core.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
 		},
 	}
 	podList := &v1.PodList{

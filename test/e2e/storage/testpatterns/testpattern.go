@@ -128,21 +128,24 @@ var (
 
 	// XfsInlineVolume is TestPattern for "Inline-volume (xfs)"
 	XfsInlineVolume = TestPattern{
-		Name:    "Inline-volume (xfs)",
-		VolType: InlineVolume,
-		FsType:  "xfs",
+		Name:       "Inline-volume (xfs)",
+		VolType:    InlineVolume,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
 	}
 	// XfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (xfs)"
 	XfsPreprovisionedPV = TestPattern{
-		Name:    "Pre-provisioned PV (xfs)",
-		VolType: PreprovisionedPV,
-		FsType:  "xfs",
+		Name:       "Pre-provisioned PV (xfs)",
+		VolType:    PreprovisionedPV,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
 	}
 	// XfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
 	XfsDynamicPV = TestPattern{
-		Name:    "Dynamic PV (xfs)",
-		VolType: DynamicPV,
-		FsType:  "xfs",
+		Name:       "Dynamic PV (xfs)",
+		VolType:    DynamicPV,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
 	}
 
 	// Definitions for ntfs

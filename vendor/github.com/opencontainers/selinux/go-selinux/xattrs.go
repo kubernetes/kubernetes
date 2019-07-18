@@ -1,4 +1,4 @@
-// +build linux
+// +build selinux,linux
 
 package selinux
 

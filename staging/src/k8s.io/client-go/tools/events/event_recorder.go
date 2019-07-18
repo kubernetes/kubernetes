@@ -51,7 +51,7 @@ func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.O
 	}
 	refRelated, err := reference.GetReference(recorder.scheme, related)
 	if err != nil {
-		klog.Errorf("Could not construct reference to: '%#v' due to: '%v'.", related, err)
+		klog.V(9).Infof("Could not construct reference to: '%#v' due to: '%v'.", related, err)
 	}
 	if !util.ValidateEventType(eventtype) {
 		klog.Errorf("Unsupported event type: '%v'", eventtype)
@@ -85,5 +85,8 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 		Related:             refRelated,
 		Note:                message,
 		Type:                eventtype,
+		// TODO: remove this when we change conversion to convert eventSource
+		// to reportingController
+		DeprecatedSource: v1.EventSource{Component: reportingController},
 	}
 }

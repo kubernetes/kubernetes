@@ -3,6 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "build_args.go",
+        "build_args_old.go",
         "log_writer.go",
         "run_result.go",
         "test_runner.go",

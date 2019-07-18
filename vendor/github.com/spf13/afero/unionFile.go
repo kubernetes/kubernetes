@@ -21,32 +21,33 @@ import (
 // successful read in the overlay will move the cursor position in the base layer
 // by the number of bytes read.
 type UnionFile struct {
-	base  File
-	layer File
-	off   int
-	files []os.FileInfo
+	Base   File
+	Layer  File
+	Merger DirsMerger
+	off    int
+	files  []os.FileInfo
 }
 
 func (f *UnionFile) Close() error {
 	// first close base, so we have a newer timestamp in the overlay. If we'd close
 	// the overlay first, we'd get a cacheStale the next time we access this file
 	// -> cache would be useless ;-)
-	if f.base != nil {
-		f.base.Close()
+	if f.Base != nil {
+		f.Base.Close()
 	}
-	if f.layer != nil {
-		return f.layer.Close()
+	if f.Layer != nil {
+		return f.Layer.Close()
 	}
 	return BADFD
 }
 
 func (f *UnionFile) Read(s []byte) (int, error) {
-	if f.layer != nil {
-		n, err := f.layer.Read(s)
-		if (err == nil || err == io.EOF) && f.base != nil {
+	if f.Layer != nil {
+		n, err := f.Layer.Read(s)
+		if (err == nil || err == io.EOF) && f.Base != nil {
 			// advance the file position also in the base file, the next
 			// call may be a write at this position (or a seek with SEEK_CUR)
-			if _, seekErr := f.base.Seek(int64(n), os.SEEK_CUR); seekErr != nil {
+			if _, seekErr := f.Base.Seek(int64(n), os.SEEK_CUR); seekErr != nil {
 				// only overwrite err in case the seek fails: we need to
 				// report an eventual io.EOF to the caller
 				err = seekErr
@@ -54,109 +55,154 @@ func (f *UnionFile) Read(s []byte) (int, error) {
 		}
 		return n, err
 	}
-	if f.base != nil {
-		return f.base.Read(s)
+	if f.Base != nil {
+		return f.Base.Read(s)
 	}
 	return 0, BADFD
 }
 
 func (f *UnionFile) ReadAt(s []byte, o int64) (int, error) {
-	if f.layer != nil {
-		n, err := f.layer.ReadAt(s, o)
-		if (err == nil || err == io.EOF) && f.base != nil {
-			_, err = f.base.Seek(o+int64(n), os.SEEK_SET)
+	if f.Layer != nil {
+		n, err := f.Layer.ReadAt(s, o)
+		if (err == nil || err == io.EOF) && f.Base != nil {
+			_, err = f.Base.Seek(o+int64(n), os.SEEK_SET)
 		}
 		return n, err
 	}
-	if f.base != nil {
-		return f.base.ReadAt(s, o)
+	if f.Base != nil {
+		return f.Base.ReadAt(s, o)
 	}
 	return 0, BADFD
 }
 
 func (f *UnionFile) Seek(o int64, w int) (pos int64, err error) {
-	if f.layer != nil {
-		pos, err = f.layer.Seek(o, w)
-		if (err == nil || err == io.EOF) && f.base != nil {
-			_, err = f.base.Seek(o, w)
+	if f.Layer != nil {
+		pos, err = f.Layer.Seek(o, w)
+		if (err == nil || err == io.EOF) && f.Base != nil {
+			_, err = f.Base.Seek(o, w)
 		}
 		return pos, err
 	}
-	if f.base != nil {
-		return f.base.Seek(o, w)
+	if f.Base != nil {
+		return f.Base.Seek(o, w)
 	}
 	return 0, BADFD
 }
 
 func (f *UnionFile) Write(s []byte) (n int, err error) {
-	if f.layer != nil {
-		n, err = f.layer.Write(s)
-		if err == nil && f.base != nil { // hmm, do we have fixed size files where a write may hit the EOF mark?
-			_, err = f.base.Write(s)
+	if f.Layer != nil {
+		n, err = f.Layer.Write(s)
+		if err == nil && f.Base != nil { // hmm, do we have fixed size files where a write may hit the EOF mark?
+			_, err = f.Base.Write(s)
 		}
 		return n, err
 	}
-	if f.base != nil {
-		return f.base.Write(s)
+	if f.Base != nil {
+		return f.Base.Write(s)
 	}
 	return 0, BADFD
 }
 
 func (f *UnionFile) WriteAt(s []byte, o int64) (n int, err error) {
-	if f.layer != nil {
-		n, err = f.layer.WriteAt(s, o)
-		if err == nil && f.base != nil {
-			_, err = f.base.WriteAt(s, o)
+	if f.Layer != nil {
+		n, err = f.Layer.WriteAt(s, o)
+		if err == nil && f.Base != nil {
+			_, err = f.Base.WriteAt(s, o)
 		}
 		return n, err
 	}
-	if f.base != nil {
-		return f.base.WriteAt(s, o)
+	if f.Base != nil {
+		return f.Base.WriteAt(s, o)
 	}
 	return 0, BADFD
 }
 
 func (f *UnionFile) Name() string {
-	if f.layer != nil {
-		return f.layer.Name()
+	if f.Layer != nil {
+		return f.Layer.Name()
 	}
-	return f.base.Name()
+	return f.Base.Name()
+}
+
+// DirsMerger is how UnionFile weaves two directories together.
+// It takes the FileInfo slices from the layer and the base and returns a
+// single view.
+type DirsMerger func(lofi, bofi []os.FileInfo) ([]os.FileInfo, error)
+
+var defaultUnionMergeDirsFn = func(lofi, bofi []os.FileInfo) ([]os.FileInfo, error) {
+	var files = make(map[string]os.FileInfo)
+
+	for _, fi := range lofi {
+		files[fi.Name()] = fi
+	}
+
+	for _, fi := range bofi {
+		if _, exists := files[fi.Name()]; !exists {
+			files[fi.Name()] = fi
+		}
+	}
+
+	rfi := make([]os.FileInfo, len(files))
+
+	i := 0
+	for _, fi := range files {
+		rfi[i] = fi
+		i++
+	}
+
+	return rfi, nil
+
 }
 
 // Readdir will weave the two directories together and
-// return a single view of the overlayed directories
+// return a single view of the overlayed directories.
+// At the end of the directory view, the error is io.EOF if c > 0.
 func (f *UnionFile) Readdir(c int) (ofi []os.FileInfo, err error) {
+	var merge DirsMerger = f.Merger
+	if merge == nil {
+		merge = defaultUnionMergeDirsFn
+	}
+
 	if f.off == 0 {
-		var files = make(map[string]os.FileInfo)
-		var rfi []os.FileInfo
-		if f.layer != nil {
-			rfi, err = f.layer.Readdir(-1)
+		var lfi []os.FileInfo
+		if f.Layer != nil {
+			lfi, err = f.Layer.Readdir(-1)
 			if err != nil {
 				return nil, err
-			}
-			for _, fi := range rfi {
-				files[fi.Name()] = fi
 			}
 		}
 
-		if f.base != nil {
-			rfi, err = f.base.Readdir(-1)
+		var bfi []os.FileInfo
+		if f.Base != nil {
+			bfi, err = f.Base.Readdir(-1)
 			if err != nil {
 				return nil, err
 			}
-			for _, fi := range rfi {
-				if _, exists := files[fi.Name()]; !exists {
-					files[fi.Name()] = fi
-				}
-			}
+
 		}
-		for _, fi := range files {
-			f.files = append(f.files, fi)
+		merged, err := merge(lfi, bfi)
+		if err != nil {
+			return nil, err
 		}
+		f.files = append(f.files, merged...)
 	}
-	if c == -1 {
+
+	if c <= 0 && len(f.files) == 0 {
+		return f.files, nil
+	}
+
+	if f.off >= len(f.files) {
+		return nil, io.EOF
+	}
+
+	if c <= 0 {
 		return f.files[f.off:], nil
 	}
+
+	if c > len(f.files) {
+		c = len(f.files)
+	}
+
 	defer func() { f.off += c }()
 	return f.files[f.off:c], nil
 }
@@ -174,53 +220,53 @@ func (f *UnionFile) Readdirnames(c int) ([]string, error) {
 }
 
 func (f *UnionFile) Stat() (os.FileInfo, error) {
-	if f.layer != nil {
-		return f.layer.Stat()
+	if f.Layer != nil {
+		return f.Layer.Stat()
 	}
-	if f.base != nil {
-		return f.base.Stat()
+	if f.Base != nil {
+		return f.Base.Stat()
 	}
 	return nil, BADFD
 }
 
 func (f *UnionFile) Sync() (err error) {
-	if f.layer != nil {
-		err = f.layer.Sync()
-		if err == nil && f.base != nil {
-			err = f.base.Sync()
+	if f.Layer != nil {
+		err = f.Layer.Sync()
+		if err == nil && f.Base != nil {
+			err = f.Base.Sync()
 		}
 		return err
 	}
-	if f.base != nil {
-		return f.base.Sync()
+	if f.Base != nil {
+		return f.Base.Sync()
 	}
 	return BADFD
 }
 
 func (f *UnionFile) Truncate(s int64) (err error) {
-	if f.layer != nil {
-		err = f.layer.Truncate(s)
-		if err == nil && f.base != nil {
-			err = f.base.Truncate(s)
+	if f.Layer != nil {
+		err = f.Layer.Truncate(s)
+		if err == nil && f.Base != nil {
+			err = f.Base.Truncate(s)
 		}
 		return err
 	}
-	if f.base != nil {
-		return f.base.Truncate(s)
+	if f.Base != nil {
+		return f.Base.Truncate(s)
 	}
 	return BADFD
 }
 
 func (f *UnionFile) WriteString(s string) (n int, err error) {
-	if f.layer != nil {
-		n, err = f.layer.WriteString(s)
-		if err == nil && f.base != nil {
-			_, err = f.base.WriteString(s)
+	if f.Layer != nil {
+		n, err = f.Layer.WriteString(s)
+		if err == nil && f.Base != nil {
+			_, err = f.Base.WriteString(s)
 		}
 		return n, err
 	}
-	if f.base != nil {
-		return f.base.WriteString(s)
+	if f.Base != nil {
+		return f.Base.WriteString(s)
 	}
 	return 0, BADFD
 }

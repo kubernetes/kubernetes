@@ -3,12 +3,6 @@ kind: Pod
 metadata:
   name: kube-proxy
   namespace: kube-system
-  # This annotation ensures that kube-proxy does not get evicted if the node
-  # supports critical pod annotation based priority scheme.
-  # Note that kube-proxy runs as a static pod so this annotation does NOT have
-  # any effect on default scheduler which scheduling kube-proxy.
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     tier: node
     component: kube-proxy
@@ -29,7 +23,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}

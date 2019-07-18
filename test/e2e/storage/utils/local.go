@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // LocalVolumeType represents type of local volume, e.g. tmpfs, directory,
@@ -36,23 +37,23 @@ import (
 type LocalVolumeType string
 
 const (
-	// A simple directory as local volume
+	// LocalVolumeDirectory reprensents a simple directory as local volume
 	LocalVolumeDirectory LocalVolumeType = "dir"
-	// Like LocalVolumeDirectory but it's a symbolic link to directory
+	// LocalVolumeDirectoryLink is like LocalVolumeDirectory but it's a symbolic link to directory
 	LocalVolumeDirectoryLink LocalVolumeType = "dir-link"
-	// Like LocalVolumeDirectory but bind mounted
+	// LocalVolumeDirectoryBindMounted is like LocalVolumeDirectory but bind mounted
 	LocalVolumeDirectoryBindMounted LocalVolumeType = "dir-bindmounted"
-	// Like LocalVolumeDirectory but it's a symbolic link to self bind mounted directory
+	// LocalVolumeDirectoryLinkBindMounted is like LocalVolumeDirectory but it's a symbolic link to self bind mounted directory
 	// Note that bind mounting at symbolic link actually mounts at directory it
 	// links to
 	LocalVolumeDirectoryLinkBindMounted LocalVolumeType = "dir-link-bindmounted"
-	// Use temporary filesystem as local volume
+	// LocalVolumeTmpfs represents a temporary filesystem to be used as local volume
 	LocalVolumeTmpfs LocalVolumeType = "tmpfs"
-	// Block device, creates a local file, and maps it as a block device
+	// LocalVolumeBlock represents a Block device, creates a local file, and maps it as a block device
 	LocalVolumeBlock LocalVolumeType = "block"
-	// Filesystem backed by a block device
+	// LocalVolumeBlockFS represents a filesystem backed by a block device
 	LocalVolumeBlockFS LocalVolumeType = "blockfs"
-	// Use GCE Local SSD as local volume, this is a filesystem
+	// LocalVolumeGCELocalSSD represents a Filesystem backed by GCE Local SSD as local volume
 	LocalVolumeGCELocalSSD LocalVolumeType = "gce-localssd-scsi-fs"
 )
 
@@ -309,11 +310,11 @@ func (l *ltrMgr) Create(node *v1.Node, volumeType LocalVolumeType, parameters ma
 	case LocalVolumeGCELocalSSD:
 		ltr = l.setupLocalVolumeGCELocalSSD(node, parameters)
 	default:
-		framework.Failf("Failed to create local test resource on node %q, unsupported volume type: %v is specified", node.Name, volumeType)
+		e2elog.Failf("Failed to create local test resource on node %q, unsupported volume type: %v is specified", node.Name, volumeType)
 		return nil
 	}
 	if ltr == nil {
-		framework.Failf("Failed to create local test resource on node %q, volume type: %v, parameters: %v", node.Name, volumeType, parameters)
+		e2elog.Failf("Failed to create local test resource on node %q, volume type: %v, parameters: %v", node.Name, volumeType, parameters)
 	}
 	ltr.VolumeType = volumeType
 	return ltr
@@ -338,7 +339,7 @@ func (l *ltrMgr) Remove(ltr *LocalTestResource) {
 	case LocalVolumeGCELocalSSD:
 		l.cleanupLocalVolumeGCELocalSSD(ltr)
 	default:
-		framework.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
+		e2elog.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
 	}
 	return
 }

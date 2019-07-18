@@ -66,6 +66,13 @@ const (
 	CSIVolumePublished CSIVolumePhaseType = "published"
 )
 
+var (
+	deprecatedVolumeProviders = map[string]string{
+		"kubernetes.io/cinder":  "The Cinder volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/scaleio": "The ScaleIO volume provider is deprecated and will be removed in a future release",
+	}
+)
+
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner
@@ -334,6 +341,8 @@ type KubeletVolumeHost interface {
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 	WaitForCacheSync() error
+	// Returns HostUtils Interface
+	GetHostUtil() mount.HostUtils
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
@@ -452,9 +461,10 @@ type VolumePluginMgr struct {
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
 type Spec struct {
-	Volume           *v1.Volume
-	PersistentVolume *v1.PersistentVolume
-	ReadOnly         bool
+	Volume                          *v1.Volume
+	PersistentVolume                *v1.PersistentVolume
+	ReadOnly                        bool
+	InlineVolumeSpecForCSIMigration bool
 }
 
 // Name returns the name of either Volume or PersistentVolume, one of which must not be nil.
@@ -671,6 +681,11 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
+
+	// Issue warning if the matched provider is deprecated
+	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
+	}
 	return matches[0], nil
 }
 
@@ -733,6 +748,11 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+	}
+
+	// Issue warning if the matched provider is deprecated
+	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
 	}
 	return matches[0], nil
 }

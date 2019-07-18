@@ -35,7 +35,7 @@ type dnsFederationsConfigMapTest struct {
 }
 
 var (
-	googleDNSHostname = "google-public-dns-a.google.com"
+	googleDNSHostname = "dns.google"
 	// The ConfigMap update mechanism takes longer than the standard
 	// wait.ForeverTestTimeout.
 	moreForeverTestTimeout = 2 * 60 * time.Second

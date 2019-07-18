@@ -45,6 +45,12 @@ type EventBroadcaster interface {
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
 	NewRecorder(scheme *runtime.Scheme, reportingController string) EventRecorder
+
+	// StartEventWatcher enables you to watch for emitted events without usage
+	// of StartRecordingToSink. This lets you also process events in a custom way (e.g. in tests).
+	// NOTE: events received on your eventHandler should be copied before being used.
+	// TODO: figure out if this can be removed.
+	StartEventWatcher(eventHandler func(event runtime.Object)) func()
 }
 
 // EventSink knows how to store events (client-go implements it.)

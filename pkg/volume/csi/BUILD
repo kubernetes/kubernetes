@@ -99,6 +99,7 @@ filegroup(
         "//pkg/volume/csi/csiv0:all-srcs",
         "//pkg/volume/csi/fake:all-srcs",
         "//pkg/volume/csi/nodeinfomanager:all-srcs",
+        "//pkg/volume/csi/testing:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

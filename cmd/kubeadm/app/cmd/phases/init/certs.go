@@ -32,17 +32,16 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	saKeyLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+	saKeyLongDesc = fmt.Sprintf(cmdutil.LongDesc(`
 		Generate the private key for signing service account tokens along with its public key, and save them into
 		%s and %s files.
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
 
-	genericLongDesc = normalizer.LongDesc(`
+	genericLongDesc = cmdutil.LongDesc(`
 		Generate the %[1]s, and save them into %[2]s.cert and %[2]s.key files.%[3]s
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
@@ -86,17 +85,19 @@ func newCertSubPhases() []workflow.Phase {
 
 	subPhases = append(subPhases, allPhase)
 
-	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
-
-	for ca, certList := range certTree {
-		caPhase := newCertSubPhase(ca, runCAPhase(ca))
-		subPhases = append(subPhases, caPhase)
-
-		for _, cert := range certList {
-			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
-			certPhase.LocalFlags = localFlags()
-			subPhases = append(subPhases, certPhase)
+	// This loop assumes that GetDefaultCertList() always returns a list of
+	// certificate that is preceded by the CAs that sign them.
+	var lastCACert *certsphase.KubeadmCert
+	for _, cert := range certsphase.GetDefaultCertList() {
+		var phase workflow.Phase
+		if cert.CAName == "" {
+			phase = newCertSubPhase(cert, runCAPhase(cert))
+			lastCACert = cert
+		} else {
+			phase = newCertSubPhase(cert, runCertPhase(cert, lastCACert))
+			phase.LocalFlags = localFlags()
 		}
+		subPhases = append(subPhases, phase)
 	}
 
 	// SA creates the private/public key pair, which doesn't use x509 at all
@@ -135,10 +136,12 @@ func getCertPhaseFlags(name string) []string {
 		options.CfgPath,
 		options.CSROnly,
 		options.CSRDir,
+		options.KubernetesVersion,
 	}
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerCertSANs,
 			options.NetworkingDNSDomain,
 			options.NetworkingServiceSubnet,

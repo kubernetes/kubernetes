@@ -2,6 +2,7 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/apiserver/pkg/util/feature
+  - k8s.io/component-base/featuregate/testing
   - k8s.io/kubernetes/pkg/apis/core
   - k8s.io/kubernetes/pkg/features
   - k8s.io/kubernetes/pkg/fieldpath
@@ -123,6 +124,16 @@
   - k8s.io/klog
   - k8s.io/utils
 
+- baseImportPath: "./vendor/k8s.io/kubectl/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/cli-runtime
+  - k8s.io/client-go
+  - k8s.io/kubectl
+  - k8s.io/utils
+  - k8s.io/klog
+
 - baseImportPath: "./vendor/k8s.io/sample-apiserver/"
   allowedImports:
   - k8s.io/api
@@ -131,6 +142,7 @@
   - k8s.io/client-go
   - k8s.io/code-generator
   - k8s.io/component-base
+  - k8s.io/kube-openapi
   - k8s.io/sample-apiserver
   - k8s.io/klog
 
@@ -193,6 +205,7 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/cluster-bootstrap
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/cloud-provider/"
   allowedImports:
@@ -213,6 +226,8 @@
   - k8s.io/klog
   - k8s.io/legacy-cloud-providers
   - k8s.io/utils
+  - k8s.io/apiserver/pkg/util/feature
+  - k8s.io/component-base/featuregate
 
 - baseImportPath: "./vendor/k8s.io/node-api/"
   allowedImports:

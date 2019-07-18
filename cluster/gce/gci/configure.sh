@@ -248,7 +248,7 @@ function install-cni-binaries {
   fi
 
   echo "Downloading cni binaries"
-  download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+  download-or-bust "${cni_sha1}" "${CNI_STORAGE_PATH}/${cni_tar}"
   local -r cni_dir="${KUBE_HOME}/cni"
   mkdir -p "${cni_dir}/bin"
   tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite
@@ -381,6 +381,15 @@ function load-docker-images {
   else
     try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
+  # When we load from a docker archive, the image is tagged with the arch, we don't have docker manifests here.
+  # The resource manifest is expecting something like 'registry/kube-controller-manager:v1.2.3', no arch specified.
+  local -r images=$(docker images --format "{{.Repository}}:{{.Tag}}" | egrep 'kube-apiserver|kube-controller-manager|kube-scheduler|kube-proxy' | grep amd64)
+  for image in $images ; do
+    local manifest_name="${image/-amd64/}"
+    if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q ${manifest_name} ; then
+      docker tag $image $manifest_name
+    fi
+  done
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,

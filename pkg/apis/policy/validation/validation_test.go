@@ -281,6 +281,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidProcMount := validPSP()
 	invalidProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.ProcMountType("bogus")}
 
+	allowedCSIDriverPSP := validPSP()
+	allowedCSIDriverPSP.Spec.Volumes = []policy.FSType{policy.CSI}
+	allowedCSIDriverPSP.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{}}
+
 	type testCase struct {
 		psp         *policy.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -447,6 +451,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeRequired,
 			errorDetail: "must specify a driver",
 		},
+		"CSI policy with empty allowed driver list": {
+			psp:       allowedCSIDriverPSP,
+			errorType: field.ErrorTypeRequired,
+		},
 		"invalid allowedProcMountTypes": {
 			psp:         invalidProcMount,
 			errorType:   field.ErrorTypeNotSupported,
@@ -549,6 +557,14 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validProcMount := validPSP()
 	validProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.DefaultProcMount, api.UnmaskedProcMount}
 
+	allowedCSIDriversWithCSIFsType := validPSP()
+	allowedCSIDriversWithCSIFsType.Spec.Volumes = []policy.FSType{policy.CSI}
+	allowedCSIDriversWithCSIFsType.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}}
+
+	allowedCSIDriversWithAllFsTypes := validPSP()
+	allowedCSIDriversWithAllFsTypes.Spec.Volumes = []policy.FSType{policy.All}
+	allowedCSIDriversWithAllFsTypes.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "bar"}}
+
 	successCases := map[string]struct {
 		psp *policy.PodSecurityPolicy
 	}{
@@ -590,6 +606,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid allowedProcMountTypes": {
 			psp: validProcMount,
+		},
+		"allowed CSI drivers when FSType policy is set to CSI": {
+			psp: allowedCSIDriversWithCSIFsType,
+		},
+		"allowed CSI drivers when FSType policy is set to All": {
+			psp: allowedCSIDriversWithAllFsTypes,
 		},
 	}
 

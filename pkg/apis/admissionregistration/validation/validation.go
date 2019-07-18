@@ -22,6 +22,7 @@ import (
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -167,7 +168,7 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedVersion
 
 	// Currently only v1beta1 accepted in AdmissionReviewVersions
 	if len(versions) < 1 {
-		allErrors = append(allErrors, field.Required(fldPath, ""))
+		allErrors = append(allErrors, field.Required(fldPath, fmt.Sprintf("must specify one of %v", strings.Join(AcceptedAdmissionReviewVersions, ", "))))
 	} else {
 		seen := map[string]bool{}
 		hasAcceptedVersion := false
@@ -194,33 +195,49 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedVersion
 	return allErrors
 }
 
-func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
-	return validateValidatingWebhookConfiguration(e, true)
+// ValidateValidatingWebhookConfiguration validates a webhook before creation.
+func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+	return validateValidatingWebhookConfiguration(e, true, requireUniqueWebhookNames(requestGV))
 }
 
-func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, requireRecognizedVersion bool) field.ErrorList {
+func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, requireRecognizedVersion, requireUniqueWebhookNames bool) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	hookNames := sets.NewString()
 	for i, hook := range e.Webhooks {
-		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+		allErrors = append(allErrors, validateValidatingWebhook(&hook, field.NewPath("webhooks").Index(i))...)
 		allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, requireRecognizedVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
+		if requireUniqueWebhookNames && len(hook.Name) > 0 {
+			if hookNames.Has(hook.Name) {
+				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			}
+			hookNames.Insert(hook.Name)
+		}
 	}
 	return allErrors
 }
 
-func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
-	return validateMutatingWebhookConfiguration(e, true)
+// ValidateMutatingWebhookConfiguration validates a webhook before creation.
+func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+	return validateMutatingWebhookConfiguration(e, true, requireUniqueWebhookNames(requestGV))
 }
 
-func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, requireRecognizedVersion bool) field.ErrorList {
+func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, requireRecognizedVersion, requireUniqueWebhookNames bool) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	hookNames := sets.NewString()
 	for i, hook := range e.Webhooks {
-		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+		allErrors = append(allErrors, validateMutatingWebhook(&hook, field.NewPath("webhooks").Index(i))...)
 		allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, requireRecognizedVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
+		if requireUniqueWebhookNames && len(hook.Name) > 0 {
+			if hookNames.Has(hook.Name) {
+				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			}
+			hookNames.Insert(hook.Name)
+		}
 	}
 	return allErrors
 }
 
-func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) field.ErrorList {
+func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
 	allErrors = append(allErrors, utilvalidation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
@@ -231,6 +248,12 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
 	}
+	if hook.MatchPolicy != nil && !supportedMatchPolicies.Has(string(*hook.MatchPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, supportedMatchPolicies.List()))
+	}
+	if hook.SideEffects == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(supportedSideEffectClasses.List(), ", "))))
+	}
 	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
 	}
@@ -240,6 +263,56 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	}
+
+	if hook.ObjectSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector"))...)
+	}
+
+	cc := hook.ClientConfig
+	switch {
+	case (cc.URL == nil) == (cc.Service == nil):
+		allErrors = append(allErrors, field.Required(fldPath.Child("clientConfig"), "exactly one of url or service is required"))
+	case cc.URL != nil:
+		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
+	case cc.Service != nil:
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
+	}
+	return allErrors
+}
+
+func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	// hook.Name must be fully qualified
+	allErrors = append(allErrors, utilvalidation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
+
+	for i, rule := range hook.Rules {
+		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
+	}
+	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
+	}
+	if hook.MatchPolicy != nil && !supportedMatchPolicies.Has(string(*hook.MatchPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, supportedMatchPolicies.List()))
+	}
+	if hook.SideEffects == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(supportedSideEffectClasses.List(), ", "))))
+	}
+	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
+	}
+	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
+	}
+
+	if hook.NamespaceSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	}
+	if hook.ObjectSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector"))...)
+	}
+	if hook.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*hook.ReinvocationPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *hook.ReinvocationPolicy, supportedReinvocationPolicies.List()))
 	}
 
 	cc := hook.ClientConfig
@@ -259,6 +332,11 @@ var supportedFailurePolicies = sets.NewString(
 	string(admissionregistration.Fail),
 )
 
+var supportedMatchPolicies = sets.NewString(
+	string(admissionregistration.Exact),
+	string(admissionregistration.Equivalent),
+)
+
 var supportedSideEffectClasses = sets.NewString(
 	string(admissionregistration.SideEffectClassUnknown),
 	string(admissionregistration.SideEffectClassNone),
@@ -272,6 +350,11 @@ var supportedOperations = sets.NewString(
 	string(admissionregistration.Update),
 	string(admissionregistration.Delete),
 	string(admissionregistration.Connect),
+)
+
+var supportedReinvocationPolicies = sets.NewString(
+	string(admissionregistration.NeverReinvocationPolicy),
+	string(admissionregistration.IfNeededReinvocationPolicy),
 )
 
 func hasWildcardOperation(operations []admissionregistration.OperationType) bool {
@@ -301,9 +384,9 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 	return allErrors
 }
 
-// hasAcceptedAdmissionReviewVersions returns true if all webhooks have at least one
+// mutatingHasAcceptedAdmissionReviewVersions returns true if all webhooks have at least one
 // admission review version this apiserver accepts.
-func hasAcceptedAdmissionReviewVersions(webhooks []admissionregistration.Webhook) bool {
+func mutatingHasAcceptedAdmissionReviewVersions(webhooks []admissionregistration.MutatingWebhook) bool {
 	for _, hook := range webhooks {
 		hasRecognizedVersion := false
 		for _, version := range hook.AdmissionReviewVersions {
@@ -319,10 +402,65 @@ func hasAcceptedAdmissionReviewVersions(webhooks []admissionregistration.Webhook
 	return true
 }
 
-func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
-	return validateValidatingWebhookConfiguration(newC, hasAcceptedAdmissionReviewVersions(oldC.Webhooks))
+// validatingHasAcceptedAdmissionReviewVersions returns true if all webhooks have at least one
+// admission review version this apiserver accepts.
+func validatingHasAcceptedAdmissionReviewVersions(webhooks []admissionregistration.ValidatingWebhook) bool {
+	for _, hook := range webhooks {
+		hasRecognizedVersion := false
+		for _, version := range hook.AdmissionReviewVersions {
+			if isAcceptedAdmissionReviewVersion(version) {
+				hasRecognizedVersion = true
+				break
+			}
+		}
+		if !hasRecognizedVersion && len(hook.AdmissionReviewVersions) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
-func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
-	return validateMutatingWebhookConfiguration(newC, hasAcceptedAdmissionReviewVersions(oldC.Webhooks))
+// mutatingHasUniqueWebhookNames returns true if all webhooks have unique names
+func mutatingHasUniqueWebhookNames(webhooks []admissionregistration.MutatingWebhook) bool {
+	names := sets.NewString()
+	for _, hook := range webhooks {
+		if names.Has(hook.Name) {
+			return false
+		}
+		names.Insert(hook.Name)
+	}
+	return true
+}
+
+// validatingHasUniqueWebhookNames returns true if all webhooks have unique names
+func validatingHasUniqueWebhookNames(webhooks []admissionregistration.ValidatingWebhook) bool {
+	names := sets.NewString()
+	for _, hook := range webhooks {
+		if names.Has(hook.Name) {
+			return false
+		}
+		names.Insert(hook.Name)
+	}
+	return true
+}
+
+func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+	return validateValidatingWebhookConfiguration(
+		newC,
+		validatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
+		requireUniqueWebhookNames(requestGV) && validatingHasUniqueWebhookNames(oldC.Webhooks),
+	)
+}
+
+func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+	return validateMutatingWebhookConfiguration(
+		newC,
+		mutatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
+		requireUniqueWebhookNames(requestGV) && mutatingHasUniqueWebhookNames(oldC.Webhooks),
+	)
+}
+
+// requireUniqueWebhookNames returns true for all requests except v1beta1 (for backwards compatibility)
+func requireUniqueWebhookNames(requestGV schema.GroupVersion) bool {
+	return requestGV != (schema.GroupVersion{Group: admissionregistration.GroupName, Version: "v1beta1"})
 }

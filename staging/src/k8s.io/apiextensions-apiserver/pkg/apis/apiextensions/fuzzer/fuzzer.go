@@ -123,6 +123,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(obj.Type) == 0 {
 				obj.Nullable = false // because this does not roundtrip through go-openapi
 			}
+			if obj.XIntOrString {
+				obj.Type = ""
+			}
 		},
 		func(obj *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {
 			if c.RandBool() {

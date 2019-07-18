@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
+	"k8s.io/kubectl/pkg/util/podutils"
 )
 
 func TestGetFirstPod(t *testing.T) {

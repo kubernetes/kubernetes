@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -101,7 +102,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 
 			createAndWaitPod := func(pod *v1.Pod) error {
 				podClient.Create(pod)
-				return framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+				return e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 			}
 
 			var logPodName string

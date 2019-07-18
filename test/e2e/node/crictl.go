@@ -42,7 +42,7 @@ var _ = SIGDescribe("crictl", func() {
 		ginkgo.By("Getting all nodes' SSH-able IP addresses")
 		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
 		if err != nil {
-			framework.Failf("Error getting node hostnames: %v", err)
+			e2elog.Failf("Error getting node hostnames: %v", err)
 		}
 
 		testCases := []struct {
@@ -60,7 +60,7 @@ var _ = SIGDescribe("crictl", func() {
 			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
-				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
+				e2elog.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
 			}
 			// Log the stdout/stderr output.
 			// TODO: Verify the output.

@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -51,18 +52,18 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		err := framework.DeleteNodeOnCloudProvider(&nodeToDelete)
 		if err != nil {
-			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
+			e2elog.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
 
-		newNodes, err := framework.CheckNodesReady(c, len(origNodes.Items)-1, 5*time.Minute)
+		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
 		gomega.Expect(err).To(gomega.BeNil())
-		gomega.Expect(len(newNodes)).To(gomega.Equal(len(origNodes.Items) - 1))
+		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
 		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
-			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
+			e2elog.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
 		} else if !apierrs.IsNotFound(err) {
-			framework.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
+			e2elog.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
 		}
 
 	})

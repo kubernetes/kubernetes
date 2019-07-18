@@ -17,6 +17,7 @@
 package jose
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -29,15 +30,30 @@ import (
 	"hash"
 	"io"
 
+	"golang.org/x/crypto/pbkdf2"
 	"gopkg.in/square/go-jose.v2/cipher"
 )
 
 // Random reader (stubbed out in tests)
-var randReader = rand.Reader
+var RandReader = rand.Reader
+
+const (
+	// RFC7518 recommends a minimum of 1,000 iterations:
+	// https://tools.ietf.org/html/rfc7518#section-4.8.1.2
+	// NIST recommends a minimum of 10,000:
+	// https://pages.nist.gov/800-63-3/sp800-63b.html
+	// 1Password uses 100,000:
+	// https://support.1password.com/pbkdf2/
+	defaultP2C = 100000
+	// Default salt size: 128 bits
+	defaultP2SSize = 16
+)
 
 // Dummy key cipher for shared symmetric key mode
 type symmetricKeyCipher struct {
 	key []byte // Pre-shared content-encryption key
+	p2c int    // PBES2 Count
+	p2s []byte // PBES2 Salt Input
 }
 
 // Signer/verifier for MAC modes
@@ -87,7 +103,7 @@ func newAESGCM(keySize int) contentCipher {
 func newAESCBC(keySize int) contentCipher {
 	return &aeadContentCipher{
 		keyBytes:     keySize * 2,
-		authtagBytes: 16,
+		authtagBytes: keySize,
 		getAead: func(key []byte) (cipher.AEAD, error) {
 			return josecipher.NewCBCHMAC(key, aes.NewCipher)
 		},
@@ -114,10 +130,37 @@ func getContentCipher(alg ContentEncryption) contentCipher {
 	}
 }
 
+// getPbkdf2Params returns the key length and hash function used in
+// pbkdf2.Key.
+func getPbkdf2Params(alg KeyAlgorithm) (int, func() hash.Hash) {
+	switch alg {
+	case PBES2_HS256_A128KW:
+		return 16, sha256.New
+	case PBES2_HS384_A192KW:
+		return 24, sha512.New384
+	case PBES2_HS512_A256KW:
+		return 32, sha512.New
+	default:
+		panic("invalid algorithm")
+	}
+}
+
+// getRandomSalt generates a new salt of the given size.
+func getRandomSalt(size int) ([]byte, error) {
+	salt := make([]byte, size)
+	_, err := io.ReadFull(RandReader, salt)
+	if err != nil {
+		return nil, err
+	}
+
+	return salt, nil
+}
+
 // newSymmetricRecipient creates a JWE encrypter based on AES-GCM key wrap.
 func newSymmetricRecipient(keyAlg KeyAlgorithm, key []byte) (recipientKeyInfo, error) {
 	switch keyAlg {
 	case DIRECT, A128GCMKW, A192GCMKW, A256GCMKW, A128KW, A192KW, A256KW:
+	case PBES2_HS256_A128KW, PBES2_HS384_A192KW, PBES2_HS512_A256KW:
 	default:
 		return recipientKeyInfo{}, ErrUnsupportedAlgorithm
 	}
@@ -150,7 +193,7 @@ func newSymmetricSigner(sigAlg SignatureAlgorithm, key []byte) (recipientSigInfo
 // Generate a random key for the given content cipher
 func (ctx randomKeyGenerator) genKey() ([]byte, rawHeader, error) {
 	key := make([]byte, ctx.size)
-	_, err := io.ReadFull(randReader, key)
+	_, err := io.ReadFull(RandReader, key)
 	if err != nil {
 		return nil, rawHeader{}, err
 	}
@@ -190,7 +233,7 @@ func (ctx aeadContentCipher) encrypt(key, aad, pt []byte) (*aeadParts, error) {
 
 	// Initialize a new nonce
 	iv := make([]byte, aead.NonceSize())
-	_, err = io.ReadFull(randReader, iv)
+	_, err = io.ReadFull(RandReader, iv)
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +253,10 @@ func (ctx aeadContentCipher) decrypt(key, aad []byte, parts *aeadParts) ([]byte,
 	aead, err := ctx.getAead(key)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(parts.iv) != aead.NonceSize() || len(parts.tag) < ctx.authtagBytes {
+		return nil, ErrCryptoFailure
 	}
 
 	return aead.Open(nil, parts.iv, append(parts.ciphertext, parts.tag...), aad)
@@ -253,6 +300,45 @@ func (ctx *symmetricKeyCipher) encryptKey(cek []byte, alg KeyAlgorithm) (recipie
 			encryptedKey: jek,
 			header:       &rawHeader{},
 		}, nil
+	case PBES2_HS256_A128KW, PBES2_HS384_A192KW, PBES2_HS512_A256KW:
+		if len(ctx.p2s) == 0 {
+			salt, err := getRandomSalt(defaultP2SSize)
+			if err != nil {
+				return recipientInfo{}, err
+			}
+			ctx.p2s = salt
+		}
+
+		if ctx.p2c <= 0 {
+			ctx.p2c = defaultP2C
+		}
+
+		// salt is UTF8(Alg) || 0x00 || Salt Input
+		salt := bytes.Join([][]byte{[]byte(alg), ctx.p2s}, []byte{0x00})
+
+		// derive key
+		keyLen, h := getPbkdf2Params(alg)
+		key := pbkdf2.Key(ctx.key, salt, ctx.p2c, keyLen, h)
+
+		// use AES cipher with derived key
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			return recipientInfo{}, err
+		}
+
+		jek, err := josecipher.KeyWrap(block, cek)
+		if err != nil {
+			return recipientInfo{}, err
+		}
+
+		header := &rawHeader{}
+		header.set(headerP2C, ctx.p2c)
+		header.set(headerP2S, newBuffer(ctx.p2s))
+
+		return recipientInfo{
+			encryptedKey: jek,
+			header:       header,
+		}, nil
 	}
 
 	return recipientInfo{}, ErrUnsupportedAlgorithm
@@ -291,6 +377,42 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 		return cek, nil
 	case A128KW, A192KW, A256KW:
 		block, err := aes.NewCipher(ctx.key)
+		if err != nil {
+			return nil, err
+		}
+
+		cek, err := josecipher.KeyUnwrap(block, recipient.encryptedKey)
+		if err != nil {
+			return nil, err
+		}
+		return cek, nil
+	case PBES2_HS256_A128KW, PBES2_HS384_A192KW, PBES2_HS512_A256KW:
+		p2s, err := headers.getP2S()
+		if err != nil {
+			return nil, fmt.Errorf("square/go-jose: invalid P2S: %v", err)
+		}
+		if p2s == nil || len(p2s.data) == 0 {
+			return nil, fmt.Errorf("square/go-jose: invalid P2S: must be present")
+		}
+
+		p2c, err := headers.getP2C()
+		if err != nil {
+			return nil, fmt.Errorf("square/go-jose: invalid P2C: %v", err)
+		}
+		if p2c <= 0 {
+			return nil, fmt.Errorf("square/go-jose: invalid P2C: must be a positive integer")
+		}
+
+		// salt is UTF8(Alg) || 0x00 || Salt Input
+		alg := headers.getAlgorithm()
+		salt := bytes.Join([][]byte{[]byte(alg), p2s.bytes()}, []byte{0x00})
+
+		// derive key
+		keyLen, h := getPbkdf2Params(alg)
+		key := pbkdf2.Key(ctx.key, salt, p2c, keyLen, h)
+
+		// use AES cipher with derived key
+		block, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
 		}

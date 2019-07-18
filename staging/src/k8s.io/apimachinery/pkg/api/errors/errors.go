@@ -394,7 +394,11 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	case http.StatusNotAcceptable:
 		reason = metav1.StatusReasonNotAcceptable
 		// the server message has details about what types are acceptable
-		message = serverMessage
+		if len(serverMessage) == 0 || serverMessage == "unknown" {
+			message = "the server was unable to respond with a content type that the client supports"
+		} else {
+			message = serverMessage
+		}
 	case http.StatusUnsupportedMediaType:
 		reason = metav1.StatusReasonUnsupportedMediaType
 		// the server message has details about what types are acceptable

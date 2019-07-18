@@ -391,7 +391,6 @@ func (in *ImageMeta) DeepCopy() *ImageMeta {
 func (in *InitConfiguration) DeepCopyInto(out *InitConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	in.ClusterConfiguration.DeepCopyInto(&out.ClusterConfiguration)
 	if in.BootstrapTokens != nil {
 		in, out := &in.BootstrapTokens, &out.BootstrapTokens
 		*out = make([]BootstrapToken, len(*in))

@@ -1260,6 +1260,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.PodIP)(nil), (*core.PodIP)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodIP_To_core_PodIP(a.(*v1.PodIP), b.(*core.PodIP), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.PodIP)(nil), (*v1.PodIP)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_PodIP_To_v1_PodIP(a.(*core.PodIP), b.(*v1.PodIP), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.PodList)(nil), (*core.PodList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodList_To_core_PodList(a.(*v1.PodList), b.(*core.PodList), scope)
 	}); err != nil {
@@ -2035,8 +2045,23 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*core.NodeSpec)(nil), (*v1.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_NodeSpec_To_v1_NodeSpec(a.(*core.NodeSpec), b.(*v1.NodeSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*core.PersistentVolumeSpec)(nil), (*v1.PersistentVolumeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(a.(*core.PersistentVolumeSpec), b.(*v1.PersistentVolumeSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*core.PodSpec)(nil), (*v1.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PodSpec_To_v1_PodSpec(a.(*core.PodSpec), b.(*v1.PodSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*core.PodStatus)(nil), (*v1.PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_PodStatus_To_v1_PodStatus(a.(*core.PodStatus), b.(*v1.PodStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -2055,8 +2080,23 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*v1.NodeSpec)(nil), (*core.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeSpec_To_core_NodeSpec(a.(*v1.NodeSpec), b.(*core.NodeSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.PersistentVolumeSpec)(nil), (*core.PersistentVolumeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(a.(*v1.PersistentVolumeSpec), b.(*core.PersistentVolumeSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1.PodSpec)(nil), (*core.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodSpec_To_core_PodSpec(a.(*v1.PodSpec), b.(*core.PodSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.PodStatus)(nil), (*core.PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodStatus_To_core_PodStatus(a.(*v1.PodStatus), b.(*core.PodStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -4445,7 +4485,17 @@ func Convert_core_NodeDaemonEndpoints_To_v1_NodeDaemonEndpoints(in *core.NodeDae
 
 func autoConvert_v1_NodeList_To_core_NodeList(in *v1.NodeList, out *core.NodeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.Node)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.Node, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Node_To_core_Node(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4456,7 +4506,17 @@ func Convert_v1_NodeList_To_core_NodeList(in *v1.NodeList, out *core.NodeList, s
 
 func autoConvert_core_NodeList_To_v1_NodeList(in *core.NodeList, out *v1.NodeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Node)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.Node, len(*in))
+		for i := range *in {
+			if err := Convert_core_Node_To_v1_Node(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4572,7 +4632,8 @@ func Convert_core_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *core.NodeSelectorT
 }
 
 func autoConvert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
-	out.PodCIDR = in.PodCIDR
+	// WARNING: in.PodCIDR requires manual conversion: does not exist in peer-type
+	out.PodCIDRs = *(*[]string)(unsafe.Pointer(&in.PodCIDRs))
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	out.Taints = *(*[]core.Taint)(unsafe.Pointer(&in.Taints))
@@ -4581,24 +4642,14 @@ func autoConvert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpe
 	return nil
 }
 
-// Convert_v1_NodeSpec_To_core_NodeSpec is an autogenerated conversion function.
-func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
-	return autoConvert_v1_NodeSpec_To_core_NodeSpec(in, out, s)
-}
-
 func autoConvert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
-	out.PodCIDR = in.PodCIDR
+	out.PodCIDRs = *(*[]string)(unsafe.Pointer(&in.PodCIDRs))
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	out.Taints = *(*[]v1.Taint)(unsafe.Pointer(&in.Taints))
 	out.ConfigSource = (*v1.NodeConfigSource)(unsafe.Pointer(in.ConfigSource))
 	out.DoNotUse_ExternalID = in.DoNotUse_ExternalID
 	return nil
-}
-
-// Convert_core_NodeSpec_To_v1_NodeSpec is an autogenerated conversion function.
-func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
-	return autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s)
 }
 
 func autoConvert_v1_NodeStatus_To_core_NodeStatus(in *v1.NodeStatus, out *core.NodeStatus, s conversion.Scope) error {
@@ -5060,11 +5111,6 @@ func autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.Per
 	return nil
 }
 
-// Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec is an autogenerated conversion function.
-func Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.PersistentVolumeSpec, out *core.PersistentVolumeSpec, s conversion.Scope) error {
-	return autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in, out, s)
-}
-
 func autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.PersistentVolumeSpec, out *v1.PersistentVolumeSpec, s conversion.Scope) error {
 	out.Capacity = *(*v1.ResourceList)(unsafe.Pointer(&in.Capacity))
 	if err := Convert_core_PersistentVolumeSource_To_v1_PersistentVolumeSource(&in.PersistentVolumeSource, &out.PersistentVolumeSource, s); err != nil {
@@ -5078,11 +5124,6 @@ func autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.P
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.NodeAffinity = (*v1.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
 	return nil
-}
-
-// Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec is an autogenerated conversion function.
-func Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.PersistentVolumeSpec, out *v1.PersistentVolumeSpec, s conversion.Scope) error {
-	return autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolumeStatus_To_core_PersistentVolumeStatus(in *v1.PersistentVolumeStatus, out *core.PersistentVolumeStatus, s conversion.Scope) error {
@@ -5355,6 +5396,26 @@ func Convert_core_PodExecOptions_To_v1_PodExecOptions(in *core.PodExecOptions, o
 	return autoConvert_core_PodExecOptions_To_v1_PodExecOptions(in, out, s)
 }
 
+func autoConvert_v1_PodIP_To_core_PodIP(in *v1.PodIP, out *core.PodIP, s conversion.Scope) error {
+	out.IP = in.IP
+	return nil
+}
+
+// Convert_v1_PodIP_To_core_PodIP is an autogenerated conversion function.
+func Convert_v1_PodIP_To_core_PodIP(in *v1.PodIP, out *core.PodIP, s conversion.Scope) error {
+	return autoConvert_v1_PodIP_To_core_PodIP(in, out, s)
+}
+
+func autoConvert_core_PodIP_To_v1_PodIP(in *core.PodIP, out *v1.PodIP, s conversion.Scope) error {
+	out.IP = in.IP
+	return nil
+}
+
+// Convert_core_PodIP_To_v1_PodIP is an autogenerated conversion function.
+func Convert_core_PodIP_To_v1_PodIP(in *core.PodIP, out *v1.PodIP, s conversion.Scope) error {
+	return autoConvert_core_PodIP_To_v1_PodIP(in, out, s)
+}
+
 func autoConvert_v1_PodList_To_core_PodList(in *v1.PodList, out *core.PodList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
@@ -5598,6 +5659,8 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.ReadinessGates = *(*[]core.PodReadinessGate)(unsafe.Pointer(&in.ReadinessGates))
 	out.RuntimeClassName = (*string)(unsafe.Pointer(in.RuntimeClassName))
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
+	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.Overhead = *(*core.ResourceList)(unsafe.Pointer(&in.Overhead))
 	return nil
 }
 
@@ -5641,9 +5704,11 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	out.HostAliases = *(*[]v1.HostAlias)(unsafe.Pointer(&in.HostAliases))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	out.PreemptionPolicy = (*v1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	out.DNSConfig = (*v1.PodDNSConfig)(unsafe.Pointer(in.DNSConfig))
 	out.ReadinessGates = *(*[]v1.PodReadinessGate)(unsafe.Pointer(&in.ReadinessGates))
 	out.RuntimeClassName = (*string)(unsafe.Pointer(in.RuntimeClassName))
+	out.Overhead = *(*v1.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	return nil
 }
@@ -5655,17 +5720,13 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodS
 	out.Reason = in.Reason
 	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
-	out.PodIP = in.PodIP
+	// WARNING: in.PodIP requires manual conversion: does not exist in peer-type
+	out.PodIPs = *(*[]core.PodIP)(unsafe.Pointer(&in.PodIPs))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.InitContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	out.QOSClass = core.PodQOSClass(in.QOSClass)
 	return nil
-}
-
-// Convert_v1_PodStatus_To_core_PodStatus is an autogenerated conversion function.
-func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
-	return autoConvert_v1_PodStatus_To_core_PodStatus(in, out, s)
 }
 
 func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
@@ -5675,17 +5736,12 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodS
 	out.Reason = in.Reason
 	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
-	out.PodIP = in.PodIP
+	out.PodIPs = *(*[]v1.PodIP)(unsafe.Pointer(&in.PodIPs))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.QOSClass = v1.PodQOSClass(in.QOSClass)
 	out.InitContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	return nil
-}
-
-// Convert_core_PodStatus_To_v1_PodStatus is an autogenerated conversion function.
-func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
-	return autoConvert_core_PodStatus_To_v1_PodStatus(in, out, s)
 }
 
 func autoConvert_v1_PodStatusResult_To_core_PodStatusResult(in *v1.PodStatusResult, out *core.PodStatusResult, s conversion.Scope) error {
@@ -7601,6 +7657,7 @@ func Convert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *core
 func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in *v1.WindowsSecurityContextOptions, out *core.WindowsSecurityContextOptions, s conversion.Scope) error {
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
+	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
 	return nil
 }
 
@@ -7612,6 +7669,7 @@ func Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOpti
 func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
+	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
 	return nil
 }
 

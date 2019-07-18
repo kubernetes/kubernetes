@@ -29,6 +29,8 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -77,9 +79,9 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = framework.GetNodeExternalIP(node)
+		host, err = e2enode.GetExternalIP(node)
 		if err != nil {
-			host, err = framework.GetNodeInternalIP(node)
+			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
 		masterHostWithPort := framework.GetMasterHost()
@@ -106,9 +108,9 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = framework.GetNodeExternalIP(node)
+		host, err = e2enode.GetExternalIP(node)
 		if err != nil {
-			host, err = framework.GetNodeInternalIP(node)
+			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
 		masterHostWithPort := framework.GetMasterHost()
@@ -117,7 +119,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 	}
 
 	if host == "" {
-		framework.Failf("Error getting node ip : %v", err)
+		e2elog.Failf("Error getting node ip : %v", err)
 	}
 
 	cmd := fmt.Sprintf("sudo rm -r %s", flexDir)
@@ -138,7 +140,7 @@ func sshAndLog(cmd, host string, failOnError bool) {
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err)
 	if result.Code != 0 && failOnError {
-		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
+		e2elog.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
 	}
 }
 

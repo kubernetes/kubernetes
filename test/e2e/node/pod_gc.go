@@ -44,7 +44,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 			pod.Status.Phase = v1.PodFailed
 			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(pod)
 			if err != nil {
-				framework.Failf("err failing pod: %v", err)
+				e2elog.Failf("err failing pod: %v", err)
 			}
 
 			count++
@@ -76,7 +76,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 			return true, nil
 		})
 		if pollErr != nil {
-			framework.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
+			e2elog.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
 		}
 	})
 })

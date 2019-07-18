@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 const (
@@ -115,6 +115,8 @@ type LogsOptions struct {
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
 	genericclioptions.IOStreams
+
+	TailSpecified bool
 }
 
 func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
@@ -191,7 +193,7 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 		logOptions.SinceSeconds = &sec
 	}
 
-	if len(o.Selector) > 0 && o.Tail == -1 {
+	if len(o.Selector) > 0 && o.Tail == -1 && !o.TailSpecified {
 		logOptions.TailLines = &selectorTail
 	} else if o.Tail != -1 {
 		logOptions.TailLines = &o.Tail
@@ -202,6 +204,7 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 
 func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.ContainerNameSpecified = cmd.Flag("container").Changed
+	o.TailSpecified = cmd.Flag("tail").Changed
 	o.Resources = args
 
 	switch len(args) {
@@ -290,8 +293,8 @@ func (o LogsOptions) Validate() error {
 		return fmt.Errorf("--since must be greater than 0")
 	}
 
-	if logsOptions.TailLines != nil && *logsOptions.TailLines < 0 {
-		return fmt.Errorf("TailLines must be greater than or equal to 0")
+	if logsOptions.TailLines != nil && *logsOptions.TailLines < -1 {
+		return fmt.Errorf("--tail must be greater than or equal to -1")
 	}
 
 	return nil
@@ -324,6 +327,7 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 	wg.Add(len(requests))
 	for _, request := range requests {
 		go func(request rest.ResponseWrapper) {
+			defer wg.Done()
 			if err := o.ConsumeRequestFn(request, writer); err != nil {
 				if !o.IgnoreLogErrors {
 					writer.CloseWithError(err)
@@ -335,7 +339,6 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 				fmt.Fprintf(writer, "error: %v\n", err)
 			}
 
-			wg.Done()
 		}(request)
 	}
 

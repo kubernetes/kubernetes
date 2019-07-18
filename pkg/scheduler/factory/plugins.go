@@ -278,10 +278,9 @@ func RegisterPriorityFunction(name string, function priorities.PriorityFunction,
 	})
 }
 
-// RegisterPriorityFunction2 registers a priority function with the algorithm registry. Returns the name,
+// RegisterPriorityMapReduceFunction registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
-// FIXME: Rename to PriorityFunctionFactory.
-func RegisterPriorityFunction2(
+func RegisterPriorityMapReduceFunction(
 	name string,
 	mapFunction priorities.PriorityMapFunction,
 	reduceFunction priorities.PriorityReduceFunction,

@@ -37,11 +37,7 @@ func patch(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Service) (*v
 		return nil, err
 	}
 
-	updatedSvc, err := c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
-	if err != nil {
-		return nil, fmt.Errorf("failed to patch %q for svc %s/%s: %v", patchBytes, oldSvc.Namespace, oldSvc.Name, err)
-	}
-	return updatedSvc, nil
+	return c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
 }
 
 func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {

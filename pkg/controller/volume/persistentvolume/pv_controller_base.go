@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,6 +92,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
+		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -209,6 +210,10 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
 	_ = ctrl.volumes.store.Delete(volume)
 	klog.V(4).Infof("volume %q deleted", volume.Name)
+	// record deletion metric if a deletion start timestamp is in the cache
+	// the following calls will be a no-op if there is nothing for this volume in the cache
+	// end of timestamp cache entry lifecycle, "RecordMetric" will do the clean
+	metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, nil)
 
 	if volume.Spec.ClaimRef == nil {
 		return
@@ -245,20 +250,26 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 	}
 }
 
+// Unit test [5-5] [5-6] [5-7]
 // deleteClaim runs in worker thread and handles "claim deleted" event.
 func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeClaim) {
 	_ = ctrl.claims.Delete(claim)
-	klog.V(4).Infof("claim %q deleted", claimToClaimKey(claim))
+	claimKey := claimToClaimKey(claim)
+	klog.V(4).Infof("claim %q deleted", claimKey)
+	// clean any possible unfinished provision start timestamp from cache
+	// Unit test [5-8] [5-9]
+	ctrl.operationTimestamps.Delete(claimKey)
 
 	volumeName := claim.Spec.VolumeName
 	if volumeName == "" {
-		klog.V(5).Infof("deleteClaim[%q]: volume not bound", claimToClaimKey(claim))
+		klog.V(5).Infof("deleteClaim[%q]: volume not bound", claimKey)
 		return
 	}
+
 	// sync the volume when its claim is deleted.  Explicitly sync'ing the
 	// volume here in response to claim deletion prevents the volume from
 	// waiting until the next sync period for its Release.
-	klog.V(5).Infof("deleteClaim[%q]: scheduling sync of volume %s", claimToClaimKey(claim), volumeName)
+	klog.V(5).Infof("deleteClaim[%q]: scheduling sync of volume %s", claimKey, volumeName)
 	ctrl.volumeQueue.Add(volumeName)
 }
 

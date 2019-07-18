@@ -1,0 +1,66 @@
+action: "35"
+apiVersion: v1
+count: 1749009427
+eventTime: "2343-04-17T01:08:33.494361Z"
+firstTimestamp: "2452-08-27T22:01:15Z"
+involvedObject:
+  apiVersion: "27"
+  fieldPath: "29"
+  kind: "24"
+  name: "26"
+  namespace: "25"
+  resourceVersion: "28"
+  uid: ƗǸƢ6/ʕV
+kind: Event
+lastTimestamp: "2620-11-25T16:08:31Z"
+message: "31"
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fields:
+      "18":
+        "19": null
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "16964250748386560239"
+  selfLink: "5"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+reason: "30"
+related:
+  apiVersion: "39"
+  fieldPath: "41"
+  kind: "36"
+  name: "38"
+  namespace: "37"
+  resourceVersion: "40"
+  uid: ǡƏS$+½H
+reportingComponent: "42"
+reportingInstance: "43"
+series:
+  count: 1970127545
+  lastObservedTime: "1985-03-23T14:10:57.985776Z"
+  state: 颋ǅ
+source:
+  component: "32"
+  host: "33"
+type: "34"

@@ -19,41 +19,15 @@ package framework
 import (
 	"fmt"
 
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/perftype"
 )
 
 // TODO(random-liu): Change the tests to actually use PerfData from the beginning instead of
 // translating one to the other here.
 
-// currentAPICallMetricsVersion is the current apicall performance metrics version. We should
-// bump up the version each time we make incompatible change to the metrics.
-const currentAPICallMetricsVersion = "v1"
-
-// APICallToPerfData transforms APIResponsiveness to PerfData.
-func APICallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
-	perfData := &perftype.PerfData{Version: currentAPICallMetricsVersion}
-	for _, apicall := range apicalls.APICalls {
-		item := perftype.DataItem{
-			Data: map[string]float64{
-				"Perc50": float64(apicall.Latency.Perc50) / 1000000, // us -> ms
-				"Perc90": float64(apicall.Latency.Perc90) / 1000000,
-				"Perc99": float64(apicall.Latency.Perc99) / 1000000,
-			},
-			Unit: "ms",
-			Labels: map[string]string{
-				"Verb":        apicall.Verb,
-				"Resource":    apicall.Resource,
-				"Subresource": apicall.Subresource,
-				"Scope":       apicall.Scope,
-				"Count":       fmt.Sprintf("%v", apicall.Count),
-			},
-		}
-		perfData.DataItems = append(perfData.DataItems, item)
-	}
-	return perfData
-}
-
-func latencyToPerfData(l LatencyMetric, name string) perftype.DataItem {
+func latencyToPerfData(l e2emetrics.LatencyMetric, name string) perftype.DataItem {
 	return perftype.DataItem{
 		Data: map[string]float64{
 			"Perc50":  float64(l.Perc50) / 1000000, // us -> ms
@@ -66,17 +40,6 @@ func latencyToPerfData(l LatencyMetric, name string) perftype.DataItem {
 			"Metric": name,
 		},
 	}
-}
-
-// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
-func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
-	perfData := &perftype.PerfData{Version: currentAPICallMetricsVersion}
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.CreateToScheduleLatency, "create_to_schedule"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.ScheduleToRunLatency, "schedule_to_run"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.RunToWatchLatency, "run_to_watch"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.ScheduleToWatchLatency, "schedule_to_watch"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.E2ELatency, "pod_startup"))
-	return perfData
 }
 
 // CurrentKubeletPerfMetricsVersion is the current kubelet performance metrics
@@ -99,8 +62,8 @@ func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
 // If an error occurs, nothing will be printed.
 func PrintPerfData(p *perftype.PerfData) {
 	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := PrettyPrintJSON(p); str != "" {
-		Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+		e2elog.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }
 

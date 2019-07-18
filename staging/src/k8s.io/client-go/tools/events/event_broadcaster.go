@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	typedv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/klog"
 )
@@ -65,22 +66,44 @@ type eventBroadcasterImpl struct {
 	sink          EventSink
 }
 
+// EventSinkImpl wraps EventInterface to implement EventSink.
+// TODO: this makes it easier for testing purpose and masks the logic of performing API calls.
+// Note that rollbacking to raw clientset should also be transparent.
+type EventSinkImpl struct {
+	Interface typedv1beta1.EventInterface
+}
+
+// Create is the same as CreateWithEventNamespace of the EventExpansion
+func (e *EventSinkImpl) Create(event *v1beta1.Event) (*v1beta1.Event, error) {
+	return e.Interface.CreateWithEventNamespace(event)
+}
+
+// Update is the same as UpdateithEventNamespace of the EventExpansion
+func (e *EventSinkImpl) Update(event *v1beta1.Event) (*v1beta1.Event, error) {
+	return e.Interface.UpdateWithEventNamespace(event)
+}
+
+// Patch is the same as PatchWithEventNamespace of the EventExpansion
+func (e *EventSinkImpl) Patch(event *v1beta1.Event, data []byte) (*v1beta1.Event, error) {
+	return e.Interface.PatchWithEventNamespace(event, data)
+}
+
 // NewBroadcaster Creates a new event broadcaster.
 func NewBroadcaster(sink EventSink) EventBroadcaster {
-	return newBroadcaster(sink, defaultSleepDuration)
+	return newBroadcaster(sink, defaultSleepDuration, map[eventKey]*v1beta1.Event{})
 }
 
 // NewBroadcasterForTest Creates a new event broadcaster for test purposes.
-func newBroadcaster(sink EventSink, sleepDuration time.Duration) EventBroadcaster {
+func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[eventKey]*v1beta1.Event) EventBroadcaster {
 	return &eventBroadcasterImpl{
 		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		eventCache:    map[eventKey]*v1beta1.Event{},
+		eventCache:    eventCache,
 		sleepDuration: sleepDuration,
 		sink:          sink,
 	}
 }
 
-// TODO: add test for refreshExistingEventSeries
+// refreshExistingEventSeries refresh events TTL
 func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	// TODO: Investigate whether lock contention won't be a problem
 	e.mu.Lock()
@@ -94,19 +117,23 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	}
 }
 
-// TODO: add test for finishSeries
+// finishSeries checks if a series has ended and either:
+// - write final count to the apiserver
+// - delete a singleton event (i.e. series field is nil) from the cache
 func (e *eventBroadcasterImpl) finishSeries() {
 	// TODO: Investigate whether lock contention won't be a problem
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
-		eventSeries := event.Series
-		if eventSeries != nil {
-			if eventSeries.LastObservedTime.Time.Add(finishTime).Before(time.Now()) {
+		eventSerie := event.Series
+		if eventSerie != nil {
+			if eventSerie.LastObservedTime.Time.Before(time.Now().Add(-finishTime)) {
 				if _, retry := recordEvent(e.sink, event); !retry {
 					delete(e.eventCache, isomorphicKey)
 				}
 			}
+		} else if event.EventTime.Time.Before(time.Now().Add(-finishTime)) {
+			delete(e.eventCache, isomorphicKey)
 		}
 	}
 }
@@ -244,9 +271,9 @@ func getKey(event *v1beta1.Event) eventKey {
 	return key
 }
 
-// startEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
+// StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
-func (e *eventBroadcasterImpl) startEventWatcher(eventHandler func(event runtime.Object)) func() {
+func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) func() {
 	watcher := e.Watch()
 	go func() {
 		defer utilruntime.HandleCrash()
@@ -277,7 +304,7 @@ func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 		}
 		e.recordToSink(event, clock.RealClock{})
 	}
-	stopWatcher := e.startEventWatcher(eventHandler)
+	stopWatcher := e.StartEventWatcher(eventHandler)
 	go func() {
 		<-stopCh
 		stopWatcher()

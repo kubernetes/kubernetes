@@ -17,6 +17,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
@@ -62,6 +63,7 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/util:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

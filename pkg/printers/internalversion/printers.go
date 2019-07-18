@@ -643,7 +643,10 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1.TableRow, e
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
 		nominatedNodeName := pod.Status.NominatedNodeName
-		podIP := pod.Status.PodIP
+		podIP := ""
+		if len(pod.Status.PodIPs) > 0 {
+			podIP = pod.Status.PodIPs[0].IP
+		}
 
 		if podIP == "" {
 			podIP = "<none>"
@@ -1597,7 +1600,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 		case autoscaling.ExternalMetricSourceType:
 			if spec.External.Target.AverageValue != nil {
 				current := "<unknown>"
-				if len(statuses) > i && statuses[i].External != nil && &statuses[i].External.Current.AverageValue != nil {
+				if len(statuses) > i && statuses[i].External != nil && statuses[i].External.Current.AverageValue != nil {
 					current = statuses[i].External.Current.AverageValue.String()
 				}
 				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.External.Target.AverageValue.String()))

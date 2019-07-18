@@ -28,6 +28,8 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
@@ -45,20 +47,20 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are disabled via API server proxy
 	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func() {
-		result, err := framework.NodeProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
+		result, err := e2enode.ProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
 		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).NotTo(gomega.Equal(http.StatusOK))
+		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
-		result, err := framework.NodeProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
+		result, err := e2enode.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
 		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).NotTo(gomega.Equal(http.StatusOK))
+		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are closed on the public IP address
@@ -72,14 +74,14 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 
 // checks whether the target port is closed
 func portClosedTest(f *framework.Framework, pickNode *v1.Node, port int) {
-	nodeAddrs := framework.GetNodeAddresses(pickNode, v1.NodeExternalIP)
+	nodeAddrs := e2enode.GetAddresses(pickNode, v1.NodeExternalIP)
 	gomega.Expect(len(nodeAddrs)).NotTo(gomega.BeZero())
 
 	for _, addr := range nodeAddrs {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", addr, port), 1*time.Minute)
 		if err == nil {
 			conn.Close()
-			framework.Failf("port %d is not disabled", port)
+			e2elog.Failf("port %d is not disabled", port)
 		}
 	}
 }

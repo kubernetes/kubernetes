@@ -125,7 +125,8 @@ var _ = SIGDescribe("Proxy", func() {
 			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
 				Client:       f.ClientSet,
-				Image:        imageutils.GetE2EImage(imageutils.Porter),
+				Image:        imageutils.GetE2EImage(imageutils.Agnhost),
+				Command:      []string{"/agnhost", "porter"},
 				Name:         service.Name,
 				Namespace:    f.Namespace.Name,
 				Replicas:     1,
@@ -255,7 +256,7 @@ var _ = SIGDescribe("Proxy", func() {
 					e2elog.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				framework.Failf(strings.Join(errs, "\n"))
+				e2elog.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})
@@ -311,7 +312,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 			serviceUnavailableErrors++
 		} else {
 			framework.ExpectNoError(err)
-			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
+			framework.ExpectEqual(status, http.StatusOK)
 			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}

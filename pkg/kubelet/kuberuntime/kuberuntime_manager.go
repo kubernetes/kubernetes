@@ -472,11 +472,15 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
-		if !shouldRestartOnFailure(pod) && attempt != 0 {
+		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
 			// Should not restart the pod, just return.
 			// we should not create a sandbox for a pod if it is already done.
 			// if all containers are done and should not be started, there is no need to create a new sandbox.
 			// this stops confusing logs on pods whose containers all have exit codes, but we recreate a sandbox before terminating it.
+			//
+			// If ContainerStatuses is empty, we assume that we've never
+			// successfully created any containers. In this case, we should
+			// retry creating the sandbox.
 			changes.CreateSandbox = false
 			return changes
 		}
@@ -659,18 +663,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// by container garbage collector.
 	m.pruneInitContainersBeforeStart(pod, podStatus)
 
-	// We pass the value of the podIP down to generatePodSandboxConfig and
+	// We pass the value of the PRIMARY podIP down to generatePodSandboxConfig and
 	// generateContainerConfig, which in turn passes it to various other
 	// functions, in order to facilitate functionality that requires this
 	// value (hosts file and downward API) and avoid races determining
 	// the pod IP in cases where a container requires restart but the
 	// podIP isn't in the status manager yet.
 	//
-	// We default to the IP in the passed-in pod status, and overwrite it if the
+	// We default to the IPs in the passed-in pod status, and overwrite them if the
 	// sandbox needs to be (re)started.
-	podIP := ""
+	var podIPs []string
 	if podStatus != nil {
-		podIP = podStatus.IP
+		podIPs = podStatus.IPs
 	}
 
 	// Step 4: Create a sandbox for the pod if necessary.
@@ -710,10 +714,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		// If we ever allow updating a pod from non-host-network to
 		// host-network, we may use a stale IP.
 		if !kubecontainer.IsHostNetworkPod(pod) {
-			// Overwrite the podIP passed in the pod status, since we just started the pod sandbox.
-			podIP = m.determinePodSandboxIP(pod.Namespace, pod.Name, podSandboxStatus)
-			klog.V(4).Infof("Determined the ip %q for pod %q after sandbox changed", podIP, format.Pod(pod))
+			// Overwrite the podIPs passed in the pod status, since we just started the pod sandbox.
+			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, podSandboxStatus)
+			klog.V(4).Infof("Determined the ip %v for pod %q after sandbox changed", podIPs, format.Pod(pod))
 		}
+	}
+
+	// the start containers routines depend on pod ip(as in primary pod ip)
+	// instead of trying to figure out if we have 0 < len(podIPs)
+	// everytime, we short circuit it here
+	podIP := ""
+	if len(podIPs) != 0 {
+		podIP = podIPs[0]
 	}
 
 	// Get podSandboxConfig for containers to start.
@@ -876,7 +888,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	klog.V(4).Infof("getSandboxIDByPodUID got sandbox IDs %q for pod %q", podSandboxIDs, podFullName)
 
 	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podSandboxIDs))
-	podIP := ""
+	podIPs := []string{}
 	for idx, podSandboxID := range podSandboxIDs {
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
 		if err != nil {
@@ -887,7 +899,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 
 		// Only get pod IP from latest sandbox
 		if idx == 0 && podSandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			podIP = m.determinePodSandboxIP(namespace, name, podSandboxStatus)
+			podIPs = m.determinePodSandboxIPs(namespace, name, podSandboxStatus)
 		}
 	}
 
@@ -905,7 +917,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		ID:                uid,
 		Name:              name,
 		Namespace:         namespace,
-		IP:                podIP,
+		IPs:               podIPs,
 		SandboxStatuses:   sandboxStatuses,
 		ContainerStatuses: containerStatuses,
 	}, nil

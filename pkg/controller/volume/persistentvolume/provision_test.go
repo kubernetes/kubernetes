@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -432,6 +432,17 @@ func TestProvisionSync(t *testing.T) {
 			[]string{"Normal ExternalProvisioning"},
 			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
 		},
+		{
+			// volume provisioned and available
+			// in this case, NO normal event with external provisioner should be issued
+			"11-22 - external provisioner with volume available",
+			newVolumeArray("volume11-22", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal),
+			newVolumeArray("volume11-22", "1Gi", "uid11-22", "claim11-22", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController),
+			newClaimArray("claim11-22", "uid11-22", "1Gi", "", v1.ClaimPending, &classExternal),
+			newClaimArray("claim11-22", "uid11-22", "1Gi", "volume11-22", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
+			noevents,
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
 	}
 	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
 }
@@ -460,6 +471,68 @@ func TestProvisionMultiSync(t *testing.T) {
 			newClaimArray("claim12-1", "uid12-1", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", v1.ClaimBound, &classGold, pvutil.AnnBoundByController, pvutil.AnnBindCompleted, pvutil.AnnStorageProvisioner),
 			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+		},
+		{
+			// provision a volume (external provisioner) and binding + normal event with external provisioner
+			"12-2 - external provisioner with volume provisioned success",
+			novolumes,
+			newVolumeArray("pvc-uid12-2", "1Gi", "uid12-2", "claim12-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController),
+			newClaimArray("claim12-2", "uid12-2", "1Gi", "", v1.ClaimPending, &classExternal),
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
+				newClaimArray("claim12-2", "uid12-2", "1Gi", "pvc-uid12-2", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors,
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+				// Create a volume before syncClaim tries to bind a PV to PVC
+				// This simulates external provisioner creating a volume while the controller
+				// is waiting for a volume to bind to the existed claim
+				// the external provisioner workflow implemented in "provisionClaimOperationCSI"
+				// should issue an ExternalProvisioning event to signal that some external provisioner
+				// is working on provisioning the PV, also add the operation start timestamp into local cache
+				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
+				if ctrl.operationTimestamps.Has("default/claim12-2") {
+					volume := newVolume("pvc-uid12-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal)
+					ctrl.volumes.store.Add(volume) // add the volume to controller
+					reactor.AddVolume(volume)
+				}
+			}),
+		},
+		{
+			// provision a volume (external provisioner) but binding will not happen + normal event with external provisioner
+			"12-3 - external provisioner with volume to be provisioned",
+			novolumes,
+			novolumes,
+			newClaimArray("claim12-3", "uid12-3", "1Gi", "", v1.ClaimPending, &classExternal),
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
+				newClaimArray("claim12-3", "uid12-3", "1Gi", "", v1.ClaimPending, &classExternal)),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors,
+			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+		},
+		{
+			// provision a volume (external provisioner) and binding + normal event with external provisioner
+			"12-4 - external provisioner with volume provisioned/bound success",
+			novolumes,
+			newVolumeArray("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController),
+			newClaimArray("claim12-4", "uid12-4", "1Gi", "", v1.ClaimPending, &classExternal),
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
+				newClaimArray("claim12-4", "uid12-4", "1Gi", "pvc-uid12-4", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors,
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+				// Create a volume before syncClaim tries to bind a PV to PVC
+				// This simulates external provisioner creating a volume while the controller
+				// is waiting for a volume to bind to the existed claim
+				// the external provisioner workflow implemented in "provisionClaimOperationCSI"
+				// should issue an ExternalProvisioning event to signal that some external provisioner
+				// is working on provisioning the PV, also add the operation start timestamp into local cache
+				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
+				if ctrl.operationTimestamps.Has("default/claim12-4") {
+					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController)
+					ctrl.volumes.store.Add(volume) // add the volume to controller
+					reactor.AddVolume(volume)
+				}
+			}),
 		},
 	}
 

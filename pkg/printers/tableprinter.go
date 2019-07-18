@@ -30,11 +30,23 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 var _ ResourcePrinter = &HumanReadablePrinter{}
 
 var (
+	statusHandlerEntry = &handlerEntry{
+		columnDefinitions: statusColumnDefinitions,
+		printFunc:         reflect.ValueOf(printStatus),
+	}
+
+	statusColumnDefinitions = []metav1beta1.TableColumnDefinition{
+		{Name: "Status", Type: "string"},
+		{Name: "Reason", Type: "string"},
+		{Name: "Message", Type: "string"},
+	}
+
 	defaultHandlerEntry = &handlerEntry{
 		columnDefinitions: objectMetaColumnDefinitions,
 		printFunc:         reflect.ValueOf(printObjectMeta),
@@ -45,6 +57,7 @@ var (
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
+	withEventTypePrefixColumns = []string{"EVENT"}
 	withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 )
 
@@ -75,27 +88,45 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		defer w.Flush()
 	}
 
+	var eventType string
+	if event, isEvent := obj.(*metav1.WatchEvent); isEvent {
+		eventType = event.Type
+		obj = event.Object.Object
+	}
+
 	// Case 1: Parameter "obj" is a table from server; print it.
 	// display tables following the rules of options
 	if table, ok := obj.(*metav1beta1.Table); ok {
 		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
 		localOptions := h.options
-		if len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns) {
+		if h.printedHeaders && (len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns)) {
 			localOptions.NoHeaders = true
 		}
 
 		if len(table.ColumnDefinitions) == 0 {
 			// If this table has no column definitions, use the columns from the last table we printed for decoration and layout.
 			// This is done when receiving tables in watch events to save bandwidth.
-			localOptions.NoHeaders = true
 			table.ColumnDefinitions = h.lastColumns
-		} else {
+		} else if !reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns) {
 			// If this table has column definitions, remember them for future use.
 			h.lastColumns = table.ColumnDefinitions
+			h.printedHeaders = false
+		}
+
+		if len(table.Rows) > 0 {
+			h.printedHeaders = true
 		}
 
 		if err := decorateTable(table, localOptions); err != nil {
 			return err
+		}
+		if len(eventType) > 0 {
+			if err := addColumns(beginning, table,
+				[]metav1beta1.TableColumnDefinition{{Name: "Event", Type: "string"}},
+				[]cellValueFunc{func(metav1beta1.TableRow) (interface{}, error) { return formatEventType(eventType), nil }},
+			); err != nil {
+				return err
+			}
 		}
 		return printTable(table, output, localOptions)
 	}
@@ -111,25 +142,33 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			fmt.Fprintln(output)
 		}
 
-		if err := printRowsForHandlerEntry(output, handler, obj, h.options, includeHeaders); err != nil {
+		if err := printRowsForHandlerEntry(output, handler, eventType, obj, h.options, includeHeaders); err != nil {
 			return err
 		}
 		h.lastType = t
 		return nil
 	}
 
-	// Case 3: Could not find print handler for "obj"; use the default print handler.
-	// Print with the default handler, and use the columns from the last time
-	includeHeaders := h.lastType != defaultHandlerEntry && !h.options.NoHeaders
+	// Case 3: Could not find print handler for "obj"; use the default or status print handler.
+	// Print with the default or status handler, and use the columns from the last time
+	var handler *handlerEntry
+	if _, isStatus := obj.(*metav1.Status); isStatus {
+		handler = statusHandlerEntry
+	} else {
+		handler = defaultHandlerEntry
+	}
 
-	if h.lastType != nil && h.lastType != defaultHandlerEntry && !h.options.NoHeaders {
+	includeHeaders := h.lastType != handler && !h.options.NoHeaders
+
+	if h.lastType != nil && h.lastType != handler && !h.options.NoHeaders {
 		fmt.Fprintln(output)
 	}
 
-	if err := printRowsForHandlerEntry(output, defaultHandlerEntry, obj, h.options, includeHeaders); err != nil {
+	if err := printRowsForHandlerEntry(output, handler, eventType, obj, h.options, includeHeaders); err != nil {
 		return err
 	}
-	h.lastType = defaultHandlerEntry
+	h.lastType = handler
+
 	return nil
 }
 
@@ -180,6 +219,75 @@ func printTable(table *metav1beta1.Table, output io.Writer, options PrintOptions
 		}
 		fmt.Fprintln(output)
 	}
+	return nil
+}
+
+type cellValueFunc func(metav1beta1.TableRow) (interface{}, error)
+
+type columnAddPosition int
+
+const (
+	beginning columnAddPosition = 1
+	end       columnAddPosition = 2
+)
+
+func addColumns(pos columnAddPosition, table *metav1beta1.Table, columns []metav1beta1.TableColumnDefinition, valueFuncs []cellValueFunc) error {
+	if len(columns) != len(valueFuncs) {
+		return fmt.Errorf("cannot prepend columns, unmatched value functions")
+	}
+	if len(columns) == 0 {
+		return nil
+	}
+
+	// Compute the new rows
+	newRows := make([][]interface{}, len(table.Rows))
+	for i := range table.Rows {
+		newCells := make([]interface{}, 0, len(columns)+len(table.Rows[i].Cells))
+
+		if pos == end {
+			// If we're appending, start with the existing cells,
+			// then add nil cells to match the number of columns
+			newCells = append(newCells, table.Rows[i].Cells...)
+			for len(newCells) < len(table.ColumnDefinitions) {
+				newCells = append(newCells, nil)
+			}
+		}
+
+		// Compute cells for new columns
+		for _, f := range valueFuncs {
+			newCell, err := f(table.Rows[i])
+			if err != nil {
+				return err
+			}
+			newCells = append(newCells, newCell)
+		}
+
+		if pos == beginning {
+			// If we're prepending, add existing cells
+			newCells = append(newCells, table.Rows[i].Cells...)
+		}
+
+		// Remember the new cells for this row
+		newRows[i] = newCells
+	}
+
+	// All cells successfully computed, now replace columns and rows
+	newColumns := make([]metav1beta1.TableColumnDefinition, 0, len(columns)+len(table.ColumnDefinitions))
+	switch pos {
+	case beginning:
+		newColumns = append(newColumns, columns...)
+		newColumns = append(newColumns, table.ColumnDefinitions...)
+	case end:
+		newColumns = append(newColumns, table.ColumnDefinitions...)
+		newColumns = append(newColumns, columns...)
+	default:
+		return fmt.Errorf("invalid column add position: %v", pos)
+	}
+	table.ColumnDefinitions = newColumns
+	for i := range table.Rows {
+		table.Rows[i].Cells = newRows[i]
+	}
+
 	return nil
 }
 
@@ -281,7 +389,7 @@ func decorateTable(table *metav1beta1.Table, options PrintOptions) error {
 // printRowsForHandlerEntry prints the incremental table output (headers if the current type is
 // different from lastType) including all the rows in the object. It returns the current type
 // or an error, if any.
-func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
+func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, eventType string, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
 	var results []reflect.Value
 
 	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(options)}
@@ -301,23 +409,46 @@ func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runti
 		headers = append(headers, formatLabelHeaders(options.ColumnLabels)...)
 		// LABELS is always the last column.
 		headers = append(headers, formatShowLabelsHeader(options.ShowLabels)...)
+		// prepend namespace header
 		if options.WithNamespace {
 			headers = append(withNamespacePrefixColumns, headers...)
+		}
+		// prepend event type header
+		if len(eventType) > 0 {
+			headers = append(withEventTypePrefixColumns, headers...)
 		}
 		printHeader(headers, output)
 	}
 
 	if results[1].IsNil() {
 		rows := results[0].Interface().([]metav1beta1.TableRow)
-		printRows(output, rows, options)
+		printRows(output, eventType, rows, options)
 		return nil
 	}
 	return results[1].Interface().(error)
 }
 
+var formattedEventType = map[string]string{
+	string(watch.Added):    "ADDED   ",
+	string(watch.Modified): "MODIFIED",
+	string(watch.Deleted):  "DELETED ",
+	string(watch.Error):    "ERROR   ",
+}
+
+func formatEventType(eventType string) string {
+	if formatted, ok := formattedEventType[eventType]; ok {
+		return formatted
+	}
+	return string(eventType)
+}
+
 // printRows writes the provided rows to output.
-func printRows(output io.Writer, rows []metav1beta1.TableRow, options PrintOptions) {
+func printRows(output io.Writer, eventType string, rows []metav1beta1.TableRow, options PrintOptions) {
 	for _, row := range rows {
+		if len(eventType) > 0 {
+			fmt.Fprint(output, formatEventType(eventType))
+			fmt.Fprint(output, "\t")
+		}
 		if options.WithNamespace {
 			if obj := row.Object.Object; obj != nil {
 				if m, err := meta.Accessor(obj); err == nil {
@@ -393,6 +524,17 @@ func appendLabelCells(values []interface{}, itemLabels map[string]string, opts P
 		values = append(values, labels.FormatLabels(itemLabels))
 	}
 	return values
+}
+
+func printStatus(obj runtime.Object, options PrintOptions) ([]metav1beta1.TableRow, error) {
+	status, ok := obj.(*metav1.Status)
+	if !ok {
+		return nil, fmt.Errorf("expected *v1.Status, got %T", obj)
+	}
+	return []metav1beta1.TableRow{{
+		Object: runtime.RawExtension{Object: obj},
+		Cells:  []interface{}{status.Status, status.Reason, status.Message},
+	}}, nil
 }
 
 func printObjectMeta(obj runtime.Object, options PrintOptions) ([]metav1beta1.TableRow, error) {

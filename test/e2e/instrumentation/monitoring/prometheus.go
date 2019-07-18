@@ -212,7 +212,7 @@ func getInstanceLabelsAvailableForMetric(c clientset.Interface, duration time.Du
 	instanceLabels := make([]string, 0)
 	m, ok := result.(model.Matrix)
 	if !ok {
-		framework.Failf("Expected matrix response for query '%v', got: %T", query, result)
+		e2elog.Failf("Expected matrix response for query '%v', got: %T", query, result)
 		return instanceLabels, nil
 	}
 	for _, stream := range m {
@@ -373,7 +373,7 @@ func retryUntilSucceeds(validator func() error, timeout time.Duration) {
 		e2elog.Logf(err.Error())
 		time.Sleep(prometheusSleepBetweenAttempts)
 	}
-	framework.Failf(err.Error())
+	e2elog.Failf(err.Error())
 }
 
 func getAllNodes(c clientset.Interface) ([]string, error) {

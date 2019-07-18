@@ -19,11 +19,12 @@ package apimachinery
 import (
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,8 +39,8 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/test/integration"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -60,11 +61,28 @@ var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: true,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"hostPort": {Type: "string"},
+				},
+			},
+		},
 	},
 	{
 		Name:    "v2",
 		Served:  true,
 		Storage: false,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"host": {Type: "string"},
+					"port": {Type: "string"},
+				},
+			},
+		},
 	},
 }
 
@@ -73,15 +91,32 @@ var alternativeAPIVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: false,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"hostPort": {Type: "string"},
+				},
+			},
+		},
 	},
 	{
 		Name:    "v2",
 		Served:  true,
 		Storage: true,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"host": {Type: "string"},
+					"port": {Type: "string"},
+				},
+			},
+		},
 	},
 }
 
-var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebhookConversion]", func() {
+var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 	var context *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
 
@@ -99,7 +134,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 		context = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.CRDConversionWebhook), context)
+		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -121,6 +156,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 					},
 				},
 			}
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
 		})
 		if err != nil {
 			return
@@ -144,6 +180,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 					},
 				},
 			}
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
 		})
 		if err != nil {
 			return
@@ -232,27 +269,27 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			Name:         "sample-crd-conversion-webhook",
 			VolumeMounts: mounts,
 			Args: []string{
+				"crd-conversion-webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
 				"--alsologtostderr",
 				"-v=4",
-				"2>&1",
 			},
 			Image: image,
 		},
 	}
-	d := &apps.Deployment{
+	d := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   deploymentCRDName,
 			Labels: podLabels,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,
 			},
-			Strategy: apps.DeploymentStrategy{
-				Type: apps.RollingUpdateDeploymentStrategyType,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

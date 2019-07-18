@@ -36,6 +36,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
@@ -552,6 +554,7 @@ func mockInstancesResp(selfInstance *ec2.Instance, instances []*ec2.Instance) (*
 	if err != nil {
 		panic(err)
 	}
+	awsCloud.kubeClient = fake.NewSimpleClientset()
 	return awsCloud, awsServices
 }
 
@@ -561,6 +564,7 @@ func mockAvailabilityZone(availabilityZone string) *Cloud {
 	if err != nil {
 		panic(err)
 	}
+	awsCloud.kubeClient = fake.NewSimpleClientset()
 	return awsCloud
 }
 
@@ -699,6 +703,41 @@ func TestNodeAddressesWithMetadata(t *testing.T) {
 	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.2")
 	testHasNodeAddress(t, addrs, v1.NodeExternalIP, "2.3.4.5")
+}
+
+func TestParseMetadataLocalHostname(t *testing.T) {
+	tests := []struct {
+		name        string
+		metadata    string
+		hostname    string
+		internalDNS []string
+	}{
+		{
+			"single hostname",
+			"ip-172-31-16-168.us-west-2.compute.internal",
+			"ip-172-31-16-168.us-west-2.compute.internal",
+			[]string{"ip-172-31-16-168.us-west-2.compute.internal"},
+		},
+		{
+			"dhcp options set with three additional domain names",
+			"ip-172-31-16-168.us-west-2.compute.internal example.com example.ca example.org",
+			"ip-172-31-16-168.us-west-2.compute.internal",
+			[]string{"ip-172-31-16-168.us-west-2.compute.internal", "ip-172-31-16-168.example.com", "ip-172-31-16-168.example.ca", "ip-172-31-16-168.example.org"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hostname, internalDNS := parseMetadataLocalHostname(test.metadata)
+			if hostname != test.hostname {
+				t.Errorf("got hostname %v, expected %v", hostname, test.hostname)
+			}
+			for i, v := range internalDNS {
+				if v != test.internalDNS[i] {
+					t.Errorf("got an internalDNS %v, expected %v", v, test.internalDNS[i])
+				}
+			}
+		})
+	}
 }
 
 func TestGetRegion(t *testing.T) {
@@ -1873,6 +1912,53 @@ func TestRegionIsValid(t *testing.T) {
 	}
 
 	assert.False(t, isRegionValid("pl-fake-991a", fake.metadata), "expected region 'pl-fake-991' to be invalid but it was not")
+}
+
+func TestNodeNameToProviderID(t *testing.T) {
+	testNodeName := types.NodeName("ip-10-0-0-1.ec2.internal")
+	testProviderID := "aws:///us-east-1c/i-02bce90670bb0c7cd"
+	fakeAWS := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, fakeAWS)
+	assert.NoError(t, err)
+
+	fakeClient := &fake.Clientset{}
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	c.SetInformers(fakeInformerFactory)
+
+	// no node name
+	_, err = c.nodeNameToProviderID("")
+	assert.Error(t, err)
+
+	// informer has not synced
+	c.nodeInformerHasSynced = informerNotSynced
+	_, err = c.nodeNameToProviderID(testNodeName)
+	assert.Error(t, err)
+
+	// informer has synced but node not found
+	c.nodeInformerHasSynced = informerSynced
+	_, err = c.nodeNameToProviderID(testNodeName)
+	assert.Error(t, err)
+
+	// we are able to find the node in cache
+	err = c.nodeInformer.Informer().GetStore().Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(testNodeName),
+		},
+		Spec: v1.NodeSpec{
+			ProviderID: testProviderID,
+		},
+	})
+	assert.NoError(t, err)
+	_, err = c.nodeNameToProviderID(testNodeName)
+	assert.NoError(t, err)
+}
+
+func informerSynced() bool {
+	return true
+}
+
+func informerNotSynced() bool {
+	return false
 }
 
 func newMockedFakeAWSServices(id string) *FakeAWSServices {

@@ -2084,6 +2084,13 @@ message NodeSpec {
   // +optional
   optional string podCIDR = 1;
 
+  // podCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. If this
+  // field is specified, the 0th entry must match the podCIDR field. It may contain at most 1 value for
+  // each of IPv4 and IPv6.
+  // +optional
+  // +patchStrategy=merge
+  repeated string podCIDRs = 7;
+
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
   // +optional
   optional string providerID = 3;
@@ -2136,6 +2143,9 @@ message NodeStatus {
   // List of addresses reachable to the node.
   // Queried from cloud provider, if available.
   // More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses
+  // Note: This field is declared as mergeable, but the merge key is not sufficiently
+  // unique, which can cause data corruption when it is merged. Callers should instead
+  // use a full-replacement patch. See http://pr.k8s.io/79391 for an example.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -2842,6 +2852,14 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
+// IP address information for entries in the (plural) PodIPs field.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within the cluster.
+message PodIP {
+  // ip is an IP address (IPv4 or IPv6) assigned to the pod
+  optional string ip = 1;
+}
+
 // PodList is a list of Pods.
 message PodList {
   // Standard list metadata.
@@ -2937,7 +2955,9 @@ message PodSecurityContext {
   // +optional
   optional SELinuxOptions seLinuxOptions = 1;
 
-  // Windows security options.
+  // The Windows specific settings applied to all containers.
+  // If unspecified, the options within a container's SecurityContext will be used.
+  // If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
   // +optional
   optional WindowsSecurityContextOptions windowsOptions = 8;
 
@@ -3208,6 +3228,24 @@ message PodSpec {
   // Optional: Defaults to true.
   // +optional
   optional bool enableServiceLinks = 30;
+
+  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // Defaults to PreemptLowerPriority if unset.
+  // This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+  // +optional
+  optional string preemptionPolicy = 31;
+
+  // Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
+  // This field will be autopopulated at admission time by the RuntimeClass admission controller. If
+  // the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests.
+  // The RuntimeClass admission controller will reject Pod create requests which have the overhead already
+  // set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value
+  // defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
+  // More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
+  // This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> overhead = 32;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -3269,6 +3307,14 @@ message PodStatus {
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
+
+  // podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must
+  // match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list
+  // is empty if no IPs have been allocated yet.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=ip
+  repeated PodIP podIPs = 12;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
@@ -4095,7 +4141,9 @@ message SecurityContext {
   // +optional
   optional SELinuxOptions seLinuxOptions = 3;
 
-  // Windows security options.
+  // The Windows specific settings applied to all containers.
+  // If unspecified, the options from the PodSecurityContext will be used.
+  // If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
   // +optional
   optional WindowsSecurityContextOptions windowsOptions = 10;
 
@@ -4874,5 +4922,13 @@ message WindowsSecurityContextOptions {
   // This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
   // +optional
   optional string gmsaCredentialSpec = 2;
+
+  // The UserName in Windows to run the entrypoint of the container process.
+  // Defaults to the user specified in image metadata if unspecified.
+  // May also be set in PodSecurityContext. If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // This field is alpha-level and it is only honored by servers that enable the WindowsRunAsUserName feature flag.
+  // +optional
+  optional string runAsUserName = 3;
 }
 

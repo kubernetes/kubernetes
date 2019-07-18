@@ -20,9 +20,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"time"
-
-	"k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -30,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
+	"time"
 
 	"github.com/onsi/ginkgo"
 )
@@ -52,16 +51,16 @@ var _ = SIGDescribe("Certificates API", func() {
 		csrb, err := cert.MakeCSR(pk, &pkix.Name{CommonName: commonName, Organization: []string{"system:masters"}}, nil, nil)
 		framework.ExpectNoError(err)
 
-		csr := &v1beta1.CertificateSigningRequest{
+		csr := &certificatesv1beta1.CertificateSigningRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: commonName + "-",
 			},
-			Spec: v1beta1.CertificateSigningRequestSpec{
+			Spec: certificatesv1beta1.CertificateSigningRequestSpec{
 				Request: csrb,
-				Usages: []v1beta1.KeyUsage{
-					v1beta1.UsageSigning,
-					v1beta1.UsageKeyEncipherment,
-					v1beta1.UsageClientAuth,
+				Usages: []certificatesv1beta1.KeyUsage{
+					certificatesv1beta1.UsageSigning,
+					certificatesv1beta1.UsageKeyEncipherment,
+					certificatesv1beta1.UsageClientAuth,
 				},
 			},
 		}
@@ -75,9 +74,9 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		e2elog.Logf("approving CSR")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
-			csr.Status.Conditions = []v1beta1.CertificateSigningRequestCondition{
+			csr.Status.Conditions = []certificatesv1beta1.CertificateSigningRequestCondition{
 				{
-					Type:    v1beta1.CertificateApproved,
+					Type:    certificatesv1beta1.CertificateApproved,
 					Reason:  "E2E",
 					Message: "Set from an e2e test",
 				},

@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build
+.PHONY:	build push
 
-PREFIX = gcr.io/fluentd-elasticsearch
+PREFIX = quay.io/fluentd_elasticsearch
 IMAGE = fluentd
-TAG = v2.5.2
+TAG = v2.6.0
 
 build:
-	gcloud builds submit --tag $(PREFIX)/$(IMAGE):$(TAG)
+	docker build  --tag ${PREFIX}/${IMAGE}:${TAG} .
+
+push:
+	docker push ${PREFIX}/${IMAGE}:${TAG}
+	docker push ${PREFIX}/${IMAGE}:latest
+	

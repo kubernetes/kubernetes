@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "error_channel_test.go",
         "heap_test.go",
         "utils_test.go",
     ],
@@ -24,18 +25,17 @@ go_library(
     name = "go_default_library",
     srcs = [
         "clock.go",
+        "error_channel.go",
         "heap.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/util",
     deps = [
         "//pkg/apis/scheduling:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

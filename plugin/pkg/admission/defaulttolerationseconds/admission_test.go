@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -32,7 +33,7 @@ func TestForgivenessAdmission(t *testing.T) {
 		return &s
 	}
 
-	handler := NewDefaultTolerationSeconds()
+	handler := admissiontesting.WithReinvocationTesting(t, NewDefaultTolerationSeconds())
 	// NOTE: for anyone who want to modify this test, the order of tolerations matters!
 	tests := []struct {
 		description  string

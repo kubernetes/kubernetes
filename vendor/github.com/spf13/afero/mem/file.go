@@ -59,7 +59,9 @@ type FileData struct {
 	modtime time.Time
 }
 
-func (d FileData) Name() string {
+func (d *FileData) Name() string {
+	d.Lock()
+	defer d.Unlock()
 	return d.name
 }
 
@@ -72,14 +74,24 @@ func CreateDir(name string) *FileData {
 }
 
 func ChangeFileName(f *FileData, newname string) {
+	f.Lock()
 	f.name = newname
+	f.Unlock()
 }
 
 func SetMode(f *FileData, mode os.FileMode) {
+	f.Lock()
 	f.mode = mode
+	f.Unlock()
 }
 
 func SetModTime(f *FileData, mtime time.Time) {
+	f.Lock()
+	setModTime(f, mtime)
+	f.Unlock()
+}
+
+func setModTime(f *FileData, mtime time.Time) {
 	f.modtime = mtime
 }
 
@@ -100,14 +112,14 @@ func (f *File) Close() error {
 	f.fileData.Lock()
 	f.closed = true
 	if !f.readOnly {
-		SetModTime(f.fileData, time.Now())
+		setModTime(f.fileData, time.Now())
 	}
 	f.fileData.Unlock()
 	return nil
 }
 
 func (f *File) Name() string {
-	return f.fileData.name
+	return f.fileData.Name()
 }
 
 func (f *File) Stat() (os.FileInfo, error) {
@@ -119,6 +131,9 @@ func (f *File) Sync() error {
 }
 
 func (f *File) Readdir(count int) (res []os.FileInfo, err error) {
+	if !f.fileData.dir {
+		return nil, &os.PathError{Op: "readdir", Path: f.fileData.name, Err: errors.New("not a dir")}
+	}
 	var outLength int64
 
 	f.fileData.Lock()
@@ -164,6 +179,9 @@ func (f *File) Read(b []byte) (n int, err error) {
 	if len(b) > 0 && int(f.at) == len(f.fileData.data) {
 		return 0, io.EOF
 	}
+	if int(f.at) > len(f.fileData.data) {
+		return 0, io.ErrUnexpectedEOF
+	}
 	if len(f.fileData.data)-int(f.at) >= len(b) {
 		n = len(b)
 	} else {
@@ -184,7 +202,7 @@ func (f *File) Truncate(size int64) error {
 		return ErrFileClosed
 	}
 	if f.readOnly {
-		return &os.PathError{"truncate", f.fileData.name, errors.New("file handle is read only")}
+		return &os.PathError{Op: "truncate", Path: f.fileData.name, Err: errors.New("file handle is read only")}
 	}
 	if size < 0 {
 		return ErrOutOfRange
@@ -195,7 +213,7 @@ func (f *File) Truncate(size int64) error {
 	} else {
 		f.fileData.data = f.fileData.data[0:size]
 	}
-	SetModTime(f.fileData, time.Now())
+	setModTime(f.fileData, time.Now())
 	return nil
 }
 
@@ -216,7 +234,7 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 
 func (f *File) Write(b []byte) (n int, err error) {
 	if f.readOnly {
-		return 0, &os.PathError{"write", f.fileData.name, errors.New("file handle is read only")}
+		return 0, &os.PathError{Op: "write", Path: f.fileData.name, Err: errors.New("file handle is read only")}
 	}
 	n = len(b)
 	cur := atomic.LoadInt64(&f.at)
@@ -234,7 +252,7 @@ func (f *File) Write(b []byte) (n int, err error) {
 		f.fileData.data = append(f.fileData.data[:cur], b...)
 		f.fileData.data = append(f.fileData.data, tail...)
 	}
-	SetModTime(f.fileData, time.Now())
+	setModTime(f.fileData, time.Now())
 
 	atomic.StoreInt64(&f.at, int64(len(f.fileData.data)))
 	return
@@ -259,17 +277,33 @@ type FileInfo struct {
 
 // Implements os.FileInfo
 func (s *FileInfo) Name() string {
+	s.Lock()
 	_, name := filepath.Split(s.name)
+	s.Unlock()
 	return name
 }
-func (s *FileInfo) Mode() os.FileMode  { return s.mode }
-func (s *FileInfo) ModTime() time.Time { return s.modtime }
-func (s *FileInfo) IsDir() bool        { return s.dir }
-func (s *FileInfo) Sys() interface{}   { return nil }
+func (s *FileInfo) Mode() os.FileMode {
+	s.Lock()
+	defer s.Unlock()
+	return s.mode
+}
+func (s *FileInfo) ModTime() time.Time {
+	s.Lock()
+	defer s.Unlock()
+	return s.modtime
+}
+func (s *FileInfo) IsDir() bool {
+	s.Lock()
+	defer s.Unlock()
+	return s.dir
+}
+func (s *FileInfo) Sys() interface{} { return nil }
 func (s *FileInfo) Size() int64 {
 	if s.IsDir() {
 		return int64(42)
 	}
+	s.Lock()
+	defer s.Unlock()
 	return int64(len(s.data))
 }
 

@@ -17,7 +17,7 @@ limitations under the License.
 package auth
 
 import (
-	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,11 +33,11 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 	ginkgo.It("should run a check-metadata-concealment job to completion", func() {
 		framework.SkipUnlessProviderIs("gce")
 		ginkgo.By("Creating a job")
-		job := &batch.Job{
+		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "check-metadata-concealment",
 			},
-			Spec: batch.JobSpec{
+			Spec: batchv1.JobSpec{
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "check-metadata-concealment",

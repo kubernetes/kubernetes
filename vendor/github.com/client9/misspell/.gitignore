@@ -1,5 +1,6 @@
 dist/
 bin/
+vendor/
 
 # editor turds
 *~

@@ -167,9 +167,23 @@ func (*fakeFramework) NodeInfoSnapshot() *internalcache.NodeInfoSnapshot {
 	return nil
 }
 
+func (*fakeFramework) RunPrefilterPlugins(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+	return nil
+}
+
+func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node) (framework.PluginToNodeScoreMap, *framework.Status) {
+	return nil, nil
+}
+
 func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
+
+func (*fakeFramework) RunBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	return nil
+}
+
+func (*fakeFramework) RunPostbindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
 
 func (*fakeFramework) RunReservePlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
@@ -915,7 +929,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 // TestHighPriorityBackoff tests that a high priority pod does not block
 // other pods if it is unschedulable
-func TestHighProirotyBackoff(t *testing.T) {
+func TestHighPriorityBackoff(t *testing.T) {
 	q := NewPriorityQueue(nil, nil)
 
 	midPod := v1.Pod{
@@ -953,7 +967,7 @@ func TestHighProirotyBackoff(t *testing.T) {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
 	if p != &highPod {
-		t.Errorf("Expected to get high prority pod, got: %v", p)
+		t.Errorf("Expected to get high priority pod, got: %v", p)
 	}
 	// Update pod condition to unschedulable.
 	podutil.UpdatePodCondition(&p.Status, &v1.PodCondition{
@@ -972,13 +986,13 @@ func TestHighProirotyBackoff(t *testing.T) {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
 	if p != &midPod {
-		t.Errorf("Expected to get mid prority pod, got: %v", p)
+		t.Errorf("Expected to get mid priority pod, got: %v", p)
 	}
 }
 
-// TestHighProirotyFlushUnschedulableQLeftover tests that pods will be moved to
+// TestHighPriorityFlushUnschedulableQLeftover tests that pods will be moved to
 // activeQ after one minutes if it is in unschedulableQ
-func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
+func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	q := NewPriorityQueue(nil, nil)
 	midPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

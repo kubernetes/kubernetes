@@ -137,7 +137,6 @@ aliases:
     - k82cn
     - resouer
     - ravisantoshgudimetla
-    - misterikkit
     - Huang-Wei
     - wgliang
 
@@ -202,6 +201,7 @@ aliases:
     - yifan-gu
     - yujuhong
     - krmayankk
+    - mattjmcnaughton
   sig-network-approvers:
     - bowei
     - caseydavenport
@@ -227,6 +227,7 @@ aliases:
     - rramkumar1
     - cmluciano
     - m1093782566
+    - andrewsykim
   sig-apps-approvers:
     - kow3ns
     - janetkuo
@@ -244,6 +245,7 @@ aliases:
     - smarterclayton
     - soltysh
     - tnozicka
+    - krmayankk
   sig-autoscaling-maintainers:
     - aleksandra-malinowska
     - bskiba
@@ -312,7 +314,8 @@ aliases:
   sig-windows-api-approvers:
     - smarterclayton
     - thockin
-
+    - liggitt
+  
   api-reviewers:
     - erictune
     - lavalamp
@@ -398,7 +401,8 @@ aliases:
   
   sig-windows-api-reviewers:
     - patricklang
-    - michmike
+    - ddebroy
+    - benmoss
 
   dep-approvers:
     - apelisse

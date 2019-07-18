@@ -155,7 +155,7 @@ func brokenWebhookConfig(name string) *admissionregistrationv1beta1.ValidatingWe
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Webhooks: []admissionregistrationv1beta1.Webhook{
+		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
 			{
 				Name: "broken-webhook.k8s.io",
 				Rules: []admissionregistrationv1beta1.RuleWithOperations{{

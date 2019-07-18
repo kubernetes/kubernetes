@@ -876,7 +876,11 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	}
 
 	daemonPods, exists := nodeToDaemonPods[node.Name]
-	dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
+	dsKey, err := cache.MetaNamespaceKeyFunc(ds)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
 
 	dsc.removeSuspendedDaemonPods(node.Name, dsKey)
 
@@ -934,6 +938,9 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	case !shouldContinueRunning && exists:
 		// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 		for _, pod := range daemonPods {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
 			podsToDelete = append(podsToDelete, pod.Name)
 		}
 	}

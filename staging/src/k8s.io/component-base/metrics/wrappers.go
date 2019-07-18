@@ -59,6 +59,8 @@ type CounterVecMetric interface {
 // GaugeMetric is an interface which defines a subset of the interface provided by prometheus.Gauge
 type GaugeMetric interface {
 	Set(float64)
+	Inc()
+	Dec()
 }
 
 // ObserverMetric captures individual observations.

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -374,7 +375,9 @@ func TestAccessMultipleVolumesAcrossPodRecreation(f *framework.Framework, cs cli
 	if requiresSameNode {
 		framework.SetAffinity(&node, nodeName)
 	} else {
-		framework.SetAntiAffinity(&node, nodeName)
+		// Do not put hard requirement on the anti-affinity. In some occasions there might exist only
+		// one available node for the pod scheduling (e.g., multi-AZ cluster with one node per AZ)
+		framework.SetAntiAffinityPreference(&node, nodeName)
 	}
 
 	// Test access to multiple volumes again on the node updated above
@@ -382,7 +385,13 @@ func TestAccessMultipleVolumesAcrossPodRecreation(f *framework.Framework, cs cli
 	readSeedBase = writeSeedBase
 	// Update writeSeed with new value
 	writeSeedBase = time.Now().UTC().UnixNano()
-	_ = testAccessMultipleVolumes(f, cs, ns, node, pvcs, readSeedBase, writeSeedBase)
+	secondNodeName := testAccessMultipleVolumes(f, cs, ns, node, pvcs, readSeedBase, writeSeedBase)
+	if !requiresSameNode && (secondNodeName == nodeName) {
+		// The pod was created on the same node: presumably there was no other node available
+		// for the second pod scheduling -- this does not mean the test should fail. Skip it instead/
+		e2elog.Logf("Warning: The pod got scheduled on the same node despite requesting otherwise: skipping test")
+		framework.Skipf("No node available for the second pod found")
+	}
 }
 
 // TestConcurrentAccessToSingleVolume tests access to a single volume from multiple pods,
@@ -394,6 +403,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 
 	var pods []*v1.Pod
 
+	firstNodeName := ""
 	// Create each pod with pvc
 	for i := 0; i < numPods; i++ {
 		index := i + 1
@@ -410,12 +420,22 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		pods = append(pods, pod)
 		framework.ExpectNoError(err, fmt.Sprintf("get pod%d", index))
 		actualNodeName := pod.Spec.NodeName
+		// Remember where the first pod was scheduled
+		if i == 0 {
+			firstNodeName = actualNodeName
+		}
+		// If the second pod got scheduled on the same node as the first one it means
+		// there was no available node for the second pod and the test should be skipped.
+		if !requiresSameNode && i == 1 && (actualNodeName == firstNodeName) {
+			e2elog.Logf("Warning: The pod got scheduled on the same node as the previous one: skipping test")
+			framework.Skipf("No node available for the second pod found")
+		}
 
 		// Set affinity depending on requiresSameNode
 		if requiresSameNode {
 			framework.SetAffinity(&node, actualNodeName)
 		} else {
-			framework.SetAntiAffinity(&node, actualNodeName)
+			framework.SetAntiAffinityPreference(&node, actualNodeName)
 		}
 	}
 
@@ -446,7 +466,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 
 	// Delete the last pod and remove from slice of pods
 	if len(pods) < 2 {
-		framework.Failf("Number of pods shouldn't be less than 2, but got %d", len(pods))
+		e2elog.Failf("Number of pods shouldn't be less than 2, but got %d", len(pods))
 	}
 	lastPod := pods[len(pods)-1]
 	framework.ExpectNoError(framework.DeletePodWithWait(f, cs, lastPod))

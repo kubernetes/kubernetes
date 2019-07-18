@@ -72,6 +72,18 @@ func TestParseWithBadValue(t *testing.T) {
 	test.run(t)
 }
 
+func TestParseWithNoMatchingValue(t *testing.T) {
+	test := stepParserTest{
+		path: "users.jheiss.exec.command",
+		expectedNavigationSteps: navigationSteps{
+			steps: []navigationStep{},
+		},
+		expectedError: "unable to parse one or more field values of users.jheiss.exec",
+	}
+
+	test.run(t)
+}
+
 func (test stepParserTest) run(t *testing.T) {
 	actualSteps, err := newNavigationSteps(test.path)
 	if len(test.expectedError) != 0 {

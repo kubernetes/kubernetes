@@ -34,6 +34,92 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
+func TestVisitContainers(t *testing.T) {
+	testCases := []struct {
+		description string
+		haveSpec    *api.PodSpec
+		wantNames   []string
+	}{
+		{
+			"empty podspec",
+			&api.PodSpec{},
+			[]string{},
+		},
+		{
+			"regular containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+			},
+			[]string{"c1", "c2"},
+		},
+		{
+			"init containers",
+			&api.PodSpec{
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2"},
+		},
+		{
+			"regular and init containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+		{
+			"dropping fields",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &api.SecurityContext{}},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &api.SecurityContext{}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+	}
+
+	for _, tc := range testCases {
+		gotNames := []string{}
+		VisitContainers(tc.haveSpec, func(c *api.Container) bool {
+			gotNames = append(gotNames, c.Name)
+			if c.SecurityContext != nil {
+				c.SecurityContext = nil
+			}
+			return true
+		})
+		if !reflect.DeepEqual(gotNames, tc.wantNames) {
+			t.Errorf("VisitContainers() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
+		}
+		for _, c := range tc.haveSpec.Containers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+		for _, c := range tc.haveSpec.InitContainers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for init container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+	}
+}
+
 func TestPodSecrets(t *testing.T) {
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
@@ -616,12 +702,21 @@ func TestDropProcMount(t *testing.T) {
 			},
 		}
 	}
-	podWithoutProcMount := func() *api.Pod {
+	podWithDefaultProcMount := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
 				RestartPolicy:  api.RestartPolicyNever,
 				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
 				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
+			},
+		}
+	}
+	podWithoutProcMount := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyNever,
+				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
+				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
 			},
 		}
 	}
@@ -635,6 +730,11 @@ func TestDropProcMount(t *testing.T) {
 			description:  "has ProcMount",
 			hasProcMount: true,
 			pod:          podWithProcMount,
+		},
+		{
+			description:  "has default ProcMount",
+			hasProcMount: false,
+			pod:          podWithDefaultProcMount,
 		},
 		{
 			description:  "does not have ProcMount",
@@ -683,124 +783,8 @@ func TestDropProcMount(t *testing.T) {
 							t.Errorf("new pod was not changed")
 						}
 						// new pod should not have ProcMount
-						if !reflect.DeepEqual(newPod, podWithoutProcMount()) {
-							t.Errorf("new pod had ProcMount: %v", diff.ObjectReflectDiff(newPod, podWithoutProcMount()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
-func TestDropPodPriority(t *testing.T) {
-	podPriority := int32(1000)
-	podWithoutPriority := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          nil,
-				PriorityClassName: "",
-			},
-		}
-	}
-	podWithPriority := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          &podPriority,
-				PriorityClassName: "",
-			},
-		}
-	}
-	podWithPriorityClassOnly := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          nil,
-				PriorityClassName: "HighPriorityClass",
-			},
-		}
-	}
-	podWithBothPriorityFields := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          &podPriority,
-				PriorityClassName: "HighPriorityClass",
-			},
-		}
-	}
-	podInfo := []struct {
-		description    string
-		hasPodPriority bool
-		pod            func() *api.Pod
-	}{
-		{
-			description:    "pod With no PodPriority fields set",
-			hasPodPriority: false,
-			pod:            podWithoutPriority,
-		},
-		{
-			description:    "feature disabled and pod With PodPriority field set but class name not set",
-			hasPodPriority: true,
-			pod:            podWithPriority,
-		},
-		{
-			description:    "feature disabled and pod With PodPriority ClassName field set but PortPriority not set",
-			hasPodPriority: true,
-			pod:            podWithPriorityClassOnly,
-		},
-		{
-			description:    "feature disabled and pod With both PodPriority ClassName and PodPriority fields set",
-			hasPodPriority: true,
-			pod:            podWithBothPriorityFields,
-		},
-		{
-			description:    "is nil",
-			hasPodPriority: false,
-			pod:            func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasPodPriority, oldPod := oldPodInfo.hasPodPriority, oldPodInfo.pod()
-				newPodHasPodPriority, newPod := newPodInfo.hasPodPriority, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasPodPriority:
-						// new pod should not be changed if the feature is enabled, or if the old pod had PodPriority
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasPodPriority:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have PodPriority
-						if !reflect.DeepEqual(newPod, podWithoutPriority()) {
-							t.Errorf("new pod had PodPriority: %v", diff.ObjectReflectDiff(newPod, podWithoutPriority()))
+						if procMountInUse(&newPod.Spec) {
+							t.Errorf("new pod had ProcMount: %#v", &newPod.Spec)
 						}
 					default:
 						// new pod should not need to be changed
@@ -1561,6 +1545,180 @@ func TestDropGMSAFields(t *testing.T) {
 	}
 }
 
+func TestDropWindowsRunAsUserNameFields(t *testing.T) {
+	defaultContainerSecurityContextFactory := func() *api.SecurityContext {
+		defaultProcMount := api.DefaultProcMount
+		return &api.SecurityContext{ProcMount: &defaultProcMount}
+	}
+	podWithoutWindowsOptionsFactory := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
+			},
+		}
+	}
+
+	type podFactoryInfo struct {
+		description           string
+		hasRunAsUserNameField bool
+		// this factory should generate the input pod whose spec will be fed to dropDisabledFields
+		podFactory func() *api.Pod
+		// this factory should generate the expected pod after the RunAsUserName fields have been dropped
+		// we can't just use podWithoutWindowsOptionsFactory as is for this, since in some cases
+		// we'll be left with a WindowsSecurityContextOptions struct with no RunAsUserName field set,
+		// as oposed to a nil pointer in the pod generated by podWithoutWindowsOptionsFactory
+		// if this field is not set, it will default to the podFactory
+		strippedPodFactory func() *api.Pod
+	}
+
+	toPtr := func(s string) *string {
+		return &s
+	}
+
+	podFactoryInfos := []podFactoryInfo{
+		{
+			description:           "is nil",
+			hasRunAsUserNameField: false,
+			podFactory:            func() *api.Pod { return nil },
+		},
+		{
+			description:           "does not have any RunAsUserName field set",
+			hasRunAsUserNameField: false,
+			podFactory:            podWithoutWindowsOptionsFactory,
+		},
+		{
+			description:           "has a pod-level WindowsSecurityContextOptions struct with no RunAsUserName field set",
+			hasRunAsUserNameField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has a WindowsSecurityContextOptions struct with no RunAsUserName field set on a container",
+			hasRunAsUserNameField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has a WindowsSecurityContextOptions struct with no RunAsUserName field set on an init container",
+			hasRunAsUserNameField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has RunAsUserName field set in the PodSecurityContext",
+			hasRunAsUserNameField: true,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{RunAsUserName: toPtr("foo-lish")}
+				return pod
+			},
+			strippedPodFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has RunAsUserName field set in a container's SecurityContext",
+			hasRunAsUserNameField: true,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{RunAsUserName: toPtr("foo-lish")}
+				return pod
+			},
+			strippedPodFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has RunAsUserName field set in an init container's PodSecurityContext",
+			hasRunAsUserNameField: true,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{RunAsUserName: toPtr("foo-lish")}
+				return pod
+			},
+			strippedPodFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodFactoryInfo := range podFactoryInfos {
+			for _, newPodFactoryInfo := range podFactoryInfos {
+				newPodHasRunAsUserNameField, newPod := newPodFactoryInfo.hasRunAsUserNameField, newPodFactoryInfo.podFactory()
+				if newPod == nil {
+					continue
+				}
+				oldPodHasRunAsUserNameField, oldPod := oldPodFactoryInfo.hasRunAsUserNameField, oldPodFactoryInfo.podFactory()
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %s, new pod %s", enabled, oldPodFactoryInfo.description, newPodFactoryInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsRunAsUserName, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodFactoryInfo.podFactory()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodFactoryInfo.podFactory()))
+					}
+
+					switch {
+					case enabled || oldPodHasRunAsUserNameField:
+						// new pod should not be changed if the feature is enabled, or if the old pod had the RunAsUserName field set
+						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
+						}
+					case newPodHasRunAsUserNameField:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("%v", oldPod)
+							t.Errorf("%v", newPod)
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have the RunAsUserName field set
+						var expectedStrippedPod *api.Pod
+						if newPodFactoryInfo.strippedPodFactory == nil {
+							expectedStrippedPod = newPodFactoryInfo.podFactory()
+						} else {
+							expectedStrippedPod = newPodFactoryInfo.strippedPodFactory()
+						}
+
+						if !reflect.DeepEqual(newPod, expectedStrippedPod) {
+							t.Errorf("new pod had some RunAsUserName field set: %v", diff.ObjectReflectDiff(newPod, expectedStrippedPod))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestDropPodSysctls(t *testing.T) {
 	podWithSysctls := func() *api.Pod {
 		return &api.Pod{
@@ -1752,5 +1910,106 @@ func TestDropSubPathExpr(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// helper creates a podStatus with list of PodIPs
+func makePodStatus(podIPs []api.PodIP) *api.PodStatus {
+	return &api.PodStatus{
+		PodIPs: podIPs,
+	}
+}
+
+func TestDropStatusPodIPs(t *testing.T) {
+	testCases := []struct {
+		name             string
+		podStatus        *api.PodStatus
+		oldPodStatus     *api.PodStatus
+		comparePodStatus *api.PodStatus
+		enableDualStack  bool
+	}{
+		{
+			name:             "nil pod ips",
+			enableDualStack:  false,
+			podStatus:        makePodStatus(nil),
+			oldPodStatus:     nil,
+			comparePodStatus: makePodStatus(nil),
+		},
+		{
+			name:             "empty pod ips",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{}),
+			oldPodStatus:     nil,
+			comparePodStatus: makePodStatus([]api.PodIP{}),
+		},
+		{
+			name:             "single family ipv6",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "::1"}}),
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "::1"}}),
+		},
+		{
+			name:             "single family ipv4",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "1.1.1.1"}}),
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "1.1.1.1"}}),
+		},
+		{
+			name:             "dualstack 4-6",
+			enableDualStack:  true,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			name:             "dualstack 6-4",
+			enableDualStack:  true,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		{
+			name:             "not dualstack 6-4=>4only",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			oldPodStatus:     nil,
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "::1"}}),
+		},
+		{
+			name:             "not dualstack 6-4=>as is (used in old)",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			oldPodStatus:     makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		{
+			name:             "not dualstack 6-4=>6only",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			oldPodStatus:     nil,
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "::1"}}),
+		},
+		{
+			name:             "not dualstack 6-4=>as is (used in old)",
+			enableDualStack:  false,
+			podStatus:        makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			oldPodStatus:     makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			comparePodStatus: makePodStatus([]api.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+	}
+
+	for _, tc := range testCases {
+		func() {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			dropPodStatusDisabledFields(tc.podStatus, tc.oldPodStatus)
+
+			old := tc.oldPodStatus.DeepCopy()
+			// old pod status should never be changed
+			if !reflect.DeepEqual(tc.oldPodStatus, old) {
+				t.Errorf("%v: old pod status changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldPodStatus, old))
+			}
+
+			if !reflect.DeepEqual(tc.podStatus, tc.comparePodStatus) {
+				t.Errorf("%v: unexpected pod status: %v", tc.name, diff.ObjectReflectDiff(tc.podStatus, tc.comparePodStatus))
+			}
+		}()
 	}
 }

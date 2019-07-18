@@ -75,12 +75,14 @@ type newRef struct {
 type context struct {
 	newRefs  map[string]*newRef
 	warnings []string
+	resolved map[string]string
 }
 
 func newContext() *context {
 	return &context{
 		newRefs:  make(map[string]*newRef, 150),
 		warnings: make([]string, 0),
+		resolved: make(map[string]string, 50),
 	}
 }
 
@@ -141,8 +143,9 @@ func Flatten(opts FlattenOpts) error {
 
 	opts.flattenContext = newContext()
 
-	// recursively expand responses, parameters, path items and items in simple schemas
-	// TODO: we should not expand discriminated types
+	// recursively expand responses, parameters, path items and items in simple schemas.
+	// This simplifies the spec and leaves $ref only into schema objects.
+	//
 	if err := swspec.ExpandSpec(opts.Swagger(), opts.ExpandOpts(!opts.Expand)); err != nil {
 		return err
 	}
@@ -163,10 +166,13 @@ func Flatten(opts FlattenOpts) error {
 	opts.Spec.reload() // re-analyze
 
 	// at this point there are no other references left but schemas
-	if err := importExternalReferences(&opts); err != nil {
-		return err
+	for imported := false; !imported; {
+		var err error
+		if imported, err = importExternalReferences(&opts); err != nil {
+			return err
+		}
+		opts.Spec.reload() // re-analyze
 	}
-	opts.Spec.reload() // re-analyze
 
 	if !opts.Minimal && !opts.Expand {
 		// full flattening: rewrite inline schemas (schemas that aren't simple types or arrays or maps)
@@ -176,7 +182,6 @@ func Flatten(opts FlattenOpts) error {
 
 		opts.Spec.reload() // re-analyze
 	}
-
 	// rewrite JSON pointers other than $ref to named definitions
 	// and attempts to resolve conflicting names
 	if err := stripPointersAndOAIGen(&opts); err != nil {
@@ -512,7 +517,10 @@ const (
 	definitionsPath = "#/definitions"
 )
 
-var ignoredKeys map[string]struct{}
+var (
+	ignoredKeys  map[string]struct{}
+	validMethods map[string]struct{}
+)
 
 func init() {
 	ignoredKeys = map[string]struct{}{
@@ -521,6 +529,16 @@ func init() {
 		"not":        {},
 		"anyOf":      {},
 		"oneOf":      {},
+	}
+
+	validMethods = map[string]struct{}{
+		"GET":     {},
+		"HEAD":    {},
+		"OPTIONS": {},
+		"PATCH":   {},
+		"POST":    {},
+		"PUT":     {},
+		"DELETE":  {},
 	}
 }
 
@@ -619,26 +637,12 @@ func (s splitKey) ResponseName() string {
 	return ""
 }
 
-var validMethods map[string]struct{}
-
-func init() {
-	validMethods = map[string]struct{}{
-		"GET":     {},
-		"HEAD":    {},
-		"OPTIONS": {},
-		"PATCH":   {},
-		"POST":    {},
-		"PUT":     {},
-		"DELETE":  {},
-	}
-}
-
 func (s splitKey) PathItemRef() swspec.Ref {
 	if len(s) < 3 {
 		return swspec.Ref{}
 	}
 	pth, method := s[1], s[2]
-	if _, validMethod := validMethods[strings.ToUpper(method)]; !validMethod && !strings.HasPrefix(method, "x-") {
+	if _, isValidMethod := validMethods[strings.ToUpper(method)]; !isValidMethod && !strings.HasPrefix(method, "x-") {
 		return swspec.Ref{}
 	}
 	return swspec.MustCreateRef("#" + slashpath.Join("/", paths, jsonpointer.Escape(pth), strings.ToUpper(method)))
@@ -777,9 +781,12 @@ func cloneSchema(schema *swspec.Schema) (*swspec.Schema, error) {
 	return &sch, nil
 }
 
-func importExternalReferences(opts *FlattenOpts) error {
+func importExternalReferences(opts *FlattenOpts) (bool, error) {
 	groupedRefs := reverseIndexForSchemaRefs(opts)
 	sortedRefStr := make([]string, 0, len(groupedRefs))
+	if opts.flattenContext == nil {
+		opts.flattenContext = newContext()
+	}
 
 	// sort $ref resolution to ensure deterministic name conflict resolution
 	for refStr := range groupedRefs {
@@ -787,35 +794,53 @@ func importExternalReferences(opts *FlattenOpts) error {
 	}
 	sort.Strings(sortedRefStr)
 
+	complete := true
 	for _, refStr := range sortedRefStr {
 		entry := groupedRefs[refStr]
 		if !entry.Ref.HasFragmentOnly {
-			debugLog("importing external schema for [%s] from %s", strings.Join(entry.Keys, ", "), refStr)
-			// resolve to actual schema
-			sch := new(swspec.Schema)
-			sch.Ref = entry.Ref
-			if err := swspec.ExpandSchemaWithBasePath(sch, nil, opts.ExpandOpts(false)); err != nil {
-				return err
-			}
-			if sch == nil {
-				return fmt.Errorf("no schema found at %s for [%s]", refStr, strings.Join(entry.Keys, ", "))
-			}
-			debugLog("importing external schema for [%s] from %s", strings.Join(entry.Keys, ", "), refStr)
+			complete = false
+			var isOAIGen bool
 
-			// generate a unique name - isOAIGen means that a naming conflict was resolved by changing the name
-			newName, isOAIGen := uniqifyName(opts.Swagger().Definitions, nameFromRef(entry.Ref))
-			debugLog("new name for [%s]: %s - with name conflict:%t",
-				strings.Join(entry.Keys, ", "), newName, isOAIGen)
-
-			// rewrite the external refs to local ones
-			for _, key := range entry.Keys {
-				if err := updateRef(opts.Swagger(), key,
-					swspec.MustCreateRef(slashpath.Join(definitionsPath, newName))); err != nil {
-					return err
+			newName := opts.flattenContext.resolved[refStr]
+			if newName != "" {
+				// rewrite ref with already resolved external ref (useful for cyclicali refs)
+				debugLog("resolving known ref [%s] to %s", refStr, newName)
+				// rewrite the external refs to local ones
+				for _, key := range entry.Keys {
+					if err := updateRef(opts.Swagger(), key,
+						swspec.MustCreateRef(slashpath.Join(definitionsPath, newName))); err != nil {
+						return false, err
+					}
 				}
+			} else {
+				debugLog("importing external schema for [%s] from %s", strings.Join(entry.Keys, ", "), refStr)
 
-				// keep track of created refs
-				if opts.flattenContext != nil {
+				// resolve to actual schema
+				sch := new(swspec.Schema)
+				sch.Ref = entry.Ref
+				if err := swspec.ExpandSchemaWithBasePath(sch, nil, opts.ExpandOpts(false)); err != nil {
+					return false, err
+				}
+				if sch == nil {
+					return false, fmt.Errorf("no schema found at %s for [%s]", refStr, strings.Join(entry.Keys, ", "))
+				}
+				debugLog("importing external schema for [%s] from %s", strings.Join(entry.Keys, ", "), refStr)
+
+				// generate a unique name - isOAIGen means that a naming conflict was resolved by changing the name
+				newName, isOAIGen = uniqifyName(opts.Swagger().Definitions, nameFromRef(entry.Ref))
+				debugLog("new name for [%s]: %s - with name conflict:%t",
+					strings.Join(entry.Keys, ", "), newName, isOAIGen)
+
+				opts.flattenContext.resolved[refStr] = newName
+
+				// rewrite the external refs to local ones
+				for _, key := range entry.Keys {
+					if err := updateRef(opts.Swagger(), key,
+						swspec.MustCreateRef(slashpath.Join(definitionsPath, newName))); err != nil {
+						return false, err
+					}
+
+					// keep track of created refs
 					resolved := false
 					if _, ok := opts.flattenContext.newRefs[key]; ok {
 						resolved = opts.flattenContext.newRefs[key].resolved
@@ -829,13 +854,13 @@ func importExternalReferences(opts *FlattenOpts) error {
 						schema:   sch,
 					}
 				}
-			}
 
-			// add the resolved schema to the definitions
-			saveSchema(opts.Swagger(), newName, sch)
+				// add the resolved schema to the definitions
+				saveSchema(opts.Swagger(), newName, sch)
+			}
 		}
 	}
-	return nil
+	return complete, nil
 }
 
 type refRevIdx struct {
@@ -1259,7 +1284,6 @@ func croak(opts *FlattenOpts) {
 func namePointers(opts *FlattenOpts) error {
 	debugLog("name pointers")
 	refsToReplace := make(map[string]SchemaRef, len(opts.Spec.references.schemas))
-	//for k, ref := range opts.Spec.references.schemas {
 	for k, ref := range opts.Spec.references.allRefs {
 		if slashpath.Dir(ref.String()) == definitionsPath {
 			// this a ref to a top-level definition: ok
@@ -1377,6 +1401,7 @@ func namePointers(opts *FlattenOpts) error {
 // NOTE: all external $ref's are assumed to be already expanded at this stage.
 func deepestRef(opts *FlattenOpts, ref swspec.Ref) (swspec.Ref, *swspec.Schema, error) {
 	if !ref.HasFragmentOnly {
+		// we found an external $ref, which is odd
 		// does nothing on external $refs
 		return ref, nil, nil
 	}

@@ -92,7 +92,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	ginkgo.AfterEach(func() {
 		e2elog.Logf("AfterEach: Cleaning up test resources.")
 		if errs := framework.PVPVCCleanup(client, nameSpace, pv, pvc); len(errs) > 0 {
-			framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 		}
 	})
 
@@ -120,7 +120,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		ginkgo.By("Checking that the PV status is Terminating")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "While checking PV status")
-		gomega.Expect(pv.ObjectMeta.DeletionTimestamp).NotTo(gomega.Equal(nil))
+		framework.ExpectNotEqual(pv.ObjectMeta.DeletionTimestamp, nil)
 
 		ginkgo.By("Deleting the PVC that is bound to the PV")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))

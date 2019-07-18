@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	api_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -85,7 +85,7 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 	return nil
 }
 
-func getLoggingAgentPods(f *framework.Framework, appName string) (*api_v1.PodList, error) {
+func getLoggingAgentPods(f *framework.Framework, appName string) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": appName}))
 	options := meta_v1.ListOptions{LabelSelector: label.String()}
 	return f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)

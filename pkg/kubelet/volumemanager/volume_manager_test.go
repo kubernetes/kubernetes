@@ -232,6 +232,7 @@ func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient 
 		plugMgr,
 		&containertest.FakeRuntime{},
 		&mount.FakeMounter{},
+		&mount.FakeHostUtil{},
 		"",
 		fakeRecorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */

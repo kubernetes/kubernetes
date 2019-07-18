@@ -20,6 +20,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -88,6 +89,7 @@ filegroup(
         ":package-srcs",
         "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
+        "//pkg/volume/util/fsquota:all-srcs",
         "//pkg/volume/util/nestedpendingoperations:all-srcs",
         "//pkg/volume/util/nsenter:all-srcs",
         "//pkg/volume/util/operationexecutor:all-srcs",

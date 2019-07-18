@@ -25,29 +25,30 @@ import (
 
 func TestCheckIPSetVersion(t *testing.T) {
 	testCases := []struct {
+		name    string
 		vstring string
 		valid   bool
 	}{
-		// version less than "6.0" is not valid.
-		{"4.0", false},
-		{"5.1", false},
-		{"5.1.2", false},
-		// "7" is not a valid version string.
-		{"7", false},
-		{"6.0", true},
-		{"6.1", true},
-		{"6.19", true},
-		{"7.0", true},
-		{"8.1.2", true},
-		{"9.3.4.0", true},
-		{"total junk", false},
+		{"4.0 < 6.0 is invalid", "4.0", false},
+		{"5.1 < 6.0 is invalid", "5.1", false},
+		{"5.2 < 6.0 is invalid", "5.1.2", false},
+		{"7 is not a valid version", "7", false},
+		{"6.0 is valid since >= 6.0", "6.0", true},
+		{"6.1 is valid since >= 6.0", "6.1", true},
+		{"6.19 is valid since >= 6.0", "6.19", true},
+		{"7.0 is valid since >= 6.0", "7.0", true},
+		{"8.1.2 is valid since >= 6.0", "8.1.2", true},
+		{"9.3.4.0 is valid since >= 6.0", "9.3.4.0", true},
+		{"not a valid semantic version", "total junk", false},
 	}
 
-	for i := range testCases {
-		valid := checkMinVersion(testCases[i].vstring)
-		if testCases[i].valid != valid {
-			t.Errorf("Expected result: %v, Got result: %v", testCases[i].valid, valid)
-		}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			valid := checkMinVersion(testCase.vstring)
+			if testCase.valid != valid {
+				t.Errorf("Expected result: %v, Got result: %v", testCase.valid, valid)
+			}
+		})
 	}
 }
 
@@ -55,6 +56,7 @@ const testIPSetVersion = "v6.19"
 
 func TestSyncIPSetEntries(t *testing.T) {
 	testCases := []struct {
+		name            string
 		set             *utilipset.IPSet
 		setType         utilipset.Type
 		ipv6            bool
@@ -62,7 +64,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 		currentEntries  []string
 		expectedEntries []string
 	}{
-		{ // case 0
+		{
+			name: "normal ipset sync",
 			set: &utilipset.IPSet{
 				Name: "foo",
 			},
@@ -72,7 +75,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  nil,
 			expectedEntries: []string{"172.17.0.4,tcp:80"},
 		},
-		{ // case 1
+		{
+			name: "ipset IPv6 sync with no new entries",
 			set: &utilipset.IPSet{
 				Name: "abz",
 			},
@@ -82,7 +86,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"FE80::0202:B3FF:FE1E:8329,tcp:80"},
 			expectedEntries: []string{"FE80::0202:B3FF:FE1E:8329,tcp:80"},
 		},
-		{ // case 2
+		{
+			name: "ipset sync with updated udp->tcp in hash",
 			set: &utilipset.IPSet{
 				Name: "bca",
 			},
@@ -92,7 +97,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"172.17.0.5,udp:53"},
 			expectedEntries: []string{"172.17.0.4,tcp:80", "172.17.0.5,tcp:80"},
 		},
-		{ // case 3
+		{
+			name: "ipset sync no updates required",
 			set: &utilipset.IPSet{
 				Name: "bar",
 			},
@@ -102,7 +108,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"172.17.0.4,tcp:80:172.17.0.4"},
 			expectedEntries: []string{"172.17.0.4,tcp:80:172.17.0.4"},
 		},
-		{ // case 4
+		{
+			name: "ipset IPv6 sync, delete and add new entry",
 			set: &utilipset.IPSet{
 				Name: "baz",
 			},
@@ -112,7 +119,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"1111:0000:0000:0000:0202:B3FF:FE1E:8329,tcp:8081:1111:0000:0000:0000:0202:B3FF:FE1E:8329:8081"},
 			expectedEntries: []string{"FE80:0000:0000:0000:0202:B3FF:FE1E:8329,tcp:8080:FE80:0000:0000:0000:0202:B3FF:FE1E:8329"},
 		},
-		{ // case 5
+		{
+			name: "ipset sync, no current entries",
 			set: &utilipset.IPSet{
 				Name: "NOPE",
 			},
@@ -122,7 +130,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  nil,
 			expectedEntries: []string{"172.17.0.4,tcp:80,172.17.0.9", "172.17.0.5,tcp:80,172.17.0.10"},
 		},
-		{ // case 6
+		{
+			name: "ipset sync, no current entries with /16 subnet",
 			set: &utilipset.IPSet{
 				Name: "ABC-DEF",
 			},
@@ -132,7 +141,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  nil,
 			expectedEntries: []string{"172.17.0.4,tcp:80,172.17.0.0/16", "172.17.0.5,tcp:80,172.17.0.0/16"},
 		},
-		{ // case 7
+		{
+			name: "ipset IPv6 sync, no updates required with /32 subnet",
 			set: &utilipset.IPSet{
 				Name: "zar",
 			},
@@ -142,7 +152,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"FE80::8329,tcp:8800,2001:db8::/32"},
 			expectedEntries: []string{"FE80::8329,tcp:8800,2001:db8::/32"},
 		},
-		{ // case 8
+		{
+			name: "ipset IPv6 sync, current entries removed",
 			set: &utilipset.IPSet{
 				Name: "bbb",
 			},
@@ -152,7 +163,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"FE80::8329,udp:8801,2001:db8::/32"},
 			expectedEntries: nil,
 		},
-		{ // case 9
+		{
+			name: "ipset sync, port entry removed",
 			set: &utilipset.IPSet{
 				Name: "AAA",
 			},
@@ -161,7 +173,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"80"},
 			expectedEntries: nil,
 		},
-		{ // case 10
+		{
+			name: "ipset sync, remove old and add new",
 			set: &utilipset.IPSet{
 				Name: "c-c-c",
 			},
@@ -170,7 +183,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"80"},
 			expectedEntries: []string{"8080", "9090"},
 		},
-		{ // case 11
+		{
+			name: "ipset sync, remove many stale ports",
 			set: &utilipset.IPSet{
 				Name: "NODE-PORT",
 			},
@@ -179,7 +193,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"80", "9090", "8081", "8082"},
 			expectedEntries: []string{"8080"},
 		},
-		{ // case 12
+		{
+			name: "ipset sync, add sctp entry",
 			set: &utilipset.IPSet{
 				Name: "sctp-1",
 			},
@@ -189,7 +204,8 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  nil,
 			expectedEntries: []string{"172.17.0.4,sctp:80"},
 		},
-		{ // case 1
+		{
+			name: "ipset sync, add IPV6 sctp entry",
 			set: &utilipset.IPSet{
 				Name: "sctp-2",
 			},
@@ -201,26 +217,29 @@ func TestSyncIPSetEntries(t *testing.T) {
 		},
 	}
 
-	for i := range testCases {
-		set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCases[i].set.Name, testCases[i].setType, testCases[i].ipv6, "comment-"+testCases[i].set.Name)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCase.set.Name, testCase.setType, testCase.ipv6, "comment-"+testCase.set.Name)
 
-		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		for _, entry := range testCases[i].expectedEntries {
-			set.handle.AddEntry(entry, testCases[i].set, true)
-		}
-
-		set.activeEntries.Insert(testCases[i].activeEntries...)
-		set.syncIPSetEntries()
-		for _, entry := range testCases[i].expectedEntries {
-			found, err := set.handle.TestEntry(entry, testCases[i].set.Name)
-			if err != nil {
+			if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if !found {
-				t.Errorf("Unexpected entry 172.17.0.4,tcp:80 not found in set foo")
+
+			for _, entry := range testCase.currentEntries {
+				set.handle.AddEntry(entry, testCase.set, true)
 			}
-		}
+
+			set.activeEntries.Insert(testCase.activeEntries...)
+			set.syncIPSetEntries()
+			for _, entry := range testCase.expectedEntries {
+				found, err := set.handle.TestEntry(entry, testCase.set.Name)
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if !found {
+					t.Errorf("Unexpected entry %q not found in set foo", entry)
+				}
+			}
+		})
 	}
 }

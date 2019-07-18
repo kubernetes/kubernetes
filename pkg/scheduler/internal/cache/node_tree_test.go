@@ -140,28 +140,28 @@ func TestNodeTree_AddNode(t *testing.T) {
 		{
 			name:         "single node no labels",
 			nodesToAdd:   allNodes[:1],
-			expectedTree: map[string]*nodeArray{"": {[]string{"node-0"}, 1}},
+			expectedTree: map[string]*nodeArray{"": {[]string{"node-0"}, 0}},
 		},
 		{
 			name:       "mix of nodes with and without proper labels",
 			nodesToAdd: allNodes[:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 1},
-				"region-1:\x00:":       {[]string{"node-1"}, 1},
-				":\x00:zone-2":         {[]string{"node-2"}, 1},
-				"region-1:\x00:zone-2": {[]string{"node-3"}, 1},
+				"":                     {[]string{"node-0"}, 0},
+				"region-1:\x00:":       {[]string{"node-1"}, 0},
+				":\x00:zone-2":         {[]string{"node-2"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-3"}, 0},
 			},
 		},
 		{
 			name:       "mix of nodes with and without proper labels and some zones with multiple nodes",
 			nodesToAdd: allNodes[:7],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 1},
-				"region-1:\x00:":       {[]string{"node-1"}, 1},
-				":\x00:zone-2":         {[]string{"node-2"}, 1},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 2},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
+				"":                     {[]string{"node-0"}, 0},
+				"region-1:\x00:":       {[]string{"node-1"}, 0},
+				":\x00:zone-2":         {[]string{"node-2"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 	}
@@ -190,11 +190,11 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[:1],
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 1},
-				":\x00:zone-2":         {[]string{"node-2"}, 1},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 2},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
+				"region-1:\x00:":       {[]string{"node-1"}, 0},
+				":\x00:zone-2":         {[]string{"node-2"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 		{
@@ -202,10 +202,10 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[1:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 1},
-				"region-1:\x00:zone-2": {[]string{"node-4"}, 1},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
+				"":                     {[]string{"node-0"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-4"}, 0},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 		{
@@ -257,11 +257,11 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 1},
-				":\x00:zone-2":         {[]string{"node-2"}, 1},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4", "node-0"}, 3},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
+				"region-1:\x00:":       {[]string{"node-1"}, 0},
+				":\x00:zone-2":         {[]string{"node-2"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-3", "node-4", "node-0"}, 0},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 		{
@@ -277,7 +277,7 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:zone-2": {[]string{"node-0"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-0"}, 0},
 			},
 		},
 		{
@@ -293,8 +293,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 1},
-				"region-1:\x00:zone-2": {[]string{"node-new"}, 1},
+				"":                     {[]string{"node-0"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-new"}, 0},
 			},
 		},
 	}
@@ -322,7 +322,7 @@ func TestNodeTree_Next(t *testing.T) {
 	tests := []struct {
 		name           string
 		nodesToAdd     []*v1.Node
-		numRuns        int // number of times to run next()
+		numRuns        int // number of times to run Next()
 		expectedOutput []string
 	}{
 		{
@@ -357,7 +357,7 @@ func TestNodeTree_Next(t *testing.T) {
 
 			var output []string
 			for i := 0; i < test.numRuns; i++ {
-				output = append(output, nt.next())
+				output = append(output, nt.Next())
 			}
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
@@ -399,15 +399,15 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			name:           "add more nodes to an exhausted zone",
 			nodesToAdd:     append(allNodes[4:9], allNodes[3]),
 			nodesToRemove:  nil,
-			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "next", "next", "next"},
-			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-8", "node-4", "node-5"},
+			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
+			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
 		},
 		{
 			name:           "remove zone and add new to ensure exhausted is reset correctly",
 			nodesToAdd:     append(allNodes[3:5], allNodes[6:8]...),
 			nodesToRemove:  allNodes[3:5],
 			operations:     []string{"add", "add", "next", "next", "remove", "add", "add", "next", "next", "remove", "next", "next"},
-			expectedOutput: []string{"node-3", "node-4", "node-4", "node-6", "node-6", "node-7"},
+			expectedOutput: []string{"node-3", "node-4", "node-6", "node-7", "node-6", "node-7"},
 		},
 	}
 
@@ -434,7 +434,7 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 						removeIndex++
 					}
 				case "next":
-					output = append(output, nt.next())
+					output = append(output, nt.Next())
 				default:
 					t.Errorf("unknow operation: %v", op)
 				}

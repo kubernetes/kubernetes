@@ -21,46 +21,223 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
-func TestAttachDisk(t *testing.T) {
-	c := getTestCloud()
-
-	common := &controllerCommon{
-		location:              c.Location,
-		storageEndpointSuffix: c.Environment.StorageEndpointSuffix,
-		resourceGroup:         c.ResourceGroup,
-		subscriptionID:        c.SubscriptionID,
-		cloud:                 c,
+func TestCommonAttachDisk(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		vmList          map[string]string
+		nodeName        types.NodeName
+		isDataDisksFull bool
+		expectedLun     int32
+		expectedErr     bool
+	}{
+		{
+			desc:        "LUN -1 and error shall be returned if there's no such instance corresponding to given nodeName",
+			nodeName:    "vm1",
+			expectedLun: -1,
+			expectedErr: true,
+		},
+		{
+			desc:            "LUN -1 and error shall be returned if there's no available LUN for instance",
+			vmList:          map[string]string{"vm1": "PowerState/Running"},
+			nodeName:        "vm1",
+			isDataDisksFull: true,
+			expectedLun:     -1,
+			expectedErr:     true,
+		},
+		{
+			desc:        "correct LUN and no error shall be returned if everything is good",
+			vmList:      map[string]string{"vm1": "PowerState/Running"},
+			nodeName:    "vm1",
+			expectedLun: 1,
+			expectedErr: false,
+		},
 	}
 
-	diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name", c.SubscriptionID, c.ResourceGroup)
+	for i, test := range testCases {
+		testCloud := getTestCloud()
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+		}
+		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
+			testCloud.SubscriptionID, testCloud.ResourceGroup)
+		setTestVirtualMachines(testCloud, test.vmList, test.isDataDisksFull)
 
-	_, err := common.AttachDisk(true, "", diskURI, "node1", compute.CachingTypesReadOnly)
-	if err != nil {
-		fmt.Printf("TestAttachDisk return expected error: %v", err)
-	} else {
-		t.Errorf("TestAttachDisk unexpected nil err")
+		lun, err := common.AttachDisk(true, "", diskURI, test.nodeName, compute.CachingTypesReadOnly)
+		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
 }
 
-func TestDetachDisk(t *testing.T) {
-	c := getTestCloud()
-
-	common := &controllerCommon{
-		location:              c.Location,
-		storageEndpointSuffix: c.Environment.StorageEndpointSuffix,
-		resourceGroup:         c.ResourceGroup,
-		subscriptionID:        c.SubscriptionID,
-		cloud:                 c,
+func TestCommonDetachDisk(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		vmList      map[string]string
+		nodeName    types.NodeName
+		diskName    string
+		expectedErr bool
+	}{
+		{
+			desc:        "an error shall be returned if there's no such instance corresponding to given nodeName",
+			nodeName:    "vm1",
+			expectedErr: true,
+		},
+		{
+			desc:        "no error shall be returned if there's no matching disk according to given diskName",
+			vmList:      map[string]string{"vm1": "PowerState/Running"},
+			nodeName:    "vm1",
+			diskName:    "disk2",
+			expectedErr: false,
+		},
+		{
+			desc:        "no error shall be returned if the disk exsists",
+			vmList:      map[string]string{"vm1": "PowerState/Running"},
+			nodeName:    "vm1",
+			diskName:    "disk1",
+			expectedErr: false,
+		},
 	}
 
-	diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name", c.SubscriptionID, c.ResourceGroup)
+	for i, test := range testCases {
+		testCloud := getTestCloud()
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+		}
+		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
+			testCloud.SubscriptionID, testCloud.ResourceGroup)
+		setTestVirtualMachines(testCloud, test.vmList, false)
 
-	err := common.DetachDisk("", diskURI, "node1")
-	if err != nil {
-		fmt.Printf("TestAttachDisk return expected error: %v", err)
-	} else {
-		t.Errorf("TestAttachDisk unexpected nil err")
+		err := common.DetachDisk(test.diskName, diskURI, test.nodeName)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
+func TestGetDiskLun(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		diskName    string
+		diskURI     string
+		expectedLun int32
+		expectedErr bool
+	}{
+		{
+			desc:        "LUN -1 and error shall be returned if diskName != disk.Name or diskURI != disk.Vhd.URI",
+			diskName:    "disk2",
+			expectedLun: -1,
+			expectedErr: true,
+		},
+		{
+			desc:        "correct LUN and no error shall be returned if diskName = disk.Name",
+			diskName:    "disk1",
+			expectedLun: 0,
+			expectedErr: false,
+		},
+	}
+
+	for i, test := range testCases {
+		testCloud := getTestCloud()
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+		}
+		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+
+		lun, err := common.GetDiskLun(test.diskName, test.diskURI, "vm1")
+		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
+func TestGetNextDiskLun(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		isDataDisksFull bool
+		expectedLun     int32
+		expectedErr     bool
+	}{
+		{
+			desc:            "the minimal LUN shall be returned if there's enough room for extra disks",
+			isDataDisksFull: false,
+			expectedLun:     1,
+			expectedErr:     false,
+		},
+		{
+			desc:            "LUN -1 and and error shall be returned if there's no available LUN",
+			isDataDisksFull: true,
+			expectedLun:     -1,
+			expectedErr:     true,
+		},
+	}
+
+	for i, test := range testCases {
+		testCloud := getTestCloud()
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+		}
+		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
+
+		lun, err := common.GetNextDiskLun("vm1")
+		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
+func TestDisksAreAttached(t *testing.T) {
+	testCases := []struct {
+		desc             string
+		diskNames        []string
+		nodeName         types.NodeName
+		expectedAttached map[string]bool
+		expectedErr      bool
+	}{
+		{
+			desc:             "an error shall be returned if there's no such instance corresponding to given nodeName",
+			diskNames:        []string{"disk1"},
+			nodeName:         "vm2",
+			expectedAttached: map[string]bool{"disk1": false},
+			expectedErr:      false,
+		},
+		{
+			desc:             "proper attach map shall be returned if everything is good",
+			diskNames:        []string{"disk1", "disk2"},
+			nodeName:         "vm1",
+			expectedAttached: map[string]bool{"disk1": true, "disk2": false},
+			expectedErr:      false,
+		},
+	}
+
+	for i, test := range testCases {
+		testCloud := getTestCloud()
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+		}
+		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+
+		attached, err := common.DisksAreAttached(test.diskNames, test.nodeName)
+		assert.Equal(t, test.expectedAttached, attached, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
 }

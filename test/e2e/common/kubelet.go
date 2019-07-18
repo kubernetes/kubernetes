@@ -27,17 +27,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Kubelet", func() {
 	f := framework.NewDefaultFramework("kubelet-test")
 	var podClient *framework.PodClient
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
-	Context("when scheduling a busybox command in a pod", func() {
+	ginkgo.Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 
 		/*
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					},
 				},
 			})
-			Eventually(func() string {
+			gomega.Eventually(func() string {
 				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
 				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
 				if err != nil {
@@ -72,13 +72,13 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(rc)
 				return buf.String()
-			}, time.Minute, time.Second*4).Should(Equal("Hello World\n"))
+			}, time.Minute, time.Second*4).Should(gomega.Equal("Hello World\n"))
 		})
 	})
-	Context("when scheduling a busybox command that always fails in a pod", func() {
+	ginkgo.Context("when scheduling a busybox command that always fails in a pod", func() {
 		var podName string
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			podName = "bin-false" + string(uuid.NewUUID())
 			podClient.Create(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
 		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
-			Eventually(func() error {
+			gomega.Eventually(func() error {
 				podData, err := podClient.Get(podName, metav1.GetOptions{})
 				if err != nil {
 					return err
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					return fmt.Errorf("expected non-zero exitCode and non-empty terminated state reason. Got exitCode: %+v and terminated state reason: %+v", contTerminatedState.ExitCode, contTerminatedState.Reason)
 				}
 				return nil
-			}, time.Minute, time.Second*4).Should(BeNil())
+			}, time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 
 		/*
@@ -130,10 +130,10 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		*/
 		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
 			err := podClient.Delete(podName, &metav1.DeleteOptions{})
-			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
-	Context("when scheduling a busybox Pod with hostAliases", func() {
+	ginkgo.Context("when scheduling a busybox Pod with hostAliases", func() {
 		podName := "busybox-host-aliases" + string(uuid.NewUUID())
 
 		/*
@@ -166,7 +166,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 
-			Eventually(func() error {
+			gomega.Eventually(func() error {
 				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
 				defer rc.Close()
 				if err != nil {
@@ -181,10 +181,10 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				}
 
 				return nil
-			}, time.Minute, time.Second*4).Should(BeNil())
+			}, time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 	})
-	Context("when scheduling a read only busybox container", func() {
+	ginkgo.Context("when scheduling a read only busybox container", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 
 		/*
@@ -214,7 +214,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					},
 				},
 			})
-			Eventually(func() string {
+			gomega.Eventually(func() string {
 				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
 				if err != nil {
 					return ""
@@ -223,7 +223,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(rc)
 				return buf.String()
-			}, time.Minute, time.Second*4).Should(Equal("/bin/sh: can't create /file: Read-only file system\n"))
+			}, time.Minute, time.Second*4).Should(gomega.Equal("/bin/sh: can't create /file: Read-only file system\n"))
 		})
 	})
 })

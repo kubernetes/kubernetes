@@ -85,6 +85,7 @@ func TestRunOnce(t *testing.T) {
 		hostname:         testKubeletHostname,
 		nodeName:         testKubeletHostname,
 		runtimeState:     newRuntimeState(time.Second),
+		hostutil:         &mount.FakeHostUtil{},
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
@@ -103,6 +104,7 @@ func TestRunOnce(t *testing.T) {
 		kb.volumePluginMgr,
 		fakeRuntime,
 		kb.mounter,
+		kb.hostutil,
 		kb.getPodsDir(),
 		kb.recorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */

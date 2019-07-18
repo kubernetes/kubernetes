@@ -116,10 +116,8 @@ func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionP
 	}
 }
 
-func SecretNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
-	secret := obj.(*api.Secret)
-	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: secret.ObjectMeta.Name}
-	return []pkgstorage.MatchValue{result}
+func SecretNameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Secret).ObjectMeta.Name
 }
 
 // SelectableFields returns a field set that can be used for filter selection

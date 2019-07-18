@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -655,42 +656,42 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 	for i := range testPod.Spec.Containers {
 		container := testPod.Spec.Containers[i]
 		limitMemory := container.Resources.Limits.Memory().String()
-		limitCpu := container.Resources.Limits.Cpu().String()
+		limitCPU := container.Resources.Limits.Cpu().String()
 		requestMemory := container.Resources.Requests.Memory().String()
-		requestCpu := container.Resources.Requests.Cpu().String()
+		requestCPU := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
 			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
-		if limitCpu != "75m" {
-			t.Errorf("Unexpected limit cpu value %s", limitCpu)
+		if limitCPU != "75m" {
+			t.Errorf("Unexpected limit cpu value %s", limitCPU)
 		}
 		if requestMemory != "5Mi" {
 			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
-		if requestCpu != "50m" {
-			t.Errorf("Unexpected request cpu value %s", requestCpu)
+		if requestCPU != "50m" {
+			t.Errorf("Unexpected request cpu value %s", requestCPU)
 		}
 	}
 
 	for i := range testPod.Spec.InitContainers {
 		container := testPod.Spec.InitContainers[i]
 		limitMemory := container.Resources.Limits.Memory().String()
-		limitCpu := container.Resources.Limits.Cpu().String()
+		limitCPU := container.Resources.Limits.Cpu().String()
 		requestMemory := container.Resources.Requests.Memory().String()
-		requestCpu := container.Resources.Requests.Cpu().String()
+		requestCPU := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
 			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
-		if limitCpu != "75m" {
-			t.Errorf("Unexpected limit cpu value %s", limitCpu)
+		if limitCPU != "75m" {
+			t.Errorf("Unexpected limit cpu value %s", limitCPU)
 		}
 		if requestMemory != "5Mi" {
 			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
-		if requestCpu != "50m" {
-			t.Errorf("Unexpected request cpu value %s", requestCpu)
+		if requestCPU != "50m" {
+			t.Errorf("Unexpected request cpu value %s", requestCPU)
 		}
 	}
 }
@@ -705,7 +706,7 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -735,7 +736,7 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

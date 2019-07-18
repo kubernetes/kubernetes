@@ -75,5 +75,5 @@ func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration)
 		e2elog.Logf("failed to retrieve kubelet stats -\n %v", errors)
 		time.Sleep(cadvisor.SleepDuration)
 	}
-	framework.Failf("Failed after retrying %d times for cadvisor to be healthy on all nodes. Errors:\n%v", maxRetries, errors)
+	e2elog.Failf("Failed after retrying %d times for cadvisor to be healthy on all nodes. Errors:\n%v", maxRetries, errors)
 }

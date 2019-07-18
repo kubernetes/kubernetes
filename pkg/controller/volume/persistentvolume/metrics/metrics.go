@@ -18,11 +18,12 @@ package metrics
 
 import (
 	"sync"
-
-	"k8s.io/api/core/v1"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
+	metricutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -56,7 +57,6 @@ type PVCLister interface {
 func Register(pvLister PVLister, pvcLister PVCLister) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
-		prometheus.MustRegister(volumeOperationMetric)
 		prometheus.MustRegister(volumeOperationErrorsMetric)
 	})
 }
@@ -92,12 +92,6 @@ var (
 		"Gauge measuring number of persistent volume claim currently unbound",
 		[]string{namespaceLabel}, nil)
 
-	volumeOperationMetric = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "volume_operation_total_seconds",
-			Help: "Total volume operation time",
-		},
-		[]string{"plugin_name", "operation_name"})
 	volumeOperationErrorsMetric = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "volume_operation_total_errors",
@@ -198,14 +192,79 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 	}
 }
 
-// RecordVolumeOperationMetric records the latency and errors of volume operations.
-func RecordVolumeOperationMetric(pluginName, opName string, timeTaken float64, err error) {
+// RecordVolumeOperationErrorMetric records error count into metric
+// volume_operation_total_errors for provisioning/deletion operations
+func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 	if pluginName == "" {
 		pluginName = "N/A"
 	}
-	if err != nil {
-		volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+	volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+}
+
+// operationTimestamp stores the start time of an operation by a plugin
+type operationTimestamp struct {
+	pluginName string
+	operation  string
+	startTs    time.Time
+}
+
+func newOperationTimestamp(pluginName, operationName string) *operationTimestamp {
+	return &operationTimestamp{
+		pluginName: pluginName,
+		operation:  operationName,
+		startTs:    time.Now(),
+	}
+}
+
+// OperationStartTimeCache concurrent safe cache for operation start timestamps
+type OperationStartTimeCache struct {
+	cache sync.Map // [string]operationTimestamp
+}
+
+// NewOperationStartTimeCache creates a operation timestamp cache
+func NewOperationStartTimeCache() OperationStartTimeCache {
+	return OperationStartTimeCache{
+		cache: sync.Map{}, //[string]operationTimestamp {}
+	}
+}
+
+// AddIfNotExist returns directly if there exists an entry with the key. Otherwise, it
+// creates a new operation timestamp using operationName, pluginName, and current timestamp
+// and stores the operation timestamp with the key
+func (c *OperationStartTimeCache) AddIfNotExist(key, pluginName, operationName string) {
+	ts := newOperationTimestamp(pluginName, operationName)
+	c.cache.LoadOrStore(key, ts)
+}
+
+// Delete deletes a value for a key.
+func (c *OperationStartTimeCache) Delete(key string) {
+	c.cache.Delete(key)
+}
+
+// Has returns a bool value indicates the existence of a key in the cache
+func (c *OperationStartTimeCache) Has(key string) bool {
+	_, exists := c.cache.Load(key)
+	return exists
+}
+
+// RecordMetric records either an error count metric or a latency metric if there
+// exists a start timestamp entry in the cache. For a successful operation, i.e.,
+// err == nil, the corresponding timestamp entry will be removed from cache
+func RecordMetric(key string, c *OperationStartTimeCache, err error) {
+	obj, exists := c.cache.Load(key)
+	if !exists {
 		return
 	}
-	volumeOperationMetric.WithLabelValues(pluginName, opName).Observe(timeTaken)
+	ts, ok := obj.(*operationTimestamp)
+	if !ok {
+		return
+	}
+	if err != nil {
+		RecordVolumeOperationErrorMetric(ts.pluginName, ts.operation)
+	} else {
+		timeTaken := time.Since(ts.startTs).Seconds()
+		metricutil.RecordOperationLatencyMetric(ts.pluginName, ts.operation, timeTaken)
+		// end of this operation, remove the timestamp entry from cache
+		c.Delete(key)
+	}
 }

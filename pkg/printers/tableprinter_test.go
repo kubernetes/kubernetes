@@ -52,6 +52,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 		name          string
 		h             *handlerEntry
 		opt           PrintOptions
+		eventType     string
 		obj           runtime.Object
 		includeHeader bool
 		expectOut     string
@@ -97,6 +98,20 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 			expectOut:     "NAME\tSTATUS\tAGE\ntest\t\t<unknow>\n",
 		},
 		{
+			name: "with event type",
+			h: &handlerEntry{
+				columnDefinitions: testNamespaceColumnDefinitions,
+				printFunc:         printFunc,
+			},
+			opt:       PrintOptions{},
+			eventType: "ADDED",
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			},
+			includeHeader: true,
+			expectOut:     "EVENT\tNAME\tSTATUS\tAGE\nADDED   \ttest\t\t<unknow>\n",
+		},
+		{
 			name: "print namespace and withnamespace true, should not print header",
 			h: &handlerEntry{
 				columnDefinitions: testNamespaceColumnDefinitions,
@@ -116,7 +131,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 	for _, test := range testCase {
 		t.Run(test.name, func(t *testing.T) {
 			buffer := &bytes.Buffer{}
-			err := printRowsForHandlerEntry(buffer, test.h, test.obj, test.opt, test.includeHeader)
+			err := printRowsForHandlerEntry(buffer, test.h, test.eventType, test.obj, test.opt, test.includeHeader)
 			if err != nil {
 				if err.Error() != test.expectErr {
 					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, test.expectErr, err)
