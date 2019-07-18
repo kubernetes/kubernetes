@@ -61,6 +61,7 @@ import (
 var (
 	simpleDaemonSetLabel  = map[string]string{"name": "simple-daemon", "type": "production"}
 	simpleDaemonSetLabel2 = map[string]string{"name": "simple-daemon", "type": "test"}
+	simpleDaemonSetLabelWithHash = map[string]string{"name": "simple-daemon", "type": "production", apps.DefaultDaemonSetUniqueLabelKey: "new-hash"}
 	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
 	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
 	alwaysReady           = func() bool { return true }
@@ -140,7 +141,15 @@ func newOnDeleteStrategy() *apps.DaemonSetUpdateStrategy {
 }
 
 func updateStrategies() []*apps.DaemonSetUpdateStrategy {
-	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
+	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy(), newSurgingRollingUpdateStrategy()}
+}
+
+func newSurgingRollingUpdateStrategy() *apps.DaemonSetUpdateStrategy {
+	one := intstr.FromInt(1)
+	return &apps.DaemonSetUpdateStrategy{
+		Type:                 apps.SurgingRollingUpdateDaemonSetStrategyType,
+		SurgingRollingUpdate: &apps.SurgingRollingUpdateDaemonSet{MaxSurge: &one},
+	}
 }
 
 func newNode(name string, label map[string]string) *v1.Node {
@@ -768,6 +777,8 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
 		case apps.RollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+		case apps.SurgingRollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 4)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -805,6 +816,12 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 			case apps.RollingUpdateDaemonSetStrategyType:
 				if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 					syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+				} else {
+					syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+				}
+			case apps.SurgingRollingUpdateDaemonSetStrategyType:
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+					syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 4)
 				} else {
 					syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 				}
@@ -1841,6 +1858,8 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
 		case apps.RollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+		case apps.SurgingRollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 4)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -1852,6 +1871,8 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 2)
 		case apps.RollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 3)
+		case apps.SurgingRollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 4)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -2298,6 +2319,11 @@ func TestUpdateNode(t *testing.T) {
 							return 3
 						}
 						return 0
+					case apps.SurgingRollingUpdateDaemonSetStrategyType:
+						if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+							return 4
+						}
+						return 0
 					default:
 						t.Fatalf("unexpected UpdateStrategy %+v", strategyType)
 					}
@@ -2514,6 +2540,12 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 					syncAndValidateDaemonSets(t, manager, c.ds, podControl, 1, 0, 0)
 				} else {
 					syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 3)
+				}
+			case apps.SurgingRollingUpdateDaemonSetStrategyType:
+				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+					syncAndValidateDaemonSets(t, manager, c.ds, podControl, 1, 0, 0)
+				} else {
+					syncAndValidateDaemonSets(t, manager, c.ds, podControl, 1, 0, 4)
 				}
 			default:
 				t.Fatalf("unexpected UpdateStrategy %+v", strategy)

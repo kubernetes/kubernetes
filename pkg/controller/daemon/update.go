@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
@@ -76,6 +77,180 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 		numUnavailable++
 	}
 	return dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
+}
+
+// getSurgeNumbers returns the max allowable number of surging pods and the current number of
+// surging pods. The number of surging pods is computed as the total number pods above the first
+// on each node.
+func (dsc *DaemonSetsController) getSurgeNumbers(ds *apps.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod, hash string) (int, int, error) {
+	klog.V(4).Infof("Getting surge numbers")
+	// TODO: get nodeList once in syncDaemonSet and pass it to other functions
+	nodeList, err := dsc.nodeLister.List(labels.Everything())
+	if err != nil {
+		return -1, -1, fmt.Errorf("couldn't get list of nodes during surging rolling update of daemon set %#v: %v", ds, err)
+	}
+
+	generation, err := util.GetTemplateGeneration(ds)
+	if err != nil {
+		generation = nil
+	}
+	var desiredNumberScheduled, numSurge int
+	for i := range nodeList {
+		node := nodeList[i]
+		wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		if err != nil {
+			return -1, -1, err
+		}
+		if !wantToRun {
+			continue
+		}
+
+		desiredNumberScheduled++
+
+		for _, pod := range nodeToDaemonPods[node.Name] {
+			if util.IsPodUpdated(pod, hash, generation) && len(nodeToDaemonPods[node.Name]) > 1 {
+				numSurge += 1
+				break
+			}
+		}
+	}
+
+	maxSurge, err := intstrutil.GetValueFromIntOrPercent(ds.Spec.UpdateStrategy.SurgingRollingUpdate.MaxSurge, desiredNumberScheduled, true)
+	if err != nil {
+		return -1, -1, fmt.Errorf("Invalid value for MaxSurge: %v", err)
+	}
+	klog.V(4).Infof("DaemonSet %s/%s, maxSurge: %d, numSurge: %d", ds.Namespace, ds.Name, maxSurge, numSurge)
+	return maxSurge, numSurge, nil
+}
+
+// get all nodes where the ds should run
+func (dsc *DaemonSetsController) getNodesShouldRunDaemonPod(ds *apps.DaemonSet) (
+	nodesWantToRun sets.String,
+	nodesShouldContinueRunning sets.String,
+	err error) {
+	nodeList, err := dsc.nodeLister.List(labels.Everything())
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't get list of nodes when updating daemon set %#v: %v", ds, err)
+	}
+
+	nodesWantToRun = sets.String{}
+	nodesShouldContinueRunning = sets.String{}
+	for _, node := range nodeList {
+		wantToRun, _, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if wantToRun {
+			nodesWantToRun.Insert(node.Name)
+		}
+
+		if shouldContinueRunning {
+			nodesShouldContinueRunning.Insert(node.Name)
+		}
+	}
+	return nodesWantToRun, nodesShouldContinueRunning, nil
+}
+
+// pruneSurgingDaemonPods prunes the list of pods to only contain pods belonging to the current
+// generation. This method only applies when the update strategy is SurgingRollingUpdate.
+// This allows the daemon set controller to temporarily break its contract that only one daemon
+// pod can run per node by ignoring the pods that belong to previous generations, which are
+// cleaned up by the surgingRollineUpdate() method above.
+func (dsc *DaemonSetsController) pruneSurgingDaemonPods(ds *apps.DaemonSet, pods []*v1.Pod, hash string) []*v1.Pod {
+	if len(pods) <= 1 || ds.Spec.UpdateStrategy.Type != apps.SurgingRollingUpdateDaemonSetStrategyType {
+		return pods
+	}
+	var currentPods []*v1.Pod
+	for _, pod := range pods {
+		generation, err := util.GetTemplateGeneration(ds)
+		if err != nil {
+			generation = nil
+		}
+		if util.IsPodUpdated(pod, hash, generation) {
+			klog.V(5).Infof("Pod %s of ds %s/%s already updated(%s)", pod.Name, ds.Namespace, ds.Name, hash)
+			currentPods = append(currentPods, pod)
+		}
+	}
+	// Escape hatch if no new pods of the current generation are present yet.
+	if len(currentPods) == 0 {
+		klog.V(5).Infof("No new version(%s) pods for %s/%s", hash, ds.Namespace, ds.Name)
+		currentPods = pods
+	}
+	return currentPods
+}
+
+// surgingRollingUpdate creates new daemon set pods to replace old ones making sure that no more
+// than ds.Spec.UpdateStrategy.SurgingRollingUpdate.MaxSurge extra pods are scheduled at any
+// given time.
+func (dsc *DaemonSetsController) surgingRollingUpdate(ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
+	maxSurge, numSurge, err := dsc.getSurgeNumbers(ds, nodeToDaemonPods, hash)
+	if err != nil {
+		return fmt.Errorf("Couldn't get surge numbers: %v", err)
+	}
+
+	nodesWantToRun, nodesShouldContinueRunning, err := dsc.getNodesShouldRunDaemonPod(ds)
+	if err != nil {
+		return fmt.Errorf("Couldn't get nodes which want to run ds pod: %v", err)
+	}
+
+	klog.V(4).Infof("Surging new pods and deleting obsolete old pods")
+	var nodesToSurge []string
+	var oldPodsToDelete []string
+	for node, pods := range nodeToDaemonPods {
+		var newPod, oldPod *v1.Pod
+		wantToRun := nodesWantToRun.Has(node)
+		shouldContinueRunning := nodesShouldContinueRunning.Has(node)
+		// if node has new taint, then the already existed pod does not want to run but should continue running
+		if !wantToRun && !shouldContinueRunning {
+			for _, pod := range pods {
+				klog.V(4).Infof("Marking pod %s/%s on unsuitable node %s for deletion", ds.Name, pod.Name, node)
+				if pod.DeletionTimestamp == nil {
+					oldPodsToDelete = append(oldPodsToDelete, pod.Name)
+				}
+			}
+			continue
+		}
+		foundAvailable := false
+		for _, pod := range pods {
+			generation, err := util.GetTemplateGeneration(ds)
+			if err != nil {
+				generation = nil
+			}
+			if util.IsPodUpdated(pod, hash, generation) {
+				if newPod != nil {
+					klog.Warningf("Multiple new pods on node %s: %s, %s", node, newPod.Name, pod.Name)
+				}
+				newPod = pod
+			} else {
+				if oldPod != nil {
+					klog.Warningf("Multiple old pods on node %s: %s, %s", node, oldPod.Name, pod.Name)
+				}
+				oldPod = pod
+			}
+			if !foundAvailable && podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+				foundAvailable = true
+			}
+		}
+
+		if newPod == nil && numSurge < maxSurge && wantToRun {
+			if !foundAvailable && len(pods) >= 2 {
+				klog.Warningf("Node %s already has %d unavailble pods, need clean first, skip surge new pod", node, len(pods))
+			} else {
+				klog.V(4).Infof("Surging new pod on node %s", node)
+				numSurge++
+				nodesToSurge = append(nodesToSurge, node)
+			}
+		} else if newPod != nil && podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Now()) && oldPod != nil && oldPod.DeletionTimestamp == nil {
+			klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, oldPod.Name)
+			oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
+		}
+	}
+	return dsc.syncNodes(ds, oldPodsToDelete, nodesToSurge, hash)
 }
 
 // constructHistory finds all histories controlled by the given DaemonSet, and

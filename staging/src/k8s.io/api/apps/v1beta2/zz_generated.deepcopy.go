@@ -544,6 +544,16 @@ func (in *RollingUpdateDaemonSet) DeepCopyInto(out *RollingUpdateDaemonSet) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Partition != nil {
+		in, out := &in.Partition, &out.Partition
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

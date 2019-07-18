@@ -503,6 +503,14 @@ type DaemonSetUpdateStrategy struct {
 	// See https://github.com/kubernetes/kubernetes/issues/35345
 	// +optional
 	RollingUpdate *RollingUpdateDaemonSet
+
+	// Surging rolling update config params. Present only if type = "SurgingRollingUpdate".
+	//---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be. Same as Deployment `strategy.rollingUpdate`.
+	// See https://github.com/kubernetes/kubernetes/issues/35345
+	// +optional
+	SurgingRollingUpdate *SurgingRollingUpdateDaemonSet
 }
 
 type DaemonSetUpdateStrategyType string
@@ -513,6 +521,10 @@ const (
 
 	// OnDeleteDaemonSetStrategyType - Replace the old daemons only when it's killed
 	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
+
+	// Replace the old daemons by new ones using rolling update i.e replace them on each node one
+	// after the other, creating the new pod and then killing the old one.
+	SurgingRollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "SurgingRollingUpdate"
 )
 
 // RollingUpdateDaemonSet is the spec to control the desired behavior of daemon set rolling update.
@@ -533,6 +545,44 @@ type RollingUpdateDaemonSet struct {
 	// all times during the update.
 	// +optional
 	MaxUnavailable intstr.IntOrString
+
+	// A label query over nodes that are managed by the daemon set RollingUpdate.
+	// Must match in order to be controlled.
+	// It must match the node's labels.
+	Selector *metav1.LabelSelector
+
+	// The number of DaemonSet pods remained to be old version.
+	// Default value is 0.
+	// Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
+	// +optional
+	Partition int32
+}
+
+// Spec to control the desired behavior of a daemon set surging rolling update.
+type SurgingRollingUpdateDaemonSet struct {
+	// The maximum number of DaemonSet pods that can be scheduled above the desired number of pods
+	// during the update. Value can be an absolute number (ex: 5) or a percentage of the total number
+	// of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from
+	// the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is
+	// set to 30%, at most 30% of the total number of nodes that should be running the daemon pod
+	// (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update
+	// starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are
+	// available it then stops the existing pods before proceeding onto other DaemonSet pods, thus
+	// ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all
+	// times during the update.
+	// +optional
+	MaxSurge intstr.IntOrString
+
+	// A label query over pods that are managed by the daemon set SurgingRollingUpdate.
+	// Must match in order to be controlled.
+	// It must match the node's labels.
+	Selector *metav1.LabelSelector
+
+	// The number of DaemonSet pods remained to be old version.
+	// Default value is 0.
+	// Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
+	// +optional
+	Partition int32
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -573,6 +623,11 @@ type DaemonSetSpec struct {
 	// Defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32
+
+	// Indicates that the daemon set is paused and will not be processed by the
+	// daemon set controller.
+	// +optional
+	Paused bool
 }
 
 // DaemonSetStatus represents the current status of a daemon set.

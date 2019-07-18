@@ -547,6 +547,17 @@ type RollingUpdateDaemonSet struct {
 	// all times during the update.
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
+
+	// A label query over nodes that are managed by the daemon set RollingUpdate.
+	// Must match in order to be controlled.
+	// It must match the node's labels.
+	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
+
+	// The number of DaemonSet pods remained to be old version.
+	// Default value is 0.
+	// Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
+	// +optional
+	Partition *int32 `json:"partition,omitempty" protobuf:"varint,3,opt,name=partition"`
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -580,6 +591,11 @@ type DaemonSetSpec struct {
 	// Defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,6,opt,name=revisionHistoryLimit"`
+
+	// Indicates that the DaemonSet is paused and will not be processed by the
+	// DaemonSet controller.
+	// +optional
+	Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
 }
 
 // DaemonSetStatus represents the current status of a daemon set.

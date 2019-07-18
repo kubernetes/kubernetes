@@ -320,6 +320,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.SurgingRollingUpdateDaemonSet)(nil), (*apps.SurgingRollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet(a.(*v1.SurgingRollingUpdateDaemonSet), b.(*apps.SurgingRollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.SurgingRollingUpdateDaemonSet)(nil), (*v1.SurgingRollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet(a.(*apps.SurgingRollingUpdateDaemonSet), b.(*v1.SurgingRollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*apps.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
 	}); err != nil {
@@ -380,6 +390,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*apps.SurgingRollingUpdateDaemonSet)(nil), (*v1.SurgingRollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet(a.(*apps.SurgingRollingUpdateDaemonSet), b.(*v1.SurgingRollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
 	}); err != nil {
@@ -437,6 +452,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*v1.StatefulSetUpdateStrategy)(nil), (*apps.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(a.(*v1.StatefulSetUpdateStrategy), b.(*apps.StatefulSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.SurgingRollingUpdateDaemonSet)(nil), (*apps.SurgingRollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet(a.(*v1.SurgingRollingUpdateDaemonSet), b.(*apps.SurgingRollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
@@ -615,6 +635,7 @@ func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1.DaemonSetSpec, ou
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.Paused = in.Paused
 	return nil
 }
 
@@ -629,6 +650,7 @@ func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, 
 	out.MinReadySeconds = in.MinReadySeconds
 	// WARNING: in.TemplateGeneration requires manual conversion: does not exist in peer-type
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.Paused = in.Paused
 	return nil
 }
 
@@ -681,6 +703,15 @@ func autoConvert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *
 	} else {
 		out.RollingUpdate = nil
 	}
+	if in.SurgingRollingUpdate != nil {
+		in, out := &in.SurgingRollingUpdate, &out.SurgingRollingUpdate
+		*out = new(apps.SurgingRollingUpdateDaemonSet)
+		if err := Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.SurgingRollingUpdate = nil
+	}
 	return nil
 }
 
@@ -694,6 +725,15 @@ func autoConvert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *
 		}
 	} else {
 		out.RollingUpdate = nil
+	}
+	if in.SurgingRollingUpdate != nil {
+		in, out := &in.SurgingRollingUpdate, &out.SurgingRollingUpdate
+		*out = new(v1.SurgingRollingUpdateDaemonSet)
+		if err := Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.SurgingRollingUpdate = nil
 	}
 	return nil
 }
@@ -1049,11 +1089,19 @@ func Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetSta
 
 func autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1285,6 +1333,24 @@ func autoConvert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(
 		}
 	} else {
 		out.RollingUpdate = nil
+	}
+	return nil
+}
+
+func autoConvert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet(in *v1.SurgingRollingUpdateDaemonSet, out *apps.SurgingRollingUpdateDaemonSet, s conversion.Scope) error {
+	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func autoConvert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet(in *apps.SurgingRollingUpdateDaemonSet, out *v1.SurgingRollingUpdateDaemonSet, s conversion.Scope) error {
+	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
+		return err
 	}
 	return nil
 }

@@ -986,8 +986,9 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, nodeList []*v1.Node,
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
-// returns slice with erros if any
+// returns slice with errors if any
 func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
+
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
@@ -1260,6 +1261,12 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return nil
 	}
 
+	// if daemon set spec 'Paused' was set to true, the update should be paused.
+	if ds.Spec.Paused {
+		klog.V(4).Infof("daemonset %s updation is paused.", ds.Name)
+		return nil
+	}
+
 	// Construct histories of the DaemonSet, and get the hash of current history
 	cur, old, err := dsc.constructHistory(ds)
 	if err != nil {
@@ -1283,6 +1290,8 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		case apps.OnDeleteDaemonSetStrategyType:
 		case apps.RollingUpdateDaemonSetStrategyType:
 			err = dsc.rollingUpdate(ds, nodeList, hash)
+		case apps.SurgingRollingUpdateDaemonSetStrategyType:
+			err = dsc.surgingRollingUpdate(ds, nodeList, hash)
 		}
 		if err != nil {
 			return err

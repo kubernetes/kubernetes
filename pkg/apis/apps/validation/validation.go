@@ -352,6 +352,18 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, 
 	return allErrs
 }
 
+func ValidateSurgingRollingUpdateDaemonSet(surgingRollingUpdate *apps.SurgingRollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(surgingRollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	if getIntOrPercentValue(surgingRollingUpdate.MaxSurge) == 0 {
+		// MaxSurge cannot be 0.
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), surgingRollingUpdate.MaxSurge, "cannot be 0"))
+	}
+	// Validate that MaxSurge is not more than 100%.
+	allErrs = append(allErrs, IsNotMoreThan100Percent(surgingRollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	return allErrs
+}
+
 func ValidateDaemonSetUpdateStrategy(strategy *apps.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch strategy.Type {
@@ -360,9 +372,24 @@ func ValidateDaemonSetUpdateStrategy(strategy *apps.DaemonSetUpdateStrategy, fld
 		// Make sure RollingUpdate field isn't nil.
 		if strategy.RollingUpdate == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
+			allErrs = append(allErrs,
+				apivalidation.ValidateNonnegativeField(
+					int64(strategy.RollingUpdate.Partition),
+					fldPath.Child("rollingUpdate").Child("partition"))...)
 			return allErrs
 		}
 		allErrs = append(allErrs, ValidateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+	case apps.SurgingRollingUpdateDaemonSetStrategyType:
+		// Make sure SurgingRollingUpdate field isn't nil.
+		if strategy.SurgingRollingUpdate == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("surgingRollingUpdate"), ""))
+			allErrs = append(allErrs,
+				apivalidation.ValidateNonnegativeField(
+					int64(strategy.SurgingRollingUpdate.Partition),
+					fldPath.Child("surgingRollingUpdate").Child("partition"))...)
+			return allErrs
+		}
+		allErrs = append(allErrs, ValidateSurgingRollingUpdateDaemonSet(strategy.SurgingRollingUpdate, fldPath.Child("surgingRollingUpdate"))...)
 	default:
 		validValues := []string{string(apps.RollingUpdateDaemonSetStrategyType), string(apps.OnDeleteDaemonSetStrategyType)}
 		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))

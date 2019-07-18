@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,6 +43,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy,
 		Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet,
 		Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet,
+		Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet,
+		Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet,
 		Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus,
 		Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus,
 		Convert_v1_Deployment_To_apps_Deployment,
@@ -225,13 +227,47 @@ func Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.R
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
 	}
+
+	*out.Partition = in.Partition
+	out.Selector = in.Selector
+
 	return nil
 }
+
+func Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet(in *apps.SurgingRollingUpdateDaemonSet, out *appsv1.SurgingRollingUpdateDaemonSet, s conversion.Scope) error {
+	if out.MaxSurge == nil {
+		out.MaxSurge = &intstr.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
+		return err
+	}
+
+	*out.Partition = in.Partition
+	out.Selector = in.Selector
+	return nil
+}
+
+
 
 func Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *appsv1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
 	}
+
+	out.Partition = *in.Partition
+	out.Selector = in.Selector
+
+	return nil
+}
+
+func Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet(in *appsv1.SurgingRollingUpdateDaemonSet, out *apps.SurgingRollingUpdateDaemonSet, s conversion.Scope) error {
+	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
+		return err
+	}
+
+	out.Partition = *in.Partition
+	out.Selector = in.Selector
+
 	return nil
 }
 
@@ -258,6 +294,7 @@ func Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out 
 		return err
 	}
 	out.MinReadySeconds = int32(in.MinReadySeconds)
+	out.Paused = in.Paused
 	if in.RevisionHistoryLimit != nil {
 		out.RevisionHistoryLimit = new(int32)
 		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
@@ -269,9 +306,29 @@ func Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out 
 
 func Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *appsv1.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = appsv1.DaemonSetUpdateStrategyType(in.Type)
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = &appsv1.RollingUpdateDaemonSet{}
-		if err := Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+	if in.Type ==  apps.RollingUpdateDaemonSetStrategyType {
+		if err := s.Convert(in.RollingUpdate.MaxUnavailable, &out.RollingUpdate.MaxUnavailable, 0); err != nil {
+			return err
+		}
+
+		if err := s.Convert(in.RollingUpdate.Partition, &out.RollingUpdate.Partition, 0); err != nil {
+			return err
+		}
+
+		if err := s.Convert(in.RollingUpdate.Selector, &out.RollingUpdate.Partition, 0); err != nil {
+			return err
+		}
+	}
+
+	if in.Type ==  apps.SurgingRollingUpdateDaemonSetStrategyType {
+		if err := s.Convert(in.SurgingRollingUpdate.MaxSurge, &out.SurgingRollingUpdate.MaxSurge, 0); err != nil {
+			return err
+		}
+
+		if err := s.Convert(in.SurgingRollingUpdate.Partition, &out.SurgingRollingUpdate.Partition, 0); err != nil {
+			return err
+		}
+		if err := s.Convert(in.SurgingRollingUpdate.Selector, &out.SurgingRollingUpdate.Partition, 0); err != nil {
 			return err
 		}
 	}
@@ -313,6 +370,7 @@ func Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, ou
 		out.RevisionHistoryLimit = nil
 	}
 	out.MinReadySeconds = in.MinReadySeconds
+	out.Paused = in.Paused
 	return nil
 }
 
