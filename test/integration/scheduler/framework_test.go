@@ -456,6 +456,7 @@ func TestScorePlugin(t *testing.T) {
 			Enabled: []schedulerconfig.Plugin{
 				{
 					Name: scorePluginName,
+					Weight: 1,
 				},
 			},
 		},
