@@ -68,13 +68,23 @@ type FairQueuingSystem interface {
 	SetRequestWaitLimit(time.Duration)
 
 	// DoOnEmpty records a function to be called when all the queues
-	// have no requests waiting nor executing.  The filter uses this
-	// for a priority level that has become undesired, setting a
-	// callback that will actually remove the priority level by
-	// establishing a new RMState whose priorityLevelStates map lacks
-	// that entry.  If the priority level becomes desired again before
-	// this is called, the filter cancels by calling `DoOnEmpty(nil)`.
-	// The callback is invoked with no mutexes locked.
+	// have no requests waiting nor executing.  This is setting a
+	// notification handler.  A call to `DoOnEmpty(fn)` requires the
+	// implementation to guarantee that if `fn != nil` then either (1)
+	// eventually there is another call to `DoOnEmpty` or (2) if
+	// eventually all the queues have no requests waiting nor
+	// executing then eventually there will be a call to `fn()` with
+	// no mutexes locked.  Note that (2) effectively has two
+	// interesting intervals of time (until empty, then until the call
+	// to fn), and that (1) is about how the client can effectively
+	// remove the promise of (2).
+	//
+	// The filter uses this for a priority level that has become
+	// undesired, setting a handler that will cause the priority level
+	// to eventually be removed from the filter if the filter still
+	// wants that.  If the filter later changes its mind and wants to
+	// preserve the priority level then the filter can use this to
+	// cancel the handler registration.
 	DoOnEmpty(func())
 
 	// Wait, in the happy case, shuffle shards the given request into
@@ -125,9 +135,6 @@ type requestManagement struct {
 	// configQueue holds TypedConfigObjectReference values, identifying
 	// config objects that need to be processed
 	configQueue workqueue.RateLimitingInterface
-
-	// numConfigWorkers is the configured number of workers for the config queue
-	numConfigWorkers int
 
 	// plInformer is the informer for priority level config objects
 	plInformer cache.SharedIndexInformer
