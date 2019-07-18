@@ -211,11 +211,11 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			return nil, fmt.Errorf("Couldn't get object from tombstone %#v", obj)
+			return nil, fmt.Errorf("couldn't get object from tombstone %#v", obj)
 		}
 		cm, ok = tombstone.Obj.(*v1.ConfigMap)
 		if !ok {
-			return nil, fmt.Errorf("Tombstone contained object that is not a ConfigMap %#v", obj)
+			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", obj)
 		}
 	}
 	return cm, nil

@@ -132,7 +132,7 @@ func waitForItemsFromChan(timeoutChan <-chan time.Time, stringChan chan string, 
 	for {
 		select {
 		case <-timeoutChan:
-			return errors.New("The prepull operation timed out")
+			return errors.New("the prepull operation timed out")
 		case result := <-stringChan:
 			i++
 			// If the cleanup function errors; error here as well

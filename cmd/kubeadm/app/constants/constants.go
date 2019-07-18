@@ -428,7 +428,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, errors.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+	return nil, errors.Errorf("unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

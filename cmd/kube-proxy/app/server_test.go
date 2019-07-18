@@ -393,7 +393,7 @@ func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
 		tempDir, err := ioutil.TempDir("", "kubeproxy-config-change")
 		if err != nil {
-			return nil, "", fmt.Errorf("Unable to create temporary directory: %v", err)
+			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
 		}
 		fullPath := filepath.Join(tempDir, "kube-proxy-config")
 		file, err := os.Create(fullPath)
