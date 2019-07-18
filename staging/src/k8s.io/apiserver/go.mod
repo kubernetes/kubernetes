@@ -59,7 +59,7 @@ require (
 	k8s.io/klog v0.3.1
 	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
 	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
-	sigs.k8s.io/structured-merge-diff v0.0.0-20190525122527-15d366b2352e
+	sigs.k8s.io/structured-merge-diff v0.0.0-20190628201129-059502f64143
 	sigs.k8s.io/yaml v1.1.0
 )
 
