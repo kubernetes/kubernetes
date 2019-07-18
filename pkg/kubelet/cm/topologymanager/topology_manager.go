@@ -17,6 +17,8 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
@@ -71,7 +73,7 @@ type TopologyHint struct {
 var _ Manager = &manager{}
 
 //NewManager creates a new TopologyManager based on provided policy
-func NewManager(topologyPolicyName string) Manager {
+func NewManager(topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
 	var policy Policy
 
@@ -87,8 +89,7 @@ func NewManager(topologyPolicyName string) Manager {
 		policy = NewStrictPolicy()
 
 	default:
-		klog.Errorf("[topologymanager] Unknown policy %s, using default policy %s", topologyPolicyName, PolicyNone)
-		policy = NewNonePolicy()
+		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
 
 	var hp []HintProvider
@@ -101,7 +102,7 @@ func NewManager(topologyPolicyName string) Manager {
 		policy:           policy,
 	}
 
-	return manager
+	return manager, nil
 }
 
 func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
