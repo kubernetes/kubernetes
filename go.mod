@@ -88,7 +88,7 @@ require (
 	github.com/json-iterator/go v1.1.6
 	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/karrick/godirwalk v1.7.5 // indirect
-	github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
+	github.com/libopenstorage/openstorage v2.0.0+incompatible
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
@@ -318,7 +318,7 @@ replace (
 	github.com/kr/pty => github.com/kr/pty v1.1.5
 	github.com/kr/text => github.com/kr/text v0.1.0
 	github.com/kylelemons/godebug => github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
-	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
+	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v2.0.0+incompatible
 	github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent => github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc => github.com/lpabon/godbc v0.1.1

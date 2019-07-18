@@ -14,6 +14,19 @@ import (
 // SpecHandler provides conversion function from what gets passed in over the
 // plugin API to an api.VolumeSpec object.
 type SpecHandler interface {
+	// SpecOptsFromString parses options from the name and returns in a map.
+	// The input string should have known keys in the following format:
+	// "scale=value;size=value;name=volname"
+	// If the spec was parsed, it returns:
+	//   (true, options_map, parsed_name)
+	// If the input string didn't contain the name, it returns:
+	//   (false, nil, inputString)
+	SpecOptsFromString(inputString string) (
+		bool,
+		map[string]string,
+		string,
+	)
+
 	// SpecFromString parses options from the name.
 	// If the scheduler was unable to pass in the volume spec via the API,
 	// the spec can be passed in via the name in the format:
@@ -38,7 +51,6 @@ type SpecHandler interface {
 	// 	(resultant_VolumeSpec, source, locator, nil)
 	// If the options have invalid values then it returns:
 	//	(nil, nil, nil, error)
-
 	SpecFromOpts(opts map[string]string) (
 		*api.VolumeSpec,
 		*api.VolumeLocator,
@@ -66,6 +78,7 @@ type SpecHandler interface {
 var (
 	nameRegex       = regexp.MustCompile(api.Name + "=([0-9A-Za-z_-]+),?")
 	nodesRegex      = regexp.MustCompile(api.SpecNodes + "=([0-9A-Za-z_-]+),?")
+	parentRegex     = regexp.MustCompile(api.SpecParent + "=([A-Za-z]+),?")
 	sizeRegex       = regexp.MustCompile(api.SpecSize + "=([0-9A-Za-z]+),?")
 	scaleRegex      = regexp.MustCompile(api.SpecScale + "=([0-9]+),?")
 	fsRegex         = regexp.MustCompile(api.SpecFilesystem + "=([0-9A-Za-z]+),?")
@@ -73,16 +86,21 @@ var (
 	haRegex         = regexp.MustCompile(api.SpecHaLevel + "=([0-9]+),?")
 	cosRegex        = regexp.MustCompile(api.SpecPriority + "=([A-Za-z]+),?")
 	sharedRegex     = regexp.MustCompile(api.SpecShared + "=([A-Za-z]+),?")
+	journalRegex    = regexp.MustCompile(api.SpecJournal + "=([A-Za-z]+),?")
+	nfsRegex        = regexp.MustCompile(api.SpecNfs + "=([A-Za-z]+),?")
+	cascadedRegex   = regexp.MustCompile(api.SpecCascaded + "=([A-Za-z]+),?")
 	passphraseRegex = regexp.MustCompile(api.SpecPassphrase + "=([0-9A-Za-z_@./#&+-]+),?")
 	stickyRegex     = regexp.MustCompile(api.SpecSticky + "=([A-Za-z]+),?")
 	secureRegex     = regexp.MustCompile(api.SpecSecure + "=([A-Za-z]+),?")
 	zonesRegex      = regexp.MustCompile(api.SpecZones + "=([A-Za-z]+),?")
 	racksRegex      = regexp.MustCompile(api.SpecRacks + "=([A-Za-z]+),?")
+	rackRegex       = regexp.MustCompile(api.SpecRack + "=([A-Za-z]+),?")
 	aggrRegex       = regexp.MustCompile(api.SpecAggregationLevel + "=([0-9]+|" +
 		api.SpecAutoAggregationValue + "),?")
 	compressedRegex   = regexp.MustCompile(api.SpecCompressed + "=([A-Za-z]+),?")
 	snapScheduleRegex = regexp.MustCompile(api.SpecSnapshotSchedule +
 		`=([A-Za-z0-9:;@=#]+),?`)
+	ioProfileRegex = regexp.MustCompile(api.SpecIoProfile + "=([0-9A-Za-z_-]+),?")
 )
 
 type specHandler struct {
@@ -221,6 +239,24 @@ func (d *specHandler) UpdateSpecFromOpts(opts map[string]string, spec *api.Volum
 			} else {
 				spec.Shared = shared
 			}
+		case api.SpecJournal:
+			if journal, err := strconv.ParseBool(v); err != nil {
+				return nil, nil, nil, err
+			} else {
+				spec.Journal = journal
+			}
+		case api.SpecNfs:
+			if nfs, err := strconv.ParseBool(v); err != nil {
+				return nil, nil, nil, err
+			} else {
+				spec.Nfs = nfs
+			}
+		case api.SpecCascaded:
+			if cascaded, err := strconv.ParseBool(v); err != nil {
+				return nil, nil, nil, err
+			} else {
+				spec.Cascaded = cascaded
+			}
 		case api.SpecSticky:
 			if sticky, err := strconv.ParseBool(v); err != nil {
 				return nil, nil, nil, err
@@ -246,6 +282,8 @@ func (d *specHandler) UpdateSpecFromOpts(opts map[string]string, spec *api.Volum
 			}
 		case api.SpecZones, api.SpecRacks:
 			locator.VolumeLabels[k] = v
+		case api.SpecRack:
+			locator.VolumeLabels[api.SpecRacks] = v
 		case api.SpecCompressed:
 			if compressed, err := strconv.ParseBool(v); err != nil {
 				return nil, nil, nil, err
@@ -285,13 +323,13 @@ func (d *specHandler) SpecFromOpts(
 	return d.UpdateSpecFromOpts(opts, spec, locator, source)
 }
 
-func (d *specHandler) SpecFromString(
+func (d *specHandler) SpecOptsFromString(
 	str string,
-) (bool, *api.VolumeSpec, *api.VolumeLocator, *api.Source, string) {
+) (bool, map[string]string, string) {
 	// If we can't parse the name, the rest of the spec is invalid.
 	ok, name := d.getVal(nameRegex, str)
 	if !ok {
-		return false, d.DefaultSpec(), nil, nil, str
+		return false, nil, str
 	}
 
 	opts := make(map[string]string)
@@ -301,6 +339,9 @@ func (d *specHandler) SpecFromString(
 	}
 	if ok, nodes := d.getVal(nodesRegex, str); ok {
 		opts[api.SpecNodes] = nodes
+	}
+	if ok, parent := d.getVal(parentRegex, str); ok {
+		opts[api.SpecParent] = parent
 	}
 	if ok, scale := d.getVal(scaleRegex, str); ok {
 		opts[api.SpecScale] = scale
@@ -320,6 +361,15 @@ func (d *specHandler) SpecFromString(
 	if ok, shared := d.getVal(sharedRegex, str); ok {
 		opts[api.SpecShared] = shared
 	}
+	if ok, journal := d.getVal(journalRegex, str); ok {
+		opts[api.SpecJournal] = journal
+	}
+	if ok, nfs := d.getVal(nfsRegex, str); ok {
+		opts[api.SpecNfs] = nfs
+	}
+	if ok, cascaded := d.getVal(cascadedRegex, str); ok {
+		opts[api.SpecCascaded] = cascaded
+	}
 	if ok, sticky := d.getVal(stickyRegex, str); ok {
 		opts[api.SpecSticky] = sticky
 	}
@@ -334,6 +384,10 @@ func (d *specHandler) SpecFromString(
 	}
 	if ok, racks := d.getVal(racksRegex, str); ok {
 		opts[api.SpecRacks] = racks
+	} else {
+		if ok, rack := d.getVal(rackRegex, str); ok {
+			opts[api.SpecRack] = rack
+		}
 	}
 	if ok, aggregationLvl := d.getVal(aggrRegex, str); ok {
 		opts[api.SpecAggregationLevel] = aggregationLvl
@@ -344,7 +398,20 @@ func (d *specHandler) SpecFromString(
 	if ok, sched := d.getVal(snapScheduleRegex, str); ok {
 		opts[api.SpecSnapshotSchedule] = strings.Replace(sched, "#", ",", -1)
 	}
+	if ok, ioProfile := d.getVal(ioProfileRegex, str); ok {
+		opts[api.SpecIoProfile] = ioProfile
+	}
 
+	return true, opts, name
+}
+
+func (d *specHandler) SpecFromString(
+	str string,
+) (bool, *api.VolumeSpec, *api.VolumeLocator, *api.Source, string) {
+	ok, opts, name := d.SpecOptsFromString(str)
+	if !ok {
+		return false, d.DefaultSpec(), nil, nil, name
+	}
 	spec, locator, source, err := d.SpecFromOpts(opts)
 	if err != nil {
 		return false, d.DefaultSpec(), nil, nil, name

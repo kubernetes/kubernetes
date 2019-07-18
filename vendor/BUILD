@@ -278,6 +278,7 @@ filegroup(
         "//vendor/github.com/karrick/godirwalk:all-srcs",
         "//vendor/github.com/konsorten/go-windows-terminal-sequences:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/api:all-srcs",
+        "//vendor/github.com/libopenstorage/openstorage/pkg/options:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/pkg/parser:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/pkg/units:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/volume:all-srcs",

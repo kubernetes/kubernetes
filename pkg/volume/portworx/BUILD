@@ -43,6 +43,7 @@ go_library(
         "//vendor/github.com/libopenstorage/openstorage/api/client:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/api/client/volume:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/api/spec:go_default_library",
+        "//vendor/github.com/libopenstorage/openstorage/pkg/options:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/volume:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",

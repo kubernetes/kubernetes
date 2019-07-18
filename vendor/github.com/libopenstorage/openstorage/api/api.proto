@@ -95,6 +95,7 @@ enum IoProfile {
   IO_PROFILE_RANDOM= 1;
   IO_PROFILE_DB = 2;
   IO_PROFILE_DB_REMOTE = 3;
+  IO_PROFILE_CMS = 4;
 }
 
 // VolumeState represents the state of a volume.
@@ -158,7 +159,15 @@ enum AttachState {
     ATTACH_STATE_INTERNAL_SWITCH = 2;
 }
 
+enum OperationFlags {                                                           
+	OP_FLAGS_UNKNOWN = 0;
+	OP_FLAGS_NONE = 1;                                                          
+	// Perform a force_detach during detach operation
+	OP_FLAGS_DETACH_FORCE = 2;                                                  
+}
+
 // StorageResource groups properties of a storage device.
+// swagger:model
 message StorageResource {
   // Id is the LUN identifier.
   string id = 1;
@@ -206,6 +215,7 @@ message StoragePool {
 
 // VolumeLocator is a structure that is attached to a volume
 // and is used to carry opaque metadata.
+// swagger:model
 message VolumeLocator {
   // User friendly identifier
   string name = 1;
@@ -213,6 +223,9 @@ message VolumeLocator {
   map<string, string> volume_labels = 2;
 }
 
+// Source is a structure that can be given to a volume
+// to seed the volume with data.
+// swagger:model
 message Source {
   // A volume id, if specified will create a clone of the parent.
   string parent = 1;
@@ -221,12 +234,16 @@ message Source {
   string seed = 2;
 }
 
+// Group represents VolumeGroup / namespace
+// All volumes in the same group share this object.
+// swagger:model
 message Group {
   // Id common identifier across volumes that have the same group.
   string id = 1;
 }
 
 // VolumeSpec has the properties needed to create a volume.
+// swagger:model
 message VolumeSpec {
   // Ephemeral storage
   bool ephemeral = 1;
@@ -270,22 +287,31 @@ message VolumeSpec {
   bool group_enforced = 22;
   // Compressed is true if this volume is to be compressed.
   bool compressed = 23;
+  // Cascaded is true if this volume can be populated on any node from an external source.
+  bool cascaded = 24;
+  // Journal is true if data for the volume goes into the journal.
+  bool journal = 25;
+  // Nfs is true if this volume can be accessed via nfs.
+  bool nfs = 26;
 }
 
 // ReplicaSet set of machine IDs (nodes) to which part of this volume is erasure 
 // coded - for clustered storage arrays
+// swagger:model
 message ReplicaSet {
   repeated string nodes = 1;
 }
 
 // RuntimeStateMap is a list of name value mapping of driver specific runtime 
 // information.
+// swagger:model
 message RuntimeStateMap {
   map<string, string> runtime_state = 1;
 }
 
 // Volume represents an abstract storage volume.
 // Volume represents an abstract storage volume.
+// swagger:model
 message Volume {
   // Self referential volume ID.
   string id = 1;
@@ -332,6 +358,8 @@ message Volume {
   string error = 21;
 }
 
+// Stats is a structure that represents last collected stats for a volume
+// swagger:model
 message Stats {
   // Reads completed successfully
   uint64 reads = 1;
@@ -353,6 +381,9 @@ message Stats {
   uint64 interval_ms = 10;
 }
 
+
+// Alert is a structure that represents an alert object
+// swagger:model
 message Alert {
   // Id for Alert
   int64 id = 1;
@@ -376,10 +407,15 @@ message Alert {
   string unique_tag = 10;
 }
 
+// Alerts is an array of Alert objects
+// swagger:model
 message Alerts {
   repeated Alert alert = 1;
 }
 
+// VolumeCreateRequest is a structure that has the locator, source and spec
+// to create a volume
+// swagger:model
 message VolumeCreateRequest {
   // User specified volume name and labels
   VolumeLocator locator = 1;
@@ -389,10 +425,13 @@ message VolumeCreateRequest {
   VolumeSpec spec = 3;
 }
 
+// VolumeResponse is a structure that wraps an error.
+// swagger:response
 message VolumeResponse {
   string error = 1;
 }
 
+// swagger:response
 message VolumeCreateResponse {
   // ID of the newly created volume
   string id = 1;
@@ -400,6 +439,7 @@ message VolumeCreateResponse {
 }
 
 // VolumeStateAction specifies desired actions.
+// swagger:model
 message VolumeStateAction {
   // Attach or Detach volume
   VolumeActionParam attach = 1;
@@ -409,11 +449,10 @@ message VolumeStateAction {
   string mount_path = 3;
   // DevicePath Path returned in attach
   string device_path = 4;
-  // UnmountBeforeDetach is used to check whether unmount should be done before
-  // a detach
-  bool unmount_before_detach = 5;
 }
 
+// VolumeSet specifies a request to update a volume.
+// swagger:model
 message VolumeSetRequest {
   // User specified volume name and labels
   VolumeLocator locator = 1;
@@ -426,11 +465,14 @@ message VolumeSetRequest {
   map<string, string> options = 4;
 }
 
+// swagger:response
 message VolumeSetResponse {
   Volume volume = 1;
   VolumeResponse volume_response = 2;
 }
 
+// SnapCreateRequest specifies a request to create a snapshot of given volume.
+// swagger:parameters snapVolume
 message SnapCreateRequest {
   // volume id
   string id = 1;
@@ -438,10 +480,12 @@ message SnapCreateRequest {
   bool readonly = 3;
 }
 
+// swagger:response
 message SnapCreateResponse {
   VolumeCreateResponse volume_create_response = 1;
 }
 
+// swagger:model
 message VolumeInfo {
   string volume_id = 1;
   string path = 2;
@@ -452,19 +496,23 @@ message VolumeInfo {
 // specified by the ID and Parent.  // Parent may be an empty string, in which
 // case there is no parent.
 // Where the Path is the filesystem path within the layered filesystem
+// swagger:model
 message GraphDriverChanges {
   string path = 1;
   GraphDriverChangeType kind = 2;
 }
 
+// swagger:response
 message ClusterResponse {
   string error = 1;
 }
 
+// swagger:model
 message ActiveRequest {
   map<int64, string> ReqestKV = 1;
 }
 
+// swagger:model
 message ActiveRequests {
   int64 RequestCount = 1;
   repeated ActiveRequest ActiveRequest = 2;

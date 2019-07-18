@@ -32,11 +32,12 @@ func NewAuthDriverClient(host, driverName, version, authstring, accesstoken, use
 // NewDriverClient returns a new REST client of the supplied version for specified driver.
 // host: REST endpoint [http://<ip>:<port> OR unix://<path-to-unix-socket>]. default: [unix:///var/lib/osd/<driverName>.sock]
 // version: Volume API version
+// userAgent: Drivername for http connections
 func NewDriverClient(host, driverName, version, userAgent string) (*client.Client, error) {
-	if driverName == "" {
-		return nil, fmt.Errorf("Driver Name cannot be empty")
-	}
 	if host == "" {
+		if driverName == "" {
+			return nil, fmt.Errorf("Driver Name cannot be empty")
+		}
 		host = client.GetUnixServerPath(driverName, volume.DriverAPIBase)
 	}
 	if version == "" {

@@ -59,14 +59,6 @@ const (
 	LocalNode = "LocalNode"
 )
 
-// AttachOptionsKey specifies a key type from a key-value pair
-// that will be passed in to the Attach api
-type AttachOptionsKey string
-
-const (
-	AttachOptionsSecret = AttachOptionsKey("SECRET_KEY")
-)
-
 // Store defines the interface for basic volume store operations
 type Store interface {
 	// Lock volume specified by volumeID.
@@ -128,11 +120,50 @@ type StatsDriver interface {
 	GetActiveRequests() (*api.ActiveRequests, error)
 }
 
+type QuiesceDriver interface {
+	// Freezes mounted filesystem resulting in a quiesced volume state.
+	// Only one freeze operation may be active at any given time per volume.
+	// Unfreezes after timeout seconds if it is non-zero.
+	// An optional quiesceID can be passed for driver-specific use.
+	Quiesce(volumeID string, timeoutSeconds uint64, quiesceID string) error
+	// Unfreezes mounted filesystem if it was frozen.
+	Unquiesce(volumeID string) error
+}
+
+// CloudBackupDriver interface provides Cloud backup features
+type CloudBackupDriver interface {
+	// Backup uploads snapshot of a volume to cloud
+	Backup(input *api.BackupRequest) error
+	// BackupRestore downloads a cloud backup and restores it to a volume
+	BackupRestore(input *api.BackupRestoreRequest) *api.BackupRestoreResponse
+	// BackupEnumerate enumerates the backups for a given cluster/credential/volumeID
+	BackupEnumerate(input *api.BackupEnumerateRequest) *api.BackupEnumerateResponse
+	// BackupDelete deletes the backups in cloud
+	BackupDelete(input *api.BackupDeleteRequest) error
+	// BackupStatus indicates the most recent status of backup/restores
+	BackupStatus(input *api.BackupStsRequest) *api.BackupStsResponse
+	// BackupCatalogue displays listing of backup content
+	BackupCatalogue(input *api.BackupCatalogueRequest) *api.BackupCatalogueResponse
+	// History displays past backup/restore operations on a volume
+	BackupHistory(*api.BackupHistoryRequest) *api.BackupHistoryResponse
+	// ChangeBackupState allows a current backup state transisions(pause/resume/stop)
+	BackupStateChange(input *api.BackupStateChangeRequest) error
+	// BackupSchedCreate creates a schedule backup volume to cloud
+	BackupSchedCreate(input *api.BackupScheduleInfo) *api.BackupSchedResponse
+	// BackupSchedDelete delete a volume backup schedule to cloud
+	BackupSchedDelete(input *api.BackupSchedDeleteRequest) error
+	// BackupSchedEnumerate enumerates the configured backup schedules in the cluster
+	BackupSchedEnumerate() *api.BackupSchedEnumerateResponse
+}
+
 // ProtoDriver must be implemented by all volume drivers.  It specifies the
 // most basic functionality, such as creating and deleting volumes.
 type ProtoDriver interface {
 	SnapshotDriver
 	StatsDriver
+	QuiesceDriver
+	CredsDriver
+	CloudBackupDriver
 	// Name returns the name of the driver.
 	Name() string
 	// Type of this driver
@@ -145,12 +176,12 @@ type ProtoDriver interface {
 	Delete(volumeID string) error
 	// Mount volume at specified path
 	// Errors ErrEnoEnt, ErrVolDetached may be returned.
-	Mount(volumeID string, mountPath string) error
+	Mount(volumeID string, mountPath string, options map[string]string) error
 	// MountedAt return volume mounted at specified mountpath.
 	MountedAt(mountPath string) string
 	// Unmount volume at specified path
 	// Errors ErrEnoEnt, ErrVolDetached may be returned.
-	Unmount(volumeID string, mountPath string) error
+	Unmount(volumeID string, mountPath string, options map[string]string) error
 	// Update not all fields of the spec are supported, ErrNotSupported will be thrown for unsupported
 	// updates.
 	Set(volumeID string, locator *api.VolumeLocator, spec *api.VolumeSpec) error
@@ -188,7 +219,19 @@ type BlockDriver interface {
 	Attach(volumeID string, attachOptions map[string]string) (string, error)
 	// Detach device from the host.
 	// Errors ErrEnoEnt, ErrVolDetached may be returned.
-	Detach(volumeID string, unmountBeforeDetach bool) error
+	Detach(volumeID string, options map[string]string) error
+}
+
+// CredsDriver provides methods to handle credentials
+type CredsDriver interface {
+	// CredsCreate creates credential for a given cloud provider
+	CredsCreate(params map[string]string) (string, error)
+	// CredsList lists the configured credentials in the cluster
+	CredsEnumerate() (map[string]interface{}, error)
+	// CredsDelete deletes the credential associated credUUID
+	CredsDelete(credUUID string) error
+	// CredsValidate validates the credential associated credUUID
+	CredsValidate(credUUID string) error
 }
 
 // VolumeDriverProvider provides VolumeDrivers.
@@ -209,6 +252,9 @@ type VolumeDriverRegistry interface {
 
 	// Add inserts a new VolumeDriver provider with a well known name.
 	Add(name string, init func(map[string]string) (VolumeDriver, error)) error
+
+	// Removes driver from registry. Does nothing if driver name does not exist.
+	Remove(name string)
 }
 
 // NewVolumeDriverRegistry constructs a new VolumeDriverRegistry.
