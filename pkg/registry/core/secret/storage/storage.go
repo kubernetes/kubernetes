@@ -50,7 +50,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
 		AttrFunc:    secret.GetAttrs,
-		TriggerFunc: map[string]storage.TriggerPublisherFunc{"metadata.name": secret.SecretNameTriggerFunc},
+		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": secret.SecretNameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
