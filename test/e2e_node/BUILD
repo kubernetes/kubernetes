@@ -126,7 +126,6 @@ go_test(
     tags = ["e2e"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/scheduling:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",

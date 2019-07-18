@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -1133,12 +1132,12 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	}
 }
 
-// TestStaticCriticalPodsAreNotEvicted
-func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
+// TestCriticalPodsAreNotEvicted
+func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
-		{name: "critical", priority: scheduling.SystemCriticalPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "800Mi"},
+		{name: "critical", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "800Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
@@ -1148,12 +1147,11 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		podStats[pod] = podStat
 	}
 
+	// Mark the pod as critical
 	pods[0].Annotations = map[string]string{
+		kubelettypes.CriticalPodAnnotationKey:  "",
 		kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 	}
-	// Mark the pod as critical
-	podPriority := scheduling.SystemCriticalPriority
-	pods[0].Spec.Priority = &podPriority
 	pods[0].Namespace = kubeapi.NamespaceSystem
 
 	podToEvict := pods[0]
@@ -1210,6 +1208,9 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
 
+	// Enable critical pod annotation feature gate
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -1252,11 +1253,8 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		t.Errorf("Manager should not report memory pressure")
 	}
 
-	pods[0].Annotations = map[string]string{
-		kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
-	}
-	pods[0].Spec.Priority = nil
-	pods[0].Namespace = kubeapi.NamespaceSystem
+	// Disable critical pod annotation feature gate
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, false)()
 
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
