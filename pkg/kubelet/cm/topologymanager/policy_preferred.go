@@ -20,23 +20,23 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type preferredPolicy struct{}
+type bestEffortPolicy struct{}
 
-var _ Policy = &preferredPolicy{}
+var _ Policy = &bestEffortPolicy{}
 
-// PolicyPreferred policy name.
-const PolicyPreferred string = "preferred"
+// PolicyBestEffort policy name.
+const PolicyBestEffort string = "best-effort"
 
-// NewPreferredPolicy returns preferred policy.
-func NewPreferredPolicy() Policy {
-	return &preferredPolicy{}
+// NewBestEffortPolicy returns best-effort policy.
+func NewBestEffortPolicy() Policy {
+	return &bestEffortPolicy{}
 }
 
-func (p *preferredPolicy) Name() string {
-	return PolicyPreferred
+func (p *bestEffortPolicy) Name() string {
+	return PolicyBestEffort
 }
 
-func (p *preferredPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
+func (p *bestEffortPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}

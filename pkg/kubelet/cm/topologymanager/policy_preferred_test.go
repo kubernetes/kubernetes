@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestPolicyPreferredCanAdmitPodResult(t *testing.T) {
+func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		admit    bool
@@ -39,7 +39,7 @@ func TestPolicyPreferredCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewPreferredPolicy()
+		policy := NewBestEffortPolicy()
 		admit := tc.admit
 		result := policy.CanAdmitPodResult(admit)
 
