@@ -3038,7 +3038,9 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,1,opt,name=seLinuxOptions"`
-	// Windows security options.
+	// The Windows specific settings applied to all containers.
+	// If unspecified, the options within a container's SecurityContext will be used.
+	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,8,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
@@ -5333,7 +5335,9 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,3,opt,name=seLinuxOptions"`
-	// Windows security options.
+	// The Windows specific settings applied to all containers.
+	// If unspecified, the options from the PodSecurityContext will be used.
+	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,10,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
@@ -5419,6 +5423,14 @@ type WindowsSecurityContextOptions struct {
 	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpec *string `json:"gmsaCredentialSpec,omitempty" protobuf:"bytes,2,opt,name=gmsaCredentialSpec"`
+
+	// The UserName in Windows to run the entrypoint of the container process.
+	// Defaults to the user specified in image metadata if unspecified.
+	// May also be set in PodSecurityContext. If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// This field is alpha-level and it is only honored by servers that enable the WindowsRunAsUserName feature flag.
+	// +optional
+	RunAsUserName *string `json:"runAsUserName,omitempty" protobuf:"bytes,3,opt,name=runAsUserName"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

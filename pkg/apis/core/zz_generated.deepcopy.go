@@ -5523,6 +5523,11 @@ func (in *WindowsSecurityContextOptions) DeepCopyInto(out *WindowsSecurityContex
 		*out = new(string)
 		**out = **in
 	}
+	if in.RunAsUserName != nil {
+		in, out := &in.RunAsUserName, &out.RunAsUserName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

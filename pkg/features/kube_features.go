@@ -408,6 +408,12 @@ const (
 	// Enables GMSA support for Windows workloads.
 	WindowsGMSA featuregate.Feature = "WindowsGMSA"
 
+	// owner: @bclau
+	// alpha: v1.16
+	//
+	// Enables support for running container entrypoints as different usernames than their default ones.
+	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
+
 	// owner: @adisky
 	// alpha: v1.14
 	//
@@ -526,6 +532,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TTLAfterFinished:                    {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                 {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                         {Default: false, PreRelease: featuregate.Alpha},
+	WindowsRunAsUserName:                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerFinalizer:        {Default: false, PreRelease: featuregate.Alpha},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
