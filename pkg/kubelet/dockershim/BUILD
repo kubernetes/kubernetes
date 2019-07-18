@@ -57,6 +57,7 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/util/orderedmap:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -73,7 +74,6 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/strslice:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/go-connections/nat:go_default_library",
-        "//vendor/github.com/wk8/go-ordered-map:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({

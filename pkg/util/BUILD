@@ -38,6 +38,7 @@ filegroup(
         "//pkg/util/node:all-srcs",
         "//pkg/util/normalizer:all-srcs",
         "//pkg/util/oom:all-srcs",
+        "//pkg/util/orderedmap:all-srcs",
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/pod:all-srcs",
         "//pkg/util/procfs:all-srcs",
