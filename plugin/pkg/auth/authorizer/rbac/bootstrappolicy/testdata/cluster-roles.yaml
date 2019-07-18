@@ -310,8 +310,8 @@ items:
     - daemonsets
     - daemonsets/status
     - deployments
-    - deployments/status
     - deployments/scale
+    - deployments/status
     - ingresses
     - ingresses/status
     - networkpolicies
