@@ -232,7 +232,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			description:                "invalid policy name",
 			cpuPolicyName:              "invalid",
 			nodeAllocatableReservation: nil,
-			expectedPolicy:             "none",
+			expectedError:              fmt.Errorf("unknown policy: \"invalid\""),
 		},
 		{
 			description:                "static policy",
