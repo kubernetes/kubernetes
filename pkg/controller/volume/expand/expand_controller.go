@@ -95,6 +95,7 @@ type expandController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewExpandController expands the pvs
 func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
