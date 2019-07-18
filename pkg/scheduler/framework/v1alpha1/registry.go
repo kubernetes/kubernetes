@@ -49,19 +49,3 @@ func (r Registry) Unregister(name string) error {
 	delete(r, name)
 	return nil
 }
-
-// NewRegistry builds a default registry with all the default plugins.
-// This is the registry that Kubernetes default scheduler uses. A scheduler that
-// runs custom plugins, can pass a different Registry and when initializing the
-// scheduler.
-func NewRegistry() Registry {
-	return Registry{
-		// FactoryMap:
-		// New plugins are registered here.
-		// example:
-		// {
-		//  stateful_plugin.Name: stateful.NewStatefulMultipointExample,
-		//  fooplugin.Name: fooplugin.New,
-		// }
-	}
-}

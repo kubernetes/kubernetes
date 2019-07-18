@@ -1,3 +1,5 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -14,4 +16,12 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["register.go"],
+    importpath = "k8s.io/kubernetes/pkg/scheduler/framework",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/scheduler/framework/v1alpha1:go_default_library"],
 )

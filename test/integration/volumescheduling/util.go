@@ -39,7 +39,8 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	schedulerframeworkv1alpha1 "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	// Install "DefaultProvider" algorithprovider
@@ -159,7 +160,7 @@ func createConfiguratorArgsWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
-	pluginRegistry schedulerframework.Registry,
+	pluginRegistry schedulerframeworkv1alpha1.Registry,
 	plugins *schedulerconfig.Plugins,
 	pluginConfig []schedulerconfig.PluginConfig,
 	stopCh <-chan struct{},

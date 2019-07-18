@@ -45,7 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	frameworkv1alpha1 "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -57,8 +58,8 @@ import (
 	"k8s.io/klog"
 )
 
-// Option configures a framework.Registry.
-type Option func(framework.Registry) error
+// Option configures a frameworkv1alpha1.Registry.
+type Option func(frameworkv1alpha1.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
@@ -337,8 +338,8 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 }
 
 // WithPlugin creates an Option based on plugin name and factory.
-func WithPlugin(name string, factory framework.PluginFactory) Option {
-	return func(registry framework.Registry) error {
+func WithPlugin(name string, factory frameworkv1alpha1.PluginFactory) Option {
+	return func(registry frameworkv1alpha1.Registry) error {
 		return registry.Register(name, factory)
 	}
 }
