@@ -19,10 +19,15 @@ package gcp
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -114,7 +119,11 @@ type gcpAuthProvider struct {
 }
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	ts, err := tokenSource(isCmdTokenSource(gcpConfig), gcpConfig)
+	tknType, err := tokenSourceType(gcpConfig)
+	if err != nil {
+		return nil, err
+	}
+	ts, err := tokenSource(tknType, gcpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -125,18 +134,51 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 	return &gcpAuthProvider{cts, persister}, nil
 }
 
-func isCmdTokenSource(gcpConfig map[string]string) bool {
-	_, ok := gcpConfig["cmd-path"]
-	return ok
+func tokenSourceType(gcpConfig map[string]string) (string, error) {
+	var types []string
+	if _, ok := gcpConfig[TokenFromCmd]; ok {
+		types = append(types, TokenFromCmd)
+	}
+	if _, ok := gcpConfig[TokenFromString]; ok {
+		types = append(types, TokenFromString)
+	}
+	if _, ok := gcpConfig[TokenFromEnvPath]; ok {
+		types = append(types, TokenFromEnvPath)
+	}
+	if _, ok := gcpConfig[TokenFromEnvString]; ok {
+		types = append(types, TokenFromEnvString)
+	}
+	if len(types) > 1 {
+		return "", errors.New("more than a single auth token types provided")
+	}
+	if len(types) == 1 {
+		return types[0], nil
+	}
+	return "", nil
 }
 
-func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, error) {
-	// Command-based token source
-	if isCmd {
-		cmd := gcpConfig["cmd-path"]
-		if len(cmd) == 0 {
-			return nil, fmt.Errorf("missing access token cmd")
-		}
+const (
+	// TokenFromCmd runs a command to get the token.
+	TokenFromCmd = "cmd-path"
+	// TokenFromString contains the token string.
+	TokenFromString = "string"
+	// TokenFromPath points to a file containing the token.
+	TokenFromPath = "path"
+	// TokenFromEnvPath is an env which points to a file that contains the token.
+	TokenFromEnvPath = "env-path"
+	// TokenFromEnvString is an env which contains the token string.
+	TokenFromEnvString = "env-string"
+)
+
+func tokenSource(tknType string, gcpConfig map[string]string) (oauth2.TokenSource, error) {
+	tknSrc := gcpConfig[tknType]
+	if tknType != "" && tknSrc == "" {
+		return nil, fmt.Errorf("missing access token string")
+	}
+	scopes := parseScopes(gcpConfig)
+
+	switch tknType {
+	case TokenFromCmd:
 		if gcpConfig["scopes"] != "" {
 			return nil, fmt.Errorf("scopes can only be used when kubectl is using a gcp service account key")
 		}
@@ -144,15 +186,23 @@ func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, e
 		if cmdArgs, ok := gcpConfig["cmd-args"]; ok {
 			args = strings.Fields(cmdArgs)
 		} else {
-			fields := strings.Fields(cmd)
-			cmd = fields[0]
+			fields := strings.Fields(tknSrc)
+			tknSrc = fields[0]
 			args = fields[1:]
 		}
-		return newCmdTokenSource(cmd, args, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"]), nil
+		return newCmdTokenSource(tknSrc, args, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"]), nil
+	case TokenFromString:
+		return newStrTokenSource(tknSrc, scopes)
+	case TokenFromPath:
+		return newPathTokenSource(tknSrc, scopes)
+	case TokenFromEnvPath:
+		return newENVPathTokenSource(tknSrc, scopes)
+	case TokenFromEnvString:
+		return newENVStringTokenSource(tknSrc, scopes)
 	}
 
-	// Google Application Credentials-based token source
-	scopes := parseScopes(gcpConfig)
+	// When everything else failed try to use the default
+	// Google Application Credentials-based token source.
 	ts, err := google.DefaultTokenSource(context.Background(), scopes...)
 	if err != nil {
 		return nil, fmt.Errorf("cannot construct google default token source: %v", err)
@@ -266,6 +316,45 @@ func (t *cachedTokenSource) baseCache() map[string]string {
 	return ret
 }
 
+type stringTokenSource struct {
+	tk oauth2.TokenSource
+}
+
+func (c *stringTokenSource) Token() (*oauth2.Token, error) {
+	return c.tk.Token()
+}
+
+func newStrTokenSource(tkn string, scopes []string) (*stringTokenSource, error) {
+	tkn, err := decodeBase64String(tkn)
+	if err != nil {
+		return nil, fmt.Errorf("decoding the token string: %v", err)
+
+	}
+	ts, err := google.CredentialsFromJSON(context.Background(), []byte(tkn), scopes...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot construct google default token source: %v", err)
+	}
+	return &stringTokenSource{tk: ts.TokenSource}, nil
+}
+
+func newPathTokenSource(tkn string, scopes []string) (*stringTokenSource, error) {
+	content, err := ioutil.ReadFile(tkn)
+	if err != nil {
+		return nil, fmt.Errorf("reading the token file: %v", err)
+	}
+	return newStrTokenSource(string(content), scopes)
+}
+
+func newENVPathTokenSource(tkn string, scopes []string) (*stringTokenSource, error) {
+	tkn = os.Getenv(tkn)
+	return newPathTokenSource(tkn, scopes)
+}
+
+func newENVStringTokenSource(tkn string, scopes []string) (*stringTokenSource, error) {
+	tkn = os.Getenv(tkn)
+	return newStrTokenSource(tkn, scopes)
+}
+
 type commandTokenSource struct {
 	cmd       string
 	args      []string
@@ -351,6 +440,24 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// decodeBase64String checks if a stirng is base64 encoded and
+// returns the decoded value.
+func decodeBase64String(str string) (string, error) {
+	// Check is string is base64 encoded.
+	encoded, err := regexp.MatchString("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$", str)
+	if err != nil {
+		return "", err
+	}
+	if encoded {
+		t, err := base64.StdEncoding.DecodeString(str)
+		if err != nil {
+			return "nil", err
+		}
+		str = string(t)
+	}
+	return str, nil
 }
 
 type conditionalTransport struct {
