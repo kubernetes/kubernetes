@@ -31,6 +31,6 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultStatefulSetControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.StatefulSetControllerConfiguration) {
 	if obj.ConcurrentStatefulSetSyncs == 0 {
-		obj.ConcurrentStatefulSetSyncs = 1
+		obj.ConcurrentStatefulSetSyncs = 5
 	}
 }
