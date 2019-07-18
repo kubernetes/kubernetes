@@ -1,9 +1,16 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.15.0](#v1150)
-  - [Downloads for v1.15.0](#downloads-for-v1150)
+- [v1.15.1](#v1151)
+  - [Downloads for v1.15.1](#downloads-for-v1151)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
+  - [Changelog since v1.15.0](#changelog-since-v1150)
+    - [Other notable changes](#other-notable-changes)
+- [v1.15.0](#v1150)
+  - [Downloads for v1.15.0](#downloads-for-v1150)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
+    - [Node Binaries](#node-binaries-1)
 - [Kubernetes v1.15 Release Notes](#kubernetes-v115-release-notes)
   - [1.15 What’s New](#115-whats-new)
       - [Continuous Improvement](#continuous-improvement)
@@ -40,7 +47,7 @@
     - [CLI Improvements](#cli-improvements)
     - [Misc](#misc)
   - [API Changes](#api-changes)
-  - [Other notable changes](#other-notable-changes)
+  - [Other notable changes](#other-notable-changes-1)
     - [API Machinery](#api-machinery-1)
     - [Apps](#apps-1)
     - [Auth](#auth-1)
@@ -65,52 +72,120 @@
     - [Unchanged](#unchanged)
 - [v1.15.0-rc.1](#v1150-rc1)
   - [Downloads for v1.15.0-rc.1](#downloads-for-v1150-rc1)
-    - [Client Binaries](#client-binaries-1)
-    - [Server Binaries](#server-binaries-1)
-    - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.15.0-beta.2](#changelog-since-v1150-beta2)
-    - [Other notable changes](#other-notable-changes-1)
-- [v1.15.0-beta.2](#v1150-beta2)
-  - [Downloads for v1.15.0-beta.2](#downloads-for-v1150-beta2)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.15.0-beta.1](#changelog-since-v1150-beta1)
-    - [Action Required](#action-required)
+  - [Changelog since v1.15.0-beta.2](#changelog-since-v1150-beta2)
     - [Other notable changes](#other-notable-changes-2)
-- [v1.15.0-beta.1](#v1150-beta1)
-  - [Downloads for v1.15.0-beta.1](#downloads-for-v1150-beta1)
+- [v1.15.0-beta.2](#v1150-beta2)
+  - [Downloads for v1.15.0-beta.2](#downloads-for-v1150-beta2)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
-  - [Changelog since v1.15.0-alpha.3](#changelog-since-v1150-alpha3)
-    - [Action Required](#action-required-1)
+  - [Changelog since v1.15.0-beta.1](#changelog-since-v1150-beta1)
+    - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes-3)
-- [v1.15.0-alpha.3](#v1150-alpha3)
-  - [Downloads for v1.15.0-alpha.3](#downloads-for-v1150-alpha3)
+- [v1.15.0-beta.1](#v1150-beta1)
+  - [Downloads for v1.15.0-beta.1](#downloads-for-v1150-beta1)
     - [Client Binaries](#client-binaries-4)
     - [Server Binaries](#server-binaries-4)
     - [Node Binaries](#node-binaries-4)
-  - [Changelog since v1.15.0-alpha.2](#changelog-since-v1150-alpha2)
+  - [Changelog since v1.15.0-alpha.3](#changelog-since-v1150-alpha3)
+    - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-4)
-- [v1.15.0-alpha.2](#v1150-alpha2)
-  - [Downloads for v1.15.0-alpha.2](#downloads-for-v1150-alpha2)
+- [v1.15.0-alpha.3](#v1150-alpha3)
+  - [Downloads for v1.15.0-alpha.3](#downloads-for-v1150-alpha3)
     - [Client Binaries](#client-binaries-5)
     - [Server Binaries](#server-binaries-5)
     - [Node Binaries](#node-binaries-5)
-  - [Changelog since v1.15.0-alpha.1](#changelog-since-v1150-alpha1)
+  - [Changelog since v1.15.0-alpha.2](#changelog-since-v1150-alpha2)
     - [Other notable changes](#other-notable-changes-5)
-- [v1.15.0-alpha.1](#v1150-alpha1)
-  - [Downloads for v1.15.0-alpha.1](#downloads-for-v1150-alpha1)
+- [v1.15.0-alpha.2](#v1150-alpha2)
+  - [Downloads for v1.15.0-alpha.2](#downloads-for-v1150-alpha2)
     - [Client Binaries](#client-binaries-6)
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
+  - [Changelog since v1.15.0-alpha.1](#changelog-since-v1150-alpha1)
+    - [Other notable changes](#other-notable-changes-6)
+- [v1.15.0-alpha.1](#v1150-alpha1)
+  - [Downloads for v1.15.0-alpha.1](#downloads-for-v1150-alpha1)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
+    - [Node Binaries](#node-binaries-7)
   - [Changelog since v1.14.0](#changelog-since-v1140)
     - [Action Required](#action-required-2)
-    - [Other notable changes](#other-notable-changes-6)
+    - [Other notable changes](#other-notable-changes-7)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.15.1
+
+[Documentation](https://docs.k8s.io)
+
+## Downloads for v1.15.1
+
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes.tar.gz) | `75cdef9f2e7e246a7833b454282858574bea37aea207d967599f49777e2998c49bf04e6c314b83b0debbbbaf50abd724cbb621ca7b909ede720305ae701c4e89`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-src.tar.gz) | `52ead4397b3fbcaca927e82ed70bc8a7dae2ce806c60499618a415ca6f697db61e5101a8deafa77dfb80e26e80276ca584c463f53c18436646f33f618a816dc0`
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-darwin-386.tar.gz) | `d331d981b3cce9cd60a43f6a30482b4d7178f07d940b9a0644b3651bb2516ada6e940dee021fce5061c81546cab6134f582ddc2f7f238fba24bb3e0509b7043b`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-darwin-amd64.tar.gz) | `64740289806c40337c019605697e667b16120b44459ce13fb7f8c2db754e5ef61de6a34a418789afbd56a1ae4a7646cb38dc4ec20958632dd177f4bbaf0817d8`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-linux-386.tar.gz) | `2ebc06c0c63ee4c0ef4bf30661fb639979cd81374e907ce8c2289303d874680343d69d0ec1b6f2706c82bb27349388a3d5be53f8d21965fadb4bccc0ed567798`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-linux-amd64.tar.gz) | `b1830b66e69b96ca092da19adb97cc61b8af70b4d512c7ba8a3ec64c7f41d8db6bf225c63f408d70d42eecfca9f8868141674aecb00268cec5baa72bb7a9a217`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-linux-arm.tar.gz) | `4d16fc26fd980c95f29cdc6b7b7a05c92e7ce2347aa06871c35b856b74d5000a7495223843c1bbe785bddd5cb0cbf7e4fa1cf5bfd8abc7669dbe12f82b3b36b9`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-linux-arm64.tar.gz) | `fa1e5355768d4dcd7c2dcf6364e31b8ba5b9dd9b9f67eca04a8f60f334ab82aba327e828892dab89f7cea00f3531b47222abf34b9204672ad592ba81ef62a5e2`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-linux-ppc64le.tar.gz) | `4a60ebd26393fa0d404e51fa6cfdc79e1d141bbada74578ff68f5426b770981700a6d1d64be0e063817d2de6502088c0c9c4dadcf58b067015b71ba48e1a255f`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-linux-s390x.tar.gz) | `b50dd9f013c028395f21d487f8157a2093c13b178ade5751fd3afed745ba0280ffcc620834e68579e07d2a3ff5ef1ba7435575be2a18ff14cb91cf056f2cb4f0`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-windows-386.tar.gz) | `83838859a420d4eb6fdebcf8c10e2e2162cb51088cd6e735ea692abc8642992d87d3693a9bab7f517f91f73c302ed8b66e5c4056749430fbdb1ed3b16038871d`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-client-windows-amd64.tar.gz) | `50b2aff80ecee3a01a76345b90ef9e8c13002ae0ebd51289d80af654954a64f989cd254829fa12f5be954f2a48d1f4226ed36d9c548ddb3e9838b08193ec8abe`
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-server-linux-amd64.tar.gz) | `5080c5f955c27b678b173af0f34b1dcac00437b7b93f368fd7315a1e61eb35eaee8df7da6af92f205a89a1c48825a98470c8fd3210a539c35cc81c9740a48781`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-server-linux-arm.tar.gz) | `e1983d3dd28d915d2d2bc232f1205d8b1ffe1c6afd7be6f488eaab121df31e922c332ee3fa618b745cb0130997e293d8e9d14d88eaae74b97c0de69a9b26c72b`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-server-linux-arm64.tar.gz) | `d59bbab5acadd6918341b37f1edbaadb4745d960b0a81e817a87f6aadaa1bd721f9774186b5475ab16047a52fe3324e1df6f3e2c2c3a68e04d9b7ca30b68e97e`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-server-linux-ppc64le.tar.gz) | `6be4abc81ab762fbe3872b598b654bb5d8d14c4f47746c939543aa63d5ca39e054ff017f58ec9ba4ba2fbc56cb5d757da30d9f09b1ae7a780c6def6daeba5594`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-server-linux-s390x.tar.gz) | `67ae29519a5864bff4afbd7000a603db1571b14af82dad041808384ea3d0f6fde7f6fda6c6d27dff9f45c006935232b76d4161c12c22b3bf47448cc0354a95b7`
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-node-linux-amd64.tar.gz) | `e29961aa6519d0bb6d2e41ba599abde1f0a19736a5fcce939e236cba91e70b07c95f7df8ffeb46207e6c898f6439e43d11293715cabcc082e979c874ac48d557`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-node-linux-arm.tar.gz) | `4e74ff45c833b762dcf3495349ae91ad77939df685f5bd4b47ff21c7aa1751d80e88652165c3acb12b842ae1277242f84f05fa77e350397de64894b158cf38eb`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-node-linux-arm64.tar.gz) | `86bd8ce2ef600b8fd2d7ae2cf5f6128d66fb1409a0d9df6698e2fbfb12eb2eff985eede340032624965166cdcdc1335c2462c274a555c509a54c58e30034db38`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-node-linux-ppc64le.tar.gz) | `fb1f00a87d39aad6cb44cd5ae334217cb57eb68d8003844ecc6cd043826f3c85f3baabb765f03114df686b421006bc88c75bd8b540f75eaa1328d066b7189f5a`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-node-linux-s390x.tar.gz) | `b333913b7736ba367dac8dcd95673f71820f198442adddff5a4454dc0e3996d60ebce8d64016398948a41cb436c06afdb55fb8e4b27d9418ab1450c581f6fd3d`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.15.1/kubernetes-node-windows-amd64.tar.gz) | `d064ae274f10cda36a70d332623f7f7c464b0f161d9954e66dd9892f95c590f519afd54fee0dbebdee1661cc642fea86fcf2a9222f6b22a2d0e4e4104f403b5b`
+
+## Changelog since v1.15.0
+
+### Other notable changes
+
+* kubeadm: implement support for concurrent add/remove of stacked etcd members ([#79677](https://github.com/kubernetes/kubernetes/pull/79677), [@neolit123](https://github.com/neolit123))
+* Fixes a bug in openapi published for custom resources using x-kubernetes-preserve-unknown-fields extensions, so that kubectl will allow sending unknown fields for that portion of the object. ([#79636](https://github.com/kubernetes/kubernetes/pull/79636), [@liggitt](https://github.com/liggitt))
+* Resolves an issue serving aggregated APIs backed by services that respond to requests to `/` with non-2xx HTTP responses ([#79895](https://github.com/kubernetes/kubernetes/pull/79895), [@deads2k](https://github.com/deads2k))
+* changes timeout value in csi plugin from 15s to 2min which fixes the timeout issue ([#79529](https://github.com/kubernetes/kubernetes/pull/79529), [@andyzhangx](https://github.com/andyzhangx))
+* kubeadm: fix the bug that "--cri-socket" flag does not work for `kubeadm reset` ([#79498](https://github.com/kubernetes/kubernetes/pull/79498), [@SataQiu](https://github.com/SataQiu))
+* fix kubelet fail to delete orphaned pod directory when the kubelet's pods directory (default is "/var/lib/kubelet/pods") symbolically links to another disk device's directory ([#79094](https://github.com/kubernetes/kubernetes/pull/79094), [@gaorong](https://github.com/gaorong))
+* Fix possible fd leak and closing of dirs in doSafeMakeDir  ([#79534](https://github.com/kubernetes/kubernetes/pull/79534), [@odinuge](https://github.com/odinuge))
+* Default resourceGroup should be used when the value of annotation azure-load-balancer-resource-group is an empty string. ([#79514](https://github.com/kubernetes/kubernetes/pull/79514), [@feiskyer](https://github.com/feiskyer))
+* The CRD handler now properly re-creates stale CR storage to reflect CRD update. ([#79114](https://github.com/kubernetes/kubernetes/pull/79114), [@roycaihw](https://github.com/roycaihw))
+* fix pod stuck issue due to corrupt mnt point in flexvol plugin, call Unmount if PathExists returns any error ([#75234](https://github.com/kubernetes/kubernetes/pull/75234), [@andyzhangx](https://github.com/andyzhangx))
+* Fix a bug where kubelet would not retry pod sandbox creation when the restart policy of the pod is Never ([#79451](https://github.com/kubernetes/kubernetes/pull/79451), [@yujuhong](https://github.com/yujuhong))
+* Remove pids cgroup controller requirement when related feature gates are disabled ([#79073](https://github.com/kubernetes/kubernetes/pull/79073), [@rafatio](https://github.com/rafatio))
+* Fix remove the etcd member from the cluster during a kubeadm reset. ([#79326](https://github.com/kubernetes/kubernetes/pull/79326), [@bradbeam](https://github.com/bradbeam))
+
 
 
 # v1.15.0
@@ -467,7 +542,6 @@ Configure each cluster with a different cluster name using `kube-controller-mana
 - Fixed a bug in apiserver storage that could cause just-added finalizers to be ignored immediately following a delete request, leading to premature deletion. ([#77619](https://github.com/kubernetes/kubernetes/pull/77619), [@caesarxuchao](https://github.com/caesarxuchao))
 - API requests rejected by admission webhooks which specify an http status code < 400 are now assigned a 400 status code. ([#77022](https://github.com/kubernetes/kubernetes/pull/77022), [@liggitt](https://github.com/liggitt))
 - Fixed a transient error API requests for custom resources could encounter while changes to the CustomResourceDefinition were being applied. ([#77816](https://github.com/kubernetes/kubernetes/pull/77816), [@liggitt](https://github.com/liggitt))
-[@smarterclayton](https://github.com/smarterclayton))
 - Added name validation for dynamic client methods in client-go ([#75072](https://github.com/kubernetes/kubernetes/pull/75072), [@lblackstone](https://github.com/lblackstone))
 - CustomResourceDefinition with invalid regular expression in the pattern field of OpenAPI v3 validation schemas are no longer considered structural. ([#78453](https://github.com/kubernetes/kubernetes/pull/78453), [@sttts](https://github.com/sttts))
 - API paging is now enabled by default in k8s.io/apiserver recommended options, and in k8s.io/sample-apiserver ([#77278](https://github.com/kubernetes/kubernetes/pull/77278), [@liggitt](https://github.com/liggitt))
@@ -839,38 +913,9 @@ filename | sha512 hash
 
 ### Action Required
 
-* ACTION REQUIRED  The deprecated flag --conntrack-max has been removed from kube-proxy. Users of this flag should switch to --conntrack-min and --conntrack-max-per-core instead. ([#78399](https://github.com/kubernetes/kubernetes/pull/78399), [@rikatz](https://github.com/rikatz))
+* ACTION REQUIRED: The deprecated flag --conntrack-max has been removed from kube-proxy. Users of this flag should switch to --conntrack-min and --conntrack-max-per-core instead. ([#78399](https://github.com/kubernetes/kubernetes/pull/78399), [@rikatz](https://github.com/rikatz))
 * ACTION REQUIRED: kubeadm: the mixture of "--config" and "--certificate-key" is no longer allowed. The InitConfiguration and JoinConfiguration objects now support the "certificateKey" field and this field should be used instead of the command line argument in case a configuration file is already passed. ([#78542](https://github.com/kubernetes/kubernetes/pull/78542), [@neolit123](https://github.com/neolit123))
-* Azure cloud provider could now be configured by Kubernetes secrets and a new option `cloudConfigType` is introduced, whose candicate values are `file`, `secret` and `merge` (default is `merge`). ([#78242](https://github.com/kubernetes/kubernetes/pull/78242), [@feiskyer](https://github.com/feiskyer))
-    * action required:
-    * Since Azure cloud provider would read Kubernetes secrets, the following RBAC should be configured:
-    *     ---
-    *     apiVersion: rbac.authorization.k8s.io/v1beta1
-    *     kind: ClusterRole
-    *     metadata:
-    *     labels:
-    *         kubernetes.io/cluster-service: "true"
-    *     name: system:azure-cloud-provider-secret-getter
-    *     rules:
-    *     - apiGroups: [""]
-    *     resources: ["secrets"]
-    *     verbs:
-    *     - get
-    *     ---
-    *     apiVersion: rbac.authorization.k8s.io/v1beta1
-    *     kind: ClusterRoleBinding
-    *     metadata:
-    *     labels:
-    *         kubernetes.io/cluster-service: "true"
-    *     name: system:azure-cloud-provider-secret-getter
-    *     roleRef:
-    *     apiGroup: rbac.authorization.k8s.io
-    *     kind: ClusterRole
-    *     name: system:azure-cloud-provider-secret-getter
-    *     subjects:
-    *     - kind: ServiceAccount
-    *     name: azure-cloud-provider
-    *     namespace: kube-system
+* ACTION REQUIRED: Azure cloud provider could now be configured by Kubernetes secrets and a new option `cloudConfigType` is introduced, whose candidate values are `file`, `secret` and `merge` (default is `merge`). Note that the secret is a serialized version of azure.json file with key cloud-config. And the secret name is azure-cloud-provider in kube-system namespace. To allow Azure cloud provider read this secret, the RBAC permission referred [here](https://github.com/kubernetes/kubernetes/pull/78242) should also be assigned to service account `kube-system:azure-cloud-provider`.([#78242](https://github.com/kubernetes/kubernetes/pull/78242), [@feiskyer](https://github.com/feiskyer))
 
 ### Other notable changes
 
@@ -1026,9 +1071,9 @@ filename | sha512 hash
 * Add configuration options for the scheduling framework and its plugins. ([#77501](https://github.com/kubernetes/kubernetes/pull/77501), [@JieJhih](https://github.com/JieJhih))
 * Publish DeleteOptions parameters for deletecollection endpoints in OpenAPI spec ([#77843](https://github.com/kubernetes/kubernetes/pull/77843), [@roycaihw](https://github.com/roycaihw))
 * CoreDNS is now version 1.5.0 ([#78030](https://github.com/kubernetes/kubernetes/pull/78030), [@rajansandeep](https://github.com/rajansandeep))
-    *     - A `ready` plugin has been included to report pod readiness
-    *     - The `proxy` plugin has been deprecated. The `forward` plugin is to be used instead.
-    *     - CoreDNS fixes the logging now that kubernetes’ client lib switched to klog from glog.
+    * A `ready` plugin has been included to report pod readiness
+    * The `proxy` plugin has been deprecated. The `forward` plugin is to be used instead.
+    * CoreDNS fixes the logging now that kubernetes’ client lib switched to klog from glog.
 * Upgrade Azure network API version to 2018-07-01, so that EnableTcpReset could be enabled on Azure standard loadbalancer (SLB). ([#78012](https://github.com/kubernetes/kubernetes/pull/78012), [@feiskyer](https://github.com/feiskyer))
 * Fixed a scheduler racing issue to ensure low priority pods to be unschedulable on the node(s) where high priority pods have `NominatedNodeName` set to the node(s).  ([#77990](https://github.com/kubernetes/kubernetes/pull/77990), [@Huang-Wei](https://github.com/Huang-Wei))
 * Support starting Kubernetes on GCE using containerd in COS and Ubuntu with `KUBE_CONTAINER_RUNTIME=containerd`. ([#77889](https://github.com/kubernetes/kubernetes/pull/77889), [@Random-Liu](https://github.com/Random-Liu))
@@ -1087,9 +1132,7 @@ filename | sha512 hash
 * If a pod has a running instance, the stats of its previously terminated instances will not show up in the kubelet summary stats any more for CRI runtimes like containerd and cri-o. ([#77426](https://github.com/kubernetes/kubernetes/pull/77426), [@Random-Liu](https://github.com/Random-Liu))
     * This keeps the behavior consistent with Docker integration, and fixes an issue that some container Prometheus metrics don't work when there are summary stats for multiple instances of the same pod.
 * Limit use of tags when calling EC2 API to prevent API throttling for very large clusters ([#76749](https://github.com/kubernetes/kubernetes/pull/76749), [@mcrute](https://github.com/mcrute))
-* When specifying an invalid value for a label, it was not always ([#77144](https://github.com/kubernetes/kubernetes/pull/77144), [@kenegozi](https://github.com/kenegozi))
-    * clear which label the value was specified for. Starting with this release, the
-    * label's key is included in such error messages, which makes debugging easier.
+* When specifying an invalid value for a label, it was not always clear which label the value was specified for. Starting with this release, the label's key is included in such error messages, which makes debugging easier. ([#77144](https://github.com/kubernetes/kubernetes/pull/77144), [@kenegozi](https://github.com/kenegozi))
 
 
 
@@ -1151,7 +1194,7 @@ filename | sha512 hash
 * kubeadm: kubeadm alpha certs renew and kubeadm upgrade now supports renews of certificates embedded in KubeConfig files managed by kubeadm; this does not apply to certificates signed by external CAs.  ([#77180](https://github.com/kubernetes/kubernetes/pull/77180), [@fabriziopandini](https://github.com/fabriziopandini))
 * As of Kubernetes 1.15, the SupportNodePidsLimit feature introduced as alpha in Kubernetes 1.14 is now beta, and the ability to utilize it is enabled by default.  It is no longer necessary to set the feature gate `SupportNodePidsLimit=true`.  In all other respects, this functionality behaves as it did in Kubernetes 1.14. ([#76221](https://github.com/kubernetes/kubernetes/pull/76221), [@RobertKrawitz](https://github.com/RobertKrawitz))
 * Bump addon-manager to v9.0.1 ([#77282](https://github.com/kubernetes/kubernetes/pull/77282), [@MrHohn](https://github.com/MrHohn))
-    * - Rebase image on debian-base:v1.0.0
+    * Rebase image on debian-base:v1.0.0
 * Fix kubectl describe CronJobs error of `Successful Job History Limit`. ([#77347](https://github.com/kubernetes/kubernetes/pull/77347), [@danielqsj](https://github.com/danielqsj))
 * Remove extra pod creation expections when daemonset fails to create pods in batches. ([#74856](https://github.com/kubernetes/kubernetes/pull/74856), [@draveness](https://github.com/draveness))
 * enhance the daemonset sync logic in clock-skew scenario ([#77208](https://github.com/kubernetes/kubernetes/pull/77208), [@DaiHao](https://github.com/DaiHao))
@@ -1244,10 +1287,7 @@ filename | sha512 hash
     * kubeadm still generates RSA keys when deploying a node, but also accepts ECDSA
     * keys if they exist already in the directory specified in --cert-dir option.
 * kube-proxy: HealthzBindAddress and MetricsBindAddress support ipv6 address. ([#76320](https://github.com/kubernetes/kubernetes/pull/76320), [@JieJhih](https://github.com/JieJhih))
-* Packets considered INVALID by conntrack are now dropped. In particular, this fixes ([#74840](https://github.com/kubernetes/kubernetes/pull/74840), [@anfernee](https://github.com/anfernee))
-    * a problem where spurious retransmits in a long-running TCP connection to a service
-    * IP could result in the connection being closed with the error "Connection reset by
-    * peer"
+* Packets considered INVALID by conntrack are now dropped. In particular, this fixes a problem where spurious retransmits in a long-running TCP connection to a service IP could result in the connection being closed with the error "Connection reset by peer" ([#74840](https://github.com/kubernetes/kubernetes/pull/74840), [@anfernee](https://github.com/anfernee))
 * Introduce the v1beta2 config format to kubeadm. ([#76710](https://github.com/kubernetes/kubernetes/pull/76710), [@rosti](https://github.com/rosti))
 * kubeadm: bump the minimum supported Docker version to 1.13.1 ([#77051](https://github.com/kubernetes/kubernetes/pull/77051), [@chenzhiwei](https://github.com/chenzhiwei))
 * Rancher credential provider has now been removed ([#77099](https://github.com/kubernetes/kubernetes/pull/77099), [@dims](https://github.com/dims))
@@ -1360,10 +1400,10 @@ filename | sha512 hash
 * 2X performance improvement on both required and preferred PodAffinity. ([#76243](https://github.com/kubernetes/kubernetes/pull/76243), [@Huang-Wei](https://github.com/Huang-Wei))
 * scheduler: add metrics to record number of pending pods in different queues ([#75501](https://github.com/kubernetes/kubernetes/pull/75501), [@Huang-Wei](https://github.com/Huang-Wei))
 * Create a new `kubectl rollout restart` command that does a rolling restart of a deployment. ([#76062](https://github.com/kubernetes/kubernetes/pull/76062), [@apelisse](https://github.com/apelisse))
-* - Added port configuration to Admission webhook configuration service reference. ([#74855](https://github.com/kubernetes/kubernetes/pull/74855), [@mbohlool](https://github.com/mbohlool))
-    * - Added port configuration to AuditSink webhook configuration service reference.
-    * - Added port configuration to CRD Conversion webhook configuration service reference.
-    * - Added port configuration to kube-aggregator service reference.
+* Added port configuration to Admission webhook configuration service reference. ([#74855](https://github.com/kubernetes/kubernetes/pull/74855), [@mbohlool](https://github.com/mbohlool))
+    * Added port configuration to AuditSink webhook configuration service reference.
+    * Added port configuration to CRD Conversion webhook configuration service reference.
+    * Added port configuration to kube-aggregator service reference.
 * `kubectl get -w` now prints custom resource definitions with custom print columns ([#76161](https://github.com/kubernetes/kubernetes/pull/76161), [@liggitt](https://github.com/liggitt))
 * Fixes bug in DaemonSetController causing it to stop processing some DaemonSets for 5 minutes after node removal. ([#76060](https://github.com/kubernetes/kubernetes/pull/76060), [@krzysztof-jastrzebski](https://github.com/krzysztof-jastrzebski))
 * no ([#75820](https://github.com/kubernetes/kubernetes/pull/75820), [@YoubingLi](https://github.com/YoubingLi))
@@ -1406,11 +1446,8 @@ filename | sha512 hash
     * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * Support describe pod with inline csi volumes ([#75513](https://github.com/kubernetes/kubernetes/pull/75513), [@cwdsuzhou](https://github.com/cwdsuzhou))
 * Object count quota is now supported for namespaced custom resources using the count/<resource>.<group> syntax. ([#72384](https://github.com/kubernetes/kubernetes/pull/72384), [@zhouhaibing089](https://github.com/zhouhaibing089))
-* In case kubeadm can't access the current Kubernetes version remotely and fails to parse ([#72454](https://github.com/kubernetes/kubernetes/pull/72454), [@rojkov](https://github.com/rojkov))
-    * the git-based version it falls back to a static predefined value of
-    * k8s.io/kubernetes/cmd/kubeadm/app/constants.CurrentKubernetesVersion.
-* Fixed a potential deadlock in resource quota controller ([#74747](https://github.com/kubernetes/kubernetes/pull/74747), [@liggitt](https://github.com/liggitt))
-        * Enabled recording partial usage info for quota objects specifying multiple resources, when only some of the resources' usage can be determined.
+* In case kubeadm can't access the current Kubernetes version remotely and fails to parse the git-based version it falls back to a static predefined value of k8s.io/kubernetes/cmd/kubeadm/app/constants.CurrentKubernetesVersion. ([#72454](https://github.com/kubernetes/kubernetes/pull/72454), [@rojkov](https://github.com/rojkov))
+* Fixed a potential deadlock in resource quota controller Enabled recording partial usage info for quota objects specifying multiple resources, when only some of the resources' usage can be determined. ([#74747](https://github.com/kubernetes/kubernetes/pull/74747), [@liggitt](https://github.com/liggitt))
 * CRI API will now be available in the kubernetes/cri-api repository ([#75531](https://github.com/kubernetes/kubernetes/pull/75531), [@dims](https://github.com/dims))
 * Support vSphere SAML token auth when using Zones ([#75515](https://github.com/kubernetes/kubernetes/pull/75515), [@dougm](https://github.com/dougm))
 * Transition service account controller clients to TokenRequest API ([#72179](https://github.com/kubernetes/kubernetes/pull/72179), [@WanLinghao](https://github.com/WanLinghao))
@@ -1418,8 +1455,7 @@ filename | sha512 hash
 * Allow to read OpenStack user credentials from a secret instead of a local config file. ([#75062](https://github.com/kubernetes/kubernetes/pull/75062), [@Fedosin](https://github.com/Fedosin))
 * watch can now be enabled  for events using the flag --watch-cache-sizes on kube-apiserver ([#74321](https://github.com/kubernetes/kubernetes/pull/74321), [@yastij](https://github.com/yastij))
 * kubeadm: Support for deprecated old kubeadm v1alpha3 config is totally removed. ([#75179](https://github.com/kubernetes/kubernetes/pull/75179), [@rosti](https://github.com/rosti))
-* The Kubelet now properly requests protobuf objects where they are ([#75602](https://github.com/kubernetes/kubernetes/pull/75602), [@smarterclayton](https://github.com/smarterclayton))
-    * supported from the apiserver, reducing load in large clusters.
+* The Kubelet now properly requests protobuf objects where they are supported from the apiserver, reducing load in large clusters. ([#75602](https://github.com/kubernetes/kubernetes/pull/75602), [@smarterclayton](https://github.com/smarterclayton))
 * Add name validation for dynamic client methods in client-go ([#75072](https://github.com/kubernetes/kubernetes/pull/75072), [@lblackstone](https://github.com/lblackstone))
 * Users may now execute `get-kube-binaries.sh` to request a client for an OS/Arch unlike the one of the host on which the script is invoked. ([#74889](https://github.com/kubernetes/kubernetes/pull/74889), [@akutz](https://github.com/akutz))
 * Move config local to controllers in kube-controller-manager ([#72800](https://github.com/kubernetes/kubernetes/pull/72800), [@stewart-yu](https://github.com/stewart-yu))
