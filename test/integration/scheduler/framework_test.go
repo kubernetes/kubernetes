@@ -779,6 +779,10 @@ type pluginInvokeEvent struct {
 	val        int
 }
 
+func (e *pluginInvokeEvent) String() string {
+	return fmt.Sprintf("plugin %s with val %d", e.pluginName, e.val)
+}
+
 // TestBindPlugin tests invocation of bind plugins.
 func TestBindPlugin(t *testing.T) {
 	testContext := initTestMaster(t, "bind-plugin", nil)
@@ -944,18 +948,32 @@ func TestBindPlugin(t *testing.T) {
 				t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, postbindPlugin.numPostbindCalled)
 			}
 		}
+
+		expectInvokeEvents := map[pluginInvokeEvent]struct{}{}
 		for j := range test.expectInvokeEvents {
 			expectEvent := test.expectInvokeEvents[j]
+			expectInvokeEvents[expectEvent] = struct{}{}
+		}
+
+		for {
+			if len(expectInvokeEvents) == 0 {
+				break
+			}
+
 			select {
 			case event := <-pluginInvokeEventChan:
-				if event.pluginName != expectEvent.pluginName {
-					t.Errorf("test #%v: Expect invoke event %d from plugin %s instead of %s", i, j, expectEvent.pluginName, event.pluginName)
+				_, ok := expectInvokeEvents[event]
+				if !ok {
+					t.Errorf("test #%v: Unexpected event val %d from plugin %s", i, event.val, event.pluginName)
 				}
-				if event.val != expectEvent.val {
-					t.Errorf("test #%v: Expect val of invoke event %d to be %d instead of %d", i, j, expectEvent.val, event.val)
-				}
+
+				delete(expectInvokeEvents, event)
 			case <-time.After(time.Second * 30):
-				t.Errorf("test #%v: Waiting for invoke event %d timeout.", i, j)
+				for _, event := range expectInvokeEvents {
+					t.Errorf("test #%v: Remaining event %s not received", i, event)
+				}
+
+				t.Fatalf("test #%v: Waiting for invoke event timeout.", i)
 			}
 		}
 		postbindPlugin.reset()
