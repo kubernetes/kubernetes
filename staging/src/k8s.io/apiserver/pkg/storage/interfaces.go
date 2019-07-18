@@ -73,15 +73,13 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// TriggerPublisherFunc is a function that for a given object computes
+// IndexerFunc is a function that for a given object computes
 // <value of an index> for a particular <index>.
-// TODO(wojtek-t): Rename to IndexerFunc?
-type TriggerPublisherFunc func(obj runtime.Object) string
+type IndexerFunc func(obj runtime.Object) string
 
-// TriggerPublisherFuncs is a mapping from <index name> to function that
+// IndexerFuncs is a mapping from <index name> to function that
 // for a given object computes <value for that index>.
-// TODO(wojtek-t): Rename to IndexerFuncs?
-type TriggerPublisherFuncs map[string]TriggerPublisherFunc
+type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
 var Everything = SelectionPredicate{

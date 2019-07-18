@@ -88,9 +88,9 @@ type Config struct {
 	// GetAttrsFunc is used to get object labels, fields
 	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, err error)
 
-	// TriggerPublisherFuncs is used for optimizing amount of watchers that
+	// IndexerFuncs is used for optimizing amount of watchers that
 	// needs to process an incoming event.
-	TriggerPublisherFuncs storage.TriggerPublisherFuncs
+	IndexerFuncs storage.IndexerFuncs
 
 	// NewFunc is a function that creates new empty object storing a object of type Type.
 	NewFunc func() runtime.Object
@@ -211,7 +211,7 @@ type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
 
 type indexedTriggerFunc struct {
 	indexName   string
-	triggerFunc storage.TriggerPublisherFunc
+	indexerFunc storage.IndexerFunc
 }
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
@@ -306,17 +306,17 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	var indexedTrigger *indexedTriggerFunc
-	if config.TriggerPublisherFuncs != nil {
+	if config.IndexerFuncs != nil {
 		// For now, we don't support multiple trigger functions defined
 		// for a given resource.
-		if len(config.TriggerPublisherFuncs) > 1 {
-			return nil, fmt.Errorf("cacher %s doesn't support more than one TriggerPublisherFunc: ", reflect.TypeOf(obj).String())
+		if len(config.IndexerFuncs) > 1 {
+			return nil, fmt.Errorf("cacher %s doesn't support more than one IndexerFunc: ", reflect.TypeOf(obj).String())
 		}
-		for key, value := range config.TriggerPublisherFuncs {
+		for key, value := range config.IndexerFuncs {
 			if value != nil {
 				indexedTrigger = &indexedTriggerFunc{
 					indexName:   key,
-					triggerFunc: value,
+					indexerFunc: value,
 				}
 			}
 		}
@@ -742,11 +742,11 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 	}
 
 	result := make([]string, 0, 2)
-	result = append(result, c.indexedTrigger.triggerFunc(event.Object))
+	result = append(result, c.indexedTrigger.indexerFunc(event.Object))
 	if event.PrevObject == nil {
 		return result, true
 	}
-	prevTriggerValue := c.indexedTrigger.triggerFunc(event.PrevObject)
+	prevTriggerValue := c.indexedTrigger.indexerFunc(event.PrevObject)
 	if result[0] != prevTriggerValue {
 		result = append(result, prevTriggerValue)
 	}
