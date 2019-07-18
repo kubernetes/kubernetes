@@ -83,8 +83,6 @@ clusterroles="clusterroles"
 configmaps="configmaps"
 csr="csr"
 deployments="deployments"
-export horizontalpodautoscalers="horizontalpodautoscalers"
-export metrics="metrics"
 namespaces="namespaces"
 nodes="nodes"
 persistentvolumeclaims="persistentvolumeclaims"
@@ -98,10 +96,8 @@ secrets="secrets"
 serviceaccounts="serviceaccounts"
 services="services"
 statefulsets="statefulsets"
-export static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
-export selfsubjectaccessreviews="selfsubjectaccessreviews"
 customresourcedefinitions="customresourcedefinitions"
 daemonsets="daemonsets"
 controllerrevisions="controllerrevisions"
@@ -335,7 +331,10 @@ runTests() {
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
   fi
 
-  id_field=".metadata.name"
+  # Define helper variables for fields to prevent typos.
+  # They will be used in some other files under test/cmd,
+  # Let's export them as https://github.com/koalaman/shellcheck/wiki/SC2034 suggested.
+  export id_field=".metadata.name"
   export labels_field=".metadata.labels"
   export annotations_field=".metadata.annotations"
   export service_selector_field=".spec.selector"
