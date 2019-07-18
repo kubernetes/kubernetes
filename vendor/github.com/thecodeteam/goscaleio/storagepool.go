@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type StoragePool struct {

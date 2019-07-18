@@ -16,12 +16,12 @@ go_library(
         "user.go",
         "volume.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/codedellemc/goscaleio",
-    importpath = "github.com/codedellemc/goscaleio",
+    importmap = "k8s.io/kubernetes/vendor/github.com/thecodeteam/goscaleio",
+    importpath = "github.com/thecodeteam/goscaleio",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/codedellemc/goscaleio/types/v1:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
+        "//vendor/github.com/thecodeteam/goscaleio/types/v1:go_default_library",
     ],
 )
 
@@ -36,7 +36,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//vendor/github.com/codedellemc/goscaleio/types/v1:all-srcs",
+        "//vendor/github.com/thecodeteam/goscaleio/types/v1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -3,7 +3,7 @@ package goscaleio
 import (
 	"fmt"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 func (system *System) GetScsiInitiator() (scsiInitiators []types.ScsiInitiator, err error) {
