@@ -289,6 +289,7 @@ items:
     - autoscaling
     resources:
     - horizontalpodautoscalers
+    - horizontalpodautoscalers/status
     verbs:
     - get
     - list
@@ -307,12 +308,16 @@ items:
     - extensions
     resources:
     - daemonsets
+    - daemonsets/status
     - deployments
+    - deployments/status
     - deployments/scale
     - ingresses
+    - ingresses/status
     - networkpolicies
     - replicasets
     - replicasets/scale
+    - replicasets/status
     - replicationcontrollers/scale
     verbs:
     - get
@@ -322,6 +327,7 @@ items:
     - policy
     resources:
     - poddisruptionbudgets
+    - poddisruptionbudgets/status
     verbs:
     - get
     - list
