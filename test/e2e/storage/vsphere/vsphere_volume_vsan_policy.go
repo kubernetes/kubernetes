@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -110,7 +111,12 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		if !(len(nodeList.Items) > 0) {
 			e2elog.Failf("Unable to find ready and schedulable Node")
 		}
-		masternodes, _ := framework.GetMasterAndWorkerNodesOrDie(client)
+		masternodes, _, err := e2enode.GetMasterAndWorkerNodes(client)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
 		masterNode = masternodes.List()[0]
 	})

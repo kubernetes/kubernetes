@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -298,8 +299,12 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 
 	ginkgo.It("Kubelet should not restart containers across restart", func() {
 
-		nodeIPs, err := framework.GetNodePublicIps(f.ClientSet)
-		framework.ExpectNoError(err)
+		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 		preRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if preRestarts != 0 {
 			e2elog.Logf("WARNING: Non-zero container restart count: %d across nodes %v", preRestarts, badNodes)

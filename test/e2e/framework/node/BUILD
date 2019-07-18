@@ -10,10 +10,13 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/nodelifecycle:go_default_library",
+        "//pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/system:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",

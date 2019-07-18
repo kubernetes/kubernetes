@@ -116,14 +116,6 @@ type ServiceTestJig struct {
 	Labels map[string]string
 }
 
-// PodNode is a pod-node pair indicating which node a given pod is running on
-type PodNode struct {
-	// Pod represents pod name
-	Pod string
-	// Node represents node name
-	Node string
-}
-
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
 func NewServiceTestJig(client clientset.Interface, name string) *ServiceTestJig {
 	j := &ServiceTestJig{}
@@ -323,48 +315,6 @@ func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string
 	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	return svc
-}
-
-// GetNodePublicIps returns a public IP list of nodes.
-func GetNodePublicIps(c clientset.Interface) ([]string, error) {
-	nodes := GetReadySchedulableNodesOrDie(c)
-
-	ips := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
-	if len(ips) == 0 {
-		// If ExternalIP isn't set, assume the test programs can reach the InternalIP
-		ips = e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-	}
-	return ips, nil
-}
-
-// PickNodeIP picks one public node IP
-func PickNodeIP(c clientset.Interface) string {
-	publicIps, err := GetNodePublicIps(c)
-	ExpectNoError(err)
-	if len(publicIps) == 0 {
-		e2elog.Failf("got unexpected number (%d) of public IPs", len(publicIps))
-	}
-	ip := publicIps[0]
-	return ip
-}
-
-// PodNodePairs return PodNode pairs for all pods in a namespace
-func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
-	var result []PodNode
-
-	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
-	if err != nil {
-		return result, err
-	}
-
-	for _, pod := range podList.Items {
-		result = append(result, PodNode{
-			Pod:  pod.Name,
-			Node: pod.Spec.NodeName,
-		})
-	}
-
-	return result, nil
 }
 
 // GetEndpointNodes returns a map of nodenames:external-ip on which the

@@ -48,6 +48,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	var masterNodes sets.String
 	var systemPodsNo int
 	var ns string
+	var err error
 	f := framework.NewDefaultFramework("equivalence-cache")
 
 	ginkgo.BeforeEach(func() {
@@ -55,7 +56,12 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		ns = f.Namespace.Name
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
+		masterNodes, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 
 		framework.ExpectNoError(framework.CheckTestingNSDeletedExcept(cs, ns))
 
