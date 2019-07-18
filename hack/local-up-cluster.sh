@@ -528,7 +528,7 @@ function start_apiserver {
       cloud_config_arg="--cloud-provider=external"
     fi
 
-    if [[ -n "${AUDIT_POLICY_FILE}" ]]; then
+    if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
       cat <<EOF > /tmp/kube-audit-policy-file
 # Log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1

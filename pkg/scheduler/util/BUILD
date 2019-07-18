@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "error_channel_test.go",
         "heap_test.go",
         "utils_test.go",
     ],
@@ -24,6 +25,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "clock.go",
+        "error_channel.go",
         "heap.go",
         "utils.go",
     ],

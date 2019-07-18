@@ -78,7 +78,11 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: pod.GetAttrs, TriggerFunc: pod.NodeNameTriggerFunc}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    pod.GetAttrs,
+		TriggerFunc: map[string]storage.TriggerPublisherFunc{"spec.nodeName": pod.NodeNameTriggerFunc},
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

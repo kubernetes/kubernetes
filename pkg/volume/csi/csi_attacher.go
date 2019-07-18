@@ -390,6 +390,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		accessMode = spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
+	var mountOptions []string
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.MountOptions != nil {
+		mountOptions = spec.PersistentVolume.Spec.MountOptions
+	}
+
 	fsType := csiSource.FSType
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
@@ -398,7 +403,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		fsType,
 		accessMode,
 		nodeStageSecrets,
-		csiSource.VolumeAttributes)
+		csiSource.VolumeAttributes,
+		mountOptions)
 
 	if err != nil {
 		return err
@@ -492,8 +498,13 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 	if err != nil {
 		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
+	var watcherClosed bool
 	ch := watcher.ResultChan()
-	defer watcher.Stop()
+	defer func() {
+		if !watcherClosed {
+			watcher.Stop()
+		}
+	}()
 
 	for {
 		select {
@@ -518,8 +529,10 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 				return nil
 
 			case watch.Error:
+				watcher.Stop()
+				watcherClosed = true
 				// start another cycle
-				c.waitForVolumeDetachmentInternal(volumeHandle, attachID, timer, timeout)
+				return c.waitForVolumeDetachmentInternal(volumeHandle, attachID, timer, timeout)
 			}
 
 		case <-timer.C:

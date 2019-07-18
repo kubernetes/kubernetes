@@ -276,11 +276,11 @@ func TestClonedIface(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
+			Iface:  "192.168.1.10:pv0001",
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	newIface := "192.168.1.10:pv0001"
-	cloneIface(fakeMounter, newIface)
+	cloneIface(fakeMounter)
 	if cmdCount != 4 {
 		t.Errorf("expected 4 CombinedOutput() calls, got %d", cmdCount)
 	}
@@ -305,11 +305,11 @@ func TestClonedIfaceShowError(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
+			Iface:  "192.168.1.10:pv0001",
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	newIface := "192.168.1.10:pv0001"
-	cloneIface(fakeMounter, newIface)
+	cloneIface(fakeMounter)
 	if cmdCount != 1 {
 		t.Errorf("expected 1 CombinedOutput() calls, got %d", cmdCount)
 	}
@@ -350,11 +350,11 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
+			Iface:  "192.168.1.10:pv0001",
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	newIface := "192.168.1.10:pv0001"
-	cloneIface(fakeMounter, newIface)
+	cloneIface(fakeMounter)
 	if cmdCount != 5 {
 		t.Errorf("expected 5 CombinedOutput() calls, got %d", cmdCount)
 	}

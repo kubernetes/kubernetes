@@ -45,7 +45,7 @@ import (
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -114,7 +114,7 @@ type Config struct {
 	Error func(*v1.Pod, error)
 
 	// Recorder is the EventRecorder to use
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}

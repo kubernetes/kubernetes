@@ -42,3 +42,17 @@ Enter your extended release note in the block below. If the PR requires addition
 ```release-note
 
 ```
+
+**Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
+
+<!--
+This section can be blank if this pull request does not require a release note.
+Please use the following format for linking documentation or pass the
+section below:
+- [KEP]: <link>
+- [Usage]: <link>
+- [Other doc]: <link>
+-->
+```docs
+
+```

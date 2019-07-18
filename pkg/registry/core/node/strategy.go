@@ -225,10 +225,8 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
-	node := obj.(*api.Node)
-	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: node.ObjectMeta.Name}
-	return []pkgstorage.MatchValue{result}
+func NodeNameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Node).ObjectMeta.Name
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.

@@ -45,6 +45,7 @@ filegroup(
         "//staging/src/k8s.io/sample-apiserver/pkg/generated/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1alpha1:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1beta1:all-srcs",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/openapi:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/registry:all-srcs",
     ],
     tags = ["automanaged"],

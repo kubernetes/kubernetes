@@ -76,6 +76,9 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 			effectiveSc.WindowsOptions.GMSACredentialSpecName = containerSc.WindowsOptions.GMSACredentialSpecName
 			effectiveSc.WindowsOptions.GMSACredentialSpec = containerSc.WindowsOptions.GMSACredentialSpec
 		}
+		if containerSc.WindowsOptions.RunAsUserName != nil {
+			effectiveSc.WindowsOptions.RunAsUserName = containerSc.WindowsOptions.RunAsUserName
+		}
 	}
 
 	if containerSc.Capabilities != nil {

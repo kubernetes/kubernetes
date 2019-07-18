@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -47,7 +46,7 @@ type kubeletFlagsOpts struct {
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
 func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
-	hostName, err := nodeutil.GetHostname("")
+	hostName, err := kubeadmutil.GetHostname("")
 	if err != nil {
 		return err
 	}

@@ -29,7 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -86,12 +89,20 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulernodeinfo.Resource) *v1.Po
 	return pod
 }
 
+func newResourceOverheadPod(pod *v1.Pod, overhead v1.ResourceList) *v1.Pod {
+	pod.Spec.Overhead = overhead
+	return pod
+}
+
 func GetPredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
 	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
 	return pm.GetMetadata(p, nodeInfo)
 }
 
 func TestPodFitsResources(t *testing.T) {
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
 	enoughPodsTests := []struct {
 		pod                      *v1.Pod
 		nodeInfo                 *schedulernodeinfo.NodeInfo
@@ -350,6 +361,31 @@ func TestPodFitsResources(t *testing.T) {
 			fits:                     true,
 			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
 			name:                     "skip checking ignored extended resource",
+		},
+		{
+			pod: newResourceOverheadPod(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("13")},
+			),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
+			fits:                     true,
+			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
+			name:                     "resources + pod overhead fits",
+		},
+		{
+			pod: newResourceOverheadPod(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m"), v1.ResourceMemory: resource.MustParse("15")},
+			),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
+			fits:                     false,
+			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
+			name:                     "requests + overhead does not fit for memory",
+			reasons: []PredicateFailureReason{
+				NewInsufficientResourceError(v1.ResourceMemory, 16, 5, 20),
+			},
 		},
 	}
 

@@ -876,7 +876,11 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	}
 
 	daemonPods, exists := nodeToDaemonPods[node.Name]
-	dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
+	dsKey, err := cache.MetaNamespaceKeyFunc(ds)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
 
 	dsc.removeSuspendedDaemonPods(node.Name, dsKey)
 

@@ -19,7 +19,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/json-iterator/go v1.1.6
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo v1.8.0 // indirect
@@ -34,7 +33,7 @@ require (
 	gopkg.in/inf.v0 v0.9.0
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/klog v0.3.1
-	k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
+	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
 	sigs.k8s.io/yaml v1.1.0
 )
 

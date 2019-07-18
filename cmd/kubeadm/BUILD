@@ -5,7 +5,7 @@ load(
     "go_binary",
     "go_library",
 )
-load("//vendor/k8s.io/client-go/pkg/version:def.bzl", "version_x_defs")
+load("//cmd/kubeadm/app/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kubeadm",

@@ -30,6 +30,12 @@ import (
 // Code is the Status code/type which is returned from plugins.
 type Code int
 
+// NodeScoreList declares a list of nodes and their scores.
+type NodeScoreList []int
+
+// PluginToNodeScoreMap declares a map from plugin name to its NodeScoreList.
+type PluginToNodeScoreMap map[string]NodeScoreList
+
 // These are predefined codes used in a Status.
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
@@ -42,6 +48,8 @@ const (
 	Unschedulable
 	// Wait is used when a permit plugin finds a pod scheduling should wait.
 	Wait
+	// Skip is used when a bind plugin chooses to skip binding.
+	Skip
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
@@ -135,6 +143,16 @@ type PrefilterPlugin interface {
 	Prefilter(pc *PluginContext, p *v1.Pod) *Status
 }
 
+// ScorePlugin is an interface that must be implemented by "score" plugins to rank
+// nodes that passed the filtering phase.
+type ScorePlugin interface {
+	Plugin
+	// Score is called on each filtered node. It must return success and an integer
+	// indicating the rank of the node. All scoring plugins must return success or
+	// the pod will be rejected.
+	Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status)
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -192,6 +210,19 @@ type PermitPlugin interface {
 	Permit(pc *PluginContext, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
+// BindPlugin is an interface that must be implemented by "bind" plugins. Bind
+// plugins are used to bind a pod to a Node.
+type BindPlugin interface {
+	Plugin
+	// Bind plugins will not be called until all pre-bind plugins have completed. Each
+	// bind plugin is called in the configured order. A bind plugin may choose whether
+	// or not to handle the given Pod. If a bind plugin chooses to handle a Pod, the
+	// remaining bind plugins are skipped. When a bind plugin does not handle a pod,
+	// it must return Skip in its Status code. If a bind plugin returns an Error, the
+	// pod is rejected and will not be bound.
+	Bind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -204,6 +235,12 @@ type Framework interface {
 	// anything but Success. If a non-success status is returned, then the scheduling
 	// cycle is aborted.
 	RunPrefilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
+
+	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
+	// stores for each scoring plugin name the corresponding NodeScoreList(s).
+	// It also returns *Status, which is set to non-success if any of the plugins returns
+	// a non-success status.
+	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status)
 
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
@@ -231,6 +268,13 @@ type Framework interface {
 	// Note that if multiple plugins asked to wait, then we wait for the minimum
 	// timeout duration.
 	RunPermitPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	// RunBindPlugins runs the set of configured bind plugins. A bind plugin may choose
+	// whether or not to handle the given Pod. If a bind plugin chooses to skip the
+	// binding, it should return code=4("skip") status. Otherwise, it should return "Error"
+	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
+	// code=4("skip") status.
+	RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is

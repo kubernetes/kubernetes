@@ -82,7 +82,6 @@
 				"k8s.io/kubernetes/pkg/util/iptables",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/util/metrics",
-				"k8s.io/kubernetes/pkg/util/node",
 				"k8s.io/kubernetes/pkg/util/parsers",
 				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/sysctl",

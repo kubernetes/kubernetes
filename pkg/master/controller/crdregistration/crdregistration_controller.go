@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -40,7 +40,7 @@ import (
 // adding and removing APIServices
 type AutoAPIServiceRegistration interface {
 	// AddAPIServiceToSync adds an API service to auto-register.
-	AddAPIServiceToSync(in *apiregistration.APIService)
+	AddAPIServiceToSync(in *v1.APIService)
 	// RemoveAPIServiceToSync removes an API service to auto-register.
 	RemoveAPIServiceToSync(name string)
 }
@@ -208,9 +208,9 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 				continue
 			}
 
-			c.apiServiceRegistration.AddAPIServiceToSync(&apiregistration.APIService{
+			c.apiServiceRegistration.AddAPIServiceToSync(&v1.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
-				Spec: apiregistration.APIServiceSpec{
+				Spec: v1.APIServiceSpec{
 					Group:                groupVersion.Group,
 					Version:              groupVersion.Version,
 					GroupPriorityMinimum: 1000, // CRDs should have relatively low priority

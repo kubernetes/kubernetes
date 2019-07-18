@@ -36,7 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/term"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
@@ -58,8 +58,11 @@ import (
 	"k8s.io/klog"
 )
 
-// NewSchedulerCommand creates a *cobra.Command object with default parameters
-func NewSchedulerCommand() *cobra.Command {
+// Option configures a framework.Registry.
+type Option func(framework.Registry) error
+
+// NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
+func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	opts, err := options.NewOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -75,7 +78,7 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := runCommand(cmd, args, opts); err != nil {
+			if err := runCommand(cmd, args, opts, registryOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -106,7 +109,7 @@ through the API as necessary.`,
 }
 
 // runCommand runs the scheduler.
-func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error {
+func runCommand(cmd *cobra.Command, args []string, opts *options.Options, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
 	utilflag.PrintFlags(cmd.Flags())
 
@@ -134,7 +137,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 	}
 
 	stopCh := make(chan struct{})
-
 	// Get the completed config
 	cc := c.Complete()
 
@@ -152,13 +154,20 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	return Run(cc, stopCh)
+	return Run(cc, stopCh, registryOptions...)
 }
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
-func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
+func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, registryOptions ...Option) error {
 	// To help debugging, immediately log version
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
+
+	registry := framework.NewRegistry()
+	for _, option := range registryOptions {
+		if err := option(registry); err != nil {
+			return err
+		}
+	}
 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
@@ -176,7 +185,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
-		framework.NewRegistry(),
+		registry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
@@ -190,10 +199,11 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	// Prepare the event broadcaster.
 	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartLogging(klog.V(6).Infof)
-		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
+		cc.Broadcaster.StartRecordingToSink(stopCh)
 	}
-
+	if cc.LeaderElectionBroadcaster != nil && cc.CoreEventClient != nil {
+		cc.LeaderElectionBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
+	}
 	// Setup healthz checks.
 	var checks []healthz.HealthzChecker
 	if cc.ComponentConfig.LeaderElection.LeaderElect {
@@ -275,7 +285,6 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
 	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
-	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
 	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
@@ -326,4 +335,11 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 		}
 	}
 	return pathRecorderMux
+}
+
+// WithPlugin creates an Option based on plugin name and factory.
+func WithPlugin(name string, factory framework.PluginFactory) Option {
+	return func(registry framework.Registry) error {
+		return registry.Register(name, factory)
+	}
 }

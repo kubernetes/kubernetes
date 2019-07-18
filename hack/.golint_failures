@@ -456,7 +456,6 @@ staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
-staging/src/k8s.io/apiserver/pkg/storage/etcd/util
 staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert
 staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
@@ -561,6 +560,7 @@ staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
+
 test/e2e/storage/vsphere
 test/e2e_kubeadm
 test/e2e_node

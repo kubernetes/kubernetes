@@ -13,7 +13,8 @@
     "acorn": {
       "version": "2.7.0",
       "resolved": "https://registry.npmjs.org/acorn/-/acorn-2.7.0.tgz",
-      "integrity": "sha1-q259nYhqrKiwhbwzEreaGYQz8Oc="
+      "integrity": "sha1-q259nYhqrKiwhbwzEreaGYQz8Oc=",
+      "optional": true
     },
     "acorn-globals": {
       "version": "1.0.9",
@@ -292,7 +293,8 @@
     "cssom": {
       "version": "0.3.6",
       "resolved": "https://registry.npmjs.org/cssom/-/cssom-0.3.6.tgz",
-      "integrity": "sha512-DtUeseGk9/GBW0hl0vVPpU22iHL6YB5BUX7ml1hB+GMpo0NX5G4voX3kdWiMSEguFtcW3Vh3djqNF4aIe6ne0A=="
+      "integrity": "sha512-DtUeseGk9/GBW0hl0vVPpU22iHL6YB5BUX7ml1hB+GMpo0NX5G4voX3kdWiMSEguFtcW3Vh3djqNF4aIe6ne0A==",
+      "optional": true
     },
     "cssstyle": {
       "version": "0.2.37",
@@ -1333,9 +1335,9 @@
       "integrity": "sha1-Xee/afqisPnYXoMyCZtw5BmoRdU="
     },
     "lodash": {
-      "version": "4.17.5",
-      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.5.tgz",
-      "integrity": "sha512-svL3uiZf1RwhH+cWrfZn3A4+U58wbP0tGVTLQPbjplZxZ8ROD9VLuNgsRniTlLe7OlSqR79RUehXgpBW/s0IQw=="
+      "version": "4.17.13",
+      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.13.tgz",
+      "integrity": "sha512-vm3/XWXfWtRua0FkUyEHBZy8kCPjErNBT9fJx8Zvs+U6zjqPbTUOpkaoum3O5uiA8sm+yNMHXfYkTUHFoMxFNA=="
     },
     "markdown-link": {
       "version": "0.1.1",
@@ -5613,7 +5615,8 @@
     "prelude-ls": {
       "version": "1.1.2",
       "resolved": "https://registry.npmjs.org/prelude-ls/-/prelude-ls-1.1.2.tgz",
-      "integrity": "sha1-IZMqVJ9eUv/ZqCf1cOBL5iqX2lQ="
+      "integrity": "sha1-IZMqVJ9eUv/ZqCf1cOBL5iqX2lQ=",
+      "optional": true
     },
     "process-nextick-args": {
       "version": "2.0.0",
@@ -5926,6 +5929,7 @@
       "version": "0.3.2",
       "resolved": "https://registry.npmjs.org/type-check/-/type-check-0.3.2.tgz",
       "integrity": "sha1-WITKtRLPHTVeP7eE8wgEsrUg23I=",
+      "optional": true,
       "requires": {
         "prelude-ls": "~1.1.2"
       }

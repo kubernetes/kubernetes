@@ -726,6 +726,9 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 // the max in each dimension iteratively. In contrast, we sum the resource vectors for
 // regular containers since they run simultaneously.
 //
+// If Pod Overhead is specified and the feature gate is set, the resources defined for Overhead
+// are added to the calculated Resource request sum
+//
 // Example:
 //
 // Pod:
@@ -754,6 +757,11 @@ func GetResourceRequest(pod *v1.Pod) *schedulernodeinfo.Resource {
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		result.SetMaxResource(container.Resources.Requests)
+	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		result.Add(pod.Spec.Overhead)
 	}
 
 	return result

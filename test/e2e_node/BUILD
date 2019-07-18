@@ -196,7 +196,6 @@ go_test(
             "//test/e2e/framework/config:go_default_library",
             "//test/e2e/framework/testfiles:go_default_library",
             "//test/e2e/generated:go_default_library",
-            "//vendor/github.com/kardianos/osext:go_default_library",
             "//vendor/github.com/onsi/ginkgo/config:go_default_library",
             "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
             "//vendor/github.com/spf13/pflag:go_default_library",

@@ -1415,6 +1415,10 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
 	volume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	if err != nil && !apierrs.IsNotFound(err) {
+		klog.V(3).Infof("error reading persistent volume %q: %v", pvName, err)
+		return pluginName, err
+	}
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
 		klog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))

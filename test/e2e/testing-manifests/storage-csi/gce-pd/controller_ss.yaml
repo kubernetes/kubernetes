@@ -16,8 +16,7 @@ spec:
       serviceAccountName: csi-controller-sa
       containers:
         - name: csi-provisioner
-          # TODO: replace with official image
-          image: quay.io/k8scsi/csi-provisioner:v1.1.0-rc1
+          image: gcr.io/gke-release/csi-provisioner:v1.2.1-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -26,7 +25,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          image: gcr.io/gke-release/csi-attacher:v1.0.1-gke.0
+          image: gcr.io/gke-release/csi-attacher:v1.2.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -34,7 +33,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: gce-pd-driver
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.4.0-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.5.1-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"

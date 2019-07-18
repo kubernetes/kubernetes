@@ -1839,23 +1839,23 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
-		e2elog.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
-		cmd := fmt.Sprintf(`wget -T 3 -qO- %v`, serviceAddress)
+		e2elog.Logf("waiting up to %v to connect to %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
+		cmd := fmt.Sprintf("/agnhost connect --timeout=3s %s", serviceAddress)
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
-		expectedErr := "connection refused"
+		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, framework.KubeProxyEndpointLagTimeout, func() (bool, error) {
 			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
-				if strings.Contains(strings.ToLower(err.Error()), expectedErr) {
+				if strings.Contains(err.Error(), expectedErr) {
 					e2elog.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
 					return true, nil
 				}
 				e2elog.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
 				return false, nil
 			}
-			return true, errors.New("expected wget call to fail")
+			return true, errors.New("expected connect call to fail")
 		}); pollErr != nil {
 			framework.ExpectNoError(pollErr)
 		}

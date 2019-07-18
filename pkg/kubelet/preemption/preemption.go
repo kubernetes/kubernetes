@@ -191,10 +191,9 @@ func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
 		remainingRequest := float64(req.quantity - resource.GetResourceRequest(pod, req.resourceName))
-		if remainingRequest < 0 {
-			remainingRequest = 0
+		if remainingRequest > 0 {
+			dist += math.Pow(remainingRequest/float64(req.quantity), 2)
 		}
-		dist += math.Pow(remainingRequest/float64(req.quantity), 2)
 	}
 	return dist
 }
@@ -207,6 +206,9 @@ func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirement
 		newQuantity := req.quantity
 		for _, pod := range pods {
 			newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
+			if newQuantity <= 0 {
+				break
+			}
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{

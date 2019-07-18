@@ -132,7 +132,8 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
 
-	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
+	// TODO(apelisse) use the first return value when unions are implemented
+	_, managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
@@ -247,6 +248,7 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 var stripSet = fieldpath.NewSet(
 	fieldpath.MakePathOrDie("apiVersion"),
 	fieldpath.MakePathOrDie("kind"),
+	fieldpath.MakePathOrDie("metadata"),
 	fieldpath.MakePathOrDie("metadata", "name"),
 	fieldpath.MakePathOrDie("metadata", "namespace"),
 	fieldpath.MakePathOrDie("metadata", "creationTimestamp"),
@@ -265,9 +267,11 @@ func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager stri
 		if vs == nil {
 			panic(fmt.Sprintf("Found unexpected nil manager which should never happen: %s", manager))
 		}
-		vs.Set = vs.Set.Difference(stripSet)
-		if vs.Set.Empty() {
+		newSet := vs.Set().Difference(stripSet)
+		if newSet.Empty() {
 			delete(managed, manager)
+		} else {
+			managed[manager] = fieldpath.NewVersionedSet(newSet, vs.APIVersion(), vs.Applied())
 		}
 	}
 

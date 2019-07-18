@@ -5,6 +5,7 @@ module k8s.io/sample-apiserver
 go 1.12
 
 require (
+	github.com/go-openapi/spec v0.19.2
 	github.com/google/gofuzz v1.0.0
 	github.com/spf13/cobra v0.0.4
 	k8s.io/apimachinery v0.0.0
@@ -13,6 +14,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v0.3.1
+	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
 )
 
 replace (
