@@ -220,3 +220,39 @@ func (h *Handle) NeighList(linkIndex, family int) ([]Neigh, error) {
 func (h *Handle) NeighProxyList(linkIndex, family int) ([]Neigh, error) {
 	return nil, ErrNotImplemented
 }
+
+func (h *Handle) RouteAdd(route *Route) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) RouteDel(route *Route) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
+	return nil, ErrNotImplemented
+}
+
+func (h *Handle) RouteList(link Link, family int) ([]Route, error) {
+	return nil, ErrNotImplemented
+}
+
+func (h *Handle) RouteListFiltered(family int, filter *Route, filterMask uint64) ([]Route, error) {
+	return nil, ErrNotImplemented
+}
+
+func (h *Handle) RouteReplace(route *Route) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) RuleAdd(rule *Rule) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) RuleDel(rule *Rule) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) RuleList(family int) ([]Rule, error) {
+	return nil, ErrNotImplemented
+}

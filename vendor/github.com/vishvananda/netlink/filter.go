@@ -17,7 +17,7 @@ type FilterAttrs struct {
 	Handle    uint32
 	Parent    uint32
 	Priority  uint16 // lower is higher priority
-	Protocol  uint16 // syscall.ETH_P_*
+	Protocol  uint16 // unix.ETH_P_*
 }
 
 func (q FilterAttrs) String() string {
@@ -223,6 +223,21 @@ func (filter *U32) Attrs() *FilterAttrs {
 
 func (filter *U32) Type() string {
 	return "u32"
+}
+
+// MatchAll filters match all packets
+type MatchAll struct {
+	FilterAttrs
+	ClassId uint32
+	Actions []Action
+}
+
+func (filter *MatchAll) Attrs() *FilterAttrs {
+	return &filter.FilterAttrs
+}
+
+func (filter *MatchAll) Type() string {
+	return "matchall"
 }
 
 type FilterFwAttrs struct {
