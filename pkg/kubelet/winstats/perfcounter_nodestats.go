@@ -207,7 +207,7 @@ func (p *perfCounterNodeStatsClient) convertCPUValue(cpuCores int, cpuValue uint
 }
 
 func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
-	cpuUsageNanoCores := (p.cpuUsageCoreNanoSecondsCache.latestValue - p.cpuUsageCoreNanoSecondsCache.previousValue) * uint64(time.Second / time.Nanosecond) / uint64(defaultCachePeriod)
+	cpuUsageNanoCores := (p.cpuUsageCoreNanoSecondsCache.latestValue - p.cpuUsageCoreNanoSecondsCache.previousValue) * uint64(time.Second/time.Nanosecond) / uint64(defaultCachePeriod)
 	return cpuUsageNanoCores
 }
 
