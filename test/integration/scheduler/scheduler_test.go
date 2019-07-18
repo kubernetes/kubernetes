@@ -42,7 +42,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
 )

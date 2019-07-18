@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 )
