@@ -80,6 +80,7 @@ go_library(
         "//pkg/kubelet/runtimeclass:go_default_library",
         "//pkg/kubelet/secret:go_default_library",
         "//pkg/kubelet/server:go_default_library",
+        "//pkg/kubelet/server/metrics:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
