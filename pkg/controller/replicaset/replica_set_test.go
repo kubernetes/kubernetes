@@ -177,8 +177,7 @@ func processSync(rsc *ReplicaSetController, key string) error {
 		syncErr = oldSyncHandler(key)
 		return syncErr
 	}
-	rsc.queue.Add(key)
-	rsc.processNextWorkItem()
+	rsc.processNextWorkItem(key)
 	return syncErr
 }
 
@@ -234,7 +233,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, rsSpec, "pod")
 	manager.deletePod(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
 
-	go manager.worker()
+	go manager.workerGroup(1)()
 
 	expected := GetKey(rsSpec, t)
 	select {
@@ -443,7 +442,7 @@ func TestWatchControllers(t *testing.T) {
 	}
 	// Start only the ReplicaSet watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method.
-	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.workerGroup(1), 10*time.Millisecond, stopCh)
 
 	testRSSpec.Name = "foo"
 	fakeWatch.Add(&testRSSpec)
@@ -527,7 +526,7 @@ func TestUpdatePods(t *testing.T) {
 		return nil
 	}
 
-	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go wait.Until(manager.workerGroup(1), 10*time.Millisecond, stopCh)
 
 	// Put 2 ReplicaSets and one pod into the informers
 	labelMap1 := map[string]string{"foo": "bar"}
@@ -658,7 +657,8 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	// Enqueue once. Then process it. Disable rate-limiting for this.
 	manager.queue = workqueue.NewRateLimitingQueue(workqueue.NewMaxOfRateLimiter())
 	manager.enqueueReplicaSet(rs)
-	manager.processNextWorkItem()
+	//manager.processNextWorkItem()
+	go manager.workerGroup(1)()
 	// It should have been requeued.
 	if got, want := manager.queue.Len(), 1; got != want {
 		t.Errorf("queue.Len() = %v, want %v", got, want)

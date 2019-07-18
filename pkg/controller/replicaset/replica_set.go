@@ -29,6 +29,8 @@ package replicaset
 
 import (
 	"fmt"
+	"hash/fnv"
+	"io"
 	"reflect"
 	"sort"
 	"strings"
@@ -67,6 +69,8 @@ const (
 
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
+
+	keyChannelSize = 10
 )
 
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
@@ -186,11 +190,32 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 		return
 	}
 
-	for i := 0; i < workers; i++ {
-		go wait.Until(rsc.worker, time.Second, stopCh)
-	}
+	go wait.Until(rsc.workerGroup(workers), time.Second, stopCh)
 
 	<-stopCh
+}
+
+func (rsc *ReplicaSetController) workerGroup(workers int) func() {
+	return func() {
+		klog.V(4).Infof("Creating worker group of size %d", workers)
+		keyChannels := make([]chan interface{}, workers)
+		for i := 0; i < workers; i++ {
+			keyChannels[i] = make(chan interface{}, keyChannelSize)
+			go rsc.worker(keyChannels[i])
+		}
+		for {
+			key, quit := rsc.queue.Get()
+			if quit {
+				klog.V(4).Infof("Closing worker group")
+				for i := 0; i < workers; i++ {
+					close(keyChannels[i])
+				}
+				return
+			}
+			chanId := hash(key.(string), workers)
+			keyChannels[chanId] <- key
+		}
+	}
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.
@@ -429,28 +454,31 @@ func (rsc *ReplicaSetController) enqueueReplicaSetAfter(obj interface{}, after t
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (rsc *ReplicaSetController) worker() {
-	for rsc.processNextWorkItem() {
+func (rsc *ReplicaSetController) worker(keyCannel chan interface{}) {
+	for {
+		func() {
+			key, ok := <-keyCannel
+			if !ok {
+				return
+			}
+			defer rsc.queue.Done(key)
+			if rsc.processNextWorkItem(key.(string)) {
+				rsc.queue.Forget(key)
+			} else {
+				rsc.queue.AddRateLimited(key)
+			}
+		}()
 	}
 }
 
-func (rsc *ReplicaSetController) processNextWorkItem() bool {
-	key, quit := rsc.queue.Get()
-	if quit {
-		return false
-	}
-	defer rsc.queue.Done(key)
-
-	err := rsc.syncHandler(key.(string))
+func (rsc *ReplicaSetController) processNextWorkItem(key string) bool {
+	err := rsc.syncHandler(key)
 	if err == nil {
-		rsc.queue.Forget(key)
 		return true
 	}
 
 	utilruntime.HandleError(fmt.Errorf("Sync %q failed with %v", key, err))
-	rsc.queue.AddRateLimited(key)
-
-	return true
+	return false
 }
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
@@ -699,4 +727,10 @@ func getPodKeys(pods []*v1.Pod) []string {
 		podKeys = append(podKeys, controller.PodKey(pod))
 	}
 	return podKeys
+}
+
+func hash(val string, max int) int {
+	hasher := fnv.New32a()
+	io.WriteString(hasher, val)
+	return int(hasher.Sum32() % uint32(max))
 }
