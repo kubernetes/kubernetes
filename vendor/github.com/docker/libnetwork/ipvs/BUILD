@@ -15,6 +15,7 @@ go_library(
             "//vendor/github.com/sirupsen/logrus:go_default_library",
             "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
             "//vendor/github.com/vishvananda/netns:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),

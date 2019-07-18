@@ -145,3 +145,23 @@ const (
 	// addresses.
 	SourceHashing = "sh"
 )
+
+const (
+	// ConnFwdMask is a mask for the fwd methods
+	ConnFwdMask = 0x0007
+
+	// ConnFwdMasq denotes forwarding via masquerading/NAT
+	ConnFwdMasq = 0x0000
+
+	// ConnFwdLocalNode denotes forwarding to a local node
+	ConnFwdLocalNode = 0x0001
+
+	// ConnFwdTunnel denotes forwarding via a tunnel
+	ConnFwdTunnel = 0x0002
+
+	// ConnFwdDirectRoute denotes forwarding via direct routing
+	ConnFwdDirectRoute = 0x0003
+
+	// ConnFwdBypass denotes forwarding while bypassing the cache
+	ConnFwdBypass = 0x0004
+)
