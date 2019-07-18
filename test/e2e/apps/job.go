@@ -83,8 +83,13 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 	})
 
-	// Pods sometimes fail, but eventually succeed.
-	ginkgo.It("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
+	/*
+		Release : v1.16
+		Testname: Jobs, completion after task failure
+		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
+		execute to completion.
+	*/
+	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach used by the
