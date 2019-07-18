@@ -236,6 +236,7 @@ items:
     - configmaps
     - endpoints
     - persistentvolumeclaims
+    - persistentvolumeclaims/status
     - pods
     - replicationcontrollers
     - replicationcontrollers/scale
@@ -297,6 +298,7 @@ items:
     resources:
     - cronjobs
     - jobs
+    - jobs/status
     verbs:
     - get
     - list
