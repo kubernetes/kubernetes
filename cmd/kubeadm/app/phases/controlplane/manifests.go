@@ -34,7 +34,6 @@ import (
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	utilsnet "k8s.io/utils/net"
 )
 
@@ -198,14 +197,14 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 // AlwaysAllow and AlwaysDeny is ignored as they are only for testing
 func getAuthzModes(authzModeExtraArgs string) string {
 	modes := []string{
-		authzmodes.ModeNode,
-		authzmodes.ModeRBAC,
+		kubeadmconstants.ModeNode,
+		kubeadmconstants.ModeRBAC,
 	}
-	if strings.Contains(authzModeExtraArgs, authzmodes.ModeABAC) {
-		modes = append(modes, authzmodes.ModeABAC)
+	if strings.Contains(authzModeExtraArgs, kubeadmconstants.ModeABAC) {
+		modes = append(modes, kubeadmconstants.ModeABAC)
 	}
-	if strings.Contains(authzModeExtraArgs, authzmodes.ModeWebhook) {
-		modes = append(modes, authzmodes.ModeWebhook)
+	if strings.Contains(authzModeExtraArgs, kubeadmconstants.ModeWebhook) {
+		modes = append(modes, kubeadmconstants.ModeWebhook)
 	}
 	return strings.Join(modes, ",")
 }
