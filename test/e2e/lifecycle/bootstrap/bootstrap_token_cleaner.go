@@ -51,7 +51,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
-		tokenSecret, err := GenerateTokenSecret()
+		tokenSecret, err := generateTokenSecret()
 		framework.ExpectNoError(err)
 
 		secret := newTokenSecret(tokenID, tokenSecret)
@@ -69,7 +69,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
-		tokenSecret, err := GenerateTokenSecret()
+		tokenSecret, err := generateTokenSecret()
 		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenID, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(time.Hour))
