@@ -26,10 +26,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wk8/go-ordered-map"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/orderedmap"
 )
 
 type containerCleanupManager struct {
