@@ -9,7 +9,7 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implies.
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
@@ -21,6 +21,8 @@ import (
 	"hash/fnv"
 	"math"
 	"net/http"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -50,7 +52,7 @@ import (
 // FairQueuingFactory knows how to make FairQueueingSystem objects.
 // This filter makes a FairQueuingSystem for each priority level.
 type FairQueuingFactory interface {
-	NewFairQueuingSystem(numQueues, queueLengthLimit int, requestWaitLimit time.Duration, clk clock.Clock) FairQueuingSystem
+	NewFairQueuingSystem(concurrencyLimit, numQueues, queueLengthLimit int, requestWaitLimit time.Duration, clk clock.Clock) FairQueuingSystem
 }
 
 // FairQueuingSystem is the abstraction for the queuing and
@@ -116,30 +118,26 @@ type FairQueuingSystemImpl struct {
 // initQueues is a convenience method for initializing an array of n queues
 func initQueues(numQueues int) []fq.FQQueue {
 	queues := make([]*fq.Queue, 0, numQueues)
+	fqqueues := make([]fq.FQQueue, numQueues, numQueues)
+
 	for i := 0; i < numQueues; i++ {
 		queues = append(queues, &fq.Queue{})
 		packets := []*fq.Packet{}
 		fqpackets := make([]fq.FQPacket, len(packets), len(packets))
-		for i := range packets {
-			fqpackets[i] = fqpackets[i]
-		}
 		queues[i].Packets = fqpackets
-	}
 
-	fqqueues := make([]fq.FQQueue, len(queues), len(queues))
-	for i := range queues {
 		fqqueues[i] = queues[i]
 	}
 
 	return fqqueues
 }
 
-func NewFairQueuingSystem(numQueues, queueLengthLimit int, requestWaitLimit time.Duration, clk clock.Clock) FairQueuingSystem {
+func NewFairQueuingSystem(concurrencyLimit, numQueues, queueLengthLimit int, requestWaitLimit time.Duration, clk clock.Clock) FairQueuingSystem {
 	return &FairQueuingSystemImpl{
 		// queues: queues,
 		fqq: inflight.NewFQScheduler(initQueues(numQueues), clk),
 		// TODO(aaron-prindle) concurrency limit is updated dynamically
-		// concurrencyLimit: 0,
+		concurrencyLimit: concurrencyLimit,
 		numqueues:        numQueues,
 		queueLengthLimit: queueLengthLimit,
 		requestWaitLimit: requestWaitLimit,
@@ -208,11 +206,13 @@ func (s *FairQueuingSystemImpl) Wait(hashValue uint64, handSize int32) (execute 
 	// NOTE: currently timeout is only checked for each new request.  This means that there can be
 	// requests that are in the queue longer than the timeout if there are no new requests
 	// We think this is a fine tradeoff
+
 	func() {
 		// TODO(aaron-prindle) verify if this actually needs to be locked...
 		s.lock.Lock()
 		defer s.lock.Unlock()
 
+		timeoutIdx := -1
 		now := time.Now()
 		queues := s.fqq.GetQueues()
 		fmt.Printf("s.requestWaitLimit: %v\n", s.requestWaitLimit)
@@ -222,16 +222,35 @@ func (s *FairQueuingSystemImpl) Wait(hashValue uint64, handSize int32) (execute 
 		// pkts are sorted oldest -> newest
 		// can short circuit loop (break) if oldest packets are not timing out
 		//  as newer packets also will not have timed out
-		for _, pkt := range pkts {
+		for i, pkt := range pkts {
 			channelPkt := pkt.(*inflight.Packet)
 			limit := channelPkt.EnqueueTime.Add(s.requestWaitLimit)
 			if now.After(limit) {
-
+				fmt.Println("timeout!!!")
 				channelPkt.DequeueChannel <- false
+				close(channelPkt.DequeueChannel)
+
+				// // TODO(aaron-prindle) verify this makes sense here
+				// get idx for timed out packets
+				timeoutIdx = i
+
 			} else {
 				break
 			}
 		}
+		fmt.Printf("timeoutIdx: %d\n", timeoutIdx)
+		// remove timed out packets from queue
+		// TODO(aaron-prindle) BAD, currently copies slice for deletion
+		if timeoutIdx != -1 {
+			// timeoutIdx + 1 to remove the last timeout pkt
+			fmt.Println("HERE!")
+			removeIdx := timeoutIdx + 1
+			queue.SetPackets(pkts[removeIdx:])
+			// queue.SetRequestsExecuting(
+			// 	queue.GetRequestsExecuting() - removeIdx)
+			s.fqq.DecrementPackets(removeIdx)
+		}
+
 	}()
 
 	// The next step is to reject the newly
@@ -288,8 +307,12 @@ func (s *FairQueuingSystemImpl) Wait(hashValue uint64, handSize int32) (execute 
 	// technique to pick a queue, dequeue the request at the head of that
 	// queue, increment the count of the number executing, and send `{true,
 	// handleCompletion(that dequeued request)}` to the request's channel.
+
+	// TODO(aaron-prindle) ERROR - with timeout remove from queueu
+	// this is looping forever..
 	for !s.fqq.IsEmpty() && s.fqq.GetRequestsExecuting() < s.concurrencyLimit {
 		fmt.Printf("s.fqq.GetRequestsExecuting(): %v\n", s.fqq.GetRequestsExecuting())
+		fmt.Printf("s.concurrencyLimit(): %v\n", s.concurrencyLimit)
 		s.fqq.Dequeue()
 	}
 
@@ -323,7 +346,6 @@ func (s *FairQueuingSystemImpl) Wait(hashValue uint64, handSize int32) (execute 
 // RMState is the variable state that this filter is working with at a
 // given point in time.
 type RMState struct {
-	// TODO(aaron-prindle) remove?
 	serverConcurrencyLimit int
 
 	// flowSchemas holds the flow schema objects, sorted by increasing
@@ -335,15 +357,20 @@ type RMState struct {
 	priorityLevelStates map[string]*PriorityLevelState
 }
 
-func (r *RMState) updateACV(ps *PriorityLevelState) {
-	// ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )
-	denom := 0
-	for _, pl := range r.priorityLevelStates {
-		denom += int(pl.config.AssuredConcurrencyShares)
-		// denom += ACS(prioritylvl, queues)
+func getACV(serverConcurrencyLimit int, plcs []*rmtypesv1a1.PriorityLevelConfiguration, origPLC *rmtypesv1a1.PriorityLevelConfiguration) int {
+	var denom float64
+	for _, plc := range plcs {
+		denom += float64(plc.Spec.AssuredConcurrencyShares)
 	}
-	ps.concurrencyLimit = int(math.Ceil(float64(r.serverConcurrencyLimit * int(ps.config.AssuredConcurrencyShares) / denom)))
-	// return int(math.Ceil(float64(SCL * ACS(pl, queues) / denom)))
+	return int(math.Ceil(float64(serverConcurrencyLimit) * float64(origPLC.Spec.AssuredConcurrencyShares) / denom))
+}
+
+func (r *RMState) updateACV(ps *PriorityLevelState) {
+	var denom float64
+	for _, pl := range r.priorityLevelStates {
+		denom += float64(pl.config.AssuredConcurrencyShares)
+	}
+	ps.concurrencyLimit = int(math.Ceil(float64(r.serverConcurrencyLimit) * float64(ps.config.AssuredConcurrencyShares) / denom))
 }
 
 // FlowSchemaSeq holds sorted set of pointers to FlowSchema objects.
@@ -379,7 +406,9 @@ type requestManagement struct {
 	fsInformer cache.SharedIndexInformer
 
 	// plLister belongs here too
+	// plLister
 	// fsLister belongs here too
+	// fsLister
 
 	// serverConcurrencyLimit is the limit on the server's total
 	// number of non-exempt requests being served at once.  This comes
@@ -407,7 +436,7 @@ type requestManagement struct {
 }
 
 // TypedConfigObjectReference is a reference to a relevant config API object.
-// No namespace is needed because none of these objects is namespaces.
+// No namespace is needed because none of these objects is namespaced.
 type TypedConfigObjectReference struct {
 	Kind string
 	Name string
@@ -431,7 +460,7 @@ func rmSetup(loopbackClientConfig *restclient.Config, serverConcurrencyLimit int
 	return reqMgmt
 }
 
-func initPriorityLevelStates(plcs []*rmtypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) map[string]*PriorityLevelState {
+func initPriorityLevelStates(serverConcurrencyLimit int, plcs []*rmtypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) map[string]*PriorityLevelState {
 	pls := map[string]*PriorityLevelState{}
 
 	// TODO(aaron-prindle) change this to a test method and change clock to be
@@ -439,10 +468,11 @@ func initPriorityLevelStates(plcs []*rmtypesv1a1.PriorityLevelConfiguration, req
 	clk := clock.RealClock{}
 
 	for _, plc := range plcs {
+		concurrencyLimit := getACV(serverConcurrencyLimit, plcs, plc)
 
 		pls[plc.Name] = &PriorityLevelState{
 			config: plc.Spec,
-			fqs: NewFairQueuingSystem(int(plc.Spec.Queues),
+			fqs: NewFairQueuingSystem(concurrencyLimit, int(plc.Spec.Queues),
 				int(plc.Spec.QueueLengthLimit), requestWaitLimit, clk),
 		}
 	}
@@ -463,82 +493,73 @@ func WithRequestManagement(
 ) http.Handler {
 	// reqMgmt := rmSetup(loopbackClientConfig, serverConcurrencyLimit, requestWaitLimit)
 	// --
-	pls := initPriorityLevelStates(priorityLevelConfigurations, requestWaitLimit)
+	// TODO(aaron-prindle) REMOVE - TEST - make dynamic
+	pls := initPriorityLevelStates(serverConcurrencyLimit, priorityLevelConfigurations, requestWaitLimit)
+
+	// rmState.updateACV(ps) // TODO(aaron-prindle) rename updateACV?
+	// ps.fqs.SetConcurrencyLimit(ps.concurrencyLimit)
+
 	rmState := RMState{
 		flowSchemas:            flowSchemas,
 		priorityLevelStates:    pls,
 		serverConcurrencyLimit: serverConcurrencyLimit,
 	}
+
 	// --
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// =======================
-		// TODO(aaron-prindle) CHANGE removed for early testing
-		// ctx := r.Context()
-		// requestInfo, ok := apirequest.RequestInfoFrom(ctx)
-		// if !ok {
-		// 	handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
-		// 	return
-		// }
+		ctx := r.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if !ok {
+			handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
+			return
+		}
 
 		// Skip tracking long running events.
-		// if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
-		// 	handler.ServeHTTP(w, r)
-		// 	return
-		// }
+		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		// --ORIG-- START
+		// TODO(aaron-prindle) CHANGE removed for early testing
 
 		// get state of regMgmnt so we know all the obj/config values
 		// rmState := reqMgmt.curState.Load().(*RMState)
 
-		// =======================
-
 		// analyze request to get flowSchema (so can get it's info - PriorityState, FlowDistinguisher)
 		// fs := reqMgmt.pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
 
-		fs := pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
-
 		// get the PriorityState, if exempt pass through
 		// ps := reqMgmt.requestPriorityState(r, fs, rmState.priorityLevelStates)
+
+		// calculate the flow distinguisher for the flowSchema
+		// flowDistinguisher := reqMgmt.computeFlowDistinguisher(r, fs)
+
+		// hash the flowDistinguisher (for shuffle sharding
+		// hashValue := reqMgmt.hashFlowID(fs.Name, flowDistinguisher)
+		// -- ORIG -- END
+
+		// -- TEST -- START
+		fs := pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
+
 		ps := requestPriorityState(r, fs, rmState.priorityLevelStates)
 		if ps.config.Exempt {
-
 			klog.V(5).Infof("Serving %v without delay\n", r)
 			handler.ServeHTTP(w, r)
 			return
 		}
-		// flowDistinguisher := reqMgmt.computeFlowDistinguisher(r, fs)
-		// hashValue := reqMgmt.hashFlowID(fs.Name, flowDistinguisher)
-		// execute, afterExecute := ps.fqs.Wait(hashValue, ps.config.HandSize)
-		// if execute {
-		// 	klog.V(5).Infof("Serving %v after queuing\n", r)
-		// 	timedOut := ctx.Done()
-		// 	finished := make(chan struct{})
-		// 	go func() {
-		// 		handler.ServeHTTP(w, r)
-		// 		close(finished)
-		// 	}()
-		// 	select {
-		// 	case <-timedOut:
-		// 		klog.V(5).Infof("Timed out waiting for %v to finish\n", r)
-		// 	case <-finished:
-		// 	}
 
-		// calculate the flow distinguisher for the flowSchema
-		// flowDistinguisher := reqMgmt.computeFlowDistinguisher(r, fs)
 		flowDistinguisher := computeFlowDistinguisher(r, fs)
 
-		// hash the flowDistinguisher (for shuffle sharding
-		// hashValue := reqMgmt.hashFlowID(fs.Name, flowDistinguisher)
 		hashValue := hashFlowID(fs.Name, flowDistinguisher)
+		// -- TEST -- END
 
 		// TODO(aaron-prindle) verify this is needed?
-		rmState.updateACV(ps) // TODO(aaron-prindle) rename updateACV?
-		ps.fqs.SetConcurrencyLimit(ps.concurrencyLimit)
+		// rmState.updateACV(ps) // TODO(aaron-prindle) rename updateACV?
+		// ps.fqs.SetConcurrencyLimit(ps.concurrencyLimit)
 
 		// attempt to enqueue and dispatch the package
-		// TODO(aaron-prindle) use PriorityLevelState concurrencylimit OR
-		// fqs concurrency
-
-		execute, afterExecute := ps.fqs.Wait(hashValue, *ps.config.HandSize)
+		execute, afterExecute := ps.fqs.Wait(hashValue, ps.config.HandSize)
 
 		if execute {
 			klog.V(5).Infof("Serving %v after queuing\n", r)
@@ -552,12 +573,16 @@ func WithRequestManagement(
 			case <-timedOut:
 				klog.V(5).Infof("Timed out waiting for %v to finish\n", r)
 			case <-finished:
+				// TODO(aaron-prindle) update this with anything that should be done
 			}
 			afterExecute()
 		} else {
 			klog.V(5).Infof("Rejecting %v\n", r)
 			tooManyRequests(r, w)
 		}
+		return
+	})
+
 }
 
 func hash(s string) uint64 {

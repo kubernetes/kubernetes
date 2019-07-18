@@ -44,6 +44,7 @@ func (p *Packet) SetStartTime(starttime time.Time) {
 
 type FQQueue interface {
 	GetPackets() []FQPacket
+	SetPackets([]FQPacket)
 	GetVirtualFinish(J int, G float64) float64
 	GetVirStart() float64
 	SetVirStart(float64)
@@ -64,6 +65,11 @@ type Queue struct {
 // GetPackets
 func (q *Queue) GetPackets() []FQPacket {
 	return q.Packets
+}
+
+// GetPackets
+func (q *Queue) SetPackets(pkts []FQPacket) {
+	q.Packets = pkts
 }
 
 // GetRequestsExecuting

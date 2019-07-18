@@ -1,6 +1,7 @@
 package fq
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -24,11 +25,11 @@ type FQScheduler struct {
 	robinidx     int
 }
 
-func (q *FQScheduler) chooseQueue(packet FQPacket) FQQueue {
-	if packet.GetQueueIdx() < 0 || packet.GetQueueIdx() > len(q.Queues) {
+func (fqs *FQScheduler) chooseQueue(packet FQPacket) FQQueue {
+	if packet.GetQueueIdx() < 0 || packet.GetQueueIdx() > len(fqs.Queues) {
 		panic("no matching queue for packet")
 	}
-	return q.Queues[packet.GetQueueIdx()]
+	return fqs.Queues[packet.GetQueueIdx()]
 }
 
 func NewFQScheduler(queues []FQQueue, clock clock.Clock) *FQScheduler {
@@ -44,31 +45,31 @@ func NewFQScheduler(queues []FQQueue, clock clock.Clock) *FQScheduler {
 }
 
 // Enqueue enqueues a packet into the fair queuing scheduler
-func (q *FQScheduler) Enqueue(packet FQPacket) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	q.synctime()
+func (fqs *FQScheduler) Enqueue(packet FQPacket) {
+	fqs.lock.Lock()
+	defer fqs.lock.Unlock()
+	fqs.synctime()
 
-	queue := q.chooseQueue(packet)
+	queue := fqs.chooseQueue(packet)
 	queue.Enqueue(packet)
-	q.updateTime(packet, queue)
+	fqs.updateTime(packet, queue)
 }
 
-func (q *FQScheduler) getVirtualTime() float64 {
-	return q.vt
+func (fqs *FQScheduler) getVirtualTime() float64 {
+	return fqs.vt
 }
 
-func (q *FQScheduler) synctime() {
-	realNow := q.clock.Now()
-	timesincelast := realNow.Sub(q.lastRealTime).Seconds()
-	q.lastRealTime = realNow
-	q.vt += timesincelast * q.getvirtualtimeratio()
+func (fqs *FQScheduler) synctime() {
+	realNow := fqs.clock.Now()
+	timesincelast := realNow.Sub(fqs.lastRealTime).Seconds()
+	fqs.lastRealTime = realNow
+	fqs.vt += timesincelast * fqs.getvirtualtimeratio()
 }
 
-func (q *FQScheduler) getvirtualtimeratio() float64 {
+func (fqs *FQScheduler) getvirtualtimeratio() float64 {
 	NEQ := 0
 	reqs := 0
-	for _, queue := range q.Queues {
+	for _, queue := range fqs.Queues {
 		reqs += queue.GetRequestsExecuting()
 		// It might be best to delete this line. If everything is working
 		//  correctly, there will be no waiting packets if reqs < C on current
@@ -84,88 +85,108 @@ func (q *FQScheduler) getvirtualtimeratio() float64 {
 	if NEQ == 0 {
 		return 0
 	}
-	return min(float64(reqs), float64(q.C)) / float64(NEQ)
+	return min(float64(reqs), float64(fqs.C)) / float64(NEQ)
 }
 
-func (q *FQScheduler) updateTime(packet FQPacket, queue FQQueue) {
+func (fqs *FQScheduler) updateTime(packet FQPacket, queue FQQueue) {
 	// When a request arrives to an empty queue with no requests executing
 	// len(queue.GetPackets()) == 1 as enqueue has just happened prior (vs  == 0)
 	if len(queue.GetPackets()) == 1 && queue.GetRequestsExecuting() == 0 {
 		// the queue’s virtual start time is set to getVirtualTime().
-		queue.SetVirStart(q.getVirtualTime())
+		queue.SetVirStart(fqs.getVirtualTime())
 	}
 }
 
 // FinishPacketAndDequeue is a convenience method used using the FQScheduler
 // at the concurrency limit
-func (q *FQScheduler) FinishPacketAndDeque(p FQPacket) (FQPacket, bool) {
-	q.FinishPacket(p)
-	return q.Dequeue()
+func (fqs *FQScheduler) FinishPacketAndDeque(p FQPacket) (FQPacket, bool) {
+	fqs.FinishPacket(p)
+	return fqs.Dequeue()
 }
 
 // FinishPacket is a callback that should be used when a previously dequeud packet
 // has completed it's service.  This callback updates imporatnt state in the
 //  FQScheduler
-func (q *FQScheduler) FinishPacket(p FQPacket) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
+func (fqs *FQScheduler) FinishPacket(p FQPacket) {
+	fqs.lock.Lock()
+	defer fqs.lock.Unlock()
 
-	q.synctime()
-	S := q.clock.Since(p.GetStartTime()).Seconds()
+	fqs.synctime()
+	S := fqs.clock.Since(p.GetStartTime()).Seconds()
 
 	// When a request finishes being served, and the actual service time was S,
 	// the queue’s virtual start time is decremented by G - S.
-	virstart := q.Queues[p.GetQueueIdx()].GetVirStart()
-	virstart -= q.G - S
-	q.Queues[p.GetQueueIdx()].SetVirStart(virstart)
+	virstart := fqs.Queues[p.GetQueueIdx()].GetVirStart()
+	virstart -= fqs.G - S
+	fqs.Queues[p.GetQueueIdx()].SetVirStart(virstart)
 
 	// request has finished, remove from requests executing
-	requestsExecuting := q.Queues[p.GetQueueIdx()].GetRequestsExecuting()
+	requestsExecuting := fqs.Queues[p.GetQueueIdx()].GetRequestsExecuting()
 	requestsExecuting--
-	q.Queues[p.GetQueueIdx()].SetRequestsExecuting(requestsExecuting)
+	fqs.Queues[p.GetQueueIdx()].SetRequestsExecuting(requestsExecuting)
+
+	// TODO(aaron-prindle) using curQueue seems to copy
+	// // When a request finishes being served, and the actual service time was S,
+	// // the queue’s virtual start time is decremented by G - S.
+	// curQueue := fqs.Queues[p.GetQueueIdx()]
+	// virstart := curQueue.GetVirStart()
+	// virstart -= fqs.G - S
+	// curQueue.SetVirStart(virstart)
+
+	// // request has finished, remove from requests executing
+	// requestsExecuting := curQueue.GetRequestsExecuting()
+	// requestsExecuting--
+	// curQueue.SetRequestsExecuting(requestsExecuting)
+
 }
 
 // Dequeue dequeues a packet from the fair queuing scheduler
-func (q *FQScheduler) Dequeue() (FQPacket, bool) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	q.synctime()
-	queue := q.selectQueue()
+func (fqs *FQScheduler) Dequeue() (FQPacket, bool) {
+	fqs.lock.Lock()
+	defer fqs.lock.Unlock()
+	fqs.synctime()
+	queue := fqs.selectQueue()
 
+	fmt.Println("1")
 	if queue == nil {
+		fmt.Println("2")
 		return nil, false
 	}
 	packet, ok := queue.Dequeue()
 
 	if ok {
-		// When a request is dequeued for service -> q.VirStart += G
+		fmt.Println("3")
+		// When a request is dequeued for service -> fqs.VirStart += G
 		virstart := queue.GetVirStart()
-		virstart += q.G
+		virstart += fqs.G
 		queue.SetVirStart(virstart)
 
-		packet.SetStartTime(q.clock.Now())
+		packet.SetStartTime(fqs.clock.Now())
 		// request dequeued, service has started
-		requestsExecuting := queue.GetRequestsExecuting()
-		requestsExecuting++
-		queue.SetRequestsExecuting(requestsExecuting)
+		queue.SetRequestsExecuting(queue.GetRequestsExecuting() + 1)
+	} else {
+		// TODO(aaron-prindle) verify this statement is needed...
+		return nil, false
 	}
+
+	fmt.Println("4")
 	return packet, ok
 }
 
-func (q *FQScheduler) roundrobinqueue() int {
-	q.robinidx = (q.robinidx + 1) % len(q.Queues)
-	return q.robinidx
+func (fqs *FQScheduler) roundrobinqueue() int {
+	fqs.robinidx = (fqs.robinidx + 1) % len(fqs.Queues)
+	return fqs.robinidx
 }
 
-func (q *FQScheduler) selectQueue() FQQueue {
+func (fqs *FQScheduler) selectQueue() FQQueue {
 	minvirfinish := math.Inf(1)
 	var minqueue FQQueue
 	var minidx int
-	for range q.Queues {
-		idx := q.roundrobinqueue()
-		queue := q.Queues[idx]
+	for range fqs.Queues {
+		idx := fqs.roundrobinqueue()
+		queue := fqs.Queues[idx]
 		if len(queue.GetPackets()) != 0 {
-			curvirfinish := queue.GetVirtualFinish(0, q.G)
+			curvirfinish := queue.GetVirtualFinish(0, fqs.G)
 			if curvirfinish < minvirfinish {
 				minvirfinish = curvirfinish
 				minqueue = queue
@@ -173,6 +194,6 @@ func (q *FQScheduler) selectQueue() FQQueue {
 			}
 		}
 	}
-	q.robinidx = minidx
+	fqs.robinidx = minidx
 	return minqueue
 }

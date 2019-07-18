@@ -126,15 +126,16 @@ func (q *FQScheduler) Dequeue() (bool, fq.FQPacket) {
 	reqMgmtPkt := pkt.(*Packet)
 
 	fmt.Printf("dequeue: %v, %v\n", reqMgmtPkt.DequeueChannel, reqMgmtPkt.Seq)
-	defer close(reqMgmtPkt.DequeueChannel)
 
-	select {
-	case reqMgmtPkt.DequeueChannel <- true:
-	default:
-		fmt.Println("Channel full. Discarding value")
-		// TODO(aaron-prindle) verify nothing else is needed here...
-	}
-
+	reqMgmtPkt.DequeueChannel <- true
 	q.numPackets--
 	return true, pkt
+}
+
+// Dequeue dequeues a packet from the fair queuing scheduler
+func (q *FQScheduler) DecrementPackets(i int) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	q.numPackets -= i
 }

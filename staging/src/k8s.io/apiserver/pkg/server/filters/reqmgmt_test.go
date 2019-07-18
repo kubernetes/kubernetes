@@ -26,15 +26,19 @@ import (
 	"time"
 
 	rmtypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func createRequestManagementServer(
 	delegate http.Handler, flowSchemas []*rmtypesv1a1.FlowSchema, priorityLevelConfigurations []*rmtypesv1a1.PriorityLevelConfiguration,
 	serverConcurrencyLimit int, requestWaitLimit time.Duration) *httptest.Server {
-	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
+	var longRunningRequestCheck apirequest.LongRunningRequestCheck
+	// longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	// requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 
 	handler := WithRequestManagement(
 		delegate,
@@ -44,20 +48,11 @@ func createRequestManagementServer(
 		requestWaitLimit,
 		longRunningRequestCheck,
 	)
-	// TODO(aaron-prindle) add back if needed...
-	// handler = withFakeUser(handler)
-	// handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
+
+	handler = withFakeUser(handler)
+	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
 
 	return httptest.NewServer(handler)
-}
-
-func newFalse() *bool {
-	b := false
-	return &b
-}
-
-func newHandSize(x int32) *int32 {
-	return &x
 }
 
 // current tests assume serverConcurrencyLimit >= # of flowschemas
@@ -82,9 +77,9 @@ func TestRequestManagementTwoRequests(t *testing.T) {
 		&rmtypesv1a1.PriorityLevelConfiguration{
 			Spec: rmtypesv1a1.PriorityLevelConfigurationSpec{
 				AssuredConcurrencyShares: 10,
-				Exempt:                   newFalse(),
-				GlobalDefault:            newFalse(),
-				HandSize:                 newHandSize(8),
+				Exempt:                   false,
+				GlobalDefault:            false,
+				HandSize:                 int32(8),
 				QueueLengthLimit:         int32(65536),
 				Queues:                   int32(128),
 			},
@@ -151,9 +146,9 @@ func TestRequestManagement(t *testing.T) {
 		&rmtypesv1a1.PriorityLevelConfiguration{
 			Spec: rmtypesv1a1.PriorityLevelConfigurationSpec{
 				AssuredConcurrencyShares: 10,
-				Exempt:                   newFalse(),
-				GlobalDefault:            newFalse(),
-				HandSize:                 newHandSize(8),
+				Exempt:                   false,
+				GlobalDefault:            false,
+				HandSize:                 int32(8),
 				QueueLengthLimit:         int32(65536),
 				Queues:                   int32(128),
 			},
@@ -225,20 +220,17 @@ func TestRequestMultiple(t *testing.T) {
 	for i := 0; i < groups; i++ {
 		priorityLevelConfigurations = append(priorityLevelConfigurations,
 			&rmtypesv1a1.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("plc-%d", i)},
 				Spec: rmtypesv1a1.PriorityLevelConfigurationSpec{
 					AssuredConcurrencyShares: 1,
-					Exempt:                   newFalse(),
-					GlobalDefault:            newFalse(),
-					HandSize:                 newHandSize(8),
+					Exempt:                   false,
+					GlobalDefault:            false,
+					HandSize:                 int32(8),
 					QueueLengthLimit:         int32(65536),
 					Queues:                   int32(128),
 				},
 			},
 		)
-	}
-	// can't init nested struct in initializer
-	for i := range priorityLevelConfigurations {
-		priorityLevelConfigurations[i].Name = fmt.Sprintf("plc-%d", i)
 	}
 
 	serverConcurrencyLimit := groups
@@ -246,10 +238,7 @@ func TestRequestMultiple(t *testing.T) {
 	requests := 100
 
 	countnum := len(flowSchemas)
-	counts := []int64{}
-	for range flowSchemas {
-		counts = append(counts, int64(0))
-	}
+	counts := make([]int64, len(flowSchemas))
 
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(500 * time.Millisecond)
@@ -316,9 +305,9 @@ func TestRequestTimeout(t *testing.T) {
 		&rmtypesv1a1.PriorityLevelConfiguration{
 			Spec: rmtypesv1a1.PriorityLevelConfigurationSpec{
 				AssuredConcurrencyShares: 10,
-				Exempt:                   newFalse(),
-				GlobalDefault:            newFalse(),
-				HandSize:                 newHandSize(1),
+				Exempt:                   false,
+				GlobalDefault:            false,
+				HandSize:                 int32(1),
 				QueueLengthLimit:         int32(65536),
 				Queues:                   int32(1),
 			},
@@ -328,15 +317,17 @@ func TestRequestTimeout(t *testing.T) {
 		priorityLevelConfigurations[i].Name = fmt.Sprintf("plc-%d", i)
 	}
 
+	// serverConcurrencyLimit := 100
 	serverConcurrencyLimit := 1000
 	// TODO(aaron-prindle) currently ignored
-	requestWaitLimit := 1 * time.Nanosecond
+	requestWaitLimit := 10 * time.Nanosecond
+	// requests := 1000
 	requests := 5000
 
 	var count int64
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&count, int64(1))
-		time.Sleep(1 * time.Second)
+		// time.Sleep(1 * time.Second)
 	})
 
 	server := createRequestManagementServer(
@@ -353,7 +344,8 @@ func TestRequestTimeout(t *testing.T) {
 	w := &Work{
 		Request: req,
 		N:       requests,
-		C:       1000, // C > serverConcurrencyLimit - must be or else nothing
+		// C:       100, // C > serverConcurrencyLimit - must be or else nothing
+		C: 1000, // C > serverConcurrencyLimit - must be or else nothing
 	}
 
 	// Run blocks until all work is done.
@@ -387,8 +379,8 @@ func TestRequestTimeout(t *testing.T) {
 // 		&rmtypesv1a1.PriorityLevelConfiguration{
 // 			Spec: rmtypesv1a1.PriorityLevelConfigurationSpec{
 // 				AssuredConcurrencyShares: 10,
-// 				Exempt:                   newFalse(),
-// 				GlobalDefault:            newFalse(),
+// 				Exempt:                   false,
+// 				GlobalDefault:            false,
 // 				HandSize:                 newHandSize(1),
 // 				QueueLengthLimit:         int32(0),
 // 				Queues:                   int32(1),
