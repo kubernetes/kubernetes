@@ -39,7 +39,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
-		triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc, error) {
+		triggerFuncs storage.TriggerPublisherFuncs) (storage.Interface, factory.DestroyFunc, error) {
 
 		s, d, err := generic.NewRawStorage(storageConfig)
 		if err != nil {
@@ -56,16 +56,16 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
 		// Currently it has two layers of same storage interface -- cacher and low level kv.
 		cacherConfig := cacherstorage.Config{
-			CacheCapacity:        capacity,
-			Storage:              s,
-			Versioner:            etcd3.APIObjectVersioner{},
-			ResourcePrefix:       resourcePrefix,
-			KeyFunc:              keyFunc,
-			NewFunc:              newFunc,
-			NewListFunc:          newListFunc,
-			GetAttrsFunc:         getAttrsFunc,
-			TriggerPublisherFunc: triggerFunc,
-			Codec:                storageConfig.Codec,
+			CacheCapacity:         capacity,
+			Storage:               s,
+			Versioner:             etcd3.APIObjectVersioner{},
+			ResourcePrefix:        resourcePrefix,
+			KeyFunc:               keyFunc,
+			NewFunc:               newFunc,
+			NewListFunc:           newListFunc,
+			GetAttrsFunc:          getAttrsFunc,
+			TriggerPublisherFuncs: triggerFuncs,
+			Codec:                 storageConfig.Codec,
 		}
 		cacher, err := cacherstorage.NewCacherFromConfig(cacherConfig)
 		if err != nil {

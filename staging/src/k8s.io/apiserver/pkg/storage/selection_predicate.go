@@ -124,20 +124,6 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 	return "", false
 }
 
-// For any index defined by IndexFields, if a matcher can match only (a subset)
-// of objects that return <value> for a given index, a pair (<index name>, <value>)
-// wil be returned.
-// TODO: Consider supporting also labels.
-func (s *SelectionPredicate) MatcherIndex() []MatchValue {
-	var result []MatchValue
-	for _, field := range s.IndexFields {
-		if value, ok := s.Field.RequiresExactMatch(field); ok {
-			result = append(result, MatchValue{IndexName: field, Value: value})
-		}
-	}
-	return result
-}
-
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
 	return s.Label.Empty() && s.Field.Empty()

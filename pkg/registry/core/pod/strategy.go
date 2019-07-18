@@ -193,10 +193,8 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
-	pod := obj.(*api.Pod)
-	result := storage.MatchValue{IndexName: "spec.nodeName", Value: pod.Spec.NodeName}
-	return []storage.MatchValue{result}
+func NodeNameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Pod).Spec.NodeName
 }
 
 // PodToSelectableFields returns a field set that represents the object
