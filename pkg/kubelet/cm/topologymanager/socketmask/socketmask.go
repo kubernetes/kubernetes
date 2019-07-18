@@ -171,3 +171,17 @@ func (s *socketMask) GetSockets() []int {
 	}
 	return sockets
 }
+
+//And is a package level implementation of 'and' between first and masks
+func And(first SocketMask, masks ...SocketMask) SocketMask {
+	s := *first.(*socketMask)
+	s.And(masks...)
+	return &s
+}
+
+//Or is a package level implementation of 'or' between first and masks
+func Or(first SocketMask, masks ...SocketMask) SocketMask {
+	s := *first.(*socketMask)
+	s.Or(masks...)
+	return &s
+}
