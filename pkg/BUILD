@@ -17,7 +17,6 @@ filegroup(
         "//pkg/api/persistentvolumeclaim:all-srcs",
         "//pkg/api/pod:all-srcs",
         "//pkg/api/podsecuritypolicy:all-srcs",
-        "//pkg/api/ref:all-srcs",
         "//pkg/api/resource:all-srcs",
         "//pkg/api/resourcequota:all-srcs",
         "//pkg/api/service:all-srcs",
