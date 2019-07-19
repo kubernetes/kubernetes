@@ -36,6 +36,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	e2efwk "k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -672,13 +673,13 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
-				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionTrue))
+				e2efwk.ExpectEqual(scheduledCondition != nil, true)
+				e2efwk.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
 				scheduledPods = append(scheduledPods, pod)
 			} else {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
-				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionFalse))
+				e2efwk.ExpectEqual(scheduledCondition != nil, true)
+				e2efwk.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
 				if scheduledCondition.Reason == "Unschedulable" {
 
 					notScheduledPods = append(notScheduledPods, pod)
