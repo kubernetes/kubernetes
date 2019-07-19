@@ -621,8 +621,8 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 	// Specs are expected to match this test's PersistentVolume
 
 	if len(cfg.AccessModes) == 0 {
-		e2elog.Logf("AccessModes unspecified, default: all modes (RWO, RWX, ROX).")
-		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadOnlyMany)
+		e2elog.Logf("AccessModes unspecified, default: ReadWriteOnce (RWO).")
+		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce)
 	}
 
 	return &v1.PersistentVolumeClaim{
