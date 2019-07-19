@@ -23,9 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -124,9 +125,16 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	// delayed claim binding
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
-	err = manager.WaitForAttachAndMount(pod)
+	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
+		err = manager.WaitForAttachAndMount(pod)
+		if err != nil {
+			// Few "PVC not bound" errors are expected
+			return false, nil
+		}
+		return true, nil
+	})
 	if err != nil {
-		t.Errorf("Expected success: %v", err)
+		t.Errorf("Expected a volume to be mounted, got: %s", err)
 	}
 
 }

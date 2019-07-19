@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -270,6 +270,13 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			volumeToMount.PodName, volumeToMount.VolumeName)
 		dswp.deleteProcessedPod(volumeToMount.PodName)
 	}
+
+	podsWithError := dswp.desiredStateOfWorld.GetPodsWithErrors()
+	for _, podName := range podsWithError {
+		if _, podExists := dswp.podManager.GetPodByUID(types.UID(podName)); !podExists {
+			dswp.desiredStateOfWorld.PopPodErrors(podName)
+		}
+	}
 }
 
 // processPodVolumes processes the volumes in the given pod and adds them to the
@@ -300,6 +307,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 				podVolume.Name,
 				format.Pod(pod),
 				err)
+			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
 			continue
 		}
@@ -314,6 +322,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 				volumeSpec.Name(),
 				uniquePodName,
 				err)
+			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
 		}
 
@@ -335,6 +344,8 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		// New pod has been synced. Re-mount all volumes that need it
 		// (e.g. DownwardAPI)
 		dswp.actualStateOfWorld.MarkRemountRequired(uniquePodName)
+		// Remove any stored errors for the pod, everything went well in this processPodVolumes
+		dswp.desiredStateOfWorld.PopPodErrors(uniquePodName)
 	}
 
 }
