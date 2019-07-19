@@ -416,6 +416,12 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
+	
+	destDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return fmt.Errorf("relative path to absolute path error")
+	}
+	
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
