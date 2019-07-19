@@ -57,7 +57,7 @@ var (
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
-		Currently only deployments support being resumed.`)
+		Currently only deployments and daemonsets support being resumed.`)
 
 	resumeExample = templates.Examples(`
 		# Resume an already paused deployment
@@ -76,7 +76,7 @@ func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions
 func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutResumeOptions(streams)
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset"}
 
 	cmd := &cobra.Command{
 		Use:                   "resume RESOURCE",

@@ -56,7 +56,7 @@ var (
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
-		Currently only deployments support being paused.`)
+		Currently only deployments and daemonsets support being paused.`)
 
 	pauseExample = templates.Examples(`
 		# Mark the nginx deployment as paused. Any current state of
@@ -72,7 +72,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		IOStreams:  streams,
 	}
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset"}
 
 	cmd := &cobra.Command{
 		Use:                   "pause RESOURCE",
