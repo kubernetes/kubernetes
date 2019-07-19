@@ -172,43 +172,33 @@ go_test(
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "//pkg/proxy/ipvs:go_default_library",
-            "//pkg/util/iptables:go_default_library",
         ],
         "//conditions:default": [],
     }),
