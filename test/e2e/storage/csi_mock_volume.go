@@ -439,7 +439,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
-				pvc, err = expandPVCSize(pvc, newSize, m.cs)
+				pvc, err = testsuites.ExpandPVCSize(pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
 
@@ -448,18 +448,18 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					e2elog.Failf("error updating pvc size %q", pvc.Name)
 				}
 				if test.expectFailure {
-					err = waitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
+					err = testsuites.WaitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
 					framework.ExpectError(err, "unexpected resizing condition on PVC")
 					return
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
-				err = waitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
+				err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for CSI PV resize to finish")
 
 				checkPVCSize := func() {
 					ginkgo.By("Waiting for PVC resize to finish")
-					pvc, err = waitForFSResize(pvc, m.cs)
+					pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
 					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
@@ -530,7 +530,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
-				pvc, err = expandPVCSize(pvc, newSize, m.cs)
+				pvc, err = testsuites.ExpandPVCSize(pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
 
@@ -540,11 +540,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
-				err = waitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
+				err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
 				ginkgo.By("Waiting for PVC resize to finish")
-				pvc, err = waitForFSResize(pvc, m.cs)
+				pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
 				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
