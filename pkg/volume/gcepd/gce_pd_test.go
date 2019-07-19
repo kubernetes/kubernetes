@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"testing"
 
@@ -187,6 +188,16 @@ func TestPlugin(t *testing.T) {
 	if persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName != "test-gce-volume-name" {
 		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
 	}
+	var fstype string
+	if runtime.GOOS == "windows" {
+		fstype = "ntfs"
+	} else {
+		fstype = "ext4"
+	}
+	if persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.FSType != fstype {
+		t.Errorf("Provision() returned unexpected fsType: %s", persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.FSType)
+	}
+
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
 	if size != 100*volumehelpers.GiB {

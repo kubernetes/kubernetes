@@ -492,9 +492,13 @@ func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedT
 	}
 
 	if fstype == "" {
-		fstype = "ext4"
+		if runtime.GOOS == "windows" {
+			fstype = "ntfs"
+		} else {
+			fstype = "ext4"
+		}
 	}
-
+	
 	var volumeMode *v1.PersistentVolumeMode
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		volumeMode = c.options.PVC.Spec.VolumeMode
