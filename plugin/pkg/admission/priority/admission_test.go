@@ -422,7 +422,23 @@ func TestPodAdmission(t *testing.T) {
 				Priority:          &intPriority,
 			},
 		},
-		// pod[7]: Pod with a system priority class name in non-system namespace
+		// pod[7]: Pod with a critical priority annotation. This needs to be automatically assigned
+		// system-cluster-critical
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "pod-w-system-priority",
+				Namespace:   "kube-system",
+				Annotations: map[string]string{"scheduler.alpha.kubernetes.io/critical-pod": ""},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+			},
+		},
+		// pod[8]: Pod with a system priority class name in non-system namespace
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-system-priority-in-nonsystem-namespace",
@@ -437,7 +453,7 @@ func TestPodAdmission(t *testing.T) {
 				PriorityClassName: scheduling.SystemClusterCritical,
 			},
 		},
-		// pod[8]: Pod with a priority value that matches the resolved priority
+		// pod[9]: Pod with a priority value that matches the resolved priority
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-zero-priority-in-nonsystem-namespace",
@@ -452,7 +468,7 @@ func TestPodAdmission(t *testing.T) {
 				Priority: &zeroPriority,
 			},
 		},
-		// pod[9]: Pod with a priority value that matches the resolved default priority
+		// pod[10]: Pod with a priority value that matches the resolved default priority
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-priority-matching-default-priority",
@@ -467,7 +483,7 @@ func TestPodAdmission(t *testing.T) {
 				Priority: &defaultClass2.Value,
 			},
 		},
-		// pod[10]: Pod with a priority value that matches the resolved priority
+		// pod[11]: Pod with a priority value that matches the resolved priority
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-priority-matching-resolved-default-priority",
@@ -483,7 +499,7 @@ func TestPodAdmission(t *testing.T) {
 				Priority:          &systemClusterCritical.Value,
 			},
 		},
-		// pod[11]: Pod without a preemption policy that matches the resolved preemption policy
+		// pod[12]: Pod without a preemption policy that matches the resolved preemption policy
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-never-preemption-policy-matching-resolved-preemption-policy",
@@ -500,7 +516,7 @@ func TestPodAdmission(t *testing.T) {
 				PreemptionPolicy:  nil,
 			},
 		},
-		// pod[12]: Pod with a preemption policy that matches the resolved preemption policy
+		// pod[13]: Pod with a preemption policy that matches the resolved preemption policy
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-preemption-policy-matching-resolved-preemption-policy",
@@ -517,7 +533,7 @@ func TestPodAdmission(t *testing.T) {
 				PreemptionPolicy:  &preemptLowerPriority,
 			},
 		},
-		// pod[13]: Pod with a preemption policy that does't match the resolved preemption policy
+		// pod[14]: Pod with a preemption policy that does't match the resolved preemption policy
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-preemption-policy-not-matching-resolved-preemption-policy",
@@ -535,6 +551,8 @@ func TestPodAdmission(t *testing.T) {
 			},
 		},
 	}
+	// Enable ExperimentalCriticalPodAnnotation feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	// Enable NonPreemptingPriority feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
 	tests := []struct {
@@ -621,9 +639,17 @@ func TestPodAdmission(t *testing.T) {
 			nil,
 		},
 		{
-			"pod with system critical priority in non-system namespace",
+			"pod with critical pod annotation",
 			[]*scheduling.PriorityClass{systemClusterCritical},
 			*pods[7],
+			scheduling.SystemCriticalPriority,
+			false,
+			nil,
+		},
+		{
+			"pod with system critical priority in non-system namespace",
+			[]*scheduling.PriorityClass{systemClusterCritical},
+			*pods[8],
 			scheduling.SystemCriticalPriority,
 			true,
 			nil,
@@ -631,7 +657,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			"pod with priority that matches computed priority",
 			[]*scheduling.PriorityClass{nondefaultClass1},
-			*pods[8],
+			*pods[9],
 			0,
 			false,
 			nil,
@@ -639,7 +665,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			"pod with priority that matches default priority",
 			[]*scheduling.PriorityClass{defaultClass2},
-			*pods[9],
+			*pods[10],
 			defaultClass2.Value,
 			false,
 			nil,
@@ -647,7 +673,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			"pod with priority that matches resolved priority",
 			[]*scheduling.PriorityClass{systemClusterCritical},
-			*pods[10],
+			*pods[11],
 			systemClusterCritical.Value,
 			false,
 			nil,
@@ -655,7 +681,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			"pod with nil preemtpion policy",
 			[]*scheduling.PriorityClass{preemptionPolicyClass},
-			*pods[11],
+			*pods[12],
 			preemptionPolicyClass.Value,
 			false,
 			nil,
@@ -663,7 +689,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			"pod with preemtpion policy that matches resolved preemtpion policy",
 			[]*scheduling.PriorityClass{preemptionPolicyClass},
-			*pods[12],
+			*pods[13],
 			preemptionPolicyClass.Value,
 			false,
 			&preemptLowerPriority,
@@ -671,7 +697,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			"pod with preemtpion policy that does't matches resolved preemtpion policy",
 			[]*scheduling.PriorityClass{preemptionPolicyClass},
-			*pods[13],
+			*pods[14],
 			preemptionPolicyClass.Value,
 			true,
 			&preemptLowerPriority,
