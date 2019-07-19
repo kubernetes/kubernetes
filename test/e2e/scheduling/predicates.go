@@ -562,7 +562,13 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, 1, 0, ns)
 	})
 
-	ginkgo.It("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
+	/*
+		Release : v1.16
+		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
+		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
+		if the HostIP or Protocol is different.
+	*/
+	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
 
 		nodeName := GetNodeThatCanRunPod(f)
 
@@ -589,7 +595,13 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		createHostPortPodOnNode(f, "pod3", ns, "127.0.0.2", port, v1.ProtocolUDP, nodeSelector, true)
 	})
 
-	ginkgo.It("validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP", func() {
+	/*
+		Release : v1.16
+		Testname: Scheduling, HostPort and Protocol match, HostIPs different but one is default HostIP (0.0.0.0)
+		Description: Pods with the same HostPort and Protocol, but different HostIPs, MUST NOT schedule to the
+		same node if one of those IPs is the default HostIP of 0.0.0.0, which represents all IPs on the host.
+	*/
+	framework.ConformanceIt("validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP", func() {
 		nodeName := GetNodeThatCanRunPod(f)
 
 		// use nodeSelector to make sure the testing pods get assigned on the same node to explicitly verify there exists conflict or not
