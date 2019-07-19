@@ -65,6 +65,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/event"
@@ -75,7 +76,6 @@ import (
 	"k8s.io/kubectl/pkg/util/slice"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 // Each level has 2 spaces for PrefixWriter

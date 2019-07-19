@@ -6,7 +6,8 @@ go_library(
         "install.go",
         "scheme.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/scheme",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/scheme",
+    importpath = "k8s.io/kubectl/pkg/scheme",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
@@ -48,20 +49,6 @@ go_library(
     ],
 )
 
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [":package-srcs"],
-    tags = ["automanaged"],
-    visibility = ["//visibility:public"],
-)
-
 go_test(
     name = "go_default_test",
     srcs = ["sparse_test.go"],
@@ -74,4 +61,18 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

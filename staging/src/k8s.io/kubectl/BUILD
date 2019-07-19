@@ -10,6 +10,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/kubectl/pkg/rawhttp:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/scheme:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/certificate:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/deployment:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/event:all-srcs",
