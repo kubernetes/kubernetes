@@ -23,6 +23,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -227,4 +228,58 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "failed to create pod")
 	return pod
+}
+
+// CSIInlineVolumesEnabled checks whether the running cluster has the CSIInlineVolumes feature gate enabled.
+// It does that by trying to create a pod that uses that feature.
+func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "csi-inline-volume-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "csi-volume-tester",
+					Image: "no-such-registry/no-such-image",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "my-volume",
+							MountPath: "/mnt/test",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: "my-volume",
+					VolumeSource: v1.VolumeSource{
+						CSI: &v1.CSIVolumeSource{
+							Driver: "no-such-driver.example.com",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod, err := c.CoreV1().Pods(ns).Create(pod)
+
+	switch {
+	case err == nil:
+		// Pod was created, feature supported.
+		StopPod(c, pod)
+		return true, nil
+	case errors.IsInvalid(err):
+		// "Invalid" because it uses a feature that isn't supported.
+		return false, nil
+	default:
+		// Unexpected error.
+		return false, err
+	}
 }

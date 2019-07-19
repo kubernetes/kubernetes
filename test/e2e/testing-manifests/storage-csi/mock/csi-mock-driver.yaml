@@ -48,7 +48,9 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: quay.io/k8scsi/mock-driver:v1.1.1
+          image: quay.io/k8scsi/mock-driver:v2.1.0
+          args:
+            - "--permissive-target-path" # because of https://github.com/kubernetes/kubernetes/issues/75535
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
