@@ -214,7 +214,7 @@ func (p *PodWrapper) Label(k, v string) *PodWrapper {
 	return p
 }
 
-// NodeWrapper wraps a LabelSelector inside.
+// NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 
 // MakeNode creates a Node wrapper.

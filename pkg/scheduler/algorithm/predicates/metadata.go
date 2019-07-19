@@ -202,8 +202,8 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		allNodeNames = append(allNodeNames, name)
 	}
 
+	errCh := schedutil.NewErrorChannel()
 	var lock sync.Mutex
-	var firstError error
 
 	topologyPairsPodSpreadMap := &topologyPairsPodSpreadMap{
 		// topologyKeyToMinPodsMap will be initilized with proper size later.
@@ -215,13 +215,6 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		topologyPairsPodSpreadMap.appendMaps(toAppend)
 		lock.Unlock()
 	}
-	catchError := func(err error) {
-		lock.Lock()
-		if firstError == nil {
-			firstError = err
-		}
-		lock.Unlock()
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -229,12 +222,11 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("node %q not found", allNodeNames[i]))
-			cancel()
+			klog.Errorf("node %q not found", allNodeNames[i])
 			return
 		}
-		// Be design if NodeAffinity or NodeSelector is defined, spreading is
-		// applied to nodes that pass those filters.
+		// In accordance to design, if NodeAffinity or NodeSelector is defined,
+		// spreading is applied to nodes that pass those filters.
 		if !podMatchesNodeSelectorAndAffinityTerms(pod, node) {
 			return
 		}
@@ -250,8 +242,7 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		for _, existingPod := range nodeInfo.Pods() {
 			ok, err := podMatchesAllSpreadConstraints(existingPod, pod.Namespace, constraints)
 			if err != nil {
-				catchError(err)
-				cancel()
+				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
 			if ok {
@@ -280,8 +271,8 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
 
-	if firstError != nil {
-		return nil, firstError
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, err
 	}
 
 	// calculate min match for each topology pair
@@ -395,19 +386,18 @@ func (m *topologyPairsMaps) clone() *topologyPairsMaps {
 	return copy
 }
 
-func (podSpreadMap *topologyPairsPodSpreadMap) clone() *topologyPairsPodSpreadMap {
-	// podSpreadMap could be nil when EvenPodsSpread feature is disabled
-	if podSpreadMap == nil {
+func (m *topologyPairsPodSpreadMap) clone() *topologyPairsPodSpreadMap {
+	// m could be nil when EvenPodsSpread feature is disabled
+	if m == nil {
 		return nil
 	}
 	copy := &topologyPairsPodSpreadMap{
 		topologyKeyToMinPodsMap: make(map[string]int32),
-		topologyPairsMaps:       newTopologyPairsMaps(),
+		topologyPairsMaps:       m.topologyPairsMaps.clone(),
 	}
-	for key, minMatched := range podSpreadMap.topologyKeyToMinPodsMap {
+	for key, minMatched := range m.topologyKeyToMinPodsMap {
 		copy.topologyKeyToMinPodsMap[key] = minMatched
 	}
-	copy.topologyPairsMaps.appendMaps(podSpreadMap.topologyPairsMaps)
 	return copy
 }
 
