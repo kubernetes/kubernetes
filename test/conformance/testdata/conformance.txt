@@ -9,6 +9,7 @@ test/e2e/apimachinery/garbage_collector.go: "should not delete dependents that h
 test/e2e/apimachinery/garbage_collector.go: "should not be blocked by dependency circle"
 test/e2e/apimachinery/namespace.go: "should ensure that all pods are removed when a namespace is deleted"
 test/e2e/apimachinery/namespace.go: "should ensure that all services are removed when a namespace is deleted"
+test/e2e/apimachinery/table_conversion.go: "should return a 406 for a backend which does not implement metadata"
 test/e2e/apimachinery/watch.go: "should observe add, update, and delete watch notifications on configmaps"
 test/e2e/apimachinery/watch.go: "should be able to start watching from a specific resource version"
 test/e2e/apimachinery/watch.go: "should be able to restart watching from the last resource version observed by the previous watch"
