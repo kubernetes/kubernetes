@@ -215,6 +215,7 @@ func (defaultFramer) NewFrameWriter(w io.Writer) io.Writer         { return w }
 type WithVersionEncoder struct {
 	Version GroupVersioner
 	Encoder
+	ObjectConvertor
 	ObjectTyper
 }
 
@@ -240,6 +241,14 @@ func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
 	err = e.Encoder.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)
 	return err
+}
+
+// CustomEncoder is an interface that allows intercepting encoding for
+// individual object to allow custom encoding.
+type CustomEncoder interface {
+	// InterceptEncode takes encoder that would have been used if the object
+	// didn't implement CustomEncoder interface.
+	InterceptEncode(encoder WithVersionEncoder, w io.Writer) error
 }
 
 // WithoutVersionDecoder clears the group version kind of a deserialized object.

@@ -195,6 +195,16 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
+	if customEncoder, ok := obj.(runtime.CustomEncoder); ok {
+		encoder := runtime.WithVersionEncoder{
+			Version:         c.encodeVersion,
+			Encoder:         c.encoder,
+			ObjectConvertor: c.convertor,
+			ObjectTyper:     c.typer,
+		}
+		return customEncoder.InterceptEncode(encoder, w)
+	}
+
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
 	if err != nil {
 		return err
