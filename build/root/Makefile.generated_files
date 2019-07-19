@@ -424,9 +424,9 @@ SAMPLEAPISERVER_KNOWN_VIOLATION_FILENAME := api/api-rules/sample_apiserver_viola
 
 APIMACHINERY_DEFAULT_TAG_FILES := vendor/k8s.io/apimachinery/pkg/apis/meta/v1/% vendor/k8s.io/apimachinery/pkg/runtime/% vendor/k8s.io/apimachinery/pkg/version/%
 
-KUBE_OPENAPI_TAG_FILES :=            $(filter-out vendor/k8s.io/code-generator/% vendor/k8s.io/kube-aggregator/% vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
+KUBE_OPENAPI_TAG_FILES :=            $(filter-out vendor/k8s.io/apiextensions-apiserver/% vendor/k8s.io/code-generator/% vendor/k8s.io/kube-aggregator/% vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
 AGGREGATOR_OPENAPI_TAG_FILES :=      $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/kube-aggregator/%, $(ALL_K8S_TAG_FILES))
-APIEXTENSIONS_OPENAPI_TAG_FILES :=   $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/apiextensions/% vendor/k8s.io/api/autoscaling/v1/%, $(ALL_K8S_TAG_FILES))
+APIEXTENSIONS_OPENAPI_TAG_FILES :=   $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/apiextensions-apiserver/% vendor/k8s.io/api/autoscaling/v1/%, $(ALL_K8S_TAG_FILES))
 CODEGEN_OPENAPI_TAG_FILES :=         $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/code-generator/%, $(ALL_K8S_TAG_FILES))
 SAMPLEAPISERVER_OPENAPI_TAG_FILES := $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
 

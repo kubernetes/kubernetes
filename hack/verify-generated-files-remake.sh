@@ -296,7 +296,7 @@ touch "${STAMP}"
 make generated_files >/dev/null
 X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
-./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/apiextensions-apiserver/pkg/client/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/kube-aggregator/pkg/client/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
@@ -341,7 +341,7 @@ touch "${STAMP}"
 make generated_files UPDATE_API_KNOWN_VIOLATIONS=true >/dev/null
 X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
-./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/apiextensions-apiserver/pkg/client/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/kube-aggregator/pkg/client/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then

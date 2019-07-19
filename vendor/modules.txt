@@ -1156,6 +1156,7 @@ k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/internalinte
 k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion
 k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1
+k8s.io/apiextensions-apiserver/pkg/client/openapi
 k8s.io/apiextensions-apiserver/pkg/cmd/server/options
 k8s.io/apiextensions-apiserver/pkg/cmd/server/testing
 k8s.io/apiextensions-apiserver/pkg/controller/apiapproval
@@ -1168,7 +1169,6 @@ k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2
 k8s.io/apiextensions-apiserver/pkg/controller/status
 k8s.io/apiextensions-apiserver/pkg/crdserverscheme
 k8s.io/apiextensions-apiserver/pkg/features
-k8s.io/apiextensions-apiserver/pkg/generated/openapi
 k8s.io/apiextensions-apiserver/pkg/registry/customresource
 k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor
 k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition

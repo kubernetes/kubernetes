@@ -6,6 +6,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 gen_openapi(
     outs = ["zz_generated.openapi.go"],
     exclude_pkgs = [
+        "staging/src/k8s.io/apiextensions-apiserver",
         "staging/src/k8s.io/code-generator",
         "staging/src/k8s.io/kube-aggregator",
         "staging/src/k8s.io/sample-apiserver",
