@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "globalflags.go",
+        "globalflags_legacyproviders.go",
         "options.go",
         "validation.go",
     ],

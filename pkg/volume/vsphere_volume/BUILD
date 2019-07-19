@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "attacher.go",
+        "doc.go",
         "vsphere_volume.go",
         "vsphere_volume_block.go",
         "vsphere_volume_util.go",

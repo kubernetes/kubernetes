@@ -19,6 +19,7 @@ go_library(
         "azure_dd_max_disk_count.go",
         "azure_mounter.go",
         "azure_provision.go",
+        "doc.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/azure_dd",
     deps = [

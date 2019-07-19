@@ -17,6 +17,7 @@ go_library(
         "aws_routes.go",
         "aws_utils.go",
         "device_allocator.go",
+        "doc.go",
         "instances.go",
         "log_handler.go",
         "retry_handler.go",
