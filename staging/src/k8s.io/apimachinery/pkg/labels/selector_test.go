@@ -395,9 +395,15 @@ func TestRequirementSelectorMatching(t *testing.T) {
 			getRequirement("y", selection.In, sets.NewString("alpha"), t),
 		}, false},
 		{Set{"y": ""}, &internalSelector{
+			getRequirement("x", selection.NotEquals, sets.NewString(""), t),
+		}, false},
+		{Set{"y": ""}, &internalSelector{
+			getRequirement("x", selection.NotIn, sets.NewString(""), t),
+		}, false},
+		{Set{"y": ""}, &internalSelector{
 			getRequirement("x", selection.NotIn, sets.NewString(""), t),
 			getRequirement("y", selection.Exists, nil, t),
-		}, true},
+		}, false},
 		{Set{"y": ""}, &internalSelector{
 			getRequirement("x", selection.DoesNotExist, nil, t),
 			getRequirement("y", selection.Exists, nil, t),

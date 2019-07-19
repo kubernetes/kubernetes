@@ -198,7 +198,7 @@ func (r *Requirement) Matches(ls Labels) bool {
 		return r.hasValue(ls.Get(r.key))
 	case selection.NotIn, selection.NotEquals:
 		if !ls.Has(r.key) {
-			return true
+			return false
 		}
 		return !r.hasValue(ls.Get(r.key))
 	case selection.Exists:
