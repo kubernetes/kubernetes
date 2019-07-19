@@ -212,7 +212,7 @@ var _ = SIGDescribe("Job", func() {
 		)).To(gomega.Succeed(), "wait for pod %q to be released", pod.Name)
 	})
 
-	ginkgo.It("should exceed backoffLimit", func() {
+	ginkgo.It("should fail to exceed backoffLimit", func() {
 		ginkgo.By("Creating a job")
 		backoff := 1
 		job := jobutil.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
