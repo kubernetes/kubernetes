@@ -41,6 +41,7 @@ import (
 	"strconv"
 
 	"github.com/onsi/ginkgo"
+	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -354,6 +355,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
 			},
+			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
 	}
 }

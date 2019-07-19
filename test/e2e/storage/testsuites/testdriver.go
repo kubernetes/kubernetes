@@ -160,11 +160,19 @@ type DriverInfo struct {
 	InTreePluginName string
 	FeatureTag       string // FeatureTag for the driver
 
-	MaxFileSize          int64               // Max file size to be tested for this driver
-	SupportedFsType      sets.String         // Map of string for supported fs type
-	SupportedMountOption sets.String         // Map of string for supported mount option
-	RequiredMountOption  sets.String         // Map of string for required mount option (Optional)
-	Capabilities         map[Capability]bool // Map that represents plugin capabilities
+	// Max file size to be tested for this driver
+	MaxFileSize int64
+	// Map of string for supported fs type
+	SupportedFsType sets.String
+	// Map of string for supported mount option
+	SupportedMountOption sets.String
+	// [Optional] Map of string for required mount option
+	RequiredMountOption sets.String
+	// Map that represents plugin capabilities
+	Capabilities map[Capability]bool
+	// [Optional] List of access modes required for provisioning, defaults to
+	// RWO if unset
+	RequiredAccessModes []v1.PersistentVolumeAccessMode
 }
 
 // PerTestConfig represents parameters that control test execution.
