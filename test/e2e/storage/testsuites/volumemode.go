@@ -139,10 +139,11 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}
 				l.sc.VolumeBindingMode = &volBindMode
 
-				claimSize := dDriver.GetClaimSize()
-				l.pvc = getClaim(claimSize, l.ns.Name)
-				l.pvc.Spec.StorageClassName = &l.sc.Name
-				l.pvc.Spec.VolumeMode = &pattern.VolMode
+				l.pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+					ClaimSize:        dDriver.GetClaimSize(),
+					StorageClassName: &(l.sc.Name),
+					VolumeMode:       &pattern.VolMode,
+				}, l.ns.Name)
 			}
 		default:
 			e2elog.Failf("Volume mode test doesn't support: %s", pattern.VolType)

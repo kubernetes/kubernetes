@@ -88,8 +88,10 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		framework.ExpectNoError(err, "Error creating resizable storage class: %v", err)
 		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
 
-		pvc = getClaim("2Gi", ns)
-		pvc.Spec.StorageClassName = &resizableSc.Name
+		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			StorageClassName: &(resizableSc.Name),
+			ClaimSize:        "2Gi",
+		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err, "Error creating pvc: %v", err)
 

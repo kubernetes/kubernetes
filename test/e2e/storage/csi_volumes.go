@@ -119,8 +119,11 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
 	}
 	test.Client = cs
-	test.Claim = newClaim(test, namespace, suffix)
-	test.Claim.Spec.StorageClassName = &class.Name
+	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		ClaimSize:        test.ClaimSize,
+		StorageClassName: &(class.Name),
+		VolumeMode:       &test.VolumeMode,
+	}, namespace)
 	test.Class = class
 
 	if delayBinding {
@@ -150,8 +153,11 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	test.Client = cs
 	test.Class = newStorageClass(test, namespace, suffix)
 	addSingleCSIZoneAllowedTopologyToStorageClass(cs, test.Class, pvZone)
-	test.Claim = newClaim(test, namespace, suffix)
-	test.Claim.Spec.StorageClassName = &test.Class.Name
+	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		ClaimSize:        test.ClaimSize,
+		StorageClassName: &(test.Class.Name),
+		VolumeMode:       &test.VolumeMode,
+	}, namespace)
 	if delayBinding {
 		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
 	} else {

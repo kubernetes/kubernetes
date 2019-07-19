@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -202,7 +201,8 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
 			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, pattern.FsType, r.volume)
 			if pvSource != nil {
-				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false, pattern.VolMode)
+				r.pv, r.pvc = createPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, pattern.VolMode)
+				r.volSource = createVolumeSource(r.pvc.Name, false /* readOnly */)
 			}
 			r.volType = fmt.Sprintf("%s-preprovisionedPV", dInfo.Name)
 		}
@@ -225,8 +225,9 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			framework.ExpectNoError(err)
 
 			if r.sc != nil {
-				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPVFromDynamicProvisionSC(
-					f, dInfo.Name, claimSize, r.sc, false, pattern.VolMode)
+				r.pv, r.pvc = createPVCPVFromDynamicProvisionSC(
+					f, dInfo.Name, claimSize, r.sc, pattern.VolMode)
+				r.volSource = createVolumeSource(r.pvc.Name, false /* readOnly */)
 			}
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
@@ -239,6 +240,16 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 	}
 
 	return &r
+}
+
+func createVolumeSource(pvcName string, readOnly bool) *v1.VolumeSource {
+	return &v1.VolumeSource{
+		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: pvcName,
+			ReadOnly:  readOnly,
+		},
+	}
+
 }
 
 // cleanupResource cleans up genericVolumeTestResource
@@ -283,14 +294,13 @@ func (r *genericVolumeTestResource) cleanupResource() {
 	}
 }
 
-func createVolumeSourceWithPVCPV(
+func createPVCPV(
 	f *framework.Framework,
 	name string,
 	pvSource *v1.PersistentVolumeSource,
 	volumeNodeAffinity *v1.VolumeNodeAffinity,
-	readOnly bool,
 	volMode v1.PersistentVolumeMode,
-) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix:       fmt.Sprintf("%s-", name),
 		StorageClassName: f.Namespace.Name,
@@ -314,32 +324,31 @@ func createVolumeSourceWithPVCPV(
 	err = framework.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
 	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
-	volSource := &v1.VolumeSource{
-		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-			ClaimName: pvc.Name,
-			ReadOnly:  readOnly,
-		},
-	}
-	return volSource, pv, pvc
+	return pv, pvc
 }
 
-func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
+func createPVCPVFromDynamicProvisionSC(
 	f *framework.Framework,
 	name string,
 	claimSize string,
 	sc *storagev1.StorageClass,
-	readOnly bool,
 	volMode v1.PersistentVolumeMode,
-) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	cs := f.ClientSet
 	ns := f.Namespace.Name
 
 	ginkgo.By("creating a claim")
-	pvc := getClaim(claimSize, ns)
-	pvc.Spec.StorageClassName = &sc.Name
-	if volMode != "" {
-		pvc.Spec.VolumeMode = &volMode
+	pvcCfg := framework.PersistentVolumeClaimConfig{
+		NamePrefix:       name,
+		ClaimSize:        claimSize,
+		StorageClassName: &(sc.Name),
 	}
+
+	if len(volMode) != 0 {
+		pvcCfg.VolumeMode = &volMode
+	}
+
+	pvc := framework.MakePersistentVolumeClaim(pvcCfg, ns)
 
 	var err error
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
@@ -359,13 +368,7 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 		framework.ExpectNoError(err)
 	}
 
-	volSource := &v1.VolumeSource{
-		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-			ClaimName: pvc.Name,
-			ReadOnly:  readOnly,
-		},
-	}
-	return volSource, pv, pvc
+	return pv, pvc
 }
 
 func isDelayedBinding(sc *storagev1.StorageClass) bool {
@@ -373,27 +376,6 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
 	}
 	return false
-}
-
-func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
-	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-",
-			Namespace:    ns,
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
-				},
-			},
-		},
-	}
-
-	return &claim
 }
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"

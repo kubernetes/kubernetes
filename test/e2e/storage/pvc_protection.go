@@ -47,12 +47,16 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
 		ginkgo.By("Creating a PVC")
-		suffix := "pvc-protection"
+		prefix := "pvc-protection"
 		framework.SkipIfNoDefaultStorageClass(client)
-		testStorageClass := testsuites.StorageClassTest{
+		t := testsuites.StorageClassTest{
 			ClaimSize: "1Gi",
 		}
-		pvc = newClaim(testStorageClass, nameSpace, suffix)
+		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			NamePrefix: prefix,
+			ClaimSize:  t.ClaimSize,
+			VolumeMode: &t.VolumeMode,
+		}, nameSpace)
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err, "Error creating PVC")
 		pvcCreatedAndNotDeleted = true
