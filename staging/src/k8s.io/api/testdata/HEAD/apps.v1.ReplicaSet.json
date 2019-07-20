@@ -1045,23 +1045,44 @@
         "preemptionPolicy": "ʜ_ȭwɵ糫武诰ð",
         "overhead": {
           "娒Ġ滔xvŗÑ\"虆k遚釾ŉ{": "803"
-        }
+        },
+        "topologySpreadConstraints": [
+          {
+            "maxSkew": -1531421126,
+            "topologyKey": "349",
+            "whenUnsatisfiable": "墘ȕûy\u003cvĝ線Ưȫ喆5O2.",
+            "labelSelector": {
+              "matchLabels": {
+                "7s4483-o--3f1p7--43nw-l-x18mtxb--kexr-1-o--g--1l8.bc-coa--y--4-1204wrb---1024g-5-3v9-9jcz9f-6-4g-z46--f2t-k/db-L7.-__-G_2kCpSY": "0"
+              },
+              "matchExpressions": [
+                {
+                  "key": "vf3q-z-5z80n--t5--9-4-d2-22--i--40wv--in-870w--it6k47-7yd-y-3/hjO",
+                  "operator": "NotIn",
+                  "values": [
+                    "c.q.8_00.0_._.-_L-__bf_9_-C-PfNxG"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
       }
     }
   },
   "status": {
-    "replicas": 1226704591,
-    "fullyLabeledReplicas": 801466911,
-    "readyReplicas": -545107118,
-    "availableReplicas": -746105654,
-    "observedGeneration": 4456040724914385859,
+    "replicas": -1530496417,
+    "fullyLabeledReplicas": -1698525469,
+    "readyReplicas": -525943726,
+    "availableReplicas": -578926701,
+    "observedGeneration": 8034206547748752944,
     "conditions": [
       {
-        "type": "\u003cvĝ線Ưȫ喆5O2.:鑋Ļ",
-        "status": "H筆U锟蕞纥奆0ǔ廘ɵ岳v\u0026ȝxɕū",
-        "lastTransitionTime": "2732-10-05T01:06:26Z",
-        "reason": "349",
-        "message": "350"
+        "type": "Î磣:mʂ渢pɉ驻(+昒ȼȈɍ颬灲",
+        "status": "\u003e堵zŕƧ钖孝0蛮xAǫ\u0026tŧK剛Ʀ",
+        "lastTransitionTime": "2837-10-14T23:23:27Z",
+        "reason": "356",
+        "message": "357"
       }
     ]
   }

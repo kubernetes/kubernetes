@@ -508,6 +508,18 @@ template:
       operator: ŜŲ&洪y儕lmò
       tolerationSeconds: -2713809069228546579
       value: "335"
+    topologySpreadConstraints:
+    - labelSelector:
+        matchExpressions:
+        - key: x3zm-lx300w-tj-35840-w4g-27-5sx6dbp-72q--m--2k-p---19/6l.-5_BZk5v3aUK_--_o_2.--4ZH
+          operator: NotIn
+          values:
+          - M.--_-_ve5.m_2_--XZ-x.__.Y_2-n_503
+        matchLabels:
+          d4----q-x3w3dn5-1rhm-5y--z---69o-9-69mxv7.05-6-1xr-7---064eqk5--f4e4--r1k278l-d8/NN-S..O-BZ..6-1.S-BX: o5-yp8q_s-1_g
+      maxSkew: -12553907
+      topologyKey: "344"
+      whenUnsatisfiable: 4ƫZɀȩ愉BʟƮƙ
     volumes:
     - awsElasticBlockStore:
         fsType: "50"
