@@ -44,13 +44,13 @@ func TestReferenceTypename(t *testing.T) {
 			// Kind is "Object"
 			name:     "test1",
 			path:     []string{},
-			expected: "Object",
+			expected: "OneKind",
 		},
 		{
 			// Reference is equal to pointed type "Object"
 			name:     "test2",
 			path:     []string{"field1"},
-			expected: "Object",
+			expected: "OtherKind",
 		},
 		{
 			// Reference is equal to pointed type "string"

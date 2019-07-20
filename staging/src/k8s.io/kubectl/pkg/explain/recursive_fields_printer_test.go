@@ -34,7 +34,7 @@ func TestRecursiveFields(t *testing.T) {
 		t.Fatal("Couldn't find schema v1.OneKind")
 	}
 
-	want := `field1	<Object>
+	want := `field1	<OtherKind>
    array	<[]integer>
    int	<integer>
    object	<map[string]string>
@@ -72,13 +72,13 @@ func TestRecursiveFieldsWithSelfReferenceObjects(t *testing.T) {
 		t.Fatal("Couldn't find schema v2.OneKind")
 	}
 
-	want := `field1	<Object>
-   referencefield	<Object>
-   referencesarray	<[]Object>
-field2	<Object>
-   reference	<Object>
-      referencefield	<Object>
-      referencesarray	<[]Object>
+	want := `field1	<ReferenceKind>
+   referencefield	<ReferenceKind>
+   referencesarray	<[]ReferenceKind>
+field2	<OtherKind>
+   reference	<ReferenceKind>
+      referencefield	<ReferenceKind>
+      referencesarray	<[]ReferenceKind>
    string	<string>
 `
 

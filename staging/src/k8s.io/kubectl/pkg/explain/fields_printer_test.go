@@ -33,7 +33,7 @@ func TestFields(t *testing.T) {
 		t.Fatal("Couldn't find schema v1.OneKind")
 	}
 
-	want := `field1	<Object> -required-
+	want := `field1	<OtherKind> -required-
   Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla ut lacus ac
   enim vulputate imperdiet ac accumsan risus. Integer vel accumsan lectus.
   Praesent tempus nulla id tortor luctus, quis varius nulla laoreet. Ut orci

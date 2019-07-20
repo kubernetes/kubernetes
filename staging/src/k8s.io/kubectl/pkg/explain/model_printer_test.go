@@ -46,7 +46,7 @@ DESCRIPTION:
      OneKind has a short description
 
 FIELDS:
-   field1	<Object> -required-
+   field1	<OtherKind> -required-
      Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla ut lacus ac
      enim vulputate imperdiet ac accumsan risus. Integer vel accumsan lectus.
      Praesent tempus nulla id tortor luctus, quis varius nulla laoreet. Ut orci
@@ -65,7 +65,7 @@ FIELDS:
 			want: `KIND:     OneKind
 VERSION:  v1
 
-RESOURCE: field1 <Object>
+RESOURCE: field1 <OtherKind>
 
 DESCRIPTION:
      Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla ut lacus ac
