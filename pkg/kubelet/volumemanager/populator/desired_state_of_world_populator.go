@@ -178,6 +178,14 @@ func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {
 	return util.IsPodTerminated(pod, podStatus)
 }
 
+func (dswp *desiredStateOfWorldPopulator) isPodTerminating(pod *v1.Pod) bool {
+	podStatus, found := dswp.podStatusProvider.GetPodStatus(pod.UID)
+	if !found {
+		podStatus = pod.Status
+	}
+	return util.IsPodTerminating(pod, podStatus)
+}
+
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
@@ -196,8 +204,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 
 	processedVolumesForFSResize := sets.NewString()
 	for _, pod := range dswp.podManager.GetPods() {
-		if dswp.isPodTerminated(pod) {
-			// Do not (re)add volumes for terminated pods
+		if dswp.isPodTerminating(pod) {
+			// Do not (re)add volumes for terminating pods
 			continue
 		}
 		dswp.processPodVolumes(pod, mountedVolumesForPod, processedVolumesForFSResize)

@@ -376,6 +376,11 @@ func IsPodTerminated(pod *v1.Pod, podStatus v1.PodStatus) bool {
 	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
 }
 
+// IsPodTerminating checks if pod is terminating
+func IsPodTerminating(pod *v1.Pod, podStatus v1.PodStatus) bool {
+	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || pod.DeletionTimestamp != nil
+}
+
 // notRunning returns true if every status is terminated or waiting, or the status list
 // is empty.
 func notRunning(statuses []v1.ContainerStatus) bool {
