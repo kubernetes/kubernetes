@@ -36,9 +36,9 @@ func (t *typeName) VisitArray(a *proto.Array) {
 	t.Name = fmt.Sprintf("[]%s", s.Name)
 }
 
-// VisitKind just returns "Object".
+// VisitKind returns the path of the kind.
 func (t *typeName) VisitKind(k *proto.Kind) {
-	t.Name = "Object"
+	t.Name = k.GetPath().String()
 }
 
 // VisitMap adds the map[string] prefix and recurses.
