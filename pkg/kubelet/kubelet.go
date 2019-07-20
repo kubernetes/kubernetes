@@ -1594,8 +1594,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		// should be killed intermittently and brought back up
 		// under the qos cgroup hierarchy.
 		// Check if this is the pod's first sync
+		// The application of resource parameters should affect init containers as well.
 		firstSync := true
-		for _, containerStatus := range apiPodStatus.ContainerStatuses {
+		for _, containerStatus := range append(apiPodStatus.InitContainerStatuses, apiPodStatus.ContainerStatuses...) {
 			if containerStatus.State.Running != nil {
 				firstSync = false
 				break
