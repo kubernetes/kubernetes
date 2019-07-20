@@ -1767,11 +1767,9 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
 		matchNum := len(topologyPairsPodSpreadMap.topologyPairToPods[pair])
 
-		// TODO(Huang-Wei): remove this after thorough testing
-		// fmt.Printf("node '%s' => spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) ?<= maxSkew(%d)\n", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
-
-		// TODO(Huang-Wei): check if it can overflow?
-		if int32(matchNum+selfMatchNum)-minMatchNum > constraint.MaxSkew {
+		// cast to int to avoid potential overflow.
+		skew := matchNum + selfMatchNum - int(minMatchNum)
+		if skew > int(constraint.MaxSkew) {
 			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
 		}
