@@ -35,7 +35,7 @@ func fieldsSet(f metav1.Fields, path fieldpath.Path, set *fieldpath.Set) error {
 			set.Insert(path)
 			continue
 		}
-		pe, err := NewPathElement(k)
+		pe, err := fieldpath.DeserializePathElement(k)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func SetToFields(s fieldpath.Set) (metav1.Fields, error) {
 		tf := f
 		for _, pe := range path {
 			var str string
-			str, err = PathElementString(pe)
+			str, err = fieldpath.SerializePathElement(pe)
 			if err != nil {
 				break
 			}

@@ -74,7 +74,7 @@ func TestFieldsToSetError(t *testing.T) {
 					},
 				},
 			},
-			errString: "invalid character",
+			errString: "error found",
 		},
 	}
 
@@ -97,7 +97,7 @@ func TestSetToFieldsError(t *testing.T) {
 	}{
 		{
 			set:       *fieldpath.NewSet(invalidPath),
-			errString: "Invalid type of path element",
+			errString: "invalid PathElement",
 		},
 	}
 
