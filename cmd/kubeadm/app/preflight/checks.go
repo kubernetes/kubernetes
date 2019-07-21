@@ -297,7 +297,7 @@ func (fac FileAvailableCheck) Check() (warnings, errorList []error) {
 	return nil, errorList
 }
 
-// FileExistingCheck checks that the given file does not already exist.
+// FileExistingCheck checks that the given file does already exist.
 type FileExistingCheck struct {
 	Path  string
 	Label string
