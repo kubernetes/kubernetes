@@ -165,6 +165,13 @@ func GetExtraParameters(overrides map[string]string, defaults map[string]string)
 	return command
 }
 
+// CheckStaticPodExists checks if a static pod file exists on disk
+func CheckStaticPodExists(componentName, manifestDir string) bool {
+	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
+	_, certErr := os.Stat(filename)
+	return certErr == nil
+}
+
 // WriteStaticPodToDisk writes a static pod file to disk
 func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 

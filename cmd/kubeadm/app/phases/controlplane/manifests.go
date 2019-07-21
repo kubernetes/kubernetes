@@ -124,11 +124,14 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfigurati
 		}
 
 		// writes the StaticPodSpec to disk
-		if err := staticpodutil.WriteStaticPodToDisk(componentName, manifestDir, spec); err != nil {
-			return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
+		if !staticpodutil.CheckStaticPodExists(componentName, manifestDir) {
+			if err := staticpodutil.WriteStaticPodToDisk(componentName, manifestDir, spec); err != nil {
+				return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
+			}
+			klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
+	  } else {
+			klog.V(1).Infof("[control-plane] using the existing static Pod manifest for component %q\n", componentName)
 		}
-
-		klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
 	}
 
 	return nil
