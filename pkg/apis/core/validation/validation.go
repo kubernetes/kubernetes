@@ -5576,7 +5576,7 @@ type spreadConstraintPair struct {
 func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstraint, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	var existingConstraintPairs []spreadConstraintPair
+	existingConstraintPairs := map[spreadConstraintPair]struct{}{}
 	for i, constraint := range constraints {
 		subFldPath := fldPath.Index(i)
 		if err := ValidateMaxSkew(subFldPath.Child("maxSkew"), constraint.MaxSkew); err != nil {
@@ -5596,7 +5596,7 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := ValidateSpreadConstraintPair(subFldPath.Child("{topologyKey, whenUnsatisfiable}"), pair, existingConstraintPairs); err != nil {
 			allErrs = append(allErrs, err)
 		} else {
-			existingConstraintPairs = append(existingConstraintPairs, pair)
+			existingConstraintPairs[pair] = struct{}{}
 		}
 	}
 
@@ -5628,12 +5628,9 @@ func ValidateWhenUnsatisfiable(fldPath *field.Path, action core.UnsatisfiableCon
 }
 
 // ValidateSpreadConstraintPair tests that if `pair` exists in `existingConstraintPairs`.
-func ValidateSpreadConstraintPair(fldPath *field.Path, pair spreadConstraintPair, existingConstraintPairs []spreadConstraintPair) *field.Error {
-	for _, existingPair := range existingConstraintPairs {
-		if pair.topologyKey == existingPair.topologyKey &&
-			pair.whenUnsatisfiable == existingPair.whenUnsatisfiable {
-			return field.Duplicate(fldPath, pair)
-		}
+func ValidateSpreadConstraintPair(fldPath *field.Path, pair spreadConstraintPair, existingConstraintPairs map[spreadConstraintPair]struct{}) *field.Error {
+	if _, ok := existingConstraintPairs[pair]; ok {
+		return field.Duplicate(fldPath, pair)
 	}
 	return nil
 }
