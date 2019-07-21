@@ -1762,23 +1762,28 @@ type ContainerPort struct {
 // VolumeMount describes a mounting of a Volume within a container.
 type VolumeMount struct {
 	// This must match the Name of a Volume.
+	// +k8s:openapi-gen=x-kubernetes-explain-category:1.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Mounted read-only if true, read-write otherwise (false or unspecified).
 	// Defaults to false.
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 	// Path within the container at which the volume should be mounted.  Must
 	// not contain ':'.
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.
 	MountPath string `json:"mountPath" protobuf:"bytes,3,opt,name=mountPath"`
 	// Path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.
 	SubPath string `json:"subPath,omitempty" protobuf:"bytes,4,opt,name=subPath"`
 	// mountPropagation determines how mounts are propagated from the host
 	// to container and the other way around.
 	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.
 	MountPropagation *MountPropagationMode `json:"mountPropagation,omitempty" protobuf:"bytes,5,opt,name=mountPropagation,casttype=MountPropagationMode"`
 	// Expanded path within the volume from which the container's volume should be mounted.
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
@@ -1786,6 +1791,7 @@ type VolumeMount struct {
 	// SubPathExpr and SubPath are mutually exclusive.
 	// This field is beta in 1.15.
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
 }
 
@@ -1841,6 +1847,7 @@ type EnvVar struct {
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Source for the environment variable's value. Cannot be used if value is not empty.
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
@@ -1909,12 +1916,15 @@ type SecretKeySelector struct {
 type EnvFromSource struct {
 	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:1.
 	Prefix string `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
 	// The ConfigMap to select from
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.
 	ConfigMapRef *ConfigMapEnvSource `json:"configMapRef,omitempty" protobuf:"bytes,2,opt,name=configMapRef"`
 	// The Secret to select from
 	// +optional
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.
 	SecretRef *SecretEnvSource `json:"secretRef,omitempty" protobuf:"bytes,3,opt,name=secretRef"`
 }
 
@@ -2106,14 +2116,14 @@ type Container struct {
 	// Name of the container specified as a DNS_LABEL.
 	// Each container in a pod must have a unique name (DNS_LABEL).
 	// Cannot be updated.
-	// +k8s:openapi-gen=x-kubernetes-category:1.identification
+	// +k8s:openapi-gen=x-kubernetes-explain-category:1.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Docker image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	// This field is optional to allow higher level config management to default or override
 	// container images in workload controllers like Deployments and StatefulSets.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:2.image
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.image
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's ENTRYPOINT is used if this is not provided.
@@ -2124,7 +2134,7 @@ type Container struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.entrypoint
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.entrypoint
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
 	// Arguments to the entrypoint.
 	// The docker image's CMD is used if this is not provided.
@@ -2135,14 +2145,14 @@ type Container struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.entrypoint
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.entrypoint
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	// Container's working directory.
 	// If not specified, the container runtime's default will be used, which
 	// might be configured in the container image.
 	// Cannot be updated.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.entrypoint
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.entrypoint
 	WorkingDir string `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
 	// List of ports to expose from the container. Exposing a port here gives
 	// the system additional information about the network connections a
@@ -2157,7 +2167,8 @@ type Container struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
-	// +k8s:openapi-gen=x-kubernetes-category:4.ports
+	// +k8s:openapi-gen=x-kubernetes-explain-category:4.ports
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
@@ -2166,48 +2177,53 @@ type Container struct {
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:5.environment-variables
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.environment-variables
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	// +k8s:openapi-gen=x-kubernetes-category:5.environment-variables
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.environment-variables
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:7.resources
+	// +k8s:openapi-gen=x-kubernetes-explain-category:7.resources
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Pod volumes to mount into the container's filesystem.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=mountPath
 	// +patchStrategy=merge
-	// +k8s:openapi-gen=x-kubernetes-category:6.volumes
+	// +k8s:openapi-gen=x-kubernetes-explain-category:6.volumes
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
 	// This is a beta feature.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:6.volumes
+	// +k8s:openapi-gen=x-kubernetes-explain-category:6.volumes
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
 	// Periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:8.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:8.lifecycle
 	LivenessProbe *Probe `json:"livenessProbe,omitempty" protobuf:"bytes,10,opt,name=livenessProbe"`
 	// Periodic probe of container service readiness.
 	// Container will be removed from service endpoints if the probe fails.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:8.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:8.lifecycle
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty" protobuf:"bytes,11,opt,name=readinessProbe"`
 	// StartupProbe indicates that the Pod has successfully initialized.
 	// If specified, no other probes are executed until this completes successfully.
@@ -2222,7 +2238,8 @@ type Container struct {
 	// Actions that the management system should take in response to container lifecycle events.
 	// Cannot be updated.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:8.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:8.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-expand:
 	Lifecycle *Lifecycle `json:"lifecycle,omitempty" protobuf:"bytes,12,opt,name=lifecycle"`
 	// Optional: Path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.
@@ -2232,7 +2249,7 @@ type Container struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:8.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:8.lifecycle
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -2242,7 +2259,7 @@ type Container struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:8.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:8.lifecycle
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -2250,13 +2267,13 @@ type Container struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:2.image
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.image
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
 	// Security options the pod should run with.
 	// More info: https://kubernetes.io/docs/concepts/policy/security-context/
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:9.security
+	// +k8s:openapi-gen=x-kubernetes-explain-category:9.security
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
@@ -2266,7 +2283,7 @@ type Container struct {
 	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:20.debug
+	// +k8s:openapi-gen=x-kubernetes-explain-category:20.debug
 	Stdin bool `json:"stdin,omitempty" protobuf:"varint,16,opt,name=stdin"`
 	// Whether the container runtime should close the stdin channel after it has been opened by
 	// a single attach. When stdin is true the stdin stream will remain open across multiple attach
@@ -2276,12 +2293,12 @@ type Container struct {
 	// flag is false, a container processes that reads from stdin will never receive an EOF.
 	// Default is false
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:20.debug
+	// +k8s:openapi-gen=x-kubernetes-explain-category:20.debug
 	StdinOnce bool `json:"stdinOnce,omitempty" protobuf:"varint,17,opt,name=stdinOnce"`
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:20.debug
+	// +k8s:openapi-gen=x-kubernetes-explain-category:20.debug
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
 }
 
@@ -2856,7 +2873,7 @@ type PodSpec struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
-	// +k8s:openapi-gen=x-kubernetes-category:2.volumes
+	// +k8s:openapi-gen=x-kubernetes-explain-category:2.volumes
 	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
 	// List of initialization containers belonging to the pod.
 	// Init containers are executed in order prior to containers being started. If any
@@ -2873,7 +2890,7 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	// +k8s:openapi-gen=x-kubernetes-category:1.containers
+	// +k8s:openapi-gen=x-kubernetes-explain-category:1.containers
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
@@ -2881,7 +2898,7 @@ type PodSpec struct {
 	// Cannot be updated.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	// +k8s:openapi-gen=x-kubernetes-category:1.containers
+	// +k8s:openapi-gen=x-kubernetes-explain-category:1.containers
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
 	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
@@ -2897,7 +2914,7 @@ type PodSpec struct {
 	// Default to Always.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:4.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:4.lifecycle
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates delete immediately.
@@ -2907,13 +2924,13 @@ type PodSpec struct {
 	// Set this value longer than the expected cleanup time for your process.
 	// Defaults to 30 seconds.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:4.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:4.lifecycle
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,4,opt,name=terminationGracePeriodSeconds"`
 	// Optional duration in seconds the pod may be active on the node relative to
 	// StartTime before the system will actively try to mark it failed and kill associated containers.
 	// Value must be a positive integer.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:4.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:4.lifecycle
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// Set DNS policy for the pod.
 	// Defaults to "ClusterFirst".
@@ -2922,55 +2939,55 @@ type PodSpec struct {
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:5.name-resolution
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.name-resolution
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:7.service-account
+	// +k8s:openapi-gen=x-kubernetes-explain-category:7.service-account
 	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
 	// DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
 	// Deprecated: Use serviceAccountName instead.
 	// +k8s:conversion-gen=false
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:7.service-account
+	// +k8s:openapi-gen=x-kubernetes-explain-category:7.service-account
 	DeprecatedServiceAccount string `json:"serviceAccount,omitempty" protobuf:"bytes,9,opt,name=serviceAccount"`
 	// AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:7.service-account
+	// +k8s:openapi-gen=x-kubernetes-explain-category:7.service-account
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty" protobuf:"varint,21,opt,name=automountServiceAccountToken"`
 
 	// NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
 	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
 	// requirements.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
 	// Host networking requested for this pod. Use the host's network namespace.
 	// If this option is set, the ports that will be used must be specified.
 	// Default to false.
 	// +k8s:conversion-gen=false
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:6.host-namespaces
+	// +k8s:openapi-gen=x-kubernetes-explain-category:6.host-namespaces
 	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,11,opt,name=hostNetwork"`
 	// Use the host's pid namespace.
 	// Optional: Default to false.
 	// +k8s:conversion-gen=false
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:6.host-namespaces
+	// +k8s:openapi-gen=x-kubernetes-explain-category:6.host-namespaces
 	HostPID bool `json:"hostPID,omitempty" protobuf:"varint,12,opt,name=hostPID"`
 	// Use the host's ipc namespace.
 	// Optional: Default to false.
 	// +k8s:conversion-gen=false
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:6.host-namespaces
+	// +k8s:openapi-gen=x-kubernetes-explain-category:6.host-namespaces
 	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,13,opt,name=hostIPC"`
 	// Share a single process namespace between all of the containers in a pod.
 	// When this is set containers will be able to view and signal processes from other containers
@@ -2980,12 +2997,12 @@ type PodSpec struct {
 	// This field is beta-level and may be disabled with the PodShareProcessNamespace feature.
 	// +k8s:conversion-gen=false
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:6.host-namespaces
+	// +k8s:openapi-gen=x-kubernetes-explain-category:6.host-namespaces
 	ShareProcessNamespace *bool `json:"shareProcessNamespace,omitempty" protobuf:"varint,27,opt,name=shareProcessNamespace"`
 	// SecurityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:8.security
+	// +k8s:openapi-gen=x-kubernetes-explain-category:8.security
 	SecurityContext *PodSecurityContext `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use. For example,
@@ -2994,37 +3011,37 @@ type PodSpec struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	// +k8s:openapi-gen=x-kubernetes-category:1.containers
+	// +k8s:openapi-gen=x-kubernetes-explain-category:1.containers
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,15,rep,name=imagePullSecrets"`
 	// Specifies the hostname of the Pod
 	// If not specified, the pod's hostname will be set to a system-defined value.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:5.name-resolution
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.name-resolution
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,16,opt,name=hostname"`
 	// If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:5.name-resolution
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.name-resolution
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
 	// If specified, the pod's scheduling constraints
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	Affinity *Affinity `json:"affinity,omitempty" protobuf:"bytes,18,opt,name=affinity"`
 	// If specified, the pod will be dispatched by specified scheduler.
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 	// If specified, the pod's tolerations.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
 	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
 	// +patchMergeKey=ip
 	// +patchStrategy=merge
-	// +k8s:openapi-gen=x-kubernetes-category:5.name-resolution
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.name-resolution
 	HostAliases []HostAlias `json:"hostAliases,omitempty" patchStrategy:"merge" patchMergeKey:"ip" protobuf:"bytes,23,rep,name=hostAliases"`
 	// If specified, indicates the pod's priority. "system-node-critical" and
 	// "system-cluster-critical" are two special keywords which indicate the
@@ -3033,7 +3050,7 @@ type PodSpec struct {
 	// If not specified, the pod priority will be default or zero if there is no
 	// default.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,24,opt,name=priorityClassName"`
 	// The priority value. Various system components use this field to find the
 	// priority of the pod. When Priority Admission Controller is enabled, it
@@ -3041,20 +3058,20 @@ type PodSpec struct {
 	// this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	Priority *int32 `json:"priority,omitempty" protobuf:"bytes,25,opt,name=priority"`
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:5.name-resolution
+	// +k8s:openapi-gen=x-kubernetes-explain-category:5.name-resolution
 	DNSConfig *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
 	// If specified, all readiness gates will be evaluated for pod readiness.
 	// A pod is ready when all its containers are ready AND
 	// all conditions specified in the readiness gates have status equal to "True"
 	// More info: https://git.k8s.io/enhancements/keps/sig-network/0007-pod-ready%2B%2B.md
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:4.lifecycle
+	// +k8s:openapi-gen=x-kubernetes-explain-category:4.lifecycle
 	ReadinessGates []PodReadinessGate `json:"readinessGates,omitempty" protobuf:"bytes,28,opt,name=readinessGates"`
 	// RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
 	// to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
@@ -3063,7 +3080,7 @@ type PodSpec struct {
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
 	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
@@ -3075,7 +3092,7 @@ type PodSpec struct {
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,31,opt,name=preemptionPolicy"`
 	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
 	// This field will be autopopulated at admission time by the RuntimeClass admission controller. If
@@ -3086,7 +3103,7 @@ type PodSpec struct {
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
 	// This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
 	// +optional
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	Overhead ResourceList `json:"overhead,omitempty" protobuf:"bytes,32,opt,name=overhead"`
 	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
 	// domains. Scheduler will schedule pods in a way which abides by the constraints.
@@ -3099,7 +3116,7 @@ type PodSpec struct {
 	// +listType=map
 	// +listMapKey=topologyKey
 	// +listMapKey=whenUnsatisfiable
-	// +k8s:openapi-gen=x-kubernetes-category:3.scheduling
+	// +k8s:openapi-gen=x-kubernetes-explain-category:3.scheduling
 	TopologySpreadConstraints []TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty" patchStrategy:"merge" patchMergeKey:"topologyKey" protobuf:"bytes,33,opt,name=topologySpreadConstraints"`
 }
 

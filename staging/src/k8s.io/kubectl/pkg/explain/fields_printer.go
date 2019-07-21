@@ -26,9 +26,10 @@ import (
 
 // indentDesc is the level of indentation for descriptions.
 const (
-	indentDesc        = 2
-	otherCategory     = "99.other"
-	extensionCategory = "x-kubernetes-category"
+	indentDesc         = 2
+	otherCategory      = "99.other"
+	annotationCategory = "x-kubernetes-explain-category"
+	annotationExpand   = "x-kubernetes-explain-expand"
 )
 
 // regularFieldsPrinter prints fields with their type and description.
@@ -53,7 +54,7 @@ func (f *regularFieldsPrinter) VisitKind(k *proto.Kind) {
 		added := false
 		v := k.Fields[key]
 		extensions := v.GetExtensions()
-		if intCategory, ok := extensions[extensionCategory]; ok {
+		if intCategory, ok := extensions[annotationCategory]; ok {
 			if category, ok2 := intCategory.(string); ok2 {
 				categories[category] = append(categories[category], key)
 				added = true
@@ -92,9 +93,12 @@ func (f *regularFieldsPrinter) VisitKind(k *proto.Kind) {
 	for _, category := range orderedCategories {
 		fields := categories[category]
 		if len(categories) > 1 || (len(categories) == 1 && len(categories[otherCategory]) == 0) {
-			if err := f.Writer.Write("%s\n", titleFromCategory(category)); err != nil {
-				f.Error = err
-				return
+			title := titleFromCategory(category)
+			if len(title) > 0 {
+				if err := f.Writer.Write("%s\n", title); err != nil {
+					f.Error = err
+					return
+				}
 			}
 		}
 		for _, key := range fields {
@@ -115,6 +119,17 @@ func (f *regularFieldsPrinter) VisitKind(k *proto.Kind) {
 			if err := f.Writer.Write(""); err != nil {
 				f.Error = err
 				return
+			}
+
+			extensions := v.GetExtensions()
+			if _, expand := extensions[annotationExpand]; expand {
+				subFields := &regularFieldsPrinter{
+					Writer: f.Writer.Indent(indentPerLevel),
+				}
+				if err := subFields.PrintFields(v); err != nil {
+					f.Error = err
+					return
+				}
 			}
 		}
 	}
