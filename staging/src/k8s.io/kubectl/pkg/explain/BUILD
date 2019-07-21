@@ -34,6 +34,8 @@ go_test(
         "typename_test.go",
     ],
     data = [
+        "test-category-swagger.json",
+        "test-expand-swagger.json",
         "test-recursive-swagger.json",
         "test-swagger.json",
     ],

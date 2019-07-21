@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 func TestFields(t *testing.T) {
@@ -44,6 +45,99 @@ func TestFields(t *testing.T) {
 
 field2	<[]map[string]string>
   This is an array of object of PrimitiveDef
+
+`
+
+	buf := bytes.Buffer{}
+	f := Formatter{
+		Writer: &buf,
+		Wrap:   80,
+	}
+	s, err := LookupSchemaForField(schema, []string{})
+	if err != nil {
+		t.Fatalf("Invalid path %v: %v", []string{}, err)
+	}
+	if err := (fieldsPrinterBuilder{Recursive: false}).BuildFieldsPrinter(&f).PrintFields(s); err != nil {
+		t.Fatalf("Failed to print fields: %v", err)
+	}
+	got := buf.String()
+	if got != want {
+		t.Errorf("Got:\n%v\nWant:\n%v\n", buf.String(), want)
+	}
+}
+
+func TestCategoryFields(t *testing.T) {
+	var resources = tst.NewFakeResources("test-category-swagger.json")
+	schema := resources.LookupResource(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v2",
+		Kind:    "OneKind",
+	})
+	if schema == nil {
+		t.Fatal("Couldn't find schema v2.OneKind")
+	}
+
+	want := `field1	<Object> -required-
+  This is first reference field
+
+PART 1
+
+field3	<Object>
+  This is a third field
+
+field5	<Object>
+  This is fifth field
+
+PART 2
+
+field2	<Object>
+  This is other kind field with string and reference
+
+field4	<Object>
+  This is fourth field
+
+`
+
+	buf := bytes.Buffer{}
+	f := Formatter{
+		Writer: &buf,
+		Wrap:   80,
+	}
+	s, err := LookupSchemaForField(schema, []string{})
+	if err != nil {
+		t.Fatalf("Invalid path %v: %v", []string{}, err)
+	}
+	if err := (fieldsPrinterBuilder{Recursive: false}).BuildFieldsPrinter(&f).PrintFields(s); err != nil {
+		t.Fatalf("Failed to print fields: %v", err)
+	}
+	got := buf.String()
+	if got != want {
+		t.Errorf("Got:\n%v\nWant:\n%v\n", buf.String(), want)
+	}
+}
+
+func TestExpandFields(t *testing.T) {
+	var resources = tst.NewFakeResources("test-expand-swagger.json")
+	schema := resources.LookupResource(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v2",
+		Kind:    "OneKind",
+	})
+	if schema == nil {
+		t.Fatal("Couldn't find schema v2.OneKind")
+	}
+
+	want := `field1	<Object> -required-
+  This is first reference field
+
+   referencefield	<Object>
+     This is reference to itself.
+
+   referencesarray	<[]Object>
+     This is an array of references
+
+field2	<Object>
+  This is other kind field with string and reference
 
 `
 
