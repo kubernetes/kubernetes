@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1376,6 +1376,50 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
 
 	c.EnsureLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
+}
+
+func TestCheckProtocol(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		protocol    v1.Protocol
+		wantErr     error
+	}{
+		{
+			name:        "TCP with ELB",
+			annotations: make(map[string]string),
+			protocol:    v1.ProtocolTCP,
+			wantErr:     nil,
+		},
+		{
+			name:        "TCP with NLB",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			protocol:    v1.ProtocolTCP,
+			wantErr:     nil,
+		},
+		{
+			name:        "UDP with ELB",
+			annotations: make(map[string]string),
+			protocol:    v1.ProtocolUDP,
+			wantErr:     errorELBOnlySupportTCPLoadBalancer,
+		},
+		{
+			name:        "UDP with NLB",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			protocol:    v1.ProtocolUDP,
+			wantErr:     nil,
+		},
+	}
+
+	for _, test := range tests {
+		tt := test
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if want, got := tt.wantErr, checkProtocol(tt.protocol, tt.annotations); want != got {
+				t.Errorf("unexpected error: want=%s got =%s", want, got)
+			}
+		})
+	}
 }
 
 func TestBuildListener(t *testing.T) {

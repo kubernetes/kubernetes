@@ -45,7 +45,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"gopkg.in/gcfg.v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -61,7 +61,7 @@ import (
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -249,6 +249,9 @@ const (
 // awsTagNameMasterRoles is a set of well-known AWS tag names that indicate the instance is a master
 // The major consequence is that it is then not considered for AWS zone discovery for dynamic volume creation.
 var awsTagNameMasterRoles = sets.NewString("kubernetes.io/role/master", "k8s.io/role/master")
+
+// errorELBOnlySupportTCPLoadBalancer represents the error that only TCP LoadBalancer is supported for ELB
+var errorELBOnlySupportTCPLoadBalancer = fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
 
 // Maps from backend protocol to ELB protocol
 var backendProtocolMapping = map[string]string{
@@ -3521,9 +3524,10 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	sslPorts := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
-		if port.Protocol != v1.ProtocolTCP {
-			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+		if err := checkProtocol(port.Protocol, annotations); err != nil {
+			return nil, err
 		}
+
 		if port.NodePort == 0 {
 			klog.Errorf("Ignoring port without NodePort defined: %v", port)
 			continue
@@ -4584,6 +4588,15 @@ func (c *Cloud) nodeNameToProviderID(nodeName types.NodeName) (InstanceID, error
 	}
 
 	return KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
+}
+
+// checkProtocol checks to make sure only TCP is supported for ELB
+func checkProtocol(proto v1.Protocol, annotations map[string]string) error {
+	if !isNLB(annotations) && proto != v1.ProtocolTCP {
+		return errorELBOnlySupportTCPLoadBalancer
+	}
+
+	return nil
 }
 
 func setNodeDisk(
