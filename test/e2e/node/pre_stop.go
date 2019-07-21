@@ -225,6 +225,46 @@ var _ = SIGDescribe("PreStop", func() {
 			return false, err
 		})
 	})
+
+	/*
+		Usecase: PreStop hook is not executed for completed/terminated pod on issuing a DELETE API call
+		Description: SIGTERM and PreStop hook calls are made simultaneously once a DELETE API call is made. However, if the main command finishes
+						execution before a DELETE API call then the pod enters the completed state. A DELETE API call would then kill and
+						remove the pod from the namespace without calling the preStop hook. Under this situation, the FailedPreStopHook
+						warning event too would be reflecting false indicating no error.
+		Approach: 1. Sleep till the pod completes it main command and enters completed state
+				  2. Verify that the pod is alive
+				  3. Issue a DELETE API call
+				  4. Poll immediately to check if the pod is alive. If it is destroyed then preStop wasn't executed
+	*/
+	ginkgo.It("completed pod should not execute prestop on DELETE API call", func() {
+		ginkgo.By("creating the pod")
+		name := "pod-prestop-hook-with-main" + string(uuid.NewUUID())
+		pod := getPodWithMainCmdAndPreStopLifeCycle(name)
+
+		ginkgo.By("submitting the pod to kubernetes")
+		podClient.Create(pod)
+
+		ginkgo.By("waiting for pod no longer running")
+		framework.ExpectNoError(f.WaitForPodNoLongerRunning(pod.Name))
+
+		//Delete the completed pod - Issue DELETE API call
+		ginkgo.By("deleting the pod gracefully")
+		err := podClient.Delete(pod.Name, nil)
+		framework.ExpectNoError(err, "failed to delete pod")
+
+		//Verify if preStop was executed by checking pod status
+		ginkgo.By("verifying the pod running state after graceful termination")
+		err = wait.Poll(time.Second*3, time.Second*time.Duration(0), func() (bool, error) {
+			var client *v1.Pod
+			client, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
+
+			if client.Status.Phase != v1.PodSucceeded {
+				return true, err
+			}
+			return false, nil
+		})
+	})
 })
 
 func getPodWithpreStopLifeCycle(name string) *v1.Pod {
@@ -244,6 +284,31 @@ func getPodWithpreStopLifeCycle(name string) *v1.Pod {
 							},
 						},
 					},
+				},
+			},
+		},
+	}
+}
+
+func getPodWithMainCmdAndPreStopLifeCycle(name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:  "agnhost",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.Handler{
+							Exec: &v1.ExecAction{
+								Command: []string{"sh", "-c", "while true; do echo preStop; sleep 300; done"},
+							},
+						},
+					},
+					Command: []string{"/bin/sh", "-c", "sleep 15"},
 				},
 			},
 		},
