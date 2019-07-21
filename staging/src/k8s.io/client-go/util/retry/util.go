@@ -42,12 +42,12 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// RetryConflict executes the provided function repeatedly, retrying if the server returns a conflicting
-// write. Callers should preserve previous executions if they wish to retry changes. It performs an
+// OnError executes the provided function repeatedly, retrying if the server returns a specified
+// error. Callers should preserve previous executions if they wish to retry changes. It performs an
 // exponential backoff.
 //
 //     var pod *api.Pod
-//     err := RetryOnConflict(DefaultBackoff, func() (err error) {
+//     err := retry.OnError(DefaultBackoff, errors.IsConflict, func() (err error) {
 //       pod, err = c.Pods("mynamespace").UpdateStatus(podStatus)
 //       return
 //     })
@@ -58,14 +58,14 @@ var DefaultBackoff = wait.Backoff{
 //     ...
 //
 // TODO: Make Backoff an interface?
-func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
+func OnError(backoff wait.Backoff, errorFunc func(error) bool, fn func() error) error {
 	var lastConflictErr error
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err := fn()
 		switch {
 		case err == nil:
 			return true, nil
-		case errors.IsConflict(err):
+		case errorFunc(err):
 			lastConflictErr = err
 			return false, nil
 		default:
@@ -76,4 +76,9 @@ func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 		err = lastConflictErr
 	}
 	return err
+}
+
+// RetryOnConflict executes the function function repeatedly, retrying if the server returns a conflicting
+func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
+	return OnError(backoff, errors.IsConflict, fn)
 }
