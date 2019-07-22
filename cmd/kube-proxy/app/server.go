@@ -100,7 +100,7 @@ type Options struct {
 	ConfigFile string
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
-	// CleanupAndExit, when true, makes the proxy server clean up iptables rules, then exit.
+	// CleanupAndExit, when true, makes the proxy server clean up iptables rules and ipvs rules, then exit.
 	CleanupAndExit bool
 	// CleanupIPVS, when true, makes the proxy server clean up ipvs rules before running.
 	CleanupIPVS bool
