@@ -382,9 +382,9 @@ func (m *topologyPairsMaps) clone() *topologyPairsMaps {
 	return copy
 }
 
-func (m *topologyPairsPodSpreadMap) addPod(addedPod, metapod *v1.Pod, node *v1.Node) error {
-	constraints := getHardTopologySpreadConstraints(metapod)
-	match, err := podMatchesAllSpreadConstraints(addedPod, metapod.Namespace, constraints)
+func (m *topologyPairsPodSpreadMap) addPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) error {
+	constraints := getHardTopologySpreadConstraints(preemptorPod)
+	match, err := podMatchesAllSpreadConstraints(addedPod, preemptorPod.Namespace, constraints)
 	if err != nil {
 		return err
 	}

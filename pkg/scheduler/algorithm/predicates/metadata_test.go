@@ -1246,7 +1246,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 func TestPodSpreadMap_addPod(t *testing.T) {
 	tests := []struct {
 		name                string
-		metaPod             *v1.Pod // also known as incoming/preemptor pod
+		preemptorPod        *v1.Pod
 		addedPod            *v1.Pod
 		existingPods        []*v1.Pod
 		nodeIdx             int // denotes which node 'addedPod' belongs to
@@ -1257,7 +1257,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 	}{
 		{
 			name: "node a and b both impact current min match",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			addedPod:     st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -1287,7 +1287,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 		},
 		{
 			name: "only node a impacts current min match",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			addedPod: st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -1318,7 +1318,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 		},
 		{
 			name: "add a pod with mis-matched namespace doesn't change topologyKeyToMinPodsMap",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			addedPod: st.MakePod().Name("p-a1").Namespace("ns1").Node("node-a").Label("foo", "").Obj(),
@@ -1348,7 +1348,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 		},
 		{
 			name: "add pod on non-critical node won't trigger re-calculation",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			addedPod: st.MakePod().Name("p-b2").Node("node-a").Label("foo", "").Obj(),
@@ -1379,7 +1379,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 		},
 		{
 			name: "node a and b both impact topologyKeyToMinPodsMap on zone and node",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
@@ -1409,7 +1409,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 		},
 		{
 			name: "only node a impacts topologyKeyToMinPodsMap on zone and node",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
@@ -1442,7 +1442,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 		},
 		{
 			name: "node a impacts topologyKeyToMinPodsMap on node, node x impacts topologyKeyToMinPodsMap on zone",
-			metaPod: st.MakePod().Name("p").Label("foo", "").
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
@@ -1499,9 +1499,9 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 			}
 
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			podSpreadMap, _ := getTPMapMatchingSpreadConstraints(tt.metaPod, nodeInfoMap)
+			podSpreadMap, _ := getTPMapMatchingSpreadConstraints(tt.preemptorPod, nodeInfoMap)
 
-			podSpreadMap.addPod(tt.addedPod, tt.metaPod, tt.nodes[tt.nodeIdx])
+			podSpreadMap.addPod(tt.addedPod, tt.preemptorPod, tt.nodes[tt.nodeIdx])
 			if !reflect.DeepEqual(podSpreadMap, tt.want) {
 				t.Errorf("podSpreadMap#addPod() = %v, want %v", podSpreadMap, tt.want)
 			}
