@@ -28,7 +28,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -163,6 +163,13 @@ func GetExtraParameters(overrides map[string]string, defaults map[string]string)
 		}
 	}
 	return command
+}
+
+// CheckStaticPodExists checks if a static pod file exists on disk
+func CheckStaticPodExists(componentName, manifestDir string) bool {
+	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
+	_, certErr := os.Stat(filename)
+	return certErr == nil
 }
 
 // WriteStaticPodToDisk writes a static pod file to disk

@@ -52,12 +52,14 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, nodeName string, c
 	// gets etcd StaticPodSpec
 	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, []etcdutil.Member{})
 
-	// writes etcd StaticPod to disk
-	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
-		return err
+	if !staticpodutil.CheckStaticPodExists(kubeadmconstants.Etcd, manifestDir) {
+		if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+			return err
+		}
+		klog.V(1).Infof("[etcd] wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	} else {
+		klog.V(1).Infoln("[etcd] using the existing Static Pod manifest for a local etcd member\n")
 	}
-
-	klog.V(1).Infof("[etcd] wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
 	return nil
 }
 

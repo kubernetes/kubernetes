@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -116,12 +116,14 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfigurati
 			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
 		}
 
-		// writes the StaticPodSpec to disk
-		if err := staticpodutil.WriteStaticPodToDisk(componentName, manifestDir, spec); err != nil {
-			return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
+		if !staticpodutil.CheckStaticPodExists(componentName, manifestDir) {
+			if err := staticpodutil.WriteStaticPodToDisk(componentName, manifestDir, spec); err != nil {
+				return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
+			}
+			klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
+		} else {
+			klog.V(1).Infof("[control-plane] using the existing static Pod manifest for component %q\n", componentName)
 		}
-
-		klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
 	}
 
 	return nil
