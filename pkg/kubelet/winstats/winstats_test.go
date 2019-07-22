@@ -150,9 +150,9 @@ func TestConvertCPUValue(t *testing.T) {
 
 func TestGetCPUUsageNanoCores(t *testing.T) {
 	testCases := []struct {
-		latestValue uint64
+		latestValue   uint64
 		previousValue uint64
-		expected uint64
+		expected      uint64
 	}{
 		{latestValue: uint64(0), previousValue: uint64(0), expected: uint64(0)},
 		{latestValue: uint64(2000000000), previousValue: uint64(0), expected: uint64(200000000)},
