@@ -31,10 +31,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -45,15 +47,16 @@ import (
 
 // PodStorage includes storage for pods and all sub resources
 type PodStorage struct {
-	Pod         *REST
-	Binding     *BindingREST
-	Eviction    *EvictionREST
-	Status      *StatusREST
-	Log         *podrest.LogREST
-	Proxy       *podrest.ProxyREST
-	Exec        *podrest.ExecREST
-	Attach      *podrest.AttachREST
-	PortForward *podrest.PortForwardREST
+	Pod                 *REST
+	Binding             *BindingREST
+	Eviction            *EvictionREST
+	Status              *StatusREST
+	EphemeralContainers *EphemeralContainersREST
+	Log                 *podrest.LogREST
+	Proxy               *podrest.ProxyREST
+	Exec                *podrest.ExecREST
+	Attach              *podrest.AttachREST
+	PortForward         *podrest.PortForwardREST
 }
 
 // REST implements a RESTStorage for pods
@@ -89,17 +92,20 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	statusStore := *store
 	statusStore.UpdateStrategy = pod.StatusStrategy
+	ephemeralContainersStore := *store
+	ephemeralContainersStore.UpdateStrategy = pod.EphemeralContainersStrategy
 
 	return PodStorage{
-		Pod:         &REST{store, proxyTransport},
-		Binding:     &BindingREST{store: store},
-		Eviction:    newEvictionStorage(store, podDisruptionBudgetClient),
-		Status:      &StatusREST{store: &statusStore},
-		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
-		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
-		Exec:        &podrest.ExecREST{Store: store, KubeletConn: k},
-		Attach:      &podrest.AttachREST{Store: store, KubeletConn: k},
-		PortForward: &podrest.PortForwardREST{Store: store, KubeletConn: k},
+		Pod:                 &REST{store, proxyTransport},
+		Binding:             &BindingREST{store: store},
+		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
+		Status:              &StatusREST{store: &statusStore},
+		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
+		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
+		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
+		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k},
+		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k},
 	}
 }
 
@@ -232,4 +238,97 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
+type EphemeralContainersREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Patcher(&EphemeralContainersREST{})
+
+// Get of this endpoint will return the list of ephemeral containers in this pod
+func (r *EphemeralContainersREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return nil, errors.NewBadRequest("feature EphemeralContainers disabled")
+	}
+
+	obj, err := r.store.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return ephemeralContainersInPod(obj.(*api.Pod)), nil
+}
+
+// New creates a new EphemeralContainers resource
+func (r *EphemeralContainersREST) New() runtime.Object {
+	return &api.EphemeralContainers{}
+}
+
+// Update alters the EphemeralContainers field in PodSpec
+func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return nil, false, errors.NewBadRequest("feature EphemeralContainers disabled")
+	}
+
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	pod := obj.(*api.Pod)
+
+	// Build an UpdatedObjectInfo to pass to the pod store.
+	// It is given the currently stored v1.Pod and transforms it to the new pod that should be stored.
+	updatedPodInfo := rest.DefaultUpdatedObjectInfo(pod, func(ctx context.Context, oldObject, _ runtime.Object) (newObject runtime.Object, err error) {
+		oldPod, ok := oldObject.(*api.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for Pod %T", oldObject)
+		}
+
+		newEphemeralContainersObj, err := objInfo.UpdatedObject(ctx, ephemeralContainersInPod(oldPod))
+		if err != nil {
+			return nil, err
+		}
+		newEphemeralContainers, ok := newEphemeralContainersObj.(*api.EphemeralContainers)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for EphemeralContainers %T", newEphemeralContainersObj)
+		}
+
+		// avoid mutating
+		newPod := oldPod.DeepCopy()
+		// identity, version (make sure we're working with the right object, instance, and version)
+		newPod.Name = newEphemeralContainers.Name
+		newPod.Namespace = newEphemeralContainers.Namespace
+		newPod.UID = newEphemeralContainers.UID
+		newPod.ResourceVersion = newEphemeralContainers.ResourceVersion
+		// ephemeral containers
+		newPod.Spec.EphemeralContainers = newEphemeralContainers.EphemeralContainers
+
+		return newPod, nil
+	})
+
+	obj, _, err = r.store.Update(ctx, name, updatedPodInfo, createValidation, updateValidation, false, options)
+	if err != nil {
+		return nil, false, err
+	}
+	return ephemeralContainersInPod(obj.(*api.Pod)), false, err
+}
+
+// Extract the list of Ephemeral Containers from a Pod
+func ephemeralContainersInPod(pod *api.Pod) *api.EphemeralContainers {
+	ephemeralContainers := pod.Spec.EphemeralContainers
+	if ephemeralContainers == nil {
+		ephemeralContainers = []api.EphemeralContainer{}
+	}
+	return &api.EphemeralContainers{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              pod.Name,
+			Namespace:         pod.Namespace,
+			UID:               pod.UID,
+			ResourceVersion:   pod.ResourceVersion,
+			CreationTimestamp: pod.CreationTimestamp,
+		},
+		EphemeralContainers: ephemeralContainers,
+	}
 }

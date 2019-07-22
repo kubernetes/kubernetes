@@ -45,6 +45,13 @@ func VisitContainers(podSpec *api.PodSpec, visitor ContainerVisitor) bool {
 			return false
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+				return false
+			}
+		}
+	}
 	return true
 }
 
@@ -361,6 +368,9 @@ func dropDisabledFields(
 			}
 			return true
 		})
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		podSpec.EphemeralContainers = nil
 	}
 
 	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {

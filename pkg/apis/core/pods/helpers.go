@@ -20,7 +20,9 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
@@ -43,6 +45,14 @@ func VisitContainersWithPath(podSpec *api.PodSpec, visitor ContainerVisitorWithP
 	for i := range podSpec.Containers {
 		if !visitor(&podSpec.Containers[i], path.Index(i)) {
 			return false
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		path = field.NewPath("spec", "ephemeralContainers")
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), path.Index(i)) {
+				return false
+			}
 		}
 	}
 	return true

@@ -58,6 +58,7 @@ var kindWhiteList = sets.NewString(
 	"APIVersions",
 	"Binding",
 	"DeleteOptions",
+	"EphemeralContainers",
 	"ExportOptions",
 	"GetOptions",
 	"ListOptions",

@@ -153,6 +153,52 @@
         "imageID": "58",
         "containerID": "59"
       }
+    ],
+    "ephemeralContainerStatuses": [
+      {
+        "name": "60",
+        "state": {
+          "waiting": {
+            "reason": "61",
+            "message": "62"
+          },
+          "running": {
+            "startedAt": "2928-05-04T19:41:29Z"
+          },
+          "terminated": {
+            "exitCode": 13677460,
+            "signal": -444792810,
+            "reason": "63",
+            "message": "64",
+            "startedAt": "2843-03-23T07:04:39Z",
+            "finishedAt": "2610-09-08T03:07:19Z",
+            "containerID": "65"
+          }
+        },
+        "lastState": {
+          "waiting": {
+            "reason": "66",
+            "message": "67"
+          },
+          "running": {
+            "startedAt": "2617-08-06T21:50:30Z"
+          },
+          "terminated": {
+            "exitCode": 819364842,
+            "signal": 933484239,
+            "reason": "68",
+            "message": "69",
+            "startedAt": "2907-09-12T12:00:36Z",
+            "finishedAt": "2772-11-03T11:41:34Z",
+            "containerID": "70"
+          }
+        },
+        "ready": true,
+        "restartCount": -314157282,
+        "image": "71",
+        "imageID": "72",
+        "containerID": "73"
+      }
     ]
   }
 }

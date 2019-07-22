@@ -1,0 +1,188 @@
+apiVersion: v1
+ephemeralContainers:
+- args:
+  - "27"
+  command:
+  - "26"
+  env:
+  - name: "34"
+    value: "35"
+    valueFrom:
+      configMapKeyRef:
+        key: "41"
+        name: "40"
+        optional: false
+      fieldRef:
+        apiVersion: "36"
+        fieldPath: "37"
+      resourceFieldRef:
+        containerName: "38"
+        divisor: "590"
+        resource: "39"
+      secretKeyRef:
+        key: "43"
+        name: "42"
+        optional: false
+  envFrom:
+  - configMapRef:
+      name: "32"
+      optional: true
+    prefix: "31"
+    secretRef:
+      name: "33"
+      optional: true
+  image: "25"
+  imagePullPolicy: 4懙鏮嵒ƫS捕ɷD¡轫n(鲼ƳÐƣKʘ
+  lifecycle:
+    postStart:
+      exec:
+        command:
+        - "64"
+      httpGet:
+        host: "67"
+        httpHeaders:
+        - name: "68"
+          value: "69"
+        path: "65"
+        port: "66"
+        scheme: 譋娲瘹ɭȊɚɎ(
+      tcpSocket:
+        host: "71"
+        port: "70"
+    preStop:
+      exec:
+        command:
+        - "72"
+      httpGet:
+        host: "74"
+        httpHeaders:
+        - name: "75"
+          value: "76"
+        path: "73"
+        port: 75785535
+        scheme: 圬剴扲ȿQZ{ʁgɸ=ǤÆ碛,1ZƜ/
+      tcpSocket:
+        host: "78"
+        port: "77"
+  livenessProbe:
+    exec:
+      command:
+      - "50"
+    failureThreshold: -1623705764
+    httpGet:
+      host: "52"
+      httpHeaders:
+      - name: "53"
+        value: "54"
+      path: "51"
+      port: 1747809671
+      scheme: 潁谯耨V6&]鴍Ɋ恧ȭ%ƎÜ掸8½£.
+    initialDelaySeconds: 1167335696
+    periodSeconds: 153426386
+    successThreshold: 1006284894
+    tcpSocket:
+      host: "56"
+      port: "55"
+    timeoutSeconds: -532496585
+  name: "24"
+  ports:
+  - containerPort: -439697596
+    hostIP: "30"
+    hostPort: -1821918122
+    name: "29"
+    protocol: /ʕVŚ(ĿȊ甞谐颋ǅSǡ
+  readinessProbe:
+    exec:
+      command:
+      - "57"
+    failureThreshold: 1380868499
+    httpGet:
+      host: "60"
+      httpHeaders:
+      - name: "61"
+        value: "62"
+      path: "58"
+      port: "59"
+      scheme: 9Ȏ瀮
+    initialDelaySeconds: 1721139423
+    periodSeconds: -1077199580
+    successThreshold: 1633185252
+    tcpSocket:
+      host: "63"
+      port: -1081142510
+    timeoutSeconds: 252483228
+  resources:
+    limits:
+      亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h: "494"
+    requests:
+      ņɖ橙9ȫŚʒUɦOŖ樅尷: "239"
+  securityContext:
+    allowPrivilegeEscalation: true
+    capabilities:
+      add:
+      - :5塋訩塶"=y钡n)İ笓
+      drop:
+      - 筩ƐP_
+    privileged: false
+    procMount: 舁吉蓨O澘銈e棈_Ĭ
+    readOnlyRootFilesystem: false
+    runAsGroup: 2270010876567964647
+    runAsNonRoot: false
+    runAsUser: -2890225091301830311
+    seLinuxOptions:
+      level: "83"
+      role: "81"
+      type: "82"
+      user: "80"
+    windowsOptions:
+      gmsaCredentialSpec: "85"
+      gmsaCredentialSpecName: "84"
+      runAsUserName: "86"
+  stdinOnce: true
+  targetContainerName: "87"
+  terminationMessagePath: "79"
+  terminationMessagePolicy: ȪÆ
+  tty: true
+  volumeDevices:
+  - devicePath: "49"
+    name: "48"
+  volumeMounts:
+  - mountPath: "45"
+    mountPropagation: ĴC浔Ű壝ž
+    name: "44"
+    readOnly: true
+    subPath: "46"
+    subPathExpr: "47"
+  workingDir: "28"
+kind: EphemeralContainers
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fields:
+      "18":
+        "19": null
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "16964250748386560239"
+  selfLink: "5"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e

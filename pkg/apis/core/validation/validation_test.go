@@ -5527,6 +5527,243 @@ func getResourceLimits(cpu, memory string) core.ResourceList {
 	return res
 }
 
+func TestValidateEphemeralContainers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
+	containers := []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
+	initContainers := []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
+	vols := map[string]core.VolumeSource{"vol": {EmptyDir: &core.EmptyDirVolumeSource{}}}
+
+	// Success Cases
+	for title, ephemeralContainers := range map[string][]core.EphemeralContainer{
+		"Empty Ephemeral Containers": {},
+		"Single Container": {
+			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		},
+		"Multiple Containers": {
+			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug2", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		},
+		"Single Container with Target": {
+			{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				TargetContainerName:      "ctr",
+			},
+		},
+		"All Whitelisted Fields": {
+			{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+
+					Name:       "debug",
+					Image:      "image",
+					Command:    []string{"bash"},
+					Args:       []string{"bash"},
+					WorkingDir: "/",
+					EnvFrom: []core.EnvFromSource{
+						{
+							ConfigMapRef: &core.ConfigMapEnvSource{
+								LocalObjectReference: core.LocalObjectReference{Name: "dummy"},
+								Optional:             &[]bool{true}[0],
+							},
+						},
+					},
+					Env: []core.EnvVar{
+						{Name: "TEST", Value: "TRUE"},
+					},
+					VolumeMounts: []core.VolumeMount{
+						{Name: "vol", MountPath: "/vol"},
+					},
+					TerminationMessagePath:   "/dev/termination-log",
+					TerminationMessagePolicy: "File",
+					ImagePullPolicy:          "IfNotPresent",
+					Stdin:                    true,
+					StdinOnce:                true,
+					TTY:                      true,
+				},
+			},
+		},
+	} {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers")); len(errs) != 0 {
+			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
+		}
+	}
+
+	// Failure Cases
+	tcs := []struct {
+		title               string
+		ephemeralContainers []core.EphemeralContainer
+		expectedError       field.Error
+	}{
+
+		{
+			"Name Collision with Container.Containers",
+			[]core.EphemeralContainer{
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			},
+			field.Error{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[0].name"},
+		},
+		{
+			"Name Collision with Container.InitContainers",
+			[]core.EphemeralContainer{
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ictr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			},
+			field.Error{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[0].name"},
+		},
+		{
+			"Name Collision with EphemeralContainers",
+			[]core.EphemeralContainer{
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			},
+			field.Error{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[1].name"},
+		},
+		{
+			"empty Container Container",
+			[]core.EphemeralContainer{
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{}},
+			},
+			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0]"},
+		},
+		{
+			"empty Container Name",
+			[]core.EphemeralContainer{
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			},
+			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0]"},
+		},
+		{
+			"whitespace padded image name",
+			[]core.EphemeralContainer{
+				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: " image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			},
+			field.Error{Type: field.ErrorTypeInvalid, Field: "ephemeralContainers[0][0].image"},
+		},
+		{
+			"TargetContainerName doesn't exist",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+					TargetContainerName:      "bogus",
+				},
+			},
+			field.Error{Type: field.ErrorTypeNotFound, Field: "ephemeralContainers[0].targetContainerName"},
+		},
+		{
+			"Container uses non-whitelisted field: Lifecycle",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Lifecycle: &core.Lifecycle{
+							PreStop: &core.Handler{
+								Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
+							},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].lifecycle"},
+		},
+		{
+			"Container uses non-whitelisted field: LivenessProbe",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						LivenessProbe: &core.Probe{
+							Handler: core.Handler{
+								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+							},
+							SuccessThreshold: 1,
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].livenessProbe"},
+		},
+		{
+			"Container uses non-whitelisted field: Ports",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Ports: []core.ContainerPort{
+							{Protocol: "TCP", ContainerPort: 80},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].ports"},
+		},
+		{
+			"Container uses non-whitelisted field: ReadinessProbe",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						ReadinessProbe: &core.Probe{
+							Handler: core.Handler{
+								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+							},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].readinessProbe"},
+		},
+		{
+			"Container uses non-whitelisted field: Resources",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Resources: core.ResourceRequirements{
+							Limits: core.ResourceList{
+								core.ResourceName(core.ResourceCPU): resource.MustParse("10"),
+							},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resources"},
+		},
+	}
+
+	for _, tc := range tcs {
+		errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"))
+
+		if len(errs) == 0 {
+			t.Errorf("for test %q, expected error but received none", tc.title)
+		} else if len(errs) > 1 {
+			t.Errorf("for test %q, expected 1 error but received %d: %q", tc.title, len(errs), errs)
+		} else {
+			if errs[0].Type != tc.expectedError.Type {
+				t.Errorf("for test %q, expected error type %q but received %q: %q", tc.title, string(tc.expectedError.Type), string(errs[0].Type), errs)
+			}
+			if errs[0].Field != tc.expectedError.Field {
+				t.Errorf("for test %q, expected error for field %q but received error for field %q: %q", tc.title, tc.expectedError.Field, errs[0].Field, errs)
+			}
+		}
+	}
+}
+
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -6330,6 +6567,7 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
 
@@ -6670,6 +6908,34 @@ func TestValidatePodSpec(t *testing.T) {
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
+
+	featuregatedCases := map[string]core.PodSpec{
+		"disabled by EphemeralContainers feature-gate": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			EphemeralContainers: []core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+	}
+	for expectedErr, spec := range featuregatedCases {
+		errs := ValidatePodSpec(&spec, field.NewPath("field"))
+		if len(errs) == 0 {
+			t.Errorf("expected failure due to gated feature: %s\n%+v", expectedErr, spec)
+		} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, expectedErr) {
+			t.Errorf("unexpected error message for gated feature. Expected error: %s\nActual error: %s", expectedErr, actualErr)
 		}
 	}
 }
@@ -8323,6 +8589,27 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: core.PodSpec{
+					EphemeralContainers: []core.EphemeralContainer{
+						{
+							EphemeralContainerCommon: core.EphemeralContainerCommon{
+								Name:  "ephemeral",
+								Image: "busybox",
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       core.PodSpec{},
+			},
+			"Forbidden: pod updates may not change fields other than",
+			"ephemeralContainer changes are not allowed via normal pod update",
+		},
+		{
+			core.Pod{
 				Spec: core.PodSpec{},
 			},
 			core.Pod{
@@ -8899,6 +9186,272 @@ func makeValidService() core.Service {
 			Type:            core.ServiceTypeClusterIP,
 			Ports:           []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
 		},
+	}
+}
+
+func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
+	tests := []struct {
+		new  []core.EphemeralContainer
+		old  []core.EphemeralContainer
+		err  string
+		test string
+	}{
+		{[]core.EphemeralContainer{}, []core.EphemeralContainer{}, "", "nothing"},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"",
+			"No change in Ephemeral Containers",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"",
+			"Ephemeral Container list order changes",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{},
+			"",
+			"Add an Ephemeral Container",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger1",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{},
+			"",
+			"Add two Ephemeral Containers",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"",
+			"Add to an existing Ephemeral Containers",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger3",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"",
+			"Add to an existing Ephemeral Containers, list order changes",
+		},
+		{
+			[]core.EphemeralContainer{},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"may not be removed",
+			"Remove an Ephemeral Container",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "firstone",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "thentheother",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"may not be removed",
+			"Replace an Ephemeral Container",
+		},
+		{
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger1",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			[]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger1",
+					Image:                    "debian",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}},
+			"may not be changed",
+			"Change an Ephemeral Containers",
+		},
+	}
+
+	for _, test := range tests {
+		new := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.new}}
+		old := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.old}}
+		errs := ValidatePodEphemeralContainersUpdate(&new, &old)
+		if test.err == "" {
+			if len(errs) != 0 {
+				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+			}
+		} else {
+			if len(errs) == 0 {
+				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
+			}
+		}
 	}
 }
 
@@ -10006,6 +10559,8 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 }
 
 func TestValidateReplicationController(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := core.PodTemplate{
 		Template: core.PodTemplateSpec{
@@ -10195,6 +10750,24 @@ func TestValidateReplicationController(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
+					},
+				},
+			},
+		},
+		"template may not contain ephemeral containers": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: core.ReplicationControllerSpec{
+				Replicas: 1,
+				Selector: validSelector,
+				Template: &core.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: validSelector,
+					},
+					Spec: core.PodSpec{
+						RestartPolicy:       core.RestartPolicyAlways,
+						DNSPolicy:           core.DNSClusterFirst,
+						Containers:          []core.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+						EphemeralContainers: []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}},
 					},
 				},
 			},

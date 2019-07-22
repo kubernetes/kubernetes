@@ -125,6 +125,14 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,EndpointSubset,NotReady
 API rule violation: list_type_missing,k8s.io/api/core/v1,EndpointSubset,Ports
 API rule violation: list_type_missing,k8s.io/api/core/v1,Endpoints,Subsets
 API rule violation: list_type_missing,k8s.io/api/core/v1,EndpointsList,Items
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Args
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Command
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Env
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,EnvFrom
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Ports
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeDevices
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeMounts
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainers,EphemeralContainers
 API rule violation: list_type_missing,k8s.io/api/core/v1,EventList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,ExecAction,Command
 API rule violation: list_type_missing,k8s.io/api/core/v1,FCVolumeSource,TargetWWNs
@@ -173,6 +181,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,PodPortForwardOptions,P
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSecurityContext,SupplementalGroups
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSecurityContext,Sysctls
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,Containers
+API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,EphemeralContainers
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,HostAliases
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,ImagePullSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,InitContainers
@@ -181,6 +190,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,Tolerations
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,Volumes
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodStatus,ContainerStatuses
+API rule violation: list_type_missing,k8s.io/api/core/v1,PodStatus,EphemeralContainerStatuses
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodStatus,InitContainerStatuses
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodStatus,PodIPs
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodTemplateList,Items
