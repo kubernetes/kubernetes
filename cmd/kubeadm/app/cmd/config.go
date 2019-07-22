@@ -96,8 +96,10 @@ func NewCmdConfigPrint(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "print",
 		Short: "Print configuration",
-		Long:  "This command prints configurations for subcommands provided.",
-		RunE:  cmdutil.SubCmdRunE("print"),
+		Long: dedent.Dedent(`
+			This command prints configurations for subcommands provided.
+			For details, see: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2`),
+		RunE: cmdutil.SubCmdRunE("print"),
 	}
 	cmd.AddCommand(NewCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(NewCmdConfigPrintJoinDefaults(out))
