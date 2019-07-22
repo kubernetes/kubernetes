@@ -144,7 +144,9 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 		}
 	}
 
-	return "", fmt.Errorf("failed to get power status for node %q", name)
+	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
+	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
+	return vmPowerStateStopped, nil
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
@@ -589,8 +591,15 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 	defer cancel()
 	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroup, ssName, instanceID, nicName, "")
 	if err != nil {
-		klog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, resourceGroup, ssName, nicName, err)
-		return network.Interface{}, err
+		exists, _, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			klog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, resourceGroup, ssName, nicName, realErr)
+			return network.Interface{}, err
+		}
+
+		if !exists {
+			return network.Interface{}, cloudprovider.InstanceNotFound
+		}
 	}
 
 	// Fix interface's location, which is required when updating the interface.
@@ -767,20 +776,24 @@ func (ss *scaleSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, bac
 		}
 
 		f := func() error {
-			// VMAS nodes should also be added to the SLB backends.
-			if ss.useStandardLoadBalancer() {
-				// Check whether the node is VMAS virtual machine.
-				managedByAS, err := ss.isNodeManagedByAvailabilitySet(localNodeName)
-				if err != nil {
-					klog.Errorf("Failed to check isNodeManagedByAvailabilitySet(%s): %v", localNodeName, err)
-					return err
-				}
-				if managedByAS {
-					return ss.availabilitySet.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
-				}
+			// Check whether the node is VMAS virtual machine.
+			managedByAS, err := ss.isNodeManagedByAvailabilitySet(localNodeName)
+			if err != nil {
+				klog.Errorf("Failed to check isNodeManagedByAvailabilitySet(%s): %v", localNodeName, err)
+				return err
 			}
 
-			err := ss.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+			if managedByAS {
+				// VMAS nodes should also be added to the SLB backends.
+				if ss.useStandardLoadBalancer() {
+					return ss.availabilitySet.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+				}
+
+				klog.V(3).Infof("EnsureHostsInPool skips node %s because VMAS nodes couldn't be added to basic LB with VMSS backends", localNodeName)
+				return nil
+			}
+
+			err = ss.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
 			if err != nil {
 				return fmt.Errorf("EnsureHostInPool(%s): backendPoolID(%s) - failed to ensure host in pool: %q", getServiceName(service), backendPoolID, err)
 			}

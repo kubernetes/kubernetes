@@ -366,7 +366,9 @@ func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState str
 		}
 	}
 
-	return "", fmt.Errorf("failed to get power status for node %q", name)
+	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
+	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
+	return vmPowerStateStopped, nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.

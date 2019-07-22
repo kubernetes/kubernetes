@@ -19,6 +19,7 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
@@ -30,6 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+)
+
+const (
+	// not active means the instance is under deleting from Azure VMSS.
+	vmssVMNotActiveErrorMessage = "not an active Virtual Machine Scale Set VM instanceId"
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -133,10 +139,14 @@ func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]st
 		var retryErr error
 		privateIPs, retryErr = az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
 		if retryErr != nil {
+			// won't retry since the instance doesn't exist on Azure.
+			if retryErr == cloudprovider.InstanceNotFound {
+				return true, retryErr
+			}
 			klog.Errorf("GetPrivateIPsByNodeName(%s): backoff failure, will retry,err=%v", nodeName, retryErr)
 			return false, nil
 		}
-		klog.V(2).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
+		klog.V(3).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
 		return true, nil
 	})
 	return privateIPs, err
@@ -160,7 +170,7 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 			klog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		klog.V(2).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
+		klog.V(3).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	return ip, publicIP, err
@@ -582,7 +592,15 @@ func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName 
 		defer cancel()
 
 		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source)
-		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
+		klog.V(10).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s): end", VMScaleSetName, instanceID)
+
+		if strings.Contains(err.Error(), vmssVMNotActiveErrorMessage) {
+			// When instances are under deleting, updating API would report "not an active Virtual Machine Scale Set VM instanceId" error.
+			// Since they're under deleting, we shouldn't send more update requests for it.
+			klog.V(3).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s) gets error message %q, abort backoff because it's probably under deleting", VMScaleSetName, instanceID, vmssVMNotActiveErrorMessage)
+			return true, nil
+		}
+
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }

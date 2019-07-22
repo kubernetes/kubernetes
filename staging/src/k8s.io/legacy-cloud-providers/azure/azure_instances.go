@@ -205,8 +205,7 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 
 	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
-		// returns false, because otherwise node is not deleted from cluster
-		// false means that it will continue to check InstanceExistsByProviderID
+		// Returns false, so the controller manager will continue to check InstanceExistsByProviderID().
 		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
@@ -216,8 +215,7 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 
 	powerStatus, err := az.vmSet.GetPowerStatusByNodeName(string(nodeName))
 	if err != nil {
-		// returns false, because otherwise node is not deleted from cluster
-		// false means that it will continue to check InstanceExistsByProviderID
+		// Returns false, so the controller manager will continue to check InstanceExistsByProviderID().
 		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
