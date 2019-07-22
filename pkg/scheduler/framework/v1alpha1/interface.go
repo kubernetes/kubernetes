@@ -143,6 +143,23 @@ type PrefilterPlugin interface {
 	Prefilter(pc *PluginContext, p *v1.Pod) *Status
 }
 
+// FilterPlugin is an interface for Filter plugins. These plugins are called at the
+// filter extension point for filtering out hosts that cannot run a pod.
+// This concept used to be called 'predicate' in the original scheduler.
+// These plugins should return "Success", "Unschedulable" or "Error" in Status.code.
+// However, the scheduler accepts other valid codes as well.
+// Anything other than "Success" will lead to exclusion of the given host from
+// running the pod.
+type FilterPlugin interface {
+	Plugin
+	// Filter is called by the scheduling framework.
+	// All FilterPlugins should return "Success" to declare that
+	// the given node fits the pod. If Filter doesn't return "Success",
+	// please refer scheduler/algorithm/predicates/error.go
+	// to set error message.
+	Filter(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+}
+
 // ScorePlugin is an interface that must be implemented by "score" plugins to rank
 // nodes that passed the filtering phase.
 type ScorePlugin interface {
@@ -235,6 +252,11 @@ type Framework interface {
 	// anything but Success. If a non-success status is returned, then the scheduling
 	// cycle is aborted.
 	RunPrefilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
+
+	// RunFilterPlugins runs the set of configured filter plugins for pod on the
+	// given host. If any of these plugins returns any status other than "Success",
+	// the given node is not suitable for running the pod.
+	RunFilterPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 
 	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).

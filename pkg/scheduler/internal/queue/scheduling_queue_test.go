@@ -171,6 +171,10 @@ func (*fakeFramework) RunPrefilterPlugins(pc *framework.PluginContext, pod *v1.P
 	return nil
 }
 
+func (*fakeFramework) RunFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	return nil
+}
+
 func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node) (framework.PluginToNodeScoreMap, *framework.Status) {
 	return nil, nil
 }
