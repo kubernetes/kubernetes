@@ -25,7 +25,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -272,4 +275,40 @@ func TestPatchWithMissingObject(t *testing.T) {
 	assert.True(t, handled)
 	assert.Nil(t, node)
 	assert.EqualError(t, err, `nodes "node-1" not found`)
+}
+
+func TestListAfterCreateSubresource(t *testing.T) {
+	podsResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	podsKind := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, policyv1beta1.AddToScheme(scheme))
+
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	reaction := ObjectReaction(o)
+
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cool", Namespace: "default"}}
+	create := NewCreateAction(podsResource, "default", pod)
+
+	handled, obj, err := reaction(create)
+	assert.True(t, handled)
+	assert.NotNil(t, obj)
+	assert.NoError(t, err)
+
+	create2 := NewCreateSubresourceAction(podsResource, "cool", "eviction", "default", &policyv1beta1.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "cool"}})
+	handled, obj, err = reaction(create2)
+	assert.True(t, handled)
+	assert.NotNil(t, obj)
+	assert.NoError(t, err)
+
+	action := NewListAction(podsResource, podsKind, "default", metav1.ListOptions{})
+	handled, list, err := reaction(action)
+	assert.True(t, handled)
+
+	// Verify the pod wasn't modified
+	l := list.(*corev1.PodList)
+	assert.Equal(t, *pod, l.Items[0])
+	assert.NoError(t, err)
 }

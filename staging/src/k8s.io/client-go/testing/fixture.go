@@ -97,17 +97,17 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			if action.GetSubresource() == "" {
-				err = tracker.Create(gvr, action.GetObject(), ns)
-			} else {
-				// TODO: Currently we're handling subresource creation as an update
-				// on the enclosing resource. This works for some subresources but
-				// might not be generic enough.
-				err = tracker.Update(gvr, action.GetObject(), ns)
+
+			// Don't save subresources
+			if action.GetSubresource() != "" {
+				return true, action.GetObject(), nil
 			}
+
+			err = tracker.Create(gvr, action.GetObject(), ns)
 			if err != nil {
 				return true, nil, err
 			}
+
 			obj, err := tracker.Get(gvr, ns, objMeta.GetName())
 			return true, obj, err
 
