@@ -28,37 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-func TestGetDevicePrefixRefCount(t *testing.T) {
-	fm := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-1"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-2"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-3"},
-		},
-	}
-
-	tests := []struct {
-		devicePrefix string
-		expectedRefs int
-	}{
-		{
-			"/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00",
-			4,
-		},
-	}
-
-	for i, test := range tests {
-		if refs, err := getDevicePrefixRefCount(fm, test.devicePrefix); err != nil || test.expectedRefs != refs {
-			t.Errorf("%d. GetDevicePrefixRefCount(%s) = %d, %v; expected %d, nil", i, test.devicePrefix, refs, err, test.expectedRefs)
-		}
-	}
-}
-
 func TestExtractDeviceAndPrefix(t *testing.T) {
 	devicePath := "127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00"
 	mountPrefix := "/var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/" + devicePath
