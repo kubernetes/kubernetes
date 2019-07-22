@@ -164,9 +164,14 @@ Usage:
 
 ### fake-gitserver
 
-Fakes a git server. When doing `git clone localhost:8000`, you will clone an empty git
-repo named `8000` on local. You can also use `git clone localhost:8000 my-repo-name` to
-rename that repo.
+Fakes a git server. When doing `git clone http://localhost:8000`, you will clone an empty git
+repo named `localhost` on local. You can also use `git clone http://localhost:8000 my-repo-name` to
+rename that repo. Access to the service with the backing pod will show you below information.
+
+```console
+curl -w "\n" http://localhost:8000
+I am a fake git server
+```
 
 Usage:
 
