@@ -89,6 +89,10 @@ func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+	if providerID == "" {
+		return cloudprovider.Zone{}, errNodeNotInitialized
+	}
+
 	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
 		klog.V(2).Infof("GetZoneByProviderID: omitting unmanaged node %q", providerID)
