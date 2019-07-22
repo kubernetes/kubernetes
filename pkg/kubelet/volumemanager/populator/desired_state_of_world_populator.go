@@ -21,6 +21,7 @@ caches in sync with the "ground truth".
 package populator
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -317,7 +318,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
 		if err != nil {
 			klog.Errorf(
-				"Failed to add volume %q (specName: %q) for pod %q to desiredStateOfWorld. err=%v",
+				"Failed to add volume %s (specName: %s) for pod %q to desiredStateOfWorld: %v",
 				podVolume.Name,
 				volumeSpec.Name(),
 				uniquePodName,
@@ -497,7 +498,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			podNamespace, pvcSource.ClaimName)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %q/%q: %v",
+				"error processing PVC %s/%s: %v",
 				podNamespace,
 				pvcSource.ClaimName,
 				err)
@@ -516,7 +517,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %q/%q: %v",
+				"error processing PVC %s/%s: %v",
 				podNamespace,
 				pvcSource.ClaimName,
 				err)
@@ -539,20 +540,16 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem
 			if mountsMap[podVolume.Name] && volumeMode != v1.PersistentVolumeFilesystem {
 				return nil, nil, "", fmt.Errorf(
-					"Volume %q has volumeMode %q, but is specified in volumeMounts for pod %q/%q",
+					"volume %s has volumeMode %s, but is specified in volumeMounts",
 					podVolume.Name,
-					volumeMode,
-					podNamespace,
-					podName)
+					volumeMode)
 			}
 			// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
 			if devicesMap[podVolume.Name] && volumeMode != v1.PersistentVolumeBlock {
 				return nil, nil, "", fmt.Errorf(
-					"Volume %q has volumeMode %q, but is specified in volumeDevices for pod %q/%q",
+					"volume %s has volumeMode %s, but is specified in volumeDevices",
 					podVolume.Name,
-					volumeMode,
-					podNamespace,
-					podName)
+					volumeMode)
 			}
 		}
 		return pvc, volumeSpec, volumeGidValue, nil
@@ -573,11 +570,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	pvc, err :=
 		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
-		return nil, fmt.Errorf(
-			"failed to fetch PVC %s/%s from API server. err=%v",
-			namespace,
-			claimName,
-			err)
+		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
@@ -590,21 +583,15 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 		// It should happen only in very rare case when scheduler schedules
 		// a pod and user deletes a PVC that's used by it at the same time.
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			return nil, fmt.Errorf(
-				"can't start pod because PVC %s/%s is being deleted",
-				namespace,
-				claimName)
+			return nil, errors.New("PVC is being deleted")
 		}
 	}
 
-	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
-
-		return nil, fmt.Errorf(
-			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
-			namespace,
-			claimName,
-			pvc.Status.Phase,
-			pvc.Spec.VolumeName)
+	if pvc.Status.Phase != v1.ClaimBound {
+		return nil, errors.New("PVC is not bound")
+	}
+	if pvc.Spec.VolumeName == "" {
+		return nil, errors.New("PVC has empty pvc.Spec.VolumeName")
 	}
 
 	return pvc, nil
@@ -620,18 +607,18 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(
-			"failed to fetch PV %q from API server. err=%v", name, err)
+			"failed to fetch PV %s from API server: %v", name, err)
 	}
 
 	if pv.Spec.ClaimRef == nil {
 		return nil, "", fmt.Errorf(
-			"found PV object %q but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
+			"found PV object %s but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
 			name)
 	}
 
 	if pv.Spec.ClaimRef.UID != expectedClaimUID {
 		return nil, "", fmt.Errorf(
-			"found PV object %q but its pv.Spec.ClaimRef.UID (%q) does not point to claim.UID (%q)",
+			"found PV object %s but its pv.Spec.ClaimRef.UID %s does not point to claim.UID %s",
 			name,
 			pv.Spec.ClaimRef.UID,
 			expectedClaimUID)

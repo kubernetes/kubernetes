@@ -376,12 +376,10 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		}
 
 		return fmt.Errorf(
-			"failed to attach or mount for pod %q/%q: %s. List of unmounted volumes=%v, list of unattached volumes=%v.",
-			pod.Namespace,
-			pod.Name,
-			err,
+			"unmounted volumes=%v, unattached volumes=%v: %s",
 			unmountedVolumes,
-			unattachedVolumes)
+			unattachedVolumes,
+			err)
 	}
 
 	klog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
