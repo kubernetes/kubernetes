@@ -85,7 +85,7 @@ func TestHTTPProbeProxy(t *testing.T) {
 	if err != nil {
 		t.Errorf("proxy test unexpected error: %v", err)
 	}
-	_, response, _ := prober.Probe(url, http.Header{}, time.Second*3)
+	_, response, _ := prober.Probe(url, http.Header{}, []int{}, time.Second*3)
 
 	if response == res {
 		t.Errorf("proxy test unexpected error: the probe is using proxy")
@@ -122,49 +122,61 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 	}
 
+	specialHandler := func() func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+	}
+
 	prober := New(true)
 	testCases := []struct {
-		handler    func(w http.ResponseWriter, r *http.Request)
-		reqHeaders http.Header
-		health     probe.Result
-		accBody    string
-		notBody    string
+		handler      func(w http.ResponseWriter, r *http.Request)
+		reqHeaders   http.Header
+		health       probe.Result
+		successCodes []int
+		accBody      string
+		notBody      string
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{
-			handler: handleReq(http.StatusOK, "ok body"),
-			health:  probe.Success,
-			accBody: "ok body",
+			handler:      handleReq(http.StatusOK, "ok body"),
+			successCodes: []int{},
+			health:       probe.Success,
+			accBody:      "ok body",
 		},
 		{
 			handler: headerEchoHandler,
 			reqHeaders: http.Header{
 				"X-Muffins-Or-Cupcakes": {"muffins"},
 			},
-			health:  probe.Success,
-			accBody: "X-Muffins-Or-Cupcakes: muffins",
+			successCodes: []int{},
+			health:       probe.Success,
+			accBody:      "X-Muffins-Or-Cupcakes: muffins",
 		},
 		{
 			handler: headerEchoHandler,
 			reqHeaders: http.Header{
 				"User-Agent": {"foo/1.0"},
 			},
-			health:  probe.Success,
-			accBody: "User-Agent: foo/1.0",
+			successCodes: []int{},
+			health:       probe.Success,
+			accBody:      "User-Agent: foo/1.0",
 		},
 		{
 			handler: headerEchoHandler,
 			reqHeaders: http.Header{
 				"User-Agent": {""},
 			},
-			health:  probe.Success,
-			notBody: "User-Agent",
+			successCodes: []int{},
+			health:       probe.Success,
+			notBody:      "User-Agent",
 		},
 		{
-			handler:    headerEchoHandler,
-			reqHeaders: http.Header{},
-			health:     probe.Success,
-			accBody:    "User-Agent: kube-probe/",
+			handler:      headerEchoHandler,
+			reqHeaders:   http.Header{},
+			successCodes: []int{},
+			health:       probe.Success,
+			accBody:      "User-Agent: kube-probe/",
 		},
 		{
 			// Echo handler that returns the contents of Host in the body
@@ -175,54 +187,81 @@ func TestHTTPProbeChecker(t *testing.T) {
 			reqHeaders: http.Header{
 				"Host": {"muffins.cupcakes.org"},
 			},
-			health:  probe.Success,
-			accBody: "muffins.cupcakes.org",
+			successCodes: []int{},
+			health:       probe.Success,
+			accBody:      "muffins.cupcakes.org",
 		},
 		{
-			handler: handleReq(FailureCode, "fail body"),
-			health:  probe.Failure,
+			handler:      handleReq(FailureCode, "fail body"),
+			successCodes: []int{},
+			health:       probe.Failure,
 		},
 		{
-			handler: handleReq(http.StatusInternalServerError, "fail body"),
-			health:  probe.Failure,
+			handler:      handleReq(http.StatusInternalServerError, "fail body"),
+			successCodes: []int{},
+			health:       probe.Failure,
 		},
 		{
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				time.Sleep(3 * time.Second)
 			},
-			health: probe.Failure,
+			successCodes: []int{},
+			health:       probe.Failure,
 		},
 		{
-			handler: redirectHandler(http.StatusMovedPermanently, false), // 301
-			health:  probe.Success,
+			handler:      redirectHandler(http.StatusMovedPermanently, false), // 301
+			successCodes: []int{},
+			health:       probe.Success,
 		},
 		{
-			handler: redirectHandler(http.StatusMovedPermanently, true), // 301
-			health:  probe.Failure,
+			handler:      redirectHandler(http.StatusMovedPermanently, true), // 301
+			successCodes: []int{},
+			health:       probe.Failure,
 		},
 		{
-			handler: redirectHandler(http.StatusFound, false), // 302
-			health:  probe.Success,
+			handler:      redirectHandler(http.StatusFound, false), // 302
+			health:       probe.Success,
+			successCodes: []int{},
 		},
 		{
-			handler: redirectHandler(http.StatusFound, true), // 302
-			health:  probe.Failure,
+			handler:      redirectHandler(http.StatusFound, true), // 302
+			successCodes: []int{},
+			health:       probe.Failure,
 		},
 		{
-			handler: redirectHandler(http.StatusTemporaryRedirect, false), // 307
-			health:  probe.Success,
+			handler:      redirectHandler(http.StatusTemporaryRedirect, false), // 307
+			successCodes: []int{},
+			health:       probe.Success,
 		},
 		{
-			handler: redirectHandler(http.StatusTemporaryRedirect, true), // 307
-			health:  probe.Failure,
+			handler:      redirectHandler(http.StatusTemporaryRedirect, true), // 307
+			successCodes: []int{},
+			health:       probe.Failure,
 		},
 		{
-			handler: redirectHandler(http.StatusPermanentRedirect, false), // 308
-			health:  probe.Success,
+			handler:      redirectHandler(http.StatusPermanentRedirect, false), // 308
+			successCodes: []int{},
+			health:       probe.Success,
 		},
 		{
-			handler: redirectHandler(http.StatusPermanentRedirect, true), // 308
-			health:  probe.Failure,
+			handler:      redirectHandler(http.StatusPermanentRedirect, true), // 308
+			successCodes: []int{},
+			health:       probe.Failure,
+		},
+		{
+			handler:      specialHandler(), //500
+			health:       probe.Success,
+			successCodes: []int{200, 500},
+		},
+		{
+			handler:      specialHandler(), //500
+			health:       probe.Failure,
+			successCodes: []int{200},
+		},
+		{
+			handler:      specialHandler(), //500
+			health:       probe.Success,
+			successCodes: []int{500},
 		},
 	}
 	for i, test := range testCases {
@@ -243,7 +282,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 			if err != nil {
 				t.Errorf("case %d: unexpected error: %v", i, err)
 			}
-			health, output, err := prober.Probe(u, test.reqHeaders, 1*time.Second)
+			health, output, err := prober.Probe(u, test.reqHeaders, test.successCodes, 1*time.Second)
 			if test.health == probe.Unknown && err == nil {
 				t.Errorf("case %d: expected error", i)
 			}
@@ -302,14 +341,14 @@ func TestHTTPProbeChecker_NonLocalRedirects(t *testing.T) {
 			prober := New(false)
 			target, err := url.Parse(server.URL + "/redirect?loc=" + url.QueryEscape(test.redirect))
 			require.NoError(t, err)
-			result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
+			result, _, _ := prober.Probe(target, nil, []int{}, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectLocalResult, result)
 		})
 		t.Run(desc+"-nonlocal", func(t *testing.T) {
 			prober := New(true)
 			target, err := url.Parse(server.URL + "/redirect?loc=" + url.QueryEscape(test.redirect))
 			require.NoError(t, err)
-			result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
+			result, _, _ := prober.Probe(target, nil, []int{}, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectNonLocalResult, result)
 		})
 	}
@@ -351,7 +390,7 @@ func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
 			prober := New(followNonLocalRedirects)
 			target, err := url.Parse(server.URL + "/redirect")
 			require.NoError(t, err)
-			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
+			result, _, _ := prober.Probe(target, headers, []int{}, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectedResult, result)
 		})
 		t.Run(desc+"nonlocal", func(t *testing.T) {
@@ -359,7 +398,7 @@ func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
 			prober := New(followNonLocalRedirects)
 			target, err := url.Parse(server.URL + "/redirect")
 			require.NoError(t, err)
-			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
+			result, _, _ := prober.Probe(target, headers, []int{}, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectedResult, result)
 		})
 	}
