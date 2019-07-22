@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:master-monitoring-role
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+  - nonResourceURLs: ["/metrics", "/metrics/*"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: master-monitoring-role-binding
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  kind: ClusterRole
+  name: system:master-monitoring-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: User
+    name: system:master-prom-to-sd-monitor

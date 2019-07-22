@@ -127,12 +127,23 @@ function generate_vertical_pod_autoscaler_admission_controller_certs {
   fi
 }
 
+function setup_master_prom_to_sd_monitor_component {
+  local -r manifests_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+  mkdir -p "${manifests_dir}/master-prom-to-sd-monitor"
+
+  cp "${manifests_dir}/master-prom-to-sd-monitor-rbac.yaml" "${manifests_dir}/master-prom-to-sd-monitor"
+  setup-addon-manifests "addons" "master-prom-to-sd-monitor"
+
+  create-static-auth-kubeconfig-for-component master-prom-to-sd-monitor
+}
+
 function create-static-auth-kubeconfig-for-component {
   local component=$1
   echo "Creating token for component ${component}"
   local token="$(secure_random 32)"
   append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "system:${component},uid:system:${component}"
   create-kubeconfig ${component} ${token}
+  echo -n ${token} > /etc/srv/kubernetes/${component}/token
 }
 
 function gke-internal-master-start {
@@ -140,6 +151,9 @@ function gke-internal-master-start {
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
   start_vertical_pod_autoscaler
+
+  setup_master_prom_to_sd_monitor_component
+
   echo "Internal GKE configuration done"
 }
 
