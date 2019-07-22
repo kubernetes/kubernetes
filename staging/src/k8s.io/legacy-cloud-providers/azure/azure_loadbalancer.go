@@ -967,6 +967,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					EnableFloatingIP:    to.BoolPtr(true),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
+					EnableTCPReset:      to.BoolPtr(az.useStandardLoadBalancer()),
 				},
 			}
 			if protocol == v1.ProtocolTCP {
@@ -1496,7 +1497,9 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
-		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP)
+		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
+		reflect.DeepEqual(s.EnableTCPReset, t.EnableTCPReset) &&
+		reflect.DeepEqual(s.DisableOutboundSnat, t.DisableOutboundSnat)
 
 	if wantLB {
 		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
