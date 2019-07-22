@@ -304,7 +304,7 @@ func (c *sioClient) IID() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		sdc, err := c.sysClient.FindSdc("SdcGUID", guid)
+		sdc, err := c.sysClient.FindSdc("SdcGuid", guid)
 		if err != nil {
 			klog.Error(log("failed to retrieve sdc info %s", err))
 			return "", err
