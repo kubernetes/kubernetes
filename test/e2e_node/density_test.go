@@ -372,7 +372,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		Expect(ok).To(Equal(true))
+		framework.ExpectEqual(ok, true)
 
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -505,12 +505,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				Expect(ok).To(Equal(true))
+				framework.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				Expect(ok).To(Equal(true))
+				framework.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 		},
@@ -553,7 +553,7 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []e2emetrics.PodLatency
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {
-			Expect(batchLag <= podBatchStartupLimit).To(Equal(true), "Batch creation startup time %v exceed limit %v",
+			framework.ExpectEqual(batchLag <= podBatchStartupLimit, true, "Batch creation startup time %v exceed limit %v",
 				batchLag, podBatchStartupLimit)
 		}
 	}
