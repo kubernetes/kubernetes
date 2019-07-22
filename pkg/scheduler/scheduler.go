@@ -136,7 +136,6 @@ func New(client clientset.Interface,
 	registry framework.Registry,
 	plugins *kubeschedulerconfig.Plugins,
 	pluginConfig []kubeschedulerconfig.PluginConfig,
-	featureDependencies []schedulerapi.FeatureDependency,
 	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
@@ -189,7 +188,7 @@ func New(client clientset.Interface,
 				return nil, err
 			}
 		}
-		sc, err := configurator.CreateFromConfig(*policy, featureDependencies)
+		sc, err := configurator.CreateFromConfig(*policy)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}

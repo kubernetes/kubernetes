@@ -19,59 +19,31 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // ValidatePolicy checks for errors in the Config
 // It does not return early so that it can find as many errors as possible
-func ValidatePolicy(policy schedulerapi.Policy, featureDependencies []schedulerapi.FeatureDependency) error {
+func ValidatePolicy(policy schedulerapi.Policy) error {
 	var validationErrors []error
+	if err := validateFeatureDependencies(policy); err != nil {
+		validationErrors = append(validationErrors, err)
+	}
 
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
-		}
-	}
-	for _, schedulerDependency := range featureDependencies {
-		for _, predicate := range policy.Predicates {
-			if schedulerDependency.ExcludedPredicateList.Has(predicate.Name) {
-				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s shouldn't be present when %s is enabled", predicate.Name, schedulerDependency.Name))
-			}
-		}
-		for _, priority := range policy.Priorities {
-			if schedulerDependency.ExcludedPriorityList.Has(priority.Name) {
-				validationErrors = append(validationErrors, fmt.Errorf("Priority %s shouldn't be present when %s is enabled", priority.Name, schedulerDependency.Name))
-			}
-		}
-
-		for _, neededPredicate := range schedulerDependency.NeededPredicateList.List() {
-			found := false
-			for _, predicate := range policy.Predicates {
-				if predicate.Name == neededPredicate {
-					found = true
-				}
-			}
-			if !found {
-				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s should be present when %s is enabled", neededPredicate, schedulerDependency.Name))
-			}
-		}
-
-		for _, neededPriority := range schedulerDependency.NeededPriorityList.List() {
-			found := false
-			for _, priority := range policy.Priorities {
-				if priority.Name == neededPriority {
-					found = true
-				}
-			}
-			if !found {
-				validationErrors = append(validationErrors, fmt.Errorf("Priority %s should be present when %s is enabled", neededPriority, schedulerDependency.Name))
-			}
 		}
 	}
 
@@ -97,6 +69,64 @@ func ValidatePolicy(policy schedulerapi.Policy, featureDependencies []schedulera
 	}
 	if binders > 1 {
 		validationErrors = append(validationErrors, fmt.Errorf("Only one extender can implement bind, found %v", binders))
+	}
+	return utilerrors.NewAggregate(validationErrors)
+}
+
+var FeatureGateDependencies = map[featuregate.Feature]schedulerapi.FeatureDependency{
+	features.TaintNodesByCondition: {
+		NeededPredicateList: sets.NewString(predicates.PodToleratesNodeTaintsPred),
+		NeededPriorityList:  nil,
+		ExcludedPredicateList: sets.NewString(predicates.CheckNodeConditionPred,
+			predicates.CheckNodeMemoryPressurePred,
+			predicates.CheckNodeDiskPressurePred,
+			predicates.CheckNodePIDPressurePred,
+		),
+		ExcludedPriorityList: nil,
+	},
+}
+
+// validateFeatureDependencies checks dependent and excluded predicates/priorities for given feature gates
+func validateFeatureDependencies(policy schedulerapi.Policy) error {
+	var validationErrors []error
+	for feature, featureDependencies := range FeatureGateDependencies {
+		if !utilfeature.DefaultFeatureGate.Enabled(feature) {
+			continue
+		}
+		for _, predicate := range policy.Predicates {
+			if featureDependencies.ExcludedPredicateList.Has(predicate.Name) {
+				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s shouldn't be present when %s is enabled", predicate.Name, string(feature)))
+			}
+		}
+		for _, priority := range policy.Priorities {
+			if featureDependencies.ExcludedPriorityList.Has(priority.Name) {
+				validationErrors = append(validationErrors, fmt.Errorf("Priority %s shouldn't be present when %s is enabled", priority.Name, string(feature)))
+			}
+		}
+
+		for _, neededPredicate := range featureDependencies.NeededPredicateList.List() {
+			found := false
+			for _, predicate := range policy.Predicates {
+				if predicate.Name == neededPredicate {
+					found = true
+				}
+			}
+			if !found {
+				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s should be present when %s is enabled", neededPredicate, string(feature)))
+			}
+		}
+
+		for _, neededPriority := range featureDependencies.NeededPriorityList.List() {
+			found := false
+			for _, priority := range policy.Priorities {
+				if priority.Name == neededPriority {
+					found = true
+				}
+			}
+			if !found {
+				validationErrors = append(validationErrors, fmt.Errorf("Priority %s should be present when %s is enabled", neededPriority, string(feature)))
+			}
+		}
 	}
 	return utilerrors.NewAggregate(validationErrors)
 }

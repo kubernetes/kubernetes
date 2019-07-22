@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"net/http"
 	"os"
 	goruntime "runtime"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -167,7 +167,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?
-	schedulerFeatureGateDependencies := algorithmprovider.ApplyFeatureGates()
+	algorithmprovider.ApplyFeatureGates()
 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
@@ -188,7 +188,6 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		registry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
-		schedulerFeatureGateDependencies,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),

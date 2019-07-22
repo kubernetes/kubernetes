@@ -69,7 +69,7 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 
 	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
 
-	config, err := schedulerConfigurator.CreateFromConfig(schedulerapi.Policy{}, []schedulerapi.FeatureDependency{})
+	config, err := schedulerConfigurator.CreateFromConfig(schedulerapi.Policy{})
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
