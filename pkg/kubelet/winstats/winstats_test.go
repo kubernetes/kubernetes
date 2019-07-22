@@ -149,13 +149,25 @@ func TestConvertCPUValue(t *testing.T) {
 }
 
 func TestGetCPUUsageNanoCores(t *testing.T) {
-	p := perfCounterNodeStatsClient{}
-	p.cpuUsageCoreNanoSecondsCache = cpuUsageCoreNanoSecondsCache{
-		latestValue:   uint64(5000000000),
-		previousValue: uint64(2000000000),
+	testCases := []struct {
+		latestValue uint64
+		previousValue uint64
+		expected uint64
+	}{
+		{latestValue: uint64(0), previousValue: uint64(0), expected: uint64(0)},
+		{latestValue: uint64(2000000000), previousValue: uint64(0), expected: uint64(200000000)},
+		{latestValue: uint64(5000000000), previousValue: uint64(2000000000), expected: uint64(300000000)},
 	}
-	cpuUsageNanoCores := p.getCPUUsageNanoCores()
-	assert.Equal(t, cpuUsageNanoCores, uint64(300000000))
+
+	for _, tc := range testCases {
+		p := perfCounterNodeStatsClient{}
+		p.cpuUsageCoreNanoSecondsCache = cpuUsageCoreNanoSecondsCache{
+			latestValue:   tc.latestValue,
+			previousValue: tc.previousValue,
+		}
+		cpuUsageNanoCores := p.getCPUUsageNanoCores()
+		assert.Equal(t, cpuUsageNanoCores, tc.expected)
+	}
 }
 
 func getClient(t *testing.T) Client {
