@@ -319,7 +319,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "jobs/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "daemonsets/status", "deployments", "deployments/scale", "deployments/status",												 
+				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "daemonsets/status", "deployments", "deployments/scale", "deployments/status",
 					"ingresses", "ingresses/status", "replicasets", "replicasets/scale", "replicasets/status", "replicationcontrollers/scale",
 					"networkpolicies").RuleOrDie(),
 
