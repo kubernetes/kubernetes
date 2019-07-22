@@ -117,11 +117,39 @@ func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (version
 	if encodedVersionedSet.Fields != nil {
 		fields = *encodedVersionedSet.Fields
 	}
-	set, err := FieldsToSet(fields)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding set: %v", err)
+	return &cachedVersionedSet{
+		encodedSet: fields,
+		apiVersion: fieldpath.APIVersion(encodedVersionedSet.APIVersion),
+		applied:    encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply,
+	}, nil
+}
+
+type cachedVersionedSet struct {
+	encodedSet metav1.Fields
+	set        *fieldpath.Set
+	apiVersion fieldpath.APIVersion
+	applied    bool
+}
+
+var _ fieldpath.VersionedSet = &cachedVersionedSet{}
+
+func (c *cachedVersionedSet) Set() *fieldpath.Set {
+	if c.set == nil {
+		set, err := FieldsToSet(c.encodedSet)
+		if err == nil {
+			return fieldpath.NewSet()
+		}
+		c.set = &set
 	}
-	return fieldpath.NewVersionedSet(&set, fieldpath.APIVersion(encodedVersionedSet.APIVersion), encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply), nil
+	return c.set
+}
+
+func (c *cachedVersionedSet) APIVersion() fieldpath.APIVersion {
+	return c.apiVersion
+}
+
+func (c *cachedVersionedSet) Applied() bool {
+	return c.applied
 }
 
 // encodeManagedFields converts ManagedFields from the format used by
@@ -185,11 +213,15 @@ func encodeManagerVersionedSet(manager string, versionedSet fieldpath.VersionedS
 	if versionedSet.Applied() {
 		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
 	}
-	fields, err := SetToFields(*versionedSet.Set())
-	if err != nil {
-		return nil, fmt.Errorf("error encoding set: %v", err)
+	if c, ok := versionedSet.(*cachedVersionedSet); ok {
+		encodedVersionedSet.Fields = &c.encodedSet
+	} else {
+		fields, err := SetToFields(*versionedSet.Set())
+		if err != nil {
+			return nil, fmt.Errorf("error encoding set: %v", err)
+		}
+		encodedVersionedSet.Fields = &fields
 	}
-	encodedVersionedSet.Fields = &fields
 
 	return encodedVersionedSet, nil
 }
