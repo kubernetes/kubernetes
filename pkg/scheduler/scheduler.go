@@ -443,8 +443,6 @@ func (sched *Scheduler) bind(assumed *v1.Pod, targetNode string, pluginContext *
 		if err := sched.config.SchedulerCache.ForgetPod(assumed); err != nil {
 			klog.Errorf("scheduler cache ForgetPod failed: %v", err)
 		}
-		sched.recordSchedulingFailure(assumed, err, SchedulerError,
-			fmt.Sprintf("Binding rejected: %v", err))
 		return err
 	}
 
@@ -601,6 +599,7 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PodScheduleErrors.Inc()
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunUnreservePlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
+			sched.recordSchedulingFailure(assumedPod, err, SchedulerError, fmt.Sprintf("Binding rejected: %v", err))
 		} else {
 			klog.V(2).Infof("pod %v/%v is bound successfully on node %v, %d nodes evaluated, %d nodes were found feasible", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
 			metrics.PodScheduleSuccesses.Inc()
