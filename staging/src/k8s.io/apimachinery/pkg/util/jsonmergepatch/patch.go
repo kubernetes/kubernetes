@@ -20,10 +20,15 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
+
+func init() {
+	// Disable negative indices to be compliant with RFC6902.
+	jsonpatch.SupportNegativeIndices = false
+}
 
 // Create a 3-way merge patch based-on JSON merge patch.
 // Calculate addition-and-change patch between current and modified.

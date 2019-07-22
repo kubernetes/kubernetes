@@ -92,6 +92,11 @@ var (
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
 )
 
+func init() {
+	// Disable negative indices to be compliant with RFC6902.
+	jsonpatch.SupportNegativeIndices = false
+}
+
 func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
 	return &PatchOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),

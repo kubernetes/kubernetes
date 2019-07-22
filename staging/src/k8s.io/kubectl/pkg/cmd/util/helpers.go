@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,6 +53,11 @@ const (
 
 type debugError interface {
 	DebugError() (msg string, args []interface{})
+}
+
+func init() {
+	// Disable negative indices to be compliant with RFC6902.
+	jsonpatch.SupportNegativeIndices = false
 }
 
 // AddSourceToErr adds handleResourcePrefix and source string to error message.

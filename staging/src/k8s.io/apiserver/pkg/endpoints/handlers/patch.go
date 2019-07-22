@@ -55,6 +55,11 @@ const (
 	maxJSONPatchOperations = 10000
 )
 
+func init() {
+	// Disable negative indices to be compliant with RFC6902.
+	jsonpatch.SupportNegativeIndices = false
+}
+
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {

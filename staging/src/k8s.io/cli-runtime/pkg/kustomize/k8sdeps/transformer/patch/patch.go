@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -38,6 +38,11 @@ type patchTransformer struct {
 }
 
 var _ transformers.Transformer = &patchTransformer{}
+
+func init() {
+	// Disable negative indices to be compliant with RFC6902.
+	jsonpatch.SupportNegativeIndices = false
+}
 
 // NewPatchTransformer constructs a patchTransformer.
 func NewPatchTransformer(

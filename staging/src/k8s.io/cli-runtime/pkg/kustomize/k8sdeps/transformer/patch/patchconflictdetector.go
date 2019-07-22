@@ -19,7 +19,7 @@ package patch
 import (
 	"encoding/json"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -37,6 +37,11 @@ type jsonMergePatch struct {
 }
 
 var _ conflictDetector = &jsonMergePatch{}
+
+func init() {
+	// Disable negative indices to be compliant with RFC6902.
+	jsonpatch.SupportNegativeIndices = false
+}
 
 func newJMPConflictDetector(rf *resource.Factory) conflictDetector {
 	return &jsonMergePatch{rf: rf}
