@@ -1972,6 +1972,9 @@ type HTTPGetAction struct {
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
 	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,5,rep,name=httpHeaders"`
+	// Success status code. If return code in the StatusCode, it trade as success.
+	// +optional
+	SuccessCodes []int `json:"successCodes,omitempty" protobuf:"bytes,6,rep,name=successCodes"`
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions
