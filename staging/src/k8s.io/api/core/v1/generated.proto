@@ -342,7 +342,7 @@ message CephFSVolumeSource {
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
 message CinderPersistentVolumeSource {
-  // volume id used to identify the volume in cinder
+  // volume id used to identify the volume in cinder.
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   optional string volumeID = 1;
 
@@ -370,7 +370,7 @@ message CinderPersistentVolumeSource {
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
 message CinderVolumeSource {
-  // volume id used to identify the volume in cinder
+  // volume id used to identify the volume in cinder.
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   optional string volumeID = 1;
 
@@ -2658,7 +2658,7 @@ message PersistentVolumeSource {
   // +optional
   optional ISCSIPersistentVolumeSource iscsi = 7;
 
-  // Cinder represents a cinder volume attached and mounted on kubelets host machine
+  // Cinder represents a cinder volume attached and mounted on kubelets host machine.
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional CinderPersistentVolumeSource cinder = 8;
@@ -5071,7 +5071,7 @@ message VolumeSource {
   // +optional
   optional FlexVolumeSource flexVolume = 12;
 
-  // Cinder represents a cinder volume attached and mounted on kubelets host machine
+  // Cinder represents a cinder volume attached and mounted on kubelets host machine.
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional CinderVolumeSource cinder = 13;
