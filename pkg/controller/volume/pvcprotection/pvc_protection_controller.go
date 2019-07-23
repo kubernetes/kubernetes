@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -168,6 +169,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 		if !isUsed {
 			return c.removeFinalizer(pvc)
 		}
+		klog.V(2).Infof("Keeping PVC %s/%s because it is still being used", pvc.Namespace, pvc.Name)
 	}
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) {
@@ -209,42 +211,82 @@ func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 }
 
 func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	// Look for a Pod using pvc in the Informer's cache. If one is found the
+	// correct decision to keep pvc is taken without doing an expensive live
+	// list.
+	if inUse, err := c.askInformer(pvc); err != nil {
+		// No need to return because a live list will follow.
+		klog.Error(err)
+	} else if inUse {
+		return true, nil
+	}
+
+	// Even if no Pod using pvc was found in the Informer's cache it doesn't
+	// mean such a Pod doesn't exist: it might just not be in the cache yet. To
+	// be 100% confident that it is safe to delete pvc make sure no Pod is using
+	// it among those returned by a live list.
+	return c.askAPIServer(pvc)
+}
+
+func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	klog.V(4).Infof("Looking for Pods using PVC %s/%s in the Informer's cache", pvc.Namespace, pvc.Name)
+
 	pods, err := c.podLister.Pods(pvc.Namespace).List(labels.Everything())
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Cache-based list of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
 	}
+
 	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
-			// This pod is not scheduled. We have a predicated in scheduler that
-			// prevents scheduling pods with deletion timestamp, so we can be
-			// pretty sure it won't be scheduled in parallel to this check.
-			// Therefore this pod does not block the PVC from deletion.
-			klog.V(4).Infof("Skipping unscheduled pod %s when checking PVC %s/%s", pod.Name, pvc.Namespace, pvc.Name)
-			continue
-		}
-		for _, volume := range pod.Spec.Volumes {
-			if volume.PersistentVolumeClaim == nil {
-				continue
-			}
-			if volume.PersistentVolumeClaim.ClaimName == pvc.Name {
-				klog.V(2).Infof("Keeping PVC %s/%s, it is used by pod %s/%s", pvc.Namespace, pvc.Name, pod.Namespace, pod.Name)
-				return true, nil
-			}
+		if podUsesPVC(pod, pvc.Name) {
+			return true, nil
 		}
 	}
 
-	klog.V(3).Infof("PVC %s/%s is unused", pvc.Namespace, pvc.Name)
+	klog.V(4).Infof("No Pod using PVC %s/%s was found in the Informer's cache", pvc.Namespace, pvc.Name)
 	return false, nil
 }
 
-// pvcAddedUpdated reacts to pvc added/updated/deleted events
+func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	klog.V(4).Infof("Looking for Pods using PVC %s/%s with a live list", pvc.Namespace, pvc.Name)
+
+	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Live list of pods failed: %s", err.Error())
+	}
+
+	for _, pod := range podsList.Items {
+		if podUsesPVC(&pod, pvc.Name) {
+			return true, nil
+		}
+	}
+
+	klog.V(2).Infof("PVC %s/%s is unused", pvc.Namespace, pvc.Name)
+	return false, nil
+}
+
+func podUsesPVC(pod *v1.Pod, pvc string) bool {
+	// Check whether pvc is used by pod only if pod is scheduled, because
+	// kubelet sees pods after they have been scheduled and it won't allow
+	// starting a pod referencing a PVC with a non-nil deletionTimestamp.
+	if pod.Spec.NodeName != "" {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc {
+				klog.V(2).Infof("Pod %s/%s uses PVC %s", pod.Namespace, pod.Name, pvc)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// pvcAddedUpdated reacts to pvc added/updated events
 func (c *Controller) pvcAddedUpdated(obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("PVC informer returned non-PVC object: %#v", obj))
 		return
 	}
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
+	key, err := cache.MetaNamespaceKeyFunc(pvc)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
 		return
