@@ -834,15 +834,14 @@ func (proxier *Proxier) syncProxyRules() {
 		if err == nil && nodeAddrSet.Len() > 0 {
 			nodeAddresses = nodeAddrSet.List()
 			for _, address := range nodeAddresses {
-				if !utilproxy.IsZeroCIDR(address) {
-					nodeIPs = append(nodeIPs, net.ParseIP(address))
-					continue
+				if utilproxy.IsZeroCIDR(address) {
+					nodeIPs, err = proxier.ipGetter.NodeIPs()
+					if err != nil {
+						klog.Errorf("Failed to list all node IPs from host, err: %v", err)
+					}
+					break
 				}
-				// zero cidr
-				nodeIPs, err = proxier.ipGetter.NodeIPs()
-				if err != nil {
-					klog.Errorf("Failed to list all node IPs from host, err: %v", err)
-				}
+				nodeIPs = append(nodeIPs, net.ParseIP(address))
 			}
 		}
 	}
