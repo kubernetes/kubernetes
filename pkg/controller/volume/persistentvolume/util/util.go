@@ -94,12 +94,6 @@ func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelist
 func GetBindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, bool, error) {
 	dirty := false
 
-	// Check if the volume was already bound (either by user or by controller)
-	shouldSetBoundByController := false
-	if !IsVolumeBoundToClaim(volume, claim) {
-		shouldSetBoundByController = true
-	}
-
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	volumeClone := volume.DeepCopy()
@@ -118,8 +112,9 @@ func GetBindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolum
 		dirty = true
 	}
 
-	// Set AnnBoundByController if it is not set yet
-	if shouldSetBoundByController && !metav1.HasAnnotation(volumeClone.ObjectMeta, AnnBoundByController) {
+	// Check if the volume was already (pre-)bound (either by user or by controller) and
+	// set AnnBoundByController if it is not set yet
+	if !IsVolumeBoundToClaim(volume, claim) && !metav1.HasAnnotation(volumeClone.ObjectMeta, AnnBoundByController) {
 		metav1.SetMetaDataAnnotation(&volumeClone.ObjectMeta, AnnBoundByController, "yes")
 		dirty = true
 	}
@@ -137,6 +132,7 @@ func IsVolumeBoundToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolum
 	if claim.Name != volume.Spec.ClaimRef.Name || claim.Namespace != volume.Spec.ClaimRef.Namespace {
 		return false
 	}
+	// pre-bound volume has empty volume.Spec.ClaimRef.UID
 	if volume.Spec.ClaimRef.UID != "" && claim.UID != volume.Spec.ClaimRef.UID {
 		return false
 	}
