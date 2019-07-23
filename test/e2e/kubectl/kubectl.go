@@ -64,6 +64,7 @@ import (
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -1179,13 +1180,13 @@ metadata:
 				})
 				framework.ExpectNoError(err)
 
-				service, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
+				e2eservice, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 
-				if len(service.Spec.Ports) != 1 {
+				if len(e2eservice.Spec.Ports) != 1 {
 					e2elog.Failf("1 port is expected")
 				}
-				port := service.Spec.Ports[0]
+				port := e2eservice.Spec.Ports[0]
 				if port.Port != int32(servicePort) {
 					e2elog.Failf("Wrong service port: %d", port.Port)
 				}
@@ -2180,7 +2181,7 @@ func waitForGuestbookResponse(c clientset.Interface, cmd, arg, expectedResponse 
 }
 
 func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string) (string, error) {
-	proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
+	proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 	if errProxy != nil {
 		return "", errProxy
 	}

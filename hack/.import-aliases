@@ -46,5 +46,6 @@
   "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1": "kubeletresourcemetricsv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1": "proxyconfigv1alpha1",
-  "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1": "schedulerconfigv1alpha1"
+  "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1": "schedulerconfigv1alpha1",
+  "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice"
 }

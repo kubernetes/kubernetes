@@ -24,7 +24,7 @@ import (
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -38,19 +38,19 @@ import (
 // NewStatefulSet creates a new Webserver StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
 // statefulPodsMounts are the mounts that will be backed by PVs. podsMounts are the mounts that are mounted directly
 // to the Pod. labels are the labels that will be usd for the StatefulSet selector.
-func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulPodMounts []corev1.VolumeMount, podMounts []corev1.VolumeMount, labels map[string]string) *appsv1.StatefulSet {
+func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulPodMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *appsv1.StatefulSet {
 	mounts := append(statefulPodMounts, podMounts...)
-	claims := []corev1.PersistentVolumeClaim{}
+	claims := []v1.PersistentVolumeClaim{}
 	for _, m := range statefulPodMounts {
 		claims = append(claims, NewStatefulSetPVC(m.Name))
 	}
 
-	vols := []corev1.Volume{}
+	vols := []v1.Volume{}
 	for _, m := range podMounts {
-		vols = append(vols, corev1.Volume{
+		vols = append(vols, v1.Volume{
 			Name: m.Name,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
 					Path: fmt.Sprintf("/tmp/%v", m.Name),
 				},
 			},
@@ -71,13 +71,13 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 				MatchLabels: labels,
 			},
 			Replicas: func(i int32) *int32 { return &i }(replicas),
-			Template: corev1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
 					Annotations: map[string]string{},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:         "webserver",
 							Image:        imageutils.GetE2EImage(imageutils.Httpd),
@@ -95,18 +95,18 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 }
 
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
-func NewStatefulSetPVC(name string) corev1.PersistentVolumeClaim {
-	return corev1.PersistentVolumeClaim{
+func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
+	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
 			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},
@@ -114,17 +114,17 @@ func NewStatefulSetPVC(name string) corev1.PersistentVolumeClaim {
 }
 
 // CreateStatefulSetService creates a Headless Service with Name name and Selector set to match labels.
-func CreateStatefulSetService(name string, labels map[string]string) *corev1.Service {
-	headlessService := &corev1.Service{
+func CreateStatefulSetService(name string, labels map[string]string) *v1.Service {
+	headlessService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: corev1.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: labels,
 		},
 	}
-	headlessService.Spec.Ports = []corev1.ServicePort{
-		{Port: 80, Name: "http", Protocol: corev1.ProtocolTCP},
+	headlessService.Spec.Ports = []v1.ServicePort{
+		{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 	}
 	headlessService.Spec.ClusterIP = "None"
 	return headlessService
@@ -149,7 +149,7 @@ func BreakHTTPProbe(c clientset.Interface, ss *appsv1.StatefulSet) error {
 }
 
 // BreakPodHTTPProbe breaks the readiness probe for Nginx StatefulSet containers in one pod.
-func BreakPodHTTPProbe(ss *appsv1.StatefulSet, pod *corev1.Pod) error {
+func BreakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("path expected to be not empty: %v", path)
@@ -173,7 +173,7 @@ func RestoreHTTPProbe(c clientset.Interface, ss *appsv1.StatefulSet) error {
 }
 
 // RestorePodHTTPProbe restores the readiness probe for Nginx StatefulSet containers in pod.
-func RestorePodHTTPProbe(ss *appsv1.StatefulSet, pod *corev1.Pod) error {
+func RestorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("path expected to be not empty: %v", path)
@@ -185,14 +185,14 @@ func RestorePodHTTPProbe(ss *appsv1.StatefulSet, pod *corev1.Pod) error {
 	return err
 }
 
-func hasPauseProbe(pod *corev1.Pod) bool {
+func hasPauseProbe(pod *v1.Pod) bool {
 	probe := pod.Spec.Containers[0].ReadinessProbe
 	return probe != nil && reflect.DeepEqual(probe.Exec.Command, pauseProbe.Exec.Command)
 }
 
-var httpProbe = &corev1.Probe{
-	Handler: corev1.Handler{
-		HTTPGet: &corev1.HTTPGetAction{
+var httpProbe = &v1.Probe{
+	Handler: v1.Handler{
+		HTTPGet: &v1.HTTPGetAction{
 			Path: "/index.html",
 			Port: intstr.IntOrString{IntVal: 80},
 		},
@@ -202,16 +202,16 @@ var httpProbe = &corev1.Probe{
 	FailureThreshold: 1,
 }
 
-var pauseProbe = &corev1.Probe{
-	Handler: corev1.Handler{
-		Exec: &corev1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
+var pauseProbe = &v1.Probe{
+	Handler: v1.Handler{
+		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
 	PeriodSeconds:    1,
 	SuccessThreshold: 1,
 	FailureThreshold: 1,
 }
 
-type statefulPodsByOrdinal []corev1.Pod
+type statefulPodsByOrdinal []v1.Pod
 
 func (sp statefulPodsByOrdinal) Len() int {
 	return len(sp)
@@ -242,7 +242,7 @@ func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
 	podList := GetPodList(c, ss)
 	resumedPod := ""
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != corev1.PodRunning {
+		if pod.Status.Phase != v1.PodRunning {
 			e2elog.Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
 		}
 		if podutil.IsPodReady(&pod) || !hasPauseProbe(&pod) {
@@ -259,13 +259,13 @@ func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
 }
 
 // SortStatefulPods sorts pods by their ordinals
-func SortStatefulPods(pods *corev1.PodList) {
+func SortStatefulPods(pods *v1.PodList) {
 	sort.Sort(statefulPodsByOrdinal(pods.Items))
 }
 
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
-func getStatefulPodOrdinal(pod *corev1.Pod) int {
+func getStatefulPodOrdinal(pod *v1.Pod) int {
 	ordinal := -1
 	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
 	if len(subMatches) < 3 {

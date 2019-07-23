@@ -29,12 +29,13 @@ import (
 	"github.com/onsi/ginkgo"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -80,7 +81,7 @@ type IngressController struct {
 
 // CleanupIngressController calls cont.CleanupIngressControllerWithTimeout with hard-coded timeout
 func (cont *IngressController) CleanupIngressController() error {
-	return cont.CleanupIngressControllerWithTimeout(framework.LoadBalancerCleanupTimeout)
+	return cont.CleanupIngressControllerWithTimeout(e2eservice.LoadBalancerCleanupTimeout)
 }
 
 // CleanupIngressControllerWithTimeout calls the IngressController.Cleanup(false)

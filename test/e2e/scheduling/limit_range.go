@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,6 +34,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -113,10 +114,10 @@ var _ = SIGDescribe("LimitRange", func() {
 				if event.Type != watch.Added {
 					e2elog.Failf("Failed to observe limitRange creation : %v", event)
 				}
-			case <-time.After(framework.ServiceRespondingTimeout):
+			case <-time.After(e2eservice.RespondingTimeout):
 				e2elog.Failf("Timeout while waiting for LimitRange creation")
 			}
-		case <-time.After(framework.ServiceRespondingTimeout):
+		case <-time.After(e2eservice.RespondingTimeout):
 			e2elog.Failf("Timeout while waiting for LimitRange list complete")
 		}
 
@@ -205,7 +206,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")
-		gomega.Expect(wait.Poll(time.Second*5, framework.ServiceRespondingTimeout, func() (bool, error) {
+		gomega.Expect(wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": limitRange.Name}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)

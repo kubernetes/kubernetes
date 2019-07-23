@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,8 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"github.com/onsi/ginkgo"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
 const (
@@ -111,7 +111,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			framework.ExpectNoError(err, "waiting for all pods to respond")
 			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
-			err = framework.ServiceResponding(c, ns.Name, backendSvcName)
+			err = e2eservice.WaitForServiceResponding(c, ns.Name, backendSvcName)
 			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 

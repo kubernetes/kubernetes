@@ -149,9 +149,6 @@ const (
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
 
 	podRespondingTimeout = 15 * time.Minute
-	// ServiceRespondingTimeout is how long to wait for a service to be responding.
-	ServiceRespondingTimeout = 2 * time.Minute
-
 	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
 	ClaimProvisionTimeout = 5 * time.Minute
 
@@ -220,11 +217,6 @@ var (
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
-
-// GetServicesProxyRequest returns a request for a service proxy.
-func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
-	return request.Resource("services").SubResource("proxy"), nil
-}
 
 // RunID is a unique identifier of the e2e run.
 // Beware that this ID is not the same for all tests in the e2e run, because each Ginkgo node creates it separately.
@@ -1252,43 +1244,6 @@ func KubectlVersion() (*utilversion.Version, error) {
 	// Don't use the full match, as it contains "GitVersion:\"" and a
 	// trailing "\"".  Just use the submatch.
 	return utilversion.ParseSemantic(matches[1])
-}
-
-// ServiceResponding waits for the service to be responding.
-func ServiceResponding(c clientset.Interface, ns, name string) error {
-	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
-
-	return wait.PollImmediate(Poll, ServiceRespondingTimeout, func() (done bool, err error) {
-		proxyRequest, errProxy := GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
-		if errProxy != nil {
-			e2elog.Logf("Failed to get services proxy request: %v:", errProxy)
-			return false, nil
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
-		defer cancel()
-
-		body, err := proxyRequest.Namespace(ns).
-			Context(ctx).
-			Name(name).
-			Do().
-			Raw()
-		if err != nil {
-			if ctx.Err() != nil {
-				e2elog.Failf("Failed to GET from service %s: %v", name, err)
-				return true, err
-			}
-			e2elog.Logf("Failed to GET from service %s: %v:", name, err)
-			return false, nil
-		}
-		got := string(body)
-		if len(got) == 0 {
-			e2elog.Logf("Service %s: expected non-empty response", name)
-			return false, err // stop polling
-		}
-		e2elog.Logf("Service %s: found nonempty answer: %s", name, got)
-		return true, nil
-	})
 }
 
 // RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.

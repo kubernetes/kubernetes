@@ -34,7 +34,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	resapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -102,7 +102,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			Expect(devId1).To(Not(Equal("")))
 
 			podResources, err := getNodeDevices()
-			var resourcesForOurPod *resapi.PodResources
+			var resourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
 			e2elog.Logf("pod resources %v", podResources)
 			Expect(err).To(BeNil())
 			Expect(len(podResources.PodResources)).To(Equal(2))
