@@ -74,7 +74,9 @@ type topologyPairsMaps struct {
 type topologyPairsPodSpreadMap struct {
 	// This map is keyed with a topology key, and valued with minimum number
 	// of pods matched on that topology domain.
+	// TODO(Huang-Wei): refactor to {tpKey->tpValSet(or tpValSlice)}
 	topologyKeyToMinPodsMap map[string]int32
+	// TODO(Huang-Wei): refactor to {tpPair->count, podName->tpPairSet(optional)}
 	*topologyPairsMaps
 }
 
@@ -383,18 +385,23 @@ func (m *topologyPairsMaps) clone() *topologyPairsMaps {
 }
 
 func (m *topologyPairsPodSpreadMap) addPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) error {
-	constraints := getHardTopologySpreadConstraints(preemptorPod)
-	match, err := podMatchesAllSpreadConstraints(addedPod, preemptorPod.Namespace, constraints)
-	if err != nil {
-		return err
+	if addedPod.Namespace != preemptorPod.Namespace {
+		return nil
 	}
-	if !match || !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+	constraints := getHardTopologySpreadConstraints(preemptorPod)
+	if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 		return nil
 	}
 
 	// records which topology key(s) needs to be updated
 	minMatchNeedingUpdate := make(map[string]struct{})
+	podLabelSet := labels.Set(addedPod.Labels)
 	for _, constraint := range constraints {
+		if match, err := podMatchesSpreadConstraint(podLabelSet, constraint); err != nil {
+			return err
+		} else if !match {
+			continue
+		}
 		pair := topologyPair{
 			key:   constraint.TopologyKey,
 			value: node.Labels[constraint.TopologyKey],

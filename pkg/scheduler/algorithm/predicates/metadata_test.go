@@ -1245,15 +1245,14 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 
 func TestPodSpreadMap_addPod(t *testing.T) {
 	tests := []struct {
-		name                string
-		preemptorPod        *v1.Pod
-		addedPod            *v1.Pod
-		existingPods        []*v1.Pod
-		nodeIdx             int // denotes which node 'addedPod' belongs to
-		nodes               []*v1.Node
-		injectPodPointers   map[topologyPair][]int
-		injectAddedPodPairs []topologyPair
-		want                *topologyPairsPodSpreadMap
+		name              string
+		preemptorPod      *v1.Pod
+		addedPod          *v1.Pod
+		existingPods      []*v1.Pod
+		nodeIdx           int // denotes which node 'addedPod' belongs to
+		nodes             []*v1.Node
+		injectPodPointers map[topologyPair][]int // non-negative index refers to existingPods[i], negative index refers to addedPod
+		want              *topologyPairsPodSpreadMap
 	}{
 		{
 			name: "node a and b both impact current min match",
@@ -1268,11 +1267,8 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "node", value: "node-a"}: {},
+				{key: "node", value: "node-a"}: {-1},
 				{key: "node", value: "node-b"}: {},
-			},
-			injectAddedPodPairs: []topologyPair{
-				{key: "node", value: "node-a"},
 			},
 			want: &topologyPairsPodSpreadMap{
 				// min match map shouldn't be changed b/c node-b is still on the critical path
@@ -1300,10 +1296,8 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
+				{key: "node", value: "node-a"}: {-1},
 				{key: "node", value: "node-b"}: {0},
-			},
-			injectAddedPodPairs: []topologyPair{
-				{key: "node", value: "node-a"},
 			},
 			want: &topologyPairsPodSpreadMap{
 				// min match should be changed from 0 to 1
@@ -1334,7 +1328,6 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				{key: "node", value: "node-a"}: {},
 				{key: "node", value: "node-b"}: {0},
 			},
-			injectAddedPodPairs: []topologyPair{},
 			want: &topologyPairsPodSpreadMap{
 				// min match remains the same
 				topologyKeyToMinPodsMap: map[string]int32{"node": 0},
@@ -1351,7 +1344,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
-			addedPod: st.MakePod().Name("p-b2").Node("node-a").Label("foo", "").Obj(),
+			addedPod: st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 			},
@@ -1362,10 +1355,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 			},
 			injectPodPointers: map[topologyPair][]int{
 				{key: "node", value: "node-a"}: {},
-				{key: "node", value: "node-b"}: {0},
-			},
-			injectAddedPodPairs: []topologyPair{
-				{key: "node", value: "node-b"},
+				{key: "node", value: "node-b"}: {-1, 0},
 			},
 			want: &topologyPairsPodSpreadMap{
 				topologyKeyToMinPodsMap: map[string]int32{"node": 0},
@@ -1378,7 +1368,7 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 			},
 		},
 		{
-			name: "node a and b both impact topologyKeyToMinPodsMap on zone and node",
+			name: "node a and x both impact topologyKeyToMinPodsMap on zone and node",
 			preemptorPod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -1391,12 +1381,10 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  {-1},
 				{key: "zone", value: "zone2"}:  {},
+				{key: "node", value: "node-a"}: {-1},
 				{key: "node", value: "node-x"}: {},
-			},
-			injectAddedPodPairs: []topologyPair{
-				{key: "zone", value: "zone1"},
-				{key: "node", value: "node-a"},
 			},
 			want: &topologyPairsPodSpreadMap{
 				topologyKeyToMinPodsMap: map[string]int32{"zone": 0, "node": 0},
@@ -1423,12 +1411,10 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  {-1},
 				{key: "zone", value: "zone2"}:  {0},
+				{key: "node", value: "node-a"}: {-1},
 				{key: "node", value: "node-x"}: {0},
-			},
-			injectAddedPodPairs: []topologyPair{
-				{key: "zone", value: "zone1"},
-				{key: "node", value: "node-a"},
 			},
 			want: &topologyPairsPodSpreadMap{
 				topologyKeyToMinPodsMap: map[string]int32{"zone": 1, "node": 1},
@@ -1459,14 +1445,11 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}:  {0, 1},
+				{key: "zone", value: "zone1"}:  {-1, 0, 1},
 				{key: "zone", value: "zone2"}:  {2},
+				{key: "node", value: "node-a"}: {-1},
 				{key: "node", value: "node-b"}: {0, 1},
 				{key: "node", value: "node-x"}: {2},
-			},
-			injectAddedPodPairs: []topologyPair{
-				{key: "zone", value: "zone1"},
-				{key: "node", value: "node-a"},
 			},
 			want: &topologyPairsPodSpreadMap{
 				topologyKeyToMinPodsMap: map[string]int32{"zone": 1, "node": 1},
@@ -1480,22 +1463,94 @@ func TestPodSpreadMap_addPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "constraints hold different labelSelectors, node a impacts topologyKeyToMinPodsMap on node",
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			addedPod: st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x2").Node("node-x").Label("bar", "").Obj(),
+			},
+			nodeIdx: 0,
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  {-1, 0},
+				{key: "zone", value: "zone2"}:  {1},
+				{key: "node", value: "node-a"}: {},
+				{key: "node", value: "node-b"}: {0},
+				{key: "node", value: "node-x"}: {2},
+			},
+			want: &topologyPairsPodSpreadMap{
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 1, "node": 0},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1"),
+						"p-b1_": newPairSet("zone", "zone1", "node", "node-b"),
+						"p-x1_": newPairSet("zone", "zone2"),
+						"p-x2_": newPairSet("node", "node-x"),
+					},
+				},
+			},
+		},
+		{
+			name: "constraints hold different labelSelectors, node a impacts topologyKeyToMinPodsMap on both zone and node",
+			preemptorPod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			addedPod: st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Label("bar", "").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-b1").Node("node-b").Label("bar", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x2").Node("node-x").Label("bar", "").Obj(),
+			},
+			nodeIdx: 0,
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  {-1},
+				{key: "zone", value: "zone2"}:  {1},
+				{key: "node", value: "node-a"}: {-1},
+				{key: "node", value: "node-b"}: {0},
+				{key: "node", value: "node-x"}: {2},
+			},
+			want: &topologyPairsPodSpreadMap{
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 1, "node": 1},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-b1_": newPairSet("node", "node-b"),
+						"p-x1_": newPairSet("zone", "zone2"),
+						"p-x2_": newPairSet("node", "node-x"),
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.want.topologyPairToPods = make(map[topologyPair]podSet)
-			for pair, indice := range tt.injectPodPointers {
+			for pair, indexes := range tt.injectPodPointers {
 				pSet := make(podSet)
-				for _, i := range indice {
-					pSet[tt.existingPods[i]] = struct{}{}
+				for _, i := range indexes {
+					if i >= 0 {
+						pSet[tt.existingPods[i]] = struct{}{}
+					} else {
+						pSet[tt.addedPod] = struct{}{}
+					}
 				}
 				tt.want.topologyPairToPods[pair] = pSet
-			}
-			for _, pair := range tt.injectAddedPodPairs {
-				if _, ok := tt.want.topologyPairToPods[pair]; !ok {
-					tt.want.topologyPairToPods[pair] = make(podSet)
-				}
-				tt.want.topologyPairToPods[pair][tt.addedPod] = struct{}{}
 			}
 
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
@@ -1515,7 +1570,7 @@ func TestPodSpreadMap_removePod(t *testing.T) {
 		preemptor         *v1.Pod // preemptor pod
 		nodes             []*v1.Node
 		existingPods      []*v1.Pod
-		deletedPodIdx     int     // need to reuse *Pod of exsitingPods[i]
+		deletedPodIdx     int     // need to reuse *Pod of existingPods[i]
 		deletedPod        *v1.Pod // if deletedPodIdx is invalid, this field is bypassed
 		injectPodPointers map[topologyPair][]int
 		want              *topologyPairsPodSpreadMap
@@ -1704,9 +1759,9 @@ func TestPodSpreadMap_removePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.want.topologyPairToPods = make(map[topologyPair]podSet)
-			for pair, indice := range tt.injectPodPointers {
+			for pair, indexes := range tt.injectPodPointers {
 				pSet := make(podSet)
-				for _, i := range indice {
+				for _, i := range indexes {
 					pSet[tt.existingPods[i]] = struct{}{}
 				}
 				tt.want.topologyPairToPods[pair] = pSet
