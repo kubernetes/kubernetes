@@ -169,13 +169,9 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 	if err != nil {
 		return "", fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
-	var watcherClosed bool
+
 	ch := watcher.ResultChan()
-	defer func() {
-		if !watcherClosed {
-			watcher.Stop()
-		}
-	}()
+	defer watcher.Stop()
 
 	for {
 		select {
@@ -201,11 +197,7 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 				return "", errors.New("volume attachment has been deleted")
 
 			case watch.Error:
-				// close the watcher to avoid keeping the watcher too log
-				watcher.Stop()
-				watcherClosed = true
-				// start another cycle
-				return c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
+				klog.Warningf("waitForVolumeAttachmentInternal received watch error: %v", event)
 			}
 
 		case <-timer.C:
