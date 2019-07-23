@@ -318,7 +318,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 		// this is necessary for rkt.
 		// http://issue.k8s.io/7710
 		if p.Name == "" {
-			pm.Name = fmt.Sprintf("%s-%s:%d", container.Name, p.Protocol, p.ContainerPort)
+			pm.Name = fmt.Sprintf("%s-%s%d:%d", container.Name, p.Protocol, p.HostPort, p.ContainerPort)
 		} else {
 			pm.Name = fmt.Sprintf("%s-%s", container.Name, p.Name)
 		}

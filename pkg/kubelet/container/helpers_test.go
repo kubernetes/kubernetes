@@ -481,17 +481,19 @@ func TestMakePortMappings(t *testing.T) {
 				Name: "fooContainer",
 				Ports: []v1.ContainerPort{
 					port("", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-					port("", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+					port("", v1.ProtocolUDP, 80, 8080, "127.0.0.1"),
+					port("", v1.ProtocolTCP, 80, 0, "127.0.0.1"),
+					port("", v1.ProtocolTCP, 80, 8888, ""),
 					port("foo", v1.ProtocolUDP, 555, 5555, ""),
 					// Duplicated, should be ignored.
 					port("foo", v1.ProtocolUDP, 888, 8888, ""),
-					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, ""),
 				},
 			},
 			[]PortMapping{
-				portMapping("fooContainer-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+				portMapping("fooContainer-TCP8080:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
+				portMapping("fooContainer-UDP8080:80", v1.ProtocolUDP, 80, 8080, "127.0.0.1"),
+				portMapping("fooContainer-TCP0:80", v1.ProtocolTCP, 80, 0, "127.0.0.1"),
+				portMapping("fooContainer-TCP8888:80", v1.ProtocolTCP, 80, 8888, ""),
 				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
 			},
 		},
