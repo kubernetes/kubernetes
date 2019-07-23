@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	// TODO: decide whether to use the existing metrics, which
@@ -38,7 +39,9 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/filters/fq"
 	"k8s.io/apiserver/pkg/server/filters/reqmgmt/inflight"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/listers/flowcontrol/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 	workqueue "k8s.io/client-go/util/workqueue"
 
@@ -405,10 +408,11 @@ type requestManagement struct {
 	// fsInformer is the informer for flow schema config objects
 	fsInformer cache.SharedIndexInformer
 
-	// plLister belongs here too
-	// plLister
-	// fsLister belongs here too
-	// fsLister
+	//plLister & fsLister belong here too
+	//--
+	plLister v1alpha1.PriorityLevelConfigurationLister
+	fsLister v1alpha1.FlowSchemaLister
+	//--
 
 	// serverConcurrencyLimit is the limit on the server's total
 	// number of non-exempt requests being served at once.  This comes
@@ -435,6 +439,133 @@ type requestManagement struct {
 	curState atomic.Value
 }
 
+// func (rm *requestManagement) Init() {
+// 	// Create a channel to stops the shared informer gracefully
+// 	//--
+// 	stopper := make(chan struct{})
+// 	defer close(stopper)
+
+// 	// Kubernetes serves an utility to handle API crashes
+// 	//--
+// 	defer runtime.HandleCrash()
+
+// 	// This is the part where your custom code gets triggered based on the
+// 	// event that the shared informer catches
+// 	//--
+// 	rm.plInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+// 		// When a new PriorityLevelConfiguration gets created
+// 		AddFunc: plOnAdd,
+// 		// AddFunc: func(obj interface{}) { panic("not implemented") },
+// 		// When a PriorityLevelConfiguration gets updated
+// 		UpdateFunc: func(interface{}, interface{}) { panic("not implemented") },
+// 		// When a PriorityLevelConfiguration gets deleted
+// 		DeleteFunc: func(interface{}) { panic("not implemented") },
+// 	})
+
+// 	rm.fsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+// 		// When a new FlowSchema gets created
+// 		AddFunc: fsOnAdd,
+// 		// AddFunc: func(obj interface{}) { panic("not implemented") },
+// 		// When a FlowSchema gets updated
+// 		UpdateFunc: func(interface{}, interface{}) { panic("not implemented") },
+// 		// When a FlowSchema gets deleted
+// 		DeleteFunc: func(interface{}) { panic("not implemented") },
+// 	})
+
+// 	// You need to start the informer, in my case, it runs in the background
+// 	//--
+// 	go informer.Run(stopper)
+
+// }
+
+// plOnAdd is the function executed when the kubernetes informer notified the
+// presence of a new kubernetes node in the cluster
+// func plOnAdd(obj interface{}) {
+// 	// Cast the obj as node
+// 	pl := obj.(*rmtypesv1a1.PriorityLevelConfiguration)
+// 	// if this pl already exits (name check)
+// 	//   if its # of queues increased
+// 	//     we add queues to the fq impl
+// 	//   if its # of queues decreased
+// 	//     by making a distinction
+// ￼	 //     between the desired and the actual number of queues.  When the desired
+// ￼	 //     number drops below the actual number, the undesired queues are left in
+// ￼	 //     place until they are naturally drained; new requests are put in only
+// ￼	 //     the desired queues.  When an undesired queue becomes empty it is
+// ￼	 //     deleted and the fair queuing round-robin pointer is advanced if it was
+// ￼	 //     pointing to that queue
+
+// 	//     When an undesired queue becomes empty it is
+//     //	   deleted and the fair queuing round-robin pointer is advanced if it was
+// ￼	 //     pointing to that queue.
+// 	//  if assured concurrency value of a priority level increases
+// 	_, ok := pl.GetLabels()[K8S_LABEL_AWS_REGION]
+// 	if ok {
+// 		fmt.Printf("It has the label!")
+// 	}
+// }
+
+// fsOnAdd is the function executed when the kubernetes informer notified the
+// presence of a new kubernetes node in the cluster
+// func fsOnAdd(obj interface{}) {
+// 	// Cast the obj as node
+// 	fs := obj.(*rmtypesv1a1.FlowSchema)
+// 	_, ok := fs.
+// 	// _, ok := fs.GetLabels()[K8S_LABEL_AWS_REGION]
+// 	if ok {
+// 		fmt.Printf("It has the label!")
+// 	}
+// }
+
+// TODO(aaron-prindle) figure out if the clock makes more sense elsewhere...
+func (rm *requestManagement) InitRMState(clk clock.Clock) {
+	// UpdateRMState vs. StoreRMState?
+
+	// TODO(aaron-prindle) see if cache package makes more sense to use...
+	// cache.NewList... (eg: see Minikube /kubernetes pkg)
+
+	// TODO(aaron-prindle) verify this works as expected and selects all of objs...
+	priorityLevelConfigurations, err := rm.plLister.List(labels.Everything())
+	if err != nil {
+		panic("pls, err := rm.plLister.List(labels.NewSelector()) - errored")
+	}
+
+	// TODO(aaron-prindle) ERROR - currently this finds nothing...
+	flowSchemas, err := rm.fsLister.List(labels.Everything())
+	if err != nil {
+		panic("flowSchemas, err := rm.fsLister.List(labels.NewSelector()) - errored")
+	}
+	// TODO(aaron-prindle) ERROR - currently this finds nothing...
+	// flowSchema, err := rm.fsLister.Get("fs-0")
+	// if err != nil {
+	// 	panic(fmt.Sprintf("flowSchema, err := rm.fsLister.Get(\"fs-0\") errored: %v", err))
+	// }
+
+	flowSchema, err := rm.fsLister.Get("fs-0")
+	if err != nil {
+		panic(fmt.Sprintf("flowSchema, err := rm.fsLister.Get(\"fs-0\") errored: %v", err))
+	}
+
+
+	flowSchemas = []*rmtypesv1a1.FlowSchema{flowSchema}
+
+	// TODO(aaron-prindle) ERROR - currently this finds nothing...
+	fmt.Println("=============")
+	fmt.Println(flowSchemas)
+	fmt.Println("=============")
+
+	pls := initPriorityLevelStates(rm.serverConcurrencyLimit,
+		clk, priorityLevelConfigurations, rm.requestWaitLimit)
+
+	rmState := &RMState{
+		flowSchemas:            flowSchemas,
+		priorityLevelStates:    pls,
+		serverConcurrencyLimit: rm.serverConcurrencyLimit,
+	}
+
+	rm.curState.Store(rmState)
+}
+
 // TypedConfigObjectReference is a reference to a relevant config API object.
 // No namespace is needed because none of these objects is namespaced.
 type TypedConfigObjectReference struct {
@@ -447,25 +578,45 @@ func (tr *TypedConfigObjectReference) String() string {
 }
 
 // rmSetup is invoked at startup to create the infrastructure of this filter
-func rmSetup(loopbackClientConfig *restclient.Config, serverConcurrencyLimit int, requestWaitLimit time.Duration) *requestManagement {
+// TODO(aaron-prindle) CHANGE BACK!
+// func rmSetup(loopbackClientConfig *restclient.Config, serverConcurrencyLimit int, requestWaitLimit time.Duration, clk clock.Clock) *requestManagement {
+func rmSetup(clientset kubernetes.Interface, serverConcurrencyLimit int, requestWaitLimit time.Duration, clk clock.Clock) *requestManagement {
+
+	// --
+	// clientset, err := kubernetes.NewForConfig(loopbackClientConfig)
+	// if err != nil {
+	// 	panic("clientset, err := kubernetes.NewForConfig(loopbackClientConfig) errored")
+	// }
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+	// --
+
 	reqMgmt := &requestManagement{
-		configQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "req_mgmt_config_queue"),
+		// fairQueuingFactory:
+		configQueue: workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "req_mgmt_config_queue"),
+		// --
+		plInformer: factory.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Informer(),
+		fsInformer: factory.Flowcontrol().V1alpha1().FlowSchemas().Informer(),
+		plLister:   factory.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Lister(),
+		fsLister:   factory.Flowcontrol().V1alpha1().FlowSchemas().Lister(),
+		// --
+
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,
+		// curState: populated by InitRmState
 	}
+	reqMgmt.InitRMState(clk)
+
 	// TODO: finish implementation
 
-	// TODO(aaron-prindle) figure out what needs to be done...
-	// fetch related k8s objects - FlowSchemas, RequestPriorityLevels
+	// ============
+
+	// ============
+
 	return reqMgmt
 }
 
-func initPriorityLevelStates(serverConcurrencyLimit int, plcs []*rmtypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) map[string]*PriorityLevelState {
+func initPriorityLevelStates(serverConcurrencyLimit int, clk clock.Clock, plcs []*rmtypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) map[string]*PriorityLevelState {
 	pls := map[string]*PriorityLevelState{}
-
-	// TODO(aaron-prindle) change this to a test method and change clock to be
-	// clk := clock.RealClock{}
-	clk := clock.RealClock{}
 
 	for _, plc := range plcs {
 		concurrencyLimit := getACV(serverConcurrencyLimit, plcs, plc)
@@ -483,27 +634,35 @@ func initPriorityLevelStates(serverConcurrencyLimit int, plcs []*rmtypesv1a1.Pri
 func WithRequestManagement(
 	handler http.Handler,
 	// loopbackClientConfig *restclient.Config,
+	loopbackClientConfig kubernetes.Interface,
 	// -- added, REMOVE
-	flowSchemas []*rmtypesv1a1.FlowSchema,
-	priorityLevelConfigurations []*rmtypesv1a1.PriorityLevelConfiguration,
+	// flowSchemas []*rmtypesv1a1.FlowSchema,
+	// priorityLevelConfigurations []*rmtypesv1a1.PriorityLevelConfiguration,
 	// --
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
+	clk clock.Clock,
 ) http.Handler {
-	// reqMgmt := rmSetup(loopbackClientConfig, serverConcurrencyLimit, requestWaitLimit)
+	reqMgmt := rmSetup(loopbackClientConfig, serverConcurrencyLimit, requestWaitLimit, clk)
+	rmState := reqMgmt.curState.Load().(*RMState)
+
 	// --
 	// TODO(aaron-prindle) REMOVE - TEST - make dynamic
-	pls := initPriorityLevelStates(serverConcurrencyLimit, priorityLevelConfigurations, requestWaitLimit)
+
+	// pls := initPriorityLevelStates(serverConcurrencyLimit, clk, priorityLevelConfigurations, requestWaitLimit)
 
 	// rmState.updateACV(ps) // TODO(aaron-prindle) rename updateACV?
 	// ps.fqs.SetConcurrencyLimit(ps.concurrencyLimit)
 
-	rmState := RMState{
-		flowSchemas:            flowSchemas,
-		priorityLevelStates:    pls,
-		serverConcurrencyLimit: serverConcurrencyLimit,
-	}
+	// rmstate is created & updated from listers & informers
+
+	// rmState := RMState{
+	// 	flowSchemas:            flowSchemas,
+	// 	priorityLevelStates:    pls,
+	// 	serverConcurrencyLimit: serverConcurrencyLimit,
+	// }
+	//--
 
 	// --
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -527,34 +686,34 @@ func WithRequestManagement(
 		// rmState := reqMgmt.curState.Load().(*RMState)
 
 		// analyze request to get flowSchema (so can get it's info - PriorityState, FlowDistinguisher)
-		// fs := reqMgmt.pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
+		fs := reqMgmt.pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
 
 		// get the PriorityState, if exempt pass through
-		// ps := reqMgmt.requestPriorityState(r, fs, rmState.priorityLevelStates)
+		ps := reqMgmt.requestPriorityState(r, fs, rmState.priorityLevelStates)
 
 		// calculate the flow distinguisher for the flowSchema
-		// flowDistinguisher := reqMgmt.computeFlowDistinguisher(r, fs)
+		flowDistinguisher := reqMgmt.computeFlowDistinguisher(r, fs)
 
 		// hash the flowDistinguisher (for shuffle sharding
-		// hashValue := reqMgmt.hashFlowID(fs.Name, flowDistinguisher)
+		hashValue := reqMgmt.hashFlowID(fs.Name, flowDistinguisher)
 		// -- ORIG -- END
 
 		// -- TEST -- START
-		fs := pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
+		// fs := pickFlowSchema(r, rmState.flowSchemas, rmState.priorityLevelStates)
 
-		ps := requestPriorityState(r, fs, rmState.priorityLevelStates)
-		if ps.config.Exempt {
-			klog.V(5).Infof("Serving %v without delay\n", r)
-			handler.ServeHTTP(w, r)
-			return
-		}
+		// ps := requestPriorityState(r, fs, rmState.priorityLevelStates)
+		// if ps.config.Exempt {
+		// 	klog.V(5).Infof("Serving %v without delay\n", r)
+		// 	handler.ServeHTTP(w, r)
+		// 	return
+		// }
 
-		flowDistinguisher := computeFlowDistinguisher(r, fs)
+		// flowDistinguisher := computeFlowDistinguisher(r, fs)
 
-		hashValue := hashFlowID(fs.Name, flowDistinguisher)
+		// hashValue := hashFlowID(fs.Name, flowDistinguisher)
 		// -- TEST -- END
 
-		// TODO(aaron-prindle) verify this is needed?
+		// TODO(aaron-prindle) verify if this is needed?
 		// rmState.updateACV(ps) // TODO(aaron-prindle) rename updateACV?
 		// ps.fqs.SetConcurrencyLimit(ps.concurrencyLimit)
 
@@ -585,57 +744,24 @@ func WithRequestManagement(
 
 }
 
-func hash(s string) uint64 {
-	h := fnv.New64a()
-	h.Write([]byte(s))
-	return h.Sum64()
-}
-
-// func (requestManagement) computeFlowDistinguisher(r *http.Request, fs *rmtypesv1a1.FlowSchema) string {
-// 	// TODO: implement
-// 	// TODO(aaron-prindle) CHANGE replace w/ proper implementation
-// 	return fs.Name
-// }
-
-// func (requestManagement) hashFlowID(fsName, fDistinguisher string) uint64 {
-// 	// TODO: implement
-// 	// TODO(aaron-prindle) verify implementation
-// 	return hash(fmt.Sprintf("%s,%s", fsName, fDistinguisher))
-// }
-
-// func (requestManagement) pickFlowSchema(r *http.Request, flowSchemas FlowSchemaSeq, priorityLevelStates map[string]*PriorityLevelState) *rmtypesv1a1.FlowSchema {
-// 	// TODO(aaron-prindle) CHANGE replace w/ proper implementation
-// 	priority := r.Header.Get("PRIORITY")
-// 	idx, err := strconv.Atoi(priority)
-// 	if err != nil {
-// 		panic("strconv.Atoi(priority) errored")
-// 	}
-// 	// TODO(aaron-prindle) can also use MatchingPrecedence for dummy method
-// 	return flowSchemas[idx]
-// }
-
-// func (requestManagement) requestPriorityState(r *http.Request, fs *rmtypesv1a1.FlowSchema, priorityLevelStates map[string]*PriorityLevelState) *PriorityLevelState {
-// 	// TODO: implement
-// 	out, ok := priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
-// 	if !ok {
-// 		panic("NOT OK!!")
-// 	}
-// 	return out
-// }
-
-func computeFlowDistinguisher(r *http.Request, fs *rmtypesv1a1.FlowSchema) string {
+func (requestManagement) computeFlowDistinguisher(r *http.Request, fs *rmtypesv1a1.FlowSchema) string {
 	// TODO: implement
 	// TODO(aaron-prindle) CHANGE replace w/ proper implementation
 	return fs.Name
 }
 
-func hashFlowID(fsName, fDistinguisher string) uint64 {
+func (requestManagement) hashFlowID(fsName, fDistinguisher string) uint64 {
 	// TODO: implement
 	// TODO(aaron-prindle) verify implementation
-	return hash(fmt.Sprintf("%s,%s", fsName, fDistinguisher))
+	h := fnv.New64a()
+	s := fmt.Sprintf("%s,%s", fsName, fDistinguisher)
+	h.Write([]byte(s))
+	return h.Sum64()
+
+	// return hash(fmt.Sprintf("%s,%s", fsName, fDistinguisher))
 }
 
-func pickFlowSchema(r *http.Request, flowSchemas FlowSchemaSeq, priorityLevelStates map[string]*PriorityLevelState) *rmtypesv1a1.FlowSchema {
+func (requestManagement) pickFlowSchema(r *http.Request, flowSchemas FlowSchemaSeq, priorityLevelStates map[string]*PriorityLevelState) *rmtypesv1a1.FlowSchema {
 	// TODO(aaron-prindle) CHANGE replace w/ proper implementation
 	priority := r.Header.Get("PRIORITY")
 	idx, err := strconv.Atoi(priority)
@@ -646,12 +772,47 @@ func pickFlowSchema(r *http.Request, flowSchemas FlowSchemaSeq, priorityLevelSta
 	return flowSchemas[idx]
 }
 
-func requestPriorityState(r *http.Request, fs *rmtypesv1a1.FlowSchema, priorityLevelStates map[string]*PriorityLevelState) *PriorityLevelState {
+func (requestManagement) requestPriorityState(r *http.Request, fs *rmtypesv1a1.FlowSchema, priorityLevelStates map[string]*PriorityLevelState) *PriorityLevelState {
 	// TODO: implement
 	out, ok := priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
-
 	if !ok {
 		panic("NOT OK!!")
 	}
 	return out
 }
+
+// func computeFlowDistinguisher(r *http.Request, fs *rmtypesv1a1.FlowSchema) string {
+// 	// TODO: implement
+// 	// TODO(aaron-prindle) CHANGE replace w/ proper implementation
+// 	return fs.Name
+// }
+
+// func hashFlowID(fsName, fDistinguisher string) uint64 {
+// 	// TODO: implement
+// 	// TODO(aaron-prindle) verify implementation
+// 	h := fnv.New64a()
+// 	s := fmt.Sprintf("%s,%s", fsName, fDistinguisher)
+// 	h.Write([]byte(s))
+// 	return h.Sum64()
+// }
+
+// func pickFlowSchema(r *http.Request, flowSchemas FlowSchemaSeq, priorityLevelStates map[string]*PriorityLevelState) *rmtypesv1a1.FlowSchema {
+// 	// TODO(aaron-prindle) CHANGE replace w/ proper implementation
+// 	priority := r.Header.Get("PRIORITY")
+// 	idx, err := strconv.Atoi(priority)
+// 	if err != nil {
+// 		panic("strconv.Atoi(priority) errored")
+// 	}
+// 	// TODO(aaron-prindle) can also use MatchingPrecedence for dummy method
+// 	return flowSchemas[idx]
+// }
+
+// func requestPriorityState(r *http.Request, fs *rmtypesv1a1.FlowSchema, priorityLevelStates map[string]*PriorityLevelState) *PriorityLevelState {
+// 	// TODO: implement
+// 	out, ok := priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
+
+// 	if !ok {
+// 		panic("NOT OK!!")
+// 	}
+// 	return out
+// }
