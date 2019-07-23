@@ -28,7 +28,7 @@ spec:
           requests:
             cpu: 100m
         env:
-          - name: ELASTICSEARCH_URL
+          - name: ELASTICSEARCH_HOSTS
             value: http://elasticsearch-logging:9200
           - name: SERVER_BASEPATH
             value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy
