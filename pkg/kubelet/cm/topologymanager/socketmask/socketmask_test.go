@@ -106,6 +106,12 @@ func TestAnd(t *testing.T) {
 	for _, tc := range tcases {
 		firstMask, _ := NewSocketMask(tc.firstMaskBit)
 		secondMask, _ := NewSocketMask(tc.secondMaskBit)
+
+		result := And(firstMask, secondMask)
+		if result.String() != string(tc.andMask) {
+			t.Errorf("Expected mask to be %v, got %v", tc.andMask, result)
+		}
+
 		firstMask.And(secondMask)
 		if firstMask.String() != string(tc.andMask) {
 			t.Errorf("Expected mask to be %v, got %v", tc.andMask, firstMask)
@@ -130,6 +136,12 @@ func TestOr(t *testing.T) {
 	for _, tc := range tcases {
 		firstMask, _ := NewSocketMask(tc.firstMaskBit)
 		secondMask, _ := NewSocketMask(tc.secondMaskBit)
+
+		result := Or(firstMask, secondMask)
+		if result.String() != string(tc.orMask) {
+			t.Errorf("Expected mask to be %v, got %v", tc.orMask, result)
+		}
+
 		firstMask.Or(secondMask)
 		if firstMask.String() != string(tc.orMask) {
 			t.Errorf("Expected mask to be %v, got %v", tc.orMask, firstMask)
