@@ -14,7 +14,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v0.3.1
-	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
+	k8s.io/kube-openapi v0.0.0-20190722073852-5e22f3d471e6
 )
 
 replace (

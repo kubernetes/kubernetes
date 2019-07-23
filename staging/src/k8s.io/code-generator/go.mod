@@ -15,7 +15,7 @@ require (
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	k8s.io/gengo v0.0.0-20190128074634-0689ccc1d7d6
 	k8s.io/klog v0.3.1
-	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
+	k8s.io/kube-openapi v0.0.0-20190722073852-5e22f3d471e6
 )
 
 replace (
