@@ -1940,6 +1940,11 @@ func (in *Lifecycle) DeepCopyInto(out *Lifecycle) {
 		*out = new(Handler)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Type != nil {
+		in, out := &in.Type, &out.Type
+		*out = new(LifecycleType)
+		**out = **in
+	}
 	return
 }
 

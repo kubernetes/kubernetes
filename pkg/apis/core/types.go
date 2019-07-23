@@ -2104,6 +2104,14 @@ type Handler struct {
 	TCPSocket *TCPSocketAction
 }
 
+// LifecycleType describes the lifecycle behaviour of the container
+type LifecycleType string
+
+const (
+	// LifecycleTypeSidecar means that the container will start up before standard containers and be terminated after
+	LifecycleTypeSidecar LifecycleType = "Sidecar"
+)
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2123,6 +2131,12 @@ type Lifecycle struct {
 	// or until the termination grace period is reached.
 	// +optional
 	PreStop *Handler
+	// Type describes the startup/shutdown behaviour of the container.
+	// This field is not supported for InitContainers.
+	// Accepted values are "Sidecar".
+	// If unset, the container will obey the normal container lifecycle.
+	// +optional
+	Type *LifecycleType
 }
 
 // The below types are used by kube_client and api_server.

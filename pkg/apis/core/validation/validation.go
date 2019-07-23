@@ -2581,7 +2581,23 @@ func validateLifecycle(lifecycle *core.Lifecycle, fldPath *field.Path) field.Err
 	if lifecycle.PreStop != nil {
 		allErrs = append(allErrs, validateHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
 	}
+	if lifecycle.Type != nil {
+		allErrs = append(allErrs, validateLifecycleType(lifecycle.Type, fldPath.Child("type"))...)
+	}
 	return allErrs
+}
+
+var supportedLifecycleTypes = sets.NewString(string(core.LifecycleTypeSidecar))
+
+func validateLifecycleType(lifecycleType *core.LifecycleType, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	switch *lifecycleType {
+	case core.LifecycleTypeSidecar:
+		break
+	default:
+		allErrors = append(allErrors, field.NotSupported(fldPath, lifecycleType, supportedLifecycleTypes.List()))
+	}
+	return allErrors
 }
 
 var supportedPullPolicies = sets.NewString(string(core.PullAlways), string(core.PullIfNotPresent), string(core.PullNever))
@@ -2762,6 +2778,10 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
 	}
 
+	if !isInitContainers {
+		allErrs = append(allErrs, validateHasNonSidecar(containers, fldPath)...)
+	}
+
 	if isInitContainers {
 		// check initContainers one by one since they are running in sequential order.
 		for _, initContainer := range containers {
@@ -2773,6 +2793,20 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 	}
 
 	return allErrs
+}
+
+//check that we have at least one container in the pod which is not set to lifecycle type sidecar
+func validateHasNonSidecar(containers []core.Container, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	for _, container := range containers {
+		if container.Lifecycle == nil || container.Lifecycle.Type == nil {
+			//if we find a container that is not a sidecar, return
+			return nil
+		}
+	}
+
+	return append(allErrors, field.Forbidden(fldPath, fmt.Sprint("must have at least one container with lifecycle type != sidecar")))
 }
 
 func validateRestartPolicy(restartPolicy *core.RestartPolicy, fldPath *field.Path) field.ErrorList {

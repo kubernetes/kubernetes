@@ -4079,6 +4079,7 @@ func Convert_core_KeyToPath_To_v1_KeyToPath(in *core.KeyToPath, out *v1.KeyToPat
 func autoConvert_v1_Lifecycle_To_core_Lifecycle(in *v1.Lifecycle, out *core.Lifecycle, s conversion.Scope) error {
 	out.PostStart = (*core.Handler)(unsafe.Pointer(in.PostStart))
 	out.PreStop = (*core.Handler)(unsafe.Pointer(in.PreStop))
+	out.Type = (*core.LifecycleType)(unsafe.Pointer(in.Type))
 	return nil
 }
 
@@ -4090,6 +4091,7 @@ func Convert_v1_Lifecycle_To_core_Lifecycle(in *v1.Lifecycle, out *core.Lifecycl
 func autoConvert_core_Lifecycle_To_v1_Lifecycle(in *core.Lifecycle, out *v1.Lifecycle, s conversion.Scope) error {
 	out.PostStart = (*v1.Handler)(unsafe.Pointer(in.PostStart))
 	out.PreStop = (*v1.Handler)(unsafe.Pointer(in.PreStop))
+	out.Type = (*v1.LifecycleType)(unsafe.Pointer(in.Type))
 	return nil
 }
 

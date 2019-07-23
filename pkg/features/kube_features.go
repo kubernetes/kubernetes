@@ -570,6 +570,13 @@ const (
 	//
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
+
+	// owner: @Joseph-Irving
+	// alpha: v1.18
+	//
+	//
+	// Enables sidecar lifecycle type
+	SidecarLifecycle featuregate.Feature = "SidecarLifecycle"
 )
 
 func init() {
@@ -659,6 +666,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
+	SidecarLifecycle:                               {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

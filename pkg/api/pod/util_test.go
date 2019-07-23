@@ -1553,3 +1553,112 @@ func TestDropEphemeralContainers(t *testing.T) {
 		}
 	}
 }
+
+func TestDroplifecycleSidecar(t *testing.T) {
+	sidecarLifecycle := api.LifecycleTypeSidecar
+	podWithFirstContainerSidecarLifecycle := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", Lifecycle: &api.Lifecycle{Type: &sidecarLifecycle}}, {Name: "container2", Image: "testimage", Lifecycle: &api.Lifecycle{}}},
+			},
+		}
+	}
+	podWithSecondContainerSidecarLifecycle := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", Lifecycle: &api.Lifecycle{}}, {Name: "container2", Image: "testimage", Lifecycle: &api.Lifecycle{Type: &sidecarLifecycle}}},
+			},
+		}
+	}
+	podWithoutSidecarLifecycle := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", Lifecycle: &api.Lifecycle{}}, {Name: "container2", Image: "testimage", Lifecycle: &api.Lifecycle{}}},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description         string
+		hasSidecarlifecycle bool
+		sidecarContainer    string
+		pod                 func() *api.Pod
+	}{
+		{
+			description:         "container1 has sidecar lifecycle type",
+			hasSidecarlifecycle: true,
+			sidecarContainer:    "container1",
+			pod:                 podWithFirstContainerSidecarLifecycle,
+		},
+		{
+			description:         "container2 has sidecar lifecycle type",
+			sidecarContainer:    "container2",
+			hasSidecarlifecycle: true,
+			pod:                 podWithSecondContainerSidecarLifecycle,
+		},
+		{
+			description:         "does not have sidecar lifecycle",
+			hasSidecarlifecycle: false,
+			sidecarContainer:    "",
+			pod:                 podWithoutSidecarLifecycle,
+		},
+		{
+			description:         "is nil",
+			hasSidecarlifecycle: false,
+			sidecarContainer:    "",
+			pod:                 func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				_, oldPod := oldPodInfo.hasSidecarlifecycle, oldPodInfo.pod()
+				newPodHasSidecarLifecycle, newPod := newPodInfo.hasSidecarlifecycle, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarLifecycle, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodInfo.sidecarContainer == newPodInfo.sidecarContainer:
+						// new pod should not be changed if the feature is enabled, or if the old pod had lifecycle type
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSidecarLifecycle:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have lifecycle type
+						if !reflect.DeepEqual(newPod, podWithoutSidecarLifecycle()) {
+							t.Errorf("new pod had sidecar lifecylce: %v", diff.ObjectReflectDiff(newPod, podWithoutSidecarLifecycle()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

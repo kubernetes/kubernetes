@@ -387,6 +387,19 @@ func dropDisabledFields(
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
+		for i := range podSpec.Containers {
+			if !lifecycleTypeInUse(oldPodSpec, podSpec.Containers[i].Name) && podSpec.Containers[i].Lifecycle != nil {
+				podSpec.Containers[i].Lifecycle.Type = nil
+			}
+		}
+		for i := range podSpec.InitContainers {
+			if !lifecycleTypeInUse(oldPodSpec, podSpec.InitContainers[i].Name) && podSpec.InitContainers[i].Lifecycle != nil {
+				podSpec.InitContainers[i].Lifecycle.Type = nil
+			}
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
@@ -678,6 +691,32 @@ func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
 	}
 	if len(podStatus.PodIPs) > 1 {
 		return true
+	}
+	return false
+}
+
+func lifecycleTypeInUse(podSpec *api.PodSpec, containerName string) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name == containerName {
+			if podSpec.Containers[i].Lifecycle != nil {
+				if podSpec.Containers[i].Lifecycle.Type != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].Name == containerName {
+			if podSpec.InitContainers[i].Lifecycle != nil {
+				if podSpec.InitContainers[i].Lifecycle.Type != nil {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }

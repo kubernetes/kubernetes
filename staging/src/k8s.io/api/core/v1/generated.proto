@@ -1911,6 +1911,13 @@ message Lifecycle {
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
   optional Handler preStop = 2;
+
+  // Type describes the startup/shutdown behaviour of the container.
+  // This field is not supported for InitContainers.
+  // Accepted values are "Sidecar".
+  // If unset, the container will obey the normal container lifecycle.
+  // +optional
+  optional string type = 3;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.

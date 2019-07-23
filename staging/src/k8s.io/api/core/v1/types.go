@@ -2284,6 +2284,14 @@ type Handler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
 
+// LifecycleType describes the lifecycle behaviour of the container
+type LifecycleType string
+
+const (
+	// LifecycleTypeSidecar means that the container will start up before standard containers and be terminated after
+	LifecycleTypeSidecar LifecycleType = "Sidecar"
+)
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2306,6 +2314,12 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	// Type describes the startup/shutdown behaviour of the container.
+	// This field is not supported for InitContainers.
+	// Accepted values are "Sidecar".
+	// If unset, the container will obey the normal container lifecycle.
+	// +optional
+	Type *LifecycleType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=LifecycleType"`
 }
 
 type ConditionStatus string

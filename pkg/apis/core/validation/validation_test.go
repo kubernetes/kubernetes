@@ -5762,6 +5762,9 @@ func TestValidateContainers(t *testing.T) {
 		AllowPrivileged: true,
 	})
 
+	lifecycleSidecar := core.LifecycleTypeSidecar
+	invalidLifecycle := core.LifecycleType("foo")
+
 	successCase := []core.Container{
 		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		// backwards compatibility to ensure containers in pod template spec do not check for this
@@ -5907,6 +5910,13 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
+		{
+			Name:                     "lifecycle-type-sidecar",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			Lifecycle:                &core.Lifecycle{Type: &lifecycleSidecar},
+			TerminationMessagePolicy: "File",
+		},
 	}
 	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -6144,6 +6154,15 @@ func TestValidateContainers(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		"Invalid lifecycle type": {
+			{
+				Name:                     "lifecycle-type",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				Lifecycle:                &core.Lifecycle{Type: &invalidLifecycle},
+				TerminationMessagePolicy: "File",
 			},
 		},
 	}
@@ -6559,6 +6578,12 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
+	sidecarLifecycle := core.LifecycleTypeSidecar
+
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
@@ -6704,6 +6729,12 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("valid-sandbox"),
 			Overhead:         core.ResourceList{},
+		},
+		{ // Populate lifecyle type
+			Containers: []core.Container{{Name: "ctr-sidecar", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Lifecycle: &core.Lifecycle{Type: &sidecarLifecycle}},
+				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 	}
 	for i := range successCases {
@@ -6891,6 +6922,11 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy:    core.RestartPolicyAlways,
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("invalid/sandbox"),
+		},
+		"only sidecars": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Lifecycle: &core.Lifecycle{Type: &sidecarLifecycle}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 	}
 	for k, v := range failureCases {
