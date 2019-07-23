@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -825,25 +826,23 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 }
 
-func TestPodLabelsMatchesSpreadConstraints(t *testing.T) {
+func TestPodMatchesSpreadConstraint(t *testing.T) {
 	tests := []struct {
-		name        string
-		podLabels   map[string]string
-		constraints []v1.TopologySpreadConstraint
-		want        bool
-		wantErr     bool
+		name       string
+		podLabels  map[string]string
+		constraint v1.TopologySpreadConstraint
+		want       bool
+		wantErr    bool
 	}{
 		{
 			name:      "normal match",
 			podLabels: map[string]string{"foo": "", "bar": ""},
-			constraints: []v1.TopologySpreadConstraint{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "foo",
-								Operator: metav1.LabelSelectorOpExists,
-							},
+			constraint: v1.TopologySpreadConstraint{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpExists,
 						},
 					},
 				},
@@ -853,18 +852,16 @@ func TestPodLabelsMatchesSpreadConstraints(t *testing.T) {
 		{
 			name:      "normal mismatch",
 			podLabels: map[string]string{"foo": "", "baz": ""},
-			constraints: []v1.TopologySpreadConstraint{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "foo",
-								Operator: metav1.LabelSelectorOpExists,
-							},
-							{
-								Key:      "bar",
-								Operator: metav1.LabelSelectorOpExists,
-							},
+			constraint: v1.TopologySpreadConstraint{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpExists,
+						},
+						{
+							Key:      "bar",
+							Operator: metav1.LabelSelectorOpExists,
 						},
 					},
 				},
@@ -873,14 +870,12 @@ func TestPodLabelsMatchesSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "podLabels is nil",
-			constraints: []v1.TopologySpreadConstraint{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "foo",
-								Operator: metav1.LabelSelectorOpExists,
-							},
+			constraint: v1.TopologySpreadConstraint{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpExists,
 						},
 					},
 				},
@@ -893,31 +888,28 @@ func TestPodLabelsMatchesSpreadConstraints(t *testing.T) {
 				"foo": "",
 				"bar": "",
 			},
-			constraints: []v1.TopologySpreadConstraint{
-				{
-					MaxSkew: 1,
-				},
+			constraint: v1.TopologySpreadConstraint{
+				MaxSkew: 1,
 			},
 			want: false,
 		},
 		{
 			name: "both podLabels and constraint.LabelSelector are nil",
-			constraints: []v1.TopologySpreadConstraint{
-				{
-					MaxSkew: 1,
-				},
+			constraint: v1.TopologySpreadConstraint{
+				MaxSkew: 1,
 			},
 			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := podLabelsMatchesSpreadConstraints(tt.podLabels, tt.constraints)
+			podLabelSet := labels.Set(tt.podLabels)
+			got, err := podMatchesSpreadConstraint(podLabelSet, tt.constraint)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("podLabelsMatchesSpreadConstraints() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("podMatchesSpreadConstraint() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("podLabelsMatchesSpreadConstraints() = %v, want %v", got, tt.want)
+				t.Errorf("podMatchesSpreadConstraint() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -996,7 +988,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 			},
 		},
 		{
-			name: "namespace mis-match doesn't count",
+			name: "namespace mismatch doesn't count",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),
@@ -1117,7 +1109,37 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 			},
 		},
 		{
-			name: "different labelSelectors",
+			name: "different labelSelectors - simple version",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  {0},
+				{key: "zone", value: "zone2"}:  {},
+				{key: "node", value: "node-a"}: {},
+				{key: "node", value: "node-b"}: {},
+				{key: "node", value: "node-y"}: {},
+			},
+			want: &topologyPairsPodSpreadMap{
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 0, "node": 0},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a_": newPairSet("zone", "zone1"),
+					},
+				},
+			},
+		},
+		{
+			name: "different labelSelectors - complex version",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
@@ -1137,18 +1159,22 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}:  {1},
-				{key: "zone", value: "zone2"}:  {4, 6},
+				{key: "zone", value: "zone1"}:  {0, 1, 2},
+				{key: "zone", value: "zone2"}:  {3, 4, 5, 6},
 				{key: "node", value: "node-a"}: {1},
 				{key: "node", value: "node-b"}: {},
 				{key: "node", value: "node-y"}: {4, 6},
 			},
 			want: &topologyPairsPodSpreadMap{
-				topologyKeyToMinPodsMap: map[string]int32{"zone": 1, "node": 0},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 3, "node": 0},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1"),
 						"p-a2_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-b1_": newPairSet("zone", "zone1"),
+						"p-y1_": newPairSet("zone", "zone2"),
 						"p-y2_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y3_": newPairSet("zone", "zone2"),
 						"p-y4_": newPairSet("zone", "zone2", "node", "node-y"),
 					},
 				},

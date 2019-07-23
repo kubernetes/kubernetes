@@ -104,7 +104,7 @@ type predicateMetadata struct {
 	// from scheduler extender configuration and does not change per pod.
 	ignoredExtendedResources sets.String
 	// Similar to the map for pod (anti-)affinity, but imposes additional min matches info
-	// to describe mininum match number on each topology spread constraint
+	// to describe minimum match number on each topology spread constraint.
 	topologyPairsPodSpreadMap *topologyPairsPodSpreadMap
 }
 
@@ -190,8 +190,8 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 }
 
 func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) (*topologyPairsPodSpreadMap, error) {
-	// we have feature gating in APIserver to strip the spec
-	// so don't need to re-check feature gate, just check length of constraints
+	// We have feature gating in APIServer to strip the spec
+	// so don't need to re-check feature gate, just check length of constraints.
 	constraints := getHardTopologySpreadConstraints(pod)
 	if len(constraints) == 0 {
 		return nil, nil
@@ -206,7 +206,7 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 	var lock sync.Mutex
 
 	topologyPairsPodSpreadMap := &topologyPairsPodSpreadMap{
-		// topologyKeyToMinPodsMap will be initilized with proper size later.
+		// topologyKeyToMinPodsMap will be initialized with proper size later.
 		topologyPairsMaps: newTopologyPairsMaps(),
 	}
 
@@ -230,7 +230,7 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		if !podMatchesNodeSelectorAndAffinityTerms(pod, node) {
 			return
 		}
-		// ensure current node's labels contains all topologyKeys in 'constraints'
+		// Ensure current node's labels contains all topologyKeys in 'constraints'.
 		for _, constraint := range constraints {
 			if _, ok := node.Labels[constraint.TopologyKey]; !ok {
 				return
@@ -240,13 +240,17 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		nodeTopologyMaps := newTopologyPairsMaps()
 		// nodeInfo.Pods() can be empty; or all pods don't fit
 		for _, existingPod := range nodeInfo.Pods() {
-			ok, err := podMatchesAllSpreadConstraints(existingPod, pod.Namespace, constraints)
-			if err != nil {
-				errCh.SendErrorWithCancel(err, cancel)
-				return
+			if existingPod.Namespace != pod.Namespace {
+				continue
 			}
-			if ok {
-				for _, constraint := range constraints {
+			podLabelSet := labels.Set(existingPod.Labels)
+			for _, constraint := range constraints {
+				ok, err := podMatchesSpreadConstraint(podLabelSet, constraint)
+				if err != nil {
+					errCh.SendErrorWithCancel(err, cancel)
+					return
+				}
+				if ok {
 					// constraint.TopologyKey is already guaranteed to be present
 					pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
 					nodeTopologyMaps.addTopologyPair(pair, existingPod)
@@ -254,7 +258,7 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 			}
 		}
 		// If needed, append topology pair without entry of pods.
-		// For example, on node-x, there is no pod matching spread constraints
+		// For example, on node-x, there is no pod matching spread constraints,
 		// but node-x should be also considered as a match (with match number 0)
 		// i.e. <node: node-x>: {}
 		for _, constraint := range constraints {
@@ -281,8 +285,8 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[constraint.TopologyKey] = math.MaxInt32
 	}
 	for pair, podSet := range topologyPairsPodSpreadMap.topologyPairToPods {
-		// TODO(Huang-Wei): short circuit all portions of <topologyKey: any value>
-		// if we see 0 as min match of the topologyKey
+		// TODO(Huang-Wei): short circuit unvisited portions of <topologyKey: any value>
+		// if we already see 0 as min match of that topologyKey.
 		if l := int32(len(podSet)); l < topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[pair.key] {
 			topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[pair.key] = l
 		}
@@ -301,30 +305,16 @@ func getHardTopologySpreadConstraints(pod *v1.Pod) (constraints []v1.TopologySpr
 	return
 }
 
-func podMatchesAllSpreadConstraints(pod *v1.Pod, ns string, constraints []v1.TopologySpreadConstraint) (bool, error) {
-	if len(constraints) == 0 || pod.Namespace != ns {
-		return false, nil
-	}
-	return podLabelsMatchesSpreadConstraints(pod.Labels, constraints)
-}
-
 // some corner cases:
-// 1. podLabels = nil, constraint.LabelSelector = nil => returns false
-// 2. podLabels = nil => returns false
-// 3. constraint.LabelSelector = nil => returns false
-func podLabelsMatchesSpreadConstraints(podLabels map[string]string, constraints []v1.TopologySpreadConstraint) (bool, error) {
-	if len(constraints) == 0 {
-		return false, nil
+// 1. podLabelSet = nil => returns (false, nil)
+// 2. constraint.LabelSelector = nil => returns (false, nil)
+func podMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySpreadConstraint) (bool, error) {
+	selector, err := metav1.LabelSelectorAsSelector(constraint.LabelSelector)
+	if err != nil {
+		return false, err
 	}
-	podLabelSet := labels.Set(podLabels)
-	for _, constraint := range constraints {
-		selector, err := metav1.LabelSelectorAsSelector(constraint.LabelSelector)
-		if err != nil {
-			return false, err
-		}
-		if !selector.Matches(podLabelSet) {
-			return false, nil
-		}
+	if !selector.Matches(podLabelSet) {
+		return false, nil
 	}
 	return true, nil
 }
@@ -337,9 +327,7 @@ func newTopologyPairsMaps() *topologyPairsMaps {
 
 func (m *topologyPairsMaps) addTopologyPair(pair topologyPair, pod *v1.Pod) {
 	podFullName := schedutil.GetPodFullName(pod)
-	if m.topologyPairToPods[pair] == nil {
-		m.topologyPairToPods[pair] = make(map[*v1.Pod]struct{})
-	}
+	m.addTopologyPairWithoutPods(pair)
 	m.topologyPairToPods[pair][pod] = struct{}{}
 	if m.podToTopologyPairs[podFullName] == nil {
 		m.podToTopologyPairs[podFullName] = make(map[topologyPair]struct{})
