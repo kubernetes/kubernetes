@@ -17,15 +17,18 @@ limitations under the License.
 package internal
 
 import (
+	"bytes"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 func newFields() metav1.Fields {
-	return metav1.Fields{Map: map[string]metav1.Fields{}}
+	return metav1.Fields{} //Map: map[string]metav1.Fields{}}
 }
 
+/*
 func fieldsSet(f metav1.Fields, path fieldpath.Path, set *fieldpath.Set) error {
 	if len(f.Map) == 0 {
 		set.Insert(path)
@@ -47,14 +50,17 @@ func fieldsSet(f metav1.Fields, path fieldpath.Path, set *fieldpath.Set) error {
 		path = path[:len(path)-1]
 	}
 	return nil
-}
+}*/
 
 // FieldsToSet creates a set paths from an input trie of fields
 func FieldsToSet(f metav1.Fields) (fieldpath.Set, error) {
 	set := fieldpath.Set{}
-	return set, fieldsSet(f, fieldpath.Path{}, &set)
+	err := set.FromJSON(bytes.NewReader(f.Map.Raw))
+	return set, err
+	//fieldsSet(f, fieldpath.Path{}, &set)
 }
 
+/*
 func removeUselessDots(f metav1.Fields) metav1.Fields {
 	if _, ok := f.Map["."]; ok && len(f.Map) == 1 {
 		delete(f.Map, ".")
@@ -64,32 +70,36 @@ func removeUselessDots(f metav1.Fields) metav1.Fields {
 		f.Map[k] = removeUselessDots(tf)
 	}
 	return f
-}
+}*/
 
 // SetToFields creates a trie of fields from an input set of paths
 func SetToFields(s fieldpath.Set) (metav1.Fields, error) {
 	var err error
 	f := newFields()
-	s.Iterate(func(path fieldpath.Path) {
-		if err != nil {
-			return
-		}
-		tf := f
-		for _, pe := range path {
-			var str string
-			str, err = fieldpath.SerializePathElement(pe)
-			if err != nil {
-				break
-			}
-			if _, ok := tf.Map[str]; ok {
-				tf = tf.Map[str]
-			} else {
-				tf.Map[str] = newFields()
-				tf = tf.Map[str]
-			}
-		}
-		tf.Map["."] = newFields()
-	})
-	f = removeUselessDots(f)
+	f.Map.Raw, err = s.ToJSON()
 	return f, err
+	/*
+		s.Iterate(func(path fieldpath.Path) {
+			if err != nil {
+				return
+			}
+			tf := f
+			for _, pe := range path {
+				var str string
+				str, err = fieldpath.SerializePathElement(pe)
+				if err != nil {
+					break
+				}
+				if _, ok := tf.Map[str]; ok {
+					tf = tf.Map[str]
+				} else {
+					tf.Map[str] = newFields()
+					tf = tf.Map[str]
+				}
+			}
+			tf.Map["."] = newFields()
+		})
+		f = removeUselessDots(f)
+		return f, err
+	*/
 }

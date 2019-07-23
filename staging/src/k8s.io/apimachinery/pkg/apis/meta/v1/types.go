@@ -1111,6 +1111,8 @@ const (
 // Fields stores a set of fields in a data structure like a Trie.
 // To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
 type Fields struct {
+	Map runtime.RawExtension `json:",inline" protobuf:"bytes,2,rep,name=map"`
+
 	// Map stores a set of fields in a data structure like a Trie.
 	//
 	// Each key is either a '.' representing the field itself, and will always map to an empty set,
@@ -1122,7 +1124,7 @@ type Fields struct {
 	// If a key maps to an empty Fields value, the field that key represents is part of the set.
 	//
 	// The exact format is defined in k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
-	Map map[string]Fields `json:",inline" protobuf:"bytes,1,rep,name=map"`
+	// Map map[string]Fields `json:",inline" protobuf:"bytes,1,rep,name=map"`
 }
 
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf
