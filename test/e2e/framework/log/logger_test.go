@@ -148,8 +148,9 @@ func stripAddresses(in string) string {
 	return instanceAddr.ReplaceAllString(in, ">")
 }
 
-// stackLocation matches "\t/<some path>/<file>.go:75 +0x1f1".
-var stackLocation = regexp.MustCompile(`/.*/([[:^space:]]+.go:[[:digit:]]+)( \+0x[0-9a-fA-F]+)?`)
+// stackLocation matches "<some path>/<file>.go:75 +0x1f1" after a slash (built
+// locally) or one of a few relative paths (built in the Kubernetes CI).
+var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space:]]+.go:[[:digit:]]+)( \+0x[0-9a-fA-F]+)?`)
 
 // functionArgs matches "<function name>(...)".
 var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
