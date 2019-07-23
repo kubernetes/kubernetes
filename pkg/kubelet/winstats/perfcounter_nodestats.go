@@ -21,7 +21,9 @@ package winstats
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -136,10 +138,16 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 		return nil, err
 	}
 
+	systemUUID, err := getSystemUUID()
+	if err != nil {
+		return nil, err
+	}
+
 	return &cadvisorapi.MachineInfo{
 		NumCores:       runtime.NumCPU(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
 		MachineID:      hostname,
+		SystemUUID:     systemUUID,
 	}, nil
 }
 
@@ -210,6 +218,16 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 	cachePeriodSeconds := uint64(defaultCachePeriod / time.Second)
 	cpuUsageNanoCores := (p.cpuUsageCoreNanoSecondsCache.latestValue - p.cpuUsageCoreNanoSecondsCache.previousValue) / cachePeriodSeconds
 	return cpuUsageNanoCores
+}
+
+func getSystemUUID() (string, error) {
+	cmd := exec.Command("powershell.exe", "-Command", "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	systemUUID := strings.TrimRight(string(out), "\r\n")
+	return systemUUID, nil
 }
 
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {

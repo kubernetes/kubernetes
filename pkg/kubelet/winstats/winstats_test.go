@@ -121,7 +121,7 @@ func TestWinMachineInfo(t *testing.T) {
 		NumCores:       4,
 		MemoryCapacity: 1.6e+10,
 		MachineID:      "somehostname",
-		SystemUUID:     machineInfo.SystemUUID,})
+		SystemUUID:     machineInfo.SystemUUID})
 }
 
 func TestWinVersionInfo(t *testing.T) {

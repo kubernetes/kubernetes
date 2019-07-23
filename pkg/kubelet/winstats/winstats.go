@@ -20,8 +20,6 @@ limitations under the License.
 package winstats
 
 import (
-	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -105,24 +103,9 @@ func (c *StatsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInf
 }
 
 // WinMachineInfo returns a cadvisorapi.MachineInfo with details about the
-// node machine. Run the powershell command to get the SystemUUID for Windows node
-// in here if it isn't provided by cadvisor.
+// node machine.
 func (c *StatsClient) WinMachineInfo() (*cadvisorapi.MachineInfo, error) {
-	infos, err := c.client.getMachineInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	if infos.SystemUUID == "" {
-		cmd := exec.Command("powershell.exe", "-Command", "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID")
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return infos, err
-		}
-		infos.SystemUUID = strings.TrimRight(string(out), "\r\n")
-	}
-
-	return infos, nil
+	return c.client.getMachineInfo()
 }
 
 // WinVersionInfo returns a  cadvisorapi.VersionInfo with version info of
