@@ -345,12 +345,13 @@ func (f *framework) RunPrebindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
 	for _, pl := range f.prebindPlugins {
 		status := pl.Prebind(pc, pod, nodeName)
+		if status.Code() == Unschedulable {
+			msg := fmt.Sprintf("rejected by %v at prebind: %v", pl.Name(), status.Message())
+			klog.V(4).Infof(msg)
+			return NewStatus(status.Code(), msg)
+		}
+
 		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at prebind: %v", pl.Name(), status.Message())
-				klog.V(4).Infof(msg)
-				return NewStatus(status.Code(), msg)
-			}
 			msg := fmt.Sprintf("error while running %v prebind plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
@@ -422,57 +423,61 @@ func (f *framework) RunUnreservePlugins(
 func (f *framework) RunPermitPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
 	timeout := maxTimeout
-	statusCode := Success
+	var needsWait bool
+	var waitPermitPluginName string
 	for _, pl := range f.permitPlugins {
 		status, d := pl.Permit(pc, pod, nodeName)
-		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at permit: %v", pl.Name(), status.Message())
-				klog.V(4).Infof(msg)
-				return NewStatus(status.Code(), msg)
+		switch status.Code() {
+		case Success:
+			break
+		case Unschedulable:
+			msg := fmt.Sprintf("rejected by %v at permit: %v", pl.Name(), status.Message())
+			klog.V(4).Infof(msg)
+			return NewStatus(status.Code(), msg)
+		case Wait:
+			if timeout <= d {
+				break
 			}
-			if status.Code() == Wait {
-				// Use the minimum timeout duration.
-				if timeout > d {
-					timeout = d
-				}
-				statusCode = Wait
-			} else {
-				msg := fmt.Sprintf("error while running %v permit plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
-				klog.Error(msg)
-				return NewStatus(Error, msg)
-			}
+			timeout = d
+			waitPermitPluginName = pl.Name()
+			needsWait = true
+		default:
+			msg := fmt.Sprintf("error while running %v permit plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
 		}
+	}
+
+	if !needsWait {
+		return nil
 	}
 
 	// We now wait for the minimum duration if at least one plugin asked to
 	// wait (and no plugin rejected the pod)
-	if statusCode == Wait {
-		w := newWaitingPod(pod)
-		f.waitingPods.add(w)
-		defer f.waitingPods.remove(pod.UID)
-		timer := time.NewTimer(timeout)
-		klog.V(4).Infof("waiting for %v for pod %v at permit", timeout, pod.Name)
-		select {
-		case <-timer.C:
-			msg := fmt.Sprintf("pod %v rejected due to timeout after waiting %v at permit", pod.Name, timeout)
+	w := newWaitingPod(pod)
+	f.waitingPods.add(w)
+	defer f.waitingPods.remove(pod.UID)
+	timer := time.NewTimer(timeout)
+	klog.V(4).Infof("permit plugin %v is waiting for %v for pod %v", waitPermitPluginName, timeout, pod.Name)
+	select {
+	case <-timer.C:
+		msg := fmt.Sprintf("pod %v rejected due to timeout after permit plugin %v waits %v", pod.Name, waitPermitPluginName, timeout)
+		klog.V(4).Infof(msg)
+		return NewStatus(Unschedulable, msg)
+	case s := <-w.s:
+		switch s.Code() {
+		case Success:
+			return nil
+		case Unschedulable:
+			msg := fmt.Sprintf("rejected while waiting at permit: %v", s.Message())
 			klog.V(4).Infof(msg)
-			return NewStatus(Unschedulable, msg)
-		case s := <-w.s:
-			if !s.IsSuccess() {
-				if s.Code() == Unschedulable {
-					msg := fmt.Sprintf("rejected while waiting at permit: %v", s.Message())
-					klog.V(4).Infof(msg)
-					return NewStatus(s.Code(), msg)
-				}
-				msg := fmt.Sprintf("error received while waiting at permit for pod %v: %v", pod.Name, s.Message())
-				klog.Error(msg)
-				return NewStatus(Error, msg)
-			}
+			return NewStatus(s.Code(), msg)
+		default:
+			msg := fmt.Sprintf("error received while waiting at permit for pod %v: %v", pod.Name, s.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
 		}
 	}
-
-	return nil
 }
 
 // NodeInfoSnapshot returns the latest NodeInfo snapshot. The snapshot
