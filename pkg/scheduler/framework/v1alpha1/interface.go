@@ -71,15 +71,15 @@ func (s *Status) Code() Code {
 
 // Message returns message of the Status.
 func (s *Status) Message() string {
+	if s == nil {
+		return ""
+	}
 	return s.message
 }
 
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
 func (s *Status) IsSuccess() bool {
-	if s == nil || s.code == Success {
-		return true
-	}
-	return false
+	return s.Code() == Success
 }
 
 // AsError returns an "error" object with the same message as that of the Status.
