@@ -37,6 +37,15 @@ func (fs *FlagSet) Var(value pflag.Value, name string, usage string) *VarValue {
 	return v
 }
 
+// Value returns the value for the registered flag if the flag was set.
+func (v *VarValue) Value() interface{} {
+    if v.fs.Changed(v.name) {
+        flag := v.fs.Lookup(v.name)
+        return flag.Value
+    }
+    return nil
+}
+
 // Apply calls the apply function if the flag associated with VarValue was set.
 // Since users supply the scratch-space when constructing the VarValue, they
 // must read the scratch space directly in their apply function.
