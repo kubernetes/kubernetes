@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 )
@@ -58,7 +59,7 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 // as "cpu" and "memory". If an error occurs, no perf data will be logged.
 func logPerfData(p *perftype.PerfData, perfType string) {
 	if framework.TestContext.ReportDir == "" {
-		framework.PrintPerfData(p)
+		e2eperf.PrintPerfData(p)
 		return
 	}
 	dumpDataToFile(p, p.Labels, "performance-"+perfType)
@@ -71,7 +72,7 @@ func logPerfData(p *perftype.PerfData, perfType string) {
 func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1.Time, testInfo map[string]string) {
 	timeSeries := &nodeperftype.NodeTimeSeries{
 		Labels:  testInfo,
-		Version: framework.CurrentKubeletPerfMetricsVersion,
+		Version: e2eperf.CurrentKubeletPerfMetricsVersion,
 	}
 	// Attach operation time series.
 	timeSeries.OperationData = map[string][]int64{
@@ -108,7 +109,7 @@ func getCumulatedPodTimeSeries(timePerPod map[string]metav1.Time) []int64 {
 // getLatencyPerfData returns perf data of pod startup latency.
 func getLatencyPerfData(latency e2emetrics.LatencyMetric, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
-		Version: framework.CurrentKubeletPerfMetricsVersion,
+		Version: e2eperf.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
 			{
 				Data: map[string]float64{
@@ -131,7 +132,7 @@ func getLatencyPerfData(latency e2emetrics.LatencyMetric, testInfo map[string]st
 // getThroughputPerfData returns perf data of pod creation startup throughput.
 func getThroughputPerfData(batchLag time.Duration, e2eLags []e2emetrics.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
-		Version: framework.CurrentKubeletPerfMetricsVersion,
+		Version: e2eperf.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
 			{
 				Data: map[string]float64{

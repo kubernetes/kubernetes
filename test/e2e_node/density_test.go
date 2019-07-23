@@ -35,6 +35,7 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -76,13 +77,13 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			{
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
-				cpuLimits: framework.ContainersCPUSummary{
+				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
 					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
-				memLimits: framework.ResourceUsagePerContainer{
-					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
+				memLimits: e2ekubelet.ResourceUsagePerContainer{
+					kubeletstatsv1alpha1.SystemContainerKubelet: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
 				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: e2emetrics.LatencyMetric{
@@ -223,13 +224,13 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			{
 				podsNr:   10,
 				bgPodsNr: 50,
-				cpuLimits: framework.ContainersCPUSummary{
+				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
 					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
-				memLimits: framework.ResourceUsagePerContainer{
-					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
+				memLimits: e2ekubelet.ResourceUsagePerContainer{
+					kubeletstatsv1alpha1.SystemContainerKubelet: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
 				},
 				podStartupLimits: e2emetrics.LatencyMetric{
 					Perc50: 5000 * time.Millisecond,
@@ -302,8 +303,8 @@ type densityTest struct {
 	// API QPS limit
 	APIQPSLimit int
 	// performance limits
-	cpuLimits            framework.ContainersCPUSummary
-	memLimits            framework.ResourceUsagePerContainer
+	cpuLimits            e2ekubelet.ContainersCPUSummary
+	memLimits            e2ekubelet.ResourceUsagePerContainer
 	podStartupLimits     e2emetrics.LatencyMetric
 	podBatchStartupLimit time.Duration
 }

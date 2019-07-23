@@ -26,7 +26,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -67,13 +69,13 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		rTests := []resourceTest{
 			{
 				podsNr: 10,
-				cpuLimits: framework.ContainersCPUSummary{
+				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.35},
 					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
-				memLimits: framework.ResourceUsagePerContainer{
-					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
-					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
+				memLimits: e2ekubelet.ResourceUsagePerContainer{
+					kubeletstatsv1alpha1.SystemContainerKubelet: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 			},
 		}
@@ -125,8 +127,8 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 type resourceTest struct {
 	podsNr    int
-	cpuLimits framework.ContainersCPUSummary
-	memLimits framework.ResourceUsagePerContainer
+	cpuLimits e2ekubelet.ContainersCPUSummary
+	memLimits e2ekubelet.ResourceUsagePerContainer
 }
 
 func (rt *resourceTest) getTestName() string {
@@ -183,8 +185,8 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 }
 
 // logAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
-func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits framework.ContainersCPUSummary,
-	memLimits framework.ResourceUsagePerContainer, testInfo map[string]string, isVerify bool) {
+func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits e2ekubelet.ContainersCPUSummary,
+	memLimits e2ekubelet.ResourceUsagePerContainer, testInfo map[string]string, isVerify bool) {
 	nodeName := framework.TestContext.NodeName
 
 	// Obtain memory PerfData
@@ -192,19 +194,19 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 	framework.ExpectNoError(err)
 	e2elog.Logf("%s", formatResourceUsageStats(usagePerContainer))
 
-	usagePerNode := make(framework.ResourceUsagePerNode)
+	usagePerNode := make(e2ekubelet.ResourceUsagePerNode)
 	usagePerNode[nodeName] = usagePerContainer
 
 	// Obtain CPU PerfData
 	cpuSummary := rc.GetCPUSummary()
 	e2elog.Logf("%s", formatCPUSummary(cpuSummary))
 
-	cpuSummaryPerNode := make(framework.NodesCPUSummary)
+	cpuSummaryPerNode := make(e2ekubelet.NodesCPUSummary)
 	cpuSummaryPerNode[nodeName] = cpuSummary
 
 	// Print resource usage
-	logPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo), "memory")
-	logPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo), "cpu")
+	logPerfData(e2eperf.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo), "memory")
+	logPerfData(e2eperf.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo), "cpu")
 
 	// Verify resource usage
 	if isVerify {
@@ -213,7 +215,7 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 	}
 }
 
-func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
+func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsagePerContainer, actual e2ekubelet.ResourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -249,7 +251,7 @@ func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsageP
 	}
 }
 
-func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.NodesCPUSummary) {
+func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet.NodesCPUSummary) {
 	if expected == nil {
 		return
 	}
