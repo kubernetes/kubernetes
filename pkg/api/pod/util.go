@@ -19,7 +19,7 @@ package pod
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -410,6 +410,19 @@ func dropDisabledFields(
 
 	dropDisabledFSGroupFields(podSpec, oldPodSpec)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
+		for i := range podSpec.Containers {
+			if !lifecycleTypeInUse(oldPodSpec, podSpec.Containers[i].Name) && podSpec.Containers[i].Lifecycle != nil {
+				podSpec.Containers[i].Lifecycle.Type = nil
+			}
+		}
+		for i := range podSpec.InitContainers {
+			if !lifecycleTypeInUse(oldPodSpec, podSpec.InitContainers[i].Name) && podSpec.InitContainers[i].Lifecycle != nil {
+				podSpec.InitContainers[i].Lifecycle.Type = nil
+			}
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
@@ -773,4 +786,30 @@ func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+func lifecycleTypeInUse(podSpec *api.PodSpec, containerName string) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name == containerName {
+			if podSpec.Containers[i].Lifecycle != nil {
+				if podSpec.Containers[i].Lifecycle.Type != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].Name == containerName {
+			if podSpec.InitContainers[i].Lifecycle != nil {
+				if podSpec.InitContainers[i].Lifecycle.Type != nil {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

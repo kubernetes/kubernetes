@@ -5925,6 +5925,9 @@ func TestValidateContainers(t *testing.T) {
 		AllowPrivileged: true,
 	})
 
+	lifecycleSidecar := core.LifecycleTypeSidecar
+	invalidLifecycle := core.LifecycleType("foo")
+
 	successCase := []core.Container{
 		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		// backwards compatibility to ensure containers in pod template spec do not check for this
@@ -6070,6 +6073,13 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
+		{
+			Name:                     "lifecycle-type-sidecar",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			Lifecycle:                &core.Lifecycle{Type: &lifecycleSidecar},
+			TerminationMessagePolicy: "File",
+		},
 	}
 	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -6307,6 +6317,15 @@ func TestValidateContainers(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		"Invalid lifecycle type": {
+			{
+				Name:                     "lifecycle-type",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				Lifecycle:                &core.Lifecycle{Type: &invalidLifecycle},
+				TerminationMessagePolicy: "File",
 			},
 		},
 	}
@@ -6725,6 +6744,8 @@ func TestValidatePodSpec(t *testing.T) {
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
+	sidecarLifecycle := core.LifecycleTypeSidecar
+
 	successCases := map[string]core.PodSpec{
 		"populate basic fields, leave defaults for most": {
 			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
@@ -6876,6 +6897,12 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				FSGroupChangePolicy: &goodfsGroupChangePolicy,
 			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"populate lifecycleType": {
+			Containers: []core.Container{{Name: "ctr-sidecar", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Lifecycle: &core.Lifecycle{Type: &sidecarLifecycle}},
+				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 		},
@@ -7081,6 +7108,11 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
 			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"only sidecars": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Lifecycle: &core.Lifecycle{Type: &sidecarLifecycle}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 		},
