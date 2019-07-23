@@ -103,7 +103,7 @@ func (c *StatsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInf
 }
 
 // WinMachineInfo returns a cadvisorapi.MachineInfo with details about the
-// node machine.
+// node machine. Analogous to cadvisor MachineInfo method.
 func (c *StatsClient) WinMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return c.client.getMachineInfo()
 }

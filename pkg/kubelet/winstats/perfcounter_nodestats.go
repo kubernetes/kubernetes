@@ -20,6 +20,7 @@ package winstats
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -221,13 +222,15 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 }
 
 func getSystemUUID() (string, error) {
-	cmd := exec.Command("powershell.exe", "-Command", "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID")
-	out, err := cmd.CombinedOutput()
+	result, err := exec.Command("wmic", "csproduct", "get", "UUID").Output()
 	if err != nil {
 		return "", err
 	}
-	systemUUID := strings.TrimRight(string(out), "\r\n")
-	return systemUUID, nil
+	fields := strings.Fields(string(result))
+	if len(fields) != 2 {
+		return "", fmt.Errorf("received unexpected value retrieving vm uuid: %q", string(result))
+	}
+	return fields[1], nil
 }
 
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
