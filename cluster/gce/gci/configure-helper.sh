@@ -758,9 +758,55 @@ contexts:
 EOF
   fi
 
-if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
-    # This is the config file for the image review webhook.
-    cat <<EOF >/etc/gcp_image_review.config
+  if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
+    if [[ -z "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
+      1>&2 echo "You requested GKE exec auth support for webhooks, but EXEC_AUTH_PLUGIN_URL was not specified.  This configuration depends on gke-exec-auth-plugin for authenticating to the webhook endpoint."
+      exit 1
+    fi
+
+    if [[ -z "${TOKEN_URL:-}" || -z "${TOKEN_BODY:-}" || -z "${TOKEN_BODY_UNQUOTED:-}" ]]; then
+      1>&2 echo "You requested GKE exec auth support for webhooks, but TOKEN_URL, TOKEN_BODY, and TOKEN_BODY_UNQUOTED were not provided.  gke-exec-auth-plugin requires these values for its configuration."
+      exit 1
+    fi
+
+    # kubeconfig to be used by webhooks with GKE exec auth support.  Note that
+    # the path to gke-exec-auth-plugin is the path when mounted inside the
+    # kube-apiserver pod.
+    cat <<EOF >/etc/srv/kubernetes/webhook.kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: '*.googleapis.com'
+  user:
+    exec:
+      apiVersion: "client.authentication.k8s.io/v1alpha1"
+      command: /usr/bin/gke-exec-auth-plugin
+      args:
+      - --mode=alt-token
+      - --alt-token-url=${TOKEN_URL}
+      - --alt-token-body=${TOKEN_BODY_UNQUOTED}
+EOF
+  fi
+
+  if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
+    # Emit a basic admission control configuration file, with no plugins specified.
+    cat <<EOF >/etc/srv/kubernetes/admission_controller_config.yaml
+apiVersion: apiserver.k8s.io/v1alpha1
+kind: AdmissionConfiguration
+plugins:
+EOF
+
+    if [[ "${ADMISSION_CONTROL:-}" == *"ImagePolicyWebhook"* ]]; then
+      if [[ -z "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
+        1>&2 echo "The ImagePolicyWebhook admission control plugin was requested, but GCP_IMAGE_VERIFICATION_URL was not provided."
+        exit 1
+      fi
+
+      1>&2 echo "ImagePolicyWebhook admission control plugin requested.  Configuring it to point at ${GCP_IMAGE_VERIFICATION_URL}"
+
+      # ImagePolicyWebhook does not use gke-exec-auth-plugin for authenticating
+      # to the webhook endpoint.  Emit its special kubeconfig.
+      cat <<EOF >/etc/srv/kubernetes/gcp_image_review.kubeconfig
 clusters:
   - name: gcp-image-review-server
     cluster:
@@ -777,15 +823,37 @@ contexts:
     user: kube-apiserver
   name: webhook
 EOF
-    # This is the config for the image review admission controller.
-    cat <<EOF >/etc/admission_controller.config
-imagePolicy:
-  kubeConfigFile: /etc/gcp_image_review.config
-  allowTTL: 30
-  denyTTL: 30
-  retryBackoff: 500
-  defaultAllow: true
+
+      # Append config for ImagePolicyWebhook to the shared admission controller
+      # configuration file.
+      cat <<EOF >>/etc/srv/kubernetes/admission_controller_config.yaml
+- name: ImagePolicyWebhook
+  configuration:
+    imagePolicy:
+      kubeConfigFile: /etc/srv/kubernetes/gcp_image_review.kubeconfig
+      allowTTL: 30
+      denyTTL: 30
+      retryBackoff: 500
+      defaultAllow: true
 EOF
+    fi
+
+    # If GKE exec auth for webhooks has been requested, then
+    # ValidatingAdmissionWebhook should use it.  Otherwise, run with the default
+    # config.
+    if [[ "${ADMISSION_CONTROL:-}" == *"ValidatingAdmissionWebhook"* && -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
+      1>&2 echo "ValidatingAdmissionWebhook requested, and WEBHOOK_GKE_EXEC_AUTH specified.  Configuring ValidatingAdmissionWebhook to use gke-exec-auth-plugin."
+
+      # Append config for ValidatingAdmissionWebhook to the shared admission
+      # controller configuration file.
+      cat <<EOF >>/etc/srv/kubernetes/admission_controller_config.yaml
+- name: ValidatingAdmissionWebhook
+  configuration:
+    apiVersion: apiserver.config.k8s.io/v1alpha1
+    kind: WebhookAdmission
+    kubeConfigFile: /etc/srv/kubernetes/webhook.kubeconfig
+EOF
+    fi
   fi
 }
 
@@ -1731,21 +1799,18 @@ function start-kube-apiserver {
     params+=" --kubelet-certificate-authority=${CA_CERT_BUNDLE_PATH}"
   fi
 
-  local admission_controller_config_mount=""
-  local admission_controller_config_volume=""
-  local image_policy_webhook_config_mount=""
-  local image_policy_webhook_config_volume=""
   if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
     params+=" --admission-control=${ADMISSION_CONTROL}"
-    if [[ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]]; then
-      params+=" --admission-control-config-file=/etc/admission_controller.config"
-      # Mount the file to configure admission controllers if ImagePolicyWebhook is set.
-      admission_controller_config_mount="{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"/etc/admission_controller.config\", \"readOnly\": false},"
-      admission_controller_config_volume="{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"/etc/admission_controller.config\", \"type\": \"FileOrCreate\"}},"
-      # Mount the file to configure the ImagePolicyWebhook's webhook.
-      image_policy_webhook_config_mount="{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false},"
-      image_policy_webhook_config_volume="{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\", \"type\": \"FileOrCreate\"}},"
-    fi
+    params+=" --admission-control-config-file=/etc/srv/kubernetes/admission_controller_config.yaml"
+  fi
+
+  # If GKE exec auth support is requested for webhooks, then
+  # gke-exec-auth-plugin needs to be mounted into the kube-apiserver container.
+  local webhook_exec_auth_plugin_mount=""
+  local webhook_exec_auth_plugin_volume=""
+  if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
+    webhook_exec_auth_plugin_mount='{"name": "gkeauth", "mountPath": "/usr/bin/gke-exec-auth-plugin", "readOnly": true},'
+    webhook_exec_auth_plugin_volume='{"name": "gkeauth", "hostPath": {"path": "/home/kubernetes/bin/gke-exec-auth-plugin", "type": "File"}},'
   fi
 
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]]; then
@@ -1867,10 +1932,8 @@ function start-kube-apiserver {
   sed -i -e "s@{{audit_policy_config_volume}}@${audit_policy_config_volume}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_mount}}@${audit_webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_volume}}@${audit_webhook_config_volume}@g" "${src_file}"
-  sed -i -e "s@{{admission_controller_config_mount}}@${admission_controller_config_mount}@g" "${src_file}"
-  sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
-  sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
-  sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{webhook_exec_auth_plugin_mount}}@${webhook_exec_auth_plugin_mount}@g" "${src_file}"
+  sed -i -e "s@{{webhook_exec_auth_plugin_volume}}@${webhook_exec_auth_plugin_volume}@g" "${src_file}"
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }
