@@ -471,6 +471,13 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 				return finalizerEstimateSeconds, nil
 			}
 		}
+
+		if gvr.GroupResource() == (schema.GroupResource{Group: "", Resource: "pods"}) {
+			klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - some pods are pending deletion from kubelet - namespace: %s, gvr: %v", namespace, gvr)
+			// Pods have implicit finalizer and are only deleted by kubelet (unless force deleted).
+			return finalizerEstimateSeconds, nil
+		}
+
 		// nothing reported a finalizer, so something was unexpected as it should have been deleted.
 		return estimate, fmt.Errorf("unexpected items still remain in namespace: %s for gvr: %v", namespace, gvr)
 	}
