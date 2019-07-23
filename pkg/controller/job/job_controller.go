@@ -812,28 +812,28 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 							klog.Warningf("not has available completions index to create pod, activePods: %+v, succeededPods: %+v", activePods, succeededPods)
 							return
 						}
-						podTemplateSpec := addCompletionsIndexToPodTemplate(job, completionsIndex)
-						err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
-						if err != nil && errors.IsTimeout(err) {
-							// Pod is created but its initialization has timed out.
-							// If the initialization is successful eventually, the
-							// controller will observe the creation via the informer.
-							// If the initialization fails, or if the pod keeps
-							// uninitialized for a long time, the informer will not
-							// receive any update, and the controller will create a new
-							// pod when the expectation expires.
-							return
-						}
-						if err != nil {
-							defer utilruntime.HandleError(err)
-							// Decrement the expected number of creates because the informer won't observe this pod
-							klog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
-							jm.expectations.CreationObserved(jobKey)
-							activeLock.Lock()
-							active--
-							activeLock.Unlock()
-							errCh <- err
-						}
+					}
+					podTemplateSpec := addCompletionsIndexToPodTemplate(job, completionsIndex)
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
+					if err != nil && errors.IsTimeout(err) {
+						// Pod is created but its initialization has timed out.
+						// If the initialization is successful eventually, the
+						// controller will observe the creation via the informer.
+						// If the initialization fails, or if the pod keeps
+						// uninitialized for a long time, the informer will not
+						// receive any update, and the controller will create a new
+						// pod when the expectation expires.
+						return
+					}
+					if err != nil {
+						defer utilruntime.HandleError(err)
+						// Decrement the expected number of creates because the informer won't observe this pod
+						klog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
+						jm.expectations.CreationObserved(jobKey)
+						activeLock.Lock()
+						active--
+						activeLock.Unlock()
+						errCh <- err
 					}
 				}()
 			}
