@@ -927,6 +927,9 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
 	for _, usage := range usages {
+		if usage == nil {
+			continue
+		}
 		unit := usage.GetUnit()
 		switch unit {
 		case csipbv1.VolumeUsage_BYTES:
