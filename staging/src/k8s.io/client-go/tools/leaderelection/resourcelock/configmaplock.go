@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -38,6 +39,7 @@ type ConfigMapLock struct {
 	Client        corev1client.ConfigMapsGetter
 	LockConfig    ResourceLockConfig
 	cm            *v1.ConfigMap
+	LeaseLock     *LeaseLock
 }
 
 // Get returns the election record from a ConfigMap Annotation
@@ -54,6 +56,16 @@ func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, error) {
 	if recordBytes, found := cml.cm.Annotations[LeaderElectionRecordAnnotationKey]; found {
 		if err := json.Unmarshal([]byte(recordBytes), &record); err != nil {
 			return nil, err
+		}
+	}
+	if cml.LeaseLock != nil {
+		leaseLock, err := cml.LeaseLock.Get()
+		if err != nil {
+			return nil, err
+		}
+		// check if the older resource lock is released
+		if leaseLock.RenewTime.Before(&record.RenewTime) {
+			return leaseLock, nil
 		}
 	}
 	return &record, nil
@@ -74,6 +86,15 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 			},
 		},
 	})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	if cml.LeaseLock != nil {
+		err = cml.LeaseLock.Create(ler)
+		if apierrors.IsAlreadyExists(err) {
+			return nil
+		}
+	}
 	return err
 }
 
@@ -88,7 +109,13 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
 	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
-	return err
+	if err != nil {
+		return err
+	}
+	if cml.LeaseLock != nil {
+		return cml.LeaseLock.Update(ler)
+	}
+	return nil
 }
 
 // RecordEvent in leader election while adding meta-data
