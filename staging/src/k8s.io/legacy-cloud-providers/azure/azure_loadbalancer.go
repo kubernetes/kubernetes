@@ -85,6 +85,10 @@ const (
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
 
+	// ServiceAnnotationLoadBalancerEnableTCPReset is the annotation used on the service
+	// to set EnableTcpReset when creating load balancer rules, if the load balancer SKU is standard
+	ServiceAnnotationLoadBalancerEnableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-enable-tcp-reset"
+
 	// serviceTagKey is the service key applied for public IP tags.
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
@@ -899,6 +903,16 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		ports = []v1.ServicePort{}
 	}
 
+	enableTCPReset := false
+	if az.useStandardLoadBalancer() {
+		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerEnableTCPReset]; ok {
+			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerEnableTCPReset, v)
+			if strings.EqualFold(v, "true") {
+				enableTCPReset = true
+			}
+		}
+	}
+
 	var expectedProbes []network.Probe
 	var expectedRules []network.LoadBalancingRule
 	for _, port := range ports {
@@ -967,7 +981,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					EnableFloatingIP:    to.BoolPtr(true),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
-					EnableTCPReset:      to.BoolPtr(az.useStandardLoadBalancer()),
+					EnableTCPReset:      to.BoolPtr(enableTCPReset),
 				},
 			}
 			if protocol == v1.ProtocolTCP {
