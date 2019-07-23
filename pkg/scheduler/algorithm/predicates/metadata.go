@@ -35,9 +35,6 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// MaxInt32 is the maximum value of int32
-const MaxInt32 = math.MaxInt32
-
 // PredicateMetadata interface represents anything that can access a predicate metadata.
 type PredicateMetadata interface {
 	ShallowCopy() PredicateMetadata

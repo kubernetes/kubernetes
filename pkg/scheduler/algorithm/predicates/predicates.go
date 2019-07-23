@@ -1740,20 +1740,22 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		return true, nil, nil
 	}
 
-	selfMatch, err := podLabelsMatchesSpreadConstraints(pod.Labels, constraints)
-	if err != nil {
-		return false, nil, err
-	}
-	selfMatchNum := 0
-	if selfMatch {
-		selfMatchNum = 1
-	}
+	podLabelSet := labels.Set(pod.Labels)
 	for _, constraint := range constraints {
 		tpKey := constraint.TopologyKey
 		tpVal, ok := node.Labels[constraint.TopologyKey]
 		if !ok {
 			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
+		}
+
+		selfMatch, err := podMatchesSpreadConstraint(podLabelSet, constraint)
+		if err != nil {
+			return false, nil, err
+		}
+		selfMatchNum := 0
+		if selfMatch {
+			selfMatchNum = 1
 		}
 
 		pair := topologyPair{key: tpKey, value: tpVal}

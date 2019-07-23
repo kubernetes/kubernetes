@@ -5300,7 +5300,7 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 		{
 			// 1. to fulfil "zone" constraint, incoming pod can be placed on any zone (hence any node)
 			// 2. to fulfil "node" constraint, incoming pod can be placed on node-x
-			// intersaction of (1) and (2) returns node-x
+			// intersection of (1) and (2) returns node-x
 			name: "two constraints on zone and node, spreads = [3/3, 2/1/0/3]",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -5330,7 +5330,7 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 		{
 			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone1 (node-a or node-b)
 			// 2. to fulfil "node" constraint, incoming pod can be placed on node-x
-			// intersaction of (1) and (2) returns no node
+			// intersection of (1) and (2) returns no node
 			name: "two constraints on zone and node, spreads = [3/4, 2/1/0/4]",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -5359,7 +5359,63 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 			},
 		},
 		{
-			name: "constraints hold different labelSelectors, spreads = [1/1, 1/0/0/1]",
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone2 (node-x or node-y)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b or node-x
+			// intersection of (1) and (2) returns node-x
+			name: "constraints hold different labelSelectors, spreads = [1/0, 1/0/0/1]",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": true,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone2 (node-x or node-y)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-a or node-b
+			// intersection of (1) and (2) returns no node
+			name: "constraints hold different labelSelectors, spreads = [1/0, 0/0/1/1]",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone1 (node-a or node-b)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b or node-x
+			// intersection of (1) and (2) returns node-b
+			name: "constraints hold different labelSelectors, spreads = [2/3, 1/0/0/1]",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
 				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
@@ -5373,7 +5429,6 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Label("bar", "").Obj(),
-				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
@@ -5381,7 +5436,34 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 			fits: map[string]bool{
 				"node-a": false,
 				"node-b": true,
-				"node-x": true,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. pod doesn't match itself on "zone" constraint, so it can be put onto any zone
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-a or node-b
+			// intersection of (1) and (2) returns node-a and node-b
+			name: "constraints hold different labelSelectors but pod doesn't match itself on 'zone' constraint",
+			pod: st.MakePod().Name("p").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true,
+				"node-x": false,
 				"node-y": false,
 			},
 		},
@@ -5393,7 +5475,7 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 			for _, node := range tt.nodes {
 				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, nodeInfoMap[node.Name])
 				if fits != tt.fits[node.Name] {
-					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits, fits)
+					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], fits)
 				}
 			}
 		})
