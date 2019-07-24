@@ -3661,16 +3661,12 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "quobyte",
 				VolumeSource: core.VolumeSource{
 					Quobyte: &core.QuobyteVolumeSource{
-						Registry: "registry:7861,reg2",
+						Registry: "registry:7861",
 						Volume:   "/test",
 						Tenant:   "",
 					},
 				},
 			},
-			errs: []verr{{
-				etype: field.ErrorTypeRequired,
-				field: "quobyte.tenant",
-			}},
 		},
 		{
 			name: "too long tenant quobyte",
@@ -3678,7 +3674,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "quobyte",
 				VolumeSource: core.VolumeSource{
 					Quobyte: &core.QuobyteVolumeSource{
-						Registry: "registry:7861,reg2",
+						Registry: "registry:7861",
 						Volume:   "/test",
 						Tenant:   "this is too long to be a valid uuid so this test has to fail on the maximum length validation of the tenant.",
 					},
