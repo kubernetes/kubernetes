@@ -94,4 +94,7 @@ func init() {
 
 	// ImageLocalityPriority prioritizes nodes that have images requested by the pod present.
 	factory.RegisterPriorityMapReduceFunction(priorities.ImageLocalityPriority, priorities.ImageLocalityPriorityMap, nil, 1)
+
+	// TeardownPriority deprioritizes nodes that are busy with teardown.
+	factory.RegisterPriorityMapReduceFunction(priorities.TeardownPriority, priorities.CalculateTeardownPriorityMap, priorities.CalculateTeardownPriorityReduce, 1)
 }

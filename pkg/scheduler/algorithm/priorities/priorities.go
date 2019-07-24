@@ -51,4 +51,6 @@ const (
 	ImageLocalityPriority = "ImageLocalityPriority"
 	// ResourceLimitsPriority defines the nodes of prioritizer function ResourceLimitsPriority.
 	ResourceLimitsPriority = "ResourceLimitsPriority"
+	// TeardownPriority defines a prioritizer that devalues nodes with termination in progress.
+	TeardownPriority = "TeardownPriority"
 )

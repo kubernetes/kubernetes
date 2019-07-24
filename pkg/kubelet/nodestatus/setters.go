@@ -218,6 +218,7 @@ func MachineInfo(nodeName string,
 	capacityFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
+	teardownCounter func() uint32, // typically Kubelet.runtimeState.getContainersUnderRemoval
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
 ) Setter {
 	return func(node *v1.Node) error {
@@ -324,6 +325,11 @@ func MachineInfo(nodeName string,
 				value.Set(0)
 			}
 			node.Status.Allocatable[k] = value
+		}
+
+		// Report containers in teardown
+		if teardownCounter != nil {
+			node.Status.RemovalInProgress = teardownCounter()
 		}
 
 		if devicePluginAllocatable != nil {
