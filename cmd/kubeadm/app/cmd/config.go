@@ -438,7 +438,8 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
 			kubeadmutil.CheckErr(err)
-			PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
+			err = PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalClusterCfg, &cfgPath, &featureGatesString)
