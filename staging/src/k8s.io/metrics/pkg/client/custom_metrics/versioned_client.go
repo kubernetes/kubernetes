@@ -18,11 +18,12 @@ package custom_metrics
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 
@@ -119,7 +120,11 @@ func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string,
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	if len(res.Items) != 1 {
 		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
@@ -157,7 +162,11 @@ func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	if len(res.Items) != 1 {
 		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
@@ -196,7 +205,11 @@ func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	return res, nil
 }
 
@@ -231,7 +244,11 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	if len(res.Items) != 1 {
 		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
@@ -266,6 +283,10 @@ func (m *namespacedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	return res, nil
 }
