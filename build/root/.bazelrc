@@ -52,7 +52,6 @@ build:cross:linux_s390x --config=repo_infra_crosstool --platforms=@io_bazel_rule
 # --config=remote-cache enables a remote bazel cache
 # Note needs a --remote_instance_name=projects/PROJ/instances/default_instance flag
 build:remote-cache --remote_cache=remotebuildexecution.googleapis.com
-build:remote-cache --tls_enabled=true
 build:remote-cache --remote_timeout=3600
 build:remote-cache --auth_enabled=true
 
