@@ -17,5 +17,4 @@
 ./cluster/validate-cluster.sh
 ./hack/lib/test.sh
 ./hack/test-integration.sh
-./hack/verify-test-featuregates.sh
 ./test/images/image-util.sh
