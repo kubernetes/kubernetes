@@ -26,7 +26,7 @@ spec:
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: gcr.io/projectcalico-org/typha:v3.3.1
+      - image: gcr.io/projectcalico-org/typha:v3.7.4
         name: calico-typha
         ports:
         - containerPort: 5473
@@ -52,6 +52,8 @@ spec:
           - name: TYPHA_MAXCONNECTIONSLOWERLIMIT
             value: "1"
           - name: TYPHA_HEALTHENABLED
+            value: "true"
+          - name: USE_POD_CIDR
             value: "true"
         volumeMounts:
         - mountPath: /etc/calico
