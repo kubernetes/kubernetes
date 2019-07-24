@@ -19,6 +19,7 @@ package iscsi
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -328,4 +329,85 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 		t.Errorf("expected 5 CombinedOutput() calls, got %d", cmdCount)
 	}
 
+}
+
+func TestGetVolCount(t *testing.T) {
+	testCases := []struct {
+		name   string
+		portal string
+		iqn    string
+		count  int
+	}{
+		{
+			name:   "wrong portal, no volumes",
+			portal: "192.168.0.2:3260", // incorrect IP address
+			iqn:    "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:  0,
+		},
+		{
+			name:   "wrong iqn, no volumes",
+			portal: "127.0.0.1:3260",
+			iqn:    "iqn.2003-01.io.k8s:e2e.volume-3", // incorrect volume
+			count:  0,
+		},
+		{
+			name:   "single volume",
+			portal: "192.168.0.1:3260",
+			iqn:    "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:  1,
+		},
+		{
+			name:   "two volumes",
+			portal: "127.0.0.1:3260",
+			iqn:    "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:  2,
+		},
+	}
+
+	// This will create a dir structure like this:
+	// /tmp/refcounter555814673
+	// ├── iface-127.0.0.1:3260:pv1
+	// │   └── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3
+	// └── iface-127.0.0.1:3260:pv2
+	//     ├── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
+	//     └── 192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1
+
+	baseDir, err := createFakePluginDir()
+	if err != nil {
+		t.Errorf("error creating fake plugin dir: %v", err)
+	}
+	defer os.RemoveAll(baseDir)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			count, err := getVolCount(baseDir, tc.portal, tc.iqn)
+			if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+			if count != tc.count {
+				t.Errorf("expected %d volumes, got %d", tc.count, count)
+			}
+		})
+	}
+}
+
+func createFakePluginDir() (string, error) {
+	dir, err := ioutil.TempDir("", "refcounter")
+	if err != nil {
+		return "", err
+	}
+
+	subdirs := []string{
+		"iface-127.0.0.1:3260:pv1/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3",
+		"iface-127.0.0.1:3260:pv2/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2",
+		"iface-127.0.0.1:3260:pv2/192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1",
+	}
+
+	for _, d := range subdirs {
+		if err := os.MkdirAll(filepath.Join(dir, d), os.ModePerm); err != nil {
+			return dir, err
+		}
+	}
+
+	return dir, err
 }
