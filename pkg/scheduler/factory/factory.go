@@ -149,10 +149,12 @@ type Configurator interface {
 	GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error)
 	GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error)
 
-	// Needs to be exposed for things like integration tests where we want to make fake nodes.
-	GetNodeLister() corelisters.NodeLister
 	// Exposed for testing
 	GetClient() clientset.Interface
+
+	// TODO(#80216): Remove these methods from the interface.
+	// Needs to be exposed for things like integration tests where we want to make fake nodes.
+	GetNodeLister() corelisters.NodeLister
 	// Exposed for testing
 	GetScheduledPodLister() corelisters.PodLister
 
@@ -163,6 +165,7 @@ type Configurator interface {
 }
 
 // configFactory is the default implementation of the scheduler.Configurator interface.
+// TODO(#80216): Remove pod and node listers.
 type configFactory struct {
 	client clientset.Interface
 	// a means to list all known scheduled pods.
@@ -486,7 +489,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	return &Config{
 		SchedulerCache: c.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          &nodeLister{c.nodeLister},
+		NodeLister:          c.schedulerCache,
 		Algorithm:           algo,
 		GetBinder:           getBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
@@ -519,14 +522,6 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 		}
 		return defaultBinder
 	}
-}
-
-type nodeLister struct {
-	corelisters.NodeLister
-}
-
-func (n *nodeLister) List() ([]*v1.Node, error) {
-	return n.NodeLister.List(labels.Everything())
 }
 
 func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, error) {
@@ -571,7 +566,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ControllerLister:               c.controllerLister,
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
-		NodeLister:                     &nodeLister{c.nodeLister},
+		NodeLister:                     c.schedulerCache,
 		PDBLister:                      c.pdbLister,
 		NodeInfo:                       c.schedulerCache,
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},

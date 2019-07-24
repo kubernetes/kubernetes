@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/api/events/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	corelister "k8s.io/client-go/listers/core/v1"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
@@ -93,14 +92,6 @@ func (fp fakePodPreemptor) SetNominatedNodeName(pod *v1.Pod, nomNodeName string)
 
 func (fp fakePodPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
 	return nil
-}
-
-type nodeLister struct {
-	corelister.NodeLister
-}
-
-func (n *nodeLister) List() ([]*v1.Node, error) {
-	return n.NodeLister.List(labels.Everything())
 }
 
 func podWithID(id, desiredHost string) *v1.Pod {
@@ -270,7 +261,6 @@ func TestScheduler(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	nl := informerFactory.Core().V1().Nodes().Lister()
 
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
@@ -282,18 +272,19 @@ func TestScheduler(t *testing.T) {
 			var gotForgetPod *v1.Pod
 			var gotAssumedPod *v1.Pod
 			var gotBinding *v1.Binding
+			sCache := &fakecache.Cache{
+				ForgetFunc: func(pod *v1.Pod) {
+					gotForgetPod = pod
+				},
+				AssumeFunc: func(pod *v1.Pod) {
+					gotAssumedPod = pod
+				},
+			}
 
 			s := NewFromConfig(&factory.Config{
-				SchedulerCache: &fakecache.Cache{
-					ForgetFunc: func(pod *v1.Pod) {
-						gotForgetPod = pod
-					},
-					AssumeFunc: func(pod *v1.Pod) {
-						gotAssumedPod = pod
-					},
-				},
-				NodeLister: &nodeLister{nl},
-				Algorithm:  item.algo,
+				SchedulerCache: sCache,
+				NodeLister:     sCache,
+				Algorithm:      item.algo,
 				GetBinder: func(pod *v1.Pod) factory.Binder {
 					return fakeBinder{func(b *v1.Binding) error {
 						gotBinding = b
@@ -669,7 +660,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 
 	config := &factory.Config{
 		SchedulerCache: scache,
-		NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
+		NodeLister:     scache,
 		Algorithm:      algo,
 		GetBinder: func(pod *v1.Pod) factory.Binder {
 			return fakeBinder{func(b *v1.Binding) error {
@@ -722,7 +713,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 
 	sched := NewFromConfig(&factory.Config{
 		SchedulerCache: scache,
-		NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
+		NodeLister:     scache,
 		Algorithm:      algo,
 		GetBinder: func(pod *v1.Pod) factory.Binder {
 			return fakeBinder{func(b *v1.Binding) error {
