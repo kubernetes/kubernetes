@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -139,6 +140,8 @@ type containerManagerImpl struct {
 	deviceManager devicemanager.Manager
 	// Interface for CPU affinity management.
 	cpuManager cpumanager.Manager
+	// Interface for Topology resource co-ordination
+	topologyManager topologymanager.Manager
 }
 
 type features struct {
@@ -284,6 +287,20 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		qosContainerManager: qosContainerManager,
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
+		cm.topologyManager, err = topologymanager.NewManager(
+			nodeConfig.ExperimentalTopologyManagerPolicy,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		klog.Infof("[topologymanager] Initilizing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
+	} else {
+		cm.topologyManager = topologymanager.NewFakeManager()
+	}
+
 	klog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
 	if devicePluginEnabled {
 		cm.deviceManager, err = devicemanager.NewManagerImpl()
@@ -332,7 +349,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cm.cpuManager}
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.topologyManager}
 }
 
 // Create a cgroup container manager.
@@ -642,6 +659,10 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 
 func (cm *containerManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return cm.deviceManager.Allocate(node, attrs)
+}
+
+func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {
+	return cm.topologyManager
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
