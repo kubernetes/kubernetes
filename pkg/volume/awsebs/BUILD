@@ -10,6 +10,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "attacher.go",
+        "attacher_linux.go",
+        "attacher_unsupported.go",
+        "attacher_windows.go",
         "aws_ebs.go",
         "aws_ebs_block.go",
         "aws_util.go",
