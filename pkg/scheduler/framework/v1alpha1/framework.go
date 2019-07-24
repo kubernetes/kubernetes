@@ -135,6 +135,9 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %v does not extend score plugin", sc.Name)
 				}
+				if f.pluginNameToWeightMap[p.Name()] == 0 {
+					return nil, fmt.Errorf("score plugin %v is not configured with weight", p.Name())
+				}
 				f.scorePlugins = append(f.scorePlugins, p)
 			} else {
 				return nil, fmt.Errorf("score plugin %v does not exist", sc.Name)
@@ -314,12 +317,8 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	errCh := schedutil.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
-			weight, weightExists := f.pluginNameToWeightMap[pl.Name()]
-			if !weightExists {
-				err := fmt.Errorf("weight does not exist for plugin %v", pl.Name())
-				errCh.SendErrorWithCancel(err, cancel)
-				return
-			}
+			// Score plugins' weight has been checked when they are initialized.
+			weight := f.pluginNameToWeightMap[pl.Name()]
 			score, status := pl.Score(pc, pod, nodes[index].Name)
 			if !status.IsSuccess() {
 				errCh.SendErrorWithCancel(fmt.Errorf(status.Message()), cancel)
