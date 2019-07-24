@@ -743,6 +743,9 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 	// update probes/rules
 	expectedProbes, expectedRules, err := az.reconcileLoadBalancerRule(service, wantLb, lbFrontendIPConfigID, lbBackendPoolID, lbName, lbIdleTimeout)
+	if err != nil {
+		return nil, err
+	}
 
 	// remove unwanted probes
 	dirtyProbes := false
@@ -903,14 +906,13 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		ports = []v1.ServicePort{}
 	}
 
-	enableTCPReset := false
-	if az.useStandardLoadBalancer() {
-		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerEnableTCPReset]; ok {
-			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerEnableTCPReset, v)
-			if strings.EqualFold(v, "true") {
-				enableTCPReset = true
-			}
+	var enableTCPReset *bool
+	if v, ok := service.Annotations[ServiceAnnotationLoadBalancerEnableTCPReset]; ok {
+		klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerEnableTCPReset, v)
+		if !az.useStandardLoadBalancer() {
+			return nil, nil, fmt.Errorf("%s should only be specified with Azure standard load balancer", ServiceAnnotationLoadBalancerEnableTCPReset)
 		}
+		enableTCPReset = to.BoolPtr(strings.EqualFold(v, "true"))
 	}
 
 	var expectedProbes []network.Probe
@@ -981,7 +983,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					EnableFloatingIP:    to.BoolPtr(true),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
-					EnableTCPReset:      to.BoolPtr(enableTCPReset),
+					EnableTCPReset:      enableTCPReset,
 				},
 			}
 			if protocol == v1.ProtocolTCP {
