@@ -231,7 +231,7 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 // It also can not distinguish between mountpoints and symbolic links.
 // mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
 // will return true. When in fact /tmp/b is a mount point. If this situation
-// if of interest to you, don't use this function...
+// is of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	stat, err := os.Stat(file)
 	if err != nil {
