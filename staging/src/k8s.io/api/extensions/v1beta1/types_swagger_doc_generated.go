@@ -97,6 +97,7 @@ var map_DaemonSetSpec = map[string]string{
 	"minReadySeconds":      "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
 	"templateGeneration":   "DEPRECATED. A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
 	"revisionHistoryLimit": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+	"paused":               "Indicates that the DaemonSet is paused and will not be processed by the DaemonSet controller.",
 }
 
 func (DaemonSetSpec) SwaggerDoc() map[string]string {
@@ -122,8 +123,9 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetUpdateStrategy = map[string]string{
-	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
-	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
+	"type":                 "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+	"rollingUpdate":        "Rolling update config params. Present only if type = \"RollingUpdate\".",
+	"surgingRollingUpdate": "Surging rolling update config params. Present only if type = \"SurgingRollingUpdate\".",
 }
 
 func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
@@ -561,6 +563,8 @@ func (RollbackConfig) SwaggerDoc() map[string]string {
 var map_RollingUpdateDaemonSet = map[string]string{
 	"":               "Spec to control the desired behavior of daemon set rolling update.",
 	"maxUnavailable": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+	"selector":       "A label query over nodes that are managed by the daemon set RollingUpdate. Must match in order to be controlled. It must match the node's labels.",
+	"partition":      "The number of DaemonSet pods remained to be old version. Default value is 0. Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.",
 }
 
 func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
@@ -656,6 +660,17 @@ var map_SupplementalGroupsStrategyOptions = map[string]string{
 
 func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
 	return map_SupplementalGroupsStrategyOptions
+}
+
+var map_SurgingRollingUpdateDaemonSet = map[string]string{
+	"":          "Spec to control the desired behavior of a daemon set surging rolling update.",
+	"maxSurge":  "The maximum number of DaemonSet pods that can be scheduled above the desired number of pods during the update. Value can be an absolute number (ex: 5) or a percentage of the total number of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are available it then stops the existing pods before proceeding onto other DaemonSet pods, thus ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all times during the update.",
+	"selector":  "A label query over pods that are managed by the daemon set SurgingRollingUpdate. Must match in order to be controlled. It must match the node's labels.",
+	"partition": "The number of DaemonSet pods remained to be old version. Default value is 0. Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.",
+}
+
+func (SurgingRollingUpdateDaemonSet) SwaggerDoc() map[string]string {
+	return map_SurgingRollingUpdateDaemonSet
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

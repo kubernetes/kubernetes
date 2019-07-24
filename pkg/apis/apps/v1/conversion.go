@@ -227,8 +227,11 @@ func Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.R
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
 	}
+	if out.Partition == nil {
+		out.Partition = new(int32)
+	}
 
-	*out.Partition = in.Partition
+	out.Partition = &in.Partition
 	out.Selector = in.Selector
 
 	return nil
@@ -242,19 +245,23 @@ func Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemon
 		return err
 	}
 
-	*out.Partition = in.Partition
+	if out.Partition == nil {
+		out.Partition = new(int32)
+	}
+
+	out.Partition = &in.Partition
 	out.Selector = in.Selector
 	return nil
 }
-
-
 
 func Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *appsv1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
 	}
 
-	out.Partition = *in.Partition
+	if in.Partition != nil {
+		out.Partition = *in.Partition
+	}
 	out.Selector = in.Selector
 
 	return nil
@@ -265,7 +272,9 @@ func Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemon
 		return err
 	}
 
-	out.Partition = *in.Partition
+	if in.Partition != nil {
+		out.Partition = *in.Partition
+	}
 	out.Selector = in.Selector
 
 	return nil
@@ -306,30 +315,25 @@ func Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out 
 
 func Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *appsv1.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = appsv1.DaemonSetUpdateStrategyType(in.Type)
-	if in.Type ==  apps.RollingUpdateDaemonSetStrategyType {
-		if err := s.Convert(in.RollingUpdate.MaxUnavailable, &out.RollingUpdate.MaxUnavailable, 0); err != nil {
-			return err
-		}
-
-		if err := s.Convert(in.RollingUpdate.Partition, &out.RollingUpdate.Partition, 0); err != nil {
-			return err
-		}
-
-		if err := s.Convert(in.RollingUpdate.Selector, &out.RollingUpdate.Partition, 0); err != nil {
-			return err
+	if in.Type == apps.RollingUpdateDaemonSetStrategyType {
+		if in.RollingUpdate != nil {
+			out.RollingUpdate = &appsv1.RollingUpdateDaemonSet{}
+			if err := Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+				return err
+			}
+		} else {
+			out.RollingUpdate = nil
 		}
 	}
 
-	if in.Type ==  apps.SurgingRollingUpdateDaemonSetStrategyType {
-		if err := s.Convert(in.SurgingRollingUpdate.MaxSurge, &out.SurgingRollingUpdate.MaxSurge, 0); err != nil {
-			return err
-		}
-
-		if err := s.Convert(in.SurgingRollingUpdate.Partition, &out.SurgingRollingUpdate.Partition, 0); err != nil {
-			return err
-		}
-		if err := s.Convert(in.SurgingRollingUpdate.Selector, &out.SurgingRollingUpdate.Partition, 0); err != nil {
-			return err
+	if in.Type == apps.SurgingRollingUpdateDaemonSetStrategyType {
+		if in.SurgingRollingUpdate != nil {
+			out.SurgingRollingUpdate = &appsv1.SurgingRollingUpdateDaemonSet{}
+			if err := Convert_apps_SurgingRollingUpdateDaemonSet_To_v1_SurgingRollingUpdateDaemonSet(in.SurgingRollingUpdate, out.SurgingRollingUpdate, s); err != nil {
+				return err
+			}
+		} else {
+			out.SurgingRollingUpdate = nil
 		}
 	}
 	return nil
@@ -376,10 +380,26 @@ func Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, ou
 
 func Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *appsv1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = apps.DaemonSetUpdateStrategyType(in.Type)
-	if in.RollingUpdate != nil {
-		out.RollingUpdate = &apps.RollingUpdateDaemonSet{}
-		if err := Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
-			return err
+
+	if in.Type == appsv1.RollingUpdateDaemonSetStrategyType {
+		if in.RollingUpdate != nil {
+			out.RollingUpdate = &apps.RollingUpdateDaemonSet{}
+			if err := Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+				return err
+			}
+		} else {
+			out.RollingUpdate = nil
+		}
+	}
+
+	if in.Type == appsv1.SurgingRollingUpdateDaemonSetStrategyType {
+		if in.SurgingRollingUpdate != nil {
+			out.SurgingRollingUpdate = &apps.SurgingRollingUpdateDaemonSet{}
+			if err := Convert_v1_SurgingRollingUpdateDaemonSet_To_apps_SurgingRollingUpdateDaemonSet(in.SurgingRollingUpdate, out.SurgingRollingUpdate, s); err != nil {
+				return err
+			}
+		} else {
+			out.SurgingRollingUpdate = nil
 		}
 	}
 	return nil

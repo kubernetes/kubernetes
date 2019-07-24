@@ -1300,29 +1300,40 @@
     "updateStrategy": {
       "type": "ũ齑誀ŭ\"ɦ?鮻ȧH僠",
       "rollingUpdate": {
-        
+        "selector": {
+          "matchLabels": {
+            "o..p_B-d--Q5._D6_.d-n_9n.p.2-.-Qw__YT.1---.-o7.pJ-4-W": ""
+          },
+          "matchExpressions": [
+            {
+              "key": "ELsu-H_.f82-8_.UdWNn_U-...1P_.D8_t..-Ww2q.zK-p-...Z-O.-j",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "partition": 965405858
       }
     },
-    "minReadySeconds": 903718123,
-    "revisionHistoryLimit": -1800817073
+    "minReadySeconds": 1979170459,
+    "revisionHistoryLimit": -1770820888
   },
   "status": {
-    "currentNumberScheduled": 1605659256,
-    "numberMisscheduled": -1376495682,
-    "desiredNumberScheduled": 1266174302,
-    "numberReady": 663607130,
-    "observedGeneration": 945894627629353003,
-    "updatedNumberScheduled": -1140021566,
-    "numberAvailable": 2081997618,
-    "numberUnavailable": -261966046,
-    "collisionCount": -513111795,
+    "currentNumberScheduled": 1311744042,
+    "numberMisscheduled": -1974019203,
+    "desiredNumberScheduled": 980041503,
+    "numberReady": -1194311233,
+    "observedGeneration": -2538223087580529891,
+    "updatedNumberScheduled": 490158926,
+    "numberAvailable": 563321475,
+    "numberUnavailable": -170312161,
+    "collisionCount": 1599173139,
     "conditions": [
       {
-        "type": "铀íÅė 宣",
-        "status": "`揄戀Ž彙pg稠",
-        "lastTransitionTime": "2387-02-20T13:00:48Z",
-        "reason": "421",
-        "message": "422"
+        "type": "3Q蠯0ƍ\\溮Ŀ傜NZ!šZ_",
+        "status": "R岹ÿŉx#綮ehɫ淫Ď眊",
+        "lastTransitionTime": "2822-09-17T14:30:59Z",
+        "reason": "427",
+        "message": "428"
       }
     ]
   }

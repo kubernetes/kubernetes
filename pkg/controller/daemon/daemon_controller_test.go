@@ -59,12 +59,12 @@ import (
 // without that feature.
 
 var (
-	simpleDaemonSetLabel  = map[string]string{"name": "simple-daemon", "type": "production"}
-	simpleDaemonSetLabel2 = map[string]string{"name": "simple-daemon", "type": "test"}
+	simpleDaemonSetLabel         = map[string]string{"name": "simple-daemon", "type": "production"}
+	simpleDaemonSetLabel2        = map[string]string{"name": "simple-daemon", "type": "test"}
 	simpleDaemonSetLabelWithHash = map[string]string{"name": "simple-daemon", "type": "production", apps.DefaultDaemonSetUniqueLabelKey: "new-hash"}
-	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
-	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
-	alwaysReady           = func() bool { return true }
+	simpleNodeLabel              = map[string]string{"color": "blue", "speed": "fast"}
+	simpleNodeLabel2             = map[string]string{"color": "red", "speed": "fast"}
+	alwaysReady                  = func() bool { return true }
 )
 
 var (
@@ -128,9 +128,10 @@ func newDaemonSet(name string) *apps.DaemonSet {
 
 func newRollbackStrategy() *apps.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
+	partition := int32(0)
 	return &apps.DaemonSetUpdateStrategy{
 		Type:          apps.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
+		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one, Partition: &partition, Selector: nil},
 	}
 }
 
@@ -146,9 +147,10 @@ func updateStrategies() []*apps.DaemonSetUpdateStrategy {
 
 func newSurgingRollingUpdateStrategy() *apps.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
+	partition := int32(1)
 	return &apps.DaemonSetUpdateStrategy{
 		Type:                 apps.SurgingRollingUpdateDaemonSetStrategyType,
-		SurgingRollingUpdate: &apps.SurgingRollingUpdateDaemonSet{MaxSurge: &one},
+		SurgingRollingUpdate: &apps.SurgingRollingUpdateDaemonSet{MaxSurge: &one, Partition: &partition, Selector: nil},
 	}
 }
 
@@ -2603,7 +2605,11 @@ func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 			if f {
 				syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1, 0)
 			} else {
-				syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+				if ds.Spec.UpdateStrategy.Type == apps.SurgingRollingUpdateDaemonSetStrategyType {
+					syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 2, 0)
+				} else {
+					syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+				}
 			}
 		}
 	}

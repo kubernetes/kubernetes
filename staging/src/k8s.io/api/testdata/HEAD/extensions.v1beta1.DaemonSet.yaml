@@ -32,8 +32,9 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
-  minReadySeconds: 903718123
-  revisionHistoryLimit: 1605659256
+  minReadySeconds: -1623129882
+  paused: true
+  revisionHistoryLimit: -432202497
   selector:
     matchExpressions:
     - key: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-B
@@ -886,23 +887,38 @@ spec:
           storagePolicyID: "113"
           storagePolicyName: "112"
           volumePath: "110"
-  templateGeneration: 5311169833460346096
+  templateGeneration: 6618296731107707621
   updateStrategy:
-    rollingUpdate: {}
+    rollingUpdate:
+      partition: 965405858
+      selector:
+        matchExpressions:
+        - key: ELsu-H_.f82-8_.UdWNn_U-...1P_.D8_t..-Ww2q.zK-p-...Z-O.-j
+          operator: Exists
+        matchLabels:
+          o..p_B-d--Q5._D6_.d-n_9n.p.2-.-Qw__YT.1---.-o7.pJ-4-W: ""
+    surgingRollingUpdate:
+      partition: 1685758743
+      selector:
+        matchExpressions:
+        - key: v4kd-36---9-d-6s83--r-vk58-7e74-ddq-a-lcv0n1-i-d-----9---063-qy.x--4t7k--e--x--b--1-n4-a--o2h0fy-j-5-5-2n32178aou-jf35-k7cd/h_Ky7-_0Vw-Nzfdw.3-._CJ4a1._-_CH--.C.8-S9_-4CwMq2
+          operator: Exists
+        matchLabels:
+          "552": 2F-F..3m6.._2v89U--8.3N_.n1.--.._-x_4..u2-_3
     type: ũ齑誀ŭ"ɦ?鮻ȧH僠
 status:
-  collisionCount: 843573892
+  collisionCount: 1929148412
   conditions:
-  - lastTransitionTime: "2857-02-09T12:05:37Z"
-    message: "422"
-    reason: "421"
-    status: Lȋw`揄戀Ž彙pg稠氦ŅsƄƜ
-    type: íÅ
-  currentNumberScheduled: -1376495682
-  desiredNumberScheduled: 663607130
-  numberAvailable: -261966046
-  numberMisscheduled: 1266174302
-  numberReady: -87275477
-  numberUnavailable: 444881930
-  observedGeneration: -8348161332040915262
-  updatedNumberScheduled: 2081997618
+  - lastTransitionTime: "2745-08-05T17:17:08Z"
+    message: "434"
+    reason: "433"
+    status: 薘-­ɞ逭ɋ¡UǦ磩Ƹȏ歟跎欨T猳
+    type: S誖Śs垦Ȋ髴T唼=`朇c
+  currentNumberScheduled: -1064463826
+  desiredNumberScheduled: -499006483
+  numberAvailable: 2099542463
+  numberMisscheduled: 2081365571
+  numberReady: -1324642947
+  numberUnavailable: -1471933491
+  observedGeneration: 3973769094347756698
+  updatedNumberScheduled: -166024973

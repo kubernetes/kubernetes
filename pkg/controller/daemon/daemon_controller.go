@@ -789,7 +789,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *apps.DaemonSet) ([]*v1.Pod, e
 		return nil, err
 	}
 
-	// List all pods to include those that don't match the selector anymore but
+	// List all pods to include those that don't match the selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector) anymore but
 	// have a ControllerRef pointing to this controller.
 	pods, err := dsc.podLister.Pods(ds.Namespace).List(labels.Everything())
 	if err != nil {

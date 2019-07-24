@@ -23,7 +23,6 @@ import (
 // sync is responsible for reconciling deployments on scaling events or when they
 // are paused.
 func (dsc *DaemonSetsController) sync(ds *apps.DaemonSet) error {
-
 	return dsc.syncDaemonSetStatus(ds)
 }
 

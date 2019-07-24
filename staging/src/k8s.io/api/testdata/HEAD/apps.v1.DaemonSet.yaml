@@ -32,8 +32,9 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
-  minReadySeconds: 903718123
-  revisionHistoryLimit: -1800817073
+  minReadySeconds: -1623129882
+  paused: true
+  revisionHistoryLimit: -865459148
   selector:
     matchExpressions:
     - key: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-B
@@ -887,21 +888,36 @@ spec:
           storagePolicyName: "112"
           volumePath: "110"
   updateStrategy:
-    rollingUpdate: {}
+    rollingUpdate:
+      partition: 965405858
+      selector:
+        matchExpressions:
+        - key: ELsu-H_.f82-8_.UdWNn_U-...1P_.D8_t..-Ww2q.zK-p-...Z-O.-j
+          operator: Exists
+        matchLabels:
+          o..p_B-d--Q5._D6_.d-n_9n.p.2-.-Qw__YT.1---.-o7.pJ-4-W: ""
+    surgingRollingUpdate:
+      partition: 1685758743
+      selector:
+        matchExpressions:
+        - key: v4kd-36---9-d-6s83--r-vk58-7e74-ddq-a-lcv0n1-i-d-----9---063-qy.x--4t7k--e--x--b--1-n4-a--o2h0fy-j-5-5-2n32178aou-jf35-k7cd/h_Ky7-_0Vw-Nzfdw.3-._CJ4a1._-_CH--.C.8-S9_-4CwMq2
+          operator: Exists
+        matchLabels:
+          "552": 2F-F..3m6.._2v89U--8.3N_.n1.--.._-x_4..u2-_3
     type: ũ齑誀ŭ"ɦ?鮻ȧH僠
 status:
-  collisionCount: -513111795
+  collisionCount: 1834388704
   conditions:
-  - lastTransitionTime: "2387-02-20T13:00:48Z"
-    message: "422"
-    reason: "421"
-    status: '`揄戀Ž彙pg稠'
-    type: 铀íÅė 宣
-  currentNumberScheduled: 1605659256
-  desiredNumberScheduled: 1266174302
-  numberAvailable: 2081997618
-  numberMisscheduled: -1376495682
-  numberReady: 663607130
-  numberUnavailable: -261966046
-  observedGeneration: 945894627629353003
-  updatedNumberScheduled: -1140021566
+  - lastTransitionTime: "1983-11-28T10:04:06Z"
+    message: "434"
+    reason: "433"
+    status: <碡4鏽喡孨ʚé薘-­ɞ逭ɋ¡U
+    type: tS誖Śs垦
+  currentNumberScheduled: -1894974314
+  desiredNumberScheduled: 2081365571
+  numberAvailable: -166024973
+  numberMisscheduled: -1064463826
+  numberReady: -499006483
+  numberUnavailable: 2099542463
+  observedGeneration: -1380721730883187331
+  updatedNumberScheduled: -133819238

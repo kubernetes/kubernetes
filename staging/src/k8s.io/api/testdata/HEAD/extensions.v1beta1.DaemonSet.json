@@ -1300,30 +1300,56 @@
     "updateStrategy": {
       "type": "ũ齑誀ŭ\"ɦ?鮻ȧH僠",
       "rollingUpdate": {
-        
+        "selector": {
+          "matchLabels": {
+            "o..p_B-d--Q5._D6_.d-n_9n.p.2-.-Qw__YT.1---.-o7.pJ-4-W": ""
+          },
+          "matchExpressions": [
+            {
+              "key": "ELsu-H_.f82-8_.UdWNn_U-...1P_.D8_t..-Ww2q.zK-p-...Z-O.-j",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "partition": 965405858
+      },
+      "surgingRollingUpdate": {
+        "selector": {
+          "matchLabels": {
+            "552": "2F-F..3m6.._2v89U--8.3N_.n1.--.._-x_4..u2-_3"
+          },
+          "matchExpressions": [
+            {
+              "key": "v4kd-36---9-d-6s83--r-vk58-7e74-ddq-a-lcv0n1-i-d-----9---063-qy.x--4t7k--e--x--b--1-n4-a--o2h0fy-j-5-5-2n32178aou-jf35-k7cd/h_Ky7-_0Vw-Nzfdw.3-._CJ4a1._-_CH--.C.8-S9_-4CwMq2",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "partition": 1685758743
       }
     },
-    "minReadySeconds": 903718123,
-    "templateGeneration": 5311169833460346096,
-    "revisionHistoryLimit": 1605659256
+    "minReadySeconds": -1623129882,
+    "templateGeneration": 6618296731107707621,
+    "revisionHistoryLimit": -432202497,
+    "paused": true
   },
   "status": {
-    "currentNumberScheduled": -1376495682,
-    "numberMisscheduled": 1266174302,
-    "desiredNumberScheduled": 663607130,
-    "numberReady": -87275477,
-    "observedGeneration": -8348161332040915262,
-    "updatedNumberScheduled": 2081997618,
-    "numberAvailable": -261966046,
-    "numberUnavailable": 444881930,
-    "collisionCount": 843573892,
+    "currentNumberScheduled": -1064463826,
+    "numberMisscheduled": 2081365571,
+    "desiredNumberScheduled": -499006483,
+    "numberReady": -1324642947,
+    "observedGeneration": 3973769094347756698,
+    "updatedNumberScheduled": -166024973,
+    "numberAvailable": 2099542463,
+    "numberUnavailable": -1471933491,
+    "collisionCount": 1929148412,
     "conditions": [
       {
-        "type": "íÅ",
-        "status": "Lȋw`揄戀Ž彙pg稠氦ŅsƄƜ",
-        "lastTransitionTime": "2857-02-09T12:05:37Z",
-        "reason": "421",
-        "message": "422"
+        "type": "S誖Śs垦Ȋ髴T唼=`朇c",
+        "status": "薘-­ɞ逭ɋ¡UǦ磩Ƹȏ歟跎欨T猳",
+        "lastTransitionTime": "2745-08-05T17:17:08Z",
+        "reason": "433",
+        "message": "434"
       }
     ]
   }

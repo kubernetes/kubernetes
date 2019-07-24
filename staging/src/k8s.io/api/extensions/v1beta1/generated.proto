@@ -154,6 +154,11 @@ message DaemonSetSpec {
   // Defaults to 10.
   // +optional
   optional int32 revisionHistoryLimit = 6;
+
+  // Indicates that the DaemonSet is paused and will not be processed by the
+  // DaemonSet controller.
+  // +optional
+  optional bool paused = 7;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -223,6 +228,14 @@ message DaemonSetUpdateStrategy {
   // See https://github.com/kubernetes/kubernetes/issues/35345
   // +optional
   optional RollingUpdateDaemonSet rollingUpdate = 2;
+
+  // Surging rolling update config params. Present only if type = "SurgingRollingUpdate".
+  // ---
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it
+  // to be. Same as Deployment `strategy.rollingUpdate`.
+  // See https://github.com/kubernetes/kubernetes/issues/35345
+  // +optional
+  optional SurgingRollingUpdateDaemonSet surgingRollingUpdate = 3;
 }
 
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
@@ -1055,6 +1068,17 @@ message RollingUpdateDaemonSet {
   // all times during the update.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+
+  // A label query over nodes that are managed by the daemon set RollingUpdate.
+  // Must match in order to be controlled.
+  // It must match the node's labels.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // The number of DaemonSet pods remained to be old version.
+  // Default value is 0.
+  // Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
+  // +optional
+  optional int32 partition = 3;
 }
 
 // Spec to control the desired behavior of rolling update.
@@ -1190,5 +1214,32 @@ message SupplementalGroupsStrategyOptions {
   // supplemental group then supply a single range with the same start and end. Required for MustRunAs.
   // +optional
   repeated IDRange ranges = 2;
+}
+
+// Spec to control the desired behavior of a daemon set surging rolling update.
+message SurgingRollingUpdateDaemonSet {
+  // The maximum number of DaemonSet pods that can be scheduled above the desired number of pods
+  // during the update. Value can be an absolute number (ex: 5) or a percentage of the total number
+  // of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from
+  // the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is
+  // set to 30%, at most 30% of the total number of nodes that should be running the daemon pod
+  // (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update
+  // starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are
+  // available it then stops the existing pods before proceeding onto other DaemonSet pods, thus
+  // ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all
+  // times during the update.
+  // +optional
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 1;
+
+  // A label query over pods that are managed by the daemon set SurgingRollingUpdate.
+  // Must match in order to be controlled.
+  // It must match the node's labels.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // The number of DaemonSet pods remained to be old version.
+  // Default value is 0.
+  // Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
+  // +optional
+  optional int32 partition = 3;
 }
 

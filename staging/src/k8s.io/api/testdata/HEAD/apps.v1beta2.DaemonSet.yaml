@@ -32,8 +32,8 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
-  minReadySeconds: 903718123
-  revisionHistoryLimit: -1800817073
+  minReadySeconds: 1979170459
+  revisionHistoryLimit: -1770820888
   selector:
     matchExpressions:
     - key: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-B
@@ -887,21 +887,28 @@ spec:
           storagePolicyName: "112"
           volumePath: "110"
   updateStrategy:
-    rollingUpdate: {}
+    rollingUpdate:
+      partition: 965405858
+      selector:
+        matchExpressions:
+        - key: ELsu-H_.f82-8_.UdWNn_U-...1P_.D8_t..-Ww2q.zK-p-...Z-O.-j
+          operator: Exists
+        matchLabels:
+          o..p_B-d--Q5._D6_.d-n_9n.p.2-.-Qw__YT.1---.-o7.pJ-4-W: ""
     type: ũ齑誀ŭ"ɦ?鮻ȧH僠
 status:
-  collisionCount: -513111795
+  collisionCount: 1599173139
   conditions:
-  - lastTransitionTime: "2387-02-20T13:00:48Z"
-    message: "422"
-    reason: "421"
-    status: '`揄戀Ž彙pg稠'
-    type: 铀íÅė 宣
-  currentNumberScheduled: 1605659256
-  desiredNumberScheduled: 1266174302
-  numberAvailable: 2081997618
-  numberMisscheduled: -1376495682
-  numberReady: 663607130
-  numberUnavailable: -261966046
-  observedGeneration: 945894627629353003
-  updatedNumberScheduled: -1140021566
+  - lastTransitionTime: "2822-09-17T14:30:59Z"
+    message: "428"
+    reason: "427"
+    status: R岹ÿŉx#綮ehɫ淫Ď眊
+    type: 3Q蠯0ƍ\溮Ŀ傜NZ!šZ_
+  currentNumberScheduled: 1311744042
+  desiredNumberScheduled: 980041503
+  numberAvailable: 563321475
+  numberMisscheduled: -1974019203
+  numberReady: -1194311233
+  numberUnavailable: -170312161
+  observedGeneration: -2538223087580529891
+  updatedNumberScheduled: 490158926

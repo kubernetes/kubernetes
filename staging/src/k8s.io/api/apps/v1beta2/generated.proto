@@ -150,6 +150,11 @@ message DaemonSetSpec {
   // Defaults to 10.
   // +optional
   optional int32 revisionHistoryLimit = 6;
+
+  // Indicates that the DaemonSet is paused and will not be processed by the
+  // DaemonSet controller.
+  // +optional
+  optional bool paused = 7;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -500,6 +505,17 @@ message RollingUpdateDaemonSet {
   // all times during the update.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+
+  // A label query over nodes that are managed by the daemon set RollingUpdate.
+  // Must match in order to be controlled.
+  // It must match the node's labels.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // The number of DaemonSet pods remained to be old version.
+  // Default value is 0.
+  // Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
+  // +optional
+  optional int32 partition = 3;
 }
 
 // Spec to control the desired behavior of rolling update.
