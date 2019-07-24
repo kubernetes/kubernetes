@@ -204,10 +204,10 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:        "InstanceShutdownByProviderID should report error if VM doesn't exist",
-			vmList:      map[string]string{"vm1": "PowerState/running"},
-			nodeName:    "vm8",
-			expectError: true,
+			name:     "InstanceShutdownByProviderID should return false if VM doesn't exist",
+			vmList:   map[string]string{"vm1": "PowerState/running"},
+			nodeName: "vm8",
+			expected: false,
 		},
 	}
 

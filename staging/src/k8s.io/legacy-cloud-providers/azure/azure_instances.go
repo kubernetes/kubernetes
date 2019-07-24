@@ -34,6 +34,10 @@ const (
 	vmPowerStateDeallocated = "deallocated"
 )
 
+var (
+	errNodeNotInitialized = fmt.Errorf("providerID is empty, the node is not initialized yet")
+)
+
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
@@ -143,6 +147,10 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
+	if providerID == "" {
+		return nil, errNodeNotInitialized
+	}
+
 	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
 		klog.V(4).Infof("NodeAddressesByProviderID: omitting unmanaged node %q", providerID)
@@ -160,6 +168,10 @@ func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID strin
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	if providerID == "" {
+		return false, errNodeNotInitialized
+	}
+
 	// Returns true for unmanaged nodes because azure cloud provider always assumes them exists.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
 		klog.V(4).Infof("InstanceExistsByProviderID: assuming unmanaged node %q exists", providerID)
@@ -187,13 +199,27 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	if providerID == "" {
+		return false, nil
+	}
+
 	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
+		// Returns false, so the controller manager will continue to check InstanceExistsByProviderID().
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+
 		return false, err
 	}
 
 	powerStatus, err := az.vmSet.GetPowerStatusByNodeName(string(nodeName))
 	if err != nil {
+		// Returns false, so the controller manager will continue to check InstanceExistsByProviderID().
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+
 		return false, err
 	}
 	klog.V(5).Infof("InstanceShutdownByProviderID gets power status %q for node %q", powerStatus, nodeName)
@@ -283,6 +309,10 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+	if providerID == "" {
+		return "", errNodeNotInitialized
+	}
+
 	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
 		klog.V(4).Infof("InstanceTypeByProviderID: omitting unmanaged node %q", providerID)
