@@ -312,6 +312,8 @@ replace (
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
+	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
+	github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
 	github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 	github.com/kr/pretty => github.com/kr/pretty v0.1.0

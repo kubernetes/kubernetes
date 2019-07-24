@@ -18,7 +18,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 // indirect
 	github.com/go-openapi/spec v0.19.2
-	github.com/gogo/protobuf v1.0.0
+	github.com/gogo/protobuf v0.0.0-20190410021324-65acae22fc9
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0

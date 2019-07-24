@@ -8329,10 +8329,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ================================================================================
 = vendor/github.com/gogo/protobuf licensed under: =
 
-Protocol Buffers for Go with Gadgets
-
 Copyright (c) 2013, The GoGo Authors. All rights reserved.
-http://github.com/gogo/protobuf
+
+Protocol Buffers for Go with Gadgets
 
 Go support for Protocol Buffers - Google's data interchange format
 
@@ -8366,7 +8365,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-= vendor/github.com/gogo/protobuf/LICENSE f76ab0572aa28f537b1508f2f2bc155e
+= vendor/github.com/gogo/protobuf/LICENSE 38be95f95200434dc208e2ee3dab5081
 ================================================================================
 
 
