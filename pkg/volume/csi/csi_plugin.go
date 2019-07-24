@@ -440,9 +440,8 @@ func (p *csiPlugin) NewMounter(
 
 	if err := saveVolumeData(dataDir, volDataFileName, volData); err != nil {
 		klog.Error(log("failed to save volume info data: %v", err))
-		if err := os.RemoveAll(dataDir); err != nil {
-			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
-			return nil, err
+		if removeErr := os.RemoveAll(dataDir); removeErr != nil {
+			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, removeErr))
 		}
 		return nil, err
 	}
@@ -685,9 +684,8 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 
 	if err := saveVolumeData(dataDir, volDataFileName, volData); err != nil {
 		klog.Error(log("failed to save volume info data: %v", err))
-		if err := os.RemoveAll(dataDir); err != nil {
-			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
-			return nil, err
+		if removeErr := os.RemoveAll(dataDir); removeErr != nil {
+			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, removeErr))
 		}
 		return nil, err
 	}
