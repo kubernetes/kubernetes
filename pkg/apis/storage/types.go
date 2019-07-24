@@ -293,7 +293,46 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
 	// +optional
 	PodInfoOnMount *bool
+
+	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+	// The default if the list is empty is "Persistent", which is the usage
+	// defined by the CSI specification and implemented in Kubernetes via the usual
+	// PV/PVC mechanism.
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline
+	// inside the pod spec with CSIVolumeSource and their lifecycle is tied to
+	// the lifecycle of that pod. A driver has to be aware of this
+	// because it is only going to get a NodePublishVolume call for such a volume.
+	// For more information about implementing this mode, see
+	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
+	// A driver can support one or more of these mode and
+	// more modes may be added in the future.
+	// +optional
+	VolumeLifecycleModes []VolumeLifecycleMode
 }
+
+// VolumeLifecycleMode specifies how a CSI volume is used in Kubernetes.
+// More modes may be added in the future.
+type VolumeLifecycleMode string
+
+const (
+	// VolumeLifecyclePersistent explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.VolumeLifecycleModes is not
+	// set. Such volumes are managed in Kubernetes via the persistent volume
+	// claim mechanism and have a lifecycle that is independent of the pods which
+	// use them.
+	VolumeLifecyclePersistent VolumeLifecycleMode = "Persistent"
+	// VolumeLifecycleEphemeral indicates that the driver can be used for
+	// ephemeral inline volumes. Such volumes are specified inside the pod
+	// spec with a CSIVolumeSource and, as far as Kubernetes is concerned, have
+	// a lifecycle that is tied to the lifecycle of the pod. For example, such
+	// a volume might contain data that gets created specifically for that pod,
+	// like secrets.
+	// But how the volume actually gets created and managed is entirely up to
+	// the driver. It might also use reference counting to share the same volume
+	// instance among different pods if the CSIVolumeSource of those pods is
+	// identical.
+	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
