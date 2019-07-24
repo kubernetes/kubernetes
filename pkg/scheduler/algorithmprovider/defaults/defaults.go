@@ -17,9 +17,10 @@ limitations under the License.
 package defaults
 
 import (
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -55,7 +56,7 @@ func defaultPredicates() sets.String {
 	)
 }
 
-// ApplyFeatureGates applies algorithm by feature gates and returns a list of feature dependencies.
+// ApplyFeatureGates applies algorithm by feature gates.
 func ApplyFeatureGates() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressure"
@@ -82,7 +83,7 @@ func ApplyFeatureGates() {
 		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.CheckNodeUnschedulablePred)
-		klog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
+		klog.Infof("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
