@@ -140,7 +140,7 @@ func NewBoundedFrequencyRunner(name string, fn func(), minInterval, maxInterval 
 // Make an instance with dependencies injected.
 func construct(name string, fn func(), minInterval, maxInterval time.Duration, burstRuns int, timer timer) *BoundedFrequencyRunner {
 	if maxInterval < minInterval {
-		panic(fmt.Sprintf("%s: maxInterval (%v) must be >= minInterval (%v)", name, minInterval, maxInterval))
+		panic(fmt.Sprintf("%s: maxInterval (%v) must be >= minInterval (%v)", name, maxInterval, minInterval))
 	}
 	if timer == nil {
 		panic(fmt.Sprintf("%s: timer must be non-nil", name))
