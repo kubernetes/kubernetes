@@ -228,6 +228,7 @@ func TestGenericScheduler(t *testing.T) {
 		pvcs                     []*v1.PersistentVolumeClaim
 		pod                      *v1.Pod
 		pods                     []*v1.Pod
+		buildPredMeta            bool // build predicates metadata or not
 		expectedHosts            sets.String
 		expectsErr               bool
 		wErr                     error
@@ -435,6 +436,108 @@ func TestGenericScheduler(t *testing.T) {
 			name:         "test error with priority map",
 			wErr:         errors.NewAggregate([]error{errPrioritize, errPrioritize}),
 		},
+		{
+			name: "test even pods spread predicate - 2 nodes with maxskew=1",
+			predicates: map[string]algorithmpredicates.FitPredicate{
+				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
+			},
+			// prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes: []string{"machine1", "machine2"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
+				Spec: v1.PodSpec{
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+			},
+			buildPredMeta: true,
+			expectedHosts: sets.NewString("machine2"),
+			wErr:          nil,
+		},
+		{
+			name: "test even pods spread predicate - 3 nodes with maxskew=2",
+			predicates: map[string]algorithmpredicates.FitPredicate{
+				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
+			},
+			// prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes: []string{"machine1", "machine2", "machine3"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
+				Spec: v1.PodSpec{
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           2,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1a", UID: types.UID("pod1a"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1b", UID: types.UID("pod1b"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID("pod2"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine2",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+			},
+			buildPredMeta: true,
+			expectedHosts: sets.NewString("machine2", "machine3"),
+			wErr:          nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -443,18 +546,24 @@ func TestGenericScheduler(t *testing.T) {
 				cache.AddPod(pod)
 			}
 			for _, name := range test.nodes {
-				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
+				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}})
 			}
 			pvcs := []*v1.PersistentVolumeClaim{}
 			pvcs = append(pvcs, test.pvcs...)
 
 			pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
+			var predMetaProducer algorithmpredicates.PredicateMetadataProducer
+			if test.buildPredMeta {
+				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
+			} else {
+				predMetaProducer = algorithmpredicates.EmptyPredicateMetadataProducer
+			}
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil, nil),
 				test.predicates,
-				algorithmpredicates.EmptyPredicateMetadataProducer,
+				predMetaProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
 				emptyFramework,
