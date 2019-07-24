@@ -20,8 +20,11 @@ package winstats
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -136,10 +139,16 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 		return nil, err
 	}
 
+	systemUUID, err := getSystemUUID()
+	if err != nil {
+		return nil, err
+	}
+
 	return &cadvisorapi.MachineInfo{
 		NumCores:       runtime.NumCPU(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
 		MachineID:      hostname,
+		SystemUUID:     systemUUID,
 	}, nil
 }
 
@@ -210,6 +219,18 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 	cachePeriodSeconds := uint64(defaultCachePeriod / time.Second)
 	cpuUsageNanoCores := (p.cpuUsageCoreNanoSecondsCache.latestValue - p.cpuUsageCoreNanoSecondsCache.previousValue) / cachePeriodSeconds
 	return cpuUsageNanoCores
+}
+
+func getSystemUUID() (string, error) {
+	result, err := exec.Command("wmic", "csproduct", "get", "UUID").Output()
+	if err != nil {
+		return "", err
+	}
+	fields := strings.Fields(string(result))
+	if len(fields) != 2 {
+		return "", fmt.Errorf("received unexpected value retrieving vm uuid: %q", string(result))
+	}
+	return fields[1], nil
 }
 
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
