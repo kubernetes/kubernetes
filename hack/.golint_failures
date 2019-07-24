@@ -279,7 +279,6 @@ pkg/util/iptables
 pkg/util/iptables/testing
 pkg/util/labels
 pkg/util/mount
-pkg/util/normalizer
 pkg/util/oom
 pkg/util/procfs
 pkg/util/removeall
