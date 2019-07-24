@@ -9,7 +9,7 @@ etcd--it's data directory in particular--to a target version.
 Each `k8s.gcr.io/etcd` docker image is tagged with an version string of the form
 `<etcd-version>-<image-revision>`, e.g. `3.0.17-0`.  The etcd version is the
 SemVer of latest etcd version available in the image. The image revision
-distinguishes between docker images with the same lastest etcd version but
+distinguishes between docker images with the same latest etcd version but
 changes (bug fixes and backward compatible improvements) to the migration
 utility bundled with the image.
 
@@ -51,7 +51,7 @@ from source. Arch-specific `busybox` images serve as base images.
 
 #### How to release
 
-First, update `ETCD_VERSION` and `REVSION` in the `Makefile`.
+First, update `ETCD_VERSION` and `REVISION` in the `Makefile`.
 
 Next, build and test the image:
 
