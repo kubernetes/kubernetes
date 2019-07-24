@@ -75,4 +75,7 @@ const (
 	// AffinityConfirmCount is the number of needed continuous requests to confirm that
 	// affinity is enabled.
 	AffinityConfirmCount = 15
+
+	// ServiceEndpointsTimeout is the maximum time in which endpoints for the service should be created.
+	ServiceEndpointsTimeout = 2 * time.Minute
 )
