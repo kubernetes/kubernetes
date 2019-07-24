@@ -555,22 +555,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 	// Check if containerName is valid.
-	containerExists := false
-	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			containerExists = true
-			break
-		}
-	}
-	if !containerExists {
-		for _, container := range pod.Spec.InitContainers {
-			if container.Name == containerName {
-				containerExists = true
-				break
-			}
-		}
-	}
-	if !containerExists {
+	if kubecontainer.GetContainerSpec(pod, containerName) == nil {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q", containerName, podID))
 		return
 	}

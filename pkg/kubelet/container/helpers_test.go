@@ -20,10 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -318,6 +322,72 @@ func TestExpandVolumeMountsWithSubpath(t *testing.T) {
 		}
 	}
 
+}
+
+func TestGetContainerSpec(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	for _, tc := range []struct {
+		name          string
+		havePod       *v1.Pod
+		haveName      string
+		wantContainer *v1.Container
+	}{
+		{
+			name: "regular container",
+			havePod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "plain-ole-container"},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container"},
+					},
+				},
+			},
+			haveName:      "plain-ole-container",
+			wantContainer: &v1.Container{Name: "plain-ole-container"},
+		},
+		{
+			name: "init container",
+			havePod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "plain-ole-container"},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container"},
+					},
+				},
+			},
+			haveName:      "init-container",
+			wantContainer: &v1.Container{Name: "init-container"},
+		},
+		{
+			name: "ephemeral container",
+			havePod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "plain-ole-container"},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container"},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+							Name: "debug-container",
+						}},
+					},
+				},
+			},
+			haveName:      "debug-container",
+			wantContainer: &v1.Container{Name: "debug-container"},
+		},
+	} {
+		gotContainer := GetContainerSpec(tc.havePod, tc.haveName)
+		if diff := cmp.Diff(tc.wantContainer, gotContainer); diff != "" {
+			t.Errorf("GetContainerSpec for %q returned diff (-want +got):%v", tc.name, diff)
+		}
+	}
 }
 
 func TestShouldContainerBeRestarted(t *testing.T) {

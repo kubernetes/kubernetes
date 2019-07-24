@@ -1414,6 +1414,22 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		len(pod.Spec.InitContainers) > 0,
 		true,
 	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		var ecSpecs []v1.Container
+		for i := range pod.Spec.EphemeralContainers {
+			ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+		}
+
+		// TODO(verb): By now we've iterated podStatus 3 times. We could refactor this to make a single
+		// pass through podStatus.ContainerStatuses
+		apiPodStatus.EphemeralContainerStatuses = kl.convertToAPIContainerStatuses(
+			pod, podStatus,
+			oldPodStatus.EphemeralContainerStatuses,
+			ecSpecs,
+			len(pod.Spec.InitContainers) > 0,
+			false,
+		)
+	}
 
 	// Preserves conditions not controlled by kubelet
 	for _, c := range pod.Status.Conditions {
@@ -1421,6 +1437,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 			apiPodStatus.Conditions = append(apiPodStatus.Conditions, c)
 		}
 	}
+
 	return &apiPodStatus
 }
 

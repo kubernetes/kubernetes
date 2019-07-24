@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -396,17 +397,16 @@ func mountedReadOnlyByPod(podVolume v1.Volume, pod *v1.Pod) bool {
 	if podVolume.PersistentVolumeClaim.ReadOnly {
 		return true
 	}
-	for _, container := range pod.Spec.InitContainers {
-		if !mountedReadOnlyByContainer(podVolume.Name, &container) {
+
+	mountedReadOnly := true
+	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+		if !mountedReadOnlyByContainer(podVolume.Name, c) {
+			mountedReadOnly = false
 			return false
 		}
-	}
-	for _, container := range pod.Spec.Containers {
-		if !mountedReadOnlyByContainer(podVolume.Name, &container) {
-			return false
-		}
-	}
-	return true
+		return true
+	})
+	return mountedReadOnly
 }
 
 func mountedReadOnlyByContainer(volumeName string, container *v1.Container) bool {
