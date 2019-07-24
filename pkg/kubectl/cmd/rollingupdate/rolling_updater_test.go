@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package rollingupdate
 
 import (
 	"bytes"
@@ -41,6 +41,7 @@ import (
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/scale"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
@@ -790,7 +791,7 @@ Scaling foo-v2 up to 2
 			t.Logf("running test %d (%s) (up: %v, down: %v, oldReady: %v, newReady: %v)", i, tt.name, upTo, downTo, oldReady, newReady)
 			updater := &RollingUpdater{
 				ns: "default",
-				scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
+				scaleAndWait: func(rc *corev1.ReplicationController, retry *scale.RetryParams, wait *scale.RetryParams) (*corev1.ReplicationController, error) {
 					// Return a scale up or scale down expectation depending on the rc,
 					// and throw errors if there is no expectation expressed for this
 					// call.
@@ -861,7 +862,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 	newRc := newRc(0, 2)
 	updater := &RollingUpdater{
 		ns: "default",
-		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
+		scaleAndWait: func(rc *corev1.ReplicationController, retry *scale.RetryParams, wait *scale.RetryParams) (*corev1.ReplicationController, error) {
 			// Do nothing.
 			return rc, nil
 		},
@@ -906,7 +907,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		rcClient:  fake.CoreV1(),
 		podClient: fake.CoreV1(),
 		ns:        "default",
-		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
+		scaleAndWait: func(rc *corev1.ReplicationController, retry *scale.RetryParams, wait *scale.RetryParams) (*corev1.ReplicationController, error) {
 			return rc, nil
 		},
 		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {

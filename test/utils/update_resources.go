@@ -23,12 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/kubectl"
+	scalecmd "k8s.io/kubernetes/pkg/kubectl/cmd/scale"
 )
 
 const (
 	// Parameters for retrying updates/waits with linear backoff.
-	// TODO: Try to move this to exponential backoff by modifying kubectl.Scale().
+	// TODO: Try to move this to exponential backoff by modifying scalecmd.Scale().
 	updateRetryInterval = 5 * time.Second
 	updateRetryTimeout  = 1 * time.Minute
 	waitRetryInterval   = 5 * time.Second
@@ -46,16 +46,16 @@ func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
 }
 
 func ScaleResourceWithRetries(scalesGetter scale.ScalesGetter, namespace, name string, size uint, gr schema.GroupResource) error {
-	scaler := kubectl.NewScaler(scalesGetter)
-	preconditions := &kubectl.ScalePrecondition{
+	scaler := scalecmd.NewScaler(scalesGetter)
+	preconditions := &scalecmd.ScalePrecondition{
 		Size:            -1,
 		ResourceVersion: "",
 	}
-	waitForReplicas := kubectl.NewRetryParams(waitRetryInterval, waitRetryTimeout)
-	cond := RetryErrorCondition(kubectl.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gr))
+	waitForReplicas := scalecmd.NewRetryParams(waitRetryInterval, waitRetryTimeout)
+	cond := RetryErrorCondition(scalecmd.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gr))
 	err := wait.PollImmediate(updateRetryInterval, updateRetryTimeout, cond)
 	if err == nil {
-		err = kubectl.WaitForScaleHasDesiredReplicas(scalesGetter, gr, name, namespace, size, waitForReplicas)
+		err = scalecmd.WaitForScaleHasDesiredReplicas(scalesGetter, gr, name, namespace, size, waitForReplicas)
 	}
 	if err != nil {
 		return fmt.Errorf("Error while scaling %s to %d replicas: %v", name, size, err)

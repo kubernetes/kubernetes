@@ -32,7 +32,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
-        "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/cmd/scale:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
