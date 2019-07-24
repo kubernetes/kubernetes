@@ -592,6 +592,16 @@ func schema_pkg_apis_meta_v1_Fields(ref common.ReferenceCallback) common.OpenAPI
 			SchemaProps: spec.SchemaProps{
 				Description: "Fields stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Raw": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Raw is the underlying serialization of this object.",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+				},
+				Required: []string{"Raw"},
 			},
 		},
 	}

@@ -173,7 +173,7 @@ type Map struct {
 	order []int
 }
 
-func (m *Map) computeOrder() {
+func (m *Map) computeOrder() []int {
 	if len(m.order) != len(m.Items) {
 		m.order = make([]int, len(m.Items))
 		for i := range m.order {
@@ -183,28 +183,67 @@ func (m *Map) computeOrder() {
 			return m.Items[m.order[i]].Name < m.Items[m.order[j]].Name
 		})
 	}
+	return m.order
 }
 
 // Less compares two maps lexically.
 func (m *Map) Less(rhs *Map) bool {
-	m.computeOrder()
-	rhs.computeOrder()
+	var noAllocL, noAllocR [2]int
+	var morder, rorder []int
+
+	// For very short maps (<2 elements) this permits us to avoid
+	// allocating the order array. We could make this accomodate larger
+	// maps, but 2 items should be enough to cover most path element
+	// comparisons, and at some point there will be diminishing returns.
+	// This has a large effect on the path element deserialization test,
+	// because everything is sorted / compared, but only once.
+	switch len(m.Items) {
+	case 0:
+		morder = noAllocL[0:0]
+	case 1:
+		morder = noAllocL[0:1]
+	case 2:
+		morder = noAllocL[0:2]
+		if m.Items[0].Name > m.Items[1].Name {
+			morder[0] = 1
+		} else {
+			morder[1] = 1
+		}
+	default:
+		morder = m.computeOrder()
+	}
+
+	switch len(rhs.Items) {
+	case 0:
+		rorder = noAllocR[0:0]
+	case 1:
+		rorder = noAllocR[0:1]
+	case 2:
+		rorder = noAllocR[0:2]
+		if rhs.Items[0].Name > rhs.Items[1].Name {
+			rorder[0] = 1
+		} else {
+			rorder[1] = 1
+		}
+	default:
+		rorder = rhs.computeOrder()
+	}
 
 	i := 0
 	for {
-		if i >= len(m.order) && i >= len(rhs.order) {
+		if i >= len(morder) && i >= len(rorder) {
 			// Maps are the same length and all items are equal.
 			return false
 		}
-		if i >= len(m.order) {
+		if i >= len(morder) {
 			// LHS is shorter.
 			return true
 		}
-		if i >= len(rhs.order) {
+		if i >= len(rorder) {
 			// RHS is shorter.
 			return false
 		}
-		fa, fb := &m.Items[m.order[i]], &rhs.Items[rhs.order[i]]
+		fa, fb := &m.Items[morder[i]], &rhs.Items[rorder[i]]
 		if fa.Name != fb.Name {
 			// the map having the field name that sorts lexically less is "less"
 			return fa.Name < fb.Name
