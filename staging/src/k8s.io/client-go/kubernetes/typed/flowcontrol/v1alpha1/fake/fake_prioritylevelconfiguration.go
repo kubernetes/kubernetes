@@ -33,9 +33,9 @@ type FakePriorityLevelConfigurations struct {
 	Fake *FakeFlowcontrolV1alpha1
 }
 
-var prioritylevelconfigurationsResource = schema.GroupVersionResource{Group: "flowcontrol", Version: "v1alpha1", Resource: "prioritylevelconfigurations"}
+var prioritylevelconfigurationsResource = schema.GroupVersionResource{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Resource: "prioritylevelconfigurations"}
 
-var prioritylevelconfigurationsKind = schema.GroupVersionKind{Group: "flowcontrol", Version: "v1alpha1", Kind: "PriorityLevelConfiguration"}
+var prioritylevelconfigurationsKind = schema.GroupVersionKind{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Kind: "PriorityLevelConfiguration"}
 
 // Get takes name of the priorityLevelConfiguration, and returns the corresponding priorityLevelConfiguration object, and an error if there is any.
 func (c *FakePriorityLevelConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {

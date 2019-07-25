@@ -7,6 +7,7 @@ go_library(
         "generated.pb.go",
         "register.go",
         "types.go",
+        "types_swagger_doc_generated.go",
         "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/flowcontrol/v1alpha1",

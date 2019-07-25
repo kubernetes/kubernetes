@@ -30,7 +30,7 @@ type FlowcontrolV1alpha1Interface interface {
 	PriorityLevelConfigurationsGetter
 }
 
-// FlowcontrolV1alpha1Client is used to interact with features provided by the flowcontrol group.
+// FlowcontrolV1alpha1Client is used to interact with features provided by the flowcontrol.apiserver.k8s.io group.
 type FlowcontrolV1alpha1Client struct {
 	restClient rest.Interface
 }
