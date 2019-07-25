@@ -109,16 +109,18 @@ type EmptyHandler interface {
 // given point in time.
 type RMState struct {
 	// flowSchemas holds the flow schema objects, sorted by increasing
-	// numerical (decreasing logical) matching precedence
+	// numerical (decreasing logical) matching precedence.  Each
+	// FlowSchema object is immutable.
 	flowSchemas FlowSchemaSeq
 
 	// priorityLevelStates maps the PriorityLevelConfiguration object
-	// name to the state for that level
+	// name to the state for that level.  Each PriorityLevelState is
+	// immutable.
 	priorityLevelStates map[string]*PriorityLevelState
 }
 
 // FlowSchemaSeq holds sorted set of pointers to FlowSchema objects.
-// FLowSchemaSeq implements `sort.Interface` (TODO: implement this).
+// FLowSchemaSeq implements `sort.Interface`
 type FlowSchemaSeq []*rmtypesv1a1.FlowSchema
 
 // PriorityLevelState holds the state specific to a priority level.
@@ -131,7 +133,17 @@ type PriorityLevelState struct {
 	// concurrencyLimit is the limit on number executing
 	concurrencyLimit int
 
+	// fqs holds the queues for this priority level
 	fqs FairQueuingSystem
+
+	// emptyHandler is used to get this correctly removed.  It is set
+	// to a fresh value when this priority level becomes undesired,
+	// and thus eventually requests stop being queued at this level,
+	// unless and until this field is cleared when this level becomes
+	// desired again.  If the same setting is present when the config
+	// worker gets the relayed notification then the worker knows that
+	// this level is still empty and can safely be removed.
+	emptyHandler *emptyRelay
 }
 
 // requestManagement holds all the state and infrastructure of this
@@ -141,8 +153,9 @@ type requestManagement struct {
 
 	fairQueuingFactory FairQueuingFactory
 
-	// configQueue holds TypedConfigObjectReference values, identifying
-	// config objects that need to be processed
+	// configQueue holds items that trigger syncing with config
+	// objects.  At the first level of development all items are `==`
+	// and one sync processes all config objects.
 	configQueue workqueue.RateLimitingInterface
 
 	// plInformer is the informer for priority level config objects
@@ -164,31 +177,21 @@ type requestManagement struct {
 	requestWaitLimit time.Duration
 
 	// curState holds a pointer to the current RMState.  That is,
-	// `Load()` produces a `*RMState`.  When a config work queue worker
-	// processes a configuration change, it stores a new pointer here ---
-	// it does NOT side-effect the old `RMState` value.  The new `RMState`
-	// has a freshly constructed slice of FlowSchema pointers and a
-	// freshly constructed map of priority level states.  But the new
-	// `RMState.priorityLevelStates` includes in its range at least all the
-	// `*PriorityLevelState` values of the old `RMState.priorityLevelStates`.
-	// Consequently the filter can load a `*RMState` and work with it
-	// without concern for concurrent updates.  When a priority level is
-	// finally deleted, this will also involve storing a new `*RMState`
-	// pointer here, but in this case the range of the
-	// `RMState.priorityLevels` will be reduced --- by removal of the
-	// priority level that is no longer in use.
+	// `Load()` produces a `*RMState`.  When a config work queue
+	// worker processes a configuration change, it stores a new
+	// pointer here --- it does NOT side-effect the old `RMState`
+	// value.  The new `RMState` has a freshly constructed slice of
+	// FlowSchema pointers and a freshly constructed map of pointers
+	// to immutable PriorityLevelState values.  The new
+	// `RMState.priorityLevelStates` includes in its domain the names
+	// of all the current and lingering priority levels.  Consequently
+	// the filter can load a `*RMState` and work with it without
+	// concern for concurrent updates.  When a priority level is
+	// finally removed from this server, this involves storing a new
+	// `*RMState` pointer here and in this case the domain of the
+	// `RMState.priorityLevels` omits the name of the priority level
+	// being removed.
 	curState atomic.Value
-}
-
-// TypedConfigObjectReference is a reference to a relevant config API object.
-// No namespace is needed because none of these objects is namespaced.
-type TypedConfigObjectReference struct {
-	Kind string
-	Name string
-}
-
-func (tr *TypedConfigObjectReference) String() string {
-	return tr.Kind + "/" + tr.Name
 }
 
 // rmSetup is invoked at startup to create the infrastructure of this filter
@@ -206,6 +209,9 @@ func rmSetup(kubeClient kubernetes.Interface, serverConcurrencyLimit int, reques
 		fsLister:               fsi.Lister(),
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,
+	}
+	if !reqMgmt.initialSync() {
+		return nil
 	}
 	// TODO: finish implementation
 	return reqMgmt
@@ -239,7 +245,9 @@ func WithRequestManagementByClient(
 	clk clock.Clock,
 ) http.Handler {
 	reqMgmt := rmSetup(kubeClient, serverConcurrencyLimit, requestWaitLimit, clk)
-
+	if reqMgmt == nil {
+		return handler
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -286,7 +294,6 @@ func WithRequestManagementByClient(
 				afterExecute()
 			} else {
 				klog.V(5).Infof("Rejecting %v\n", r)
-
 				tooManyRequests(r, w)
 			}
 		}
