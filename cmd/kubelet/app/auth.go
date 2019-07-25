@@ -98,10 +98,10 @@ func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz k
 		return authorizerConfig.New()
 
 	case "":
-		return nil, fmt.Errorf("No authorization mode specified")
+		return nil, fmt.Errorf("no authorization mode specified")
 
 	default:
-		return nil, fmt.Errorf("Unknown authorization mode %s", authz.Mode)
+		return nil, fmt.Errorf("unknown authorization mode %s", authz.Mode)
 
 	}
 }

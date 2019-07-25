@@ -418,7 +418,7 @@ func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
-		return fmt.Errorf("Kubelet needs to run as uid `0`. It is being run as %d", uid)
+		return fmt.Errorf("kubelet needs to run as uid `0`. It is being run as %d", uid)
 	}
 	// TODO: Check if kubelet is running in the `initial` user namespace.
 	// http://man7.org/linux/man-pages/man7/user_namespaces.7.html

@@ -195,12 +195,12 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 	defer v3client.Close()
 	objectsResp, err := v3client.KV.Get(ctx, ttlKeysPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return fmt.Errorf("Error while getting objects to attach to the lease")
+		return fmt.Errorf("error while getting objects to attach to the lease")
 	}
 
 	lease, err := v3client.Lease.Grant(ctx, int64(leaseDuration/time.Second))
 	if err != nil {
-		return fmt.Errorf("Error while creating lease: %v", err)
+		return fmt.Errorf("error while creating lease: %v", err)
 	}
 	klog.Infof("Lease with TTL: %v created", lease.TTL)
 

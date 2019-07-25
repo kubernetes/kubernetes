@@ -621,7 +621,7 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 // with various kubernetes errors.
 func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 	svcName := "svc-k8s-err"
-	conflictErr := apierrors.NewConflict(schema.GroupResource{}, svcName, errors.New("Object conflict"))
+	conflictErr := apierrors.NewConflict(schema.GroupResource{}, svcName, errors.New("object conflict"))
 	notFoundErr := apierrors.NewNotFound(schema.GroupResource{}, svcName)
 
 	testCases := []struct {
@@ -710,7 +710,7 @@ func TestSyncService(t *testing.T) {
 				srv := controller.cache.getOrCreate("external-balancer")
 				srv.state = defaultExternalService()
 			},
-			expectedErr: fmt.Errorf("Service somethingelse not in cache even though the watcher thought it was. Ignoring the deletion."),
+			expectedErr: fmt.Errorf("service somethingelse not in cache even though the watcher thought it was. Ignoring the deletion."),
 		},
 		*/
 
@@ -780,12 +780,12 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
-				cloud.Err = fmt.Errorf("Error Deleting the Loadbalancer")
+				cloud.Err = fmt.Errorf("error Deleting the Loadbalancer")
 
 			},
 			expectedFn: func(svcErr error) error {
 
-				expectedError := "Error Deleting the Loadbalancer"
+				expectedError := "error Deleting the Loadbalancer"
 
 				if svcErr == nil || svcErr.Error() != expectedError {
 					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, svcErr)
@@ -1110,7 +1110,7 @@ func TestServiceCache(t *testing.T) {
 					return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
 				}
 				if Cs == nil {
-					return fmt.Errorf("CachedService expected:non-nil Obtained=nil")
+					return fmt.Errorf("cachedService expected:non-nil Obtained=nil")
 				}
 				return nil
 			},
@@ -1125,7 +1125,7 @@ func TestServiceCache(t *testing.T) {
 				//It should have two elements
 				keys := sc.ListKeys()
 				if len(keys) != 2 {
-					return fmt.Errorf("Elementes Expected=2 Obtained=%v", len(keys))
+					return fmt.Errorf("elements Expected=2 Obtained=%v", len(keys))
 				}
 				return nil
 			},
