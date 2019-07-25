@@ -45,9 +45,6 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 				   watches observe events on create/delete.
 		*/
 		It("watch on custom resource definition objects", func() {
-
-			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
-
 			const (
 				watchCRNameA = "name1"
 				watchCRNameB = "name2"
