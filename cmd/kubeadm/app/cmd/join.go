@@ -179,7 +179,8 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 					"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 					"etcdMessage":    etcdMessage,
 				}
-				joinControPlaneDoneTemp.Execute(data.outputWriter, ctx)
+				err = joinControPlaneDoneTemp.Execute(data.outputWriter, ctx)
+				kubeadmutil.CheckErr(err)
 
 			} else {
 				// otherwise, if the node joined as a worker node;
