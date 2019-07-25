@@ -30,11 +30,6 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var (
-	hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
-	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
-)
-
 var _ = Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
@@ -90,7 +85,6 @@ var _ = Describe("[sig-node] Downward API", func() {
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func() {
-		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -218,7 +212,6 @@ var _ = Describe("[sig-node] Downward API", func() {
 	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func() {
-		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
