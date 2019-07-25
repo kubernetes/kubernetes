@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/replace",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/delete:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
@@ -17,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/rawhttp:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/validation:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

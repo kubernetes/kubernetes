@@ -47,7 +47,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubectl/pkg/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor/crlf"
 )
@@ -408,7 +408,7 @@ func (o *EditOptions) Run() error {
 		}
 		var annotationInfos []*resource.Info
 		for i := range infos {
-			data, err := kubectl.GetOriginalConfiguration(infos[i].Object)
+			data, err := util.GetOriginalConfiguration(infos[i].Object)
 			if err != nil {
 				return err
 			}
@@ -663,7 +663,7 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
 		if o.ApplyAnnotation {
-			if err := kubectl.CreateOrUpdateAnnotation(true, info.Object, scheme.DefaultJSONEncoder()); err != nil {
+			if err := util.CreateOrUpdateAnnotation(true, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 				return err
 			}
 		}

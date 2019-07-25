@@ -47,9 +47,9 @@ import (
 	"k8s.io/klog"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -446,7 +446,7 @@ func (o *ApplyOptions) Run() error {
 		// Get the modified configuration of the object. Embed the result
 		// as an annotation in the modified configuration, so that it will appear
 		// in the patch sent to the server.
-		modified, err := kubectl.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
+		modified, err := util.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 		}
@@ -461,7 +461,7 @@ func (o *ApplyOptions) Run() error {
 
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
-			if err := kubectl.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+			if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
@@ -858,7 +858,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
-	original, err := kubectl.GetOriginalConfiguration(obj)
+	original, err := util.GetOriginalConfiguration(obj)
 	if err != nil {
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
 	}

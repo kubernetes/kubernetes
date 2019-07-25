@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/autoscale",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/generate:go_default_library",
         "//pkg/kubectl/generate/versioned:go_default_library",
@@ -19,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

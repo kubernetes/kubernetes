@@ -11,7 +11,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/apply",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/delete:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/editor:go_default_library",
@@ -36,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/validation:go_default_library",
         "//vendor/github.com/jonboulle/clockwork:go_default_library",
