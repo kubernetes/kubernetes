@@ -230,22 +230,22 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		if !podMatchesNodeSelectorAndAffinityTerms(pod, node) {
 			return
 		}
+
 		// Ensure current node's labels contains all topologyKeys in 'constraints'.
 		for _, constraint := range constraints {
 			if _, ok := node.Labels[constraint.TopologyKey]; !ok {
 				return
 			}
 		}
-
 		nodeTopologyMaps := newTopologyPairsMaps()
-		// nodeInfo.Pods() can be empty; or all pods don't fit
-		for _, existingPod := range nodeInfo.Pods() {
-			if existingPod.Namespace != pod.Namespace {
-				continue
-			}
-			podLabelSet := labels.Set(existingPod.Labels)
-			for _, constraint := range constraints {
-				ok, err := podMatchesSpreadConstraint(podLabelSet, constraint)
+		for _, constraint := range constraints {
+			pairAdded := false
+			// nodeInfo.Pods() can be empty; or all pods don't fit
+			for _, existingPod := range nodeInfo.Pods() {
+				if existingPod.Namespace != pod.Namespace {
+					continue
+				}
+				ok, err := podMatchesSpreadConstraint(existingPod.Labels, constraint)
 				if err != nil {
 					errCh.SendErrorWithCancel(err, cancel)
 					return
@@ -254,21 +254,20 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 					// constraint.TopologyKey is already guaranteed to be present
 					pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
 					nodeTopologyMaps.addTopologyPair(pair, existingPod)
+					pairAdded = true
 				}
 			}
-		}
-		// If needed, append topology pair without entry of pods.
-		// For example, on node-x, there is no pod matching spread constraints,
-		// but node-x should be also considered as a match (with match number 0)
-		// i.e. <node: node-x>: {}
-		for _, constraint := range constraints {
-			// constraint.TopologyKey is already guaranteed to be present
-			pair := topologyPair{
-				key:   constraint.TopologyKey,
-				value: node.Labels[constraint.TopologyKey],
+			// If needed, append topology pair without entry of pods.
+			// For example, on node-x, there is no pod matching spread constraints,
+			// but node-x should be also considered as a match (with match number 0)
+			// i.e. <node: node-x>: {}
+			if !pairAdded {
+				pair := topologyPair{
+					key:   constraint.TopologyKey,
+					value: node.Labels[constraint.TopologyKey],
+				}
+				nodeTopologyMaps.addTopologyPairWithoutPods(pair)
 			}
-			// addTopologyPairWithoutPods is a non-op if other pods match this pair
-			nodeTopologyMaps.addTopologyPairWithoutPods(pair)
 		}
 
 		appendTopologyPairsMaps(nodeTopologyMaps)
