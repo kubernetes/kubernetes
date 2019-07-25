@@ -7,10 +7,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubectl/util/i18n:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
 )

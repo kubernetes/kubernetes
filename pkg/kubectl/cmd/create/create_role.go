@@ -31,9 +31,9 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (

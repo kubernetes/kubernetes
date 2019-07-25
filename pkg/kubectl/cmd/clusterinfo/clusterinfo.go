@@ -28,9 +28,9 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	ct "github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"

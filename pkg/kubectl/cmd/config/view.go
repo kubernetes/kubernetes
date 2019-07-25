@@ -28,9 +28,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/latest"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // ViewOptions holds the command-line options for 'config view' sub command

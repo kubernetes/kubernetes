@@ -31,11 +31,11 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
