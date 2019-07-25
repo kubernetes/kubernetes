@@ -134,7 +134,6 @@ pkg/kubectl/cmd/rollout
 pkg/kubectl/cmd/run
 pkg/kubectl/cmd/scale
 pkg/kubectl/cmd/set
-pkg/kubectl/cmd/taint
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/util

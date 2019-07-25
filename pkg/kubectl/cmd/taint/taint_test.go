@@ -343,33 +343,33 @@ func TestTaint(t *testing.T) {
 
 func TestValidateFlags(t *testing.T) {
 	tests := []struct {
-		taintOpts   TaintOptions
+		taintOpts   Options
 		description string
 		expectFatal bool
 	}{
 
 		{
-			taintOpts:   TaintOptions{selector: "myLabel=X", all: false},
+			taintOpts:   Options{selector: "myLabel=X", all: false},
 			description: "With Selector and without All flag",
 			expectFatal: false,
 		},
 		{
-			taintOpts:   TaintOptions{selector: "", all: true},
+			taintOpts:   Options{selector: "", all: true},
 			description: "Without selector and All flag",
 			expectFatal: false,
 		},
 		{
-			taintOpts:   TaintOptions{selector: "myLabel=X", all: true},
+			taintOpts:   Options{selector: "myLabel=X", all: true},
 			description: "With Selector and with All flag",
 			expectFatal: true,
 		},
 		{
-			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node"}},
+			taintOpts:   Options{selector: "", all: false, resources: []string{"node"}},
 			description: "Without Selector and All flags and if node name is not provided",
 			expectFatal: true,
 		},
 		{
-			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node", "node-name"}},
+			taintOpts:   Options{selector: "", all: false, resources: []string{"node", "node-name"}},
 			description: "Without Selector and ALL flags and if node name is provided",
 			expectFatal: false,
 		},

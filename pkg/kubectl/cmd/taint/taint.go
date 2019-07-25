@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-// TaintOptions have the data required to perform the taint operation
-type TaintOptions struct {
+// Options have the data required to perform the taint operation
+type Options struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
@@ -86,8 +86,9 @@ var (
 		kubectl taint nodes foo bar:NoSchedule`))
 )
 
+// NewCmdTaint creates the `taint` command
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	options := &TaintOptions{
+	options := &Options{
 		PrintFlags: genericclioptions.NewPrintFlags("tainted").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
 	}
@@ -118,7 +119,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
 	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -180,24 +181,23 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 // validateFlags checks for the validation of flags for kubectl taints.
-func (o TaintOptions) validateFlags() error {
+func (o Options) validateFlags() error {
 	// Cannot have a non-empty selector and all flag set. They are mutually exclusive.
 	if o.all && o.selector != "" {
-		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited.")
+		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited")
 	}
 	// If both selector and all are not set.
 	if !o.all && o.selector == "" {
 		if len(o.resources) < 2 {
 			return fmt.Errorf("at least one resource name must be specified since 'all' parameter is not set")
-		} else {
-			return nil
 		}
+		return nil
 	}
 	return nil
 }
 
-// Validate checks to the TaintOptions to see if there is sufficient information run the command.
-func (o TaintOptions) Validate() error {
+// Validate checks to the Options to see if there is sufficient information run the command.
+func (o Options) Validate() error {
 	resourceType := strings.ToLower(o.resources[0])
 	validResources, isValidResource := []string{"node", "nodes"}, false
 	for _, validResource := range validResources {
@@ -230,7 +230,7 @@ func (o TaintOptions) Validate() error {
 }
 
 // RunTaint does the work
-func (o TaintOptions) RunTaint() error {
+func (o Options) RunTaint() error {
 	r := o.builder.Do()
 	if err := r.Err(); err != nil {
 		return err
@@ -287,7 +287,7 @@ func (o TaintOptions) RunTaint() error {
 }
 
 // updateTaints applies a taint option(o) to a node in cluster after computing the net effect of operation(i.e. does it result in an overwrite?), it reports back the end result in a way that user can easily interpret.
-func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
+func (o Options) updateTaints(obj runtime.Object) (string, error) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
 		return "", fmt.Errorf("unexpected type %T, expected Node", obj)
