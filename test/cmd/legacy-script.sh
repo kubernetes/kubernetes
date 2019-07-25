@@ -315,17 +315,17 @@ runTests() {
   }
 
   kube_flags=(
-    -s "http://127.0.0.1:${API_PORT}"
+    '-s' "http://127.0.0.1:${API_PORT}"
   )
 
   # token defined in hack/testdata/auth-tokens.csv
   kube_flags_with_token=(
-    -s "https://127.0.0.1:${SECURE_API_PORT}" "--token=admin-token" "--insecure-skip-tls-verify=true"
+    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--token=admin-token' '--insecure-skip-tls-verify=true'
   )
 
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
-    kube_flags+=("--match-server-version")
-    kube_flags_with_token+=("--match-server-version")
+    kube_flags+=('--match-server-version')
+    kube_flags_with_token+=('--match-server-version')
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
@@ -397,7 +397,7 @@ runTests() {
     do
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
       if [[ "${pkg}" != "kubeadm" ]]; then
-        record_command run_"${pkg}"_tests
+        record_command "run_${pkg}_tests"
       fi
     done
     cleanup_tests
