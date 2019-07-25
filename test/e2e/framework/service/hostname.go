@@ -102,9 +102,9 @@ func StopServeHostnameService(clientset clientset.Interface, ns, name string) er
 // in the cluster. Each pod in the service is expected to echo its name. These
 // names are compared with the given expectedPods list after a sort | uniq.
 func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
-	execPodName := e2epod.CreateExecPodOrFail(c, ns, "execpod-", nil)
+	execPod := e2epod.CreateExecPodOrFail(c, ns, "execpod-", nil)
 	defer func() {
-		e2epod.DeletePodOrFail(c, ns, execPodName)
+		e2epod.DeletePodOrFail(c, ns, execPod.Name)
 	}()
 
 	// Loop a bunch of times - the proxy is randomized, so we want a good
@@ -129,11 +129,11 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		// verify service from pod
 		func() string {
 			cmd := buildCommand("wget -q -T 1 -O -")
-			e2elog.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
+			e2elog.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPod.Name)
 			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-			output, err := framework.RunHostCmd(ns, execPodName, cmd)
+			output, err := framework.RunHostCmd(ns, execPod.Name, cmd)
 			if err != nil {
-				e2elog.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPodName, err, output)
+				e2elog.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPod.Name, err, output)
 			}
 			return output
 		},

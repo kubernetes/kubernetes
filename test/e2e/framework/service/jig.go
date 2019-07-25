@@ -21,35 +21,45 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
-// TestJig is a test j to help service testing.
+// PauseDeploymentLabels are unique deployment selector labels for pause pod
+var PauseDeploymentLabels = map[string]string{"deployment": "agnhost-pause"}
+
+// TestJig is a test jig to help service testing.
 type TestJig struct {
 	ID     string
 	Name   string
@@ -333,6 +343,56 @@ func (j *TestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string)
 		return true, nil
 	})
 	framework.ExpectNoError(err)
+}
+
+// WaitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
+func (j *TestJig) WaitForAvailableEndpoint(namespace, serviceName string, timeout time.Duration) {
+	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
+	endpointSelector := fields.OneTermEqualSelector("metadata.name", serviceName)
+	stopCh := make(chan struct{})
+	endpointAvailable := false
+	var controller cache.Controller
+	_, controller = cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = endpointSelector.String()
+				obj, err := j.Client.CoreV1().Endpoints(namespace).List(options)
+				return runtime.Object(obj), err
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = endpointSelector.String()
+				return j.Client.CoreV1().Endpoints(namespace).Watch(options)
+			},
+		},
+		&v1.Endpoints{},
+		0,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				if e, ok := obj.(*v1.Endpoints); ok {
+					if len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0 {
+						endpointAvailable = true
+					}
+				}
+			},
+			UpdateFunc: func(old, cur interface{}) {
+				if e, ok := cur.(*v1.Endpoints); ok {
+					if len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0 {
+						endpointAvailable = true
+					}
+				}
+			},
+		},
+	)
+	defer func() {
+		close(stopCh)
+	}()
+
+	go controller.Run(stopCh)
+
+	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
+		return endpointAvailable, nil
+	})
+	framework.ExpectNoError(err, "No subset of available IP address found for the endpoint %s within timeout %v", serviceName, timeout)
 }
 
 // SanityCheckService performs sanity checks on the given service
@@ -697,6 +757,111 @@ func (j *TestJig) waitForPodsReady(namespace string, pods []string) error {
 	return nil
 }
 
+func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, execPod *v1.Pod) {
+	testEndpointReachability(serviceName, sp.Port, sp.Protocol, execPod)
+}
+
+func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) {
+	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
+	isClusterIPV46, err := regexp.MatchString(framework.RegexIPv4+"||"+framework.RegexIPv6, clusterIP)
+	framework.ExpectNoError(err, "Unable to parse ClusterIP: %s", clusterIP)
+	if isClusterIPV46 {
+		testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
+	}
+}
+func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod) {
+	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
+	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
+	for _, internalAddr := range internalAddrs {
+		testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
+	}
+	for _, externalAddr := range externalAddrs {
+		testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
+	}
+}
+
+// testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.
+// TCP and UDP protocol based service are supported at this moment
+// TODO: add support to test SCTP Protocol based services.
+func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod) {
+	ep := net.JoinHostPort(endpoint, strconv.Itoa(int(port)))
+	cmd := ""
+	switch protocol {
+	case v1.ProtocolTCP:
+		cmd = fmt.Sprintf("nc -z -t -w 2 %s %v", endpoint, port)
+	case v1.ProtocolUDP:
+		cmd = fmt.Sprintf("nc -z -u -w 2 %s %v", endpoint, port)
+	default:
+		e2elog.Failf("Service reachablity check is not supported for %v", protocol)
+	}
+	if cmd != "" {
+		_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		framework.ExpectNoError(err, "Service is not reachable on following endpoint %s over %s protocol", ep, protocol)
+	}
+}
+
+// checkClusterIPServiceReachability ensures that service of type ClusterIP is reachable over
+// - ServiceName:ServicePort, ClusterIP:ServicePort
+func (j *TestJig) checkClusterIPServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
+	clusterIP := svc.Spec.ClusterIP
+	servicePorts := svc.Spec.Ports
+
+	j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
+
+	for _, servicePort := range servicePorts {
+		testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+	}
+}
+
+// checkNodePortServiceReachability ensures that service of type nodePort are reachable
+// - Internal clients should be reachable to service over -
+//   	ServiceName:ServicePort, ClusterIP:ServicePort and NodeInternalIPs:NodePort
+// - External clients should be reachable to service over -
+//   	NodePublicIPs:NodePort
+func (j *TestJig) checkNodePortServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
+	clusterIP := svc.Spec.ClusterIP
+	servicePorts := svc.Spec.Ports
+
+	// Consider only 2 nodes for testing
+	nodes := j.GetNodes(2)
+
+	j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
+
+	for _, servicePort := range servicePorts {
+		testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+		testReachabilityOverNodePorts(nodes, servicePort, pod)
+	}
+}
+
+// checkExternalServiceReachability ensures service of type externalName resolves to IP address and no fake externalName is set
+// FQDN of kubernetes is used as externalName(for air tight platforms).
+func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) {
+	// Service must resolve to IP
+	cmd := fmt.Sprintf("nslookup %s", svc.Name)
+	_, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
+	framework.ExpectNoError(err, "ExternalName service must resolve to IP")
+}
+
+// CheckServiceReachability ensures that request are served by the services. Only supports Services with type ClusterIP, NodePort and ExternalName.
+func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
+	svcType := svc.Spec.Type
+
+	j.SanityCheckService(svc, svcType)
+
+	switch svcType {
+	case v1.ServiceTypeClusterIP:
+		j.checkClusterIPServiceReachability(namespace, svc, pod)
+	case v1.ServiceTypeNodePort:
+		j.checkNodePortServiceReachability(namespace, svc, pod)
+	case v1.ServiceTypeExternalName:
+		j.checkExternalServiceReachability(svc, pod)
+	default:
+		e2elog.Failf("Unsupported service type \"%s\" to verify service reachability for \"%s\" service. This may due to diverse implementation of the service type.", svcType, svc.Name)
+	}
+}
+
 // LaunchNetexecPodOnNode launches a netexec pod on the given node.
 func (j *TestJig) LaunchNetexecPodOnNode(f *framework.Framework, nodeName, podName string, httpPort, udpPort int32, hostNetwork bool) {
 	e2elog.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
@@ -866,6 +1031,23 @@ func (j *TestJig) TestHTTPHealthCheckNodePort(host string, port int, request str
 	return nil
 }
 
+// CreateServicePods creates a replication controller with the label same as service
+func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica int) {
+	config := testutils.RCConfig{
+		Client:       c,
+		Name:         j.Name,
+		Image:        framework.ServeHostnameImage,
+		Command:      []string{"/agnhost", "serve-hostname"},
+		Namespace:    ns,
+		Labels:       j.Labels,
+		PollInterval: 3 * time.Second,
+		Timeout:      framework.PodReadyBeforeTimeout,
+		Replicas:     replica,
+	}
+	err := framework.RunRC(config)
+	framework.ExpectNoError(err, "Replica must be created")
+}
+
 // CheckAffinity function tests whether the service affinity works as expected.
 // If affinity is expected, the test will return true once affinityConfirmCount
 // number of same response observed in a row. If affinity is not expected, the
@@ -873,7 +1055,7 @@ func (j *TestJig) TestHTTPHealthCheckNodePort(host string, port int, request str
 // return false only in case of unexpected errors.
 func (j *TestJig) CheckAffinity(execPod *v1.Pod, targetIP string, targetPort int, shouldHold bool) bool {
 	targetIPPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
-	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIPPort)
+	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, targetIPPort)
 	timeout := TestTimeout
 	if execPod == nil {
 		timeout = LoadBalancerPollTimeout
@@ -957,6 +1139,55 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 		Transport: tr,
 		Timeout:   timeout,
 	}
-
 	return client.Get(url)
+}
+
+// CreatePausePodDeployment creates a deployment for agnhost-pause pod running in different nodes
+func (j *TestJig) CreatePausePodDeployment(name, ns string, replica int32) *appsv1.Deployment {
+	// terminationGracePeriod is set to 0 to reduce deployment deletion time for infinitely running pause pod.
+	terminationGracePeriod := int64(0)
+	pauseDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: PauseDeploymentLabels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replica,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: PauseDeploymentLabels,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: PauseDeploymentLabels,
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &terminationGracePeriod,
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{MatchLabels: PauseDeploymentLabels},
+									TopologyKey:   "kubernetes.io/hostname",
+									Namespaces:    []string{ns},
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "agnhost-pause",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args:  []string{"pause"},
+						},
+					},
+				},
+			},
+		},
+	}
+	deployment, err := j.Client.AppsV1().Deployments(ns).Create(pauseDeployment)
+	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
+	return deployment
 }
