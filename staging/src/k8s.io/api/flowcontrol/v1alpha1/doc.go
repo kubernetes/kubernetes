@@ -18,5 +18,7 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 
+// +groupName=flowcontrol.apiserver.k8s.io
+
 // Package v1alpha1 holds api types of version v1alpha1 for group "flowcontrol.apiserver.k8s.io".
-package v1alpha1 // import "k8s.io/api/flowcontrol/v1beta1"
+package v1alpha1 // import "k8s.io/api/flowcontrol/v1alpha1"
