@@ -96,6 +96,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		// when configured.
 		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
 		if f.pluginNameToWeightMap[name] == 0 {
+			klog.V(4).Infof("plugin %v is not configured with weight, weight set to 1", name)
 			f.pluginNameToWeightMap[name] = 1
 		}
 	}
