@@ -1743,6 +1743,12 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 	podLabelSet := labels.Set(pod.Labels)
 	for _, constraint := range constraints {
 		tpKey := constraint.TopologyKey
+		minMatchNum, ok := topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[tpKey]
+		if !ok {
+			// error which should not happen
+			klog.Errorf("internal error: get minMatchNum from key %q of %#v", tpKey, topologyPairsPodSpreadMap.topologyKeyToMinPodsMap)
+			continue
+		}
 		tpVal, ok := node.Labels[constraint.TopologyKey]
 		if !ok {
 			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
@@ -1759,12 +1765,6 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		}
 
 		pair := topologyPair{key: tpKey, value: tpVal}
-		minMatchNum, ok := topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[tpKey]
-		if !ok {
-			// error which should not happen
-			klog.Errorf("internal error: get minMatchNum from key %q of %#v", tpKey, topologyPairsPodSpreadMap.topologyKeyToMinPodsMap)
-			continue
-		}
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
 		matchNum := len(topologyPairsPodSpreadMap.topologyPairToPods[pair])
