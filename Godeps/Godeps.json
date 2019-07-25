@@ -2390,30 +2390,37 @@
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/spec",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/pkg/parser",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/pkg/units",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/volume",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
