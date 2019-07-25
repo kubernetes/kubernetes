@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 
 	"k8s.io/klog"
 
@@ -44,14 +45,14 @@ var (
 		driverName,
 		nodeName,
 		attachmentID,
-		driverMode string
+		csiVolumeMode string
 	}{
 		"specVolID",
 		"volumeHandle",
 		"driverName",
 		"nodeName",
 		"attachmentID",
-		"driverMode",
+		"csiVolumeMode",
 	}
 )
 
@@ -60,7 +61,7 @@ type csiMountMgr struct {
 	k8s            kubernetes.Interface
 	plugin         *csiPlugin
 	driverName     csiDriverName
-	driverMode     driverMode
+	csiVolumeMode  csiVolumeMode
 	volumeID       string
 	specVolumeID   string
 	readOnly       bool
@@ -146,8 +147,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 			return fmt.Errorf("CSIInlineVolume feature required")
 		}
-		if c.driverMode != ephemeralDriverMode {
-			return fmt.Errorf("unexpected driver mode: %s", c.driverMode)
+		if c.csiVolumeMode != ephemeralVolumeMode {
+			return fmt.Errorf("unexpected volume mode: %s", c.csiVolumeMode)
 		}
 		if volSrc.FSType != nil {
 			fsType = *volSrc.FSType
@@ -161,8 +162,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = &api.SecretReference{Name: secretName, Namespace: ns}
 		}
 	case pvSrc != nil:
-		if c.driverMode != persistentDriverMode {
-			return fmt.Errorf("unexpected driver mode: %s", c.driverMode)
+		if c.csiVolumeMode != persistentVolumeMode {
+			return fmt.Errorf("unexpected driver mode: %s", c.csiVolumeMode)
 		}
 
 		fsType = pvSrc.FSType
@@ -324,6 +325,10 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
 		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.csiVolumeMode == ephemeralVolumeMode)
+	}
+
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
 	return attrs, nil
 }

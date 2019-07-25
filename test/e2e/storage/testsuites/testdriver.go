@@ -101,6 +101,23 @@ type DynamicPVTestDriver interface {
 	GetClaimSize() string
 }
 
+// EphemeralTestDriver represents an interface for a TestDriver that supports ephemeral inline volumes.
+type EphemeralTestDriver interface {
+	TestDriver
+
+	// GetVolumeAttributes returns the volume attributes for a
+	// certain inline ephemeral volume, enumerated starting with
+	// #0. Some tests might require more than one volume. They can
+	// all be the same or different, depending what the driver supports
+	// and/or wants to test.
+	GetVolumeAttributes(config *PerTestConfig, volumeNumber int) map[string]string
+
+	// GetCSIDriverName returns the name that was used when registering with
+	// kubelet. Depending on how the driver was deployed, this can be different
+	// from DriverInfo.Name.
+	GetCSIDriverName(config *PerTestConfig) string
+}
+
 // SnapshottableTestDriver represents an interface for a TestDriver that supports DynamicSnapshot
 type SnapshottableTestDriver interface {
 	TestDriver
