@@ -186,7 +186,6 @@ pkg/proxy/apis/config/v1alpha1
 pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
-pkg/quota/v1/evaluator/core
 pkg/registry/admissionregistration/rest
 pkg/registry/apps/deployment/storage
 pkg/registry/apps/replicaset
