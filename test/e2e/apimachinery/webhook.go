@@ -500,10 +500,6 @@ func registerWebhookForAttachingPod(f *framework.Framework, context *certContext
 
 	namespace := f.Namespace.Name
 	configName := attachingPodWebhookConfigName
-	// A webhook that cannot talk to server, with fail-open policy
-	failOpenHook := failingWebhook(namespace, "fail-open.k8s.io")
-	policyIgnore := admissionregistrationv1beta1.Ignore
-	failOpenHook.FailurePolicy = &policyIgnore
 
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&admissionregistrationv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
