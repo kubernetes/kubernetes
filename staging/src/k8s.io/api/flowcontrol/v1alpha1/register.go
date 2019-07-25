@@ -25,7 +25,7 @@ import (
 const GroupName = "flowcontrol.apiserver.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind
 func Kind(kind string) schema.GroupKind {
