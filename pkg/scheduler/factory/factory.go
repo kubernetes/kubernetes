@@ -152,7 +152,7 @@ type Configurator interface {
 	// Exposed for testing
 	GetClient() clientset.Interface
 
-	// TODO(#80216): Remove these methods from the interface.
+	// TODO(#80216): Remove GetScheduledPodLister from the interface.
 	// Exposed for testing
 	GetScheduledPodLister() corelisters.PodLister
 
@@ -163,7 +163,7 @@ type Configurator interface {
 }
 
 // configFactory is the default implementation of the scheduler.Configurator interface.
-// TODO(#80216): Remove pod and node listers.
+// TODO(#80216): Remove pod lister.
 type configFactory struct {
 	client clientset.Interface
 	// a means to list all known scheduled pods.
