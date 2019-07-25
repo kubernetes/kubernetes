@@ -34,34 +34,49 @@ import (
 // SharedInformer provides eventually consistent linkage of its
 // clients to the authoritative state of a given collection of
 // objects.  An object is identified by its API group, kind/resource,
-// namespace, and name.  One SharedInformer provides linkage to objects
-// of a particular API group and kind/resource.  The linked object
-// collection of a SharedInformer may be further restricted to one
-// namespace and/or by label selector and/or field selector.
+// namespace, and name; the `ObjectMeta.UID` is not part of an
+// object's ID as far as this contract is concerned.  One
+// SharedInformer provides linkage to objects of a particular API
+// group and kind/resource.  The linked object collection of a
+// SharedInformer may be further restricted to one namespace and/or by
+// label selector and/or field selector.
 //
 // The authoritative state of an object is what apiservers provide
 // access to, and an object goes through a strict sequence of states.
-// A state is either "absent" or present with a ResourceVersion and
-// other appropriate content.
+// An object state is either "absent" or present with a
+// ResourceVersion and other appropriate content.
 //
-// A SharedInformer maintains a local cache, exposed by GetStore(), of
-// the state of each relevant object.  This cache is eventually
-// consistent with the authoritative state.  This means that, unless
-// prevented by persistent communication problems, if ever a
-// particular object ID X is authoritatively associated with a state S
-// then for every SharedInformer I whose collection includes (X, S)
-// eventually either (1) I's cache associates X with S or a later
-// state of X, (2) I is stopped, or (3) the authoritative state
-// service for X terminates.  To be formally complete, we say that the
-// absent state meets any restriction by label selector or field
-// selector.
+// A SharedInformer gets object states from apiservers using a
+// sequence of LIST and WATCH operations.  Through this sequence the
+// apiservers provide a sequence of "collection states" to the
+// informer, where each collection state defines the state of every
+// object of the collection.  No promise --- beyond what is implied by
+// other remarks here --- is made about how one informer's sequence of
+// collection states relates to a different informer's sequence of
+// collection states.
+//
+// A SharedInformer maintains a local cache, exposed by GetStore() and
+// by GetIndexer() in the case of an indexed informer, of the state of
+// each relevant object.  This cache is eventually consistent with the
+// authoritative state.  This means that, unless prevented by
+// persistent communication problems, if ever a particular object ID X
+// is authoritatively associated with a state S then for every
+// SharedInformer I whose collection includes (X, S) eventually either
+// (1) I's cache associates X with S or a later state of X, (2) I is
+// stopped, or (3) the authoritative state service for X terminates.
+// To be formally complete, we say that the absent state meets any
+// restriction by label selector or field selector.
+//
+// The local cache starts out empty, and gets populated and updated
+// during `Run()`.
 //
 // As a simple example, if a collection of objects is henceforeth
-// unchanging and a SharedInformer is created that links to that
-// collection then that SharedInformer's cache eventually holds an
-// exact copy of that collection (unless it is stopped too soon, the
-// authoritative state service ends, or communication problems between
-// the two persistently thwart achievement).
+// unchanging, a SharedInformer is created that links to that
+// collection, and that SharedInformer is `Run()` then that
+// SharedInformer's cache eventually holds an exact copy of that
+// collection (unless it is stopped too soon, the authoritative state
+// service ends, or communication problems between the two
+// persistently thwart achievement).
 //
 // As another simple example, if the local cache ever holds a
 // non-absent state for some object ID and the object is eventually
@@ -70,20 +85,39 @@ import (
 // too soon, the authoritative state service ends, or communication
 // problems persistently thwart the desired result).
 //
-// The keys in GetStore() are of the form namespace/name for namespaced
+// The keys in the Store are of the form namespace/name for namespaced
 // objects, and are simply the name for non-namespaced objects.
+// Clients can use `MetaNamespaceKeyFunc(obj)` to extract the key for
+// a given object, and `SplitMetaNamespaceKey(key)` to split a key
+// into its constituent parts.
 //
 // A client is identified here by a ResourceEventHandler.  For every
-// update to the SharedInformer's local cache and for every client,
-// eventually either the SharedInformer is stopped or the client is
-// notified of the update.  These notifications happen after the
-// corresponding cache update and, in the case of a
-// SharedIndexInformer, after the corresponding index updates.  It is
-// possible that additional cache and index updates happen before such
-// a prescribed notification.  For a given SharedInformer and client,
-// all notifications are delivered sequentially.  For a given
-// SharedInformer, client, and object ID, the notifications are
-// delivered in order.
+// update to the SharedInformer's local cache and for every client
+// added before `Run()`, eventually either the SharedInformer is
+// stopped or the client is notified of the update.  A client added
+// after `Run()` starts gets a startup batch of notifications of
+// additions of the object existing in the cache at the time that
+// client was added; also, for every update to the SharedInformer's
+// local cache after that client was added, eventually either the
+// SharedInformer is stopped or that client is notified of that
+// update.  Client notifications happen after the corresponding cache
+// update and, in the case of a SharedIndexInformer, after the
+// corresponding index updates.  It is possible that additional cache
+// and index updates happen before such a prescribed notification.
+// For a given SharedInformer and client, the notifications are
+// delivered sequentially.  For a given SharedInformer, client, and
+// object ID, the notifications are delivered in order.
+//
+// A client must process each notification promptly; a SharedInformer
+// is not engineered to deal well with a large backlog of
+// notifications to deliver.  Lengthy processing should be passed off
+// to something else, for example through a
+// `client-go/util/workqueue`.
+//
+// Each query to an informer's local cache --- whether a single-object
+// lookup, a list operation, or a use of one of its indices --- is
+// answered entirely from one of the collection states received by
+// that informer.
 //
 // A delete notification exposes the last locally known non-absent
 // state, except that its ResourceVersion is replaced with a
