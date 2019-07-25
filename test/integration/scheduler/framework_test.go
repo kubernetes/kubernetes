@@ -418,13 +418,11 @@ func TestPrefilterPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set empty plugin config for testing
-	emptyPluginConfig := []schedulerconfig.PluginConfig{}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "prefilter-plugin", nil),
-		false, nil, registry, prefilterPlugin, emptyPluginConfig, false, time.Second)
+		false, nil, registry, prefilterPlugin, nil, false, time.Second)
 
 	defer cleanupTest(t, context)
 
@@ -497,13 +495,10 @@ func TestScorePlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set empty plugin config for testing
-	emptyPluginConfig := []schedulerconfig.PluginConfig{}
-
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "score-plugin", nil),
-		false, nil, registry, plugins, emptyPluginConfig, false, time.Second)
+		false, nil, registry, plugins, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -563,13 +558,10 @@ func TestReservePlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set empty plugin config for testing
-	emptyPluginConfig := []schedulerconfig.PluginConfig{}
-
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "reserve-plugin", nil),
-		false, nil, registry, reservePlugin, emptyPluginConfig, false, time.Second)
+		false, nil, registry, reservePlugin, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -622,17 +614,10 @@ func TestPrebindPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set reserve prebind config for testing
-	preBindPluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: prebindPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "prebind-plugin", nil),
-		false, nil, registry, preBindPlugin, preBindPluginConfig, false, time.Second)
+		false, nil, registry, preBindPlugin, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -724,22 +709,11 @@ func TestUnreservePlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set unreserve and prebind plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: unreservePluginName,
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: prebindPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "unreserve-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -853,29 +827,9 @@ func TestBindPlugin(t *testing.T) {
 			Enabled: []schedulerconfig.Plugin{{Name: postbindPlugin.Name()}},
 		},
 	}
-	// Set reserve and bind config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: unreservePlugin.Name(),
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: bindPlugin1.Name(),
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: bindPlugin2.Name(),
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: postbindPlugin.Name(),
-			Args: runtime.Unknown{},
-		},
-	}
-
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t, testContext,
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1030,22 +984,11 @@ func TestPostbindPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set reserve prebind and postbind config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: prebindPluginName,
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: postbindPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "postbind-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1134,18 +1077,10 @@ func TestPermitPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set permit plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: permitPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
-
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "permit-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1245,18 +1180,10 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set permit plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: permitPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
-
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "permit-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1339,13 +1266,10 @@ func TestFilterPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set empty plugin config for testing
-	emptyPluginConfig := []schedulerconfig.PluginConfig{}
-
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "filter-plugin", nil),
-		false, nil, registry, plugin, emptyPluginConfig, false, time.Second)
+		false, nil, registry, plugin, nil, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
