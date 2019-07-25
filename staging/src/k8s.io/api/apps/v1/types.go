@@ -517,7 +517,7 @@ type RollingUpdateDaemonSet struct {
 	// A label query over nodes that are managed by the daemon set RollingUpdate.
 	// Must match in order to be controlled.
 	// It must match the node's labels.
-	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// The number of DaemonSet pods remained to be old version.
 	// Default value is 0.
@@ -544,7 +544,7 @@ type SurgingRollingUpdateDaemonSet struct {
 	// A label query over pods that are managed by the daemon set SurgingRollingUpdate.
 	// Must match in order to be controlled.
 	// It must match the node's labels.
-	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// The number of DaemonSet pods remained to be old version.
 	// Default value is 0.
