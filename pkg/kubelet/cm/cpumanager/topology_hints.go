@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 )
 
-func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) []topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
 	// The 'none' policy does not generate topology hints.
 	if m.policy.Name() == string(PolicyNone) {
 		return nil
@@ -60,7 +60,9 @@ func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) []topolog
 	cpuHints := m.generateCPUTopologyHints(available, requested)
 	klog.Infof("[cpumanager] TopologyHints generated for pod '%v', container '%v': %v", pod.Name, container.Name, cpuHints)
 
-	return cpuHints
+	return map[string][]topologymanager.TopologyHint{
+		string(v1.ResourceCPU): cpuHints,
+	}
 }
 
 // generateCPUtopologyHints generates a set of TopologyHints given the set of

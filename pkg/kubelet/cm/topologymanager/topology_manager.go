@@ -54,7 +54,7 @@ type manager struct {
 
 //HintProvider interface is to be implemented by Hint Providers
 type HintProvider interface {
-	GetTopologyHints(pod v1.Pod, container v1.Container) []TopologyHint
+	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -164,16 +164,35 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// Get the TopologyHints from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 
-		// If hints is nil, overwrite 'hints' with a preferred any-socket affinity.
+		// If hints is nil, insert a single, preferred any-socket hint into allProviderHints.
 		if hints == nil || len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity")
+			klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with any resource")
 			affinity, _ := socketmask.NewSocketMask()
 			affinity.Fill()
-			hints = []TopologyHint{{affinity, true}}
+			allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
+			continue
 		}
 
-		// Accumulate the sorted hints into a [][]TopologyHint slice
-		allProviderHints = append(allProviderHints, hints)
+		// Otherwise, accumulate the hints for each resource type into allProviderHints.
+		for resource := range hints {
+			if hints[resource] == nil {
+				klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with resource '%s'", resource)
+				affinity, _ := socketmask.NewSocketMask()
+				affinity.Fill()
+				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
+				continue
+			}
+
+			if len(hints[resource]) == 0 {
+				klog.Infof("[topologymanager] Hint Provider has no possible socket affinities for resource '%s'", resource)
+				affinity, _ := socketmask.NewSocketMask()
+				affinity.Fill()
+				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, false}})
+				continue
+			}
+
+			allProviderHints = append(allProviderHints, hints[resource])
+		}
 	}
 
 	// Iterate over all permutations of hints in 'allProviderHints'. Merge the
