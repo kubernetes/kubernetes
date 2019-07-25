@@ -46,7 +46,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "apply.go",
         "conditions.go",
         "doc.go",
         "history.go",
