@@ -74,7 +74,9 @@ type topologyPairsMaps struct {
 type topologyPairsPodSpreadMap struct {
 	// This map is keyed with a topology key, and valued with minimum number
 	// of pods matched on that topology domain.
+	// TODO(Huang-Wei): refactor to {tpKey->tpValSet(or tpValSlice)}
 	topologyKeyToMinPodsMap map[string]int32
+	// TODO(Huang-Wei): refactor to {tpPair->count, podName->tpPairSet(optional)}
 	*topologyPairsMaps
 }
 
@@ -231,10 +233,8 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 			return
 		}
 		// Ensure current node's labels contains all topologyKeys in 'constraints'.
-		for _, constraint := range constraints {
-			if _, ok := node.Labels[constraint.TopologyKey]; !ok {
-				return
-			}
+		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+			return
 		}
 
 		nodeTopologyMaps := newTopologyPairsMaps()
@@ -319,6 +319,16 @@ func podMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySp
 	return true, nil
 }
 
+// check if ALL topology keys in spread constraints are present in node labels
+func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []v1.TopologySpreadConstraint) bool {
+	for _, constraint := range constraints {
+		if _, ok := nodeLabels[constraint.TopologyKey]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // returns a pointer to a new topologyPairsMaps
 func newTopologyPairsMaps() *topologyPairsMaps {
 	return &topologyPairsMaps{topologyPairToPods: make(map[topologyPair]podSet),
@@ -374,6 +384,89 @@ func (m *topologyPairsMaps) clone() *topologyPairsMaps {
 	return copy
 }
 
+func (m *topologyPairsPodSpreadMap) addPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) error {
+	if addedPod.Namespace != preemptorPod.Namespace {
+		return nil
+	}
+	constraints := getHardTopologySpreadConstraints(preemptorPod)
+	if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+		return nil
+	}
+
+	// records which topology key(s) needs to be updated
+	minMatchNeedingUpdate := make(map[string]struct{})
+	podLabelSet := labels.Set(addedPod.Labels)
+	for _, constraint := range constraints {
+		if match, err := podMatchesSpreadConstraint(podLabelSet, constraint); err != nil {
+			return err
+		} else if !match {
+			continue
+		}
+		pair := topologyPair{
+			key:   constraint.TopologyKey,
+			value: node.Labels[constraint.TopologyKey],
+		}
+		// it means current node is one of the critical paths of topologyKeyToMinPodsMap[TopologyKey]
+		if int32(len(m.topologyPairToPods[pair])) == m.topologyKeyToMinPodsMap[pair.key] {
+			minMatchNeedingUpdate[pair.key] = struct{}{}
+		}
+		m.addTopologyPair(pair, addedPod)
+	}
+	// no need to addTopologyPairWithoutPods b/c if a pair without pods must be present,
+	// it should have already been created earlier in removePod() phase
+
+	// In most cases, min match map doesn't need to be updated.
+	// But it's required to be updated when current node is the ONLY critical path which impacts
+	// the min match. With that said, in this case min match needs to be updated to min match + 1
+	if len(minMatchNeedingUpdate) != 0 {
+		// TODO(Huang-Wei): performance can be optimized.
+		// A possible solution is to record number of critical paths which co-impact the min match.
+		tempMinMatchMap := make(map[string]int32, len(minMatchNeedingUpdate))
+		for key := range minMatchNeedingUpdate {
+			tempMinMatchMap[key] = math.MaxInt32
+		}
+		for pair, podSet := range m.topologyPairToPods {
+			if _, ok := minMatchNeedingUpdate[pair.key]; !ok {
+				continue
+			}
+			if l := int32(len(podSet)); l < tempMinMatchMap[pair.key] {
+				tempMinMatchMap[pair.key] = l
+			}
+		}
+		for key, tempMin := range tempMinMatchMap {
+			if tempMin == m.topologyKeyToMinPodsMap[key]+1 {
+				m.topologyKeyToMinPodsMap[key] = tempMin
+			}
+		}
+	}
+	return nil
+}
+
+func (m *topologyPairsPodSpreadMap) removePod(deletedPod *v1.Pod) {
+	if m == nil || deletedPod == nil {
+		return
+	}
+
+	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
+	pairSet, ok := m.podToTopologyPairs[deletedPodFullName]
+	if !ok {
+		return
+	}
+	topologyPairToPods := m.topologyPairToPods
+	for pair := range pairSet {
+		delete(topologyPairToPods[pair], deletedPod)
+		// if topologyPairToPods[pair] is empty after deletion
+		// don't clean it up as that topology counts as a match now
+
+		// removal of the deletedPod would probably genereate a smaller matching number
+		// so re-calculate minMatch to a smaller value if possible
+		if l := int32(len(topologyPairToPods[pair])); l < m.topologyKeyToMinPodsMap[pair.key] {
+			m.topologyKeyToMinPodsMap[pair.key] = l
+		}
+	}
+	delete(m.podToTopologyPairs, deletedPodFullName)
+}
+
 func (m *topologyPairsPodSpreadMap) clone() *topologyPairsPodSpreadMap {
 	// m could be nil when EvenPodsSpread feature is disabled
 	if m == nil {
@@ -400,6 +493,8 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 	// Delete pod from the matching affinity or anti-affinity topology pairs maps.
 	meta.topologyPairsPotentialAffinityPods.removePod(deletedPod)
 	meta.topologyPairsPotentialAntiAffinityPods.removePod(deletedPod)
+	// Delete pod from the pod spread topology maps.
+	meta.topologyPairsPodSpreadMap.removePod(deletedPod)
 	// All pods in the serviceAffinityMatchingPodList are in the same namespace.
 	// So, if the namespace of the first one is not the same as the namespace of the
 	// deletedPod, we don't need to check the list, as deletedPod isn't in the list.
@@ -461,6 +556,12 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 			}
 		}
 	}
+	// Update meta.topologyPairsPodSpreadMap if meta.pod has hard spread constraints
+	// and addedPod matches that
+	if err := meta.topologyPairsPodSpreadMap.addPod(addedPod, meta.pod, nodeInfo.Node()); err != nil {
+		return err
+	}
+
 	// If addedPod is in the same namespace as the meta.pod, update the list
 	// of matching pods if applicable.
 	if meta.serviceAffinityInUse && addedPod.Namespace == meta.pod.Namespace {

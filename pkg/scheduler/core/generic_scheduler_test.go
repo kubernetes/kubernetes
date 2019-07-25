@@ -553,11 +553,9 @@ func TestGenericScheduler(t *testing.T) {
 
 			pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
-			var predMetaProducer algorithmpredicates.PredicateMetadataProducer
+			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
 			if test.buildPredMeta {
 				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
-			} else {
-				predMetaProducer = algorithmpredicates.EmptyPredicateMetadataProducer
 			}
 			scheduler := NewGenericScheduler(
 				cache,
@@ -1083,7 +1081,83 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			expected:             map[string]map[string]bool{"machine1": {"a": true}, "machine2": {}},
 			addAffinityPredicate: true,
 		},
+		{
+			name: "preemption to resolve even pods spread FitError",
+			predicates: map[string]algorithmpredicates.FitPredicate{
+				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
+			},
+			nodes: []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "p",
+					Labels: map[string]string{"foo": ""},
+				},
+				Spec: v1.PodSpec{
+					Priority: &highPriority,
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "zone",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+						{
+							MaxSkew:           1,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a1", UID: types.UID("pod-a1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &midPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a2", UID: types.UID("pod-a2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &lowPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-b1", UID: types.UID("pod-b1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-b", Priority: &lowPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x1", UID: types.UID("pod-x1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x2", UID: types.UID("pod-x2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+			},
+			expected: map[string]map[string]bool{
+				"node-a": {"pod-a2": true},
+				"node-b": {"pod-b1": true},
+			},
+		},
 	}
+	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assignDefaultStartTime(test.pods)
@@ -1091,7 +1165,13 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				node := makeNode(n, 1000*5, priorityutil.DefaultMemoryRequest*5)
-				node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
+				// if possible, split node name by '/' to form labels in a format of
+				// {"hostname": node.Name[0], "zone": node.Name[1], "region": node.Name[2]}
+				node.ObjectMeta.Labels = make(map[string]string)
+				for i, label := range strings.Split(node.Name, "/") {
+					node.ObjectMeta.Labels[labelKeys[i]] = label
+				}
+				node.Name = node.ObjectMeta.Labels["hostname"]
 				nodes = append(nodes, node)
 			}
 			if test.addAffinityPredicate {
@@ -1416,6 +1496,15 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			},
 			expected: map[string]bool{"machine4": true},
 		},
+		{
+			name: "ErrTopologySpreadConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+			},
+			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
+		},
 	}
 
 	for _, test := range tests {
@@ -1435,27 +1524,31 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 func TestPreempt(t *testing.T) {
 	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
-	failedPredMap := FailedPredicateMap{
+	defaultFailedPredMap := FailedPredicateMap{
 		"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
 		"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrDiskConflict},
 		"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 	}
 	// Prepare 3 node names.
-	nodeNames := []string{}
+	defaultNodeNames := []string{}
 	for i := 1; i < 4; i++ {
-		nodeNames = append(nodeNames, fmt.Sprintf("machine%d", i))
+		defaultNodeNames = append(defaultNodeNames, fmt.Sprintf("machine%d", i))
 	}
 	var (
 		preemptLowerPriority = v1.PreemptLowerPriority
 		preemptNever         = v1.PreemptNever
 	)
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		extenders    []*FakeExtender
-		expectedNode string
-		expectedPods []string // list of preempted pods
+		name          string
+		pod           *v1.Pod
+		pods          []*v1.Pod
+		extenders     []*FakeExtender
+		failedPredMap FailedPredicateMap
+		nodeNames     []string
+		predicate     algorithmpredicates.FitPredicate
+		buildPredMeta bool
+		expectedNode  string
+		expectedPods  []string // list of preempted pods
 	}{
 		{
 			name: "basic preemption logic",
@@ -1488,6 +1581,83 @@ func TestPreempt(t *testing.T) {
 			},
 			expectedNode: "machine3",
 			expectedPods: []string{},
+		},
+		{
+			name: "preemption for topology spread constraints",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "p",
+					Labels: map[string]string{"foo": ""},
+				},
+				Spec: v1.PodSpec{
+					Priority: &highPriority,
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "zone",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+						{
+							MaxSkew:           1,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a1", UID: types.UID("pod-a1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a2", UID: types.UID("pod-a2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-b1", UID: types.UID("pod-b1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-b", Priority: &lowPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x1", UID: types.UID("pod-x1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x2", UID: types.UID("pod-x2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+			},
+			failedPredMap: FailedPredicateMap{
+				"node-a": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+				"node-b": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+				"node-x": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+			},
+			predicate:     algorithmpredicates.EvenPodsSpreadPredicate,
+			buildPredMeta: true,
+			nodeNames:     []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
+			expectedNode:  "node-b",
+			expectedPods:  []string{"pod-b1"},
 		},
 		{
 			name: "Scheduler extenders allow only machine1, otherwise machine3 would have been chosen",
@@ -1618,6 +1788,7 @@ func TestPreempt(t *testing.T) {
 		},
 	}
 
+	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("===== Running test %v", t.Name())
@@ -1627,14 +1798,26 @@ func TestPreempt(t *testing.T) {
 				cache.AddPod(pod)
 			}
 			cachedNodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{}
-			for _, name := range nodeNames {
+			nodeNames := defaultNodeNames
+			if len(test.nodeNames) != 0 {
+				nodeNames = test.nodeNames
+			}
+			for i, name := range nodeNames {
 				node := makeNode(name, 1000*5, priorityutil.DefaultMemoryRequest*5)
+				// if possible, split node name by '/' to form labels in a format of
+				// {"hostname": node.Name[0], "zone": node.Name[1], "region": node.Name[2]}
+				node.ObjectMeta.Labels = make(map[string]string)
+				for i, label := range strings.Split(node.Name, "/") {
+					node.ObjectMeta.Labels[labelKeys[i]] = label
+				}
+				node.Name = node.ObjectMeta.Labels["hostname"]
 				cache.AddNode(node)
+				nodeNames[i] = node.Name
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
 				cachedNodeInfo := schedulernodeinfo.NewNodeInfo()
 				cachedNodeInfo.SetNode(node)
-				cachedNodeInfoMap[name] = cachedNodeInfo
+				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
 			extenders := []algorithm.SchedulerExtender{}
 			for _, extender := range test.extenders {
@@ -1642,11 +1825,19 @@ func TestPreempt(t *testing.T) {
 				extender.cachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
+			predicate := algorithmpredicates.PodFitsResources
+			if test.predicate != nil {
+				predicate = test.predicate
+			}
+			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
+			if test.buildPredMeta {
+				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
+			}
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil, nil),
-				map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
-				algorithmpredicates.EmptyPredicateMetadataProducer,
+				map[string]algorithmpredicates.FitPredicate{"matches": predicate},
+				predMetaProducer,
 				[]priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
 				priorities.EmptyPriorityMetadataProducer,
 				emptyFramework,
@@ -1660,6 +1851,10 @@ func TestPreempt(t *testing.T) {
 				true)
 			scheduler.(*genericScheduler).snapshot()
 			// Call Preempt and check the expected results.
+			failedPredMap := defaultFailedPredMap
+			if test.failedPredMap != nil {
+				failedPredMap = test.failedPredMap
+			}
 			node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)

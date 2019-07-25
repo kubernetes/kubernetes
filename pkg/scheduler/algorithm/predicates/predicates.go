@@ -1722,7 +1722,6 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
-
 	constraints := getHardTopologySpreadConstraints(pod)
 	if len(constraints) == 0 {
 		return true, nil, nil
