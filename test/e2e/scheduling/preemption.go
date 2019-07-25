@@ -467,7 +467,13 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		}
 	})
 
-	ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
+	/*
+	  Release : v1.16
+	  Testname: Scheduler: Preemption of ReplicaSet Pods
+	  Description: ReplicaSets MUST be scheduled within a reasonable
+	  amount of time. ReplicaSet pods MUST NOT be over-preempted.
+	*/
+	framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func() {
 		podNamesSeen := make(map[string]struct{})
 		stopCh := make(chan struct{})
 
