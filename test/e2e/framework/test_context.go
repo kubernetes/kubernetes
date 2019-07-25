@@ -165,7 +165,7 @@ type TestContextType struct {
 	// The configuration of NodeKiller.
 	NodeKiller NodeKillerConfig
 
-	// The IP Family of the cluster
+	// The Default IP Family of the cluster ("ipv4" or "ipv6")
 	IPFamily string
 }
 
