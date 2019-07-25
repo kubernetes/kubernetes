@@ -155,7 +155,8 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "echoserver",
-					Image: imageutils.GetE2EImage(imageutils.EchoServer),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},

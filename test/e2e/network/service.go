@@ -2321,7 +2321,7 @@ func execSourceipTest(pausePod v1.Pod, serviceAddress string) (string, string) {
 	timeout := 2 * time.Minute
 
 	e2elog.Logf("Waiting up to %v to get response from %s", timeout, serviceAddress)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s | grep client_address`, serviceAddress)
+	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, serviceAddress)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = framework.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
 		if err != nil {
@@ -2338,14 +2338,13 @@ func execSourceipTest(pausePod v1.Pod, serviceAddress string) (string, string) {
 
 	framework.ExpectNoError(err)
 
-	// The stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed.
-	// Desired stdout in this format: client_address=x.x.x.x
-	outputs := strings.Split(strings.TrimSpace(stdout), "=")
-	if len(outputs) != 2 {
+	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
+	host, _, err := net.SplitHostPort(stdout)
+	if err != nil {
 		// ginkgo.Fail the test if output format is unexpected.
-		e2elog.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
+		e2elog.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
 	}
-	return pausePod.Status.PodIP, outputs[1]
+	return pausePod.Status.PodIP, host
 }
 
 func execAffinityTestForNonLBServiceWithTransition(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
