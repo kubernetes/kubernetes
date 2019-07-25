@@ -29,10 +29,11 @@ import (
 
 func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 	tests := []struct {
-		name  string
-		pod   *v1.Pod
-		nodes []*v1.Node
-		want  map[topologyPair][]string
+		name                string
+		pod                 *v1.Pod
+		nodes               []*v1.Node
+		wantNodeNameMap     map[string]int64
+		wantTopologyPairMap map[topologyPair]*int64
 	}{
 		{
 			name: "normal case",
@@ -45,12 +46,17 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: map[topologyPair][]string{
-				{key: "zone", value: "zone1"}:  {"node-a", "node-b"},
-				{key: "zone", value: "zone2"}:  {"node-x"},
-				{key: "node", value: "node-a"}: {"node-a"},
-				{key: "node", value: "node-b"}: {"node-b"},
-				{key: "node", value: "node-x"}: {"node-x"},
+			wantNodeNameMap: map[string]int64{
+				"node-a": 0,
+				"node-b": 0,
+				"node-x": 0,
+			},
+			wantTopologyPairMap: map[topologyPair]*int64{
+				{key: "zone", value: "zone1"}:  new(int64),
+				{key: "zone", value: "zone2"}:  new(int64),
+				{key: "node", value: "node-a"}: new(int64),
+				{key: "node", value: "node-b"}: new(int64),
+				{key: "node", value: "node-x"}: new(int64),
 			},
 		},
 		{
@@ -64,19 +70,26 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
-			want: map[topologyPair][]string{
-				{key: "zone", value: "zone1"}:  {"node-a", "node-b"},
-				{key: "node", value: "node-a"}: {"node-a"},
-				{key: "node", value: "node-b"}: {"node-b"},
+			wantNodeNameMap: map[string]int64{
+				"node-a": 0,
+				"node-b": 0,
+			},
+			wantTopologyPairMap: map[topologyPair]*int64{
+				{key: "zone", value: "zone1"}:  new(int64),
+				{key: "node", value: "node-a"}: new(int64),
+				{key: "node", value: "node-b"}: new(int64),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tMap := newTopologySpreadConstraintsMap(len(tt.nodes))
+			tMap := newTopologySpreadConstraintsMap()
 			tMap.initialize(tt.pod, tt.nodes)
-			if !reflect.DeepEqual(tMap.topologyPairToNodeNames, tt.want) {
-				t.Errorf("initilize().topologyPairToNodeNames = %#v, want %#v", tMap.topologyPairToNodeNames, tt.want)
+			if !reflect.DeepEqual(tMap.nodeNameToPodCounts, tt.wantNodeNameMap) {
+				t.Errorf("initilize().nodeNameToPodCounts = %#v, want %#v", tMap.nodeNameToPodCounts, tt.wantNodeNameMap)
+			}
+			if !reflect.DeepEqual(tMap.topologyPairToPodCounts, tt.wantTopologyPairMap) {
+				t.Errorf("initilize().topologyPairToPodCounts = %#v, want %#v", tMap.topologyPairToPodCounts, tt.wantTopologyPairMap)
 			}
 		})
 	}
@@ -132,6 +145,24 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 10},
+			},
+		},
+		{
+			name: "one constraint on node, all nodes have the same number of matching pods",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+			},
+			want: []schedulerapi.HostPriority{
+				{Host: "node-a", Score: 10},
+				{Host: "node-b", Score: 10},
 			},
 		},
 		{
@@ -336,6 +367,36 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				{Host: "node-b", Score: 7},
 				{Host: "node-x", Score: 10},
 				{Host: "node-y", Score: 8},
+			},
+		},
+		{
+			// For the first constraint (zone): the matching pods spread as 0/0/2/2
+			// For the second constraint (node): the matching pods spread as 0/1/0/1
+			// sum them up gets: 0/1/2/3, and total number is 6.
+			// after reversing, it's 6/5/4/3.
+			// so scores = 60/6, 50/6, 40/6, 30/6
+			name: "two constraints on zone and node, with different labelSelectors, some nodes have 0 pods",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-b1").Node("node-b").Label("bar", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			failedNodes: []*v1.Node{},
+			want: []schedulerapi.HostPriority{
+				{Host: "node-a", Score: 10},
+				{Host: "node-b", Score: 8},
+				{Host: "node-x", Score: 6},
+				{Host: "node-y", Score: 5},
 			},
 		},
 		{
