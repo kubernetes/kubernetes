@@ -144,9 +144,6 @@ type driverDefinition struct {
 	// the default file system are enabled.
 	DriverInfo testsuites.DriverInfo
 
-	// ShortName is used to create unique names for test cases and test resources.
-	ShortName string
-
 	// StorageClass must be set to enable dynamic provisioning tests.
 	// The default is to not run those tests.
 	StorageClass struct {
