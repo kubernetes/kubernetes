@@ -1361,7 +1361,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		claimKey := claimToClaimKey(claim)
 		ctrl.operationTimestamps.AddIfNotExist(claimKey, ctrl.getProvisionerName(plugin, storageClass), "provision")
 		var err error
-		if plugin == nil || plugin.IsMigratedToCSI() {
+		if plugin == nil {
 			_, err = ctrl.provisionClaimOperationExternal(claim, plugin, storageClass)
 		} else {
 			_, err = ctrl.provisionClaimOperation(claim, plugin, storageClass)
@@ -1383,6 +1383,13 @@ func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName stri
 	return csitranslation.GetCSINameFromInTreeName(pluginName)
 }
 
+func (ctrl *PersistentVolumeController) isCSIMigrationEnabledForIntreePluginByName(pluginName string) bool {
+	if ctrl.csiNameFromIntreeNameHook != nil {
+		return true
+	}
+	return vol.IsCSIMigrationEnabledForPluginByName(pluginName)
+}
+
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) provisionClaimOperation(
@@ -1392,8 +1399,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
-	// called from provisionClaim(), in this case, plugin MUST NOT be nil and
-	// plugin.IsMigratedToCSI() MUST return FALSE
+	// called from provisionClaim(), in this case, plugin MUST NOT be nil
 	// NOTE: checks on plugin/storageClass has been saved
 	pluginName := plugin.GetPluginName()
 	provisionerName := storageClass.Provisioner
@@ -1590,7 +1596,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
 	provisionerName := storageClass.Provisioner
-	if plugin != nil {
+	if ctrl.isCSIMigrationEnabledForIntreePluginByName(storageClass.Provisioner) {
 		// update the provisioner name to use the CSI in-tree name
 		provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
 		if err != nil {
@@ -1689,6 +1695,9 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 		return nil, nil, err
 	}
 
+	if ctrl.isCSIMigrationEnabledForIntreePluginByName(class.Provisioner) {
+		return nil, class, nil
+	}
 	// Find a plugin for the class
 	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(class.Provisioner)
 	if err != nil {
@@ -1713,6 +1722,15 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 			if err != nil {
 				if !strings.HasPrefix(provisionPluginName, "kubernetes.io/") {
 					// External provisioner is requested, do not report error
+					// For regular CSI migration scenarios, this is the path executed
+					// since AnnDynamicallyProvisioned is set to migrated CSI plugin
+					// by external provisioner when provisioning a volume
+					return nil, nil
+				}
+				if strings.HasPrefix(provisionPluginName, "kubernetes.io/") && ctrl.isCSIMigrationEnabledForIntreePluginByName(provisionPluginName) {
+					// For CSI migration scenarios where provisioning happened through
+					// in-tree and then cluster upgdraded with migration enabled
+					// we should not error out as that can be handled by CSI plugin
 					return nil, nil
 				}
 				return nil, err
@@ -1738,7 +1756,8 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	if err != nil {
 		return "N/A"
 	}
-	if plugin != nil && !plugin.IsMigratedToCSI() {
+	// For CSI migration scenarios, plugin == nil.
+	if plugin != nil {
 		return plugin.GetPluginName()
 	}
 	// If reached here, Either an external provisioner was used for provisioning
@@ -1752,7 +1771,7 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	if err != nil {
 		return "N/A"
 	}
-	if plugin != nil {
+	if ctrl.isCSIMigrationEnabledForIntreePluginByName(class.Provisioner) {
 		provisionerName, err := ctrl.getCSINameFromIntreeName(class.Provisioner)
 		if err == nil {
 			return provisionerName
@@ -1763,11 +1782,11 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 
 // obtain plugin/external provisioner name from plugin and storage class
 func (ctrl *PersistentVolumeController) getProvisionerName(plugin vol.ProvisionableVolumePlugin, storageClass *storage.StorageClass) string {
-	// intree plugin, returns the plugin's name
-	if plugin != nil && !plugin.IsMigratedToCSI() {
+	// intree non CSI migrated plugin, returns the plugin's name
+	if plugin != nil {
 		return plugin.GetPluginName()
-	} else if plugin != nil {
-		// get the CSI in-tree name from storage class provisioner name
+	}
+	if ctrl.isCSIMigrationEnabledForIntreePluginByName(storageClass.Provisioner) {
 		provisionerName, err := ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
 		if err != nil {
 			return "N/A"

@@ -109,11 +109,6 @@ func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
 }
 
-func (plugin *cinderPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
-}
-
 func (plugin *cinderPlugin) RequiresRemount() bool {
 	return false
 }

@@ -238,8 +238,10 @@ func (expc *expandController) syncHandler(key string) error {
 	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 	volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 	volumeResizerName := class.Provisioner
+	isCSIMigrationEnabledForPlugin := volume.IsCSIMigrationEnabledForPluginByName(volumeResizerName)
 
-	if err != nil || volumePlugin == nil {
+	// err from FindExpandablePluginBySpec should be ignored when plugins are disabled/removed
+	if volumePlugin == nil && !isCSIMigrationEnabledForPlugin {
 		msg := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
 			"waiting for an external controller to process this PVC")
 		eventType := v1.EventTypeNormal
@@ -253,7 +255,7 @@ func (expc *expandController) syncHandler(key string) error {
 		return nil
 	}
 
-	if volumePlugin.IsMigratedToCSI() {
+	if isCSIMigrationEnabledForPlugin {
 		msg := fmt.Sprintf("CSI migration enabled for %s; waiting for external resizer to expand the pvc", volumeResizerName)
 		expc.recorder.Event(pvc, v1.EventTypeNormal, events.ExternalExpanding, msg)
 		csiResizerName, err := csitranslation.GetCSINameFromInTreeName(class.Provisioner)

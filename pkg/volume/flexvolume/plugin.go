@@ -148,10 +148,6 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return sourceDriver == plugin.driverName
 }
 
-func (plugin *flexVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 // RequiresRemount is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) RequiresRemount() bool {
 	return false

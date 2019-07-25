@@ -31,15 +31,10 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
-	"k8s.io/kubernetes/pkg/volume/azure_dd"
-	"k8s.io/kubernetes/pkg/volume/azure_file"
-	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
@@ -51,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/storageos"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/csimigration"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -65,19 +61,15 @@ import (
 // initialization code for kubelet really, really need a through refactor.
 func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
-
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	allPlugins = csimigration.ProbeAttachablePluginsWithCSIMigrationDisabled(allPlugins)
 	return allPlugins
 }
 
@@ -91,19 +83,14 @@ func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) v
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
 func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
-
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
+	allPlugins = csimigration.ProbePluginsWithCSIMigrationDisabled(allPlugins)
 	return allPlugins
 }
 
@@ -146,20 +133,13 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 	// add rbd provisioner
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
-
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
-
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-
+	allPlugins = csimigration.ProbePluginsWithCSIMigrationDisabled(allPlugins)
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}

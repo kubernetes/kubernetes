@@ -25,11 +25,7 @@ import (
 	"k8s.io/utils/exec"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
-	"k8s.io/kubernetes/pkg/volume/azure_dd"
-	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
-	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
@@ -37,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/git_repo"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
@@ -51,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/storageos"
+	"k8s.io/kubernetes/pkg/volume/util/csimigration"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	// Cloud providers
@@ -67,9 +63,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	//
 	// Kubelet does not currently need to configure volume plugins.
 	// If/when it does, see kube-controller-manager/app/plugins.go for example of using volume.VolumeConfig
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
@@ -77,22 +71,20 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cephfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	allPlugins = csimigration.ProbePluginsWithCSIMigrationDisabled(allPlugins)
 	return allPlugins
 }
 

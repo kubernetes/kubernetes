@@ -95,11 +95,6 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
 }
 
-func (plugin *gcePersistentDiskPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
-}
-
 func (plugin *gcePersistentDiskPlugin) RequiresRemount() bool {
 	return false
 }

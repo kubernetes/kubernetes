@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	csitranslation "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -154,10 +155,6 @@ type VolumePlugin interface {
 	// specification from the API.  The spec pointer should be considered
 	// const.
 	CanSupport(spec *Spec) bool
-
-	// IsMigratedToCSI tests whether a CSIDriver implements this plugin's
-	// functionality
-	IsMigratedToCSI() bool
 
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
@@ -691,35 +688,17 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 
 // IsPluginMigratableBySpec looks for a plugin that can support a given volume
 // specification and whether that plugin is Migratable. If no plugins can
-// support or more than one plugin can support it, return error.
+// support, return error.
 func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
-
 	if spec == nil {
 		return false, fmt.Errorf("could not find if plugin is migratable because volume spec is nil")
 	}
-
-	matches := []VolumePlugin{}
-	for _, v := range pm.plugins {
-		if v.CanSupport(spec) {
-			matches = append(matches, v)
-		}
+	pluginName, err := csitranslation.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
+	if err != nil {
+		return false, err
 	}
-
-	if len(matches) == 0 {
-		// Not a known plugin (flex) in which case it is not migratable
-		return false, nil
-	}
-	if len(matches) > 1 {
-		matchedPluginNames := []string{}
-		for _, plugin := range matches {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-		}
-		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
-	}
-
-	return matches[0].IsMigratedToCSI(), nil
+	// found an in-tree plugin that supports the spec
+	return IsCSIMigrationEnabledForPluginByName(pluginName), nil
 }
 
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin

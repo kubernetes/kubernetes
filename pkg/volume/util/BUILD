@@ -87,6 +87,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/volume/util/csimigration:all-srcs",
         "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/fsquota:all-srcs",

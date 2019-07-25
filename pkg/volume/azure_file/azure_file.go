@@ -26,11 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -81,11 +79,6 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 	//TODO: check if mount.cifs is there
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureFile != nil) ||
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
-}
-
-func (plugin *azureFilePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 }
 
 func (plugin *azureFilePlugin) RequiresRemount() bool {

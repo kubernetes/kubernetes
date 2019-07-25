@@ -107,10 +107,6 @@ func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
 }
 
-func (p *flockerPlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (p *flockerPlugin) RequiresRemount() bool {
 	return false
 }
