@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package polymorphichelpers
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	kapps "k8s.io/kubectl/pkg/apps"
+	"k8s.io/kubectl/pkg/apps"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	sliceutil "k8s.io/kubectl/pkg/util/slice"
 	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
@@ -54,27 +54,27 @@ type HistoryVisitor struct {
 	result    HistoryViewer
 }
 
-func (v *HistoryVisitor) VisitDeployment(elem kapps.GroupKindElement) {
+func (v *HistoryVisitor) VisitDeployment(elem apps.GroupKindElement) {
 	v.result = &DeploymentHistoryViewer{v.clientset}
 }
 
-func (v *HistoryVisitor) VisitStatefulSet(kind kapps.GroupKindElement) {
+func (v *HistoryVisitor) VisitStatefulSet(kind apps.GroupKindElement) {
 	v.result = &StatefulSetHistoryViewer{v.clientset}
 }
 
-func (v *HistoryVisitor) VisitDaemonSet(kind kapps.GroupKindElement) {
+func (v *HistoryVisitor) VisitDaemonSet(kind apps.GroupKindElement) {
 	v.result = &DaemonSetHistoryViewer{v.clientset}
 }
 
-func (v *HistoryVisitor) VisitJob(kind kapps.GroupKindElement)                   {}
-func (v *HistoryVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
-func (v *HistoryVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
-func (v *HistoryVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
-func (v *HistoryVisitor) VisitCronJob(kind kapps.GroupKindElement)               {}
+func (v *HistoryVisitor) VisitJob(kind apps.GroupKindElement)                   {}
+func (v *HistoryVisitor) VisitPod(kind apps.GroupKindElement)                   {}
+func (v *HistoryVisitor) VisitReplicaSet(kind apps.GroupKindElement)            {}
+func (v *HistoryVisitor) VisitReplicationController(kind apps.GroupKindElement) {}
+func (v *HistoryVisitor) VisitCronJob(kind apps.GroupKindElement)               {}
 
 // HistoryViewerFor returns an implementation of HistoryViewer interface for the given schema kind
 func HistoryViewerFor(kind schema.GroupKind, c kubernetes.Interface) (HistoryViewer, error) {
-	elem := kapps.GroupKindElement(kind)
+	elem := apps.GroupKindElement(kind)
 	visitor := &HistoryVisitor{
 		clientset: c,
 	}

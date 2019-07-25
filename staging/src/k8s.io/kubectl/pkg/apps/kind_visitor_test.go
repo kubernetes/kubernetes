@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apps_test
+package apps
 
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"k8s.io/kubectl/pkg/apps"
 )
 
 var _ = Describe("When KindVisitor accepts a GroupKind", func() {
@@ -32,7 +30,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit DaemonSet iff the Kind is a DaemonSet", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "DaemonSet",
 			Group: "apps",
 		}
@@ -41,7 +39,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 			"DaemonSet": 1,
 		}))
 
-		kind = apps.GroupKindElement{
+		kind = GroupKindElement{
 			Kind:  "DaemonSet",
 			Group: "extensions",
 		}
@@ -52,7 +50,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit Deployment iff the Kind is a Deployment", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "Deployment",
 			Group: "apps",
 		}
@@ -61,7 +59,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 			"Deployment": 1,
 		}))
 
-		kind = apps.GroupKindElement{
+		kind = GroupKindElement{
 			Kind:  "Deployment",
 			Group: "extensions",
 		}
@@ -72,7 +70,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit Job iff the Kind is a Job", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "Job",
 			Group: "batch",
 		}
@@ -84,7 +82,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit Pod iff the Kind is a Pod", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "Pod",
 			Group: "",
 		}
@@ -93,7 +91,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 			"Pod": 1,
 		}))
 
-		kind = apps.GroupKindElement{
+		kind = GroupKindElement{
 			Kind:  "Pod",
 			Group: "core",
 		}
@@ -104,7 +102,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit ReplicationController iff the Kind is a ReplicationController", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "ReplicationController",
 			Group: "",
 		}
@@ -113,7 +111,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 			"ReplicationController": 1,
 		}))
 
-		kind = apps.GroupKindElement{
+		kind = GroupKindElement{
 			Kind:  "ReplicationController",
 			Group: "core",
 		}
@@ -124,7 +122,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit ReplicaSet iff the Kind is a ReplicaSet", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "ReplicaSet",
 			Group: "extensions",
 		}
@@ -135,7 +133,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit StatefulSet iff the Kind is a StatefulSet", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "StatefulSet",
 			Group: "apps",
 		}
@@ -146,7 +144,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should Visit CronJob iff the Kind is a CronJob", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "CronJob",
 			Group: "batch",
 		}
@@ -157,7 +155,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	})
 
 	It("should give an error if the Kind is unknown", func() {
-		kind := apps.GroupKindElement{
+		kind := GroupKindElement{
 			Kind:  "Unknown",
 			Group: "apps",
 		}
@@ -171,15 +169,15 @@ type TestKindVisitor struct {
 	visits map[string]int
 }
 
-var _ apps.KindVisitor = &TestKindVisitor{}
+var _ KindVisitor = &TestKindVisitor{}
 
-func (t *TestKindVisitor) Visit(kind apps.GroupKindElement) { t.visits[kind.Kind]++ }
+func (t *TestKindVisitor) Visit(kind GroupKindElement) { t.visits[kind.Kind]++ }
 
-func (t *TestKindVisitor) VisitDaemonSet(kind apps.GroupKindElement)             { t.Visit(kind) }
-func (t *TestKindVisitor) VisitDeployment(kind apps.GroupKindElement)            { t.Visit(kind) }
-func (t *TestKindVisitor) VisitJob(kind apps.GroupKindElement)                   { t.Visit(kind) }
-func (t *TestKindVisitor) VisitPod(kind apps.GroupKindElement)                   { t.Visit(kind) }
-func (t *TestKindVisitor) VisitReplicaSet(kind apps.GroupKindElement)            { t.Visit(kind) }
-func (t *TestKindVisitor) VisitReplicationController(kind apps.GroupKindElement) { t.Visit(kind) }
-func (t *TestKindVisitor) VisitStatefulSet(kind apps.GroupKindElement)           { t.Visit(kind) }
-func (t *TestKindVisitor) VisitCronJob(kind apps.GroupKindElement)               { t.Visit(kind) }
+func (t *TestKindVisitor) VisitDaemonSet(kind GroupKindElement)             { t.Visit(kind) }
+func (t *TestKindVisitor) VisitDeployment(kind GroupKindElement)            { t.Visit(kind) }
+func (t *TestKindVisitor) VisitJob(kind GroupKindElement)                   { t.Visit(kind) }
+func (t *TestKindVisitor) VisitPod(kind GroupKindElement)                   { t.Visit(kind) }
+func (t *TestKindVisitor) VisitReplicaSet(kind GroupKindElement)            { t.Visit(kind) }
+func (t *TestKindVisitor) VisitReplicationController(kind GroupKindElement) { t.Visit(kind) }
+func (t *TestKindVisitor) VisitStatefulSet(kind GroupKindElement)           { t.Visit(kind) }
+func (t *TestKindVisitor) VisitCronJob(kind GroupKindElement)               { t.Visit(kind) }

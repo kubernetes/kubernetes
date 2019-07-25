@@ -20,11 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // historyViewer Returns a HistoryViewer for viewing change history
-func historyViewer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
+func historyViewer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (HistoryViewer, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -34,5 +33,5 @@ func historyViewer(restClientGetter genericclioptions.RESTClientGetter, mapping 
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
+	return HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
 }

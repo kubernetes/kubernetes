@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -72,7 +71,7 @@ type RolloutStatusOptions struct {
 	Revision int64
 	Timeout  time.Duration
 
-	StatusViewerFn func(*meta.RESTMapping) (kubectl.StatusViewer, error)
+	StatusViewerFn func(*meta.RESTMapping) (polymorphichelpers.StatusViewer, error)
 	Builder        func() *resource.Builder
 	DynamicClient  dynamic.Interface
 

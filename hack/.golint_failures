@@ -143,6 +143,7 @@ pkg/kubectl/describe/versioned
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
+pkg/kubectl/polymorphichelpers
 pkg/kubelet
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1

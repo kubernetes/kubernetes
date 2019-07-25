@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // LogsForObjectFunc is a function type that can tell you how to get logs for a runtime.object
@@ -41,13 +40,13 @@ type AttachablePodForObjectFunc func(restClientGetter genericclioptions.RESTClie
 var AttachablePodForObjectFn AttachablePodForObjectFunc = attachablePodForObject
 
 // HistoryViewerFunc is a function type that can tell you how to view change history
-type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
+type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (HistoryViewer, error)
 
 // HistoryViewerFn gives a way to easily override the function for unit testing if needed
 var HistoryViewerFn HistoryViewerFunc = historyViewer
 
 // StatusViewerFunc is a function type that can tell you how to print rollout status
-type StatusViewerFunc func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
+type StatusViewerFunc func(mapping *meta.RESTMapping) (StatusViewer, error)
 
 // StatusViewerFn gives a way to easily override the function for unit testing if needed
 var StatusViewerFn StatusViewerFunc = statusViewer
@@ -102,7 +101,7 @@ type ObjectResumerFunc func(runtime.Object) ([]byte, error)
 var ObjectResumerFn ObjectResumerFunc = defaultObjectResumer
 
 // RollbackerFunc gives a way to change the rollback version of the specified RESTMapping type
-type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
+type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (Rollbacker, error)
 
 // RollbackerFn gives a way to easily override the function for unit testing if needed
 var RollbackerFn RollbackerFunc = rollbacker

@@ -6,8 +6,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/annotate",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/polymorphichelpers:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

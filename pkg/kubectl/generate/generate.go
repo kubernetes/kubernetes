@@ -174,14 +174,6 @@ func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	return portProtocolMap, nil
 }
 
-func MakeLabels(labels map[string]string) string {
-	out := []string{}
-	for key, value := range labels {
-		out = append(out, fmt.Sprintf("%s=%s", key, value))
-	}
-	return strings.Join(out, ",")
-}
-
 // ParseLabels turns a string representation of a label set into a map[string]string
 func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 	labelString, isString := labelSpec.(string)
