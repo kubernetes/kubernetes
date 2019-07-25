@@ -97,7 +97,6 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
@@ -106,7 +105,7 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-resizer.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
 }
@@ -205,7 +204,6 @@ var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
 func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 	driverManifests := []string{
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
@@ -329,7 +327,9 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 func InitHostPathV0CSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0",
 		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true},
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		// Using the current set of rbac.yaml files is problematic here because they don't
+		// match the version of the rules that were written for the releases of external-attacher
+		// and external-provisioner that we are using here. It happens to work in practice...
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
@@ -423,7 +423,6 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	createGCESecrets(f.ClientSet, f.Namespace.Name)
 
 	manifests := []string{
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
