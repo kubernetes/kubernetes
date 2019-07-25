@@ -213,6 +213,8 @@ function gke-configure-node-sysctls {
   # Take a snapshot of the current sysctls and store them in a file. This will
   # be used as the base for monitoring sysctl changes by NPD custom plugin
   # sysctl-monitor.
+  #
+  # The directory was created in gke-internal-configure.sh.
   sudo sysctl -a > "${KUBE_HOME}/npd-custom-plugins/configs/init-sysctls.conf"
 }
 
