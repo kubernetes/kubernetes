@@ -32,9 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
+	kapps "k8s.io/kubectl/pkg/apps"
 	"k8s.io/kubectl/pkg/scheme"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
-	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 )
 
 const (

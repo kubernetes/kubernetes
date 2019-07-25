@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	kapps "k8s.io/kubectl/pkg/apps"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	sliceutil "k8s.io/kubectl/pkg/util/slice"
-	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
 )
 
