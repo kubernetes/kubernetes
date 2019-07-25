@@ -123,6 +123,11 @@ type VirtualCenterConfig struct {
 // Structure that represents the content of vsphere.conf file.
 // Users specify the configuration of one or more Virtual Centers in vsphere.conf where
 // the Kubernetes master and worker nodes are running.
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type VSphereConfig struct {
 	Global struct {
 		// vCenter username.
