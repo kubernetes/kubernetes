@@ -1038,7 +1038,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
 								"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
 						},
-						EnableTCPReset: nil,
+						EnableTCPReset: to.BoolPtr(false),
 					},
 				},
 			},
