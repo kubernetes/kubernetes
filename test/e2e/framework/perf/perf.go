@@ -19,28 +19,11 @@ package framework
 import (
 	"fmt"
 
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/perftype"
 )
-
-// TODO(random-liu): Change the tests to actually use PerfData from the beginning instead of
-// translating one to the other here.
-
-func latencyToPerfData(l e2emetrics.LatencyMetric, name string) perftype.DataItem {
-	return perftype.DataItem{
-		Data: map[string]float64{
-			"Perc50":  float64(l.Perc50) / 1000000, // us -> ms
-			"Perc90":  float64(l.Perc90) / 1000000,
-			"Perc99":  float64(l.Perc99) / 1000000,
-			"Perc100": float64(l.Perc100) / 1000000,
-		},
-		Unit: "ms",
-		Labels: map[string]string{
-			"Metric": name,
-		},
-	}
-}
 
 // CurrentKubeletPerfMetricsVersion is the current kubelet performance metrics
 // version. This is used by mutiple perf related data structures. We should
@@ -49,12 +32,12 @@ const CurrentKubeletPerfMetricsVersion = "v2"
 
 // ResourceUsageToPerfData transforms ResourceUsagePerNode to PerfData. Notice that this function
 // only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
-func ResourceUsageToPerfData(usagePerNode ResourceUsagePerNode) *perftype.PerfData {
+func ResourceUsageToPerfData(usagePerNode e2ekubelet.ResourceUsagePerNode) *perftype.PerfData {
 	return ResourceUsageToPerfDataWithLabels(usagePerNode, nil)
 }
 
 // CPUUsageToPerfData transforms NodesCPUSummary to PerfData.
-func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
+func CPUUsageToPerfData(usagePerNode e2ekubelet.NodesCPUSummary) *perftype.PerfData {
 	return CPUUsageToPerfDataWithLabels(usagePerNode, nil)
 }
 
@@ -69,7 +52,7 @@ func PrintPerfData(p *perftype.PerfData) {
 
 // ResourceUsageToPerfDataWithLabels transforms ResourceUsagePerNode to PerfData with additional labels.
 // Notice that this function only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
-func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
+func ResourceUsageToPerfDataWithLabels(usagePerNode e2ekubelet.ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
 	for node, usages := range usagePerNode {
 		for c, usage := range usages {
@@ -98,7 +81,7 @@ func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels
 }
 
 // CPUUsageToPerfDataWithLabels transforms NodesCPUSummary to PerfData with additional labels.
-func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[string]string) *perftype.PerfData {
+func CPUUsageToPerfDataWithLabels(usagePerNode e2ekubelet.NodesCPUSummary, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
 	for node, usages := range usagePerNode {
 		for c, usage := range usages {
