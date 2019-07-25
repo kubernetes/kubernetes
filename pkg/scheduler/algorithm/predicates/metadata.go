@@ -245,7 +245,7 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 				if existingPod.Namespace != pod.Namespace {
 					continue
 				}
-				ok, err := podMatchesSpreadConstraint(existingPod.Labels, constraint)
+				ok, err := PodMatchesSpreadConstraint(existingPod.Labels, constraint)
 				if err != nil {
 					errCh.SendErrorWithCancel(err, cancel)
 					return
@@ -304,10 +304,11 @@ func getHardTopologySpreadConstraints(pod *v1.Pod) (constraints []v1.TopologySpr
 	return
 }
 
-// some corner cases:
+// PodMatchesSpreadConstraint verifies if <constraint.LabelSelector> matches <podLabelSet>.
+// Some corner cases:
 // 1. podLabelSet = nil => returns (false, nil)
 // 2. constraint.LabelSelector = nil => returns (false, nil)
-func podMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySpreadConstraint) (bool, error) {
+func PodMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySpreadConstraint) (bool, error) {
 	selector, err := metav1.LabelSelectorAsSelector(constraint.LabelSelector)
 	if err != nil {
 		return false, err
@@ -318,7 +319,7 @@ func podMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySp
 	return true, nil
 }
 
-// check if ALL topology keys in spread constraints are present in node labels
+// NodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread constraints are present in node labels.
 func NodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []v1.TopologySpreadConstraint) bool {
 	for _, constraint := range constraints {
 		if _, ok := nodeLabels[constraint.TopologyKey]; !ok {
@@ -396,7 +397,7 @@ func (m *topologyPairsPodSpreadMap) addPod(addedPod, preemptorPod *v1.Pod, node 
 	minMatchNeedingUpdate := make(map[string]struct{})
 	podLabelSet := labels.Set(addedPod.Labels)
 	for _, constraint := range constraints {
-		if match, err := podMatchesSpreadConstraint(podLabelSet, constraint); err != nil {
+		if match, err := PodMatchesSpreadConstraint(podLabelSet, constraint); err != nil {
 			return err
 		} else if !match {
 			continue

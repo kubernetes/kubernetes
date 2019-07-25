@@ -1748,7 +1748,7 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
 		}
 
-		selfMatch, err := podMatchesSpreadConstraint(podLabelSet, constraint)
+		selfMatch, err := PodMatchesSpreadConstraint(podLabelSet, constraint)
 		if err != nil {
 			return false, nil, err
 		}

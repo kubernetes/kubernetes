@@ -26,7 +26,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func Test_topologySpreadConstrantsMap_initialize(t *testing.T) {
+func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 	tests := []struct {
 		name  string
 		pod   *v1.Pod
@@ -52,10 +52,27 @@ func Test_topologySpreadConstrantsMap_initialize(t *testing.T) {
 				{key: "node", value: "node-x"}: {"node-x"},
 			},
 		},
+		{
+			name: "node-x doesn't have label zone",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
+			},
+			want: map[topologyPair][]string{
+				{key: "zone", value: "zone1"}:  {"node-a", "node-b"},
+				{key: "node", value: "node-a"}: {"node-a"},
+				{key: "node", value: "node-b"}: {"node-b"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tMap := newTopologySpreadConstrantsMap(len(tt.nodes))
+			tMap := newTopologySpreadConstraintsMap(len(tt.nodes))
 			tMap.initialize(tt.pod, tt.nodes)
 			if !reflect.DeepEqual(tMap.topologyPairToNodeNames, tt.want) {
 				t.Errorf("initilize().topologyPairToNodeNames = %#v, want %#v", tMap.topologyPairToNodeNames, tt.want)
@@ -249,10 +266,10 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			},
 		},
 		{
-			// matching pods spread as 2/~1~/2/~4~, total = 2+3 + 2+6 = 13 (zone and node should be both sumed up)
+			// matching pods spread as 2/~1~/2/~4~, total = 2+3 + 2+6 = 13 (zone and node should be both summed up)
 			// after reversing, it's 8/5
 			// so scores = 80/8, 50/8
-			name: "two constraint on zone and node, 2 out of 4 nodes are candidates",
+			name: "two constraints on zone and node, 2 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -279,6 +296,76 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 10},
 				{Host: "node-x", Score: 6},
+			},
+		},
+		{
+			// If constraints hold different labelSelectors, it's a little complex.
+			// +----------------------+------------------------+
+			// |         zone1        |          zone2         |
+			// +----------------------+------------------------+
+			// | node-a |    node-b   | node-x |     node-y    |
+			// +--------+-------------+--------+---------------+
+			// | P{foo} | P{foo, bar} |        | P{foo} P{bar} |
+			// +--------+-------------+--------+---------------+
+			// For the first constraint (zone): the matching pods spread as 2/2/1/1
+			// For the second constraint (node): the matching pods spread as 0/1/0/1
+			// sum them up gets: 2/3/1/2, and total number is 8.
+			// after reversing, it's 6/5/7/6
+			// so scores = 60/7, 50/7, 70/7, 60/7
+			name: "two constraints on zone and node, with different labelSelectors",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("bar", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			failedNodes: []*v1.Node{},
+			want: []schedulerapi.HostPriority{
+				{Host: "node-a", Score: 8},
+				{Host: "node-b", Score: 7},
+				{Host: "node-x", Score: 10},
+				{Host: "node-y", Score: 8},
+			},
+		},
+		{
+			// For the first constraint (zone): the matching pods spread as 2/2/1/~1~
+			// For the second constraint (node): the matching pods spread as 0/1/0/~1~
+			// sum them up gets: 2/3/1, and total number is 6.
+			// after reversing, it's 4/3/5
+			// so scores = 40/5, 30/5, 50/5
+			name: "two constraints on zone and node, with different labelSelectors, 3 out of 4 nodes are candidates",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("bar", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+			},
+			failedNodes: []*v1.Node{
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			want: []schedulerapi.HostPriority{
+				{Host: "node-a", Score: 8},
+				{Host: "node-b", Score: 6},
+				{Host: "node-x", Score: 10},
 			},
 		},
 	}

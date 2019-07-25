@@ -904,12 +904,12 @@ func TestPodMatchesSpreadConstraint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			podLabelSet := labels.Set(tt.podLabels)
-			got, err := podMatchesSpreadConstraint(podLabelSet, tt.constraint)
+			got, err := PodMatchesSpreadConstraint(podLabelSet, tt.constraint)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("podMatchesSpreadConstraint() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("PodMatchesSpreadConstraint() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("podMatchesSpreadConstraint() = %v, want %v", got, tt.want)
+				t.Errorf("PodMatchesSpreadConstraint() = %v, want %v", got, tt.want)
 			}
 		})
 	}
