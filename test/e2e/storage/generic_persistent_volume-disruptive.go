@@ -90,7 +90,10 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		Name:      "default",
 		ClaimSize: "2Gi",
 	}
-	pvc := newClaim(test, ns, "default")
+	pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		ClaimSize:  test.ClaimSize,
+		VolumeMode: &test.VolumeMode,
+	}, ns)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}

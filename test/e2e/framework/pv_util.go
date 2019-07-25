@@ -88,15 +88,22 @@ type PersistentVolumeConfig struct {
 	VolumeMode       *v1.PersistentVolumeMode
 }
 
-// PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
-// AccessModes defaults to all modes (RWO, RWX, ROX) if left empty
-// (+optional) Annotations defines the PVC's annotations
+// PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to
+// generate a PVC object.
 type PersistentVolumeClaimConfig struct {
+	// NamePrefix defaults to "pvc-" if unspecified
+	NamePrefix string
+	// ClaimSize must be specified in the Quantity format. Defaults to 2Gi if
+	// unspecified
+	ClaimSize string
+	// AccessModes defaults to RWO if unspecified
 	AccessModes      []v1.PersistentVolumeAccessMode
 	Annotations      map[string]string
 	Selector         *metav1.LabelSelector
 	StorageClassName *string
-	VolumeMode       *v1.PersistentVolumeMode
+	// VolumeMode defaults to nil if unspecified or specified as the empty
+	// string
+	VolumeMode *v1.PersistentVolumeMode
 }
 
 // NodeSelection specifies where to run a pod, using a combination of fixed node name,
@@ -613,21 +620,29 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 	}
 }
 
-// MakePersistentVolumeClaim returns a PVC definition based on the namespace.
-// Note: if this PVC is intended to be pre-bound to a PV, whose name is not
-//   known until the PV is instantiated, then the func CreatePVPVC will add
-//   pvc.Spec.VolumeName to this claim.
+// MakePersistentVolumeClaim returns a PVC API Object based on the PersistentVolumeClaimConfig.
 func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.PersistentVolumeClaim {
-	// Specs are expected to match this test's PersistentVolume
 
 	if len(cfg.AccessModes) == 0 {
-		e2elog.Logf("AccessModes unspecified, default: ReadWriteOnce (RWO).")
 		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce)
+	}
+
+	if len(cfg.ClaimSize) == 0 {
+		cfg.ClaimSize = "2Gi"
+	}
+
+	if len(cfg.NamePrefix) == 0 {
+		cfg.NamePrefix = "pvc-"
+	}
+
+	if cfg.VolumeMode != nil && *cfg.VolumeMode == "" {
+		e2elog.Logf("Warning: Making PVC: VolumeMode specified as invalid empty string, treating as nil")
+		cfg.VolumeMode = nil
 	}
 
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-",
+			GenerateName: cfg.NamePrefix,
 			Namespace:    ns,
 			Annotations:  cfg.Annotations,
 		},
@@ -636,7 +651,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 			AccessModes: cfg.AccessModes,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(cfg.ClaimSize),
 				},
 			},
 			StorageClassName: cfg.StorageClassName,

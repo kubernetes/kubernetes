@@ -602,8 +602,11 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node f
 		framework.ExpectNoError(err, "Failed to create class : %v", err)
 	}
 
-	claim := newClaim(t, ns, "")
-	claim.Spec.StorageClassName = &class.Name
+	claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		ClaimSize:        t.ClaimSize,
+		StorageClassName: &(class.Name),
+		VolumeMode:       &t.VolumeMode,
+	}, ns)
 	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(claim)
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
