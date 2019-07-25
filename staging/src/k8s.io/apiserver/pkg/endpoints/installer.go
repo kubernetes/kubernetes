@@ -376,7 +376,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceKind = kind
 	}
 
-	tableProvider, _ := storage.(rest.TableConvertor)
+	var tableProvider rest.TableConvertor
+	if tableProvider, ok = storage.(rest.TableConvertor); !ok {
+		return nil, fmt.Errorf("%q  must implement TableConvertor", storage)
+	}
 
 	var apiResource metav1.APIResource
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
