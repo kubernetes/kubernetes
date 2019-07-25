@@ -1003,7 +1003,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 			volumeClone.Annotations = nil
 		}
 	} else {
-		// The volume was pre-bound by user. Clear only the binging UID.
+		// The volume was pre-bound by user. Clear only the binding UID.
 		volumeClone.Spec.ClaimRef.UID = ""
 	}
 
