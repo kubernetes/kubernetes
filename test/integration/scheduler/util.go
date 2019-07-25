@@ -84,7 +84,6 @@ func createConfiguratorArgsWithPodInformer(
 	stopCh <-chan struct{},
 ) *factory.ConfigFactoryArgs {
 	return &factory.ConfigFactoryArgs{
-		SchedulerName:                  schedulerName,
 		Client:                         clientSet,
 		NodeInformer:                   informerFactory.Core().V1().Nodes(),
 		PodInformer:                    podInformer,
