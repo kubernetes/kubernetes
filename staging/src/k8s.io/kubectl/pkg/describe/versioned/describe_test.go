@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/kubectl/describe"
+	"k8s.io/kubectl/pkg/describe"
 	utilpointer "k8s.io/utils/pointer"
 )
 
