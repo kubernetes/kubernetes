@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import argparse
-import yaml
+import util
 
 
 def dump_to_file(conf, filename):
@@ -24,29 +24,17 @@ def dump_to_file(conf, filename):
     output_file.write('\n')
 
 
-def parse_sysctl_overrides(sysctl_overrides):
-  overrides = {}
-  parts = sysctl_overrides.split(',')
-  for part in parts:
-    pair = part.split('=')
-    if len(pair) != 2:
-      continue
-    k, v = pair[0], pair[1]
-    overrides[k] = v
-  return overrides
-
-
 def main(sysctl_defaults, sysctl_overrides, output_defaults, output_overrides):
   # Dump the sysctl defaults to the .conf file.
   output = []
-  defaults = yaml.load(open(sysctl_defaults, 'r'))
+  defaults = util.get_sysctls_from_file(sysctl_defaults)
   if defaults:
     for k in sorted(defaults):
       output.append('%s=%s' % (k, defaults[k]))
     dump_to_file(output, output_defaults)
 
   # Parse the sysctl overrides and dump them to the .conf file.
-  overrides = parse_sysctl_overrides(sysctl_overrides)
+  overrides = util.parse_sysctl_overrides(sysctl_overrides)
   if overrides:
     output = []
     for k, v in overrides.iteritems():

@@ -17,6 +17,7 @@
 import argparse
 import os
 import sys
+import util
 import yaml
 
 
@@ -26,18 +27,6 @@ def get_kernel_version():
   if len(fields) < 2:
     sys.exit('Failed to parse OS release %s' % os_release)
   return fields[0], fields[1]
-
-
-def parse_sysctl_overrides_str(sysctl_overrides):
-  overrides = {}
-  parts = sysctl_overrides.split(',')
-  for part in parts:
-    pair = part.split('=')
-    if len(pair) != 2:
-      continue
-    k, v = pair[0], pair[1]
-    overrides[k] = v
-  return overrides
 
 
 def get_namespaced_sysctl_names(namespaced_sysctl_names):
@@ -70,12 +59,12 @@ def print_sysctls(sysctls):
 
 def main(sysctl_defaults, sysctl_overrides, namespaced_sysctl_names):
   # Load the sysctl defaults.
-  defaults = yaml.load(open(sysctl_defaults, 'r'))
+  defaults = util.get_sysctls_from_file(sysctl_defaults)
   if not defaults:
     defaults = {}
 
   # Parse the sysctl overrides.
-  overrides = parse_sysctl_overrides_str(sysctl_overrides)
+  overrides = util.parse_sysctl_overrides(sysctl_overrides)
 
   # Apply the overrides on top of the defaults.
   for k, v in overrides.iteritems():

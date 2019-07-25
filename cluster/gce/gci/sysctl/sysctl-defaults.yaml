@@ -97,8 +97,12 @@ vm.panic_on_oom: "0"
 
 # The following parameters are enforced by kube-proxy.
 net.ipv4.conf.all.route_localnet: "1"
-net.netfilter.nf_conntrack_max: "131072"
+# net.netfilter.nf_conntrack_max is tuned based on the number of CPUs.
+#   max(KubeProxyConntrackConfiguration.Min, KubeProxyConntrackConfiguration.MaxPerCore*NumCPUs)
+#   where KubeProxyConntrackConfiguration.Min=128*1024
+#   and   KubeProxyConntrackConfiguration.MaxPerCore=32*1024 as the default.
+net.netfilter.nf_conntrack_max: "max(128*1024,32*1024*cpu_count())"
 net.netfilter.nf_conntrack_tcp_timeout_close_wait: "3600"
 net.netfilter.nf_conntrack_tcp_timeout_established: "86400"
 # This is an alias of net.netfilter.nf_conntrack_max.
-net.nf_conntrack_max: "131072"
+net.nf_conntrack_max: "max(128*1024,32*1024*cpu_count())"
