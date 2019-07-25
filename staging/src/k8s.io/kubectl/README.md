@@ -30,7 +30,7 @@ cli client. That client will eventually move here too.
 
 ## Dependencies
 
-Dependencies are managed using [dep](https://github.com/golang/dep). Please
+Dependencies are managed using [Go modules](https://github.com/golang/go/wiki/Modules). Please
 refer to its documentation if needed.
 
 ## Community, discussion, contribution, and support
