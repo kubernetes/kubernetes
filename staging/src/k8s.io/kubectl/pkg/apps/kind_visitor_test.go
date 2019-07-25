@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/kubernetes/pkg/kubectl/apps"
+	"k8s.io/kubectl/pkg/apps"
 )
 
 var _ = Describe("When KindVisitor accepts a GroupKind", func() {
