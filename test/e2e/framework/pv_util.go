@@ -78,14 +78,29 @@ type PVCMap map[types.NamespacedName]pvcval
 //	 	},
 //	 }
 type PersistentVolumeConfig struct {
-	PVSource         v1.PersistentVolumeSource
-	Prebind          *v1.PersistentVolumeClaim
+	// [Optional] NamePrefix defaults to "pv-" if unset
+	NamePrefix string
+	// [Optional] Labels contains information used to organize and categorize
+	// objects
+	Labels labels.Set
+	// PVSource contains the details of the underlying volume and must be set
+	PVSource v1.PersistentVolumeSource
+	// [Optional] Prebind lets you specify a PVC to bind this PV to before
+	// creation
+	Prebind *v1.PersistentVolumeClaim
+	// [Optiona] ReclaimPolicy defaults to "Reclaim" if unset
 	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
-	NamePrefix       string
-	Labels           labels.Set
 	StorageClassName string
-	NodeAffinity     *v1.VolumeNodeAffinity
-	VolumeMode       *v1.PersistentVolumeMode
+	// [Optional] NodeAffinity defines constraints that limit what nodes this
+	// volume can be accessed from.
+	NodeAffinity *v1.VolumeNodeAffinity
+	// [Optional] VolumeMode defaults to "Filesystem" if unset
+	VolumeMode *v1.PersistentVolumeMode
+	// [Optional] AccessModes defaults to RWO if unset
+	AccessModes []v1.PersistentVolumeAccessMode
+	// [Optional] Capacity is the storage capacity in Quantity format. Defaults
+	// to "2Gi" if unset
+	Capacity string
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to
@@ -582,17 +597,33 @@ func makePvcKey(ns, name string) types.NamespacedName {
 //   is added later in CreatePVCPV.
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	var claimRef *v1.ObjectReference
-	// If the reclaimPolicy is not provided, assume Retain
+
+	if len(pvConfig.AccessModes) == 0 {
+		pvConfig.AccessModes = append(pvConfig.AccessModes, v1.ReadWriteOnce)
+	}
+
+	if len(pvConfig.NamePrefix) == 0 {
+		pvConfig.NamePrefix = "pv-"
+	}
+
 	if pvConfig.ReclaimPolicy == "" {
-		e2elog.Logf("PV ReclaimPolicy unspecified, default: Retain")
 		pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
+
+	if len(pvConfig.Capacity) == 0 {
+		pvConfig.Capacity = "2Gi"
+	}
+
 	if pvConfig.Prebind != nil {
 		claimRef = &v1.ObjectReference{
-			Name:      pvConfig.Prebind.Name,
-			Namespace: pvConfig.Prebind.Namespace,
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+			Name:       pvConfig.Prebind.Name,
+			Namespace:  pvConfig.Prebind.Namespace,
+			UID:        pvConfig.Prebind.UID,
 		}
 	}
+
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
@@ -604,18 +635,14 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: pvConfig.ReclaimPolicy,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+				v1.ResourceStorage: resource.MustParse(pvConfig.Capacity),
 			},
 			PersistentVolumeSource: pvConfig.PVSource,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
-			},
-			ClaimRef:         claimRef,
-			StorageClassName: pvConfig.StorageClassName,
-			NodeAffinity:     pvConfig.NodeAffinity,
-			VolumeMode:       pvConfig.VolumeMode,
+			AccessModes:            pvConfig.AccessModes,
+			ClaimRef:               claimRef,
+			StorageClassName:       pvConfig.StorageClassName,
+			NodeAffinity:           pvConfig.NodeAffinity,
+			VolumeMode:             pvConfig.VolumeMode,
 		},
 	}
 }
@@ -651,7 +678,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 			AccessModes: cfg.AccessModes,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(cfg.ClaimSize),
+					v1.ResourceStorage: resource.MustParse(cfg.ClaimSize),
 				},
 			},
 			StorageClassName: cfg.StorageClassName,

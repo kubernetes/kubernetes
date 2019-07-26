@@ -33,7 +33,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -658,31 +657,25 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("creating PV")
-			pv := &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "volume-idempotent-delete-",
+			pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
+				NamePrefix: "volume-idempotent-delete-",
+				// Use Retain to keep the PV, the test will change it to Delete
+				// when the time comes.
+				ReclaimPolicy: v1.PersistentVolumeReclaimRetain,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
 				},
-				Spec: v1.PersistentVolumeSpec{
-					// Use Retain to keep the PV, the test will change it to Delete
-					// when the time comes.
-					PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
-					AccessModes: []v1.PersistentVolumeAccessMode{
-						v1.ReadWriteOnce,
-					},
-					Capacity: v1.ResourceList{
-						v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
-					},
-					// PV is bound to non-existing PVC, so it's reclaim policy is
-					// executed immediately
-					ClaimRef: &v1.ObjectReference{
-						Kind:       "PersistentVolumeClaim",
-						APIVersion: "v1",
-						UID:        types.UID("01234567890"),
-						Namespace:  ns,
-						Name:       "dummy-claim-name",
+				Capacity: "1Gi",
+				// PV is bound to non-existing PVC, so it's reclaim policy is
+				// executed immediately
+				Prebind: &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "dummy-claim-name",
+						Namespace: ns,
+						UID:       types.UID("01234567890"),
 					},
 				},
-			}
+			})
 			switch framework.TestContext.Provider {
 			case "aws":
 				pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
