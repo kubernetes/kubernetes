@@ -98,8 +98,7 @@ var _ = SIGDescribe("Networking", func() {
 		config.GetSelfURLStatusCode(ports.ProxyStatusPort, "/proxyMode", "200")
 	})
 
-	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
-	ginkgo.Describe("Granular Checks: Services [Slow]", func() {
+	ginkgo.Describe("Granular Checks: Services", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := framework.NewNetworkingTestConfig(f)
