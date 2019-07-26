@@ -7,7 +7,8 @@ go_library(
         "drain.go",
         "filters.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/drain",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/drain",
+    importpath = "k8s.io/kubectl/pkg/drain",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
