@@ -153,6 +153,16 @@ var (
 		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, EvenPodsSpreadPred, MatchInterPodAffinityPred}
 )
 
+var checkAllPredicates = false
+
+func SetCheckAllPredicate(check bool) {
+	checkAllPredicates = check
+}
+
+func IsCheckAllPredicate() bool {
+	return checkAllPredicates
+}
+
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
 type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)
@@ -1126,20 +1136,15 @@ func haveOverlap(a1, a2 []string) bool {
 // that only non-critical pods need and EssentialPredicates are the predicates that all pods, including critical pods, need
 func GeneralPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	var predicateFails []PredicateFailureReason
-	fit, reasons, err := noncriticalPredicates(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
+	for _, predicate := range []FitPredicate{noncriticalPredicates, EssentialPredicates} {
+		fit, reasons, err := predicate(pod, meta, nodeInfo)
+		if err != nil {
+			return false, predicateFails, err
+		}
+		if !fit {
+			predicateFails = append(predicateFails, reasons...)
 
-	fit, reasons, err = EssentialPredicates(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
+		}
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
@@ -1154,6 +1159,9 @@ func noncriticalPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedu
 	}
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
+		if !IsCheckAllPredicate() {
+			return false, predicateFails, err
+		}
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
@@ -1162,31 +1170,21 @@ func noncriticalPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedu
 // EssentialPredicates are the predicates that all pods, including critical pods, need
 func EssentialPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	var predicateFails []PredicateFailureReason
-	fit, reasons, err := PodFitsHost(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
 	// TODO: PodFitsHostPorts is essential for now, but kubelet should ideally
 	//       preempt pods to free up host ports too
-	fit, reasons, err = PodFitsHostPorts(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
+	for _, predicate := range []FitPredicate{PodFitsHost, PodFitsHostPorts, PodMatchNodeSelector} {
+		fit, reasons, err := predicate(pod, meta, nodeInfo)
+		if err != nil {
+			return false, predicateFails, err
+		}
+		if !fit {
+			predicateFails = append(predicateFails, reasons...)
+			if !IsCheckAllPredicate() {
+				return false, predicateFails, err
+			}
+		}
 	}
 
-	fit, reasons, err = PodMatchNodeSelector(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
 

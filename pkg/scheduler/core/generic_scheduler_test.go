@@ -26,7 +26,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	algorithmpredicates "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -557,6 +558,13 @@ func TestGenericScheduler(t *testing.T) {
 			if test.buildPredMeta {
 				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
 			}
+
+			if test.alwaysCheckAllPredicates {
+				predicates.SetCheckAllPredicate(true)
+				// reset checkAllPredicates to false
+				defer predicates.SetCheckAllPredicate(false)
+			}
+
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil, nil),
@@ -569,7 +577,6 @@ func TestGenericScheduler(t *testing.T) {
 				nil,
 				pvcLister,
 				schedulertesting.FakePDBLister{},
-				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
@@ -600,7 +607,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		prioritizers,
 		priorities.EmptyPriorityMetadataProducer,
 		emptyFramework,
-		nil, nil, nil, nil, false, false,
+		nil, nil, nil, nil, false,
 		schedulerapi.DefaultPercentageOfNodesToScore, false)
 	cache.UpdateNodeInfoSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -1845,7 +1852,6 @@ func TestPreempt(t *testing.T) {
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
 				schedulertesting.FakePDBLister{},
-				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				true)

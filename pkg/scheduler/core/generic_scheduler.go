@@ -660,9 +660,9 @@ func podFitsOnNode(
 				if !fit {
 					// eCache is available and valid, and predicates result is unfit, record the fail reasons
 					failedPredicates = append(failedPredicates, reasons...)
-					// if alwaysCheckAllPredicates is false, short circuit all predicates when one predicate fails.
-					if !alwaysCheckAllPredicates {
-						klog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate " +
+					// if predicates.IsCheckAllPredicate() is false, short circuit all predicates when one predicate fails.
+					if !predicates.IsCheckAllPredicate() {
+						klog.V(5).Infoln("since checkAllPredicates has not been set, the predicate " +
 							"evaluation is short circuited and there are chances " +
 							"of other predicates failing as well.")
 						break
@@ -1246,7 +1246,6 @@ func NewGenericScheduler(
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pdbLister algorithm.PDBLister,
-	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
 	percentageOfNodesToScore int32,
 	enableNonPreempting bool,
@@ -1264,7 +1263,6 @@ func NewGenericScheduler(
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,
-		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 		enableNonPreempting:      enableNonPreempting,

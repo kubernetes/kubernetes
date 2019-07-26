@@ -549,7 +549,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				schedulertesting.FakePersistentVolumeClaimLister{},
 				schedulertesting.FakePDBLister{},
 				false,
-				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
 			podIgnored := &v1.Pod{}

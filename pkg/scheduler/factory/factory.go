@@ -434,7 +434,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
 	// predicates even after one or more of them fails.
 	if policy.AlwaysCheckAllPredicates {
-		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
+		predicates.SetCheckAllPredicate(true)
 	}
 
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
@@ -480,7 +480,6 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.volumeBinder,
 		c.pVCLister,
 		c.pdbLister,
-		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
 		c.enableNonPreempting,
