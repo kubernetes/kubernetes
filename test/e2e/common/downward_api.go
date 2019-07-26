@@ -141,7 +141,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 					{
 						Name:    "dapi-container",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"sh", "-c", `[[ "${HOST_IP:?}" == "${POD_IP:?}" ]] && echo 'OK'`},
+						Command: []string{"sh", "-c", `[[ "${HOST_IP:?}" == "${POD_IP:?}" ]] && echo 'OK' || echo "HOST_IP: '${HOST_IP}' != POD_IP: '${POD_IP}'"`},
 						Env:     env,
 					},
 				},
