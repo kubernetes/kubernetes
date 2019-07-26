@@ -507,10 +507,14 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 	})
 
-	// TODO: Run this test against the userspace proxy and nodes
-	// configured with a default deny firewall to validate that the
-	// proxy whitelists NodePort traffic.
-	ginkgo.It("should be able to create a functioning NodePort service", func() {
+	/*
+		Release : v1.16
+		Testname: Service, NodePort Service
+		Description: Create a TCP NodePort service, and test reachability from a client Pod.
+		The client Pod MUST be able to access the NodePort service by service name and cluster
+		IP on the service port, and on nodes' internal and external IPs on the NodePort.
+	*/
+	framework.ConformanceIt("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
