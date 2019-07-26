@@ -169,8 +169,8 @@ func newProxyServer(
 		}
 		metrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
-		klog.V(0).Info("Using ipvs Proxier.")
-		proxier, err = ipvs.NewProxier(
+		klog.V(0).Info("Using ipvs MetaProxier.")
+		proxier, err = ipvs.NewMetaProxier(
 			iptInterface,
 			ipvsInterface,
 			ipsetInterface,
