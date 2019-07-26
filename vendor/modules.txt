@@ -1642,6 +1642,8 @@ k8s.io/kube-proxy/config/v1alpha1
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 k8s.io/kubectl/pkg/apps
+k8s.io/kubectl/pkg/describe
+k8s.io/kubectl/pkg/describe/versioned
 k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/rawhttp

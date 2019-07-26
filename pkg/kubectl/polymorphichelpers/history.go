@@ -35,9 +35,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/kubectl/pkg/apps"
+	describe "k8s.io/kubectl/pkg/describe/versioned"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	sliceutil "k8s.io/kubectl/pkg/util/slice"
-	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
 )
 
 const (

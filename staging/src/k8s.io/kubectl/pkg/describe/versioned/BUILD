@@ -3,10 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["describe.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/describe/versioned",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/describe/versioned",
+    importpath = "k8s.io/kubectl/pkg/describe/versioned",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/describe:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
@@ -38,6 +38,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/describe:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/certificate:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/deployment:go_default_library",
@@ -53,26 +54,11 @@ go_library(
     ],
 )
 
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [":package-srcs"],
-    tags = ["automanaged"],
-    visibility = ["//visibility:public"],
-)
-
 go_test(
     name = "go_default_test",
     srcs = ["describe_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/describe:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
@@ -87,6 +73,21 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/describe:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
