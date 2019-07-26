@@ -296,6 +296,71 @@ func TestCSIDriverValidation(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"invalid volume mode",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecycleMode("no-such-mode"),
+					},
+				},
+			},
+			true,
+		},
+		{
+			"persistent volume mode",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecyclePersistent,
+					},
+				},
+			},
+			false,
+		},
+		{
+			"ephemeral volume mode",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecycleEphemeral,
+					},
+				},
+			},
+			false,
+		},
+		{
+			"both volume modes",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecyclePersistent,
+						storage.VolumeLifecycleEphemeral,
+					},
+				},
+			},
+			false,
+		},
 	}
 
 	for _, test := range tests {
