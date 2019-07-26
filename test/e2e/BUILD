@@ -83,6 +83,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

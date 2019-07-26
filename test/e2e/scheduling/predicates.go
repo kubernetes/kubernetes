@@ -825,6 +825,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 
 // create pod which using hostport on the specified node according to the nodeSelector
 func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
+	hostIP = framework.TranslateIPv4ToIPv6(hostIP)
 	createPausePod(f, pausePodConfig{
 		Name: podName,
 		Ports: []v1.ContainerPort{

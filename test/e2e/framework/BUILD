@@ -113,6 +113,7 @@ go_library(
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
