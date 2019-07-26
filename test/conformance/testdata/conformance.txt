@@ -218,6 +218,8 @@ test/e2e/scheduling/predicates.go: "validates that NodeSelector is respected if 
 test/e2e/scheduling/predicates.go: "validates that NodeSelector is respected if matching"
 test/e2e/scheduling/predicates.go: "validates that there is no conflict between pods with same hostPort but different hostIP and protocol"
 test/e2e/scheduling/predicates.go: "validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP"
+test/e2e/scheduling/taints.go: "removing taint cancels eviction"
+test/e2e/scheduling/taints.go: "evicts pods with minTolerationSeconds"
 test/e2e/storage/empty_dir_wrapper.go: "should not conflict"
 test/e2e/storage/empty_dir_wrapper.go: "should not cause race condition when used for configmaps"
 test/e2e/storage/subpath.go: "should support subpaths with secret pod"
