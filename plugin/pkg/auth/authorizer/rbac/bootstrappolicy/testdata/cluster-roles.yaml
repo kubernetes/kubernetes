@@ -283,14 +283,14 @@ items:
     - daemonsets
     - daemonsets/status
     - deployments
-    - deployments/scale
     - deployments/status
+    - deployments/scale
     - replicasets
-    - replicasets/scale
     - replicasets/status
+    - replicasets/scale
     - statefulsets
-    - statefulsets/scale
     - statefulsets/status
+    - statefulsets/scale
     verbs:
     - get
     - list
