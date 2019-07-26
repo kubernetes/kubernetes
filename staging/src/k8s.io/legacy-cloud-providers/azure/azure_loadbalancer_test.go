@@ -324,7 +324,7 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 	}{
 		{
 			desc:    "external service should be created and deleted successfully",
-			service: getTestService("test1", v1.ProtocolTCP, 80),
+			service: getTestService("test1", v1.ProtocolTCP, nil, 80),
 		},
 		{
 			desc:    "internal service should be created and deleted successfully",
@@ -569,7 +569,7 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 					},
 				},
 			},
-			service: getTestService("test1", v1.ProtocolTCP, 80),
+			service: getTestService("test1", v1.ProtocolTCP, nil, 80),
 			wantLB:  false,
 			expectedLB: &network.LoadBalancer{
 				Name: to.StringPtr("lb1"),
@@ -590,7 +590,7 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 		},
 		{
 			desc:           "getServiceLoadBalancer shall report error if there're loadbalancer mode annotations on a standard lb",
-			service:        getTestService("test1", v1.ProtocolTCP, 80),
+			service:        getTestService("test1", v1.ProtocolTCP, nil, 80),
 			annotations:    map[string]string{ServiceAnnotationLoadBalancerMode: "__auto__"},
 			sku:            "standard",
 			expectedExists: false,
@@ -628,7 +628,7 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 					},
 				},
 			},
-			service:     getTestService("test1", v1.ProtocolTCP, 80),
+			service:     getTestService("test1", v1.ProtocolTCP, nil, 80),
 			annotations: map[string]string{ServiceAnnotationLoadBalancerMode: "__auto__"},
 			wantLB:      true,
 			expectedLB: &network.LoadBalancer{
@@ -644,7 +644,7 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 		},
 		{
 			desc:    "getServiceLoadBalancer shall create a new lb otherwise",
-			service: getTestService("test1", v1.ProtocolTCP, 80),
+			service: getTestService("test1", v1.ProtocolTCP, nil, 80),
 			expectedLB: &network.LoadBalancer{
 				Name:                         to.StringPtr("testCluster"),
 				Location:                     to.StringPtr("westus"),
@@ -791,7 +791,7 @@ func TestIsFrontendIPChanged(t *testing.T) {
 				},
 			},
 			lbFrontendIPConfigName: "btest1-name",
-			service:                getTestService("test1", v1.ProtocolTCP, 80),
+			service:                getTestService("test1", v1.ProtocolTCP, nil, 80),
 			expectedFlag:           false,
 			expectedError:          false,
 		},
@@ -804,7 +804,7 @@ func TestIsFrontendIPChanged(t *testing.T) {
 				},
 			},
 			lbFrontendIPConfigName: "btest1-name",
-			service:                getTestService("test1", v1.ProtocolTCP, 80),
+			service:                getTestService("test1", v1.ProtocolTCP, nil, 80),
 			loadBalancerIP:         "1.1.1.1",
 			exsistingPIPs: []network.PublicIPAddress{
 				{
@@ -827,7 +827,7 @@ func TestIsFrontendIPChanged(t *testing.T) {
 				},
 			},
 			lbFrontendIPConfigName: "btest1-name",
-			service:                getTestService("test1", v1.ProtocolTCP, 80),
+			service:                getTestService("test1", v1.ProtocolTCP, nil, 80),
 			loadBalancerIP:         "1.1.1.1",
 			exsistingPIPs: []network.PublicIPAddress{
 				{
@@ -850,7 +850,7 @@ func TestIsFrontendIPChanged(t *testing.T) {
 				},
 			},
 			lbFrontendIPConfigName: "btest1-name",
-			service:                getTestService("test1", v1.ProtocolTCP, 80),
+			service:                getTestService("test1", v1.ProtocolTCP, nil, 80),
 			loadBalancerIP:         "1.1.1.1",
 			exsistingPIPs: []network.PublicIPAddress{
 				{
@@ -924,7 +924,7 @@ func TestDeterminePublicIPName(t *testing.T) {
 	}
 	for i, test := range testCases {
 		az := getTestCloud()
-		service := getTestService("test1", v1.ProtocolTCP, 80)
+		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		service.Spec.LoadBalancerIP = test.loadBalancerIP
 		for _, existingPIP := range test.exsistingPIPs {
 			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "test", existingPIP)
@@ -950,13 +950,55 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 	}{
 		{
 			desc:    "reconcileLoadBalancerRule shall return nil if wantLb is false",
-			service: getTestService("test1", v1.ProtocolTCP, 80),
+			service: getTestService("test1", v1.ProtocolTCP, nil, 80),
 			wantLb:  false,
 		},
 		{
-			desc:    "reconcileLoadBalancerRule shall return corresponding probe and lbRule otherwise",
-			service: getTestService("test1", v1.ProtocolTCP, 80),
+			desc:    "reconcileLoadBalancerRule shall return corresponding probe and lbRule(blb)",
+			service: getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, 80),
 			wantLb:  true,
+			expectedProbes: []network.Probe{
+				{
+					Name: to.StringPtr("atest1-TCP-80"),
+					ProbePropertiesFormat: &network.ProbePropertiesFormat{
+						Protocol:          network.ProbeProtocol("Tcp"),
+						Port:              to.Int32Ptr(10080),
+						IntervalInSeconds: to.Int32Ptr(5),
+						NumberOfProbes:    to.Int32Ptr(2),
+					},
+				},
+			},
+			expectedRules: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("atest1-TCP-80"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						Protocol: network.TransportProtocol("Tcp"),
+						FrontendIPConfiguration: &network.SubResource{
+							ID: to.StringPtr("frontendIPConfigID"),
+						},
+						BackendAddressPool: &network.SubResource{
+							ID: to.StringPtr("backendPoolID"),
+						},
+						LoadDistribution:     "Default",
+						FrontendPort:         to.Int32Ptr(80),
+						BackendPort:          to.Int32Ptr(80),
+						EnableFloatingIP:     to.BoolPtr(true),
+						DisableOutboundSnat:  to.BoolPtr(false),
+						IdleTimeoutInMinutes: to.Int32Ptr(0),
+						Probe: &network.SubResource{
+							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
+								"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
+						},
+						EnableTCPReset: nil,
+					},
+				},
+			},
+		},
+		{
+			desc:            "reconcileLoadBalancerRule shall return corresponding probe and lbRule (slb without tcp reset)",
+			service:         getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "True"}, 80),
+			loadBalancerSku: "standard",
+			wantLb:          true,
 			expectedProbes: []network.Probe{
 				{
 					Name: to.StringPtr("atest1-TCP-80"),
@@ -995,8 +1037,8 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			},
 		},
 		{
-			desc:            "reconcileLoadBalancerRule shall return corresponding probe and lbRule otherwise",
-			service:         getTestService("test1", v1.ProtocolTCP, 80),
+			desc:            "reconcileLoadBalancerRule shall return corresponding probe and lbRule(slb with tcp reset)",
+			service:         getTestService("test1", v1.ProtocolTCP, nil, 80),
 			loadBalancerSku: "standard",
 			wantLb:          true,
 			expectedProbes: []network.Probe{
@@ -1042,9 +1084,14 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 		az.Config.LoadBalancerSku = test.loadBalancerSku
 		probe, lbrule, err := az.reconcileLoadBalancerRule(&test.service, test.wantLb,
 			"frontendIPConfigID", "backendPoolID", "lbname", to.Int32Ptr(0))
-		assert.Equal(t, test.expectedProbes, probe, "TestCase[%d]: %s", i, test.desc)
-		assert.Equal(t, test.expectedRules, lbrule, "TestCase[%d]: %s", i, test.desc)
-		assert.Nil(t, err)
+
+		if test.expectedErr != nil {
+			assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.desc)
+		} else {
+			assert.Equal(t, test.expectedProbes, probe, "TestCase[%d]: %s", i, test.desc)
+			assert.Equal(t, test.expectedRules, lbrule, "TestCase[%d]: %s", i, test.desc)
+			assert.Nil(t, err)
+		}
 	}
 }
 
@@ -1107,10 +1154,11 @@ func getTestLoadBalancer(name, clusterName, identifier *string, service v1.Servi
 }
 
 func TestReconcileLoadBalancer(t *testing.T) {
-	service := getTestService("test1", v1.ProtocolTCP, 80)
+	service1 := getTestService("test1", v1.ProtocolTCP, nil, 80)
+	basicLb1 := getTestLoadBalancer(to.StringPtr("lb1"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service1, "Basic")
 
-	basicLb1 := getTestLoadBalancer(to.StringPtr("lb1"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service, "Basic")
-	basicLb2 := getTestLoadBalancer(to.StringPtr("lb1"), to.StringPtr("testCluster"), to.StringPtr("btest1"), service, "Basic")
+	service2 := getTestService("test1", v1.ProtocolTCP, nil, 80)
+	basicLb2 := getTestLoadBalancer(to.StringPtr("lb1"), to.StringPtr("testCluster"), to.StringPtr("btest1"), service2, "Basic")
 	basicLb2.Name = to.StringPtr("testCluster")
 	basicLb2.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
 		{
@@ -1120,7 +1168,9 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			},
 		},
 	}
-	modifiedLb1 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service, "Basic")
+
+	service3 := getTestService("test1", v1.ProtocolTCP, nil, 80)
+	modifiedLb1 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service3, "Basic")
 	modifiedLb1.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
 		{
 			Name: to.StringPtr("atest1"),
@@ -1137,22 +1187,23 @@ func TestReconcileLoadBalancer(t *testing.T) {
 	}
 	modifiedLb1.Probes = &[]network.Probe{
 		{
-			Name: to.StringPtr("atest1-" + string(service.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service.Spec.Ports[0].Port))),
+			Name: to.StringPtr("atest1-" + string(service3.Spec.Ports[0].Protocol) +
+				"-" + strconv.Itoa(int(service3.Spec.Ports[0].Port))),
 			ProbePropertiesFormat: &network.ProbePropertiesFormat{
 				Port: to.Int32Ptr(10080),
 			},
 		},
 		{
-			Name: to.StringPtr("atest1-" + string(service.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service.Spec.Ports[0].Port))),
+			Name: to.StringPtr("atest1-" + string(service3.Spec.Ports[0].Protocol) +
+				"-" + strconv.Itoa(int(service3.Spec.Ports[0].Port))),
 			ProbePropertiesFormat: &network.ProbePropertiesFormat{
 				Port: to.Int32Ptr(10081),
 			},
 		},
 	}
-	expectedLb1 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service, "Basic")
+	expectedLb1 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service3, "Basic")
 	(*expectedLb1.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].DisableOutboundSnat = to.BoolPtr(false)
+	(*expectedLb1.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = nil
 	expectedLb1.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
 		{
 			Name: to.StringPtr("btest1"),
@@ -1169,7 +1220,8 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		},
 	}
 
-	existingSLB := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service, "Standard")
+	service4 := getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, 80)
+	existingSLB := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service4, "Standard")
 	existingSLB.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
 		{
 			Name: to.StringPtr("atest1"),
@@ -1186,26 +1238,79 @@ func TestReconcileLoadBalancer(t *testing.T) {
 	}
 	existingSLB.Probes = &[]network.Probe{
 		{
-			Name: to.StringPtr("atest1-" + string(service.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service.Spec.Ports[0].Port))),
+			Name: to.StringPtr("atest1-" + string(service4.Spec.Ports[0].Protocol) +
+				"-" + strconv.Itoa(int(service4.Spec.Ports[0].Port))),
 			ProbePropertiesFormat: &network.ProbePropertiesFormat{
 				Port: to.Int32Ptr(10080),
 			},
 		},
 		{
-			Name: to.StringPtr("atest1-" + string(service.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service.Spec.Ports[0].Port))),
+			Name: to.StringPtr("atest1-" + string(service4.Spec.Ports[0].Protocol) +
+				"-" + strconv.Itoa(int(service4.Spec.Ports[0].Port))),
 			ProbePropertiesFormat: &network.ProbePropertiesFormat{
 				Port: to.Int32Ptr(10081),
 			},
 		},
 	}
-	// intentionally set the value to a wrong value, expect reconcileLoadBalancer to fix it
-	(*existingSLB.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(false)
 
-	expectedSLb := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service, "Standard")
+	expectedSLb := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service4, "Standard")
 	(*expectedSLb.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].DisableOutboundSnat = to.BoolPtr(true)
+	(*expectedSLb.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(false)
 	expectedSLb.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
+		{
+			Name: to.StringPtr("btest1"),
+			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+				PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+			},
+		},
+		{
+			Name: to.StringPtr("atest1"),
+			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+				PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/subscriptions/subscription/" +
+					"resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pipName")},
+			},
+		},
+	}
+
+	service5 := getTestService("test1", v1.ProtocolTCP, nil, 80)
+	slb5 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service5, "Standard")
+	slb5.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
+		{
+			Name: to.StringPtr("atest1"),
+			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+				PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+			},
+		},
+		{
+			Name: to.StringPtr("btest1"),
+			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+				PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+			},
+		},
+	}
+	slb5.Probes = &[]network.Probe{
+		{
+			Name: to.StringPtr("atest1-" + string(service4.Spec.Ports[0].Protocol) +
+				"-" + strconv.Itoa(int(service4.Spec.Ports[0].Port))),
+			ProbePropertiesFormat: &network.ProbePropertiesFormat{
+				Port: to.Int32Ptr(10080),
+			},
+		},
+		{
+			Name: to.StringPtr("atest1-" + string(service4.Spec.Ports[0].Protocol) +
+				"-" + strconv.Itoa(int(service4.Spec.Ports[0].Port))),
+			ProbePropertiesFormat: &network.ProbePropertiesFormat{
+				Port: to.Int32Ptr(10081),
+			},
+		},
+	}
+
+	//change to false to test that reconcilication will fix it
+	(*slb5.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(false)
+
+	expectedSLb5 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service5, "Standard")
+	(*expectedSLb5.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].DisableOutboundSnat = to.BoolPtr(true)
+	expectedSLb5.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
 		{
 			Name: to.StringPtr("btest1"),
 			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
@@ -1223,47 +1328,62 @@ func TestReconcileLoadBalancer(t *testing.T) {
 
 	testCases := []struct {
 		desc                string
+		service             v1.Service
 		loadBalancerSku     string
 		disableOutboundSnat *bool
 		wantLb              bool
 		existingLB          network.LoadBalancer
 		expectedLB          network.LoadBalancer
-		expectedError       bool
+		expectedError       error
 	}{
 		{
 			desc: "reconcileLoadBalancer shall return the lb deeply equal to the existingLB if there's no " +
 				"modification needed when wantLb == true",
 			loadBalancerSku: "basic",
+			service:         service1,
 			existingLB:      basicLb1,
 			wantLb:          true,
 			expectedLB:      basicLb1,
-			expectedError:   false,
+			expectedError:   nil,
 		},
 		{
 			desc: "reconcileLoadBalancer shall return the lb deeply equal to the existingLB if there's no " +
 				"modification needed when wantLb == false",
 			loadBalancerSku: "basic",
+			service:         service2,
 			existingLB:      basicLb2,
 			wantLb:          false,
 			expectedLB:      basicLb2,
-			expectedError:   false,
+			expectedError:   nil,
 		},
 		{
 			desc:            "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb",
 			loadBalancerSku: "basic",
+			service:         service3,
 			existingLB:      modifiedLb1,
 			wantLb:          true,
 			expectedLB:      expectedLb1,
-			expectedError:   false,
+			expectedError:   nil,
 		},
 		{
-			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset to true in lbRule",
+			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset to false in lbRule",
 			loadBalancerSku:     "standard",
+			service:             service4,
 			disableOutboundSnat: to.BoolPtr(true),
 			existingLB:          existingSLB,
 			wantLb:              true,
 			expectedLB:          expectedSLb,
-			expectedError:       false,
+			expectedError:       nil,
+		},
+		{
+			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset to true in lbRule",
+			loadBalancerSku:     "standard",
+			service:             service5,
+			disableOutboundSnat: to.BoolPtr(true),
+			existingLB:          slb5,
+			wantLb:              true,
+			expectedLB:          expectedSLb5,
+			expectedError:       nil,
 		},
 	}
 
@@ -1273,7 +1393,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		az.DisableOutboundSNAT = test.disableOutboundSnat
 
 		clusterResources := getClusterResources(az, 3, 3)
-		service.Spec.LoadBalancerIP = "1.2.3.4"
+		test.service.Spec.LoadBalancerIP = "1.2.3.4"
 
 		_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pipName", network.PublicIPAddress{
 			Name: to.StringPtr("pipName"),
@@ -1290,15 +1410,18 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 		}
 
-		lb, err := az.reconcileLoadBalancer("testCluster", &service, clusterResources.nodes, test.wantLb)
-		assert.Equal(t, &test.expectedLB, lb, "TestCase[%d]: %s", i, test.desc)
-		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
+		lb, err := az.reconcileLoadBalancer("testCluster", &test.service, clusterResources.nodes, test.wantLb)
+		assert.Equal(t, test.expectedError, err, "TestCase[%d]: %s", i, test.desc)
+
+		if test.expectedError == nil {
+			assert.Equal(t, &test.expectedLB, lb, "TestCase[%d]: %s", i, test.desc)
+		}
 	}
 }
 
 func TestGetServiceLoadBalancerStatus(t *testing.T) {
 	az := getTestCloud()
-	service := getTestService("test1", v1.ProtocolTCP, 80)
+	service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 	internalService := getInternalTestService("test1", 80)
 
 	PIPClient := newFakeAzurePIPClient(az.Config.SubscriptionID)
@@ -1457,25 +1580,25 @@ func TestReconcileSecurityGroup(t *testing.T) {
 		},
 		{
 			desc:          "reconcileSecurityGroup shall report error if no such sg can be found",
-			service:       getTestService("test1", v1.ProtocolTCP, 80),
+			service:       getTestService("test1", v1.ProtocolTCP, nil, 80),
 			expectedError: true,
 		},
 		{
 			desc:          "reconcileSecurityGroup shall report error if wantLb is true and lbIP is nil",
-			service:       getTestService("test1", v1.ProtocolTCP, 80),
+			service:       getTestService("test1", v1.ProtocolTCP, nil, 80),
 			wantLb:        true,
 			existingSgs:   map[string]network.SecurityGroup{"nsg": {}},
 			expectedError: true,
 		},
 		{
 			desc:        "reconcileSecurityGroup shall remain the existingSgs intact if nothing needs to be modified",
-			service:     getTestService("test1", v1.ProtocolTCP, 80),
+			service:     getTestService("test1", v1.ProtocolTCP, nil, 80),
 			existingSgs: map[string]network.SecurityGroup{"nsg": {}},
 			expectedSg:  &network.SecurityGroup{},
 		},
 		{
 			desc:    "reconcileSecurityGroup shall delete unwanted sgs and create needed ones",
-			service: getTestService("test1", v1.ProtocolTCP, 80),
+			service: getTestService("test1", v1.ProtocolTCP, nil, 80),
 			existingSgs: map[string]network.SecurityGroup{"nsg": {
 				Name: to.StringPtr("nsg"),
 				SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
@@ -1578,7 +1701,7 @@ func TestSafeDeletePublicIP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 		}
-		service := getTestService("test1", v1.ProtocolTCP, 80)
+		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		err = az.safeDeletePublicIP(&service, "rg", test.pip, test.lb)
 		assert.Equal(t, 0, len(*test.lb.FrontendIPConfigurations), "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, 0, len(*test.lb.LoadBalancingRules), "TestCase[%d]: %s", i, test.desc)
@@ -1624,7 +1747,7 @@ func TestReconcilePublicIP(t *testing.T) {
 
 	for i, test := range testCases {
 		az := getTestCloud()
-		service := getTestService("test1", v1.ProtocolTCP, 80)
+		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		for _, pip := range test.existingPIPs {
 			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
 			if err != nil {
@@ -1667,7 +1790,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 
 	for i, test := range testCases {
 		az := getTestCloud()
-		service := getTestService("test1", v1.ProtocolTCP, 80)
+		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		for _, pip := range test.existingPIPs {
 			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
 			if err != nil {
