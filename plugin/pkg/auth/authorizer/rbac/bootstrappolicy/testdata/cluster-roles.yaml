@@ -146,17 +146,13 @@ items:
     - apps
     resources:
     - daemonsets
-    - daemonsets/status
     - deployments
     - deployments/rollback
     - deployments/scale
-    - deployments/status
     - replicasets
     - replicasets/scale
-    - replicasets/status
     - statefulsets
     - statefulsets/scale
-    - statefulsets/status
     verbs:
     - create
     - delete
@@ -216,7 +212,6 @@ items:
     - networking.k8s.io
     resources:
     - ingresses
-    - ingresses/status
     - networkpolicies
     verbs:
     - create
@@ -283,14 +278,14 @@ items:
     - daemonsets
     - daemonsets/status
     - deployments
-    - deployments/status
     - deployments/scale
+    - deployments/status
     - replicasets
-    - replicasets/status
     - replicasets/scale
+    - replicasets/status
     - statefulsets
-    - statefulsets/status
     - statefulsets/scale
+    - statefulsets/status
     verbs:
     - get
     - list
@@ -347,6 +342,7 @@ items:
     - networking.k8s.io
     resources:
     - ingresses
+    - ingresses/status
     - networkpolicies
     verbs:
     - get
