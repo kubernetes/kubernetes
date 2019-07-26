@@ -89,7 +89,6 @@ filegroup(
         "//pkg/kubectl/metricsutil:all-srcs",
         "//pkg/kubectl/polymorphichelpers:all-srcs",
         "//pkg/kubectl/proxy:all-srcs",
-        "//pkg/kubectl/util:all-srcs",
     ],
     tags = ["automanaged"],
 )
