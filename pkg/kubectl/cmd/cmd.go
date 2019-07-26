@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/annotate"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apiresources"
@@ -71,7 +72,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/version"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/wait"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/kustomize"

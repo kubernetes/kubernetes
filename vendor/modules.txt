@@ -1643,6 +1643,7 @@ k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 k8s.io/kubectl/pkg/apps
 k8s.io/kubectl/pkg/drain
+k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/rawhttp
 k8s.io/kubectl/pkg/scheme
 k8s.io/kubectl/pkg/util
@@ -1651,6 +1652,7 @@ k8s.io/kubectl/pkg/util/deployment
 k8s.io/kubectl/pkg/util/event
 k8s.io/kubectl/pkg/util/fieldpath
 k8s.io/kubectl/pkg/util/hash
+k8s.io/kubectl/pkg/util/i18n
 k8s.io/kubectl/pkg/util/interrupt
 k8s.io/kubectl/pkg/util/logs
 k8s.io/kubectl/pkg/util/podutils

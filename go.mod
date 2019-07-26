@@ -26,7 +26,6 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.1
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
-	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b // indirect
 	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf

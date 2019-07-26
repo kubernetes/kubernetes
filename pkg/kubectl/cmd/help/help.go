@@ -21,8 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var helpLong = templates.LongDesc(i18n.T(`

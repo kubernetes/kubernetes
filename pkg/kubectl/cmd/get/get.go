@@ -42,11 +42,11 @@ import (
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	utilpointer "k8s.io/utils/pointer"
 )
 
