@@ -41,7 +41,7 @@ var (
 
 		The top command allows you to see the resource consumption for nodes or pods.
 
-		This command requires Heapster to be correctly configured and working on the server. `))
+		This command requires a working implementation of the Resource Metrics API (such as the Metrics Server) or Heapster.`))
 )
 
 func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
