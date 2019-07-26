@@ -20,7 +20,6 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_rollout_CONSUMERS",
     ],
     deps = [
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/set:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/polymorphichelpers:go_default_library",

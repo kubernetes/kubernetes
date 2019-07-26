@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package polymorphichelpers
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
-	kapps "k8s.io/kubectl/pkg/apps"
+	"k8s.io/kubectl/pkg/apps"
 	"k8s.io/kubectl/pkg/scheme"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 )
@@ -52,27 +52,27 @@ type RollbackVisitor struct {
 	result    Rollbacker
 }
 
-func (v *RollbackVisitor) VisitDeployment(elem kapps.GroupKindElement) {
+func (v *RollbackVisitor) VisitDeployment(elem apps.GroupKindElement) {
 	v.result = &DeploymentRollbacker{v.clientset}
 }
 
-func (v *RollbackVisitor) VisitStatefulSet(kind kapps.GroupKindElement) {
+func (v *RollbackVisitor) VisitStatefulSet(kind apps.GroupKindElement) {
 	v.result = &StatefulSetRollbacker{v.clientset}
 }
 
-func (v *RollbackVisitor) VisitDaemonSet(kind kapps.GroupKindElement) {
+func (v *RollbackVisitor) VisitDaemonSet(kind apps.GroupKindElement) {
 	v.result = &DaemonSetRollbacker{v.clientset}
 }
 
-func (v *RollbackVisitor) VisitJob(kind kapps.GroupKindElement)                   {}
-func (v *RollbackVisitor) VisitPod(kind kapps.GroupKindElement)                   {}
-func (v *RollbackVisitor) VisitReplicaSet(kind kapps.GroupKindElement)            {}
-func (v *RollbackVisitor) VisitReplicationController(kind kapps.GroupKindElement) {}
-func (v *RollbackVisitor) VisitCronJob(kind kapps.GroupKindElement)               {}
+func (v *RollbackVisitor) VisitJob(kind apps.GroupKindElement)                   {}
+func (v *RollbackVisitor) VisitPod(kind apps.GroupKindElement)                   {}
+func (v *RollbackVisitor) VisitReplicaSet(kind apps.GroupKindElement)            {}
+func (v *RollbackVisitor) VisitReplicationController(kind apps.GroupKindElement) {}
+func (v *RollbackVisitor) VisitCronJob(kind apps.GroupKindElement)               {}
 
 // RollbackerFor returns an implementation of Rollbacker interface for the given schema kind
 func RollbackerFor(kind schema.GroupKind, c kubernetes.Interface) (Rollbacker, error) {
-	elem := kapps.GroupKindElement(kind)
+	elem := apps.GroupKindElement(kind)
 	visitor := &RollbackVisitor{
 		clientset: c,
 	}

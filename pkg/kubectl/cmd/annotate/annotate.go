@@ -36,8 +36,8 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -334,7 +334,7 @@ func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[stri
 	var buf bytes.Buffer
 	for key := range annotations {
 		// change-cause annotation can always be overwritten
-		if key == kubectl.ChangeCauseAnnotation {
+		if key == polymorphichelpers.ChangeCauseAnnotation {
 			continue
 		}
 		if value, found := accessor.GetAnnotations()[key]; found {

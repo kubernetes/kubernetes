@@ -297,7 +297,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			if err != nil {
 				return err
 			}
-			params["labels"] = generate.MakeLabels(labels)
+			params["labels"] = polymorphichelpers.MakeLabels(labels)
 		}
 		if err = generate.ValidateParams(names, params); err != nil {
 			return err

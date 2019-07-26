@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apps_test
+package apps
 
 import (
 	. "github.com/onsi/ginkgo"
