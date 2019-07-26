@@ -281,12 +281,16 @@ items:
     resources:
     - controllerrevisions
     - daemonsets
+    - daemonsets/status
     - deployments
     - deployments/scale
+    - deployments/status
     - replicasets
     - replicasets/scale
+    - replicasets/status
     - statefulsets
     - statefulsets/scale
+    - statefulsets/status
     verbs:
     - get
     - list
