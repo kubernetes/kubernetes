@@ -23,8 +23,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -44,12 +44,12 @@ var _ = KubeadmDescribe("control-plane node", func() {
 
 	// Important! please note that this test can't be run on single-node clusters
 	// in case you can skip this test with SKIP=multi-node
-	It("should be labelled and tainted [multi-node]", func() {
+	ginkgo.It("should be labelled and tainted [multi-node]", func() {
 		// get all control-plane nodes (and this implicitly checks that node are properly labeled)
 		controlPlanes := getControlPlaneNodes(f.ClientSet)
 
 		// checks if there is at least one control-plane node
-		Expect(controlPlanes.Items).NotTo(BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneTaint)
+		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneTaint)
 
 		// checks that the control-plane nodes have the expected taint
 		for _, cp := range controlPlanes.Items {
