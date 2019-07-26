@@ -15,7 +15,6 @@ go_library(
     deps = [
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
-        "//pkg/kubectl/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -37,6 +36,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/validation:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/version:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
