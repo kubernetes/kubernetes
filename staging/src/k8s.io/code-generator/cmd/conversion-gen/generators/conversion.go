@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	gopath "path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -49,6 +50,13 @@ const (
 	// e.g., "+k8s:conversion-gen-external-types=<type-pkg>" in doc.go, where
 	// <type-pkg> is the relative path to the package the types are defined in.
 	externalTypesTagName = "k8s:conversion-gen-external-types"
+	// "+k8s:conversion-gen:set-api-version-kind=false" on a particular type will
+	// skip generation of conversion setting APIVersion and Kind fields.
+	// "+k8s:conversion-gen:set-api-version-kind=true" on a particular type will
+	// force generation of conversion setting APIVersion and Kind fields.
+	// APIVersion is set to the detected groupName/version (overrideable with +groupName and +version).
+	// Kind is set to the detected kind (overrideable with +kind).
+	setAPIVersionKind = "k8s:conversion-gen:set-api-version-kind"
 )
 
 func extractTag(comments []string) []string {
@@ -713,8 +721,50 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	if peerType := getPeerTypeFor(c, t, g.peerPackages); peerType != nil {
-		g.generateConversion(t, peerType, sw)
-		g.generateConversion(peerType, t, sw)
+		p := c.Universe.Package(genutil.Vendorless(g.typesPackage))
+
+		apiVersion, kind := "", ""
+		if shouldSetAPIVersionKind(t) {
+			// Default version to the last package segment
+			remainingPackage, version := gopath.Split(t.Name.Package)
+			// Default groupName to the next to last package segment
+			_, groupName := gopath.Split(strings.Trim(remainingPackage, "/"))
+			if groupName == "core" {
+				groupName = ""
+			}
+			// Default kind to the go type
+			kind = t.Name.Name
+
+			// allow user to override groupName/version per package
+			if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
+				groupName = override[0]
+			}
+			if override := types.ExtractCommentTags("+", p.Comments)["version"]; override != nil {
+				version = override[0]
+			}
+
+			// allow user to override groupName/version/kind per type
+			if override := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["groupName"]; override != nil {
+				groupName = override[0]
+			}
+			if override := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["version"]; override != nil {
+				version = override[0]
+			}
+			if override := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["kind"]; override != nil {
+				kind = override[0]
+			}
+
+			if len(version) > 0 {
+				if len(groupName) > 0 {
+					apiVersion = groupName + "/" + version
+				} else {
+					apiVersion = version
+				}
+			}
+		}
+
+		g.generateConversion(t, peerType, "", "", sw)
+		g.generateConversion(peerType, t, apiVersion, kind, sw)
 	}
 
 	for _, inTypeName := range getExplicitFromTypes(t) {
@@ -739,11 +789,18 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 	return sw.Error()
 }
 
-func (g *genConversion) generateConversion(inType, outType *types.Type, sw *generator.SnippetWriter) {
+func (g *genConversion) generateConversion(inType, outType *types.Type, apiVersion, kind string, sw *generator.SnippetWriter) {
 	args := argsFromType(inType, outType).
 		With("Scope", types.Ref(conversionPackagePath, "Scope"))
 
 	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
+	if len(apiVersion) > 0 && len(kind) > 0 {
+		sw.Do(fmt.Sprintf("// Auto-generated external APIVersion/Kind\n"), nil)
+		sw.Do(fmt.Sprintf("// Disable with a `+%s=false` comment\n", setAPIVersionKind), nil)
+		sw.Do(fmt.Sprintf("// Customize with `+groupName`, `+version`, or `+kind` comments\n"), nil)
+		sw.Do(fmt.Sprintf("out.APIVersion = %q\n", apiVersion), nil)
+		sw.Do(fmt.Sprintf("out.Kind = %q\n\n", kind), nil)
+	}
 	g.generateFor(inType, outType, sw)
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
@@ -881,6 +938,61 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 	}
 }
 
+func jsonName(m types.Member) (string, bool) {
+	tags := strings.Split(reflect.StructTag(m.Tags).Get("json"), ",")
+	inline := false
+	for _, t := range tags[1:] {
+		if t == "inline" {
+			inline = true
+			break
+		}
+	}
+	return tags[0], inline
+}
+
+func shouldSetAPIVersionKind(t *types.Type) bool {
+	// Handle explicit opt in or out
+	explicit := types.ExtractCommentTags("+", t.SecondClosestCommentLines)[setAPIVersionKind]
+	if len(explicit) > 0 {
+		if explicit[0] == "true" {
+			return true
+		}
+		if explicit[0] == "false" {
+			return false
+		}
+		klog.Errorf("unrecognized option %s=%v", setAPIVersionKind, explicit)
+	}
+
+	// Auto-detect
+	toFind := map[string]struct{}{
+		"apiVersion": struct{}{},
+		"kind":       struct{}{},
+	}
+	members := append([]types.Member{}, t.Members...)
+	for i := 0; i < len(members); i++ {
+		m := members[i]
+		name, inline := jsonName(m)
+		switch {
+		case name == "" && inline:
+			// if this field is embedded, see if it has apiVersion/kind fields
+			members = append(members, m.Type.Members...)
+
+		// case name == "items" && !inline && m.Type.Kind == types.Slice:
+		// 	// if this is a slice field named "items", see if the items have apiVersion/kind fields
+		// 	members = append(members, m.Type.Elem.Members...)
+
+		case name != "" && !inline:
+			if _, ok := toFind[name]; ok {
+				delete(toFind, name)
+			}
+			if len(toFind) == 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	for _, inMember := range inType.Members {
 		if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
@@ -919,14 +1031,20 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				With("SliceHeader", types.Ref("reflect", "SliceHeader"))
 			switch inMemberType.Kind {
 			case types.Pointer:
-				sw.Do("out.$.name$ = ($.outType|raw$)($.Pointer|raw$(in.$.name$))\n", args)
-				continue
+				if !shouldSetAPIVersionKind(inMemberType) && !shouldSetAPIVersionKind(outMemberType) {
+					sw.Do("out.$.name$ = ($.outType|raw$)($.Pointer|raw$(in.$.name$))\n", args)
+					continue
+				}
 			case types.Map:
-				sw.Do("out.$.name$ = *(*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
-				continue
+				if !shouldSetAPIVersionKind(inMemberType.Elem) && !shouldSetAPIVersionKind(outMemberType.Elem) {
+					sw.Do("out.$.name$ = *(*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
+					continue
+				}
 			case types.Slice:
-				sw.Do("out.$.name$ = *(*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
-				continue
+				if !shouldSetAPIVersionKind(inMemberType.Elem) && !shouldSetAPIVersionKind(outMemberType.Elem) {
+					sw.Do("out.$.name$ = *(*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
+					continue
+				}
 			}
 		}
 
