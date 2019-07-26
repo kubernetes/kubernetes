@@ -316,7 +316,5 @@ func (f WithoutConversionCodecFactory) EncoderForVersion(serializer runtime.Enco
 
 // DecoderToVersion returns an decoder that does not do conversion.
 func (f WithoutConversionCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
-	return runtime.WithoutVersionDecoder{
-		Decoder: serializer,
-	}
+	return serializer
 }
