@@ -85,6 +85,10 @@ const (
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
 
+	// ServiceAnnotationLoadBalancerDisableTCPReset is the annotation used on the service
+	// to set enableTcpReset to false in load balancer rule. This only works for Azure standard load balancer backed service.
+	ServiceAnnotationLoadBalancerDisableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset"
+
 	// serviceTagKey is the service key applied for public IP tags.
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
@@ -739,6 +743,9 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 	// update probes/rules
 	expectedProbes, expectedRules, err := az.reconcileLoadBalancerRule(service, wantLb, lbFrontendIPConfigID, lbBackendPoolID, lbName, lbIdleTimeout)
+	if err != nil {
+		return nil, err
+	}
 
 	// remove unwanted probes
 	dirtyProbes := false
@@ -899,6 +906,15 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		ports = []v1.ServicePort{}
 	}
 
+	var enableTCPReset *bool
+	if az.useStandardLoadBalancer() {
+		enableTCPReset = to.BoolPtr(true)
+		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
+			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerDisableTCPReset, v)
+			enableTCPReset = to.BoolPtr(!strings.EqualFold(v, "true"))
+		}
+	}
+
 	var expectedProbes []network.Probe
 	var expectedRules []network.LoadBalancingRule
 	for _, port := range ports {
@@ -967,6 +983,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					EnableFloatingIP:    to.BoolPtr(true),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
+					EnableTCPReset:      enableTCPReset,
 				},
 			}
 			if protocol == v1.ProtocolTCP {
@@ -1496,7 +1513,9 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
-		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP)
+		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
+		reflect.DeepEqual(s.EnableTCPReset, t.EnableTCPReset) &&
+		reflect.DeepEqual(s.DisableOutboundSnat, t.DisableOutboundSnat)
 
 	if wantLB {
 		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
