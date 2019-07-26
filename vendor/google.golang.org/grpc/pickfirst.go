@@ -19,7 +19,8 @@
 package grpc
 
 import (
-	"golang.org/x/net/context"
+	"context"
+
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/grpclog"
@@ -56,6 +57,7 @@ func (b *pickfirstBalancer) HandleResolvedAddrs(addrs []resolver.Address, err er
 	if b.sc == nil {
 		b.sc, err = b.cc.NewSubConn(addrs, balancer.NewSubConnOptions{})
 		if err != nil {
+			//TODO(yuxuanli): why not change the cc state to Idle?
 			grpclog.Errorf("pickfirstBalancer: failed to NewSubConn: %v", err)
 			return
 		}

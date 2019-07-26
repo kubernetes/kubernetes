@@ -28,6 +28,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -35,7 +36,14 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/internal"
 )
+
+func init() {
+	internal.StatusRawProto = statusRawProto
+}
+
+func statusRawProto(s *Status) *spb.Status { return s.s }
 
 // statusError is an alias of a status proto.  It implements error and Status,
 // and a nil statusError should never be returned by this package.
@@ -126,7 +134,9 @@ func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return &Status{s: &spb.Status{Code: int32(codes.OK)}}, true
 	}
-	if se, ok := err.(interface{ GRPCStatus() *Status }); ok {
+	if se, ok := err.(interface {
+		GRPCStatus() *Status
+	}); ok {
 		return se.GRPCStatus(), true
 	}
 	return New(codes.Unknown, err.Error()), false
@@ -182,8 +192,26 @@ func Code(err error) codes.Code {
 	if err == nil {
 		return codes.OK
 	}
-	if se, ok := err.(interface{ GRPCStatus() *Status }); ok {
+	if se, ok := err.(interface {
+		GRPCStatus() *Status
+	}); ok {
 		return se.GRPCStatus().Code()
 	}
 	return codes.Unknown
+}
+
+// FromContextError converts a context error into a Status.  It returns a
+// Status with codes.OK if err is nil, or a Status with codes.Unknown if err is
+// non-nil and not a context error.
+func FromContextError(err error) *Status {
+	switch err {
+	case nil:
+		return New(codes.OK, "")
+	case context.DeadlineExceeded:
+		return New(codes.DeadlineExceeded, err.Error())
+	case context.Canceled:
+		return New(codes.Canceled, err.Error())
+	default:
+		return New(codes.Unknown, err.Error())
+	}
 }
