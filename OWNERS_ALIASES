@@ -122,6 +122,23 @@ aliases:
     - mikedanese
     - WanLinghao
 
+  # SIG Release
+  sig-release-approvers:
+    - calebamiles # SIG Chair
+    - justaugustus # SIG Chair
+    - tpepper # SIG Chair
+  release-engineering-approvers:
+    - calebamiles # SIG Chair
+    - justaugustus # SIG Chair
+    - tpepper # SIG Chair / Patch Release Team
+  release-engineering-reviewers:
+    - aleksandra-malinowska # Patch Release Team
+    - calebamiles # SIG Chair
+    - feiskyer # Patch Release Team
+    - hoegaarden # Patch Release Team
+    - justaugustus # SIG Chair
+    - tpepper # SIG Chair / Patch Release Team
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
