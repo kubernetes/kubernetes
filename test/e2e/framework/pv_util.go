@@ -993,36 +993,6 @@ func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
 }
 
-// SetNodeAffinityPreference sets affinity preference with specified operator to nodeName to nodeSelection
-func SetNodeAffinityPreference(nodeSelection *NodeSelection, operator v1.NodeSelectorOperator, nodeName string) {
-	// Add node-anti-affinity.
-	if nodeSelection.Affinity == nil {
-		nodeSelection.Affinity = &v1.Affinity{}
-	}
-	if nodeSelection.Affinity.NodeAffinity == nil {
-		nodeSelection.Affinity.NodeAffinity = &v1.NodeAffinity{}
-	}
-	nodeSelection.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(nodeSelection.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-		v1.PreferredSchedulingTerm{
-			Weight: int32(100),
-			Preference: v1.NodeSelectorTerm{
-				MatchFields: []v1.NodeSelectorRequirement{
-					{Key: "metadata.name", Operator: operator, Values: []string{nodeName}},
-				},
-			},
-		})
-}
-
-// SetAffinityPreference sets affinity preference to nodeName to nodeSelection
-func SetAffinityPreference(nodeSelection *NodeSelection, nodeName string) {
-	SetNodeAffinityPreference(nodeSelection, v1.NodeSelectorOpIn, nodeName)
-}
-
-// SetAntiAffinityPreference sets anti-affinity preference to nodeName to nodeSelection
-func SetAntiAffinityPreference(nodeSelection *NodeSelection, nodeName string) {
-	SetNodeAffinityPreference(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
-}
-
 // CreateClientPod defines and creates a pod with a mounted PV.  Pod runs infinite loop until killed.
 func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
 	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
