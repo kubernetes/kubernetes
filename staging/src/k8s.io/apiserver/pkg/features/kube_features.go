@@ -159,7 +159,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
 	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
+	RemoveSelfLink:          {Default: true, PreRelease: featuregate.Beta},
 	SelectorIndex:           {Default: true, PreRelease: featuregate.Beta},
 	WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
 }
