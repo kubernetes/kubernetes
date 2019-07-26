@@ -406,7 +406,7 @@ func TestPVCProtectionController(t *testing.T) {
 
 		// Start the test by simulating an event
 		if test.updatedPVC != nil {
-			ctrl.pvcAddedUpdated(test.updatedPVC)
+			ctrl.pvcAddedUpdated(test.updatedPVC, test.updatedPVC)
 		}
 		switch {
 		case test.deletedPod != nil && test.updatedPod != nil && test.deletedPod.Namespace == test.updatedPod.Namespace && test.deletedPod.Name == test.updatedPod.Name:

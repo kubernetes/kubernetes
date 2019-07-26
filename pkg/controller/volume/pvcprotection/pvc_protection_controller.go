@@ -69,9 +69,11 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 	e.pvcLister = pvcInformer.Lister()
 	e.pvcListerSynced = pvcInformer.Informer().HasSynced
 	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: e.pvcAddedUpdated,
+		AddFunc: func(new interface{}) {
+			e.pvcAddedUpdated(nil, new)
+		},
 		UpdateFunc: func(old, new interface{}) {
-			e.pvcAddedUpdated(new)
+			e.pvcAddedUpdated(old, new)
 		},
 	})
 
@@ -238,7 +240,7 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 }
 
 // pvcAddedUpdated reacts to pvc added/updated/deleted events
-func (c *Controller) pvcAddedUpdated(obj interface{}) {
+func (c *Controller) pvcAddedUpdated(old, obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("PVC informer returned non-PVC object: %#v", obj))
@@ -253,6 +255,26 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)
+	}
+	if old != nil {
+		oldPvc, ok := old.(*v1.PersistentVolumeClaim)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("PVC informer returned non-PVC object: %#v", old))
+			return
+		}
+		if oldPvc.UID == pvc.UID {
+			// handled above for pvc
+			return
+		}
+		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(oldPvc)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for Persistent Volume Claim %#v: %v", oldPvc, err))
+			return
+		}
+		if protectionutil.IsDeletionCandidate(oldPvc, volumeutil.PVCProtectionFinalizer) {
+			klog.V(4).Infof("Deletion candidate on PVC %s", key)
+			c.queue.Add(key)
+		}
 	}
 }
 
