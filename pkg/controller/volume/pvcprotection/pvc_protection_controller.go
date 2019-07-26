@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -79,13 +79,13 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 	e.podListerSynced = podInformer.Informer().HasSynced
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			e.podAddedDeletedUpdated(obj, false)
+			e.podAddedDeletedUpdated(nil, obj, false)
 		},
 		DeleteFunc: func(obj interface{}) {
-			e.podAddedDeletedUpdated(obj, true)
+			e.podAddedDeletedUpdated(nil, obj, true)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			e.podAddedDeletedUpdated(new, false)
+			e.podAddedDeletedUpdated(old, new, false)
 		},
 	})
 
@@ -257,27 +257,48 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 }
 
 // podAddedDeletedUpdated reacts to Pod events
-func (c *Controller) podAddedDeletedUpdated(obj interface{}, deleted bool) {
+func (c *Controller) podAddedDeletedUpdated(old, new interface{}, deleted bool) {
+	if pod := c.parsePod(new); pod != nil {
+		c.enqueuePVCs(pod, deleted)
+
+		// An update notification might mask the deletion of a pod X and the
+		// following creation of a pod Y with the same namespaced name as X. If
+		// that's the case X needs to be processed as well to handle the case
+		// where it is blocking deletion of a PVC not referenced by Y, otherwise
+		// such PVC will never be deleted.
+		if oldPod := c.parsePod(old); oldPod != nil && oldPod.UID != pod.UID {
+			c.enqueuePVCs(oldPod, true)
+		}
+	}
+}
+
+func (*Controller) parsePod(obj interface{}) *v1.Pod {
+	if obj == nil {
+		return nil
+	}
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
-			return
+			return nil
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod %#v", obj))
-			return
+			return nil
 		}
 	}
+	return pod
+}
 
+func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 	// Filter out pods that can't help us to remove a finalizer on PVC
 	if !deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
 		return
 	}
 
-	klog.V(4).Infof("Got event on pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(4).Infof("Enqueuing PVCs for Pod %s/%s (UID=%s)", pod.Namespace, pod.Name, pod.UID)
 
 	// Enqueue all PVCs that the pod uses
 	for _, volume := range pod.Spec.Volumes {
