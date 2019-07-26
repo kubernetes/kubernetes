@@ -74,7 +74,11 @@ message ListAndWatchResponse {
 }
 
 message TopologyInfo {
-    	int64 socket = 1;
+    	NUMANode node = 1;
+}
+
+message NUMANode {
+    int64 ID = 1;
 }
 
 /* E.g:
@@ -82,7 +86,8 @@ message TopologyInfo {
 *    ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
 *    State: "Healthy",
 *    Topology: 
-*      Socket: 1 
+*      Node: 
+         ID: 1 
 *} */
 message Device {
 	// A unique ID assigned by the device plugin used
