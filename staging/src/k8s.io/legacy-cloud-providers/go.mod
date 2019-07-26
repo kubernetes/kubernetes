@@ -30,7 +30,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog v0.3.1
-	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+	k8s.io/utils v0.0.0-20190712204705-3dccf664f023
 	sigs.k8s.io/yaml v1.1.0
 )
 

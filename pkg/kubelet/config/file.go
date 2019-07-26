@@ -61,7 +61,7 @@ type sourceFile struct {
 }
 
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
-	// "github.com/sigma/go-inotify" requires a path without trailing "/"
+	// "k8s.io/utils/inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
 	config := newSourceFile(path, nodeName, period, updates)

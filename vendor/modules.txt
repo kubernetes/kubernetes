@@ -1726,11 +1726,12 @@ k8s.io/sample-apiserver/pkg/generated/openapi
 k8s.io/sample-apiserver/pkg/registry
 k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-# k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a => k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+# k8s.io/utils v0.0.0-20190712204705-3dccf664f023 => k8s.io/utils v0.0.0-20190712204705-3dccf664f023
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec
 k8s.io/utils/exec/testing
+k8s.io/utils/inotify
 k8s.io/utils/integer
 k8s.io/utils/io
 k8s.io/utils/keymutex
