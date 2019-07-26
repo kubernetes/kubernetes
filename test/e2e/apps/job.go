@@ -158,7 +158,14 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	})
 
-	ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
+	/*
+		Release : v1.16
+		Testname: Jobs, orphan pods, re-adoption
+		Description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
+		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
+		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
+	*/
+	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
 		ginkgo.By("Creating a job")
 		job := jobutil.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.
