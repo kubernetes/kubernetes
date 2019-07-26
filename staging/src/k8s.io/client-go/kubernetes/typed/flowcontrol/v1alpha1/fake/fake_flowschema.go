@@ -33,9 +33,9 @@ type FakeFlowSchemas struct {
 	Fake *FakeFlowcontrolV1alpha1
 }
 
-var flowschemasResource = schema.GroupVersionResource{Group: "flowcontrol", Version: "v1alpha1", Resource: "flowschemas"}
+var flowschemasResource = schema.GroupVersionResource{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Resource: "flowschemas"}
 
-var flowschemasKind = schema.GroupVersionKind{Group: "flowcontrol", Version: "v1alpha1", Kind: "FlowSchema"}
+var flowschemasKind = schema.GroupVersionKind{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Kind: "FlowSchema"}
 
 // Get takes name of the flowSchema, and returns the corresponding flowSchema object, and an error if there is any.
 func (c *FakeFlowSchemas) Get(name string, options v1.GetOptions) (result *v1alpha1.FlowSchema, err error) {
