@@ -47,9 +47,9 @@ import (
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/openapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	utilpointer "k8s.io/utils/pointer"
 )
 

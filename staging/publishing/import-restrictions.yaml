@@ -131,6 +131,7 @@
   - k8s.io/cli-runtime
   - k8s.io/client-go
   - k8s.io/kubectl
+  - k8s.io/kube-openapi
   - k8s.io/utils
   - k8s.io/klog
 

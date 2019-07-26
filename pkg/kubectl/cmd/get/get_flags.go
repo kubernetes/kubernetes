@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubectl/pkg/util/openapi"
 )
 
 // PrintFlags composes common printer flag structs

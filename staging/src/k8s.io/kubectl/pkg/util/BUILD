@@ -87,6 +87,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/interrupt:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/logs:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/util/openapi:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/podutils:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/printers:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/qos:all-srcs",

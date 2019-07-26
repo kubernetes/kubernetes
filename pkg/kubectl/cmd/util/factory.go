@@ -23,8 +23,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types

@@ -45,11 +45,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/openapi"
+	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 // InternalType is the schema for internal type
