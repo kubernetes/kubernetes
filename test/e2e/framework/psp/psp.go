@@ -27,11 +27,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -79,9 +81,9 @@ func privilegedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 }
 
 // IsPodSecurityPolicyEnabled returns true if PodSecurityPolicy is enabled. Otherwise false.
-func IsPodSecurityPolicyEnabled(f *Framework) bool {
+func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 	isPSPEnabledOnce.Do(func() {
-		psps, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
+		psps, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
 		if err != nil {
 			e2elog.Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
@@ -100,13 +102,14 @@ var (
 	privilegedPSPOnce sync.Once
 )
 
-func createPrivilegedPSPBinding(f *Framework, namespace string) {
-	if !IsPodSecurityPolicyEnabled(f) {
+// CreatePrivilegedPSPBinding creates the privileged PSP & role
+func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string) {
+	if !IsPodSecurityPolicyEnabled(kubeClient) {
 		return
 	}
 	// Create the privileged PSP & role
 	privilegedPSPOnce.Do(func() {
-		_, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Get(
+		_, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().Get(
 			podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
 			// Privileged PSP was already created.
@@ -115,14 +118,14 @@ func createPrivilegedPSPBinding(f *Framework, namespace string) {
 		}
 
 		psp := privilegedPSP(podSecurityPolicyPrivileged)
-		psp, err = f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(psp)
+		psp, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(psp)
 		if !apierrs.IsAlreadyExists(err) {
 			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}
 
-		if auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+		if auth.IsRBACEnabled(kubeClient.RbacV1()) {
 			// Create the Role to bind it to the namespace.
-			_, err = f.ClientSet.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
+			_, err = kubeClient.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{Name: podSecurityPolicyPrivileged},
 				Rules: []rbacv1.PolicyRule{{
 					APIGroups:     []string{"extensions"},
@@ -137,10 +140,10 @@ func createPrivilegedPSPBinding(f *Framework, namespace string) {
 		}
 	})
 
-	if auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+	if auth.IsRBACEnabled(kubeClient.RbacV1()) {
 		ginkgo.By(fmt.Sprintf("Binding the %s PodSecurityPolicy to the default service account in %s",
 			podSecurityPolicyPrivileged, namespace))
-		err := auth.BindClusterRoleInNamespace(f.ClientSet.RbacV1(),
+		err := auth.BindClusterRoleInNamespace(kubeClient.RbacV1(),
 			podSecurityPolicyPrivileged,
 			namespace,
 			rbacv1.Subject{
@@ -149,8 +152,16 @@ func createPrivilegedPSPBinding(f *Framework, namespace string) {
 				Name:      "default",
 			})
 		ExpectNoError(err)
-		ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
+		ExpectNoError(auth.WaitForNamedAuthorizationUpdate(kubeClient.AuthorizationV1(),
 			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
 			schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
 	}
+}
+
+// ExpectNoError is a copy from the same name function in file test/e2e/framework.go
+func ExpectNoError(err error, explain ...interface{}) {
+	if err != nil {
+		e2elog.Logf("Unexpected error occurred: %v", err)
+	}
+	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred(), explain...)
 }
