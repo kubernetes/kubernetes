@@ -41,6 +41,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/storage:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flushwriter:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/openapi:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/proxy:all-srcs",
