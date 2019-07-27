@@ -167,6 +167,11 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error uploading crisocket")
 	}
 
+	// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap are removed from disk
+	if err := os.Remove(bootstrapKubeConfigFile); err != nil {
+		return errors.Wrapf(err, "error deleting %s", bootstrapKubeConfigFile)
+	}
+
 	return nil
 }
 
