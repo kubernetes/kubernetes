@@ -330,7 +330,9 @@ func (sched *Scheduler) preempt(fwk framework.Framework, preemptor *v1.Pod, sche
 			}
 			// If the victim is a WaitingPod, send a reject message to the PermitPlugin
 			if waitingPod := fwk.GetWaitingPod(victim.UID); waitingPod != nil {
-				waitingPod.Reject("preempted")
+				if !waitingPod.Reject("preempted") {
+					klog.Warningf("unable to deliver reject to %v", victim.UID)
+				}
 			}
 			sched.config.Recorder.Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 
