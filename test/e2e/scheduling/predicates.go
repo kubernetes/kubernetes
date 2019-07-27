@@ -282,6 +282,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		fillerPods := []*v1.Pod{}
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
+			e2elog.Logf("Creating a pod which consumes cpu=%vm on Node %v", requestedCPU, nodeName)
 			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
 				Name: "filler-pod-" + string(uuid.NewUUID()),
 				Resources: &v1.ResourceRequirements{
