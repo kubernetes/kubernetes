@@ -295,7 +295,7 @@ func (sched *Scheduler) schedule(pod *v1.Pod, pluginContext *framework.PluginCon
 // preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
 // If it succeeds, it adds the name of the node where preemption has happened to the pod spec.
 // It returns the node name and an error if any.
-func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
+func (sched *Scheduler) preempt(fwk framework.Framework, preemptor *v1.Pod, scheduleErr error) (string, error) {
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
 	if err != nil {
 		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
@@ -327,6 +327,10 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
 				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
 				return "", err
+			}
+			// If the victim is a WaitingPod, send a reject message to the PermitPlugin
+			if waitingPod := fwk.GetWaitingPod(victim.UID); waitingPod != nil {
+				waitingPod.Reject("preempted")
 			}
 			sched.config.Recorder.Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 
@@ -486,7 +490,7 @@ func (sched *Scheduler) scheduleOne() {
 					" No preemption is performed.")
 			} else {
 				preemptionStartTime := time.Now()
-				sched.preempt(pod, fitError)
+				sched.preempt(fwk, pod, fitError)
 				metrics.PreemptionAttempts.Inc()
 				metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
 				metrics.DeprecatedSchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
