@@ -326,7 +326,19 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAlia
 		hostsFileContent = managedHostsFileContent(hostIP, hostName, hostDomainName, hostAliases)
 	}
 
-	return ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	err = ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	if err != nil {
+		return err
+	}
+	fileInfo, err := os.Stat(fileName)
+	if err != nil {
+		return err
+	}
+	filePerms := fileInfo.Mode().Perm()
+	if filePerms != 0644 {
+		klog.Warningf("Failed to set 0644 permissions on %s, actual permissions: %o", fileName, filePerms)
+	}
+	return nil
 }
 
 // nodeHostsFileContent reads the content of node's hosts file.
