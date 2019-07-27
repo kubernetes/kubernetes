@@ -57,9 +57,9 @@ const (
 	// StrictTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with NUMA alignment of CPU and device resources.
 	StrictTopologyManagerPolicy = "strict"
-	// PreferredTopologyManagerPolicy is a mode in which kubelet will favour
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
-	PreferredTopologyManagerPolicy = "preferred"
+	BestEffortTopologyManagerPolicy = "best-effort"
 	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
 	NoneTopologyManagerPolicy = "none"

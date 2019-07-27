@@ -82,8 +82,8 @@ func NewManager(topologyPolicyName string) (Manager, error) {
 	case PolicyNone:
 		policy = NewNonePolicy()
 
-	case PolicyPreferred:
-		policy = NewPreferredPolicy()
+	case PolicyBestEffort:
+		policy = NewBestEffortPolicy()
 
 	case PolicyStrict:
 		policy = NewStrictPolicy()

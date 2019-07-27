@@ -47,9 +47,9 @@ func TestNewManager(t *testing.T) {
 		expectedError  error
 	}{
 		{
-			description:    "Policy is set preferred",
-			policyName:     "preferred",
-			expectedPolicy: "preferred",
+			description:    "Policy is set to best-effort",
+			policyName:     "best-effort",
+			expectedPolicy: "best-effort",
 		},
 		{
 			description:    "Policy is set to strict",
@@ -673,9 +673,9 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
 					[]TopologyHint{
@@ -693,9 +693,9 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. More than one Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
 					[]TopologyHint{
@@ -717,9 +717,9 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. No Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. No Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
 					[]TopologyHint{
