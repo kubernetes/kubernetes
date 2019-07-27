@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ishidawataru/sctp"
 	"github.com/spf13/cobra"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -40,6 +41,7 @@ import (
 var (
 	httpPort    = 8080
 	udpPort     = 8081
+	sctpPort    = -1
 	shellPath   = "/bin/sh"
 	serverReady = &atomicBool{0}
 )
@@ -47,8 +49,8 @@ var (
 // CmdNetexec is used by agnhost Cobra.
 var CmdNetexec = &cobra.Command{
 	Use:   "netexec",
-	Short: "Creates a HTTP / UDP server with various endpoints",
-	Long: `Starts a HTTP server on given TCP / UDP ports with the following endpoints:
+	Short: "Creates HTTP, UDP, and (optionally) SCTP servers with various endpoints",
+	Long: `Starts a HTTP server on given port with the following endpoints:
 
 - /: Returns the request's timestamp.
 - /clientip: Returns the request's IP address.
@@ -62,7 +64,7 @@ var CmdNetexec = &cobra.Command{
   - "request": The HTTP endpoint or data to be sent through UDP. If not specified, it will result
     in a "400 Bad Request" status code being returned.
   - "protocol": The protocol which will be used when making the request. Default value: "http".
-    Acceptable values: "http", "udp".
+    Acceptable values: "http", "udp", "sctp".
   - "tries": The number of times the request will be performed. Default value: "1".
 - "/echo": Returns the given "msg" ("/echo?msg=echoed_msg")
 - "/exit": Closes the server with the given code ("/exit?code=some-code"). The "code"
@@ -78,7 +80,17 @@ var CmdNetexec = &cobra.Command{
 - "/shutdown": Closes the server with the exit code 0.
 - "/upload": Accepts a file to be uploaded, writing it in the "/uploads" folder on the host.
   Returns a JSON with the fields "output" (containing the file's name on the server) and
-  "error" containing any potential server side errors.`,
+  "error" containing any potential server side errors.
+
+It will also start a UDP server on the indicated UDP port that responds to the following commands:
+
+- "hostname": Returns the server's hostname
+- "echo <msg>": Returns the given <msg>
+- "clientip": Returns the request's IP address
+
+Additionally, if (and only if) --sctp-port is passed, it will start an SCTP server on that port,
+responding to the same commands as the UDP server.
+`,
 	Args: cobra.MaximumNArgs(0),
 	Run:  main,
 }
@@ -86,6 +98,7 @@ var CmdNetexec = &cobra.Command{
 func init() {
 	CmdNetexec.Flags().IntVar(&httpPort, "http-port", 8080, "HTTP Listen Port")
 	CmdNetexec.Flags().IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")
+	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
 }
 
 // atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
@@ -109,6 +122,9 @@ func (a *atomicBool) get() bool {
 
 func main(cmd *cobra.Command, args []string) {
 	go startUDPServer(udpPort)
+	if sctpPort != -1 {
+		go startSCTPServer(sctpPort)
+	}
 	startHTTPServer(httpPort)
 }
 
@@ -198,40 +214,37 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("request parameter not specified. %v", err), http.StatusBadRequest)
 		return
 	}
-	if len(protocol) == 0 {
+
+	hostPort := net.JoinHostPort(host, port)
+	var addr net.Addr
+	var dialer func(string, net.Addr) (string, error)
+	switch strings.ToLower(protocol) {
+	case "", "http":
 		protocol = "http"
-	} else {
-		protocol = strings.ToLower(protocol)
-	}
-	if protocol != "http" && protocol != "udp" {
+		dialer = dialHTTP
+		addr, err = net.ResolveTCPAddr("tcp", hostPort)
+	case "udp":
+		protocol = "udp"
+		dialer = dialUDP
+		addr, err = net.ResolveUDPAddr("udp", hostPort)
+	case "sctp":
+		protocol = "sctp"
+		dialer = dialSCTP
+		addr, err = sctp.ResolveSCTPAddr("sctp", hostPort)
+	default:
 		http.Error(w, fmt.Sprintf("unsupported protocol. %s", protocol), http.StatusBadRequest)
 		return
 	}
-
-	hostPort := net.JoinHostPort(host, port)
-	var udpAddress *net.UDPAddr
-	if protocol == "udp" {
-		udpAddress, err = net.ResolveUDPAddr("udp", hostPort)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("host and/or port param are invalid. %v", err), http.StatusBadRequest)
-			return
-		}
-	} else {
-		_, err = net.ResolveTCPAddr("tcp", hostPort)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("host and/or port param are invalid. %v", err), http.StatusBadRequest)
-			return
-		}
+	if err != nil {
+		http.Error(w, fmt.Sprintf("host and/or port param are invalid. %v", err), http.StatusBadRequest)
+		return
 	}
+
 	errors := make([]string, 0)
 	responses := make([]string, 0)
 	var response string
 	for i := 0; i < tries; i++ {
-		if protocol == "udp" {
-			response, err = dialUDP(request, udpAddress)
-		} else {
-			response, err = dialHTTP(request, hostPort)
-		}
+		response, err = dialer(request, addr)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%v", err))
 		} else {
@@ -253,10 +266,10 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func dialHTTP(request, hostPort string) (string, error) {
+func dialHTTP(request string, addr net.Addr) (string, error) {
 	transport := utilnet.SetTransportDefaults(&http.Transport{})
 	httpClient := createHTTPClient(transport)
-	resp, err := httpClient.Get(fmt.Sprintf("http://%s/%s", hostPort, request))
+	resp, err := httpClient.Get(fmt.Sprintf("http://%s/%s", addr.String(), request))
 	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
@@ -276,8 +289,8 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 	return client
 }
 
-func dialUDP(request string, remoteAddress *net.UDPAddr) (string, error) {
-	Conn, err := net.DialUDP("udp", nil, remoteAddress)
+func dialUDP(request string, addr net.Addr) (string, error) {
+	Conn, err := net.DialUDP("udp", nil, addr.(*net.UDPAddr))
 	if err != nil {
 		return "", fmt.Errorf("udp dial failed. err:%v", err)
 	}
@@ -295,6 +308,27 @@ func dialUDP(request string, remoteAddress *net.UDPAddr) (string, error) {
 		return "", fmt.Errorf("reading from udp connection failed. err:'%v'", err)
 	}
 	return string(udpResponse[0:count]), nil
+}
+
+func dialSCTP(request string, addr net.Addr) (string, error) {
+	Conn, err := sctp.DialSCTP("sctp", nil, addr.(*sctp.SCTPAddr))
+	if err != nil {
+		return "", fmt.Errorf("sctp dial failed. err:%v", err)
+	}
+
+	defer Conn.Close()
+	buf := []byte(request)
+	_, err = Conn.Write(buf)
+	if err != nil {
+		return "", fmt.Errorf("sctp connection write failed. err:%v", err)
+	}
+	sctpResponse := make([]byte, 1024)
+	Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	count, err := Conn.Read(sctpResponse)
+	if err != nil || count == 0 {
+		return "", fmt.Errorf("reading from sctp connection failed. err:'%v'", err)
+	}
+	return string(sctpResponse[0:count]), nil
 }
 
 func shellHandler(w http.ResponseWriter, r *http.Request) {
@@ -430,6 +464,53 @@ func startUDPServer(udpPort int) {
 		} else if len(receivedText) > 0 {
 			log.Printf("Unknown udp command received: %v\n", receivedText)
 		}
+	}
+}
+
+// sctp server supports the hostName, echo and clientIP commands.
+func startSCTPServer(sctpPort int) {
+	serverAddress, err := sctp.ResolveSCTPAddr("sctp", fmt.Sprintf(":%d", sctpPort))
+	assertNoError(err)
+	listener, err := sctp.ListenSCTP("sctp", serverAddress)
+	assertNoError(err)
+	defer listener.Close()
+	buf := make([]byte, 1024)
+
+	log.Printf("Started SCTP server")
+	// Start responding to readiness probes.
+	serverReady.set(true)
+	defer func() {
+		log.Printf("SCTP server exited")
+		serverReady.set(false)
+	}()
+	for {
+		conn, err := listener.AcceptSCTP()
+		assertNoError(err)
+		n, err := conn.Read(buf)
+		assertNoError(err)
+		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
+		if receivedText == "hostname" {
+			log.Println("Sending sctp hostName response")
+			_, err = conn.Write([]byte(getHostName()))
+			assertNoError(err)
+		} else if strings.HasPrefix(receivedText, "echo ") {
+			parts := strings.SplitN(receivedText, " ", 2)
+			resp := ""
+			if len(parts) == 2 {
+				resp = parts[1]
+			}
+			log.Printf("Echoing %v\n", resp)
+			_, err = conn.Write([]byte(resp))
+			assertNoError(err)
+		} else if receivedText == "clientip" {
+			clientAddress := conn.RemoteAddr()
+			log.Printf("Sending back clientip to %s", clientAddress.String())
+			_, err = conn.Write([]byte(clientAddress.String()))
+			assertNoError(err)
+		} else if len(receivedText) > 0 {
+			log.Printf("Unknown sctp command received: %v\n", receivedText)
+		}
+		conn.Close()
 	}
 }
 

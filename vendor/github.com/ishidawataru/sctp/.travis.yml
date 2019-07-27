@@ -1,0 +1,20 @@
+language: go
+go:
+ - 1.6
+ - 1.7
+ - 1.8
+ - 1.9
+ - "1.10"
+ - "1.11"
+ - "1.12"
+
+script:
+ - go test -v -race ./...
+ - GOOS=linux   GOARCH=amd64   go build .
+ - GOOS=linux   GOARCH=arm     go build .
+ - GOOS=linux   GOARCH=arm64   go build .
+ - GOOS=linux   GOARCH=ppc64le go build .
+ - (go version | grep go1.6 > /dev/null) || GOOS=linux   GOARCH=s390x   go build .
+# can be compiled but not functional:
+ - GOOS=linux   GOARCH=386     go build .
+ - GOOS=windows GOARCH=amd64   go build .

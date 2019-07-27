@@ -225,6 +225,7 @@ filegroup(
         "//vendor/github.com/hpcloud/tail:all-srcs",
         "//vendor/github.com/imdario/mergo:all-srcs",
         "//vendor/github.com/inconshreveable/mousetrap:all-srcs",
+        "//vendor/github.com/ishidawataru/sctp:all-srcs",
         "//vendor/github.com/jmespath/go-jmespath:all-srcs",
         "//vendor/github.com/jonboulle/clockwork:all-srcs",
         "//vendor/github.com/json-iterator/go:all-srcs",
