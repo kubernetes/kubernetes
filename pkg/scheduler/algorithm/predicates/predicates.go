@@ -853,9 +853,9 @@ func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSele
 	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, labels.Set(node.Labels), fields.Set(nodeFields))
 }
 
-// podMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
+// PodMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
 // the requirements in both NodeAffinity and nodeSelector.
-func podMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
+func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 	// Check if node.Labels match pod.Spec.NodeSelector.
 	if len(pod.Spec.NodeSelector) > 0 {
 		selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
@@ -906,7 +906,7 @@ func PodMatchNodeSelector(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedul
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
-	if podMatchesNodeSelectorAndAffinityTerms(pod, node) {
+	if PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
 		return true, nil, nil
 	}
 	return false, []PredicateFailureReason{ErrNodeSelectorNotMatch}, nil
@@ -1748,7 +1748,7 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
 		}
 
-		selfMatch, err := podMatchesSpreadConstraint(podLabelSet, constraint)
+		selfMatch, err := PodMatchesSpreadConstraint(podLabelSet, constraint)
 		if err != nil {
 			return false, nil, err
 		}
