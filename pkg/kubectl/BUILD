@@ -90,7 +90,6 @@ filegroup(
         "//pkg/kubectl/polymorphichelpers:all-srcs",
         "//pkg/kubectl/proxy:all-srcs",
         "//pkg/kubectl/util:all-srcs",
-        "//pkg/kubectl/version:all-srcs",
     ],
     tags = ["automanaged"],
 )

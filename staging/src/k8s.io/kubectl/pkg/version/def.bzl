@@ -18,7 +18,7 @@
 #   go install ... -ldflags -X 'k8s.io/kubernetes/pkg/kubectl/cmd/version.gitMinor=12+' ...
 def version_x_defs():
     stamp_pkgs = [
-        "k8s.io/kubernetes/pkg/kubectl/version",
+        "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/version",
     ]
 
     # This should match the list of vars in kube::version::ldflags
