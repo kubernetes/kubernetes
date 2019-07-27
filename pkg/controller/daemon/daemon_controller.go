@@ -572,6 +572,10 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		return
 	}
 
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+	if !labelChanged && !controllerRefChanged {
+		return
+	}
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
 	dss := dsc.getDaemonSetsForPod(curPod)
@@ -579,11 +583,8 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		return
 	}
 	klog.V(4).Infof("Orphan Pod %s updated.", curPod.Name)
-	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
-	if labelChanged || controllerRefChanged {
-		for _, ds := range dss {
-			dsc.enqueueDaemonSet(ds)
-		}
+	for _, ds := range dss {
+		dsc.enqueueDaemonSet(ds)
 	}
 }
 
