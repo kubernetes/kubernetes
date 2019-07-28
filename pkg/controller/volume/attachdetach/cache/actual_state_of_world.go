@@ -277,9 +277,6 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 
 func (asw *actualStateOfWorld) AddVolumeNode(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string, isAttached bool) (v1.UniqueVolumeName, error) {
-	asw.Lock()
-	defer asw.Unlock()
-
 	volumeName := uniqueName
 	if volumeName == "" {
 		if volumeSpec == nil {
@@ -287,6 +284,9 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 		}
 		attachableVolumePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
+			if attachableVolumePlugin == nil {
+				err = fmt.Errorf("plugin do not support attachment")
+			}
 			return "", fmt.Errorf(
 				"failed to get AttachablePlugin from volumeSpec for volume %q err=%v",
 				volumeSpec.Name(),
@@ -302,6 +302,9 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 				err)
 		}
 	}
+
+	asw.Lock()
+	defer asw.Unlock()
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
@@ -354,7 +357,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
-		return fmt.Errorf("Failed to SetVolumeMountedByNode with error: %v", err)
+		return fmt.Errorf("failed to SetVolumeMountedByNode with error: %v", err)
 	}
 
 	nodeObj.mountedByNode = mounted
@@ -387,7 +390,7 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
-		return 0, fmt.Errorf("Failed to set detach request time with error: %v", err)
+		return 0, fmt.Errorf("failed to set detach request time with error: %v", err)
 	}
 	// If there is no previous detach request, set it to the current time
 	if nodeObj.detachRequestedTime.IsZero() {

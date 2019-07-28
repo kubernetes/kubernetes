@@ -41,6 +41,9 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 		// Non-system critical priority classes are not allowed to have a value larger than HighestUserDefinablePriority.
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), fmt.Sprintf("maximum allowed value of a user defined priority is %v", scheduling.HighestUserDefinablePriority)))
 	}
+	if pc.PreemptionPolicy != nil {
+		allErrs = append(allErrs, apivalidation.ValidatePreemptionPolicy(pc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
+	}
 	return allErrs
 }
 
@@ -52,5 +55,7 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	if pc.Value != oldPc.Value {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("Value"), "may not be changed in an update."))
 	}
+	// PreemptionPolicy is immutable and is checked by the ObjectMeta validator.
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	return allErrs
 }

@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -29,13 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
@@ -104,7 +101,6 @@ func newTableInstance(name string) *unstructured.Unstructured {
 }
 
 func TestTableGet(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -148,13 +144,15 @@ func TestTableGet(t *testing.T) {
 		codecs := serializer.NewCodecFactory(scheme)
 		parameterCodec := runtime.NewParameterCodec(scheme)
 		metav1.AddToGroupVersion(scheme, gv)
-		scheme.AddKnownTypes(gv, &metav1beta1.Table{}, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(gv, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(gv, &metav1.TableOptions{})
 		scheme.AddKnownTypes(metav1beta1.SchemeGroupVersion, &metav1beta1.Table{}, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(metav1.SchemeGroupVersion, &metav1.Table{}, &metav1.TableOptions{})
 
 		crConfig := *config
 		crConfig.GroupVersion = &gv
 		crConfig.APIPath = "/apis"
-		crConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: codecs}
+		crConfig.NegotiatedSerializer = codecs.WithoutConversion()
 		crRestClient, err := rest.RESTClientFor(&crConfig)
 		if err != nil {
 			t.Fatal(err)
@@ -260,7 +258,6 @@ func TestTableGet(t *testing.T) {
 // TestColumnsPatch tests the case that a CRD was created with no top-level or
 // per-version columns. One should be able to PATCH the CRD setting per-version columns.
 func TestColumnsPatch(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -305,7 +302,6 @@ func TestColumnsPatch(t *testing.T) {
 // One should be able to PATCH the CRD cleaning the top-level columns and setting per-version
 // columns.
 func TestPatchCleanTopLevelColumns(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)

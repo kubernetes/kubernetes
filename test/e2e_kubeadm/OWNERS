@@ -6,19 +6,19 @@ approvers:
 - fabriziopandini
 - neolit123
 - rosti
+- ereslibre
 reviewers:
 - luxas
 - timothysc
 - fabriziopandini
 - neolit123
 - kad
-- liztio
-- chuckha
 - detiber
 - dixudx
 - rosti
 - yagonobre
-- ereslibre 
+- ereslibre
+- SataQiu
 
 labels:
 - area/kubeadm

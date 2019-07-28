@@ -20,26 +20,26 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"time"
-
-	"k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/utils"
+	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Certificates API", func() {
 	f := framework.NewDefaultFramework("certificates")
 
-	It("should support building a client with a CSR", func() {
+	ginkgo.It("should support building a client with a CSR", func() {
 		const commonName = "tester-csr"
 
-		pk, err := pkiutil.NewPrivateKey()
+		pk, err := utils.NewPrivateKey()
 		framework.ExpectNoError(err)
 
 		pkder := x509.MarshalPKCS1PrivateKey(pk)
@@ -51,32 +51,32 @@ var _ = SIGDescribe("Certificates API", func() {
 		csrb, err := cert.MakeCSR(pk, &pkix.Name{CommonName: commonName, Organization: []string{"system:masters"}}, nil, nil)
 		framework.ExpectNoError(err)
 
-		csr := &v1beta1.CertificateSigningRequest{
+		csr := &certificatesv1beta1.CertificateSigningRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: commonName + "-",
 			},
-			Spec: v1beta1.CertificateSigningRequestSpec{
+			Spec: certificatesv1beta1.CertificateSigningRequestSpec{
 				Request: csrb,
-				Usages: []v1beta1.KeyUsage{
-					v1beta1.UsageSigning,
-					v1beta1.UsageKeyEncipherment,
-					v1beta1.UsageClientAuth,
+				Usages: []certificatesv1beta1.KeyUsage{
+					certificatesv1beta1.UsageSigning,
+					certificatesv1beta1.UsageKeyEncipherment,
+					certificatesv1beta1.UsageClientAuth,
 				},
 			},
 		}
 		csrs := f.ClientSet.CertificatesV1beta1().CertificateSigningRequests()
 
-		framework.Logf("creating CSR")
+		e2elog.Logf("creating CSR")
 		csr, err = csrs.Create(csr)
 		framework.ExpectNoError(err)
 
 		csrName := csr.Name
 
-		framework.Logf("approving CSR")
+		e2elog.Logf("approving CSR")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
-			csr.Status.Conditions = []v1beta1.CertificateSigningRequestCondition{
+			csr.Status.Conditions = []certificatesv1beta1.CertificateSigningRequestCondition{
 				{
-					Type:    v1beta1.CertificateApproved,
+					Type:    certificatesv1beta1.CertificateApproved,
 					Reason:  "E2E",
 					Message: "Set from an e2e test",
 				},
@@ -84,27 +84,27 @@ var _ = SIGDescribe("Certificates API", func() {
 			csr, err = csrs.UpdateApproval(csr)
 			if err != nil {
 				csr, _ = csrs.Get(csrName, metav1.GetOptions{})
-				framework.Logf("err updating approval: %v", err)
+				e2elog.Logf("err updating approval: %v", err)
 				return false, nil
 			}
 			return true, nil
 		}))
 
-		framework.Logf("waiting for CSR to be signed")
+		e2elog.Logf("waiting for CSR to be signed")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
 			csr, err = csrs.Get(csrName, metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("error getting csr: %v", err)
+				e2elog.Logf("error getting csr: %v", err)
 				return false, nil
 			}
 			if len(csr.Status.Certificate) == 0 {
-				framework.Logf("csr not signed yet")
+				e2elog.Logf("csr not signed yet")
 				return false, nil
 			}
 			return true, nil
 		}))
 
-		framework.Logf("testing the client")
+		e2elog.Logf("testing the client")
 		rcfg, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 

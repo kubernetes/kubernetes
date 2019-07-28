@@ -26,13 +26,15 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/google/gofuzz"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/googleapis/gnostic/compiler"
 	"gopkg.in/yaml.v2"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/util/diff"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -94,10 +96,13 @@ properties:
 		t.Fatal(err)
 	}
 
-	schema, err := ConvertJSONSchemaPropsToOpenAPIv2Schema(&specInternal)
+	ss, err := structuralschema.NewStructural(&specInternal)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ssV2 := ToStructuralOpenAPIV2(ss)
+	schema := ssV2.ToGoOpenAPI()
 
 	if _, found := schema.Properties["spec"]; !found {
 		t.Errorf("spec not found")
@@ -107,7 +112,7 @@ properties:
 	}
 }
 
-func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
+func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 	testStr := "test"
 	testStr2 := "test2"
 	testFloat64 := float64(6.4)
@@ -115,41 +120,32 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 	testApiextensionsJSON := apiextensions.JSON(testStr)
 
 	tests := []struct {
-		name     string
-		in       *apiextensions.JSONSchemaProps
-		expected *spec.Schema
+		name        string
+		in          *apiextensions.JSONSchemaProps
+		expected    *spec.Schema
+		expectError bool
+		expectDiff  bool
 	}{
 		{
 			name: "id",
 			in: &apiextensions.JSONSchemaProps{
 				ID: testStr,
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: new(spec.Schema).
-			// 	WithID(testStr),
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "$schema",
 			in: &apiextensions.JSONSchemaProps{
 				Schema: "test",
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		Schema: "test",
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "$ref",
 			in: &apiextensions.JSONSchemaProps{
 				Ref: &testStr,
 			},
-			expected: new(spec.Schema),
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R104
-			// expected: spec.RefSchema(testStr),
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "description",
@@ -167,6 +163,14 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 			},
 			expected: new(spec.Schema).
 				Typed(testStr, testStr2),
+		},
+		{
+			name: "nullable",
+			in: &apiextensions.JSONSchemaProps{
+				Type:     "object",
+				Nullable: true,
+			},
+			expected: new(spec.Schema),
 		},
 		{
 			name: "title",
@@ -317,18 +321,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					},
 				},
 			},
-			expected: new(spec.Schema),
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R272
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		Items: &spec.SchemaOrArray{
-			// 			Schemas: []spec.Schema{
-			// 				*spec.BooleanProperty(),
-			// 				*spec.StringProperty(),
-			// 			},
-			// 		},
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "allOf",
@@ -338,8 +331,10 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					{Type: "string"},
 				},
 			},
-			expected: new(spec.Schema).
-				WithAllOf(*spec.BooleanProperty(), *spec.StringProperty()),
+			expected: new(spec.Schema),
+			// intentionally not exported in v2
+			// expected: new(spec.Schema).
+			//   WithAllOf(*spec.BooleanProperty(), *spec.StringProperty()),
 		},
 		{
 			name: "oneOf",
@@ -471,8 +466,10 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					},
 				},
 			},
-			expected: new(spec.Schema).
-				WithAllOf(spec.Schema{}, spec.Schema{}, spec.Schema{}, *spec.StringProperty()),
+			expected: new(spec.Schema),
+			// not supported by OpenAPI v2 + allOf intentionally not exported
+			// expected: new(spec.Schema).
+			//	WithAllOf(spec.Schema{}, spec.Schema{}, spec.Schema{}, *spec.StringProperty()),
 		},
 		{
 			name: "properties",
@@ -485,18 +482,35 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 				SetProperty(testStr, *spec.BooleanProperty()),
 		},
 		{
-			name: "additionalProperties",
+			name: "additionalProperties schema",
 			in: &apiextensions.JSONSchemaProps{
 				AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
-					Allows: true,
+					Allows: false,
 					Schema: &apiextensions.JSONSchemaProps{Type: "boolean"},
 				},
 			},
 			expected: &spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					AdditionalProperties: &spec.SchemaOrBool{
-						Allows: true,
+						Allows: false,
 						Schema: spec.BooleanProperty(),
+					},
+				},
+			},
+		},
+		{
+			name: "additionalProperties bool",
+			in: &apiextensions.JSONSchemaProps{
+				AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+					Allows: true,
+					Schema: nil,
+				},
+			},
+			expected: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					AdditionalProperties: &spec.SchemaOrBool{
+						Allows: true,
+						Schema: nil,
 					},
 				},
 			},
@@ -508,15 +522,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					testStr: {Type: "boolean"},
 				},
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		PatternProperties: map[string]spec.Schema{
-			// 			testStr: *spec.BooleanProperty(),
-			// 		},
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "dependencies schema",
@@ -527,17 +533,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					},
 				},
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		Dependencies: spec.Dependencies{
-			// 			testStr: spec.SchemaOrStringArray{
-			// 				Schema: spec.BooleanProperty(),
-			// 			},
-			// 		},
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "dependencies string array",
@@ -548,17 +544,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					},
 				},
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		Dependencies: spec.Dependencies{
-			// 			testStr: spec.SchemaOrStringArray{
-			// 				Property: []string{testStr2},
-			// 			},
-			// 		},
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "additionalItems",
@@ -568,16 +554,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					Schema: &apiextensions.JSONSchemaProps{Type: "boolean"},
 				},
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		AdditionalItems: &spec.SchemaOrBool{
-			// 			Allows: true,
-			// 			Schema: spec.BooleanProperty(),
-			// 		},
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "definitions",
@@ -586,15 +563,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 					testStr: apiextensions.JSONSchemaProps{Type: "boolean"},
 				},
 			},
-			expected: new(spec.Schema),
-			// not supported by gnostic
-			// expected: &spec.Schema{
-			// 	SchemaProps: spec.SchemaProps{
-			// 		Definitions: spec.Definitions{
-			// 			testStr: *spec.BooleanProperty(),
-			// 		},
-			// 	},
-			// },
+			expectError: true, // rejected by kube validation and NewStructural
 		},
 		{
 			name: "externalDocs",
@@ -606,6 +575,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 			},
 			expected: new(spec.Schema).
 				WithExternalDocs(testStr, testStr2),
+			expectDiff: true,
 		},
 		{
 			name: "example",
@@ -614,115 +584,127 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaFuzzing(t *testing.T) {
 			},
 			expected: new(spec.Schema).
 				WithExample(testStr),
+			expectDiff: true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			out, err := ConvertJSONSchemaPropsToOpenAPIv2Schema(test.in)
-			if err != nil {
-				t.Fatalf("unexpected error in converting openapi schema: %v", err)
+			ss, err := structuralschema.NewStructural(test.in)
+			if err != nil && !test.expectError {
+				t.Fatalf("structural schema error: %v", err)
+			} else if err == nil && test.expectError {
+				t.Fatalf("expected NewStructural error, but didn't get any")
 			}
-			if !reflect.DeepEqual(*out, *test.expected) {
-				t.Errorf("unexpected result:\n  want=%v\n   got=%v\n\n%s", *test.expected, *out, diff.ObjectDiff(*test.expected, *out))
+
+			if !test.expectError {
+				out := ToStructuralOpenAPIV2(ss).ToGoOpenAPI()
+				if equal := reflect.DeepEqual(*out, *test.expected); !equal && !test.expectDiff {
+					t.Errorf("unexpected result:\n  want=%v\n   got=%v\n\n%s", *test.expected, *out, cmp.Diff(*test.expected, *out, cmp.Comparer(refEqual)))
+				} else if equal && test.expectDiff {
+					t.Errorf("expected diff, but didn't get any")
+				}
 			}
 		})
 	}
+}
+
+func refEqual(x spec.Ref, y spec.Ref) bool {
+	return x.String() == y.String()
 }
 
 // TestKubeOpenapiRejectionFiltering tests that the CRD openapi schema filtering leads to a spec that the
 // kube-openapi/pkg/util/proto model code support in version used in Kubernetes 1.13.
 func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 	for i := 0; i < 10000; i++ {
-		t.Run(fmt.Sprintf("iteration %d", i), func(t *testing.T) {
-			f := fuzz.New()
-			seed := time.Now().UnixNano()
-			randSource := rand.New(rand.NewSource(seed))
-			f.RandSource(randSource)
-			t.Logf("seed = %d", seed)
+		f := fuzz.New()
+		seed := time.Now().UnixNano()
+		randSource := rand.New(rand.NewSource(seed))
+		f.RandSource(randSource)
+		t.Logf("iteration %d with seed %d", i, seed)
 
-			fuzzFuncs(f, func(ref *spec.Ref, c fuzz.Continue, visible bool) {
-				var url string
-				if c.RandBool() {
-					url = fmt.Sprintf("http://%d", c.Intn(100000))
-				} else {
-					url = "#/definitions/test"
-				}
-				r, err := spec.NewRef(url)
-				if err != nil {
-					t.Fatalf("failed to fuzz ref: %v", err)
-				}
-				*ref = r
-			})
-
-			// create go-openapi object and fuzz it (we start here because we have the powerful fuzzer already
-			s := &spec.Schema{}
-			f.Fuzz(s)
-
-			// convert to apiextensions v1beta1
-			bs, err := json.Marshal(s)
+		fuzzFuncs(f, func(ref *spec.Ref, c fuzz.Continue, visible bool) {
+			var url string
+			if c.RandBool() {
+				url = fmt.Sprintf("http://%d", c.Intn(100000))
+			} else {
+				url = "#/definitions/test"
+			}
+			r, err := spec.NewRef(url)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("failed to fuzz ref: %v", err)
 			}
-			t.Log(string(bs))
-
-			var schema *apiextensionsv1beta1.JSONSchemaProps
-			if err := json.Unmarshal(bs, &schema); err != nil {
-				t.Fatalf("failed to unmarshal JSON into apiextensions/v1beta1: %v", err)
-			}
-
-			// convert to internal
-			internalSchema := &apiextensions.JSONSchemaProps{}
-			if err := apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(schema, internalSchema, nil); err != nil {
-				t.Fatalf("failed to convert from apiextensions/v1beta1 to internal: %v", err)
-			}
-
-			// apply the filter
-			filtered, err := ConvertJSONSchemaPropsToOpenAPIv2Schema(internalSchema)
-			if err != nil {
-				t.Fatalf("failed to filter: %v", err)
-			}
-
-			// create a doc out of it
-			filteredSwagger := &spec.Swagger{
-				SwaggerProps: spec.SwaggerProps{
-					Definitions: spec.Definitions{
-						"test": *filtered,
-					},
-					Info: &spec.Info{
-						InfoProps: spec.InfoProps{
-							Description: "test",
-							Version:     "test",
-							Title:       "test",
-						},
-					},
-					Swagger: "2.0",
-				},
-			}
-
-			// convert to JSON
-			bs, err = json.Marshal(filteredSwagger)
-			if err != nil {
-				t.Fatalf("failed to encode filtered to JSON: %v", err)
-			}
-
-			// unmarshal as yaml
-			var yml yaml.MapSlice
-			if err := yaml.Unmarshal(bs, &yml); err != nil {
-				t.Fatalf("failed to decode filtered JSON by into memory: %v", err)
-			}
-
-			// create gnostic doc
-			doc, err := openapi_v2.NewDocument(yml, compiler.NewContext("$root", nil))
-			if err != nil {
-				t.Fatalf("failed to create gnostic doc: %v", err)
-			}
-
-			// load with kube-openapi/pkg/util/proto
-			if _, err := proto.NewOpenAPIData(doc); err != nil {
-				t.Fatalf("failed to convert to kube-openapi/pkg/util/proto model: %v", err)
-			}
+			*ref = r
 		})
+
+		// create go-openapi object and fuzz it (we start here because we have the powerful fuzzer already
+		s := &spec.Schema{}
+		f.Fuzz(s)
+
+		// convert to apiextensions v1beta1
+		bs, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(string(bs))
+
+		var schema *apiextensionsv1beta1.JSONSchemaProps
+		if err := json.Unmarshal(bs, &schema); err != nil {
+			t.Fatalf("failed to unmarshal JSON into apiextensions/v1beta1: %v", err)
+		}
+
+		// convert to internal
+		internalSchema := &apiextensions.JSONSchemaProps{}
+		if err := apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(schema, internalSchema, nil); err != nil {
+			t.Fatalf("failed to convert from apiextensions/v1beta1 to internal: %v", err)
+		}
+
+		// apply the filter
+		ss, err := structuralschema.NewStructural(internalSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		filtered := ToStructuralOpenAPIV2(ss).ToGoOpenAPI()
+
+		// create a doc out of it
+		filteredSwagger := &spec.Swagger{
+			SwaggerProps: spec.SwaggerProps{
+				Definitions: spec.Definitions{
+					"test": *filtered,
+				},
+				Info: &spec.Info{
+					InfoProps: spec.InfoProps{
+						Description: "test",
+						Version:     "test",
+						Title:       "test",
+					},
+				},
+				Swagger: "2.0",
+			},
+		}
+
+		// convert to JSON
+		bs, err = json.Marshal(filteredSwagger)
+		if err != nil {
+			t.Fatalf("failed to encode filtered to JSON: %v", err)
+		}
+
+		// unmarshal as yaml
+		var yml yaml.MapSlice
+		if err := yaml.Unmarshal(bs, &yml); err != nil {
+			t.Fatalf("failed to decode filtered JSON by into memory: %v", err)
+		}
+
+		// create gnostic doc
+		doc, err := openapi_v2.NewDocument(yml, compiler.NewContext("$root", nil))
+		if err != nil {
+			t.Fatalf("failed to create gnostic doc: %v", err)
+		}
+
+		// load with kube-openapi/pkg/util/proto
+		if _, err := proto.NewOpenAPIData(doc); err != nil {
+			t.Fatalf("failed to convert to kube-openapi/pkg/util/proto model: %v", err)
+		}
 	}
 }
 
@@ -794,9 +776,11 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 			if p.Default != nil {
 				p.Default = "42"
 			}
-			if p.Example != nil {
-				p.Example = "42"
-			}
+			p.Example = nil
+		},
+		func(s *spec.SwaggerSchemaProps, c fuzz.Continue) {
+			// nothing allowed
+			*s = spec.SwaggerSchemaProps{}
 		},
 		func(s *spec.SchemaProps, c fuzz.Continue) {
 			// gofuzz is broken and calls this even for *SchemaProps fields, ignoring NilChance, leading to infinite recursion
@@ -809,14 +793,26 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 
 			c.FuzzNoCustom(s)
 
-			// we don't support multi-type schema props yet in apiextensions/v1beta1
-			if len(s.Type) > 1 {
-				s.Type = s.Type[:1]
+			if c.RandBool() {
+				types := []string{"object", "array", "boolean", "string", "integer", "number"}
+				s.Type = []string{types[c.Intn(len(types))]}
+			} else {
+				s.Type = nil
+			}
 
-				s := apiextensionsv1beta1.JSONSchemaProps{}
-				if reflect.TypeOf(s.Type).String() != "string" {
-					panic(fmt.Errorf("this simplifaction is outdated: apiextensions/v1beta1 types not a single string anymore, but %T", s.Type))
-				}
+			s.ID = ""
+			s.Ref = spec.Ref{}
+			s.AdditionalItems = nil
+			s.Dependencies = nil
+			s.Schema = ""
+			s.PatternProperties = nil
+			s.Definitions = nil
+
+			if len(s.Type) == 1 && s.Type[0] == "array" {
+				s.Items = &spec.SchemaOrArray{Schema: &spec.Schema{}}
+				c.Fuzz(s.Items.Schema)
+			} else {
+				s.Items = nil
 			}
 
 			// reset JSON fields to some correct JSON

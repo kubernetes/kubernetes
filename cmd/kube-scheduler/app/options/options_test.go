@@ -29,6 +29,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -146,6 +147,31 @@ users:
 		t.Fatal(err)
 	}
 
+	// plugin config
+	pluginconfigFile := filepath.Join(tmpDir, "plugin.yaml")
+	if err := ioutil.WriteFile(pluginconfigFile, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1alpha1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+plugins:
+  reserve:
+    enabled:
+    - name: foo
+    - name: bar
+    disabled:
+    - name: baz
+  preBind:
+    enabled:
+    - name: foo
+    disabled:
+    - name: baz
+pluginConfig:
+- name: foo
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// Insulate this test from picking up in-cluster config when run inside a pod
 	// We can't assume we have permissions to write to /var/run/secrets/... from a unit test to mock in-cluster config for testing
 	originalHost := os.Getenv("KUBERNETES_SERVICE_HOST")
@@ -206,7 +232,6 @@ users:
 				HardPodAffinitySymmetricWeight: 1,
 				HealthzBindAddress:             "0.0.0.0:10251",
 				MetricsBindAddress:             "0.0.0.0:10251",
-				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
 						LeaderElect:   true,
@@ -225,6 +250,7 @@ users:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
+				Plugins:            nil,
 			},
 		},
 		{
@@ -286,7 +312,6 @@ users:
 				HardPodAffinitySymmetricWeight: 1,
 				HealthzBindAddress:             "", // defaults empty when not running from config file
 				MetricsBindAddress:             "", // defaults empty when not running from config file
-				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
 						LeaderElect:   true,
@@ -335,6 +360,73 @@ users:
 				},
 			},
 			expectedUsername: "none, http",
+		},
+		{
+			name: "plugin config",
+			options: &Options{
+				ConfigFile: pluginconfigFile,
+			},
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "0.0.0.0:10251",
+				MetricsBindAddress:             "0.0.0.0:10251",
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:   true,
+						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:  "endpoints",
+					},
+					LockObjectNamespace: "kube-system",
+					LockObjectName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
+				Plugins: &kubeschedulerconfig.Plugins{
+					Reserve: &kubeschedulerconfig.PluginSet{
+						Enabled: []kubeschedulerconfig.Plugin{
+							{
+								Name: "foo",
+							},
+							{
+								Name: "bar",
+							},
+						},
+						Disabled: []kubeschedulerconfig.Plugin{
+							{
+								Name: "baz",
+							},
+						},
+					},
+					PreBind: &kubeschedulerconfig.PluginSet{
+						Enabled: []kubeschedulerconfig.Plugin{
+							{
+								Name: "foo",
+							},
+						},
+						Disabled: []kubeschedulerconfig.Plugin{
+							{
+								Name: "baz",
+							},
+						},
+					},
+				},
+				PluginConfig: []kubeschedulerconfig.PluginConfig{
+					{
+						Name: "foo",
+						Args: runtime.Unknown{},
+					},
+				},
+			},
 		},
 		{
 			name:          "no config",

@@ -22,15 +22,15 @@ import (
 
 	"github.com/go-openapi/spec"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
-func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32) apiregistration.APIService {
-	r := apiregistration.APIService{}
+func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32, svc *apiregistrationv1.ServiceReference) apiregistrationv1.APIService {
+	r := apiregistrationv1.APIService{}
 	r.Spec.Group = group
 	r.Spec.GroupPriorityMinimum = minGroupPriority
 	r.Spec.VersionPriority = versionPriority
-	r.Spec.Service = &apiregistration.ServiceReference{}
+	r.Spec.Service = svc
 	r.Name = name
 	return r
 }
@@ -48,22 +48,31 @@ func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames 
 func TestAPIServiceSort(t *testing.T) {
 	list := []openAPISpecInfo{
 		{
-			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5),
+			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{
-			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3),
+			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{
-			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3),
+			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{
-			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3),
+			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
+		},
+		{
+			apiService: newAPIServiceForTest("local_service_1", "Group4", 15, 1, nil),
+		},
+		{
+			apiService: newAPIServiceForTest("local_service_3", "Group5", 15, 2, nil),
+		},
+		{
+			apiService: newAPIServiceForTest("local_service_2", "Group6", 15, 3, nil),
 		},
 	}
 	sortByPriority(list)
-	assertSortedServices(t, list, []string{"FirstService", "FirstServiceInternal", "SecondService", "ThirdService"})
+	assertSortedServices(t, list, []string{"local_service_1", "local_service_2", "local_service_3", "FirstService", "FirstServiceInternal", "SecondService", "ThirdService"})
 }

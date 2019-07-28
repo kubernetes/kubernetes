@@ -27,14 +27,14 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 	utilsexec "k8s.io/utils/exec"
 )
 
 var (
-	preflightExample = normalizer.Examples(`
+	preflightExample = cmdutil.Examples(`
 		# Run join pre-flight checks using a config file.
 		kubeadm join phase preflight --config kubeadm-config.yml
 		`)
@@ -120,7 +120,8 @@ func runPreflight(c workflow.RunData) error {
 
 		// run kubeadm init preflight checks for checking all the prerequisites
 		fmt.Println("[preflight] Running pre-flight checks before initializing the new control plane instance")
-		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true); err != nil {
+
+		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true, hasCertificateKey); err != nil {
 			return err
 		}
 

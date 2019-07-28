@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -41,7 +43,6 @@ const manifestPath = "test/e2e/testing-manifests/statefulset/etcd"
 type EtcdUpgradeTest struct {
 	ip               string
 	successfulWrites int
-	ssTester         *framework.StatefulSetTester
 }
 
 // Name returns the tracking name of the test.
@@ -68,13 +69,12 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
-	t.ssTester = framework.NewStatefulSetTester(f.ClientSet)
 
 	ginkgo.By("Creating a PDB")
 	kubectlCreate(ns, "pdb.yaml")
 
 	ginkgo.By("Creating an etcd StatefulSet")
-	t.ssTester.CreateStatefulSet(manifestPath, ns)
+	e2esset.CreateStatefulSet(f.ClientSet, manifestPath, ns)
 
 	ginkgo.By("Creating an etcd--test-server deployment")
 	kubectlCreate(ns, "tester.yaml")
@@ -85,23 +85,25 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.listUsers(); err != nil {
-			framework.Logf("Service endpoint is up but isn't responding")
+			e2elog.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	framework.Logf("Service endpoint is up")
+	framework.ExpectNoError(err)
+	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 dummy users")
-	gomega.Expect(t.addUser("Alice")).NotTo(gomega.HaveOccurred())
-	gomega.Expect(t.addUser("Bob")).NotTo(gomega.HaveOccurred())
+	err = t.addUser("Alice")
+	framework.ExpectNoError(err)
+	err = t.addUser("Bob")
+	framework.ExpectNoError(err)
 	t.successfulWrites = 2
 
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	gomega.Expect(len(users)).To(gomega.Equal(2))
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(len(users), 2)
 }
 
 func (t *EtcdUpgradeTest) listUsers() ([]string, error) {
@@ -143,7 +145,7 @@ func (t *EtcdUpgradeTest) addUser(name string) error {
 
 func (t *EtcdUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -163,7 +165,7 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	go wait.Until(func() {
 		writeAttempts++
 		if err := t.addUser(fmt.Sprintf("user-%d", writeAttempts)); err != nil {
-			framework.Logf("Unable to add user: %v", err)
+			e2elog.Logf("Unable to add user: %v", err)
 			mu.Lock()
 			errors[err.Error()]++
 			mu.Unlock()
@@ -175,7 +177,7 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	wait.Until(func() {
 		users, err := t.listUsers()
 		if err != nil {
-			framework.Logf("Could not retrieve users: %v", err)
+			e2elog.Logf("Could not retrieve users: %v", err)
 			failures++
 			mu.Lock()
 			errors[err.Error()]++
@@ -185,14 +187,14 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 		success++
 		lastUserCount = len(users)
 	}, 10*time.Millisecond, done)
-	framework.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
+	e2elog.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
 
 	gomega.Expect(lastUserCount >= t.successfulWrites).To(gomega.BeTrue())
 	ratio := float64(success) / float64(success+failures)
-	framework.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
+	e2elog.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
 	ratio = float64(t.successfulWrites) / float64(writeAttempts)
-	framework.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
-	framework.Logf("Errors: %v", errors)
+	e2elog.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
+	e2elog.Logf("Errors: %v", errors)
 	// TODO(maisem): tweak this value once we have a few test runs.
 	gomega.Expect(ratio > 0.75).To(gomega.BeTrue())
 }
@@ -200,6 +202,6 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 // Teardown does one final check of the data's availability.
 func (t *EtcdUpgradeTest) Teardown(f *framework.Framework) {
 	users, err := t.listUsers()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(users) >= t.successfulWrites).To(gomega.BeTrue())
 }

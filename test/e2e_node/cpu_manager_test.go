@@ -26,8 +26,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -105,7 +105,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 
 func waitForContainerRemoval(containerName, podName, podNS string) {
 	rs, _, err := getCRIClient()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	Eventually(func() bool {
 		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{

@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 const (
@@ -94,14 +94,15 @@ type LogsOptions struct {
 	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
 
 	// PodLogOptions
-	SinceTime    string
-	SinceSeconds time.Duration
-	Follow       bool
-	Previous     bool
-	Timestamps   bool
-	LimitBytes   int64
-	Tail         int64
-	Container    string
+	SinceTime       string
+	SinceSeconds    time.Duration
+	Follow          bool
+	Previous        bool
+	Timestamps      bool
+	IgnoreLogErrors bool
+	LimitBytes      int64
+	Tail            int64
+	Container       string
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -114,6 +115,8 @@ type LogsOptions struct {
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
 	genericclioptions.IOStreams
+
+	TailSpecified bool
 }
 
 func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
@@ -147,12 +150,13 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 		Aliases: []string{"log"},
 	}
-	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers's logs in the pod(s).")
+	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64Var(&o.LimitBytes, "limit-bytes", o.LimitBytes, "Maximum bytes of logs to return. Defaults to no limit.")
 	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
 	cmd.Flags().Int64Var(&o.Tail, "tail", o.Tail, "Lines of recent log file to display. Defaults to -1 with no selector, showing all log lines otherwise 10, if a selector is provided.")
+	cmd.Flags().BoolVar(&o.IgnoreLogErrors, "ignore-errors", o.IgnoreLogErrors, "If watching / following pod logs, allow for any errors that occur to be non-fatal")
 	cmd.Flags().StringVar(&o.SinceTime, "since-time", o.SinceTime, i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
 	cmd.Flags().DurationVar(&o.SinceSeconds, "since", o.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Print the logs of this container")
@@ -189,7 +193,7 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 		logOptions.SinceSeconds = &sec
 	}
 
-	if len(o.Selector) > 0 && o.Tail == -1 {
+	if len(o.Selector) > 0 && o.Tail == -1 && !o.TailSpecified {
 		logOptions.TailLines = &selectorTail
 	} else if o.Tail != -1 {
 		logOptions.TailLines = &o.Tail
@@ -200,6 +204,7 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 
 func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.ContainerNameSpecified = cmd.Flag("container").Changed
+	o.TailSpecified = cmd.Flag("tail").Changed
 	o.Resources = args
 
 	switch len(args) {
@@ -288,8 +293,8 @@ func (o LogsOptions) Validate() error {
 		return fmt.Errorf("--since must be greater than 0")
 	}
 
-	if logsOptions.TailLines != nil && *logsOptions.TailLines < 0 {
-		return fmt.Errorf("TailLines must be greater than or equal to 0")
+	if logsOptions.TailLines != nil && *logsOptions.TailLines < -1 {
+		return fmt.Errorf("--tail must be greater than or equal to -1")
 	}
 
 	return nil
@@ -322,14 +327,18 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 	wg.Add(len(requests))
 	for _, request := range requests {
 		go func(request rest.ResponseWrapper) {
+			defer wg.Done()
 			if err := o.ConsumeRequestFn(request, writer); err != nil {
-				writer.CloseWithError(err)
+				if !o.IgnoreLogErrors {
+					writer.CloseWithError(err)
 
-				// It's important to return here to propagate the error via the pipe
-				return
+					// It's important to return here to propagate the error via the pipe
+					return
+				}
+
+				fmt.Fprintf(writer, "error: %v\n", err)
 			}
 
-			wg.Done()
 		}(request)
 	}
 

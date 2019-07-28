@@ -171,6 +171,7 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		config.BearerToken = configAuthInfo.Token
+		config.BearerTokenFile = configAuthInfo.TokenFile
 	} else if len(configAuthInfo.TokenFile) > 0 {
 		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
@@ -195,6 +196,9 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 	if len(configAuthInfo.Username) > 0 || len(configAuthInfo.Password) > 0 {
 		config.Username = configAuthInfo.Username
 		config.Password = configAuthInfo.Password
+	}
+	if configAuthInfo.Exec != nil {
+		config.ExecProvider = configAuthInfo.Exec.DeepCopy()
 	}
 	if configAuthInfo.AuthProvider != nil {
 		return nil, fmt.Errorf("auth provider not supported")

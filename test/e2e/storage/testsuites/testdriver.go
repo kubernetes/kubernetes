@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -87,6 +88,9 @@ type PreprovisionedPVTestDriver interface {
 type DynamicPVTestDriver interface {
 	TestDriver
 	// GetDynamicProvisionStorageClass returns a StorageClass dynamic provision Persistent Volume.
+	// The StorageClass must be created in the current test's namespace and have
+	// a unique name inside that namespace because GetDynamicProvisionStorageClass might
+	// be called more than once per test.
 	// It will set fsType to the StorageClass, if TestDriver supports it.
 	// It will return nil, if the TestDriver doesn't support it.
 	GetDynamicProvisionStorageClass(config *PerTestConfig, fsType string) *storagev1.StorageClass
@@ -95,6 +99,23 @@ type DynamicPVTestDriver interface {
 	// The size must be chosen so that the resulting volume is large enough for all
 	// enabled tests and within the range supported by the underlying storage.
 	GetClaimSize() string
+}
+
+// EphemeralTestDriver represents an interface for a TestDriver that supports ephemeral inline volumes.
+type EphemeralTestDriver interface {
+	TestDriver
+
+	// GetVolumeAttributes returns the volume attributes for a
+	// certain inline ephemeral volume, enumerated starting with
+	// #0. Some tests might require more than one volume. They can
+	// all be the same or different, depending what the driver supports
+	// and/or wants to test.
+	GetVolumeAttributes(config *PerTestConfig, volumeNumber int) map[string]string
+
+	// GetCSIDriverName returns the name that was used when registering with
+	// kubelet. Depending on how the driver was deployed, this can be different
+	// from DriverInfo.Name.
+	GetCSIDriverName(config *PerTestConfig) string
 }
 
 // SnapshottableTestDriver represents an interface for a TestDriver that supports DynamicSnapshot
@@ -108,6 +129,7 @@ type SnapshottableTestDriver interface {
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
+// Constants related to capability
 const (
 	CapPersistence Capability = "persistence" // data is persisted across pod restarts
 	CapBlock       Capability = "block"       // raw block mode
@@ -121,12 +143,22 @@ const (
 	// - https://github.com/container-storage-interface/spec/issues/178
 	// - NodeStageVolume in the spec
 	CapMultiPODs Capability = "multipods"
+
+	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
+	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
+	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
 )
 
 // DriverInfo represents static information about a TestDriver.
 type DriverInfo struct {
-	Name       string // Name of the driver, aka the provisioner name.
-	FeatureTag string // FeatureTag for the driver
+	// Internal name of the driver, this is used as a display name in the test
+	// case and test objects
+	Name string
+	// Fully qualified plugin name as registered in Kubernetes of the in-tree
+	// plugin if it exists and is empty if this DriverInfo represents a CSI
+	// Driver
+	InTreePluginName string
+	FeatureTag       string // FeatureTag for the driver
 
 	MaxFileSize          int64               // Max file size to be tested for this driver
 	SupportedFsType      sets.String         // Map of string for supported fs type
@@ -165,7 +197,7 @@ type PerTestConfig struct {
 	// Some test drivers initialize a storage server. This is
 	// the configuration that then has to be used to run tests.
 	// The values above are ignored for such tests.
-	ServerConfig *framework.VolumeTestConfig
+	ServerConfig *volume.TestConfig
 }
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests

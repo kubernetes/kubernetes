@@ -44,14 +44,14 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
-	"k8s.io/kubernetes/pkg/master/ports"
+	kubeadmversion "k8s.io/kubernetes/cmd/kubeadm/app/version"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
+	utilsnet "k8s.io/utils/net"
 )
 
 const (
@@ -143,8 +143,8 @@ func (sc ServiceCheck) Check() (warnings, errorList []error) {
 
 	if !initSystem.ServiceIsEnabled(sc.Service) {
 		warnings = append(warnings,
-			errors.Errorf("%s service is not enabled, please run 'systemctl enable %s.service'",
-				sc.Service, sc.Service))
+			errors.Errorf("%s service is not enabled, please run '%s'",
+				sc.Service, initSystem.EnableCommand(sc.Service)))
 	}
 
 	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
@@ -884,8 +884,9 @@ func (r IPVSProxierCheck) Name() string {
 
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
+// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks and RunOptionalJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool) error {
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool, downloadCerts bool) error {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
@@ -897,10 +898,10 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), ports.KubeletPort}},
+		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), kubeadmconstants.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
-		PortOpenCheck{port: ports.InsecureSchedulerPort},
-		PortOpenCheck{port: ports.InsecureKubeControllerManagerPort},
+		PortOpenCheck{port: kubeadmconstants.InsecureSchedulerPort},
+		PortOpenCheck{port: kubeadmconstants.InsecureKubeControllerManagerPort},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
@@ -920,17 +921,23 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if ip.To4() == nil && ip.To16() != nil {
+			if utilsnet.IsIPv6(ip) {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
 				)
 			}
 		}
+
+		// if using an external etcd
+		if cfg.Etcd.External != nil {
+			// Check external etcd version before creating the cluster
+			checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
+		}
 	}
 
 	if cfg.Etcd.Local != nil {
-		// Only do etcd related checks when no external endpoints were specified
+		// Only do etcd related checks when required to install a local etcd
 		checks = append(checks,
 			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
 			PortOpenCheck{port: kubeadmconstants.EtcdListenPeerPort},
@@ -938,8 +945,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		)
 	}
 
-	if cfg.Etcd.External != nil {
-		// Only check etcd version when external endpoints are specified
+	if cfg.Etcd.External != nil && !(isSecondaryControlPlane && downloadCerts) {
+		// Only check etcd certificates when using an external etcd and not joining with automatic download of certs
 		if cfg.Etcd.External.CAFile != "" {
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CAFile, Label: "ExternalEtcdClientCertificates"})
 		}
@@ -949,7 +956,6 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		if cfg.Etcd.External.KeyFile != "" {
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile, Label: "ExternalEtcdClientCertificates"})
 		}
-		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -981,7 +987,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			)
 			if !addIPv6Checks {
 				if ip := net.ParseIP(ipstr); ip != nil {
-					if ip.To4() == nil && ip.To16() != nil {
+					if utilsnet.IsIPv6(ip) {
 						addIPv6Checks = true
 					}
 				}
@@ -1002,7 +1008,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
-	// Check if IVPS kube-proxy mode is supported
+	// Check if IPVS kube-proxy mode is supported
 	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}
@@ -1010,7 +1016,7 @@ func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.Clust
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// addCommonChecks is a helper function to deplicate checks that are common between both the
+// addCommonChecks is a helper function to duplicate checks that are common between both the
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
@@ -1053,7 +1059,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 		HostnameCheck{nodeName: nodeReg.Name},
 		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		PortOpenCheck{port: ports.KubeletPort})
+		PortOpenCheck{port: kubeadmconstants.KubeletPort})
 	return checks
 }
 
@@ -1074,7 +1080,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(&cfg.ClusterConfiguration)},
+		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration)},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
@@ -1082,10 +1088,6 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
 func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String) error {
-	type checkErrors struct {
-		Name   string
-		Errors []error
-	}
 	var errsBuffer bytes.Buffer
 
 	for _, c := range checks {

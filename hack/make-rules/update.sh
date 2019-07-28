@@ -19,7 +19,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # If called directly, exit.
@@ -32,10 +32,6 @@ fi
 
 SILENT=${SILENT:-true}
 ALL=${FORCE_ALL:-false}
-V=""
-if [[ "${SILENT}" != "true" ]]; then
-	V="-v"
-fi
 
 trap 'exit 1' SIGINT
 
@@ -47,24 +43,23 @@ if ! ${ALL} ; then
 	echo "Running in short-circuit mode; run with FORCE_ALL=true to force all scripts to run."
 fi
 
-"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
-
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
 	update-generated-runtime
 	update-generated-device-plugin
+	update-generated-api-compatibility-data
 	update-generated-docs
 	update-generated-swagger-docs
 	update-openapi-spec
-	update-staging-godeps
-	update-bazel"
+	update-bazel
+	update-gofmt"
 
 for t in ${BASH_TARGETS}; do
-	echo -e "${color_yellow}Running ${t}${color_norm}"
+	echo -e "${color_yellow:?}Running ${t}${color_norm:?}"
 	if ${SILENT} ; then
 		if ! bash "${KUBE_ROOT}/hack/${t}.sh" 1> /dev/null; then
-			echo -e "${color_red}Running ${t} FAILED${color_norm}"
+			echo -e "${color_red:?}Running ${t} FAILED${color_norm}"
 			if ! ${ALL}; then
 				exit 1
 			fi
@@ -79,4 +74,4 @@ for t in ${BASH_TARGETS}; do
 	fi
 done
 
-echo -e "${color_green}Update scripts completed successfully${color_norm}"
+echo -e "${color_green:?}Update scripts completed successfully${color_norm}"

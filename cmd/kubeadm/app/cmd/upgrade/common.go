@@ -76,17 +76,6 @@ func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsM
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
 func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// Ensure the user is root
-	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(ignorePreflightErrorsSet); err != nil {
-		return nil, nil, nil, err
-	}
-
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
@@ -95,11 +84,6 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	// Check if the cluster is self-hosted
 	if upgrade.IsControlPlaneSelfHosted(client) {
 		return nil, nil, nil, errors.New("cannot upgrade a self-hosted control plane")
-	}
-
-	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, ignorePreflightErrorsSet); err != nil {
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
@@ -125,6 +109,24 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
+	// Ensure the user is root
+	klog.V(1).Info("running preflight checks")
+	if err := runPreflightChecks(ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Run healthchecks against the cluster
+	if err := upgrade.CheckClusterHealth(client, ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// If a new k8s version should be set, apply the change before printing the config
@@ -154,7 +156,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), cfg.KubernetesVersion), cfg, nil
+	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion), cfg, nil
 }
 
 // printConfiguration prints the external version of the API to yaml

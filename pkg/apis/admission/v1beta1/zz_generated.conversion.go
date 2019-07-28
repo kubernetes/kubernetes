@@ -76,6 +76,9 @@ func autoConvert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(in *v1be
 	out.Kind = in.Kind
 	out.Resource = in.Resource
 	out.SubResource = in.SubResource
+	out.RequestKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.RequestKind))
+	out.RequestResource = (*v1.GroupVersionResource)(unsafe.Pointer(in.RequestResource))
+	out.RequestSubResource = in.RequestSubResource
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	out.Operation = admission.Operation(in.Operation)
@@ -90,6 +93,9 @@ func autoConvert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(in *v1be
 		return err
 	}
 	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Options, &out.Options, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -103,6 +109,9 @@ func autoConvert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest(in *admi
 	out.Kind = in.Kind
 	out.Resource = in.Resource
 	out.SubResource = in.SubResource
+	out.RequestKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.RequestKind))
+	out.RequestResource = (*v1.GroupVersionResource)(unsafe.Pointer(in.RequestResource))
+	out.RequestSubResource = in.RequestSubResource
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	out.Operation = v1beta1.Operation(in.Operation)
@@ -117,6 +126,9 @@ func autoConvert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest(in *admi
 		return err
 	}
 	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Options, &out.Options, s); err != nil {
+		return err
+	}
 	return nil
 }
 

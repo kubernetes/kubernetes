@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/logs"
+	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -134,12 +136,13 @@ func ListenAndServeKubeletServer(
 	port uint,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
+	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -157,9 +160,9 @@ func ListenAndServeKubeletServer(
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint) {
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, false, false, false, nil)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -210,6 +213,7 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
+	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
@@ -224,7 +228,7 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	server.InstallDefaultHandlers()
+	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers(criHandler)
 		if enableContentionProfiling {
@@ -276,7 +280,7 @@ func (s *Server) InstallAuthFilter() {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers() {
+func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.LogHealthz,
@@ -291,7 +295,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
+	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, enableCAdvisorJSONEndpoints))
 	s.restfulCont.Handle(metricsPath, prometheus.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
@@ -306,6 +310,7 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
 		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:              struct{}{},
+		cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
 	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
@@ -320,20 +325,23 @@ func (s *Server) InstallDefaultHandlers() {
 
 	// prober metrics are exposed under a different endpoint
 	p := prometheus.NewRegistry()
+	compbasemetrics.RegisterProcessStartTime(p)
 	p.MustRegister(prober.ProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
 		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
 
-	ws = new(restful.WebService)
-	ws.
-		Path(specPath).
-		Produces(restful.MIME_JSON)
-	ws.Route(ws.GET("").
-		To(s.getSpec).
-		Operation("getSpec").
-		Writes(cadvisorapi.MachineInfo{}))
-	s.restfulCont.Add(ws)
+	if enableCAdvisorJSONEndpoints {
+		ws := new(restful.WebService)
+		ws.
+			Path(specPath).
+			Produces(restful.MIME_JSON)
+		ws.Route(ws.GET("").
+			To(s.getSpec).
+			Operation("getSpec").
+			Writes(cadvisorapi.MachineInfo{}))
+		s.restfulCont.Add(ws)
+	}
 }
 
 const pprofBasePath = "/debug/pprof/"
@@ -807,20 +815,70 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
+// trimURLPath trims a URL path.
+// For paths in the format of "/metrics/xxx", "metrics/xxx" is returned;
+// For all other paths, the first part of the path is returned.
+func trimURLPath(path string) string {
+	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 3)
+	if len(parts) == 0 {
+		return path
+	}
+
+	if parts[0] == "metrics" && len(parts) > 1 {
+		return fmt.Sprintf("%s/%s", parts[0], parts[1])
+
+	}
+	return parts[0]
+}
+
+var longRunningRequestPathMap = map[string]bool{
+	"exec":        true,
+	"attach":      true,
+	"portforward": true,
+	"debug":       true,
+}
+
+// isLongRunningRequest determines whether the request is long-running or not.
+func isLongRunningRequest(path string) bool {
+	_, ok := longRunningRequestPathMap[path]
+	return ok
+}
+
+var statusesNoTracePred = httplog.StatusIsNot(
+	http.StatusOK,
+	http.StatusFound,
+	http.StatusMovedPermanently,
+	http.StatusTemporaryRedirect,
+	http.StatusBadRequest,
+	http.StatusNotFound,
+	http.StatusSwitchingProtocols,
+)
+
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer httplog.NewLogged(req, &w).StacktraceWhen(
-		httplog.StatusIsNot(
-			http.StatusOK,
-			http.StatusFound,
-			http.StatusMovedPermanently,
-			http.StatusTemporaryRedirect,
-			http.StatusBadRequest,
-			http.StatusNotFound,
-			http.StatusSwitchingProtocols,
-		),
-	).Log()
-	s.restfulCont.ServeHTTP(w, req)
+	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred)
+
+	// monitor http requests
+	var serverType string
+	if s.auth == nil {
+		serverType = "readonly"
+	} else {
+		serverType = "readwrite"
+	}
+
+	method, path := req.Method, trimURLPath(req.URL.Path)
+
+	longRunning := strconv.FormatBool(isLongRunningRequest(path))
+
+	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
+
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
+
+	startTime := time.Now()
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+
+	handler.ServeHTTP(w, req)
 }
 
 // prometheusHostAdapter adapts the HostInterface to the interface expected by the

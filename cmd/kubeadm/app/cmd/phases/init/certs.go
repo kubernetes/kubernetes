@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -32,18 +32,17 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	saKeyLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the private key for signing service account tokens along with its public key, and saves them into
+	saKeyLongDesc = fmt.Sprintf(cmdutil.LongDesc(`
+		Generate the private key for signing service account tokens along with its public key, and save them into
 		%s and %s files.
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
 
-	genericLongDesc = normalizer.LongDesc(`
-		Generates the %[1]s, and saves them into %[2]s.cert and %[2]s.key files.%[3]s
+	genericLongDesc = cmdutil.LongDesc(`
+		Generate the %[1]s, and save them into %[2]s.cert and %[2]s.key files.%[3]s
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		` + cmdutil.AlphaDisclaimer)
@@ -79,30 +78,32 @@ func newCertSubPhases() []workflow.Phase {
 	// All subphase
 	allPhase := workflow.Phase{
 		Name:           "all",
-		Short:          "Generates all certificates",
+		Short:          "Generate all certificates",
 		InheritFlags:   getCertPhaseFlags("all"),
 		RunAllSiblings: true,
 	}
 
 	subPhases = append(subPhases, allPhase)
 
-	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
-
-	for ca, certList := range certTree {
-		caPhase := newCertSubPhase(ca, runCAPhase(ca))
-		subPhases = append(subPhases, caPhase)
-
-		for _, cert := range certList {
-			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
-			certPhase.LocalFlags = localFlags()
-			subPhases = append(subPhases, certPhase)
+	// This loop assumes that GetDefaultCertList() always returns a list of
+	// certificate that is preceded by the CAs that sign them.
+	var lastCACert *certsphase.KubeadmCert
+	for _, cert := range certsphase.GetDefaultCertList() {
+		var phase workflow.Phase
+		if cert.CAName == "" {
+			phase = newCertSubPhase(cert, runCAPhase(cert))
+			lastCACert = cert
+		} else {
+			phase = newCertSubPhase(cert, runCertPhase(cert, lastCACert))
+			phase.LocalFlags = localFlags()
 		}
+		subPhases = append(subPhases, phase)
 	}
 
 	// SA creates the private/public key pair, which doesn't use x509 at all
 	saPhase := workflow.Phase{
 		Name:         "sa",
-		Short:        "Generates a private key for signing service account tokens along with its public key",
+		Short:        "Generate a private key for signing service account tokens along with its public key",
 		Long:         saKeyLongDesc,
 		Run:          runCertsSa,
 		InheritFlags: []string{options.CertificatesDir},
@@ -116,7 +117,7 @@ func newCertSubPhases() []workflow.Phase {
 func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunData) error) workflow.Phase {
 	phase := workflow.Phase{
 		Name:  certSpec.Name,
-		Short: fmt.Sprintf("Generates the %s", certSpec.LongName),
+		Short: fmt.Sprintf("Generate the %s", certSpec.LongName),
 		Long: fmt.Sprintf(
 			genericLongDesc,
 			certSpec.LongName,
@@ -135,10 +136,12 @@ func getCertPhaseFlags(name string) []string {
 		options.CfgPath,
 		options.CSROnly,
 		options.CSRDir,
+		options.KubernetesVersion,
 	}
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerCertSANs,
 			options.NetworkingDNSDomain,
 			options.NetworkingServiceSubnet,
@@ -149,8 +152,8 @@ func getCertPhaseFlags(name string) []string {
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
-	defaultConfig := &kubeadmapiv1beta1.InitConfiguration{
-		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
+	defaultConfig := &kubeadmapiv1beta2.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
 			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
 			AdvertiseAddress: "127.0.0.1",
 		},

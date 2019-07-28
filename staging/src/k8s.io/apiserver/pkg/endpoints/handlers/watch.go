@@ -63,7 +63,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch will serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		scope.err(err, w, req)
@@ -71,7 +71,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions ne
 	}
 
 	// negotiate for the stream serializer from the scope's serializer
-	serializer, err := negotiation.NegotiateOutputMediaTypeStream(req, scope.Serializer, &scope)
+	serializer, err := negotiation.NegotiateOutputMediaTypeStream(req, scope.Serializer, scope)
 	if err != nil {
 		scope.err(err, w, req)
 		return
@@ -92,19 +92,14 @@ func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions ne
 
 	// locate the appropriate embedded encoder based on the transform
 	var embeddedEncoder runtime.Encoder
-	contentKind, contentSerializer, transform := targetEncodingForTransform(&scope, mediaTypeOptions, req)
+	contentKind, contentSerializer, transform := targetEncodingForTransform(scope, mediaTypeOptions, req)
 	if transform {
-		var embedded runtime.Serializer
-		for _, supported := range contentSerializer.SupportedMediaTypes() {
-			if supported.MediaType == serializer.MediaType {
-				embedded = supported.Serializer
-			}
-		}
-		if embedded == nil {
+		info, ok := runtime.SerializerInfoForMediaType(contentSerializer.SupportedMediaTypes(), serializer.MediaType)
+		if !ok {
 			scope.err(fmt.Errorf("no encoder for %q exists in the requested target %#v", serializer.MediaType, contentSerializer), w, req)
 			return
 		}
-		embeddedEncoder = contentSerializer.EncoderForVersion(embedded, contentKind.GroupVersion())
+		embeddedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
 	} else {
 		embeddedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
 	}
@@ -145,7 +140,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions ne
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	Watching watch.Interface
-	Scope    RequestScope
+	Scope    *RequestScope
 
 	// true if websocket messages should use text framing (as opposed to binary framing)
 	UseTextFraming bool
@@ -170,7 +165,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 	defer metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Dec()
 
-	w = httplog.Unlogged(w)
+	w = httplog.Unlogged(req, w)
 
 	if wsstream.IsWebSocketRequest(req) {
 		w.Header().Set("Content-Type", s.MediaType)
@@ -216,6 +211,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	var unknown runtime.Unknown
 	internalEvent := &metav1.InternalEvent{}
+	outEvent := &metav1.WatchEvent{}
 	buf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
 	for {
@@ -229,6 +225,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			metrics.WatchEvents.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
 			obj := s.Fixup(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
@@ -242,10 +239,11 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
 
+			*outEvent = metav1.WatchEvent{}
+
 			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
 			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
 			// and we get the benefit of using conversion functions which already have to stay in sync
-			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
 			err := metav1.Convert_v1_InternalEvent_To_v1_WatchEvent(internalEvent, outEvent, nil)
 			if err != nil {

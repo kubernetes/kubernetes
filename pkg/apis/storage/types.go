@@ -21,8 +21,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StorageClass describes a named "class" of storage offered in a cluster.
@@ -94,8 +92,6 @@ type StorageClassList struct {
 	Items []StorageClass
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Captures the intent to attach or detach the specified volume to/from
@@ -149,15 +145,22 @@ type VolumeAttachmentSpec struct {
 }
 
 // VolumeAttachmentSource represents a volume that should be attached.
-// Right now only PersistenVolumes can be attached via external attacher,
-// in future we may allow also inline volumes in pods.
+// Right now persistent volumes as well as inline volumes (only in
+// CSI Migration scenarios) can be attached via external attacher.
 // Exactly one member can be set.
 type VolumeAttachmentSource struct {
 	// Name of the persistent volume to attach.
 	// +optional
 	PersistentVolumeName *string
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// inlineVolumeSpec contains all the information necessary to attach
+	// a persistent volume defined by a pod's inline VolumeSource. This field
+	// is populated only for the CSIMigration feature. It contains
+	// translated fields from a pod's inline VolumeSource to a
+	// PersistentVolumeSpec. This field is alpha-level and is only
+	// honored by servers that enabled the CSIMigration feature.
+	// +optional
+	InlineVolumeSpec *api.PersistentVolumeSpec
 }
 
 // The status of a VolumeAttachment request.
@@ -216,8 +219,6 @@ const (
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CSIDriver captures information about a Container Storage Interface (CSI)
@@ -294,8 +295,6 @@ type CSIDriverSpec struct {
 	PodInfoOnMount *bool
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CSINode holds information about all CSI drivers installed on a node.
@@ -356,6 +355,20 @@ type CSINodeDriver struct {
 	// This can be empty if driver does not support topology.
 	// +optional
 	TopologyKeys []string
+
+	// allocatable represents the volume resources of a node that are available for scheduling.
+	// +optional
+	Allocatable *VolumeNodeResources
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+type VolumeNodeResources struct {
+	// Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+	// A volume that is both attached and mounted on a node is considered to be used once, not twice.
+	// The same rule applies for a unique volume that is shared among multiple pods on the same node.
+	// If this field is nil, then the supported number of volumes on this node is unbounded.
+	// +optional
+	Count *int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

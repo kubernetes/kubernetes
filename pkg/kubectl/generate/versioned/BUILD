@@ -26,8 +26,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubectl/generate:go_default_library",
-        "//pkg/kubectl/util:go_default_library",
-        "//pkg/kubectl/util/hash:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
@@ -39,7 +37,7 @@ go_library(
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
-        "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -49,6 +47,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/hash:go_default_library",
     ],
 )
 
@@ -87,7 +87,7 @@ go_test(
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
-        "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",

@@ -66,18 +66,38 @@ import (
 //
 // Dlatrd is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlatrd(uplo blas.Uplo, n, nb int, a []float64, lda int, e, tau, w []float64, ldw int) {
-	checkMatrix(n, n, a, lda)
-	checkMatrix(n, nb, w, ldw)
-	if len(e) < n-1 {
-		panic(badE)
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
+		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case nb < 0:
+		panic(nbLT0)
+	case nb > n:
+		panic(nbGTN)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldw < max(1, nb):
+		panic(badLdW)
 	}
-	if len(tau) < n-1 {
-		panic(badTau)
-	}
-	if n <= 0 {
+
+	if n == 0 {
 		return
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(w) < (n-1)*ldw+nb:
+		panic(shortW)
+	case len(e) < n-1:
+		panic(shortE)
+	case len(tau) < n-1:
+		panic(shortTau)
+	}
+
 	bi := blas64.Implementation()
+
 	if uplo == blas.Upper {
 		for i := n - 1; i >= n-nb; i-- {
 			iw := i - n + nb

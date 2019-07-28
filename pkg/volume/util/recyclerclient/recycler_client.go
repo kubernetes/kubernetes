@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog"
 )
 
+// RecycleEventRecorder is a func that defines how to record RecycleEvent.
 type RecycleEventRecorder func(eventtype, message string)
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -127,9 +128,8 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 				if pod.Status.Phase == v1.PodFailed {
 					if pod.Status.Message != "" {
 						return fmt.Errorf(pod.Status.Message)
-					} else {
-						return fmt.Errorf("pod failed, pod.Status.Message unknown.")
 					}
+					return fmt.Errorf("pod failed, pod.Status.Message unknown")
 				}
 
 			case watch.Deleted:
@@ -238,9 +238,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 			case eventEvent, ok := <-eventWatch.ResultChan():
 				if !ok {
 					return
-				} else {
-					eventCh <- eventEvent
 				}
+				eventCh <- eventEvent
 			}
 		}
 	}()
@@ -256,9 +255,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 			case podEvent, ok := <-podWatch.ResultChan():
 				if !ok {
 					return
-				} else {
-					eventCh <- podEvent
 				}
+				eventCh <- podEvent
 			}
 		}
 	}()

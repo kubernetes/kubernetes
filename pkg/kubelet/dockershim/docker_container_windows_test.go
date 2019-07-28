@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows/registry"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 type dummyRegistryKey struct {
@@ -73,7 +73,11 @@ func TestApplyGMSAConfig(t *testing.T) {
 	expectedValueName := "k8s-cred-spec-" + expectedHex
 
 	containerConfigWithGMSAAnnotation := &runtimeapi.ContainerConfig{
-		Annotations: map[string]string{"container.alpha.windows.kubernetes.io/gmsa-credential-spec": dummyCredSpec},
+		Windows: &runtimeapi.WindowsContainerConfig{
+			SecurityContext: &runtimeapi.WindowsContainerSecurityContext{
+				CredentialSpec: dummyCredSpec,
+			},
+		},
 	}
 
 	t.Run("happy path", func(t *testing.T) {

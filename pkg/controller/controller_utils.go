@@ -26,7 +26,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
@@ -159,11 +160,11 @@ type ControllerExpectations struct {
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
 func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
-	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+	exp, exists, err := r.GetByKey(controllerKey)
+	if err == nil && exists {
 		return exp.(*ControlleeExpectations), true, nil
-	} else {
-		return nil, false, err
 	}
+	return nil, false, err
 }
 
 // DeleteExpectations deletes the expectations of the given controller from the TTLStore.
@@ -336,17 +337,17 @@ func (u *UIDTrackingControllerExpectations) GetUIDs(controllerKey string) sets.S
 
 // ExpectDeletions records expectations for the given deleteKeys, against the given controller.
 func (u *UIDTrackingControllerExpectations) ExpectDeletions(rcKey string, deletedKeys []string) error {
+	expectedUIDs := sets.NewString()
+	for _, k := range deletedKeys {
+		expectedUIDs.Insert(k)
+	}
+	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	u.uidStoreLock.Lock()
 	defer u.uidStoreLock.Unlock()
 
 	if existing := u.GetUIDs(rcKey); existing != nil && existing.Len() != 0 {
 		klog.Errorf("Clobbering existing delete keys: %+v", existing)
 	}
-	expectedUIDs := sets.NewString()
-	for _, k := range deletedKeys {
-		expectedUIDs.Insert(k)
-	}
-	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	if err := u.uidStore.Add(&UIDSet{expectedUIDs, rcKey}); err != nil {
 		return err
 	}
@@ -572,21 +573,22 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
-	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
+	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
-	if newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod); err != nil {
+	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
 		return err
-	} else {
-		accessor, err := meta.Accessor(object)
-		if err != nil {
-			klog.Errorf("parentObject does not have ObjectMeta, %v", err)
-			return nil
-		}
-		klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
 	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		return nil
+	}
+	klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
+	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+
 	return nil
 }
 
@@ -1095,4 +1097,30 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		}
 		return nil
 	})
+}
+
+func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
+	sa, err := coreClient.ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	if err == nil {
+		return sa, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Create the namespace if we can't verify it exists.
+	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
+	if _, err := coreClient.Namespaces().Get(namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+		if _, err = coreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}); err != nil && !apierrors.IsAlreadyExists(err) {
+			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
+		}
+	}
+
+	// Create the service account
+	sa, err = coreClient.ServiceAccounts(namespace).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}})
+	if apierrors.IsAlreadyExists(err) {
+		// If we're racing to init and someone else already created it, re-fetch
+		return coreClient.ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	}
+	return sa, err
 }

@@ -179,10 +179,11 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"allowPrivilegeEscalation":        "allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
 	"allowedHostPaths":                "allowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.",
 	"allowedFlexVolumes":              "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field.",
-	"allowedCSIDrivers":               "AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec. An empty value means no CSI drivers can run inline within a pod spec.",
+	"allowedCSIDrivers":               "AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec. An empty value indicates that any CSI driver can be used for inline ephemeral volumes. This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.",
 	"allowedUnsafeSysctls":            "allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed. Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.\n\nExamples: e.g. \"foo/*\" allows \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" allows \"foo.bar\", \"foo.baz\", etc.",
 	"forbiddenSysctls":                "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc.",
 	"allowedProcMountTypes":           "AllowedProcMountTypes is a whitelist of allowed ProcMountTypes. Empty or nil indicates that only the DefaultProcMountType may be used. This requires the ProcMountType feature flag to be enabled.",
+	"runtimeClass":                    "runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod. If this field is omitted, the pod's runtimeClassName field is unrestricted. Enforcement of this field depends on the RuntimeClass feature gate being enabled.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -207,6 +208,16 @@ var map_RunAsUserStrategyOptions = map[string]string{
 
 func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 	return map_RunAsUserStrategyOptions
+}
+
+var map_RuntimeClassStrategyOptions = map[string]string{
+	"":                         "RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses for a pod.",
+	"allowedRuntimeClassNames": "allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a pod. A value of \"*\" means that any RuntimeClass name is allowed, and must be the only item in the list. An empty list requires the RuntimeClassName field to be unset.",
+	"defaultRuntimeClassName":  "defaultRuntimeClassName is the default RuntimeClassName to set on the pod. The default MUST be allowed by the allowedRuntimeClassNames list. A value of nil does not mutate the Pod.",
+}
+
+func (RuntimeClassStrategyOptions) SwaggerDoc() map[string]string {
+	return map_RuntimeClassStrategyOptions
 }
 
 var map_SELinuxStrategyOptions = map[string]string{

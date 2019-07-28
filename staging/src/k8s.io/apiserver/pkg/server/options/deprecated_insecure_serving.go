@@ -54,8 +54,8 @@ func (s *DeprecatedInsecureServingOptions) Validate() []error {
 
 	errors := []error{}
 
-	if s.BindPort < 0 || s.BindPort > 65335 {
-		errors = append(errors, fmt.Errorf("insecure port %v must be between 0 and 65335, inclusive. 0 for turning off insecure (HTTP) port", s.BindPort))
+	if s.BindPort < 0 || s.BindPort > 65535 {
+		errors = append(errors, fmt.Errorf("insecure port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port", s.BindPort))
 	}
 
 	return errors

@@ -24,21 +24,20 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/gomega"
 )
 
 // ExecOptions passed to ExecWithOptions
 type ExecOptions struct {
-	Command []string
-
+	Command       []string
 	Namespace     string
 	PodName       string
 	ContainerName string
-
 	Stdin         io.Reader
 	CaptureStdout bool
 	CaptureStderr bool
@@ -50,7 +49,7 @@ type ExecOptions struct {
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
 func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
-	Logf("ExecWithOptions %+v", options)
+	e2elog.Logf("ExecWithOptions %+v", options)
 
 	config, err := LoadConfig()
 	ExpectNoError(err, "failed to load restclient config")
@@ -70,7 +69,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 		Stdout:    options.CaptureStdout,
 		Stderr:    options.CaptureStderr,
 		TTY:       tty,
-	}, legacyscheme.ParameterCodec)
+	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
 	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
@@ -85,11 +84,10 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 // specified container and return stdout, stderr and error
 func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName string, cmd ...string) (string, string, error) {
 	return f.ExecWithOptions(ExecOptions{
-		Command:       cmd,
-		Namespace:     f.Namespace.Name,
-		PodName:       podName,
-		ContainerName: containerName,
-
+		Command:            cmd,
+		Namespace:          f.Namespace.Name,
+		PodName:            podName,
+		ContainerName:      containerName,
 		Stdin:              nil,
 		CaptureStdout:      true,
 		CaptureStderr:      true,
@@ -100,7 +98,7 @@ func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName 
 // ExecCommandInContainer executes a command in the specified container.
 func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) string {
 	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	Logf("Exec stderr: %q", stderr)
+	e2elog.Logf("Exec stderr: %q", stderr)
 	ExpectNoError(err,
 		"failed to execute command in pod %v, container %v: %v",
 		podName, containerName, err)
@@ -114,14 +112,14 @@ func (f *Framework) ExecShellInContainer(podName, containerName string, cmd stri
 
 func (f *Framework) execCommandInPod(podName string, cmd ...string) string {
 	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
-	ExpectNoError(err, "failed to get pod")
+	ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return f.ExecCommandInContainer(podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
 func (f *Framework) execCommandInPodWithFullOutput(podName string, cmd ...string) (string, string, error) {
 	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
-	ExpectNoError(err, "failed to get pod")
+	ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return f.ExecCommandInContainerWithFullOutput(podName, pod.Spec.Containers[0].Name, cmd...)
 }
@@ -131,7 +129,7 @@ func (f *Framework) ExecShellInPod(podName string, cmd string) string {
 	return f.execCommandInPod(podName, "/bin/sh", "-c", cmd)
 }
 
-// ExecShellInPodWithFullOutput executes the specified command on the pod with returing return stdout, stderr and error.
+// ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
 func (f *Framework) ExecShellInPodWithFullOutput(podName string, cmd string) (string, string, error) {
 	return f.execCommandInPodWithFullOutput(podName, "/bin/sh", "-c", cmd)
 }

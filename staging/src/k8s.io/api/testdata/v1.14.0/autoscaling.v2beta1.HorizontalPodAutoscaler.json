@@ -1,0 +1,196 @@
+{
+  "kind": "HorizontalPodAutoscaler",
+  "apiVersion": "autoscaling/v2beta1",
+  "metadata": {
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
+    "resourceVersion": "16964250748386560239",
+    "generation": 8071137005907523419,
+    "creationTimestamp": null,
+    "deletionGracePeriodSeconds": -4955867275792137171,
+    "labels": {
+      "7": "8"
+    },
+    "annotations": {
+      "9": "10"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "14"
+    ],
+    "clusterName": "15",
+    "managedFields": [
+      {
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fields": {"18":{"19":null}}
+      }
+    ]
+  },
+  "spec": {
+    "scaleTargetRef": {
+      "kind": "24",
+      "name": "25",
+      "apiVersion": "26"
+    },
+    "minReplicas": -1978186127,
+    "maxReplicas": 2114329341,
+    "metrics": [
+      {
+        "type": "6/ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+",
+        "object": {
+          "target": {
+            "kind": "27",
+            "name": "28",
+            "apiVersion": "29"
+          },
+          "metricName": "30",
+          "targetValue": "810",
+          "selector": {
+            "matchLabels": {
+              "g5i9/l-Y._.-444": "c2_kS91.e5K-_e63_-_3-n-_-__3u-.__P__.7U-Uo_4_-D7r__.am64"
+            },
+            "matchExpressions": [
+              {
+                "key": "2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--n1-5",
+                "operator": "In",
+                "values": [
+                  "Ou1.m_.5AW-_S-.3g.7_2fNc5-_.-RX8"
+                ]
+              }
+            ]
+          },
+          "averageValue": "591"
+        },
+        "pods": {
+          "metricName": "37",
+          "targetAverageValue": "109",
+          "selector": {
+            "matchLabels": {
+              "5--.K_.0--_0P7_.C.Ze--D07.a_.y_C": "0_5qN2_---_M.N_._a6.9bHjH"
+            },
+            "matchExpressions": [
+              {
+                "key": "G-___196-.dX_iv1H.__.h-J-M.9_T.qo",
+                "operator": "In",
+                "values": [
+                  "5.--sT52b..N.-.K8"
+                ]
+              }
+            ]
+          }
+        },
+        "resource": {
+          "name": "S5Ǎʜǝ",
+          "targetAverageUtilization": 87018792,
+          "targetAverageValue": "274"
+        },
+        "external": {
+          "metricName": "44",
+          "metricSelector": {
+            "matchLabels": {
+              "cd525-6ni4-g3-s-98w-4-27/03f_--0..L.0qQ6W-.d.20h-OK-_8gI_z_-tY-R6S17_.8n": "7z.WH-.._Td2-N_Y.t--_0..--_6yV07-_._N"
+            },
+            "matchExpressions": [
+              {
+                "key": "JfB._.zS-._..3le-Q4-R-083.D",
+                "operator": "Exists"
+              }
+            ]
+          },
+          "targetValue": "201",
+          "targetAverageValue": "602"
+        }
+      }
+    ]
+  },
+  "status": {
+    "observedGeneration": 6319752985051851078,
+    "currentReplicas": 310937924,
+    "desiredReplicas": 912103005,
+    "currentMetrics": [
+      {
+        "type": ":贅wE@Ȗs«öʮĀ\u003cé瞾",
+        "object": {
+          "target": {
+            "kind": "51",
+            "name": "52",
+            "apiVersion": "53"
+          },
+          "metricName": "54",
+          "currentValue": "811",
+          "selector": {
+            "matchLabels": {
+              "Y93-x6bigm_-._.q768-m_0_F03_J": "L.35__5b.5-CX_VBC.Jn4f__.39X...-tO-.qff.ExZ_r7-6.-m..-_-.f9-Q"
+            },
+            "matchExpressions": [
+              {
+                "key": "q05c1lxeqyn-5--9d5a3-7bf46g-40883176jt-e8b--i.1v53nyx5u-o-k-md--381l/KpDZ-._._t__2--A.0.__cd..lv-_aLQI",
+                "operator": "Exists"
+              }
+            ]
+          },
+          "averageValue": "404"
+        },
+        "pods": {
+          "metricName": "61",
+          "currentAverageValue": "777",
+          "selector": {
+            "matchLabels": {
+              "6e1Vx8_I-.-_56-__18Y--6-_3J--.48Y.q.0-_1-F.h-__kK": "9_..O_.J_-G_--V-42Ec"
+            },
+            "matchExpressions": [
+              {
+                "key": "6.-L..-__0N_N.O30-_u.y",
+                "operator": "Exists"
+              }
+            ]
+          }
+        },
+        "resource": {
+          "name": "輂,ŕĪĠM蘇KŅ/»頸",
+          "currentAverageUtilization": 1962818731,
+          "currentAverageValue": "559"
+        },
+        "external": {
+          "metricName": "68",
+          "metricSelector": {
+            "matchLabels": {
+              "uB7": "f.gb_2_-8-----yJY.__-X_.8xNN"
+            },
+            "matchExpressions": [
+              {
+                "key": "3-c7181py-8t379s3-8x32--2qu-0-k-q-0--85.4-4tz9x--43--3---93-2-2-37--e00uz-z0sn-8hx-qa--0o8m3-d0w7p8v9/7W..4....-hD",
+                "operator": "Exists"
+              }
+            ]
+          },
+          "currentValue": "821",
+          "currentAverageValue": "439"
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "type": "v1b繐汚磉",
+        "status": "蠂Ü[ƛ^輅9ɛ棕",
+        "lastTransitionTime": "2685-12-24T19:19:52Z",
+        "reason": "75",
+        "message": "76"
+      }
+    ]
+  }
+}

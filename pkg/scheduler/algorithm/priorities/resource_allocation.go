@@ -91,6 +91,8 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	}, nil
 }
 
+// getNonZeroRequests returns the total non-zero requests. If Overhead is defined for the pod and the
+// PodOverhead feature is enabled, the Overhead is added to the result.
 func getNonZeroRequests(pod *v1.Pod) *schedulernodeinfo.Resource {
 	result := &schedulernodeinfo.Resource{}
 	for i := range pod.Spec.Containers {
@@ -99,5 +101,17 @@ func getNonZeroRequests(pod *v1.Pod) *schedulernodeinfo.Resource {
 		result.MilliCPU += cpu
 		result.Memory += memory
 	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
+			result.MilliCPU += pod.Spec.Overhead.Cpu().MilliValue()
+		}
+
+		if _, found := pod.Spec.Overhead[v1.ResourceMemory]; found {
+			result.Memory += pod.Spec.Overhead.Memory().Value()
+		}
+	}
+
 	return result
 }

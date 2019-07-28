@@ -20,11 +20,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
@@ -61,13 +61,13 @@ var (
 	  kubectl create secret generic my-secret --from-file=path/to/bar
 
 	  # Create a new secret named my-secret with specified keys instead of names on disk
-	  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+	  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/to/id_rsa --from-file=ssh-publickey=path/to/id_rsa.pub
 
 	  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
 	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
 
 	  # Create a new secret named my-secret using a combination of a file and a literal
-	  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-literal=passphrase=topsecret
+	  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/to/id_rsa --from-literal=passphrase=topsecret
 
 	  # Create a new secret named my-secret from an env file
 	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))

@@ -9,27 +9,26 @@ reviewers:
   - jbeda
   - juanvallejo
   - lavalamp
-  - zmerlynn
-  - sttts
-  - gmarek
-  - vishh
+  - SataQiu
   - spiffxp
+  - sttts
+  - vishh
+  - xichengliudui
+  - zmerlynn
 approvers:
+  - bentheelder
   - cblecker
   - deads2k
+  - dims # for local-up-cluster related files
   - eparis
   - fejta
   - ixdy
   - jbeda
   - lavalamp
-  - madhusudancs
-  - pwittrock
-  - shashidharatd
-  - zmerlynn
-  - sttts
-  - gmarek
-  - vishh
   - liggitt
+  - pwittrock
   - soltysh # for sig-cli related stuff
-  - dims # for local-up-cluster related files
   - spiffxp
+  - sttts
+  - vishh
+  - zmerlynn

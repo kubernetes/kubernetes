@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
@@ -109,9 +108,7 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 		return nil, errors.Wrapf(err, "output: %s, error", string(out))
 	}
 	pods := []string{}
-	for _, pod := range strings.Fields(string(out)) {
-		pods = append(pods, pod)
-	}
+	pods = append(pods, strings.Fields(string(out))...)
 	return pods, nil
 }
 
@@ -182,23 +179,8 @@ func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
 	return err == nil, nil
 }
 
-// isExistingSocket checks if path exists and is domain socket
-func isExistingSocket(path string) bool {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-
-	return fileInfo.Mode()&os.ModeSocket != 0
-}
-
 // detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead
 func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
-	const (
-		dockerSocket     = "/var/run/docker.sock" // The Docker socket is not CRI compatible
-		containerdSocket = "/run/containerd/containerd.sock"
-	)
-
 	foundCRISockets := []string{}
 	knownCRISockets := []string{
 		// Docker and containerd sockets are special cased below, hence not to be included here
@@ -235,9 +217,5 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 
 // DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
-	if goruntime.GOOS != "linux" {
-		return constants.DefaultDockerCRISocket, nil
-	}
-
 	return detectCRISocketImpl(isExistingSocket)
 }

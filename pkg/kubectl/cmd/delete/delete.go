@@ -18,6 +18,7 @@ package delete
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -32,10 +33,11 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	cmdwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -106,6 +108,8 @@ type DeleteOptions struct {
 	ForceDeletion       bool
 	WaitForDeletion     bool
 	Quiet               bool
+	WarnClusterScope    bool
+	Raw                 string
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -132,7 +136,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			o := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunDelete())
+			cmdutil.CheckErr(o.RunDelete(f))
 		},
 		SuggestFor: []string{"rm"},
 	}
@@ -148,6 +152,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
+
+	o.WarnClusterScope = enforceNamespace && !o.DeleteAllNamespaces
 
 	if o.DeleteAll || len(o.LabelSelector) > 0 || len(o.FieldSelector) > 0 {
 		if f := cmd.Flags().Lookup("ignore-not-found"); f != nil && !f.Changed {
@@ -167,32 +173,34 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		o.GracePeriod = 1
 	}
 
-	r := f.NewBuilder().
-		Unstructured().
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		LabelSelectorParam(o.LabelSelector).
-		FieldSelectorParam(o.FieldSelector).
-		SelectAllParam(o.DeleteAll).
-		AllNamespaces(o.DeleteAllNamespaces).
-		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
-		Flatten().
-		Do()
-	err = r.Err()
-	if err != nil {
-		return err
-	}
-	o.Result = r
+	if len(o.Raw) == 0 {
+		r := f.NewBuilder().
+			Unstructured().
+			ContinueOnError().
+			NamespaceParam(cmdNamespace).DefaultNamespace().
+			FilenameParam(enforceNamespace, &o.FilenameOptions).
+			LabelSelectorParam(o.LabelSelector).
+			FieldSelectorParam(o.FieldSelector).
+			SelectAllParam(o.DeleteAll).
+			AllNamespaces(o.DeleteAllNamespaces).
+			ResourceTypeOrNameArgs(false, args...).RequireObject(false).
+			Flatten().
+			Do()
+		err = r.Err()
+		if err != nil {
+			return err
+		}
+		o.Result = r
 
-	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
+		o.Mapper, err = f.ToRESTMapper()
+		if err != nil {
+			return err
+		}
 
-	o.DynamicClient, err = f.DynamicClient()
-	if err != nil {
-		return err
+		o.DynamicClient, err = f.DynamicClient()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -216,10 +224,41 @@ func (o *DeleteOptions) Validate() error {
 	case o.ForceDeletion:
 		fmt.Fprintf(o.ErrOut, "warning: --force is ignored because --grace-period is not 0.\n")
 	}
+
+	if len(o.Raw) > 0 {
+		if len(o.FilenameOptions.Filenames) > 1 {
+			return fmt.Errorf("--raw can only use a single local file or stdin")
+		} else if len(o.FilenameOptions.Filenames) == 1 {
+			if strings.Index(o.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.FilenameOptions.Filenames[0], "https://") == 0 {
+				return fmt.Errorf("--raw cannot read from a url")
+			}
+		}
+
+		if o.FilenameOptions.Recursive {
+			return fmt.Errorf("--raw and --recursive are mutually exclusive")
+		}
+		if len(o.Output) > 0 {
+			return fmt.Errorf("--raw and --output are mutually exclusive")
+		}
+		if _, err := url.ParseRequestURI(o.Raw); err != nil {
+			return fmt.Errorf("--raw must be a valid URL path: %v", err)
+		}
+	}
+
 	return nil
 }
 
-func (o *DeleteOptions) RunDelete() error {
+func (o *DeleteOptions) RunDelete(f cmdutil.Factory) error {
+	if len(o.Raw) > 0 {
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+		if len(o.Filenames) == 0 {
+			return rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, "")
+		}
+		return rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, o.Filenames[0])
+	}
 	return o.DeleteResult(o.Result)
 }
 
@@ -228,6 +267,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
+	warnClusterScope := o.WarnClusterScope
 	deletedInfos := []*resource.Info{}
 	uidMap := cmdwait.UIDMap{}
 	err := r.Visit(func(info *resource.Info, err error) error {
@@ -247,6 +287,10 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		}
 		options.PropagationPolicy = &policy
 
+		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			fmt.Fprintf(o.ErrOut, "warning: deleting cluster-scoped resources, not scoped to the provided namespace\n")
+			warnClusterScope = false
+		}
 		response, err := o.deleteResource(info, options)
 		if err != nil {
 			return err

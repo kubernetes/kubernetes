@@ -30,7 +30,7 @@ func MarkControlPlane(client clientset.Interface, controlPlaneName string, taint
 
 	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
 
-	if taints != nil && len(taints) > 0 {
+	if len(taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range taints {
 			taintStrs = append(taintStrs, taint.ToString())

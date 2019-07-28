@@ -246,7 +246,8 @@ func getTypeDecoderFromExtension(ctx *ctx, typ reflect2.Type) ValDecoder {
 		for _, extension := range extensions {
 			decoder = extension.DecorateDecoder(typ, decoder)
 		}
-		for _, extension := range ctx.extensions {
+		decoder = ctx.decoderExtension.DecorateDecoder(typ, decoder)
+		for _, extension := range ctx.extraExtensions {
 			decoder = extension.DecorateDecoder(typ, decoder)
 		}
 	}
@@ -259,14 +260,18 @@ func _getTypeDecoderFromExtension(ctx *ctx, typ reflect2.Type) ValDecoder {
 			return decoder
 		}
 	}
-	for _, extension := range ctx.extensions {
+	decoder := ctx.decoderExtension.CreateDecoder(typ)
+	if decoder != nil {
+		return decoder
+	}
+	for _, extension := range ctx.extraExtensions {
 		decoder := extension.CreateDecoder(typ)
 		if decoder != nil {
 			return decoder
 		}
 	}
 	typeName := typ.String()
-	decoder := typeDecoders[typeName]
+	decoder = typeDecoders[typeName]
 	if decoder != nil {
 		return decoder
 	}
@@ -286,7 +291,8 @@ func getTypeEncoderFromExtension(ctx *ctx, typ reflect2.Type) ValEncoder {
 		for _, extension := range extensions {
 			encoder = extension.DecorateEncoder(typ, encoder)
 		}
-		for _, extension := range ctx.extensions {
+		encoder = ctx.encoderExtension.DecorateEncoder(typ, encoder)
+		for _, extension := range ctx.extraExtensions {
 			encoder = extension.DecorateEncoder(typ, encoder)
 		}
 	}
@@ -300,14 +306,18 @@ func _getTypeEncoderFromExtension(ctx *ctx, typ reflect2.Type) ValEncoder {
 			return encoder
 		}
 	}
-	for _, extension := range ctx.extensions {
+	encoder := ctx.encoderExtension.CreateEncoder(typ)
+	if encoder != nil {
+		return encoder
+	}
+	for _, extension := range ctx.extraExtensions {
 		encoder := extension.CreateEncoder(typ)
 		if encoder != nil {
 			return encoder
 		}
 	}
 	typeName := typ.String()
-	encoder := typeEncoders[typeName]
+	encoder = typeEncoders[typeName]
 	if encoder != nil {
 		return encoder
 	}
@@ -328,7 +338,7 @@ func describeStruct(ctx *ctx, typ reflect2.Type) *StructDescriptor {
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
 		tag, hastag := field.Tag().Lookup(ctx.getTagKey())
-		if ctx.onlyTaggedField && !hastag {
+		if ctx.onlyTaggedField && !hastag && !field.Anonymous() {
 			continue
 		}
 		tagParts := strings.Split(tag, ",")
@@ -393,7 +403,9 @@ func createStructDescriptor(ctx *ctx, typ reflect2.Type, bindings []*Binding, em
 	for _, extension := range extensions {
 		extension.UpdateStructDescriptor(structDescriptor)
 	}
-	for _, extension := range ctx.extensions {
+	ctx.encoderExtension.UpdateStructDescriptor(structDescriptor)
+	ctx.decoderExtension.UpdateStructDescriptor(structDescriptor)
+	for _, extension := range ctx.extraExtensions {
 		extension.UpdateStructDescriptor(structDescriptor)
 	}
 	processTags(structDescriptor, ctx.frozenConfig)

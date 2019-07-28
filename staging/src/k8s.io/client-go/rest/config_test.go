@@ -172,6 +172,10 @@ func (t *fakeLimiter) QPS() float32 {
 	return t.FakeQPS
 }
 
+func (t *fakeLimiter) Wait(ctx context.Context) error {
+	return nil
+}
+
 func (t *fakeLimiter) Stop() {}
 
 func (t *fakeLimiter) Accept() {}
@@ -280,20 +284,14 @@ func TestAnonymousConfig(t *testing.T) {
 		expected.TLSClientConfig.CertFile = ""
 		expected.TLSClientConfig.KeyData = nil
 		expected.TLSClientConfig.KeyFile = ""
+		expected.Transport = nil
+		expected.WrapTransport = nil
 
-		// The DeepEqual cannot handle the func comparison, so we just verify if the
-		// function return the expected object.
-		if actual.WrapTransport == nil || !reflect.DeepEqual(expected.WrapTransport(nil), &fakeRoundTripper{}) {
-			t.Fatalf("AnonymousClientConfig dropped the WrapTransport field")
-		} else {
-			actual.WrapTransport = nil
-			expected.WrapTransport = nil
-		}
 		if actual.Dial != nil {
 			_, actualError := actual.Dial(context.Background(), "", "")
 			_, expectedError := expected.Dial(context.Background(), "", "")
 			if !reflect.DeepEqual(expectedError, actualError) {
-				t.Fatalf("CopyConfig dropped the Dial field")
+				t.Fatalf("AnonymousClientConfig dropped the Dial field")
 			}
 		} else {
 			actual.Dial = nil

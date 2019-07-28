@@ -4,7 +4,6 @@ metadata:
   name: heapster
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 apiVersion: v1
@@ -13,7 +12,6 @@ metadata:
   name: heapster-config
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: EnsureExists
 data:
   NannyConfiguration: |-
@@ -27,7 +25,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: heapster
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     version: v1.6.0-beta.1
 spec:
@@ -66,7 +63,7 @@ spec:
             - --sink=stackdriver:?cluster_name={{ cluster_name }}&use_old_resources={{ use_old_resources }}&use_new_resources={{ use_new_resources }}&min_interval_sec=100&batch_export_timeout_sec=110&cluster_location={{ cluster_location }}
         # BEGIN_PROMETHEUS_TO_SD
         - name: prom-to-sd
-          image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+          image: k8s.gcr.io/prometheus-to-sd:v0.5.0
           command:
             - /monitor
             - --source=heapster:http://localhost:8082?whitelisted=stackdriver_requests_count,stackdriver_timeseries_count
@@ -84,7 +81,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
         # END_PROMETHEUS_TO_SD
-        - image: k8s.gcr.io/addon-resizer:1.8.4
+        - image: k8s.gcr.io/addon-resizer:1.8.5
           name: heapster-nanny
           resources:
             limits:

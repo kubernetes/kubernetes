@@ -54,6 +54,7 @@ declare -a resources=(
     "clusterroles.rbac.authorization.k8s.io"
     "clusterrolebindings.rbac.authorization.k8s.io"
     "networkpolicies.networking.k8s.io"
+    "ingresses.networking.k8s.io"
 )
 
 # Find all the namespaces.

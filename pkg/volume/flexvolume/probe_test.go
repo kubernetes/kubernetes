@@ -18,7 +18,7 @@ package flexvolume
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
@@ -71,8 +71,8 @@ func TestProberAddRemoveDriver(t *testing.T) {
 
 	// add driver
 	const driverName2 = "fake-driver2"
-	driverPath := path.Join(pluginDir, driverName2)
-	executablePath := path.Join(driverPath, driverName2)
+	driverPath := filepath.Join(pluginDir, driverName2)
+	executablePath := filepath.Join(driverPath, driverName2)
 	installDriver(driverName2, fs)
 	watcher.TriggerEvent(fsnotify.Create, driverPath)
 	watcher.TriggerEvent(fsnotify.Create, executablePath)
@@ -95,7 +95,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Call probe after a non-driver file is added in a subdirectory. should return 1 event.
-	fp := path.Join(driverPath, "dummyfile")
+	fp := filepath.Join(driverPath, "dummyfile")
 	fs.Create(fp)
 	watcher.TriggerEvent(fsnotify.Create, fp)
 
@@ -115,7 +115,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Call probe after a subdirectory is added in a driver directory. should return 1 event.
-	subdirPath := path.Join(driverPath, "subdir")
+	subdirPath := filepath.Join(driverPath, "subdir")
 	fs.Create(subdirPath)
 	watcher.TriggerEvent(fsnotify.Create, subdirPath)
 
@@ -196,7 +196,7 @@ func TestRemovePluginDir(t *testing.T) {
 	// Arrange
 	driverPath, fs, watcher, _ := initTestEnvironment(t)
 	fs.RemoveAll(pluginDir)
-	watcher.TriggerEvent(fsnotify.Remove, path.Join(driverPath, driverName))
+	watcher.TriggerEvent(fsnotify.Remove, filepath.Join(driverPath, driverName))
 	watcher.TriggerEvent(fsnotify.Remove, driverPath)
 	watcher.TriggerEvent(fsnotify.Remove, pluginDir)
 
@@ -216,7 +216,7 @@ func TestNestedDriverDir(t *testing.T) {
 
 	// test add testDriverName
 	testDriverName := "testDriverName"
-	testDriverPath := path.Join(pluginDir, testDriverName)
+	testDriverPath := filepath.Join(pluginDir, testDriverName)
 	fs.MkdirAll(testDriverPath, 0666)
 	watcher.TriggerEvent(fsnotify.Create, testDriverPath)
 	// Assert
@@ -227,7 +227,7 @@ func TestNestedDriverDir(t *testing.T) {
 	basePath := testDriverPath
 	for i := 0; i < 10; i++ {
 		subdirName := "subdirName"
-		subdirPath := path.Join(basePath, subdirName)
+		subdirPath := filepath.Join(basePath, subdirName)
 		fs.MkdirAll(subdirPath, 0666)
 		watcher.TriggerEvent(fsnotify.Create, subdirPath)
 		// Assert
@@ -246,9 +246,9 @@ func TestProberMultipleEvents(t *testing.T) {
 	for i := 0; i < iterations; i++ {
 		newDriver := fmt.Sprintf("multi-event-driver%d", 1)
 		installDriver(newDriver, fs)
-		driverPath := path.Join(pluginDir, newDriver)
+		driverPath := filepath.Join(pluginDir, newDriver)
 		watcher.TriggerEvent(fsnotify.Create, driverPath)
-		watcher.TriggerEvent(fsnotify.Create, path.Join(driverPath, newDriver))
+		watcher.TriggerEvent(fsnotify.Create, filepath.Join(driverPath, newDriver))
 	}
 
 	// Act
@@ -284,9 +284,9 @@ func TestProberError(t *testing.T) {
 
 // Installs a mock driver (an empty file) in the mock fs.
 func installDriver(driverName string, fs utilfs.Filesystem) {
-	driverPath := path.Join(pluginDir, driverName)
+	driverPath := filepath.Join(pluginDir, driverName)
 	fs.MkdirAll(driverPath, 0666)
-	fs.Create(path.Join(driverPath, driverName))
+	fs.Create(filepath.Join(driverPath, driverName))
 }
 
 // Initializes mocks, installs a single driver in the mock fs, then initializes prober.
@@ -303,7 +303,7 @@ func initTestEnvironment(t *testing.T) (
 		fs:        fs,
 		factory:   fakePluginFactory{error: false},
 	}
-	driverPath = path.Join(pluginDir, driverName)
+	driverPath = filepath.Join(pluginDir, driverName)
 	installDriver(driverName, fs)
 	prober.Init()
 

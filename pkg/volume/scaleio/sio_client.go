@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -535,5 +534,5 @@ func (c *sioClient) getSdcPath() string {
 }
 
 func (c *sioClient) getSdcCmd() string {
-	return path.Join(c.getSdcPath(), "drv_cfg")
+	return filepath.Join(c.getSdcPath(), "drv_cfg")
 }

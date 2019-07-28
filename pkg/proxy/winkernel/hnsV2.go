@@ -47,7 +47,7 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 			}
 			rs := &remoteSubnetInfo{
 				destinationPrefix: policySettings.DestinationPrefix,
-				isolationId:       policySettings.IsolationId,
+				isolationID:       policySettings.IsolationId,
 				providerAddress:   policySettings.ProviderAddress,
 				drMacAddress:      policySettings.DistributedRouterMacAddress,
 			}
@@ -104,7 +104,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find network %s: %v", networkName, err)
+		return nil, err
 	}
 	var flags hcn.EndpointFlags
 	if !ep.isLocal {
@@ -141,12 +141,12 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		}
 		createdEndpoint, err = hnsNetwork.CreateRemoteEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Remote endpoint creation failed: %v", err)
+			return nil, err
 		}
 	} else {
 		createdEndpoint, err = hnsNetwork.CreateEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Local endpoint creation failed: %v", err)
+			return nil, err
 		}
 	}
 	return &endpointsInfo{
@@ -169,7 +169,7 @@ func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	}
 	return err
 }
-func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	plists, err := hcn.ListLoadBalancers()
 	if err != nil {
 		return nil, err
@@ -181,11 +181,13 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 		}
 		// Validate if input meets any of the policy lists
 		lbPortMapping := plist.PortMappings[0]
-		if lbPortMapping.Protocol == uint32(protocol) && lbPortMapping.InternalPort == internalPort && lbPortMapping.ExternalPort == externalPort && (lbPortMapping.Flags&1 != 0) == isILB {
+		if lbPortMapping.Protocol == uint32(protocol) && lbPortMapping.InternalPort == internalPort && lbPortMapping.ExternalPort == externalPort && (lbPortMapping.Flags&1 != 0) == flags.isILB {
 			if len(vip) > 0 {
 				if len(plist.FrontendVIPs) == 0 || plist.FrontendVIPs[0] != vip {
 					continue
 				}
+			} else if len(plist.FrontendVIPs) != 0 {
+				continue
 			}
 			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
@@ -207,10 +209,30 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 	if len(vip) > 0 {
 		vips = append(vips, vip)
 	}
+
+	lbPortMappingFlags := hcn.LoadBalancerPortMappingFlagsNone
+	if flags.isILB {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsILB
+	}
+	if flags.useMUX {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsUseMux
+	}
+	if flags.preserveDIP {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsPreserveDIP
+	}
+	if flags.localRoutedVIP {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP
+	}
+
+	lbFlags := hcn.LoadBalancerFlagsNone
+	if flags.isDSR {
+		lbFlags |= hcn.LoadBalancerFlagsDSR
+	}
+
 	lb, err := hcn.AddLoadBalancer(
 		hnsEndpoints,
-		isILB,
-		isDSR,
+		lbFlags,
+		lbPortMappingFlags,
 		sourceVip,
 		vips,
 		protocol,

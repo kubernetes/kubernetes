@@ -20,11 +20,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/bazelbuild/buildtools/build"
+	"github.com/bazelbuild/buildtools/tables"
 	"github.com/bazelbuild/buildtools/wspace"
 )
 
@@ -55,7 +57,7 @@ func ParseLabel(target string) (string, string, string) {
 	parts := strings.SplitN(target, ":", 2)
 	parts[0] = strings.TrimPrefix(parts[0], "//")
 	if len(parts) == 1 {
-		if strings.HasPrefix(target, "//") {
+		if strings.HasPrefix(target, "//") || tables.StripLabelLeadingSlashes {
 			// "//absolute/pkg" -> "absolute/pkg", "pkg"
 			return repo, parts[0], path.Base(parts[0])
 		}
@@ -164,7 +166,7 @@ func ExprToRule(expr build.Expr, kind string) (*build.Rule, bool) {
 	if !ok || k.Token != kind {
 		return nil, false
 	}
-	return &build.Rule{Call: call}, true
+	return &build.Rule{call, ""}, true
 }
 
 // ExistingPackageDeclaration returns the package declaration, or nil if there is none.
@@ -200,7 +202,7 @@ func PackageDeclaration(f *build.File) *build.Rule {
 		all = append(all, call)
 	}
 	f.Stmt = all
-	return &build.Rule{Call: call}
+	return &build.Rule{call, ""}
 }
 
 // RemoveEmptyPackage removes empty package declarations from the file, i.e.:
@@ -274,49 +276,12 @@ func FindRuleByName(f *build.File, name string) *build.Rule {
 	if name == "__pkg__" {
 		return PackageDeclaration(f)
 	}
-	i := IndexOfRuleByName(f, name)
-	if i != -1 {
-		return &build.Rule{Call: f.Stmt[i].(*build.CallExpr)}
-	}
-	return nil
-}
-
-// UseImplicitName returns the rule in the file if it meets these conditions:
-// - It is the only unnamed rule in the file.
-// - The file path's ending directory name and the passed rule name match.
-// In the Pants Build System, by pantsbuild, the use of an implicit name makes
-// creating targets easier. This function implements such names.
-func UseImplicitName(f *build.File, rule string) *build.Rule {
-	// We disallow empty names
-	if f.Path == "BUILD" {
-		return nil
-	}
-	ruleCount := 0
-	var temp, found *build.Rule
-	pkg := filepath.Base(filepath.Dir(f.Path))
-
-	for _, stmt := range f.Stmt {
-		call, ok := stmt.(*build.CallExpr)
-		if !ok {
-			continue
-		}
-		temp = &build.Rule{Call: call}
-		if temp.Kind() != "" && temp.Name() == "" {
-			ruleCount++
-			found = temp
-		}
-	}
-
-	if ruleCount == 1 {
-		if rule == pkg {
-			return found
-		}
-	}
-	return nil
+	_, rule := IndexOfRuleByName(f, name)
+	return rule
 }
 
 // IndexOfRuleByName returns the index (in f.Stmt) of the CallExpr which defines a rule named `name`, or -1 if it doesn't exist.
-func IndexOfRuleByName(f *build.File, name string) int {
+func IndexOfRuleByName(f *build.File, name string) (int, *build.Rule) {
 	linenum := -1
 	if strings.HasPrefix(name, "%") {
 		// "%<LINENUM>" will match the rule which begins at LINENUM.
@@ -331,13 +296,13 @@ func IndexOfRuleByName(f *build.File, name string) int {
 		if !ok {
 			continue
 		}
-		r := &build.Rule{Call: call}
+		r := f.Rule(call)
 		start, _ := call.X.Span()
 		if r.Name() == name || start.Line == linenum {
-			return i
+			return i, r
 		}
 	}
-	return -1
+	return -1, nil
 }
 
 // FindExportedFile returns the first exports_files call which contains the
@@ -377,7 +342,7 @@ func DeleteRuleByName(f *build.File, name string) *build.File {
 			all = append(all, stmt)
 			continue
 		}
-		r := &build.Rule{Call: call}
+		r := f.Rule(call)
 		if r.Name() != name {
 			all = append(all, stmt)
 		}
@@ -535,6 +500,42 @@ func ListReplace(e build.Expr, old, value, pkg string) bool {
 		}
 	}
 	return replaced
+}
+
+// ListSubstitute replaces strings matching a regular expression in all lists
+// in e and returns a Boolean to indicate whether the replacement was
+// successful.
+func ListSubstitute(e build.Expr, oldRegexp *regexp.Regexp, newTemplate string) bool {
+	substituted := false
+	for _, li := range AllLists(e) {
+		for k, elem := range li.List {
+			str, ok := elem.(*build.StringExpr)
+			if !ok {
+				continue
+			}
+			newValue, ok := stringSubstitute(str.Value, oldRegexp, newTemplate)
+			if ok {
+				li.List[k] = &build.StringExpr{Value: newValue, Comments: *elem.Comment()}
+				substituted = true
+			}
+		}
+	}
+	return substituted
+}
+
+func stringSubstitute(oldValue string, oldRegexp *regexp.Regexp, newTemplate string) (string, bool) {
+	match := oldRegexp.FindStringSubmatchIndex(oldValue)
+	if match == nil {
+		return oldValue, false
+	}
+	newValue := string(oldRegexp.ExpandString(nil, newTemplate, oldValue, match))
+	if match[0] > 0 {
+		newValue = oldValue[:match[0]] + newValue
+	}
+	if match[1] < len(oldValue) {
+		newValue = newValue + oldValue[match[1]:]
+	}
+	return newValue, true
 }
 
 // isExprLessThan compares two Expr statements. Currently, only labels are supported.

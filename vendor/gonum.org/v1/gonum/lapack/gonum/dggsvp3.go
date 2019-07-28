@@ -54,43 +54,38 @@ import (
 //
 // Dggsvp3 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int, a []float64, lda int, b []float64, ldb int, tola, tolb float64, u []float64, ldu int, v []float64, ldv int, q []float64, ldq int, iwork []int, tau, work []float64, lwork int) (k, l int) {
-	const forward = true
-
-	checkMatrix(m, n, a, lda)
-	checkMatrix(p, n, b, ldb)
-
 	wantu := jobU == lapack.GSVDU
-	if !wantu && jobU != lapack.GSVDNone {
-		panic(badGSVDJob + "U")
-	}
-	if jobU != lapack.GSVDNone {
-		checkMatrix(m, m, u, ldu)
-	}
-
 	wantv := jobV == lapack.GSVDV
-	if !wantv && jobV != lapack.GSVDNone {
-		panic(badGSVDJob + "V")
-	}
-	if jobV != lapack.GSVDNone {
-		checkMatrix(p, p, v, ldv)
-	}
-
 	wantq := jobQ == lapack.GSVDQ
-	if !wantq && jobQ != lapack.GSVDNone {
+	switch {
+	case !wantu && jobU != lapack.GSVDNone:
+		panic(badGSVDJob + "U")
+	case !wantv && jobV != lapack.GSVDNone:
+		panic(badGSVDJob + "V")
+	case !wantq && jobQ != lapack.GSVDNone:
 		panic(badGSVDJob + "Q")
-	}
-	if jobQ != lapack.GSVDNone {
-		checkMatrix(n, n, q, ldq)
-	}
-
-	if len(iwork) != n {
-		panic(badWork)
-	}
-	if lwork != -1 && lwork < 1 {
-		panic(badWork)
-	}
-	if len(work) < max(1, lwork) {
-		panic(badWork)
+	case m < 0:
+		panic(mLT0)
+	case p < 0:
+		panic(pLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldb < max(1, n):
+		panic(badLdB)
+	case ldu < 1, wantu && ldu < m:
+		panic(badLdU)
+	case ldv < 1, wantv && ldv < p:
+		panic(badLdV)
+	case ldq < 1, wantq && ldq < n:
+		panic(badLdQ)
+	case len(iwork) != n:
+		panic(shortWork)
+	case lwork < 1 && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
 
 	var lwkopt int
@@ -112,12 +107,25 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		return 0, 0
 	}
 
-	// tau check must come after lwkopt query since
-	// the Dggsvd3 call for lwkopt query may have
-	// lwork == -1, and tau is provided by work.
-	if len(tau) < n {
-		panic(badTau)
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(b) < (p-1)*ldb+n:
+		panic(shortB)
+	case wantu && len(u) < (m-1)*ldu+m:
+		panic(shortU)
+	case wantv && len(v) < (p-1)*ldv+p:
+		panic(shortV)
+	case wantq && len(q) < (n-1)*ldq+n:
+		panic(shortQ)
+	case len(tau) < n:
+		// tau check must come after lwkopt query since
+		// the Dggsvd3 call for lwkopt query may have
+		// lwork == -1, and tau is provided by work.
+		panic(shortTau)
 	}
+
+	const forward = true
 
 	// QR with column pivoting of B: B*P = V*[ S11 S12 ].
 	//                                       [  0   0  ]

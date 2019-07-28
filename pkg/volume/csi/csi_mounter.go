@@ -19,10 +19,11 @@ package csi
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"strconv"
 
 	"k8s.io/klog"
 
@@ -44,14 +45,14 @@ var (
 		driverName,
 		nodeName,
 		attachmentID,
-		driverMode string
+		csiVolumeMode string
 	}{
 		"specVolID",
 		"volumeHandle",
 		"driverName",
 		"nodeName",
 		"attachmentID",
-		"driverMode",
+		"csiVolumeMode",
 	}
 )
 
@@ -60,7 +61,7 @@ type csiMountMgr struct {
 	k8s            kubernetes.Interface
 	plugin         *csiPlugin
 	driverName     csiDriverName
-	driverMode     driverMode
+	csiVolumeMode  csiVolumeMode
 	volumeID       string
 	specVolumeID   string
 	readOnly       bool
@@ -69,14 +70,15 @@ type csiMountMgr struct {
 	podUID         types.UID
 	options        volume.VolumeOptions
 	publishContext map[string]string
-	volume.MetricsNil
+	kubeVolHost    volume.KubeletVolumeHost
+	volume.MetricsProvider
 }
 
 // volume.Volume methods
 var _ volume.Volume = &csiMountMgr{}
 
 func (c *csiMountMgr) GetPath() string {
-	dir := path.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
+	dir := filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
 	klog.V(4).Info(log("mounter.GetPath generated [%s]", dir))
 	return dir
 }
@@ -93,11 +95,11 @@ func (c *csiMountMgr) CanMount() error {
 	return nil
 }
 
-func (c *csiMountMgr) SetUp(fsGroup *int64) error {
-	return c.SetUpAt(c.GetPath(), fsGroup)
+func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
+	return c.SetUpAt(c.GetPath(), mounterArgs)
 }
 
-func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
+func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
 	mounted, err := isDirMounted(c.plugin, dir)
@@ -145,8 +147,8 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 			return fmt.Errorf("CSIInlineVolume feature required")
 		}
-		if c.driverMode != ephemeralDriverMode {
-			return fmt.Errorf("unexpected driver mode: %s", c.driverMode)
+		if c.csiVolumeMode != ephemeralVolumeMode {
+			return fmt.Errorf("unexpected volume mode: %s", c.csiVolumeMode)
 		}
 		if volSrc.FSType != nil {
 			fsType = *volSrc.FSType
@@ -160,8 +162,8 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 			secretRef = &api.SecretReference{Name: secretName, Namespace: ns}
 		}
 	case pvSrc != nil:
-		if c.driverMode != persistentDriverMode {
-			return fmt.Errorf("unexpected driver mode: %s", c.driverMode)
+		if c.csiVolumeMode != persistentVolumeMode {
+			return fmt.Errorf("unexpected driver mode: %s", c.csiVolumeMode)
 		}
 
 		fsType = pvSrc.FSType
@@ -268,7 +270,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
 
-	err = c.applyFSGroup(fsType, fsGroup)
+	err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
 	if err != nil {
 		// attempt to rollback mount.
 		fsGrpErr := fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
@@ -292,8 +294,14 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return nil, nil
 	}
+
+	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
+	if ok {
+		kletHost.WaitForCacheSync()
+	}
+
 	if c.plugin.csiDriverLister == nil {
-		return nil, errors.New("CSIDriver lister does not exist")
+		return nil, fmt.Errorf("CSIDriverLister not found")
 	}
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
@@ -317,14 +325,18 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
 		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.csiVolumeMode == ephemeralVolumeMode)
+	}
+
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
 	return attrs, nil
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
-	mounter := c.plugin.host.GetMounter(c.plugin.GetPluginName())
 	path := c.GetPath()
-	supportSelinux, err := mounter.GetSELinuxSupport(path)
+	hu := c.kubeVolHost.GetHostUtil()
+	supportSelinux, err := hu.GetSELinuxSupport(path)
 	if err != nil {
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 		// Best guess
@@ -435,7 +447,7 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 		}
 		// remove volume data file as well
 		volPath := path.Dir(mountPath)
-		dataFile := path.Join(volPath, volDataFileName)
+		dataFile := filepath.Join(volPath, volDataFileName)
 		klog.V(4).Info(log("also deleting volume info data file [%s]", dataFile))
 		if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {
 			klog.Error(log("failed to delete volume data file [%s]: %v", dataFile, err))

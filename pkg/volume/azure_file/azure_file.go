@@ -22,17 +22,19 @@ import (
 	"os"
 	"runtime"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -82,7 +84,8 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *azureFilePlugin) IsMigratedToCSI() bool {
-	return false
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 }
 
 func (plugin *azureFilePlugin) RequiresRemount() bool {
@@ -236,11 +239,11 @@ func (b *azureFileMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *azureFileMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *azureFileMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -283,7 +286,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 			options = append(options, "ro")
 		}
 		mountOptions = volutil.JoinMountOptions(b.mountOptions, options)
-		mountOptions = appendDefaultMountOptions(mountOptions, fsGroup)
+		mountOptions = appendDefaultMountOptions(mountOptions, mounterArgs.FsGroup)
 	}
 
 	err = b.mounter.Mount(source, dir, "cifs", mountOptions)

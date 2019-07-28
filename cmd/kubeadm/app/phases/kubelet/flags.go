@@ -29,8 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/procfs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -40,14 +39,14 @@ type kubeletFlagsOpts struct {
 	pauseImage               string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
-	pidOfFunc                func(string) ([]int, error)
+	isServiceActiveFunc      func(string) (bool, error)
 	defaultHostname          string
 }
 
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
 func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
-	hostName, err := nodeutil.GetHostname("")
+	hostName, err := kubeadmutil.GetHostname("")
 	if err != nil {
 		return err
 	}
@@ -58,12 +57,18 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:                   utilsexec.New(),
-		pidOfFunc:                procfs.PidOf,
-		defaultHostname:          hostName,
+		isServiceActiveFunc: func(name string) (bool, error) {
+			initSystem, err := initsystem.GetInitSystem()
+			if err != nil {
+				return false, err
+			}
+			return initSystem.ServiceIsActive(name), nil
+		},
+		defaultHostname: hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
-	envFileContent := fmt.Sprintf("%s=%s\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
+	envFileContent := fmt.Sprintf("%s=%q\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
@@ -99,8 +104,11 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
 	}
 
-	if pids, _ := opts.pidOfFunc("systemd-resolved"); len(pids) > 0 {
-		// procfs.PidOf only returns an error if the regex is empty or doesn't compile, so we can ignore it
+	ok, err := opts.isServiceActiveFunc("systemd-resolved")
+	if err != nil {
+		klog.Warningf("cannot determine if systemd-resolved is active: %v\n", err)
+	}
+	if ok {
 		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
 	}
 

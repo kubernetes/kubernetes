@@ -2,7 +2,6 @@
 package jwriter
 
 import (
-	"encoding/base64"
 	"io"
 	"strconv"
 	"unicode/utf8"
@@ -105,9 +104,7 @@ func (w *Writer) Base64Bytes(data []byte) {
 		return
 	}
 	w.Buffer.AppendByte('"')
-	dst := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
-	base64.StdEncoding.Encode(dst, data)
-	w.Buffer.AppendBytes(dst)
+	w.base64(data)
 	w.Buffer.AppendByte('"')
 }
 
@@ -196,6 +193,13 @@ func (w *Writer) Uint64Str(n uint64) {
 	w.Buffer.Buf = append(w.Buffer.Buf, '"')
 }
 
+func (w *Writer) UintptrStr(n uintptr) {
+	w.Buffer.EnsureSpace(20)
+	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
+	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+}
+
 func (w *Writer) Int8Str(n int8) {
 	w.Buffer.EnsureSpace(4)
 	w.Buffer.Buf = append(w.Buffer.Buf, '"')
@@ -236,9 +240,23 @@ func (w *Writer) Float32(n float32) {
 	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 32)
 }
 
+func (w *Writer) Float32Str(n float32) {
+	w.Buffer.EnsureSpace(20)
+	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 32)
+	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+}
+
 func (w *Writer) Float64(n float64) {
 	w.Buffer.EnsureSpace(20)
 	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, n, 'g', -1, 64)
+}
+
+func (w *Writer) Float64Str(n float64) {
+	w.Buffer.EnsureSpace(20)
+	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 64)
+	w.Buffer.Buf = append(w.Buffer.Buf, '"')
 }
 
 func (w *Writer) Bool(v bool) {
@@ -325,4 +343,48 @@ func (w *Writer) String(s string) {
 	}
 	w.Buffer.AppendString(s[p:])
 	w.Buffer.AppendByte('"')
+}
+
+const encode = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+const padChar = '='
+
+func (w *Writer) base64(in []byte) {
+
+	if len(in) == 0 {
+		return
+	}
+
+	w.Buffer.EnsureSpace(((len(in)-1)/3 + 1) * 4)
+
+	si := 0
+	n := (len(in) / 3) * 3
+
+	for si < n {
+		// Convert 3x 8bit source bytes into 4 bytes
+		val := uint(in[si+0])<<16 | uint(in[si+1])<<8 | uint(in[si+2])
+
+		w.Buffer.Buf = append(w.Buffer.Buf, encode[val>>18&0x3F], encode[val>>12&0x3F], encode[val>>6&0x3F], encode[val&0x3F])
+
+		si += 3
+	}
+
+	remain := len(in) - si
+	if remain == 0 {
+		return
+	}
+
+	// Add the remaining small block
+	val := uint(in[si+0]) << 16
+	if remain == 2 {
+		val |= uint(in[si+1]) << 8
+	}
+
+	w.Buffer.Buf = append(w.Buffer.Buf, encode[val>>18&0x3F], encode[val>>12&0x3F])
+
+	switch remain {
+	case 2:
+		w.Buffer.Buf = append(w.Buffer.Buf, encode[val>>6&0x3F], byte(padChar))
+	case 1:
+		w.Buffer.Buf = append(w.Buffer.Buf, byte(padChar), byte(padChar))
+	}
 }

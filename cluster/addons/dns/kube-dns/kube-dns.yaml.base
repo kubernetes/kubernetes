@@ -84,6 +84,8 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        prometheus.io/port: "10054"
+        prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-cluster-critical
       securityContext:
@@ -106,7 +108,7 @@ spec:
           # guaranteed class. Currently, this container falls into the
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
-            memory: 170Mi
+            memory: __PILLAR__DNS__MEMORY__LIMIT__
           requests:
             cpu: 100m
             memory: 70Mi

@@ -29,8 +29,8 @@ BUCKET="gs://k8s-bazel-cache"
 gsutil acl get "${BUCKET}" > /dev/null
 
 tmpfile=$(mktemp bazel_workspace_mirror.XXXXXX)
-trap "rm ${tmpfile}" EXIT
-cat "$1" | while read url; do
+trap 'rm ${tmpfile}' EXIT
+while read -r url; do
   echo "${url}"
   if gsutil ls "${BUCKET}/${url}" &> /dev/null; then
     echo present
@@ -40,4 +40,4 @@ cat "$1" | while read url; do
         gsutil cp -a public-read "${tmpfile}" "${BUCKET}/${url}"
     fi
   fi
-done
+done < "$1"

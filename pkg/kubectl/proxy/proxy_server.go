@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubectl/pkg/util"
 )
 
 const (
@@ -43,16 +43,6 @@ const (
 	DefaultPathRejectRE = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
 	// DefaultMethodRejectRE is the set of HTTP methods to reject by default.
 	DefaultMethodRejectRE = "^$"
-)
-
-var (
-	// ReverseProxyFlushInterval is the frequency to flush the reverse proxy.
-	// Only matters for long poll connections like the one used to watch. With an
-	// interval of 0 the reverse proxy will buffer content sent on any connection
-	// with transfer-encoding=chunked.
-	// TODO: Flush after each chunk so the client doesn't suffer a 100ms latency per
-	// watch event.
-	ReverseProxyFlushInterval = 100 * time.Millisecond
 )
 
 // FilterServer rejects requests which don't match one of the specified regular expressions

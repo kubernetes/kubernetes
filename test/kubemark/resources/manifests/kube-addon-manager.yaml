@@ -9,7 +9,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-addon-manager
-    image: {{kube_docker_registry}}/kube-addon-manager:v9.0
+    image: {{kube_docker_registry}}/kube-addon-manager:v9.0.1
     command:
     - /bin/bash
     - -c
@@ -24,6 +24,12 @@ spec:
       readOnly: true
     - name: varlog
       mountPath: /var/log/kube-addon-manager.log
+    - mountPath: /etc/srv/kubernetes/addon-manager/
+      name: srvkube
+      readOnly: true
+    env:
+    - name: KUBECTL_OPTS
+      value: '--kubeconfig=/etc/srv/kubernetes/addon-manager/kubeconfig'
   volumes:
   - name: addons
     hostPath:
@@ -32,3 +38,6 @@ spec:
     hostPath:
       path: /var/log/kube-addon-manager.log
       type: FileOrCreate
+  - hostPath:
+      path: /etc/srv/kubernetes/addon-manager/
+    name: srvkube

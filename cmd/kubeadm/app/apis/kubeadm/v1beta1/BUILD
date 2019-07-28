@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "bootstraptokenstring.go",
+        "conversion.go",
         "defaults.go",
         "defaults_unix.go",
         "defaults_windows.go",
@@ -32,9 +33,15 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["bootstraptokenstring_test.go"],
+    srcs = [
+        "bootstraptokenstring_test.go",
+        "conversion_test.go",
+    ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+    ],
 )
 
 filegroup(

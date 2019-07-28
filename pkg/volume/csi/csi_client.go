@@ -32,9 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume"
 	csipbv0 "k8s.io/kubernetes/pkg/volume/csi/csiv0"
 )
 
@@ -71,10 +70,18 @@ type csiClient interface {
 		accessMode api.PersistentVolumeAccessMode,
 		secrets map[string]string,
 		volumeContext map[string]string,
+		mountOptions []string,
 	) error
+
+	NodeGetVolumeStats(
+		ctx context.Context,
+		volID string,
+		targetPath string,
+	) (*volume.Metrics, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
+	NodeSupportsVolumeStats(ctx context.Context) (bool, error)
 }
 
 // Strongly typed address
@@ -148,21 +155,15 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name is empty")
 	}
 
-	addr := fmt.Sprintf(csiAddrTemplate, driverName)
-	requiresV0Client := true
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		existingDriver, driverExists := csiDrivers.Get(string(driverName))
-		if !driverExists {
-			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
-		}
-
-		addr = existingDriver.endpoint
-		requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
+	existingDriver, driverExists := csiDrivers.Get(string(driverName))
+	if !driverExists {
+		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
 	nodeV1ClientCreator := newV1NodeClient
 	nodeV0ClientCreator := newV0NodeClient
-	if requiresV0Client {
+
+	if versionRequiresV0Client(existingDriver.highestSupportedVersion) {
 		nodeV1ClientCreator = nil
 	} else {
 		nodeV0ClientCreator = nil
@@ -170,7 +171,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 
 	return &csiDriverClient{
 		driverName:          driverName,
-		addr:                csiAddr(addr),
+		addr:                csiAddr(existingDriver.endpoint),
 		nodeV1ClientCreator: nodeV1ClientCreator,
 		nodeV0ClientCreator: nodeV0ClientCreator,
 	}, nil
@@ -507,6 +508,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
@@ -517,9 +519,9 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	}
 
 	if c.nodeV1ClientCreator != nil {
-		return c.nodeStageVolumeV1(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext)
+		return c.nodeStageVolumeV1(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext, mountOptions)
 	} else if c.nodeV0ClientCreator != nil {
-		return c.nodeStageVolumeV0(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext)
+		return c.nodeStageVolumeV0(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext, mountOptions)
 	}
 
 	return fmt.Errorf("failed to call NodeStageVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
@@ -534,6 +536,7 @@ func (c *csiDriverClient) nodeStageVolumeV1(
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
 	if err != nil {
@@ -561,7 +564,8 @@ func (c *csiDriverClient) nodeStageVolumeV1(
 	} else {
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
 			Mount: &csipbv1.VolumeCapability_MountVolume{
-				FsType: fsType,
+				FsType:     fsType,
+				MountFlags: mountOptions,
 			},
 		}
 	}
@@ -579,6 +583,7 @@ func (c *csiDriverClient) nodeStageVolumeV0(
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
 	if err != nil {
@@ -606,7 +611,8 @@ func (c *csiDriverClient) nodeStageVolumeV0(
 	} else {
 		req.VolumeCapability.AccessType = &csipbv0.VolumeCapability_Mount{
 			Mount: &csipbv0.VolumeCapability_MountVolume{
-				FsType: fsType,
+				FsType:     fsType,
+				MountFlags: mountOptions,
 			},
 		}
 	}
@@ -681,16 +687,15 @@ func (c *csiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, err
 
 		capabilities := resp.GetCapabilities()
 
-		nodeExpandSet := false
 		if capabilities == nil {
 			return false, nil
 		}
 		for _, capability := range capabilities {
 			if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME {
-				nodeExpandSet = true
+				return true, nil
 			}
 		}
-		return nodeExpandSet, nil
+		return false, nil
 	} else if c.nodeV0ClientCreator != nil {
 		return false, nil
 	}
@@ -840,4 +845,105 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 	}
 	c.csiClient = csi
 	return c.csiClient, nil
+}
+
+func (c *csiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
+	klog.V(5).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsVolumeStats"))
+	if c.nodeV1ClientCreator != nil {
+		return c.nodeSupportsVolumeStatsV1(ctx)
+	}
+	return false, fmt.Errorf("failed to call NodeSupportsVolumeStats. nodeV1ClientCreator is nil")
+}
+
+func (c *csiDriverClient) nodeSupportsVolumeStatsV1(ctx context.Context) (bool, error) {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return false, err
+	}
+	defer closer.Close()
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	capabilities := resp.GetCapabilities()
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (*volume.Metrics, error) {
+	klog.V(4).Info(log("calling NodeGetVolumeStats rpc: [volid=%s, target_path=%s", volID, targetPath))
+	if volID == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if targetPath == "" {
+		return nil, errors.New("missing target path")
+	}
+
+	if c.nodeV1ClientCreator != nil {
+		return c.nodeGetVolumeStatsV1(ctx, volID, targetPath)
+	}
+
+	return nil, fmt.Errorf("failed to call NodeGetVolumeStats. nodeV1ClientCreator is nil")
+}
+
+func (c *csiDriverClient) nodeGetVolumeStatsV1(
+	ctx context.Context,
+	volID string,
+	targetPath string,
+) (*volume.Metrics, error) {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeGetVolumeStatsRequest{
+		VolumeId:   volID,
+		VolumePath: targetPath,
+	}
+
+	resp, err := nodeClient.NodeGetVolumeStats(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	usages := resp.GetUsage()
+	if usages == nil {
+		return nil, fmt.Errorf("failed to get usage from response. usage is nil")
+	}
+	metrics := &volume.Metrics{
+		Used:       resource.NewQuantity(int64(0), resource.BinarySI),
+		Capacity:   resource.NewQuantity(int64(0), resource.BinarySI),
+		Available:  resource.NewQuantity(int64(0), resource.BinarySI),
+		InodesUsed: resource.NewQuantity(int64(0), resource.BinarySI),
+		Inodes:     resource.NewQuantity(int64(0), resource.BinarySI),
+		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
+	}
+	for _, usage := range usages {
+		if usage == nil {
+			continue
+		}
+		unit := usage.GetUnit()
+		switch unit {
+		case csipbv1.VolumeUsage_BYTES:
+			metrics.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			metrics.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			metrics.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+		case csipbv1.VolumeUsage_INODES:
+			metrics.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			metrics.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			metrics.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+		default:
+			klog.Errorf("unknown key %s in usage", unit.String())
+		}
+
+	}
+	return metrics, nil
 }

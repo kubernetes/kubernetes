@@ -28,12 +28,13 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
 	"k8s.io/klog"
+	utilio "k8s.io/utils/io"
 )
 
 var (
@@ -47,6 +48,10 @@ const (
 	podDNSCluster podDNSType = iota
 	podDNSHost
 	podDNSNone
+)
+
+const (
+	maxResolveConfLength = 10 * 1 << 20 // 10MB
 )
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
@@ -193,7 +198,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 // parseResolvConf reads a resolv.conf file from the given reader, and parses
 // it into nameservers, searches and options, possibly returning an error.
 func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
-	file, err := ioutil.ReadAll(reader)
+	file, err := utilio.ReadAtMost(reader, maxResolveConfLength)
 	if err != nil {
 		return nil, nil, nil, err
 	}

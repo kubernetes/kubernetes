@@ -39,6 +39,7 @@ tags_values_pkgs = {"openapi-gen": {
         "pkg/apis/abac/v1beta1",
         "pkg/apis/auditregistration",
         "pkg/version",
+        "staging/src/k8s.io/api/admissionregistration/v1",
         "staging/src/k8s.io/api/admissionregistration/v1beta1",
         "staging/src/k8s.io/api/apps/v1",
         "staging/src/k8s.io/api/apps/v1beta1",
@@ -89,7 +90,6 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
         "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1beta1",
         "staging/src/k8s.io/client-go/pkg/version",
-        "staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1",
         "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
         "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
         "staging/src/k8s.io/kube-controller-manager/config/v1alpha1",
@@ -102,6 +102,8 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1",
         "staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1",
         "staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1",
+        "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+        "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1",
     ],
 }}
 
@@ -113,6 +115,7 @@ tags_pkgs_values = {"openapi-gen": {
     "pkg/apis/auditregistration": ["true"],
     "pkg/version": ["true"],
     "staging/src/k8s.io/api/admission/v1beta1": ["false"],
+    "staging/src/k8s.io/api/admissionregistration/v1": ["true"],
     "staging/src/k8s.io/api/admissionregistration/v1beta1": ["true"],
     "staging/src/k8s.io/api/apps/v1": ["true"],
     "staging/src/k8s.io/api/apps/v1beta1": ["true"],
@@ -169,7 +172,6 @@ tags_pkgs_values = {"openapi-gen": {
     "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1": ["true"],
     "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1beta1": ["true"],
     "staging/src/k8s.io/client-go/pkg/version": ["true"],
-    "staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1": ["true"],
     "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1": ["true"],
     "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1": ["true"],
     "staging/src/k8s.io/kube-controller-manager/config/v1alpha1": ["true"],
@@ -182,4 +184,6 @@ tags_pkgs_values = {"openapi-gen": {
     "staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1": ["true"],
     "staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1": ["true"],
     "staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1": ["true"],
+    "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1": ["true"],
+    "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1": ["true"],
 }}

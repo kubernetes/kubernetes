@@ -46,6 +46,7 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "", Resource: "nodes"}:                         "minions",
 	{Group: "", Resource: "services"}:                      "services/specs",
 	{Group: "extensions", Resource: "ingresses"}:           "ingress",
+	{Group: "networking.k8s.io", Resource: "ingresses"}:    "ingress",
 	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
@@ -54,6 +55,7 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
+		networking.Resource("ingresses").WithVersion("v1beta1"),
 	}
 	// add csinodes if CSINodeInfo feature gate is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
@@ -109,8 +111,9 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
 	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
 	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
+	storageFactory.AddCohabitatingResources(api.Resource("replicationcontrollers"), extensions.Resource("replicationcontrollers")) // to make scale subresources equivalent
 	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
-	storageFactory.AddCohabitatingResources(extensions.Resource("ingresses"), networking.Resource("ingresses"))
+	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
 
 	for _, override := range c.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

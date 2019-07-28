@@ -28,10 +28,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/version"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Version is a struct for version information
@@ -88,6 +88,9 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 // Complete completes all the required options
 func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
+	if o.ClientOnly {
+		return nil
+	}
 	o.discoveryClient, err = f.ToDiscoveryClient()
 	// if we had an empty rest.Config, continue and just print out client information.
 	// if we had an error other than being unable to build a rest.Config, fail.

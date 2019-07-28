@@ -25,11 +25,11 @@ import (
 )
 
 func startBootstrapSignerController(ctx ControllerContext) (http.Handler, bool, error) {
-	bsc, err := bootstrap.NewBootstrapSigner(
+	bsc, err := bootstrap.NewSigner(
 		ctx.ClientBuilder.ClientOrDie("bootstrap-signer"),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		ctx.InformerFactory.Core().V1().ConfigMaps(),
-		bootstrap.DefaultBootstrapSignerOptions(),
+		bootstrap.DefaultSignerOptions(),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating BootstrapSigner controller: %v", err)

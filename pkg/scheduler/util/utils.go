@@ -19,14 +19,13 @@ package util
 import (
 	"sort"
 
+	"time"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/api"
-	"time"
 )
 
 // GetContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
@@ -42,11 +41,6 @@ func GetContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 		}
 	}
 	return ports
-}
-
-// PodPriorityEnabled indicates whether pod priority feature is enabled.
-func PodPriorityEnabled() bool {
-	return feature.DefaultFeatureGate.Enabled(features.PodPriority)
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -134,9 +128,15 @@ func (l *SortableList) Sort() {
 	sort.Sort(l)
 }
 
-// HigherPriorityPod return true when priority of the first pod is higher than
-// the second one. It takes arguments of the type "interface{}" to be used with
-// SortableList, but expects those arguments to be *v1.Pod.
-func HigherPriorityPod(pod1, pod2 interface{}) bool {
-	return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+// MoreImportantPod return true when priority of the first pod is higher than
+// the second one. If two pods' priorities are equal, compare their StartTime.
+// It takes arguments of the type "interface{}" to be used with SortableList,
+// but expects those arguments to be *v1.Pod.
+func MoreImportantPod(pod1, pod2 interface{}) bool {
+	p1 := GetPodPriority(pod1.(*v1.Pod))
+	p2 := GetPodPriority(pod2.(*v1.Pod))
+	if p1 != p2 {
+		return p1 > p2
+	}
+	return GetPodStartTime(pod1.(*v1.Pod)).Before(GetPodStartTime(pod2.(*v1.Pod)))
 }

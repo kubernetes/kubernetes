@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,7 @@ import (
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
 
+// PluginName is a string with the name of the plugin
 const PluginName = "PodTolerationRestriction"
 
 // Register registers a plugin
@@ -59,29 +59,21 @@ const (
 	NSWLTolerations      string = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
 )
 
-var _ admission.MutationInterface = &podTolerationsPlugin{}
-var _ admission.ValidationInterface = &podTolerationsPlugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&podTolerationsPlugin{})
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&podTolerationsPlugin{})
+var _ admission.MutationInterface = &Plugin{}
+var _ admission.ValidationInterface = &Plugin{}
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
 
-type podTolerationsPlugin struct {
+// Plugin contains the client used by the admission controller
+type Plugin struct {
 	*admission.Handler
 	client          kubernetes.Interface
 	namespaceLister corev1listers.NamespaceLister
 	pluginConfig    *pluginapi.Configuration
 }
 
-// This plugin first verifies any conflict between a pod's tolerations and
-// its namespace's tolerations, and rejects the pod if there's a conflict.
-// If there's no conflict, the pod's tolerations are merged with its namespace's
-// toleration. Resulting pod's tolerations are verified against its namespace's
-// whitelist of tolerations. If the verification is successful, the pod is admitted
-// otherwise rejected. If a namespace does not have associated default or whitelist
-// of tolerations, then cluster level default or whitelist of tolerations are used
-// instead if specified. Tolerations to a namespace are assigned via
-// scheduler.alpha.kubernetes.io/defaultTolerations and scheduler.alpha.kubernetes.io/tolerationsWhitelist
-// annotations keys.
-func (p *podTolerationsPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+// Admit checks the admission policy and triggers corresponding actions
+func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -132,11 +124,14 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes, o admission.ObjectI
 			},
 		})
 	}
-	pod.Spec.Tolerations = finalTolerations
-
+	// Final merge of tolerations irrespective of pod type, if the user while creating pods gives
+	// conflicting tolerations(with same key+effect), the existing ones should be overwritten by latest one
+	pod.Spec.Tolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{})
 	return p.Validate(a, o)
 }
-func (p *podTolerationsPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+
+// Validate we can obtain a whitelist of tolerations
+func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -190,25 +185,29 @@ func shouldIgnore(a admission.Attributes) bool {
 	return false
 }
 
-func NewPodTolerationsPlugin(pluginConfig *pluginapi.Configuration) *podTolerationsPlugin {
-	return &podTolerationsPlugin{
+// NewPodTolerationsPlugin initializes a Plugin
+func NewPodTolerationsPlugin(pluginConfig *pluginapi.Configuration) *Plugin {
+	return &Plugin{
 		Handler:      admission.NewHandler(admission.Create, admission.Update),
 		pluginConfig: pluginConfig,
 	}
 }
 
-func (a *podTolerationsPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
-	a.client = client
+// SetExternalKubeClientSet sets th client
+func (p *Plugin) SetExternalKubeClientSet(client kubernetes.Interface) {
+	p.client = client
 }
 
-func (p *podTolerationsPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetExternalKubeInformerFactory initializes the Informer Factory
+func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 
 }
 
-func (p *podTolerationsPlugin) ValidateInitialization() error {
+// ValidateInitialization checks the object is properly initialized
+func (p *Plugin) ValidateInitialization() error {
 	if p.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}
@@ -219,7 +218,7 @@ func (p *podTolerationsPlugin) ValidateInitialization() error {
 }
 
 // in exceptional cases, this can result in two live calls, but once the cache catches up, that will stop.
-func (p *podTolerationsPlugin) getNamespace(nsName string) (*corev1.Namespace, error) {
+func (p *Plugin) getNamespace(nsName string) (*corev1.Namespace, error) {
 	namespace, err := p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
@@ -237,7 +236,7 @@ func (p *podTolerationsPlugin) getNamespace(nsName string) (*corev1.Namespace, e
 	return namespace, nil
 }
 
-func (p *podTolerationsPlugin) getNamespaceDefaultTolerations(nsName string) ([]api.Toleration, error) {
+func (p *Plugin) getNamespaceDefaultTolerations(nsName string) ([]api.Toleration, error) {
 	ns, err := p.getNamespace(nsName)
 	if err != nil {
 		return nil, err
@@ -245,7 +244,7 @@ func (p *podTolerationsPlugin) getNamespaceDefaultTolerations(nsName string) ([]
 	return extractNSTolerations(ns, NSDefaultTolerations)
 }
 
-func (p *podTolerationsPlugin) getNamespaceTolerationsWhitelist(nsName string) ([]api.Toleration, error) {
+func (p *Plugin) getNamespaceTolerationsWhitelist(nsName string) ([]api.Toleration, error) {
 	ns, err := p.getNamespace(nsName)
 	if err != nil {
 		return nil, err
@@ -275,7 +274,7 @@ func extractNSTolerations(ns *corev1.Namespace, key string) ([]api.Toleration, e
 		return []api.Toleration{}, nil
 	}
 
-	var v1Tolerations []v1.Toleration
+	var v1Tolerations []corev1.Toleration
 	err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
 	if err != nil {
 		return nil, err

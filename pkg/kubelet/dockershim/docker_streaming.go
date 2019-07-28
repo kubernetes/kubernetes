@@ -22,15 +22,11 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os/exec"
-	"strings"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
-	"k8s.io/klog"
-
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -72,7 +68,7 @@ func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream i
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	return portForward(r.client, podSandboxID, port, stream)
+	return r.portForward(podSandboxID, port, stream)
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.
@@ -173,61 +169,4 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 		RawTerminal:  tty,
 	}
 	return client.AttachToContainer(containerID, opts, sopts)
-}
-
-func portForward(client libdocker.Interface, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
-	container, err := client.InspectContainer(podSandboxID)
-	if err != nil {
-		return err
-	}
-
-	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container.ID)
-	}
-
-	containerPid := container.State.Pid
-	socatPath, lookupErr := exec.LookPath("socat")
-	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: socat not found.")
-	}
-
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
-
-	nsenterPath, lookupErr := exec.LookPath("nsenter")
-	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
-	}
-
-	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
-	klog.V(4).Infof("executing port forwarding command: %s", commandString)
-
-	command := exec.Command(nsenterPath, args...)
-	command.Stdout = stream
-
-	stderr := new(bytes.Buffer)
-	command.Stderr = stderr
-
-	// If we use Stdin, command.Run() won't return until the goroutine that's copying
-	// from stream finishes. Unfortunately, if you have a client like telnet connected
-	// via port forwarding, as long as the user's telnet client is connected to the user's
-	// local listener that port forwarding sets up, the telnet session never exits. This
-	// means that even if socat has finished running, command.Run() won't ever return
-	// (because the client still has the connection and stream open).
-	//
-	// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
-	// when the command (socat) exits.
-	inPipe, err := command.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
-	}
-	go func() {
-		io.Copy(inPipe, stream)
-		inPipe.Close()
-	}()
-
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("%v: %s", err, stderr.String())
-	}
-
-	return nil
 }

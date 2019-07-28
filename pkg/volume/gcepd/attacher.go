@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/gce"
 )
 
 type gcePersistentDiskAttacher struct {
@@ -104,7 +104,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 		}
 	}
 
-	return path.Join(diskByIDPath, diskGooglePrefix+pdName), nil
+	return filepath.Join(diskByIDPath, diskGooglePrefix+pdName), nil
 }
 
 func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -137,6 +137,41 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 			volumesAttachedCheck[spec] = false
 			klog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", pdName, spec.Name())
 		}
+	}
+	return volumesAttachedCheck, nil
+}
+
+func (attacher *gcePersistentDiskAttacher) BulkVerifyVolumes(volumesByNode map[types.NodeName][]*volume.Spec) (map[types.NodeName]map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[types.NodeName]map[*volume.Spec]bool)
+	diskNamesByNode := make(map[types.NodeName][]string)
+	volumeSpecToDiskName := make(map[*volume.Spec]string)
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		diskNames := []string{}
+		for _, spec := range volumeSpecs {
+			volumeSource, _, err := getVolumeSource(spec)
+			if err != nil {
+				klog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+				continue
+			}
+			diskNames = append(diskNames, volumeSource.PDName)
+			volumeSpecToDiskName[spec] = volumeSource.PDName
+		}
+		diskNamesByNode[nodeName] = diskNames
+	}
+
+	attachedDisksByNode, err := attacher.gceDisks.BulkDisksAreAttached(diskNamesByNode)
+	if err != nil {
+		return nil, err
+	}
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		volumesAreAttachedToNode := make(map[*volume.Spec]bool)
+		for _, spec := range volumeSpecs {
+			diskName := volumeSpecToDiskName[spec]
+			volumesAreAttachedToNode[spec] = attachedDisksByNode[nodeName][diskName]
+		}
+		volumesAttachedCheck[nodeName] = volumesAreAttachedToNode
 	}
 	return volumesAttachedCheck, nil
 }
@@ -350,6 +385,10 @@ func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string)
 	return mount.CleanupMountPoint(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName), false)
 }
 
-func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }

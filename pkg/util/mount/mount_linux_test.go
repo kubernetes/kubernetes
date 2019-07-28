@@ -631,7 +631,7 @@ func TestGetSELinuxSupport(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out, err := getSELinuxSupport(test.mountPoint, filename)
+		out, err := GetSELinux(test.mountPoint, filename)
 		if err != nil {
 			t.Errorf("Test %s failed with error: %s", test.name, err)
 		}
@@ -661,7 +661,7 @@ func createSocketFile(socketDir string) (string, error) {
 }
 
 func TestGetFileType(t *testing.T) {
-	mounter := Mounter{"fake/path", false}
+	hu := NewHostUtil()
 
 	testCase := []struct {
 		name         string
@@ -750,7 +750,7 @@ func TestGetFileType(t *testing.T) {
 			defer os.RemoveAll(cleanUpPath)
 		}
 
-		fileType, err := mounter.GetFileType(path)
+		fileType, err := hu.GetFileType(path)
 		if err != nil {
 			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
 		}
@@ -907,7 +907,7 @@ func TestSearchMountPoints(t *testing.T) {
 		tmpFile.Seek(0, 0)
 		tmpFile.WriteString(v.mountInfos)
 		tmpFile.Sync()
-		refs, err := searchMountPoints(v.source, tmpFile.Name())
+		refs, err := SearchMountPoints(v.source, tmpFile.Name())
 		if !reflect.DeepEqual(refs, v.expectedRefs) {
 			t.Errorf("test %q: expected Refs: %#v, got %#v", v.name, v.expectedRefs, refs)
 		}

@@ -29,33 +29,38 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 var (
 	baseURL                                           = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
 	confDoc                                           = flag.Bool("conformance", false, "write a conformance document")
+	version                                           = flag.String("version", "v1.9", "version of this conformance document")
 	totalConfTests, totalLegacyTests, missingComments int
+
+	// If a test name contains any of these tags, it is ineligble for promotion to conformance
+	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Disruptive|Feature:[^\]]+|Flaky)\]`)
 )
 
 const regexDescribe = "Describe|KubeDescribe|SIGDescribe"
-const regexContext = "Context"
+const regexContext = "^Context$"
 
 type visitor struct {
-	FileSet      *token.FileSet
-	lastDescribe describe
-	cMap         ast.CommentMap
+	FileSet   *token.FileSet
+	describes []describe
+	cMap      ast.CommentMap
 	//list of all the conformance tests in the path
 	tests []conformanceData
 }
 
 //describe contains text associated with ginkgo describe container
 type describe struct {
+	rparen      token.Pos
 	text        string
 	lastContext context
 }
@@ -72,6 +77,8 @@ type conformanceData struct {
 	TestName string
 	// Extracted from the "Description:" comment before the test
 	Description string
+	// Version when this test is added or modified ex: v1.12, v1.13
+	Release string
 }
 
 func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
@@ -85,13 +92,16 @@ func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
 	cd.Description = ""
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Testname:") {
-			line = strings.TrimSpace(line[9:])
-			cd.TestName = line
+		if sline := regexp.MustCompile("^Testname\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			cd.TestName = sline[1]
 			continue
 		}
-		if strings.HasPrefix(line, "Description:") {
-			line = strings.TrimSpace(line[12:])
+		if sline := regexp.MustCompile("^Release\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			cd.Release = sline[1]
+			continue
+		}
+		if sline := regexp.MustCompile("^Description\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			line = sline[1]
 		}
 		cd.Description += line + "\n"
 	}
@@ -161,8 +171,26 @@ func (v *visitor) failf(expr ast.Expr, format string, a ...interface{}) {
 func (v *visitor) comment(x *ast.BasicLit) string {
 	for _, comm := range v.cMap.Comments() {
 		testOffset := int(x.Pos()-comm.End()) - len("framework.ConformanceIt(\"")
-		if 0 < testOffset && testOffset < 3 {
-			return comm.Text()
+		//Cannot assume the offset is within three or four tabs from the test block itself.
+		//It is better to trim the newlines, tabs, etc and then we if the comment is followed
+		//by the test block itself so that we can associate the comment with it properly.
+		if 0 <= testOffset && testOffset <= 10 {
+			b1 := make([]byte, x.Pos()-comm.End())
+			//if we fail to open the file to compare the content we just assume the
+			//proximity of the comment and apply it.
+			myf, err := os.Open(v.FileSet.File(x.Pos()).Name())
+			if err == nil {
+				if _, err := myf.Seek(int64(comm.End()), 0); err == nil {
+					if _, err := myf.Read(b1); err == nil {
+						if strings.Compare(strings.Trim(string(b1), "\t \r\n"), "framework.ConformanceIt(\"") == 0 {
+							return comm.Text()
+						}
+					}
+				}
+			} else {
+				//comment section's end is noticed within 10 characters from framework.ConformanceIt block
+				return comm.Text()
+			}
 		}
 	}
 	return ""
@@ -173,6 +201,13 @@ func (v *visitor) emit(arg ast.Expr) {
 	case *ast.BasicLit:
 		if at.Kind != token.STRING {
 			v.failf(at, "framework.ConformanceIt() called with non-string argument")
+			return
+		}
+
+		description := v.getDescription(at.Value)
+		err := validateTestName(description)
+		if err != nil {
+			v.failf(at, err.Error())
 			return
 		}
 
@@ -189,13 +224,21 @@ func (v *visitor) emit(arg ast.Expr) {
 }
 
 func (v *visitor) getDescription(value string) string {
-	if len(v.lastDescribe.lastContext.text) > 0 {
-		return strings.Trim(v.lastDescribe.text, "\"") +
-			" " + strings.Trim(v.lastDescribe.lastContext.text, "\"") +
-			" " + strings.Trim(value, "\"")
+	tokens := []string{}
+	for _, describe := range v.describes {
+		tokens = append(tokens, describe.text)
+		if len(describe.lastContext.text) > 0 {
+			tokens = append(tokens, describe.lastContext.text)
+		}
 	}
-	return strings.Trim(v.lastDescribe.text, "\"") +
-		" " + strings.Trim(value, "\"")
+	tokens = append(tokens, value)
+
+	trimmed := []string{}
+	for _, token := range tokens {
+		trimmed = append(trimmed, strings.Trim(token, "\""))
+	}
+
+	return strings.Join(trimmed, " ")
 }
 
 var (
@@ -208,6 +251,14 @@ func normalizeTestName(s string) string {
 	r := regexTag.ReplaceAllString(s, "")
 	r = strings.Trim(r, "\"")
 	return strings.TrimSpace(r)
+}
+
+func validateTestName(s string) error {
+	matches := regexIneligibleTags.FindAllString(s, -1)
+	if matches != nil {
+		return fmt.Errorf("'%s' cannot have invalid tags %v", s, strings.Join(matches, ","))
+	}
+	return nil
 }
 
 // funcName converts a selectorExpr with two idents into a string,
@@ -281,12 +332,16 @@ func (v *visitor) matchFuncName(n *ast.CallExpr, pattern string) string {
 // It() with a manually embedded [Conformance] tag, which it will complain
 // about.
 func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
+	lastDescribe := len(v.describes) - 1
+
 	switch t := node.(type) {
 	case *ast.CallExpr:
 		if name := v.matchFuncName(t, regexDescribe); name != "" && len(t.Args) >= 2 {
-			v.lastDescribe = describe{text: name}
+			v.describes = append(v.describes, describe{text: name, rparen: t.Rparen})
 		} else if name := v.matchFuncName(t, regexContext); name != "" && len(t.Args) >= 2 {
-			v.lastDescribe.lastContext = context{text: name}
+			if lastDescribe > -1 {
+				v.describes[lastDescribe].lastContext = context{text: name}
+			}
 		} else if v.isConformanceCall(t) {
 			totalConfTests++
 			v.emit(t.Args[0])
@@ -297,19 +352,15 @@ func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 			return nil
 		}
 	}
+
+	// If we're past the position of the last describe's rparen, pop the describe off
+	if lastDescribe > -1 && node != nil {
+		if node.Pos() > v.describes[lastDescribe].rparen {
+			v.describes = v.describes[:lastDescribe]
+		}
+	}
+
 	return v
-}
-
-func scandir(dir string) {
-	v := newVisitor()
-	pkg, err := parser.ParseDir(v.FileSet, dir, nil, parser.ParseComments)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, p := range pkg {
-		ast.Walk(v, p)
-	}
 }
 
 func scanfile(path string, src interface{}) []conformanceData {
@@ -335,10 +386,16 @@ func main() {
 
 	if *confDoc {
 		// Note: this assumes that you're running from the root of the kube src repo
-		header, err := ioutil.ReadFile("test/conformance/cf_header.md")
-		if err == nil {
-			fmt.Printf("%s\n\n", header)
+		templ, err := template.ParseFiles("test/conformance/cf_header.md")
+		if err != nil {
+			fmt.Printf("Error reading the Header file information: %s\n\n", err)
 		}
+		data := struct {
+			Version string
+		}{
+			Version: *version,
+		}
+		templ.Execute(os.Stdout, data)
 	}
 
 	totalConfTests = 0
@@ -353,6 +410,7 @@ func main() {
 				tests := scanfile(path, nil)
 				for _, cd := range tests {
 					fmt.Printf("## [%s](%s)\n\n", cd.TestName, cd.URL)
+					fmt.Printf("### Release %s\n", cd.Release)
 					fmt.Printf("%s\n\n", cd.Description)
 					if len(cd.Description) < 10 {
 						missingComments++

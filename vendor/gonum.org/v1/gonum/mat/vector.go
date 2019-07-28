@@ -76,7 +76,6 @@ func (t TransposeVec) UntransposeVec() Vector {
 // VecDense represents a column vector.
 type VecDense struct {
 	mat blas64.Vector
-	n   int
 	// A BLAS vector can have a negative increment, but allowing this
 	// in the mat type complicates a lot of code, and doesn't gain anything.
 	// VecDense must have positive increment in this package.
@@ -86,8 +85,12 @@ type VecDense struct {
 // a new slice is allocated for the backing slice. If len(data) == n, data is
 // used as the backing slice, and changes to the elements of the returned VecDense
 // will be reflected in data. If neither of these is true, NewVecDense will panic.
+// NewVecDense will panic if n is zero.
 func NewVecDense(n int, data []float64) *VecDense {
-	if n < 0 {
+	if n <= 0 {
+		if n == 0 {
+			panic(ErrZeroLength)
+		}
 		panic("mat: negative dimension")
 	}
 	if len(data) != n && data != nil {
@@ -98,10 +101,10 @@ func NewVecDense(n int, data []float64) *VecDense {
 	}
 	return &VecDense{
 		mat: blas64.Vector{
+			N:    n,
 			Inc:  1,
 			Data: data,
 		},
-		n: n,
 	}
 }
 
@@ -114,8 +117,8 @@ func (v *VecDense) SliceVec(i, k int) Vector {
 		panic(ErrIndexOutOfRange)
 	}
 	return &VecDense{
-		n: k - i,
 		mat: blas64.Vector{
+			N:    k - i,
 			Inc:  v.mat.Inc,
 			Data: v.mat.Data[i*v.mat.Inc : (k-1)*v.mat.Inc+1],
 		},
@@ -128,7 +131,7 @@ func (v *VecDense) Dims() (r, c int) {
 	if v.IsZero() {
 		return 0, 0
 	}
-	return v.n, 1
+	return v.mat.N, 1
 }
 
 // Caps returns the number of rows and columns in the backing matrix. Columns is always 1
@@ -142,7 +145,7 @@ func (v *VecDense) Caps() (r, c int) {
 
 // Len returns the length of the vector.
 func (v *VecDense) Len() int {
-	return v.n
+	return v.mat.N
 }
 
 // Cap returns the capacity of the vector.
@@ -168,11 +171,18 @@ func (v *VecDense) TVec() Vector {
 //
 // See the Reseter interface for more information.
 func (v *VecDense) Reset() {
-	// No change of Inc or n to 0 may be
+	// No change of Inc or N to 0 may be
 	// made unless both are set to 0.
 	v.mat.Inc = 0
-	v.n = 0
+	v.mat.N = 0
 	v.mat.Data = v.mat.Data[:0]
+}
+
+// Zero sets all of the matrix elements to zero.
+func (v *VecDense) Zero() {
+	for i := 0; i < v.mat.N; i++ {
+		v.mat.Data[v.mat.Inc*i] = 0
+	}
 }
 
 // CloneVec makes a copy of a into the receiver, overwriting the previous value
@@ -181,13 +191,14 @@ func (v *VecDense) CloneVec(a Vector) {
 	if v == a {
 		return
 	}
-	v.n = a.Len()
+	n := a.Len()
 	v.mat = blas64.Vector{
+		N:    n,
 		Inc:  1,
-		Data: use(v.mat.Data, v.n),
+		Data: use(v.mat.Data, n),
 	}
 	if r, ok := a.(RawVectorer); ok {
-		blas64.Copy(v.n, r.RawVector(), v.mat)
+		blas64.Copy(r.RawVector(), v.mat)
 		return
 	}
 	for i := 0; i < a.Len(); i++ {
@@ -215,7 +226,7 @@ func (v *VecDense) CopyVec(a Vector) int {
 		return n
 	}
 	if r, ok := a.(RawVectorer); ok {
-		blas64.Copy(n, r.RawVector(), v.mat)
+		blas64.Copy(r.RawVector(), v.mat)
 		return n
 	}
 	for i := 0; i < n; i++ {
@@ -304,7 +315,7 @@ func (v *VecDense) AddScaledVec(a Vector, alpha float64, b Vector) {
 		}
 		v.CopyVec(a)
 	case v == a && v == b: // v <- v + alpha * v = (alpha + 1) * v
-		blas64.Scal(ar, alpha+1, v.mat)
+		blas64.Scal(alpha+1, v.mat)
 	case !fast: // v <- a + alpha * b without blas64 support.
 		for i := 0; i < ar; i++ {
 			v.setVec(i, a.AtVec(i)+alpha*b.AtVec(i))
@@ -641,13 +652,13 @@ func (v *VecDense) reuseAs(r int) {
 	}
 	if v.IsZero() {
 		v.mat = blas64.Vector{
+			N:    r,
 			Inc:  1,
 			Data: use(v.mat.Data, r),
 		}
-		v.n = r
 		return
 	}
-	if r != v.n {
+	if r != v.mat.N {
 		panic(ErrShape)
 	}
 }
@@ -677,7 +688,7 @@ func (v *VecDense) isolatedWorkspace(a Vector) (n *VecDense, restore func()) {
 func (v *VecDense) asDense() *Dense {
 	return &Dense{
 		mat:     v.asGeneral(),
-		capRows: v.n,
+		capRows: v.mat.N,
 		capCols: 1,
 	}
 }
@@ -686,7 +697,7 @@ func (v *VecDense) asDense() *Dense {
 // same underlying data.
 func (v *VecDense) asGeneral() blas64.General {
 	return blas64.General{
-		Rows:   v.n,
+		Rows:   v.mat.N,
 		Cols:   1,
 		Stride: v.mat.Inc,
 		Data:   v.mat.Data,
@@ -702,13 +713,13 @@ func (v *VecDense) ColViewOf(m RawMatrixer, j int) {
 	if j >= rm.Cols || j < 0 {
 		panic(ErrColAccess)
 	}
-	if !v.IsZero() && v.n != rm.Rows {
+	if !v.IsZero() && v.mat.N != rm.Rows {
 		panic(ErrShape)
 	}
 
 	v.mat.Inc = rm.Stride
 	v.mat.Data = rm.Data[j : (rm.Rows-1)*rm.Stride+j+1]
-	v.n = rm.Rows
+	v.mat.N = rm.Rows
 }
 
 // RowViewOf reflects the row i of the RawMatrixer m, into the receiver
@@ -720,11 +731,11 @@ func (v *VecDense) RowViewOf(m RawMatrixer, i int) {
 	if i >= rm.Rows || i < 0 {
 		panic(ErrRowAccess)
 	}
-	if !v.IsZero() && v.n != rm.Cols {
+	if !v.IsZero() && v.mat.N != rm.Cols {
 		panic(ErrShape)
 	}
 
 	v.mat.Inc = 1
 	v.mat.Data = rm.Data[i*rm.Stride : i*rm.Stride+rm.Cols]
-	v.n = rm.Cols
+	v.mat.N = rm.Cols
 }

@@ -33,7 +33,6 @@ func TestDriverParameter(t *testing.T) {
 				"", // Default fsType
 			),
 		},
-		ShortName: "foo",
 		ClaimSize: "5Gi",
 	}
 	testcases := []struct {
@@ -64,7 +63,7 @@ func TestDriverParameter(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		actual, err := testDriverParameter{}.loadDriverDefinition(testcase.filename)
+		actual, err := loadDriverDefinition(testcase.filename)
 		if testcase.err == "" {
 			assert.NoError(t, err, testcase.name)
 		} else {

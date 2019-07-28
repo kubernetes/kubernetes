@@ -45,7 +45,7 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 
 	webhookConfiguration := &v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
-		Webhooks:   []v1beta1.Webhook{{Name: "webhook1.1"}},
+		Webhooks:   []v1beta1.MutatingWebhook{{Name: "webhook1.1"}},
 	}
 
 	mutatingInformer := informerFactory.Admissionregistration().V1beta1().MutatingWebhookConfigurations()
@@ -57,7 +57,14 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 	if len(configurations) == 0 {
 		t.Errorf("expected non empty webhooks")
 	}
-	if !reflect.DeepEqual(configurations, webhookConfiguration.Webhooks) {
-		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations)
+	for i := range configurations {
+		h, ok := configurations[i].GetMutatingWebhook()
+		if !ok {
+			t.Errorf("Expected mutating webhook")
+			continue
+		}
+		if !reflect.DeepEqual(h, &webhookConfiguration.Webhooks[i]) {
+			t.Errorf("Expected\n%#v\ngot\n%#v", &webhookConfiguration.Webhooks[i], h)
+		}
 	}
 }

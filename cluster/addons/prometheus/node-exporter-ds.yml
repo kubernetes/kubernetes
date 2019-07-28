@@ -44,10 +44,9 @@ spec:
               readOnly: true
           resources:
             limits:
-              cpu: 10m
               memory: 50Mi
             requests:
-              cpu: 10m
+              cpu: 100m
               memory: 50Mi
       hostNetwork: true
       hostPID: true

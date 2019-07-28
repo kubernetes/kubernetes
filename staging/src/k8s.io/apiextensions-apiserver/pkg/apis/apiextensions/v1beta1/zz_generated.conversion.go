@@ -24,6 +24,7 @@ import (
 	unsafe "unsafe"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -295,7 +296,15 @@ func Convert_apiextensions_CustomResourceColumnDefinition_To_v1beta1_CustomResou
 
 func autoConvert_v1beta1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(in *CustomResourceConversion, out *apiextensions.CustomResourceConversion, s conversion.Scope) error {
 	out.Strategy = apiextensions.ConversionStrategyType(in.Strategy)
-	out.WebhookClientConfig = (*apiextensions.WebhookClientConfig)(unsafe.Pointer(in.WebhookClientConfig))
+	if in.WebhookClientConfig != nil {
+		in, out := &in.WebhookClientConfig, &out.WebhookClientConfig
+		*out = new(apiextensions.WebhookClientConfig)
+		if err := Convert_v1beta1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.WebhookClientConfig = nil
+	}
 	out.ConversionReviewVersions = *(*[]string)(unsafe.Pointer(&in.ConversionReviewVersions))
 	return nil
 }
@@ -307,7 +316,15 @@ func Convert_v1beta1_CustomResourceConversion_To_apiextensions_CustomResourceCon
 
 func autoConvert_apiextensions_CustomResourceConversion_To_v1beta1_CustomResourceConversion(in *apiextensions.CustomResourceConversion, out *CustomResourceConversion, s conversion.Scope) error {
 	out.Strategy = ConversionStrategyType(in.Strategy)
-	out.WebhookClientConfig = (*WebhookClientConfig)(unsafe.Pointer(in.WebhookClientConfig))
+	if in.WebhookClientConfig != nil {
+		in, out := &in.WebhookClientConfig, &out.WebhookClientConfig
+		*out = new(WebhookClientConfig)
+		if err := Convert_apiextensions_WebhookClientConfig_To_v1beta1_WebhookClientConfig(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.WebhookClientConfig = nil
+	}
 	out.ConversionReviewVersions = *(*[]string)(unsafe.Pointer(&in.ConversionReviewVersions))
 	return nil
 }
@@ -478,7 +495,16 @@ func autoConvert_v1beta1_CustomResourceDefinitionSpec_To_apiextensions_CustomRes
 		out.Versions = nil
 	}
 	out.AdditionalPrinterColumns = *(*[]apiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
-	out.Conversion = (*apiextensions.CustomResourceConversion)(unsafe.Pointer(in.Conversion))
+	if in.Conversion != nil {
+		in, out := &in.Conversion, &out.Conversion
+		*out = new(apiextensions.CustomResourceConversion)
+		if err := Convert_v1beta1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Conversion = nil
+	}
+	out.PreserveUnknownFields = (*bool)(unsafe.Pointer(in.PreserveUnknownFields))
 	return nil
 }
 
@@ -516,7 +542,16 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomRes
 		out.Versions = nil
 	}
 	out.AdditionalPrinterColumns = *(*[]CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
-	out.Conversion = (*CustomResourceConversion)(unsafe.Pointer(in.Conversion))
+	if in.Conversion != nil {
+		in, out := &in.Conversion, &out.Conversion
+		*out = new(CustomResourceConversion)
+		if err := Convert_apiextensions_CustomResourceConversion_To_v1beta1_CustomResourceConversion(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Conversion = nil
+	}
+	out.PreserveUnknownFields = (*bool)(unsafe.Pointer(in.PreserveUnknownFields))
 	return nil
 }
 
@@ -905,6 +940,9 @@ func autoConvert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JS
 		out.Example = nil
 	}
 	out.Nullable = in.Nullable
+	out.XPreserveUnknownFields = (*bool)(unsafe.Pointer(in.XPreserveUnknownFields))
+	out.XEmbeddedResource = in.XEmbeddedResource
+	out.XIntOrString = in.XIntOrString
 	return nil
 }
 
@@ -1087,6 +1125,9 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *ap
 	} else {
 		out.Example = nil
 	}
+	out.XPreserveUnknownFields = (*bool)(unsafe.Pointer(in.XPreserveUnknownFields))
+	out.XEmbeddedResource = in.XEmbeddedResource
+	out.XIntOrString = in.XIntOrString
 	return nil
 }
 
@@ -1228,6 +1269,9 @@ func autoConvert_v1beta1_ServiceReference_To_apiextensions_ServiceReference(in *
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1240,6 +1284,9 @@ func autoConvert_apiextensions_ServiceReference_To_v1beta1_ServiceReference(in *
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1250,7 +1297,15 @@ func Convert_apiextensions_ServiceReference_To_v1beta1_ServiceReference(in *apie
 
 func autoConvert_v1beta1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in *WebhookClientConfig, out *apiextensions.WebhookClientConfig, s conversion.Scope) error {
 	out.URL = (*string)(unsafe.Pointer(in.URL))
-	out.Service = (*apiextensions.ServiceReference)(unsafe.Pointer(in.Service))
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		*out = new(apiextensions.ServiceReference)
+		if err := Convert_v1beta1_ServiceReference_To_apiextensions_ServiceReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Service = nil
+	}
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }
@@ -1262,7 +1317,15 @@ func Convert_v1beta1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in
 
 func autoConvert_apiextensions_WebhookClientConfig_To_v1beta1_WebhookClientConfig(in *apiextensions.WebhookClientConfig, out *WebhookClientConfig, s conversion.Scope) error {
 	out.URL = (*string)(unsafe.Pointer(in.URL))
-	out.Service = (*ServiceReference)(unsafe.Pointer(in.Service))
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		*out = new(ServiceReference)
+		if err := Convert_apiextensions_ServiceReference_To_v1beta1_ServiceReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Service = nil
+	}
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }

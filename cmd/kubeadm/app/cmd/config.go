@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strings"
+	"sort"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -33,7 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -51,8 +51,8 @@ import (
 
 var (
 	// placeholderToken is only set statically to make kubeadm not randomize the token on every run
-	placeholderToken = kubeadmapiv1beta1.BootstrapToken{
-		Token: &kubeadmapiv1beta1.BootstrapTokenString{
+	placeholderToken = kubeadmapiv1beta2.BootstrapToken{
+		Token: &kubeadmapiv1beta2.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
 		},
@@ -65,7 +65,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Manage configuration for a kubeadm cluster persisted in a ConfigMap in the cluster.",
+		Short: "Manage configuration for a kubeadm cluster persisted in a ConfigMap in the cluster",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			There is a ConfigMap in the %s namespace called %q that kubeadm uses to store internal configuration about the
 			cluster. kubeadm CLI v1.8.0+ automatically creates this ConfigMap with the config used with 'kubeadm init', but if you
@@ -96,8 +96,10 @@ func NewCmdConfigPrint(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "print",
 		Short: "Print configuration",
-		Long:  "This command prints configurations for subcommands provided.",
-		RunE:  cmdutil.SubCmdRunE("print"),
+		Long: dedent.Dedent(`
+			This command prints configurations for subcommands provided.
+			For details, see: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2`),
+		RunE: cmdutil.SubCmdRunE("print"),
 	}
 	cmd.AddCommand(NewCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(NewCmdConfigPrintJoinDefaults(out))
@@ -173,21 +175,22 @@ func getSupportedComponentConfigAPIObjects() []string {
 	for componentType := range componentconfigs.Known {
 		objects = append(objects, string(componentType))
 	}
+	sort.Strings(objects)
 	return objects
 }
 
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	return configutil.DefaultedInitConfiguration(&kubeadmapiv1beta1.InitConfiguration{
-		// TODO: Probably move to getDefaultedClusterConfig?
-		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
-		},
-		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{placeholderToken},
-		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+	initCfg := &kubeadmapiv1beta2.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		BootstrapTokens:  []kubeadmapiv1beta2.BootstrapToken{placeholderToken},
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
-	})
+	}
+	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
+		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
+	}
+	return configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
 }
 
 func getDefaultInitConfigBytes() ([]byte, error) {
@@ -200,15 +203,15 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta1.JoinConfiguration{
-		Discovery: kubeadmapiv1beta1.Discovery{
-			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta2.JoinConfiguration{
+		Discovery: kubeadmapiv1beta2.Discovery{
+			BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
-		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
 	})
@@ -224,7 +227,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 	var oldCfgPath, newCfgPath string
 	cmd := &cobra.Command{
 		Use:   "migrate",
-		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version.",
+		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			This command lets you convert configuration objects of older versions to the latest supported version,
 			locally in the CLI tool without ever touching anything in the cluster.
@@ -238,10 +241,10 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1beta1.SchemeGroupVersion, kubeadmapiv1beta1.SchemeGroupVersion),
+		`), kubeadmapiv1beta2.SchemeGroupVersion, kubeadmapiv1beta2.SchemeGroupVersion),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --old-config flag is mandatory"))
+				kubeadmutil.CheckErr(errors.New("the --old-config flag is mandatory"))
 			}
 
 			oldCfgBytes, err := ioutil.ReadFile(oldCfgPath)
@@ -264,12 +267,14 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// NewCmdConfigUpload returns cobra.Command for "kubeadm config upload" command
+// NewCmdConfigUpload (Deprecated) returns cobra.Command for "kubeadm config upload" command
+// Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "upload",
-		Short: "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster.",
-		RunE:  cmdutil.SubCmdRunE("upload"),
+		Deprecated: "please see kubeadm init phase upload-config",
+		Use:        "upload",
+		Short:      "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster",
+		RunE:       cmdutil.SubCmdRunE("upload"),
 	}
 
 	cmd.AddCommand(NewCmdConfigUploadFromFile(out, kubeConfigFile))
@@ -281,7 +286,7 @@ func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
-		Short: "View the kubeadm configuration stored inside the cluster.",
+		Short: "View the kubeadm configuration stored inside the cluster",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
 
@@ -300,11 +305,13 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 
 // NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
 // "kubeadm config upload from-file" command
+// Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	var cfgPath string
 	cmd := &cobra.Command{
-		Use:   "from-file",
-		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration.",
+		Deprecated: "please see kubeadm init phase upload-config",
+		Use:        "from-file",
+		Short:      "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can upload configuration to the ConfigMap in the cluster using the same config file you gave to 'kubeadm init'.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and used the --config option, you need to run this command with the
@@ -314,7 +321,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --config flag is mandatory"))
+				kubeadmutil.CheckErr(errors.New("the --config flag is mandatory"))
 			}
 
 			klog.V(1).Infoln("[config] retrieving ClientSet from file")
@@ -336,15 +343,20 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 }
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
+// Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
-	kubeadmscheme.Scheme.Default(cfg)
+	initCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	kubeadmscheme.Scheme.Default(initCfg)
+
+	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	kubeadmscheme.Scheme.Default(clusterCfg)
 
 	var featureGatesString string
 
 	cmd := &cobra.Command{
-		Use:   "from-flags",
-		Short: "Create the in-cluster configuration file for the first time from using flags.",
+		Deprecated: "please see kubeadm init phase upload-config",
+		Use:        "from-flags",
+		Short:      "Create the in-cluster configuration file for the first time from using flags",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can upload configuration to the ConfigMap in the cluster using the same flags you gave to 'kubeadm init'.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and set certain flags, you need to run this command with the
@@ -355,7 +367,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
 			klog.V(1).Infoln("[config] creating new FeatureGates")
-			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+			if clusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
 			klog.V(1).Infoln("[config] retrieving ClientSet from file")
@@ -364,11 +376,11 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing DefaultedInitConfiguration
-			phaseutil.SetKubernetesVersion(&cfg.ClusterConfiguration)
+			phaseutil.SetKubernetesVersion(clusterCfg)
 
 			// Default both statically and dynamically, convert to internal API type, and validate everything
 			klog.V(1).Infoln("[config] converting to internal API type")
-			internalcfg, err := configutil.DefaultedInitConfiguration(cfg)
+			internalcfg, err := configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
 			kubeadmutil.CheckErr(err)
 
 			// Finally, upload the configuration
@@ -377,7 +389,8 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddInitConfigFlags(cmd.PersistentFlags(), initCfg)
+	AddClusterConfigFlags(cmd.PersistentFlags(), clusterCfg, &featureGatesString)
 	return cmd
 }
 
@@ -398,7 +411,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 func NewCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
-		Short: "Interact with container images used by kubeadm.",
+		Short: "Interact with container images used by kubeadm",
 		RunE:  cmdutil.SubCmdRunE("images"),
 	}
 	cmd.AddCommand(NewCmdConfigImagesList(out, nil))
@@ -408,27 +421,29 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 
 // NewCmdConfigImagesPull returns the `kubeadm config images pull` command
 func NewCmdConfigImagesPull() *cobra.Command {
-	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
-	kubeadmscheme.Scheme.Default(externalcfg)
+	externalClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	kubeadmscheme.Scheme.Default(externalClusterCfg)
+	externalInitCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	kubeadmscheme.Scheme.Default(externalInitCfg)
 	var cfgPath, featureGatesString string
 	var err error
 
 	cmd := &cobra.Command{
 		Use:   "pull",
-		Short: "Pull images used by kubeadm.",
+		Short: "Pull images used by kubeadm",
 		Run: func(_ *cobra.Command, _ []string) {
-			externalcfg.ClusterConfiguration.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+			externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
 			kubeadmutil.CheckErr(err)
-			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, externalcfg)
+			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, externalInitCfg, externalClusterCfg)
 			kubeadmutil.CheckErr(err)
 			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
 			kubeadmutil.CheckErr(err)
-			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(&internalcfg.ClusterConfiguration))
-			kubeadmutil.CheckErr(imagesPull.PullAll())
+			err = PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
+			kubeadmutil.CheckErr(err)
 		},
 	}
-	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
-	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &externalcfg.NodeRegistration.CRISocket)
+	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalClusterCfg, &cfgPath, &featureGatesString)
+	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &externalInitCfg.NodeRegistration.CRISocket)
 
 	return cmd
 }
@@ -447,10 +462,11 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 	}
 }
 
-// PullAll pulls all images that the ImagesPull knows about
-func (ip *ImagesPull) PullAll() error {
-	for _, image := range ip.images {
-		if err := ip.runtime.PullImage(image); err != nil {
+// PullControlPlaneImages pulls all images that the ImagesPull knows about
+func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
+	images := images.GetControlPlaneImages(cfg)
+	for _, image := range images {
+		if err := runtime.PullImage(image); err != nil {
 			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
@@ -460,7 +476,7 @@ func (ip *ImagesPull) PullAll() error {
 
 // NewCmdConfigImagesList returns the "kubeadm config images list" command
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta2.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -473,9 +489,9 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized.",
+		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized",
 		Run: func(_ *cobra.Command, _ []string) {
-			externalcfg.ClusterConfiguration.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+			externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
 			kubeadmutil.CheckErr(err)
 			imagesList, err := NewImagesList(cfgPath, externalcfg)
 			kubeadmutil.CheckErr(err)
@@ -487,8 +503,15 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration) (*ImagesList, error) {
-	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta2.ClusterConfiguration) (*ImagesList, error) {
+	// Avoid running the CRI auto-detection code as we don't need it
+	versionedInitCfg := &kubeadmapiv1beta2.InitConfiguration{
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+			CRISocket: constants.DefaultDockerCRISocket,
+		},
+	}
+
+	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, versionedInitCfg, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}
@@ -505,7 +528,7 @@ type ImagesList struct {
 
 // Run runs the images command and writes the result to the io.Writer passed in
 func (i *ImagesList) Run(out io.Writer) error {
-	imgs := images.GetAllImages(&i.cfg.ClusterConfiguration)
+	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
 	for _, img := range imgs {
 		fmt.Fprintln(out, img)
 	}
@@ -514,12 +537,9 @@ func (i *ImagesList) Run(out io.Writer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, cfgPath *string, featureGatesString *string) {
-	flagSet.StringVar(
-		&cfg.ClusterConfiguration.KubernetesVersion, "kubernetes-version", cfg.ClusterConfiguration.KubernetesVersion,
-		`Choose a specific Kubernetes version for the control plane.`,
-	)
-	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
-		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
-	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
+	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
+	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
+	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
+	options.AddConfigFlag(flagSet, cfgPath)
 }

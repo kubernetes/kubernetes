@@ -35,7 +35,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	// Make a local copy of the global feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
 	localFeatureGate := utilfeature.DefaultFeatureGate.DeepCopy()
-	localFeatureGate.SetFromMap(kc.FeatureGates)
+	if err := localFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
+		return err
+	}
 
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLeaseDurationSeconds must be greater than 0"))
@@ -108,6 +110,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
+	}
+	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: TopologyManager %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
 	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {

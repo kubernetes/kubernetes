@@ -20,6 +20,7 @@ package util
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -35,6 +36,7 @@ const (
 	unixProtocol = "unix"
 )
 
+// CreateListener creates a listener on the specified endpoint.
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -50,9 +52,33 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}
 
-	return net.Listen(protocol, addr)
+	if err := os.MkdirAll(filepath.Dir(addr), 0750); err != nil {
+		return nil, fmt.Errorf("error creating socket directory %q: %v", filepath.Dir(addr), err)
+	}
+
+	// Create the socket on a tempfile and move it to the destination socket to handle improprer cleanup
+	file, err := ioutil.TempFile(filepath.Dir(addr), "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file: %v", err)
+	}
+
+	if err := os.Remove(file.Name()); err != nil {
+		return nil, fmt.Errorf("failed to remove temporary file: %v", err)
+	}
+
+	l, err := net.Listen(protocol, file.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if err = os.Rename(file.Name(), addr); err != nil {
+		return nil, fmt.Errorf("failed to move temporary file to addr %q: %v", addr, err)
+	}
+
+	return l, nil
 }
 
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -102,10 +128,10 @@ func parseEndpoint(endpoint string) (string, string, error) {
 }
 
 // LocalEndpoint returns the full path to a unix socket at the given endpoint
-func LocalEndpoint(path, file string) string {
+func LocalEndpoint(path, file string) (string, error) {
 	u := url.URL{
 		Scheme: unixProtocol,
 		Path:   path,
 	}
-	return filepath.Join(u.String(), file+".sock")
+	return filepath.Join(u.String(), file+".sock"), nil
 }

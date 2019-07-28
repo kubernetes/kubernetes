@@ -47,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: cronjob.Strategy,
 		DeleteStrategy: cronjob.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -78,6 +78,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CronJob object.
 func (r *StatusREST) New() runtime.Object {
 	return &batch.CronJob{}
 }

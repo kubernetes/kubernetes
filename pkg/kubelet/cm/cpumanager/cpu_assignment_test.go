@@ -356,7 +356,7 @@ func TestTakeByTopology(t *testing.T) {
 			cpuset.NewCPUSet(2, 6),
 		},
 		{
-			"take three cpus from dual socket with HT - core from Socket 0",
+			"take one cpu from dual socket with HT - core from Socket 0",
 			topoDualSocketHT,
 			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			1,

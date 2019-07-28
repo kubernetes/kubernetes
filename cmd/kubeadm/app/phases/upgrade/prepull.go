@@ -22,13 +22,14 @@ import (
 
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -131,7 +132,7 @@ func waitForItemsFromChan(timeoutChan <-chan time.Time, stringChan chan string, 
 	for {
 		select {
 		case <-timeoutChan:
-			return errors.New("The prepull operation timed out")
+			return errors.New("the prepull operation timed out")
 		case result := <-stringChan:
 			i++
 			// If the cleanup function errors; error here as well
@@ -183,6 +184,11 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 					},
 					Tolerations:                   []v1.Toleration{constants.ControlPlaneToleration},
 					TerminationGracePeriodSeconds: &gracePeriodSecs,
+					// Explicitly add a PodSecurityContext to allow these Pods to run as non-root.
+					// This prevents restrictive PSPs from blocking the Pod creation.
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser: utilpointer.Int64Ptr(999),
+					},
 				},
 			},
 		},

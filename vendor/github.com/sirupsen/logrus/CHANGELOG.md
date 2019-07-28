@@ -1,3 +1,90 @@
+# 1.4.2
+  * Fixes build break for plan9, nacl, solaris
+# 1.4.1
+This new release introduces:
+  * Enhance TextFormatter to not print caller information when they are empty (#944)
+  * Remove dependency on golang.org/x/crypto (#932, #943) 
+
+Fixes:
+  * Fix Entry.WithContext method to return a copy of the initial entry (#941)
+
+# 1.4.0
+This new release introduces:
+  * Add `DeferExitHandler`, similar to `RegisterExitHandler` but prepending the handler to the list of handlers (semantically like `defer`) (#848).
+  * Add `CallerPrettyfier` to `JSONFormatter` and `TextFormatter (#909, #911)
+  * Add `Entry.WithContext()` and `Entry.Context`, to set a context on entries to be used e.g. in hooks (#919).
+
+Fixes:
+  * Fix wrong method calls `Logger.Print` and `Logger.Warningln` (#893).
+  * Update `Entry.Logf` to not do string formatting unless the log level is enabled (#903)
+  * Fix infinite recursion on unknown `Level.String()` (#907)
+  * Fix race condition in `getCaller` (#916).
+
+
+# 1.3.0
+This new release introduces:
+  * Log, Logf, Logln functions for Logger and Entry that take a Level
+
+Fixes:
+  * Building prometheus node_exporter on AIX (#840)
+  * Race condition in TextFormatter (#468)
+  * Travis CI import path (#868)
+  * Remove coloured output on Windows (#862)
+  * Pointer to func as field in JSONFormatter (#870)
+  * Properly marshal Levels (#873)
+
+# 1.2.0
+This new release introduces:
+  * A new method `SetReportCaller` in the `Logger` to enable the file, line and calling function from which the trace has been issued
+  * A new trace level named `Trace` whose level is below `Debug`
+  * A configurable exit function to be called upon a Fatal trace
+  * The `Level` object now implements `encoding.TextUnmarshaler` interface
+
+# 1.1.1
+This is a bug fix release.
+  * fix the build break on Solaris
+  * don't drop a whole trace in JSONFormatter when a field param is a function pointer which can not be serialized
+
+# 1.1.0
+This new release introduces:
+  * several fixes:
+    * a fix for a race condition on entry formatting
+    * proper cleanup of previously used entries before putting them back in the pool
+    * the extra new line at the end of message in text formatter has been removed
+  * a new global public API to check if a level is activated: IsLevelEnabled
+  * the following methods have been added to the Logger object
+    * IsLevelEnabled
+    * SetFormatter
+    * SetOutput
+    * ReplaceHooks
+  * introduction of go module
+  * an indent configuration for the json formatter
+  * output colour support for windows
+  * the field sort function is now configurable for text formatter
+  * the CLICOLOR and CLICOLOR\_FORCE environment variable support in text formater
+
+# 1.0.6
+
+This new release introduces:
+  * a new api WithTime which allows to easily force the time of the log entry
+    which is mostly useful for logger wrapper
+  * a fix reverting the immutability of the entry given as parameter to the hooks
+    a new configuration field of the json formatter in order to put all the fields
+    in a nested dictionnary
+  * a new SetOutput method in the Logger
+  * a new configuration of the textformatter to configure the name of the default keys
+  * a new configuration of the text formatter to disable the level truncation
+
+# 1.0.5
+
+* Fix hooks race (#707)
+* Fix panic deadlock (#695)
+
+# 1.0.4
+
+* Fix race when adding hooks (#612)
+* Fix terminal check in AppEngine (#635)
+
 # 1.0.3
 
 * Replace example files with testable examples

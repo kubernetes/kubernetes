@@ -19,24 +19,28 @@ package apimachinery
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-openapi/spec"
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	k8sclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	"sigs.k8s.io/yaml"
 )
@@ -46,321 +50,407 @@ var (
 	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
-var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublishOpenAPI]", func() {
+var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessServerVersionGTE(crdPublishOpenAPIVersion, f.ClientSet.Discovery())
 	})
 
-	It("works for CRD with validation schema", func() {
+	ginkgo.It("works for CRD with validation schema", func() {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-foo")
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		By("client-side validation (kubectl create and apply) allows request with known and required properties")
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
 		validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(validCR, ns, "create", "-f", "-"); err != nil {
-			framework.Failf("failed to create valid CR %s: %v", validCR, err)
+			e2elog.Failf("failed to create valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-foo"); err != nil {
-			framework.Failf("failed to delete valid CR: %v", err)
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
+			e2elog.Failf("failed to delete valid CR: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(validCR, ns, "apply", "-f", "-"); err != nil {
-			framework.Failf("failed to apply valid CR %s: %v", validCR, err)
+			e2elog.Failf("failed to apply valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-foo"); err != nil {
-			framework.Failf("failed to delete valid CR: %v", err)
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
+			e2elog.Failf("failed to delete valid CR: %v", err)
 		}
 
-		By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
+		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
 		unknownCR := fmt.Sprintf(`{%s,"spec":{"foo":true}}`, meta)
 		if _, err := framework.RunKubectlInput(unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
-			framework.Failf("unexpected no error when creating CR with unknown field: %v", err)
+			e2elog.Failf("unexpected no error when creating CR with unknown field: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(unknownCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
-			framework.Failf("unexpected no error when applying CR with unknown field: %v", err)
+			e2elog.Failf("unexpected no error when applying CR with unknown field: %v", err)
 		}
 
-		By("client-side validation (kubectl create and apply) rejects request without required properties")
+		ginkgo.By("client-side validation (kubectl create and apply) rejects request without required properties")
 		noRequireCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"age":"10"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
-			framework.Failf("unexpected no error when creating CR without required field: %v", err)
+			e2elog.Failf("unexpected no error when creating CR without required field: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(noRequireCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
-			framework.Failf("unexpected no error when applying CR without required field: %v", err)
+			e2elog.Failf("unexpected no error when applying CR without required field: %v", err)
 		}
 
-		By("kubectl explain works to explain CR properties")
-		if err := verifyKubectlExplain(crd.GetPluralName(), `(?s)DESCRIPTION:.*Foo CRD for Testing.*FIELDS:.*apiVersion.*<string>.*APIVersion defines.*spec.*<Object>.*Specification of Foo`); err != nil {
-			framework.Failf("%v", err)
+		ginkgo.By("kubectl explain works to explain CR properties")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*Foo CRD for Testing.*FIELDS:.*apiVersion.*<string>.*APIVersion defines.*spec.*<Object>.*Specification of Foo`); err != nil {
+			e2elog.Failf("%v", err)
 		}
 
-		By("kubectl explain works to explain CR properties recursively")
-		if err := verifyKubectlExplain(crd.GetPluralName()+".metadata", `(?s)DESCRIPTION:.*Standard object's metadata.*FIELDS:.*creationTimestamp.*<string>.*CreationTimestamp is a timestamp`); err != nil {
-			framework.Failf("%v", err)
+		ginkgo.By("kubectl explain works to explain CR properties recursively")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".metadata", `(?s)DESCRIPTION:.*Standard object's metadata.*FIELDS:.*creationTimestamp.*<string>.*CreationTimestamp is a timestamp`); err != nil {
+			e2elog.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(crd.GetPluralName()+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
-			framework.Failf("%v", err)
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
+			e2elog.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(crd.GetPluralName()+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
-			framework.Failf("%v", err)
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
+			e2elog.Failf("%v", err)
 		}
 
-		By("kubectl explain works to return error when explain is called on property that doesn't exist")
-		if _, err := framework.RunKubectl("explain", crd.GetPluralName()+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
-			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
+		ginkgo.By("kubectl explain works to return error when explain is called on property that doesn't exist")
+		if _, err := framework.RunKubectl("explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
+			e2elog.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
 		if err := cleanupCRD(f, crd); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
-	It("works for CRD without validation schema", func() {
+	ginkgo.It("works for CRD without validation schema", func() {
 		crd, err := setupCRD(f, nil, "empty", "v1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
-			framework.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
+			e2elog.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-cr"); err != nil {
-			framework.Failf("failed to delete random CR: %v", err)
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
-			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
+			e2elog.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-cr"); err != nil {
-			framework.Failf("failed to delete random CR: %v", err)
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
 		}
 
-		By("kubectl explain works to explain CR without validation schema")
-		if err := verifyKubectlExplain(crd.GetPluralName(), `(?s)DESCRIPTION:.*<empty>`); err != nil {
-			framework.Failf("%v", err)
+		ginkgo.By("kubectl explain works to explain CR without validation schema")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*<empty>`); err != nil {
+			e2elog.Failf("%v", err)
 		}
 
 		if err := cleanupCRD(f, crd); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
-	It("works for multiple CRDs of different groups", func() {
-		By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
+	ginkgo.It("works for CRD preserving unknown fields at the schema root", func() {
+		crd, err := setupCRDAndVerifySchema(f, schemaPreserveRoot, nil, "unknown-at-root", "v1")
+		if err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
+		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
+			e2elog.Failf("failed to create random CR %s for CRD that allows unknown properties at the root: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
+			e2elog.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+
+		ginkgo.By("kubectl explain works to explain CR")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, fmt.Sprintf(`(?s)KIND:.*%s`, crd.Crd.Spec.Names.Kind)); err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		if err := cleanupCRD(f, crd); err != nil {
+			e2elog.Failf("%v", err)
+		}
+	})
+
+	ginkgo.It("works for CRD preserving unknown fields in an embedded object", func() {
+		crd, err := setupCRDAndVerifySchema(f, schemaPreserveNested, nil, "unknown-in-nested", "v1")
+		if err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		randomCR := fmt.Sprintf(`{%s,"spec":{"b":[{"c":"d"}]}}`, meta)
+		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
+			e2elog.Failf("failed to create random CR %s for CRD that allows unknown properties in a nested object: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
+			e2elog.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
+		}
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+			e2elog.Failf("failed to delete random CR: %v", err)
+		}
+
+		ginkgo.By("kubectl explain works to explain CR")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*preserve-unknown-properties in nested field for Testing`); err != nil {
+			e2elog.Failf("%v", err)
+		}
+
+		if err := cleanupCRD(f, crd); err != nil {
+			e2elog.Failf("%v", err)
+		}
+	})
+
+	ginkgo.It("works for multiple CRDs of different groups", func() {
+		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crdWaldo, err := setupCRD(f, schemaWaldo, "waldo", "v1beta1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
-		if crdFoo.APIGroup == crdWaldo.APIGroup {
-			framework.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.APIGroup, crdWaldo.APIGroup)
+		if crdFoo.Crd.Spec.Group == crdWaldo.Crd.Spec.Group {
+			e2elog.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v1beta1"), schemaWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v1"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
-	It("works for multiple CRDs of same group but different versions", func() {
-		By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
+	ginkgo.It("works for multiple CRDs of same group but different versions", func() {
+		ginkgo.By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdMultiVer); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		By("CRs in the same group but different versions (two CRDs) show up in OpenAPI documentation")
+		ginkgo.By("CRs in the same group but different versions (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v4")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crdWaldo, err := setupCRD(f, schemaWaldo, "common-group", "v5")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
-		if crdFoo.APIGroup != crdWaldo.APIGroup {
-			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.APIGroup, crdWaldo.APIGroup)
+		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
+			e2elog.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v5"), schemaWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v4"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
-	It("works for multiple CRDs of same group and version but different kinds", func() {
-		By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
+	ginkgo.It("works for multiple CRDs of same group and version but different kinds", func() {
+		ginkgo.By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v6")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crdWaldo, err := setupCRD(f, schemaWaldo, "common-group", "v6")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
-		if crdFoo.APIGroup != crdWaldo.APIGroup {
-			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.APIGroup, crdWaldo.APIGroup)
+		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
+			e2elog.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v6"), schemaWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v6"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
-	It("updates the published spec when one versin gets renamed", func() {
-		By("set up a multi version CRD")
+	ginkgo.It("updates the published spec when one versin gets renamed", func() {
+		ginkgo.By("set up a multi version CRD")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		By("rename a version")
+		ginkgo.By("rename a version")
 		patch := []byte(`{"spec":{"versions":[{"name":"v2","served":true,"storage":true},{"name":"v4","served":true,"storage":false}]}}`)
-		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.GetMetaName(), types.MergePatchType, patch)
+		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.Crd.Name, types.MergePatchType, patch)
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		By("check the new version name is served")
+		ginkgo.By("check the new version name is served")
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v4"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
-		By("check the old version name is removed")
+		ginkgo.By("check the old version name is removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crdMultiVer, "v3")); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
-		By("check the other version is not changed")
+		ginkgo.By("check the other version is not changed")
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		// TestCrd.Versions is different from TestCrd.Crd.Versions, we have to manually
 		// update the name there. Used by cleanupCRD
-		crdMultiVer.Versions[1].Name = "v4"
+		crdMultiVer.Crd.Spec.Versions[1].Name = "v4"
 		if err := cleanupCRD(f, crdMultiVer); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
-	It("removes definition from spec when one versin gets changed to not be served", func() {
-		By("set up a multi version CRD")
+	ginkgo.It("removes definition from spec when one versin gets changed to not be served", func() {
+		ginkgo.By("set up a multi version CRD")
 		crd, err := setupCRD(f, schemaFoo, "multi-to-single-ver", "v5", "v6alpha1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		// just double check. setupCRD() checked this for us already
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v6alpha1"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		By("mark a version not serverd")
+		ginkgo.By("mark a version not serverd")
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
+		if err != nil {
+			e2elog.Failf("%v", err)
+		}
 		crd.Crd.Spec.Versions[1].Served = false
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
-		By("check the unserved version gets removed")
+		ginkgo.By("check the unserved version gets removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crd, "v6alpha1")); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
-		By("check the other version is not changed")
+		ginkgo.By("check the other version is not changed")
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		if err := cleanupCRD(f, crd); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 })
 
 func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
+	expect := schema
+	if schema == nil {
+		// to be backwards compatible, we expect CRD controller to treat
+		// CRD with nil schema specially and publish an empty schema
+		expect = []byte(`type: object`)
+	}
+	return setupCRDAndVerifySchema(f, schema, expect, groupSuffix, versions...)
+}
+
+func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s-test-%s.k8s.io", f.BaseName, groupSuffix)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
 	}
-	apiVersions := []v1beta1.CustomResourceDefinitionVersion{}
-	for _, version := range versions {
-		v := v1beta1.CustomResourceDefinitionVersion{
-			Name:    version,
-			Served:  true,
-			Storage: false,
-		}
-		apiVersions = append(apiVersions, v)
-	}
-	apiVersions[0].Storage = true
 
-	crd, err := crd.CreateMultiVersionTestCRD(f, group, apiVersions, nil)
+	props := &v1beta1.JSONSchemaProps{}
+	if schema != nil {
+		if err := yaml.Unmarshal(schema, props); err != nil {
+			return nil, err
+		}
+	}
+
+	crd, err := crd.CreateMultiVersionTestCRD(f, group, func(crd *v1beta1.CustomResourceDefinition) {
+		var apiVersions []v1beta1.CustomResourceDefinitionVersion
+		for i, version := range versions {
+			apiVersions = append(apiVersions, v1beta1.CustomResourceDefinitionVersion{
+				Name:    version,
+				Served:  true,
+				Storage: i == 0,
+			})
+		}
+		crd.Spec.Versions = apiVersions
+
+		// set up validation when input schema isn't nil
+		if schema != nil {
+			crd.Spec.Validation = &v1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: props,
+			}
+		}
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
 
-	if schema != nil {
-		// patch validation schema for all versions
-		if err := patchSchema(schema, crd); err != nil {
-			return nil, fmt.Errorf("failed to patch schema: %v", err)
-		}
-	} else {
-		// change expectation if CRD doesn't have schema
-		schema = []byte(`type: object`)
-	}
-
-	for _, v := range crd.Versions {
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), schema); err != nil {
+	for _, v := range crd.Crd.Spec.Versions {
+		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), expect); err != nil {
 			return nil, fmt.Errorf("%v", err)
 		}
 	}
@@ -369,7 +459,7 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 
 func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
 	crd.CleanUp()
-	for _, v := range crd.Versions {
+	for _, v := range crd.Crd.Spec.Versions {
 		name := definitionName(crd, v.Name)
 		if err := waitForDefinitionCleanup(f.ClientSet, name); err != nil {
 			return fmt.Errorf("%v", err)
@@ -378,72 +468,105 @@ func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
 	return nil
 }
 
-// patchSchema takes schema in YAML and patches it to given CRD in given version
-func patchSchema(schema []byte, crd *crd.TestCrd) error {
-	s, err := utilyaml.ToJSON(schema)
-	if err != nil {
-		return fmt.Errorf("failed to create json patch: %v", err)
+const waitSuccessThreshold = 10
+
+// mustSucceedMultipleTimes calls f multiple times on success and only returns true if all calls are successful.
+// This is necessary to avoid flaking tests where one call might hit a good apiserver while in HA other apiservers
+// might be lagging behind. Calling f multiple times reduces the chance exponentially.
+func mustSucceedMultipleTimes(n int, f func() (bool, error)) func() (bool, error) {
+	return func() (bool, error) {
+		for i := 0; i < n; i++ {
+			ok, err := f()
+			if err != nil || !ok {
+				return ok, err
+			}
+		}
+		return true, nil
 	}
-	patch := []byte(fmt.Sprintf(`{"spec":{"validation":{"openAPIV3Schema":%s}}}`, string(s)))
-	crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crd.GetMetaName(), types.MergePatchType, patch)
-	return err
 }
 
-// waitForDefinition waits for given definition showing up in swagger with given schema
+// waitForDefinition waits for given definition showing up in swagger with given schema.
+// If schema is nil, only the existence of the given name is checked.
 func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) error {
 	expect := spec.Schema{}
 	if err := convertJSONSchemaProps(schema, &expect); err != nil {
 		return err
 	}
 
-	lastMsg := ""
-	if err := wait.Poll(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-		bs, err := c.CoreV1().RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
-		if err != nil {
-			return false, err
-		}
-		spec := spec.Swagger{}
-		if err := json.Unmarshal(bs, &spec); err != nil {
-			return false, err
-		}
+	err := waitForOpenAPISchema(c, func(spec *spec.Swagger) (bool, string) {
 		d, ok := spec.SwaggerProps.Definitions[name]
 		if !ok {
-			lastMsg = fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not found", name)
-			return false, nil
+			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not found", name)
 		}
-		// drop properties and extension that we added
-		dropDefaults(&d)
-		if !apiequality.Semantic.DeepEqual(expect, d) {
-			lastMsg = fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not match; expect: %v, actual: %v", name, expect, d)
-			return false, nil
+		if schema != nil {
+			// drop properties and extension that we added
+			dropDefaults(&d)
+			if !apiequality.Semantic.DeepEqual(expect, d) {
+				return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not match; expect: %v, actual: %v", name, expect, d)
+			}
 		}
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("failed to wait for definition %s to be served: %v; lastMsg: %s", name, err, lastMsg)
+		return true, ""
+	})
+	if err != nil {
+		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %v", name, err)
 	}
 	return nil
 }
 
 // waitForDefinitionCleanup waits for given definition to be removed from swagger
 func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
+	err := waitForOpenAPISchema(c, func(spec *spec.Swagger) (bool, string) {
+		if _, ok := spec.SwaggerProps.Definitions[name]; ok {
+			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] still exists", name)
+		}
+		return true, ""
+	})
+	if err != nil {
+		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %v", name, err)
+	}
+	return nil
+}
+
+func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bool, string)) error {
+	client := c.CoreV1().RESTClient().(*rest.RESTClient).Client
+	url := c.CoreV1().RESTClient().Get().AbsPath("openapi", "v2").URL()
 	lastMsg := ""
-	if err := wait.Poll(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-		bs, err := c.CoreV1().RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	etag := ""
+	var etagSpec *spec.Swagger
+	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
+		// download spec with etag support
+		spec := &spec.Swagger{}
+		req, err := http.NewRequest("GET", url.String(), nil)
 		if err != nil {
 			return false, err
 		}
-		spec := spec.Swagger{}
-		if err := json.Unmarshal(bs, &spec); err != nil {
+		req.Close = true // enforce a new connection to hit different HA API servers
+		if len(etag) > 0 {
+			req.Header.Set("If-None-Match", fmt.Sprintf(`"%s"`, etag))
+		}
+		resp, err := client.Do(req)
+		if err != nil {
 			return false, err
 		}
-		_, ok := spec.SwaggerProps.Definitions[name]
-		if ok {
-			lastMsg = fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] still exists", name)
-			return false, nil
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotModified {
+			spec = etagSpec
+		} else if resp.StatusCode != http.StatusOK {
+			return false, fmt.Errorf("unexpected response: %d", resp.StatusCode)
+		} else if bs, err := ioutil.ReadAll(resp.Body); err != nil {
+			return false, err
+		} else if err := json.Unmarshal(bs, spec); err != nil {
+			return false, err
+		} else {
+			etag = strings.Trim(resp.Header.Get("ETag"), `"`)
+			etagSpec = spec
 		}
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("failed to wait for definition %s to be removed: %v; lastMsg: %s", name, err, lastMsg)
+
+		var ok bool
+		ok, lastMsg = pred(spec)
+		return ok, nil
+	})); err != nil {
+		return fmt.Errorf("failed to wait for OpenAPI spec validating condition: %v; lastMsg: %s", err, lastMsg)
 	}
 	return nil
 }
@@ -486,7 +609,7 @@ func verifyKubectlExplain(name, pattern string) error {
 
 // definitionName returns the openapi definition name for given CRD in given version
 func definitionName(crd *crd.TestCrd, version string) string {
-	return openapiutil.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", crd.APIGroup, version, crd.Kind))
+	return openapiutil.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", crd.Crd.Spec.Group, version, crd.Crd.Spec.Names.Kind))
 }
 
 var schemaFoo = []byte(`description: Foo CRD for Testing
@@ -545,9 +668,55 @@ properties:
     properties:
       dummy:
         description: Dummy property.
+        type: object
   status:
     description: Status of Waldo
     type: object
     properties:
       bars:
-        description: List of Bars and their statuses.`)
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object`)
+
+var schemaPreserveRoot = []byte(`description: preserve-unknown-properties at root for Testing
+x-kubernetes-preserve-unknown-fields: true
+type: object
+properties:
+  spec:
+    description: Specification of Waldo
+    type: object
+    properties:
+      dummy:
+        description: Dummy property.
+        type: object
+  status:
+    description: Status of Waldo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object`)
+
+var schemaPreserveNested = []byte(`description: preserve-unknown-properties in nested field for Testing
+type: object
+properties:
+  spec:
+    description: Specification of Waldo
+    type: object
+    x-kubernetes-preserve-unknown-fields: true
+    properties:
+      dummy:
+        description: Dummy property.
+        type: object
+  status:
+    description: Status of Waldo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object`)

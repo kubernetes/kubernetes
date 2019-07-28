@@ -50,35 +50,53 @@ import (
 //
 // Dbdsqr is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dbdsqr(uplo blas.Uplo, n, ncvt, nru, ncc int, d, e, vt []float64, ldvt int, u []float64, ldu int, c []float64, ldc int, work []float64) (ok bool) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case ncvt < 0:
+		panic(ncvtLT0)
+	case nru < 0:
+		panic(nruLT0)
+	case ncc < 0:
+		panic(nccLT0)
+	case ldvt < max(1, ncvt):
+		panic(badLdVT)
+	case (ldu < max(1, n) && nru > 0) || (ldu < 1 && nru == 0):
+		panic(badLdU)
+	case ldc < max(1, ncc):
+		panic(badLdC)
 	}
-	if ncvt != 0 {
-		checkMatrix(n, ncvt, vt, ldvt)
-	}
-	if nru != 0 {
-		checkMatrix(nru, n, u, ldu)
-	}
-	if ncc != 0 {
-		checkMatrix(n, ncc, c, ldc)
-	}
-	if len(d) < n {
-		panic(badD)
-	}
-	if len(e) < n-1 {
-		panic(badE)
-	}
-	if len(work) < 4*(n-1) {
-		panic(badWork)
-	}
-	var info int
-	bi := blas64.Implementation()
-	const (
-		maxIter = 6
-	)
+
+	// Quick return if possible.
 	if n == 0 {
 		return true
 	}
+
+	if len(vt) < (n-1)*ldvt+ncvt && ncvt != 0 {
+		panic(shortVT)
+	}
+	if len(u) < (nru-1)*ldu+n && nru != 0 {
+		panic(shortU)
+	}
+	if len(c) < (n-1)*ldc+ncc && ncc != 0 {
+		panic(shortC)
+	}
+	if len(d) < n {
+		panic(shortD)
+	}
+	if len(e) < n-1 {
+		panic(shortE)
+	}
+	if len(work) < 4*(n-1) {
+		panic(shortWork)
+	}
+
+	var info int
+	bi := blas64.Implementation()
+	const maxIter = 6
+
 	if n != 1 {
 		// If the singular vectors do not need to be computed, use qd algorithm.
 		if !(ncvt > 0 || nru > 0 || ncc > 0) {
@@ -87,7 +105,6 @@ func (impl Implementation) Dbdsqr(uplo blas.Uplo, n, ncvt, nru, ncc int, d, e, v
 			if info != 2 {
 				return info == 0
 			}
-			info = 0
 		}
 		nm1 := n - 1
 		nm12 := nm1 + nm1

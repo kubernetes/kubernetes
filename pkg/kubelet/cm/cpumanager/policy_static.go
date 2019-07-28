@@ -154,9 +154,11 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// topology that was received during CPU manager startup matches with
 	// the set of CPUs stored in the state.
 	totalKnownCPUs := tmpDefaultCPUset.Clone()
+	tmpCPUSets := []cpuset.CPUSet{}
 	for _, cset := range tmpAssignments {
-		totalKnownCPUs = totalKnownCPUs.Union(cset)
+		tmpCPUSets = append(tmpCPUSets, cset)
 	}
+	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
 	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
 			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())

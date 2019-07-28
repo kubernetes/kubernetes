@@ -25,13 +25,15 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need, but only from vendor/...
-go install k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-go install k8s.io/kubernetes/vendor/github.com/bazelbuild/buildtools/buildozer
-go install k8s.io/kubernetes/vendor/k8s.io/repo-infra/kazel
+pushd "${KUBE_ROOT}/vendor"
+  go install ./github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+  go install ./github.com/bazelbuild/buildtools/buildozer
+  go install ./k8s.io/repo-infra/kazel
+popd
 
 # Find all of the staging repos.
 while IFS='' read -r repo; do staging_repos+=("${repo}"); done <\
-  <(cd "${KUBE_ROOT}/staging/src" && find k8s.io -mindepth 1 -maxdepth 1 -type d | LANG=C sort)
+  <(cd "${KUBE_ROOT}/staging/src" && find k8s.io -mindepth 1 -maxdepth 1 -type d | LC_ALL=C LANG=C sort)
 
 # Save the staging repos into a Starlark list that can be used by Bazel rules.
 (
@@ -60,11 +62,15 @@ for repo in "${staging_repos[@]}"; do
 done
 
 # Run gazelle to update Go rules in BUILD files.
+# filter out known pkg-config error (see buildozer workaround below)
+# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors 
+# while preserving the exit code of gazelle
 gazelle fix \
     -external=vendored \
     -mode=fix \
     -repo_root "${KUBE_ROOT}" \
-    "${KUBE_ROOT}"
+    "${KUBE_ROOT}" \
+    2>&1 | grep -Ev "vendor/github.com/seccomp/libseccomp-golang/seccomp(_internal)?.go: pkg-config not supported: #cgo pkg-config: libseccomp" || (exit "${PIPESTATUS[0]}")
 
 # Run kazel to update the pkg-srcs and all-srcs rules as well as handle
 # Kubernetes code generators.
@@ -74,6 +80,20 @@ kazel
 # buildozer exits 3 when no changes are made ¯\_(ツ)_/¯
 # https://github.com/bazelbuild/buildtools/tree/master/buildozer#error-code
 buildozer -quiet 'add tags manual' '//vendor/...:%go_binary' '//vendor/...:%go_test' && ret=$? || ret=$?
+if [[ $ret != 0 && $ret != 3 ]]; then
+  exit 1
+fi
+
+# mark all ./test/integration/* targets as integration
+# see comment above re: buildozer exit codes
+buildozer -quiet 'add tags integration' '//test/integration/...:%go_test' && ret=$? || ret=$?
+if [[ $ret != 0 && $ret != 3 ]]; then
+  exit 1
+fi
+
+# we need to set this because gazelle doesn't support pkg-config, which would set this link option
+# see comment above re: buildozer exit codes
+buildozer -quiet 'set clinkopts select({"@io_bazel_rules_go//go/platform:linux":["-lseccomp",],"//conditions:default":[],})' //vendor/github.com/seccomp/libseccomp-golang:go_default_library && ret=$? || ret=$?
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi

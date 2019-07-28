@@ -59,13 +59,13 @@ func defaultPredicates() sets.String {
 // ApplyFeatureGates applies algorithm by feature gates.
 func ApplyFeatureGates() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressurePred"
+		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressure"
 		// and "CheckNodeDiskPressure" predicates
 		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
 		factory.RemoveFitPredicate(predicates.CheckNodeMemoryPressurePred)
 		factory.RemoveFitPredicate(predicates.CheckNodeDiskPressurePred)
 		factory.RemoveFitPredicate(predicates.CheckNodePIDPressurePred)
-		// Remove key "CheckNodeCondition", "CheckNodeMemoryPressure" and "CheckNodeDiskPressure"
+		// Remove key "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressure" and "CheckNodeDiskPressure"
 		// from ALL algorithm provider
 		// The key will be removed from all providers which in algorithmProviderMap[]
 		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
@@ -87,12 +87,23 @@ func ApplyFeatureGates() {
 		klog.Infof("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
 
+	// Only register EvenPodsSpread predicate & priority if the feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
+		klog.Infof("Registering EvenPodsSpread predicate and priority function")
+		// register predicate
+		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.EvenPodsSpreadPred)
+		factory.RegisterFitPredicate(predicates.EvenPodsSpreadPred, predicates.EvenPodsSpreadPredicate)
+		// register priority
+		factory.InsertPriorityKeyToAlgorithmProviderMap(priorities.EvenPodsSpreadPriority)
+		factory.RegisterPriorityFunction(priorities.EvenPodsSpreadPriority, priorities.CalculateEvenPodsSpreadPriority, 1)
+	}
+
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
-		factory.RegisterPriorityFunction2(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1)
+		factory.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1)
 		// Register the priority function to specific provider too.
-		factory.InsertPriorityKeyToAlgorithmProviderMap(factory.RegisterPriorityFunction2(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
+		factory.InsertPriorityKeyToAlgorithmProviderMap(factory.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
 	}
 }
 

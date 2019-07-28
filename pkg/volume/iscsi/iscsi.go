@@ -235,6 +235,14 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	if err != nil {
 		return nil, err
 	}
+	arr := strings.Split(device, "-lun-")
+	if len(arr) < 2 {
+		return nil, fmt.Errorf("failed to retrieve lun from globalPDPath: %v", globalPDPath)
+	}
+	lun, err := strconv.Atoi(arr[1])
+	if err != nil {
+		return nil, err
+	}
 	iface, _ := extractIface(globalPDPath)
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,
@@ -242,6 +250,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 			ISCSI: &v1.ISCSIVolumeSource{
 				TargetPortal:   bkpPortal,
 				IQN:            iqn,
+				Lun:            int32(lun),
 				ISCSIInterface: iface,
 			},
 		},
@@ -271,6 +280,7 @@ type iscsiDisk struct {
 	Portals       []string
 	Iqn           string
 	Lun           string
+	InitIface     string
 	Iface         string
 	chapDiscovery bool
 	chapSession   bool
@@ -330,13 +340,13 @@ func (b *iscsiDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *iscsiDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *iscsiDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup)
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
 	}
@@ -542,12 +552,18 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		return nil, err
 	}
 
+	initIface := iface
+	if initiatorName != "" {
+		iface = bkportal[0] + ":" + spec.Name()
+	}
+
 	return &iscsiDisk{
 		podUID:        podUID,
 		VolName:       spec.Name(),
 		Portals:       bkportal,
 		Iqn:           iqn,
 		Lun:           lun,
+		InitIface:     initIface,
 		Iface:         iface,
 		chapDiscovery: chapDiscovery,
 		chapSession:   chapSession,
@@ -592,15 +608,6 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 		}
 	}
 	return secret, err
-}
-
-func createVolumeFromISCSIVolumeSource(volumeName string, iscsi v1.ISCSIVolumeSource) *v1.Volume {
-	return &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			ISCSI: &iscsi,
-		},
-	}
 }
 
 func createPersistentVolumeFromISCSIPVSource(volumeName string, iscsi v1.ISCSIPersistentVolumeSource) *v1.PersistentVolume {

@@ -2,6 +2,7 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/apiserver/pkg/util/feature
+  - k8s.io/component-base/featuregate/testing
   - k8s.io/kubernetes/pkg/apis/core
   - k8s.io/kubernetes/pkg/features
   - k8s.io/kubernetes/pkg/fieldpath
@@ -28,6 +29,7 @@
   - k8s.io/cli-runtime/pkg/printers
   - k8s.io/cli-runtime/pkg/resource
   - k8s.io/cli-runtime/pkg/kustomize
+  - k8s.io/utils/pointer
 
 - baseImportPath: "./vendor/k8s.io/apimachinery/"
   allowedImports:
@@ -80,6 +82,7 @@
   - "./vendor/k8s.io/client-go/tools/leaderelection/resourcelock"
   - "./vendor/k8s.io/client-go/tools/portforward"
   - "./vendor/k8s.io/client-go/tools/record"
+  - "./vendor/k8s.io/client-go/tools/events"
   - "./vendor/k8s.io/client-go/tools/reference"
   - "./vendor/k8s.io/client-go/tools/remotecommand"
   allowedImports:
@@ -104,6 +107,7 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/metrics
   - k8s.io/klog
 
@@ -113,9 +117,21 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/component-base
   - k8s.io/kube-aggregator
   - k8s.io/kube-openapi
+  - k8s.io/klog
+  - k8s.io/utils
+
+- baseImportPath: "./vendor/k8s.io/kubectl/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/cli-runtime
+  - k8s.io/client-go
+  - k8s.io/kubectl
+  - k8s.io/utils
   - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/sample-apiserver/"
@@ -124,7 +140,9 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/component-base
+  - k8s.io/kube-openapi
   - k8s.io/sample-apiserver
   - k8s.io/klog
 
@@ -135,9 +153,11 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/component-base
   - k8s.io/klog
   - k8s.io/kube-openapi
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
@@ -185,31 +205,36 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/cluster-bootstrap
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/cloud-provider/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
-  - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/cloud-provider
   - k8s.io/klog
   - k8s.io/utils
 
+- baseImportPath: "./vendor/k8s.io/legacy-cloud-providers/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/cloud-provider
+  - k8s.io/csi-translation-lib
+  - k8s.io/klog
+  - k8s.io/legacy-cloud-providers
+  - k8s.io/utils
+  - k8s.io/apiserver/pkg/util/feature
+  - k8s.io/component-base/featuregate
+
 - baseImportPath: "./vendor/k8s.io/node-api/"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/node-api
-
-- baseImportPath: "./vendor/k8s.io/csi-api/"
-  allowedImports:
-  - k8s.io/api
-  - k8s.io/apimachinery
-  - k8s.io/apiextensions-apiserver
-  - k8s.io/client-go
-  - k8s.io/csi-api
-  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
   allowedImports:

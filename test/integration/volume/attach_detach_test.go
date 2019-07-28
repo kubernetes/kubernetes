@@ -27,15 +27,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgoinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -179,6 +181,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -205,6 +208,16 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	// the populator loop turns every 1 minute
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
 	close(stopCh)
+}
+
+func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		go informers.Storage().V1beta1().CSINodes().Informer().Run(stopCh)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		go informers.Storage().V1beta1().CSIDrivers().Informer().Run(stopCh)
+	}
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
@@ -246,6 +259,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -314,6 +328,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -383,7 +398,7 @@ func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, ch
 	}
 }
 
-func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, informers.SharedInformerFactory) {
+func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, clientgoinformers.SharedInformerFactory) {
 	config := restclient.Config{
 		Host:          server.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
@@ -407,8 +422,8 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.FakeCloud{}
-	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
+	cloud := &fakecloud.Cloud{}
+	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
 		informers.Core().V1().Pods(),
@@ -416,6 +431,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Core().V1().PersistentVolumes(),
 		informers.Storage().V1beta1().CSINodes(),
+		informers.Storage().V1beta1().CSIDrivers(),
 		cloud,
 		plugins,
 		nil, /* prober */
@@ -491,6 +507,7 @@ func TestPodAddedByDswp(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -576,6 +593,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
 	informers.WaitForCacheSync(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 	go pvCtrl.Run(stopCh)
 

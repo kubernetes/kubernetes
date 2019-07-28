@@ -63,7 +63,7 @@ func newNodeTree(nodes []*v1.Node) *NodeTree {
 		tree: make(map[string]*nodeArray),
 	}
 	for _, n := range nodes {
-		nt.AddNode(n)
+		nt.addNode(n)
 	}
 	return nt
 }
@@ -127,6 +127,7 @@ func (nt *NodeTree) removeZone(zone string) {
 	for i, z := range nt.zones {
 		if z == zone {
 			nt.zones = append(nt.zones[:i], nt.zones[i+1:]...)
+			return
 		}
 	}
 }

@@ -18,6 +18,7 @@ package httplog
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -33,6 +34,11 @@ type StacktracePred func(httpStatus int) (logStacktrace bool)
 type logger interface {
 	Addf(format string, data ...interface{})
 }
+
+type respLoggerContextKeyType int
+
+// respLoggerContextKey is used to store the respLogger pointer in the request context.
+const respLoggerContextKey respLoggerContextKeyType = iota
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
@@ -69,47 +75,54 @@ func DefaultStacktracePred(status int) bool {
 	return (status < http.StatusOK || status >= http.StatusInternalServerError) && status != http.StatusSwitchingProtocols
 }
 
-// NewLogged turns a normal response writer into a logged response writer.
-//
-// Usage:
-//
-// defer NewLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
-//
-// (Only the call to Log() is deferred, so you can set everything up in one line!)
-//
-// Note that this *changes* your writer, to route response writing actions
-// through the logger.
-//
-// Use LogOf(w).Addf(...) to log something along with the response result.
-func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
-	if _, ok := (*w).(*respLogger); ok {
-		// Don't double-wrap!
-		panic("multiple NewLogged calls!")
+// WithLogging wraps the handler with logging.
+func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		if old := respLoggerFromContext(req); old != nil {
+			panic("multiple WithLogging calls!")
+		}
+		rl := newLogged(req, w).StacktraceWhen(pred)
+		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
+
+		defer rl.Log()
+		handler.ServeHTTP(rl, req)
+	})
+}
+
+// respLoggerFromContext returns the respLogger or nil.
+func respLoggerFromContext(req *http.Request) *respLogger {
+	ctx := req.Context()
+	val := ctx.Value(respLoggerContextKey)
+	if rl, ok := val.(*respLogger); ok {
+		return rl
 	}
-	rl := &respLogger{
+	return nil
+}
+
+// newLogged turns a normal response writer into a logged response writer.
+func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
+	return &respLogger{
 		startTime:         time.Now(),
 		req:               req,
-		w:                 *w,
+		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
-	*w = rl // hijack caller's writer!
-	return rl
 }
 
 // LogOf returns the logger hiding in w. If there is not an existing logger
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.
 func LogOf(req *http.Request, w http.ResponseWriter) logger {
-	if rl, ok := w.(*respLogger); ok {
+	if rl := respLoggerFromContext(req); rl != nil {
 		return rl
 	}
-
 	return &passthroughLogger{}
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
-func Unlogged(w http.ResponseWriter) http.ResponseWriter {
-	if rl, ok := w.(*respLogger); ok {
+func Unlogged(req *http.Request, w http.ResponseWriter) http.ResponseWriter {
+	if rl := respLoggerFromContext(req); rl != nil {
 		return rl.w
 	}
 	return w
@@ -125,13 +138,13 @@ func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
 // StatusIsNot returns a StacktracePred which will cause stacktraces to be logged
 // for any status *not* in the given list.
 func StatusIsNot(statuses ...int) StacktracePred {
+	statusesNoTrace := map[int]bool{}
+	for _, s := range statuses {
+		statusesNoTrace[s] = true
+	}
 	return func(status int) bool {
-		for _, s := range statuses {
-			if status == s {
-				return false
-			}
-		}
-		return true
+		_, ok := statusesNoTrace[status]
+		return !ok
 	}
 }
 

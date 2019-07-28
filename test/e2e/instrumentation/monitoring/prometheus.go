@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
@@ -105,7 +106,7 @@ func prometheusPodCustomMetricQuery(namespace, podNamePrefix string) string {
 
 func consumeCPUResources(f *framework.Framework, consumerName string, cpuUsage int) *common.ResourceConsumer {
 	return common.NewDynamicResourceConsumer(consumerName, f.Namespace.Name, common.KindDeployment, 1, cpuUsage,
-		memoryUsed, 0, int64(cpuUsage), memoryLimit, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+		memoryUsed, 0, int64(cpuUsage), memoryLimit, f.ClientSet, f.ScalesGetter)
 }
 
 func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
@@ -114,7 +115,7 @@ func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metr
 		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
-	return common.NewMetricExporter(consumerName, f.Namespace.Name, podAnnotations, nil, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	return common.NewMetricExporter(consumerName, f.Namespace.Name, podAnnotations, nil, metricValue, f.ClientSet, f.ScalesGetter)
 }
 
 func exportCustomMetricFromService(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
@@ -123,7 +124,7 @@ func exportCustomMetricFromService(f *framework.Framework, consumerName string, 
 		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
-	return common.NewMetricExporter(consumerName, f.Namespace.Name, nil, serviceAnnotations, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	return common.NewMetricExporter(consumerName, f.Namespace.Name, nil, serviceAnnotations, metricValue, f.ClientSet, f.ScalesGetter)
 }
 
 func validateMetricAvailableForAllNodes(c clientset.Interface, metric string, expectedNodesNames []string) error {
@@ -171,7 +172,7 @@ func validateQueryReturnsCorrectValues(c clientset.Interface, query string, expe
 	if len(samples) < minSamplesCount {
 		return fmt.Errorf("Not enough samples for query '%v', got %v", query, samples)
 	}
-	framework.Logf("Executed query '%v' returned %v", query, samples)
+	e2elog.Logf("Executed query '%v' returned %v", query, samples)
 	for _, value := range samples {
 		error := math.Abs(value-expectedValue) / expectedValue
 		if error >= errorTolerance {
@@ -211,7 +212,7 @@ func getInstanceLabelsAvailableForMetric(c clientset.Interface, duration time.Du
 	instanceLabels := make([]string, 0)
 	m, ok := result.(model.Matrix)
 	if !ok {
-		framework.Failf("Expected matrix response for query '%v', got: %T", query, result)
+		e2elog.Failf("Expected matrix response for query '%v', got: %T", query, result)
 		return instanceLabels, nil
 	}
 	for _, stream := range m {
@@ -238,7 +239,7 @@ func fetchPrometheusTargetDiscovery(c clientset.Interface) (TargetDiscovery, err
 		Raw()
 	var qres promTargetsResponse
 	if err != nil {
-		framework.Logf(string(response))
+		e2elog.Logf(string(response))
 		return qres.Data, err
 	}
 	err = json.Unmarshal(response, &qres)
@@ -303,7 +304,7 @@ func queryPrometheus(c clientset.Interface, query string, start, end time.Time, 
 		Do().
 		Raw()
 	if err != nil {
-		framework.Logf(string(response))
+		e2elog.Logf(string(response))
 		return nil, err
 	}
 	var qres promQueryResponse
@@ -369,10 +370,10 @@ func retryUntilSucceeds(validator func() error, timeout time.Duration) {
 		if time.Since(startTime) >= timeout {
 			break
 		}
-		framework.Logf(err.Error())
+		e2elog.Logf(err.Error())
 		time.Sleep(prometheusSleepBetweenAttempts)
 	}
-	framework.Failf(err.Error())
+	e2elog.Failf(err.Error())
 }
 
 func getAllNodes(c clientset.Interface) ([]string, error) {

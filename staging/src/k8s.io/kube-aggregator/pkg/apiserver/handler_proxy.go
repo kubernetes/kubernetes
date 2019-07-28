@@ -36,7 +36,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )
 
 const aggregatorComponent string = "aggregator"
@@ -78,6 +79,8 @@ type proxyHandlingInfo struct {
 	serviceNamespace string
 	// serviceAvailable indicates this APIService is available or not
 	serviceAvailable bool
+	// servicePort is the port of the service this handler proxies to
+	servicePort int32
 }
 
 func proxyError(w http.ResponseWriter, req *http.Request, error string, code int) {
@@ -128,7 +131,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
-	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
+	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
@@ -207,7 +210,7 @@ func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
 
 // these methods provide locked access to fields
 
-func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIService) {
+func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIService) {
 	if apiService.Spec.Service == nil {
 		r.handlingInfo.Store(proxyHandlingInfo{local: true})
 		return
@@ -226,7 +229,8 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		},
 		serviceName:      apiService.Spec.Service.Name,
 		serviceNamespace: apiService.Spec.Service.Namespace,
-		serviceAvailable: apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available),
+		servicePort:      *apiService.Spec.Service.Port,
+		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
 	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
 		newInfo.restConfig.Dial = r.proxyTransport.DialContext

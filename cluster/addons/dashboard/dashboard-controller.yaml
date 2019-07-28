@@ -14,7 +14,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kubernetes-dashboard
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:

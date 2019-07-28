@@ -26,9 +26,9 @@ run_kubectl_request_timeout_tests() {
   ### Test global request timeout option
   # Pre-condition: no POD exists
   create_and_use_new_namespace
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
-  kubectl create "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml
+  kubectl create "${kube_flags[@]:?}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml
   # Post-condition: valid-pod POD is created
   kubectl get "${kube_flags[@]}" pods -o json
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'

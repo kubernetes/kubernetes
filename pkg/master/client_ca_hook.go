@@ -19,10 +19,10 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -132,7 +132,7 @@ func writeConfigMap(client corev1client.ConfigMapsGetter, name string, data map[
 		return err
 	}
 
-	if !reflect.DeepEqual(existing.Data, data) {
+	if !apiequality.Semantic.DeepEqual(existing.Data, data) {
 		existing.Data = data
 		_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(existing)
 	}

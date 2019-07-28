@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -245,49 +245,52 @@ func TestCollectDataWithSecret(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		testNamespace := "test_projected_namespace"
-		tc.secret.ObjectMeta = metav1.ObjectMeta{
-			Namespace: testNamespace,
-			Name:      tc.name,
-		}
+		t.Run(tc.name, func(t *testing.T) {
 
-		source := makeProjection(tc.name, tc.mode, "secret")
-		source.Sources[0].Secret.Items = tc.mappings
-		source.Sources[0].Secret.Optional = &tc.optional
+			testNamespace := "test_projected_namespace"
+			tc.secret.ObjectMeta = metav1.ObjectMeta{
+				Namespace: testNamespace,
+				Name:      tc.name,
+			}
 
-		testPodUID := types.UID("test_pod_uid")
-		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
-		client := fake.NewSimpleClientset(tc.secret)
-		_, host := newTestHost(t, client)
+			source := makeProjection(tc.name, tc.mode, "secret")
+			source.Sources[0].Secret.Items = tc.mappings
+			source.Sources[0].Secret.Optional = &tc.optional
 
-		var myVolumeMounter = projectedVolumeMounter{
-			projectedVolume: &projectedVolume{
-				sources: source.Sources,
-				podUID:  pod.UID,
-				plugin: &projectedPlugin{
-					host:      host,
-					getSecret: host.GetSecretFunc(),
+			testPodUID := types.UID("test_pod_uid")
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+			client := fake.NewSimpleClientset(tc.secret)
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
+			var myVolumeMounter = projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: source.Sources,
+					podUID:  pod.UID,
+					plugin: &projectedPlugin{
+						host:      host,
+						getSecret: host.GetSecretFunc(),
+					},
 				},
-			},
-			source: *source,
-			pod:    pod,
-		}
+				source: *source,
+				pod:    pod,
+			}
 
-		actualPayload, err := myVolumeMounter.collectData()
-		if err != nil && tc.success {
-			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
-			continue
-		}
-		if err == nil && !tc.success {
-			t.Errorf("%v: unexpected success making payload", tc.name)
-			continue
-		}
-		if !tc.success {
-			continue
-		}
-		if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: expected and actual payload do not match", tc.name)
-		}
+			actualPayload, err := myVolumeMounter.collectData()
+			if err != nil && tc.success {
+				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
+				return
+			}
+			if err == nil && !tc.success {
+				t.Errorf("%v: unexpected success making payload", tc.name)
+				return
+			}
+			if !tc.success {
+				return
+			}
+			if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
+				t.Errorf("%v: expected and actual payload do not match", tc.name)
+			}
+		})
 	}
 }
 
@@ -492,49 +495,51 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		testNamespace := "test_projected_namespace"
-		tc.configMap.ObjectMeta = metav1.ObjectMeta{
-			Namespace: testNamespace,
-			Name:      tc.name,
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			testNamespace := "test_projected_namespace"
+			tc.configMap.ObjectMeta = metav1.ObjectMeta{
+				Namespace: testNamespace,
+				Name:      tc.name,
+			}
 
-		source := makeProjection(tc.name, tc.mode, "configMap")
-		source.Sources[0].ConfigMap.Items = tc.mappings
-		source.Sources[0].ConfigMap.Optional = &tc.optional
+			source := makeProjection(tc.name, tc.mode, "configMap")
+			source.Sources[0].ConfigMap.Items = tc.mappings
+			source.Sources[0].ConfigMap.Optional = &tc.optional
 
-		testPodUID := types.UID("test_pod_uid")
-		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
-		client := fake.NewSimpleClientset(tc.configMap)
-		_, host := newTestHost(t, client)
-
-		var myVolumeMounter = projectedVolumeMounter{
-			projectedVolume: &projectedVolume{
-				sources: source.Sources,
-				podUID:  pod.UID,
-				plugin: &projectedPlugin{
-					host:         host,
-					getConfigMap: host.GetConfigMapFunc(),
+			testPodUID := types.UID("test_pod_uid")
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+			client := fake.NewSimpleClientset(tc.configMap)
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
+			var myVolumeMounter = projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: source.Sources,
+					podUID:  pod.UID,
+					plugin: &projectedPlugin{
+						host:         host,
+						getConfigMap: host.GetConfigMapFunc(),
+					},
 				},
-			},
-			source: *source,
-			pod:    pod,
-		}
+				source: *source,
+				pod:    pod,
+			}
 
-		actualPayload, err := myVolumeMounter.collectData()
-		if err != nil && tc.success {
-			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
-			continue
-		}
-		if err == nil && !tc.success {
-			t.Errorf("%v: unexpected success making payload", tc.name)
-			continue
-		}
-		if !tc.success {
-			continue
-		}
-		if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: expected and actual payload do not match", tc.name)
-		}
+			actualPayload, err := myVolumeMounter.collectData()
+			if err != nil && tc.success {
+				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
+				return
+			}
+			if err == nil && !tc.success {
+				t.Errorf("%v: unexpected success making payload", tc.name)
+				return
+			}
+			if !tc.success {
+				return
+			}
+			if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
+				t.Errorf("%v: expected and actual payload do not match", tc.name)
+			}
+		})
 	}
 }
 
@@ -670,39 +675,42 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		source := makeProjection("", tc.mode, "downwardAPI")
-		source.Sources[0].DownwardAPI.Items = tc.volumeFile
+		t.Run(tc.name, func(t *testing.T) {
+			source := makeProjection("", tc.mode, "downwardAPI")
+			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
-		client := fake.NewSimpleClientset(tc.pod)
-		_, host := newTestHost(t, client)
-
-		var myVolumeMounter = projectedVolumeMounter{
-			projectedVolume: &projectedVolume{
-				sources: source.Sources,
-				podUID:  tc.pod.UID,
-				plugin: &projectedPlugin{
-					host: host,
+			client := fake.NewSimpleClientset(tc.pod)
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
+			var myVolumeMounter = projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: source.Sources,
+					podUID:  tc.pod.UID,
+					plugin: &projectedPlugin{
+						host: host,
+					},
 				},
-			},
-			source: *source,
-			pod:    tc.pod,
-		}
+				source: *source,
+				pod:    tc.pod,
+			}
 
-		actualPayload, err := myVolumeMounter.collectData()
-		if err != nil && tc.success {
-			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
-			continue
-		}
-		if err == nil && !tc.success {
-			t.Errorf("%v: unexpected success making payload", tc.name)
-			continue
-		}
-		if !tc.success {
-			continue
-		}
-		if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: expected and actual payload do not match", tc.name)
-		}
+			actualPayload, err := myVolumeMounter.collectData()
+			if err != nil && tc.success {
+				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
+				return
+			}
+			if err == nil && !tc.success {
+				t.Errorf("%v: unexpected success making payload", tc.name)
+				return
+			}
+			if !tc.success {
+				return
+			}
+			if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
+				t.Errorf("%v: expected and actual payload do not match", tc.name)
+			}
+		})
+
 	}
 }
 
@@ -787,7 +795,8 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 				return true, tr, nil
 			}))
 
-			_, host := newTestHost(t, client)
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
 
 			var myVolumeMounter = projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
@@ -878,7 +887,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -943,7 +952,8 @@ func TestInvalidPathProjected(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(nil)
+	var mounterArgs volume.MounterArgs
+	err = mounter.SetUp(mounterArgs)
 	if err == nil {
 		t.Errorf("Expected error while setting up secret")
 	}
@@ -994,7 +1004,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -1046,7 +1056,7 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -1069,14 +1079,14 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
-	datadirSymlink := path.Join(volumePath, "..data")
+	datadirSymlink := filepath.Join(volumePath, "..data")
 	datadir, err := os.Readlink(datadirSymlink)
 	if err != nil && os.IsNotExist(err) {
 		t.Fatalf("couldn't find volume path's data dir, %s", datadirSymlink)
 	} else if err != nil {
 		t.Fatalf("couldn't read symlink, %s", datadirSymlink)
 	}
-	datadirPath := path.Join(volumePath, datadir)
+	datadirPath := filepath.Join(volumePath, datadir)
 
 	infos, err := ioutil.ReadDir(volumePath)
 	if err != nil {
@@ -1144,7 +1154,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -1193,20 +1203,6 @@ func makeSecret(namespace, name string) v1.Secret {
 	}
 }
 
-func configMap(namespace, name string) v1.ConfigMap {
-	return v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Data: map[string]string{
-			"data-1": "value-1",
-			"data-2": "value-2",
-			"data-3": "value-3",
-		},
-	}
-}
-
 func makeProjection(name string, defaultMode int32, kind string) *v1.ProjectedVolumeSource {
 	var item v1.VolumeProjection
 
@@ -1241,7 +1237,7 @@ func makeProjection(name string, defaultMode int32, kind string) *v1.ProjectedVo
 
 func doTestSecretDataInVolume(volumePath string, secret v1.Secret, t *testing.T) {
 	for key, value := range secret.Data {
-		secretDataHostPath := path.Join(volumePath, key)
+		secretDataHostPath := filepath.Join(volumePath, key)
 		if _, err := os.Stat(secretDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find secret data on disk: %v", secretDataHostPath)
 		} else {

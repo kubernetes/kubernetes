@@ -19,18 +19,19 @@ package iscsi
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -52,6 +53,9 @@ const (
 
 	// How many seconds to wait for a multipath device if at least two paths are available.
 	multipathDeviceTimeout = 10
+
+	// How many seconds to wait for a device/path to appear before giving up.
+	deviceDiscoveryTimeout = 30
 
 	// 'iscsiadm' error code stating that a session is logged in
 	// See https://github.com/open-iscsi/open-iscsi/blob/7d121d12ad6ba7783308c25ffd338a9fa0cc402b/include/iscsi_err.h#L37-L38
@@ -160,38 +164,14 @@ func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransp
 	return false
 }
 
-// getDevicePrefixRefCount: given a prefix of device path, find its reference count from /proc/mounts
-// returns the reference count to the device and error code
-// for services like iscsi construct multiple device paths with the same prefix pattern.
-// this function aggregates all references to a service based on the prefix pattern
-// More specifically, this prefix semantics is to aggregate disk paths that belong to the same iSCSI target/iqn pair.
-// an iSCSI target could expose multiple LUNs through the same IQN, and Linux iSCSI initiator creates disk paths that start the same prefix but end with different LUN number
-// When we decide whether it is time to logout a target, we have to see if none of the LUNs are used any more.
-// That's where the prefix based ref count kicks in. If we only count the disks using exact match, we could log other disks out.
-func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (int, error) {
-	mps, err := mounter.List()
-	if err != nil {
-		return -1, err
-	}
-
-	// Find the number of references to the device.
-	refCount := 0
-	for i := range mps {
-		if strings.HasPrefix(mps[i].Path, deviceNamePrefix) {
-			refCount++
-		}
-	}
-	return refCount, nil
-}
-
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface_name/portal-some_iqn-lun-lun_id
 func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
-	return path.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+	return filepath.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface_name/portal-some_iqn-lun-lun_id
 func makeVDPDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
-	return path.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+	return filepath.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 type ISCSIUtil struct{}
@@ -207,7 +187,7 @@ func (util *ISCSIUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
 }
 
 func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
-	file := path.Join(mnt, "iscsi.json")
+	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Create(file)
 	if err != nil {
 		return fmt.Errorf("iscsi: create %s err %s", file, err)
@@ -221,7 +201,7 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 }
 
 func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
-	file := path.Join(mnt, "iscsi.json")
+	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Open(file)
 	if err != nil {
 		return fmt.Errorf("iscsi: open %s err %s", file, err)
@@ -294,9 +274,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var iscsiTransport string
 	var lastErr error
 
-	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "show")
+	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
-		klog.Errorf("iscsi: could not read iface %s error: %s", b.Iface, string(out))
+		klog.Errorf("iscsi: could not read iface %s error: %s", b.InitIface, string(out))
 		return "", err
 	}
 
@@ -304,17 +284,13 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 	bkpPortal := b.Portals
 
-	// create new iface and copy parameters from pre-configured iface to the created iface
+	// If the initiator name was set, the iface isn't created yet,
+	// so create it and copy parameters from the pre-configured one
 	if b.InitiatorName != "" {
-		// new iface name is <target portal>:<volume name>
-		newIface := bkpPortal[0] + ":" + b.VolName
-		err = cloneIface(b, newIface)
-		if err != nil {
-			klog.Errorf("iscsi: failed to clone iface: %s error: %v", b.Iface, err)
+		if err = cloneIface(b); err != nil {
+			klog.Errorf("iscsi: failed to clone iface: %s error: %v", b.InitIface, err)
 			return "", err
 		}
-		// update iface name
-		b.Iface = newIface
 	}
 
 	// Lock the target while we login to avoid races between 2 volumes that share the same
@@ -418,10 +394,10 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
 			}
 
-			if exist := waitForPathToExist(&devicePath, multipathDeviceTimeout, iscsiTransport); !exist {
-				klog.Errorf("Could not attach disk: Timeout after 10s")
+			if exist := waitForPathToExist(&devicePath, deviceDiscoveryTimeout, iscsiTransport); !exist {
+				klog.Errorf("Could not attach disk: Timeout after %ds", deviceDiscoveryTimeout)
 				// update last error
-				lastErr = fmt.Errorf("Could not attach disk: Timeout after 10s")
+				lastErr = fmt.Errorf("Could not attach disk: Timeout after %ds", deviceDiscoveryTimeout)
 				continue
 			} else {
 				devicePaths[tp] = devicePath
@@ -457,8 +433,8 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	}
 	// Try to find a multipath device for the volume
 	if len(bkpPortal) > 1 {
-		// Multipath volume was requested. Wait up to 10 seconds for the multipath device to appear.
-		devicePath = waitForMultiPathToExist(devicePathList, 10, b.deviceUtil)
+		// Multipath volume was requested. Wait up to multipathDeviceTimeout seconds for the multipath device to appear.
+		devicePath = waitForMultiPathToExist(devicePathList, multipathDeviceTimeout, b.deviceUtil)
 	} else {
 		// For PVs with 1 portal, just try one time to find the multipath device. This
 		// avoids a long pause when the multipath device will never get created, and
@@ -614,7 +590,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	}
 
 	// if device is no longer used, see if need to logout the target
-	device, prefix, err := extractDeviceAndPrefix(mntPath)
+	device, _, err := extractDeviceAndPrefix(mntPath)
 	if err != nil {
 		return err
 	}
@@ -652,15 +628,14 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	c.plugin.targetLocks.LockKey(iqn)
 	defer c.plugin.targetLocks.UnlockKey(iqn)
 
-	// if device is no longer used, see if need to logout the target
-	refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
-	if err != nil || refCount != 0 {
-		return nil
-	}
-
 	portals := removeDuplicate(bkpPortal)
 	if len(portals) == 0 {
 		return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations")
+	}
+
+	// If device is no longer used, see if need to logout the target
+	if isSessionBusy(c.iscsiDisk.plugin.host, portals[0], iqn) {
+		return nil
 	}
 
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
@@ -720,10 +695,16 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if _, err = os.Stat(devicePath); err != nil {
 		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
 	}
-	// check if the dev is using mpio and if so mount it via the dm-XX device
-	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
-		devicePath = mappedDevicePath
+
+	// Lock the target while we determine if we can safely log out or not
+	c.plugin.targetLocks.LockKey(iqn)
+	defer c.plugin.targetLocks.UnlockKey(iqn)
+
+	// If device is no longer used, see if need to logout the target
+	if isSessionBusy(c.iscsiDisk.plugin.host, portals[0], iqn) {
+		return nil
 	}
+
 	// Detach a volume from kubelet node
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
 	if err != nil {
@@ -858,10 +839,13 @@ func parseIscsiadmShow(output string) (map[string]string, error) {
 	return params, nil
 }
 
-func cloneIface(b iscsiDiskMounter, newIface string) error {
+func cloneIface(b iscsiDiskMounter) error {
 	var lastErr error
+	if b.InitIface == b.Iface {
+		return fmt.Errorf("iscsi: cannot clone iface with same name: %s", b.InitIface)
+	}
 	// get pre-configured iface records
-	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "show")
+	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
 		lastErr = fmt.Errorf("iscsi: failed to show iface records: %s (%v)", string(out), err)
 		return lastErr
@@ -875,11 +859,11 @@ func cloneIface(b iscsiDiskMounter, newIface string) error {
 	// update initiatorname
 	params["iface.initiatorname"] = b.InitiatorName
 	// create new iface
-	out, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "new")
+	out, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "new")
 	if err != nil {
 		exit, ok := err.(utilexec.ExitError)
 		if ok && exit.ExitStatus() == iscsiadmErrorSessExists {
-			klog.Infof("iscsi: there is a session already logged in with iface %s", newIface)
+			klog.Infof("iscsi: there is a session already logged in with iface %s", b.Iface)
 		} else {
 			lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", string(out), err)
 			return lastErr
@@ -887,12 +871,65 @@ func cloneIface(b iscsiDiskMounter, newIface string) error {
 	}
 	// update new iface records
 	for key, val := range params {
-		_, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "update", "-n", key, "-v", val)
+		_, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", val)
 		if err != nil {
-			b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "delete")
-			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.Iface)
+			b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
+			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.InitIface)
 			break
 		}
 	}
 	return lastErr
+}
+
+// isSessionBusy determines if the iSCSI session is busy by counting both FS and block volumes in use.
+func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
+	fsDir := host.GetPluginDir(iscsiPluginName)
+	countFS, err := getVolCount(fsDir, portal, iqn)
+	if err != nil {
+		klog.Errorf("iscsi: could not determine FS volumes in use: %v", err)
+		return true
+	}
+
+	blockDir := host.GetVolumeDevicePluginDir(iscsiPluginName)
+	countBlock, err := getVolCount(blockDir, portal, iqn)
+	if err != nil {
+		klog.Errorf("iscsi: could not determine block volumes in use: %v", err)
+		return true
+	}
+
+	return countFS+countBlock > 1
+}
+
+// getVolCount returns the number of volumes in use by the kubelet.
+// It does so by counting the number of directories prefixed by the given portal and IQN.
+func getVolCount(dir, portal, iqn string) (int, error) {
+	// The topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0
+	contents, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return 0, err
+	}
+
+	// Inside each iface dir, we look for volume dirs prefixed by the given
+	// portal + iqn, e.g., 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
+	var counter int
+	for _, c := range contents {
+		if !c.IsDir() || c.Name() == config.DefaultKubeletVolumeDevicesDirName {
+			continue
+		}
+
+		mounts, err := ioutil.ReadDir(filepath.Join(dir, c.Name()))
+		if err != nil {
+			return 0, err
+		}
+
+		for _, m := range mounts {
+			volumeMount := m.Name()
+			prefix := portal + "-" + iqn
+			if strings.HasPrefix(volumeMount, prefix) {
+				counter++
+			}
+		}
+	}
+
+	return counter, nil
 }

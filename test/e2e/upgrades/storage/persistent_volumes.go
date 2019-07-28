@@ -20,9 +20,10 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
@@ -57,7 +58,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 
 	ginkgo.By("Initializing PV source")
-	t.pvSource, _ = framework.CreateGCEVolume()
+	t.pvSource, _ = volume.CreateGCEVolume()
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix: "pv-upgrade",
 		PVSource:   *t.pvSource,
@@ -68,7 +69,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating the PV and PVC")
 	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.ExpectNoError(framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc))
 
 	ginkgo.By("Consuming the PV before upgrade")
@@ -90,7 +91,7 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
-		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
+		e2elog.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
 	}
 }
 

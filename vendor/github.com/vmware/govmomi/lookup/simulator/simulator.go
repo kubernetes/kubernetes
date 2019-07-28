@@ -29,7 +29,7 @@ var content = types.LookupServiceContent{
 	LookupService:                vim.ManagedObjectReference{Type: "LookupLookupService", Value: "lookupService"},
 	ServiceRegistration:          &vim.ManagedObjectReference{Type: "LookupServiceRegistration", Value: "ServiceRegistration"},
 	DeploymentInformationService: vim.ManagedObjectReference{Type: "LookupDeploymentInformationService", Value: "deploymentInformationService"},
-	L10n: vim.ManagedObjectReference{Type: "LookupL10n", Value: "l10n"},
+	L10n:                         vim.ManagedObjectReference{Type: "LookupL10n", Value: "l10n"},
 }
 
 func New() *simulator.Registry {
@@ -43,7 +43,7 @@ func New() *simulator.Registry {
 	})
 	r.Put(&ServiceRegistration{
 		ManagedObjectReference: *content.ServiceRegistration,
-		Info: registrationInfo(),
+		Info:                   registrationInfo(),
 	})
 
 	return r

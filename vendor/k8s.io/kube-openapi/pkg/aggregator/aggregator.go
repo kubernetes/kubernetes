@@ -26,6 +26,8 @@ import (
 	"k8s.io/kube-openapi/pkg/util"
 )
 
+const gvkKey = "x-kubernetes-group-version-kind"
+
 // usedDefinitionForSpec returns a map with all used definitions in the provided spec as keys and true as values.
 func usedDefinitionForSpec(root *spec.Swagger) map[string]bool {
 	usedDefinitions := map[string]bool{}
@@ -152,7 +154,7 @@ func MergeSpecs(dest, source *spec.Swagger) error {
 	return mergeSpecs(dest, source, true, false)
 }
 
-// mergeSpecs merged source into dest while resolving conflicts.
+// mergeSpecs merges source into dest while resolving conflicts.
 // The source is not mutated.
 func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConflicts bool) (err error) {
 	// Paths may be empty, due to [ACL constraints](http://goo.gl/8us55a#securityFiltering).
@@ -186,7 +188,7 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 	conflicts := false
 	for k, v := range source.Definitions {
 		v2, found := dest.Definitions[k]
-		if found && !reflect.DeepEqual(v, v2) {
+		if found && !deepEqualDefinitionsModuloGVKs(&v2, &v) {
 			if !renameModelConflicts {
 				return fmt.Errorf("model name conflict in merging OpenAPI spec: %s", k)
 			}
@@ -207,7 +209,12 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 			if usedNames[k] {
 				v2, found := dest.Definitions[k]
 				// Reuse model if they are exactly the same.
-				if found && reflect.DeepEqual(v, v2) {
+				if found && deepEqualDefinitionsModuloGVKs(&v2, &v) {
+					if gvks, found, err := mergedGVKs(&v2, &v); err != nil {
+						return err
+					} else if found {
+						v2.Extensions[gvkKey] = gvks
+					}
 					continue
 				}
 
@@ -218,8 +225,13 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 					i++
 					newName = fmt.Sprintf("%s_v%d", k, i)
 					v2, found = dest.Definitions[newName]
-					if found && reflect.DeepEqual(v, v2) {
+					if found && deepEqualDefinitionsModuloGVKs(&v2, &v) {
 						renames[k] = newName
+						if gvks, found, err := mergedGVKs(&v2, &v); err != nil {
+							return err
+						} else if found {
+							v2.Extensions[gvkKey] = gvks
+						}
 						continue OUTERLOOP
 					}
 				}
@@ -256,4 +268,97 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 		dest.Paths.Paths[k] = v
 	}
 	return nil
+}
+
+// deepEqualDefinitionsModuloGVKs compares s1 and s2, but ignores the x-kubernetes-group-version-kind extension.
+func deepEqualDefinitionsModuloGVKs(s1, s2 *spec.Schema) bool {
+	if s1 == nil {
+		return s2 == nil
+	} else if s2 == nil {
+		return false
+	}
+	if !reflect.DeepEqual(s1.Extensions, s2.Extensions) {
+		for k, v := range s1.Extensions {
+			if k == gvkKey {
+				continue
+			}
+			if !reflect.DeepEqual(v, s2.Extensions[k]) {
+				return false
+			}
+		}
+		len1 := len(s1.Extensions)
+		len2 := len(s2.Extensions)
+		if _, found := s1.Extensions[gvkKey]; found {
+			len1--
+		}
+		if _, found := s2.Extensions[gvkKey]; found {
+			len2--
+		}
+		if len1 != len2 {
+			return false
+		}
+
+		if s1.Extensions != nil {
+			shallowCopy := *s1
+			s1 = &shallowCopy
+			s1.Extensions = nil
+		}
+		if s2.Extensions != nil {
+			shallowCopy := *s2
+			s2 = &shallowCopy
+			s2.Extensions = nil
+		}
+	}
+
+	return reflect.DeepEqual(s1, s2)
+}
+
+// mergedGVKs merges the x-kubernetes-group-version-kind slices and returns the result, and whether
+// s1's x-kubernetes-group-version-kind slice was changed at all.
+func mergedGVKs(s1, s2 *spec.Schema) (interface{}, bool, error) {
+	gvk1, found1 := s1.Extensions[gvkKey]
+	gvk2, found2 := s2.Extensions[gvkKey]
+
+	if !found1 {
+		return gvk2, found2, nil
+	}
+	if !found2 {
+		return gvk1, false, nil
+	}
+
+	slice1, ok := gvk1.([]interface{})
+	if !ok {
+		return nil, false, fmt.Errorf("expected slice of GroupVersionKinds, got: %+v", slice1)
+	}
+	slice2, ok := gvk2.([]interface{})
+	if !ok {
+		return nil, false, fmt.Errorf("expected slice of GroupVersionKinds, got: %+v", slice2)
+	}
+
+	ret := make([]interface{}, len(slice1), len(slice1)+len(slice2))
+	copy(ret, slice1)
+	seen := make(map[string]bool, len(slice1))
+	for _, x := range slice1 {
+		gvk, ok := x.(map[string]interface{})
+		if !ok {
+			return nil, false, fmt.Errorf(`expected {"group": <group>, "kind": <kind>, "version": <version>}, got: %#v`, x)
+		}
+		k := fmt.Sprintf("%s/%s.%s", gvk["group"], gvk["version"], gvk["kind"])
+		seen[k] = true
+	}
+	changed := false
+	for _, x := range slice2 {
+		gvk, ok := x.(map[string]interface{})
+		if !ok {
+			return nil, false, fmt.Errorf(`expected {"group": <group>, "kind": <kind>, "version": <version>}, got: %#v`, x)
+		}
+		k := fmt.Sprintf("%s/%s.%s", gvk["group"], gvk["version"], gvk["kind"])
+		if seen[k] {
+			continue
+		}
+		ret = append(ret, x)
+		changed = true
+	}
+
+	return ret, changed, nil
 }

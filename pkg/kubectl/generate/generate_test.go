@@ -17,7 +17,9 @@ limitations under the License.
 package generate
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -265,6 +267,14 @@ func TestGetBool(t *testing.T) {
 	}
 }
 
+func makeLabels(labels map[string]string) string {
+	out := []string{}
+	for key, value := range labels {
+		out = append(out, fmt.Sprintf("%s=%s", key, value))
+	}
+	return strings.Join(out, ",")
+}
+
 func TestMakeParseLabels(t *testing.T) {
 	successCases := []struct {
 		name     string
@@ -294,7 +304,7 @@ func TestMakeParseLabels(t *testing.T) {
 	}
 	for _, tt := range successCases {
 		t.Run(tt.name, func(t *testing.T) {
-			labelString := MakeLabels(tt.labels)
+			labelString := makeLabels(tt.labels)
 			got, err := ParseLabels(labelString)
 			if err != nil {
 				t.Errorf("unexpected error :%v", err)

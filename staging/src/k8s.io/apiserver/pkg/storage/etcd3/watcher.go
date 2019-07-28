@@ -56,7 +56,13 @@ func testingDeferOnDecodeError() {
 
 func init() {
 	// check to see if we are running in a test environment
+	TestOnlySetFatalOnDecodeError(true)
 	fatalOnDecodeError, _ = strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
+}
+
+// TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
+func TestOnlySetFatalOnDecodeError(b bool) {
+	fatalOnDecodeError = b
 }
 
 type watcher struct {
@@ -210,7 +216,13 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			return
 		}
 		for _, e := range wres.Events {
-			wc.sendEvent(parseEvent(e))
+			parsedEvent, err := parseEvent(e)
+			if err != nil {
+				klog.Errorf("watch chan error: %v", err)
+				wc.sendError(err)
+				return
+			}
+			wc.sendEvent(parsedEvent)
 		}
 	}
 	// When we come to this point, it's only possible that client side ends the watch.

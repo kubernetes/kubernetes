@@ -150,8 +150,7 @@ func Convert_autoscaling_PodsMetricSource_To_v1_PodsMetricSource(in *autoscaling
 }
 
 func Convert_v1_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autoscalingv1.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
-	var metricType autoscaling.MetricTargetType
-	metricType = autoscaling.AverageValueMetricType
+	metricType := autoscaling.AverageValueMetricType
 
 	out.Target = autoscaling.MetricTarget{
 		Type:         metricType,
@@ -327,10 +326,8 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 || len(currentConditions) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old)+3)
-		if old != nil {
-			for k, v := range old {
-				out.Annotations[k] = v
-			}
+		for k, v := range old {
+			out.Annotations[k] = v
 		}
 	}
 

@@ -6,11 +6,6 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/cloud.google.com/go/compute/metadata",
     importpath = "cloud.google.com/go/compute/metadata",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/cloud.google.com/go/internal:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
-    ],
 )
 
 filegroup(

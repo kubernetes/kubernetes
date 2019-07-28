@@ -126,7 +126,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
-			klog.V(2).Info("Error removing mountpoint ", volPath, ": ", err)
+			klog.V(2).Infof("Error removing mountpoint %s: %v", volPath, err)
 			return err
 		}
 	}

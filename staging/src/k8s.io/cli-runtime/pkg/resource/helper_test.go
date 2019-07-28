@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest/fake"
 
 	// TODO we need to remove this linkage and create our own scheme
@@ -305,7 +304,7 @@ func TestHelperGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -386,7 +385,7 @@ func TestHelperList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -597,7 +596,7 @@ func TestHelperReplace(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Client:               tt.HTTPClient,
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,

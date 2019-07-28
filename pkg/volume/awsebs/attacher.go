@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -27,10 +29,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/aws"
 )
 
 type awsElasticBlockStoreAttacher struct {
@@ -175,15 +177,14 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 	for {
 		select {
 		case <-ticker.C:
-			klog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
-			devicePaths := getDiskByIDPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
-			path, err := verifyDevicePath(devicePaths)
+			klog.V(5).Infof("Checking AWS Volume %q is attached at devicePath %q.", volumeID, devicePath)
+			path, err := attacher.getDevicePath(volumeSource.VolumeID, partition, devicePath)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
-				klog.Errorf("Error verifying AWS Volume (%q) is attached: %v", volumeID, err)
+				klog.Errorf("Error verifying AWS Volume (%q) is attached at devicePath %q: %v", volumeID, devicePath, err)
 			} else if path != "" {
 				// A device path has successfully been created for the PD
-				klog.Infof("Successfully found attached AWS Volume %q.", volumeID)
+				klog.Infof("Successfully found attached AWS Volume %q at path %q.", volumeID, path)
 				return path, nil
 			}
 		case <-timer.C:
@@ -208,8 +209,17 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				return err
+			dir := deviceMountPath
+			if runtime.GOOS == "windows" {
+				// On Windows, FormatAndMount will mklink (create a symbolic link) at deviceMountPath later, so don't create a
+				// directory at deviceMountPath now. Otherwise mklink will error: "Cannot create a file when that file already exists".
+				// Instead, create the parent of deviceMountPath. For example when deviceMountPath is:
+				// C:\var\lib\kubelet\plugins\kubernetes.io\aws-ebs\mounts\aws\us-west-2b\vol-xxx
+				// create us-west-2b. FormatAndMount will make vol-xxx a symlink to the drive (e.g. D:\)
+				dir = filepath.Dir(deviceMountPath)
+			}
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				return fmt.Errorf("making dir %s failed with %s", dir, err)
 			}
 			notMnt = true
 		} else {
@@ -277,8 +287,12 @@ func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath stri
 	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
-func (plugin *awsElasticBlockStorePlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *awsElasticBlockStorePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func setNodeDisk(

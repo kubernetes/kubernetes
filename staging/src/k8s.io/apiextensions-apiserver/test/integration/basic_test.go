@@ -310,6 +310,65 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 	}
 }
 
+func TestInvalidCRUD(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuResourceClients := map[string]dynamic.ResourceInterface{}
+	noxuWatchs := map[string]watch.Interface{}
+	disabledVersions := map[string]bool{}
+	for _, v := range noxuDefinition.Spec.Versions {
+		disabledVersions[v.Name] = !v.Served
+	}
+	for _, v := range noxuDefinition.Spec.Versions {
+		noxuResourceClients[v.Name] = newNamespacedCustomResourceVersionedClient("", dynamicClient, noxuDefinition, v.Name)
+
+		noxuWatch, err := noxuResourceClients[v.Name].Watch(metav1.ListOptions{})
+		if disabledVersions[v.Name] {
+			if !errors.IsNotFound(err) {
+				t.Errorf("expected the watch operation fail with NotFound for disabled version %s, got error: %v", v.Name, err)
+			}
+		} else {
+			if err != nil {
+				t.Fatal(err)
+			}
+			noxuWatchs[v.Name] = noxuWatch
+		}
+	}
+	defer func() {
+		for _, w := range noxuWatchs {
+			w.Stop()
+		}
+	}()
+
+	for version, noxuResourceClient := range noxuResourceClients {
+		// Case when typeless Unstructured object is passed
+		typelessInstance := &unstructured.Unstructured{}
+		if _, err := noxuResourceClient.Create(typelessInstance, metav1.CreateOptions{}); !errors.IsBadRequest(err) {
+			t.Errorf("expected badrequest for submitting empty object, got %#v", err)
+		}
+		// Case when apiVersion and Kind would be set up from GVK, but no other objects are present
+		typedNoBodyInstance := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "mygroup.example.com/" + version,
+				"kind":       "WishIHadChosenNoxu",
+			},
+		}
+		if _, err := noxuResourceClient.Create(typedNoBodyInstance, metav1.CreateOptions{}); !errors.IsInvalid(err) {
+			t.Errorf("expected invalid request for submitting malformed object, got %#v", err)
+		}
+	}
+}
+
 func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {
 	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})

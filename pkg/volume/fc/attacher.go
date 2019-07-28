@@ -175,8 +175,12 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func (plugin *fcPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *fcPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *fcPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMounter, error) {

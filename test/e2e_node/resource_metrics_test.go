@@ -21,9 +21,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
+	kubeletresourcemetricsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/prometheus/common/model"
 
@@ -74,7 +76,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 					"": boundedSample(1, 1E6),
 				}),
 				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeId, gstruct.Elements{
-					"": boundedSample(10*framework.Mb, memoryLimit),
+					"": boundedSample(10*volume.Mb, memoryLimit),
 				}),
 
 				"container_cpu_usage_seconds_total": gstruct.MatchElements(containerId, gstruct.IgnoreExtras, gstruct.Elements{
@@ -83,8 +85,8 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				}),
 
 				"container_memory_working_set_bytes": gstruct.MatchAllElements(containerId, gstruct.Elements{
-					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*framework.Kb, 80*framework.Mb),
-					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*framework.Kb, 80*framework.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
 				}),
 			})
 			By("Giving pods a minute to start up and produce metrics")
@@ -100,7 +102,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
 			By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -109,7 +111,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 })
 
 func getV1alpha1ResourceMetrics() (metrics.KubeletMetrics, error) {
-	return metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+v1alpha1.Version)
+	return metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+kubeletresourcemetricsv1alpha1.Version)
 }
 
 func nodeId(element interface{}) string {

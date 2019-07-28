@@ -17,14 +17,13 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -66,12 +65,6 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
-}
-
-func featureToggle(feature utilfeature.Feature) []string {
-	enabled := fmt.Sprintf("%s=%t", feature, true)
-	disabled := fmt.Sprintf("%s=%t", feature, false)
-	return []string{enabled, disabled}
 }
 
 func TestValidateJob(t *testing.T) {
@@ -225,7 +218,7 @@ func TestValidateJob(t *testing.T) {
 	}
 
 	for _, setFeature := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, setFeature)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, setFeature)()
 		ttlCase := "spec.ttlSecondsAfterFinished:must be greater than or equal to 0"
 		if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 			errorCases[ttlCase] = batch.Job{

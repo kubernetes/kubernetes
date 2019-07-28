@@ -1,11 +1,11 @@
 /*
-Copyright (c) 2011, Open Knowledge Foundation Ltd.
-All rights reserved.
-
 HTTP Content-Type Autonegotiation.
 
 The functions in this package implement the behaviour specified in
 http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+
+Copyright (c) 2011, Open Knowledge Foundation Ltd.
+All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are

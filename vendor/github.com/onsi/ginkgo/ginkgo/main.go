@@ -50,6 +50,10 @@ By default, when running multiple tests (with -r or a list of packages) Ginkgo w
 
 	ginkgo -keepGoing
 
+To fail if there are ginkgo tests in a directory but no test suite (missing `RunSpecs`)
+
+	ginkgo -requireSuite
+
 To monitor packages and rerun tests when changes occur:
 
 	ginkgo watch <-r> </path/to/package>

@@ -26,6 +26,11 @@ import (
 type ConversionStrategyType string
 
 const (
+	// KubeAPIApprovedAnnotation is an annotation that must be set to create a CRD for the k8s.io, *.k8s.io, kubernetes.io, or *.kubernetes.io namespaces.
+	// The value should be a link to a URL where the current spec was approved, so updates to the spec should also update the URL.
+	// If the API is unapproved, you may set the annotation to a string starting with `"unapproved"`.  For instance, `"unapproved, temporarily squatting"` or `"unapproved, experimental-only"`.  This is discouraged.
+	KubeAPIApprovedAnnotation = "api-approved.kubernetes.io"
+
 	// NoneConverter is a converter that only sets apiversion of the CR and leave everything else unchanged.
 	NoneConverter ConversionStrategyType = "None"
 	// WebhookConverter is a converter that calls to an external webhook to convert the CR.
@@ -78,13 +83,20 @@ type CustomResourceDefinitionSpec struct {
 	// `conversion` defines conversion settings for the CRD.
 	// +optional
 	Conversion *CustomResourceConversion `json:"conversion,omitempty" protobuf:"bytes,9,opt,name=conversion"`
+
+	// preserveUnknownFields disables pruning of object fields which are not
+	// specified in the OpenAPI schema. apiVersion, kind, metadata and known
+	// fields inside metadata are always preserved.
+	// Defaults to true in v1beta and will default to false in v1.
+	PreserveUnknownFields *bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.
 type CustomResourceConversion struct {
 	// `strategy` specifies the conversion strategy. Allowed values are:
 	// - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
-	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information is needed for this option.
+	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
+	//   is needed for this option. This requires spec.preserveUnknownFields to be false.
 	Strategy ConversionStrategyType `json:"strategy" protobuf:"bytes,1,name=strategy"`
 
 	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`. This field is
@@ -140,8 +152,6 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// Port 443 will be used if it is open, otherwise it is an error.
-	//
 	// +optional
 	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
@@ -164,6 +174,12 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
+
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }
 
 // CustomResourceDefinitionVersion describes a version for CRD.
@@ -275,13 +291,34 @@ const (
 	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
 	// the group and are therefore accepted.
 	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
+	// NonStructuralSchema means that one or more OpenAPI schema is not structural.
+	//
+	// A schema is structural if it specifies types for all values, with the only exceptions of those with
+	// - x-kubernetes-int-or-string: true — for fields which can be integer or string
+	// - x-kubernetes-preserve-unknown-fields: true — for raw, unspecified JSON values
+	// and there is no type, additionalProperties, default, nullable or x-kubernetes-* vendor extenions
+	// specified under allOf, anyOf, oneOf or not.
+	//
+	// Non-structural schemas will not be allowed anymore in v1 API groups. Moreover, new features will not be
+	// available for non-structural CRDs:
+	// - pruning
+	// - defaulting
+	// - read-only
+	// - OpenAPI publishing
+	// - webhook conversion
+	NonStructuralSchema CustomResourceDefinitionConditionType = "NonStructuralSchema"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
+	// KubernetesAPIApprovalPolicyConformant indicates that an API in *.k8s.io or *.kubernetes.io is or is not approved.  For CRDs
+	// outside those groups, this condition will not be set.  For CRDs inside those groups, the condition will
+	// be true if .metadata.annotations["api-approved.kubernetes.io"] is set to a URL, otherwise it will be false.
+	// See https://github.com/kubernetes/enhancements/pull/1111 for more details.
+	KubernetesAPIApprovalPolicyConformant CustomResourceDefinitionConditionType = "KubernetesAPIApprovalPolicyConformant"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// Type is the type of the condition.
+	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=CustomResourceDefinitionConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -386,8 +423,11 @@ type CustomResourceSubresourceScale struct {
 	StatusReplicasPath string `json:"statusReplicasPath" protobuf:"bytes,2,opt,name=statusReplicasPath"`
 	// LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
 	// Only JSON paths without the array notation are allowed.
-	// Must be a JSON Path under .status.
+	// Must be a JSON Path under .status or .spec.
 	// Must be set to work with HPA.
+	// The field pointed by this JSON path must be a string field (not a complex selector struct)
+	// which contains a serialized label selector in string form.
+	// More info: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions#scale-subresource
 	// If there is no value under the given path in the CustomResource, the status label selector value in the /scale
 	// subresource will default to the empty string.
 	// +optional
@@ -423,11 +463,12 @@ type ConversionRequest struct {
 // ConversionResponse describes a conversion response.
 type ConversionResponse struct {
 	// `uid` is an identifier for the individual request/response.
-	// This should be copied over from the corresponding AdmissionRequest.
+	// This should be copied over from the corresponding ConversionRequest.
 	UID types.UID `json:"uid" protobuf:"bytes,1,name=uid"`
 	// `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
 	// The webhook is expected to set apiVersion of these objects to the ConversionRequest.desiredAPIVersion. The list
-	// must also has the same size as input list with the same objects in the same order(i.e. equal UIDs and object meta)
+	// must also have the same size as the input list with the same objects in the same order (equal kind, UID, name and namespace).
+	// The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
 	ConvertedObjects []runtime.RawExtension `json:"convertedObjects" protobuf:"bytes,2,rep,name=convertedObjects"`
 	// `result` contains the result of conversion with extra details if the conversion failed. `result.status` determines if
 	// the conversion failed or succeeded. The `result.status` field is required and represent the success or failure of the

@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -42,7 +44,6 @@ const cassandraManifestPath = "test/e2e/testing-manifests/statefulset/cassandra"
 type CassandraUpgradeTest struct {
 	ip               string
 	successfulWrites int
-	ssTester         *framework.StatefulSetTester
 }
 
 // Name returns the tracking name of the test.
@@ -73,13 +74,12 @@ func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
-	t.ssTester = framework.NewStatefulSetTester(f.ClientSet)
 
 	ginkgo.By("Creating a PDB")
 	cassandraKubectlCreate(ns, "pdb.yaml")
 
 	ginkgo.By("Creating a Cassandra StatefulSet")
-	t.ssTester.CreateStatefulSet(cassandraManifestPath, ns)
+	e2esset.CreateStatefulSet(f.ClientSet, cassandraManifestPath, ns)
 
 	ginkgo.By("Creating a cassandra-test-server deployment")
 	cassandraKubectlCreate(ns, "tester.yaml")
@@ -90,23 +90,25 @@ func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.listUsers(); err != nil {
-			framework.Logf("Service endpoint is up but isn't responding")
+			e2elog.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	framework.Logf("Service endpoint is up")
+	framework.ExpectNoError(err)
+	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 dummy users")
-	gomega.Expect(t.addUser("Alice")).NotTo(gomega.HaveOccurred())
-	gomega.Expect(t.addUser("Bob")).NotTo(gomega.HaveOccurred())
+	err = t.addUser("Alice")
+	framework.ExpectNoError(err)
+	err = t.addUser("Bob")
+	framework.ExpectNoError(err)
 	t.successfulWrites = 2
 
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	gomega.Expect(len(users)).To(gomega.Equal(2))
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(len(users), 2)
 }
 
 // listUsers gets a list of users from the db via the tester service.
@@ -151,7 +153,7 @@ func (t *CassandraUpgradeTest) addUser(name string) error {
 // getServiceIP is a helper method to extract the Ingress IP from the service.
 func (t *CassandraUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -175,7 +177,7 @@ func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	go wait.Until(func() {
 		writeAttempts++
 		if err := t.addUser(fmt.Sprintf("user-%d", writeAttempts)); err != nil {
-			framework.Logf("Unable to add user: %v", err)
+			e2elog.Logf("Unable to add user: %v", err)
 			mu.Lock()
 			errors[err.Error()]++
 			mu.Unlock()
@@ -187,7 +189,7 @@ func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	wait.Until(func() {
 		users, err := t.listUsers()
 		if err != nil {
-			framework.Logf("Could not retrieve users: %v", err)
+			e2elog.Logf("Could not retrieve users: %v", err)
 			failures++
 			mu.Lock()
 			errors[err.Error()]++
@@ -197,14 +199,14 @@ func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 		success++
 		lastUserCount = len(users)
 	}, 10*time.Millisecond, done)
-	framework.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
+	e2elog.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
 
 	gomega.Expect(lastUserCount >= t.successfulWrites).To(gomega.BeTrue())
 	ratio := float64(success) / float64(success+failures)
-	framework.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
+	e2elog.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
 	ratio = float64(t.successfulWrites) / float64(writeAttempts)
-	framework.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
-	framework.Logf("Errors: %v", errors)
+	e2elog.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
+	e2elog.Logf("Errors: %v", errors)
 	// TODO(maisem): tweak this value once we have a few test runs.
 	gomega.Expect(ratio > 0.75).To(gomega.BeTrue())
 }
@@ -212,6 +214,6 @@ func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 // Teardown does one final check of the data's availability.
 func (t *CassandraUpgradeTest) Teardown(f *framework.Framework) {
 	users, err := t.listUsers()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(users) >= t.successfulWrites).To(gomega.BeTrue())
 }

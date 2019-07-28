@@ -19,7 +19,7 @@ package cinder
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -64,7 +64,7 @@ type fakePDManager struct {
 }
 
 func getFakeDeviceName(host volume.VolumeHost, pdName string) string {
-	return path.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
+	return filepath.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
 }
 
 // Real Cinder AttachDisk attaches a cinder volume. If it is not yet mounted,
@@ -160,13 +160,13 @@ func TestPlugin(t *testing.T) {
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cinder/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cinder/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -317,6 +317,7 @@ func getOpenstackConfig() openstack.Config {
 			CAFile          string `gcfg:"ca-file"`
 			SecretName      string `gcfg:"secret-name"`
 			SecretNamespace string `gcfg:"secret-namespace"`
+			KubeconfigPath  string `gcfg:"kubeconfig-path"`
 		}{
 			Username:   "user",
 			Password:   "pass",

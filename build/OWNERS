@@ -3,15 +3,15 @@
 reviewers:
   - bentheelder
   - cblecker
-  - ixdy
-  - jbeda
+  - fejta
   - lavalamp
   - spiffxp
-  - zmerlynn
 approvers:
+  - bentheelder
   - cblecker
-  - ixdy
-  - jbeda
+  - fejta
   - lavalamp
-  - zmerlynn
   - mikedanese
+emeritus_approvers:
+  - jbeda
+  - zmerlynn

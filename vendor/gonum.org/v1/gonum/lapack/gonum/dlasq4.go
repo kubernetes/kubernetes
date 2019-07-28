@@ -12,6 +12,17 @@ import "math"
 //
 // Dlasq4 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlasq4(i0, n0 int, z []float64, pp int, n0in int, dmin, dmin1, dmin2, dn, dn1, dn2, tau float64, ttype int, g float64) (tauOut float64, ttypeOut int, gOut float64) {
+	switch {
+	case i0 < 0:
+		panic(i0LT0)
+	case n0 < 0:
+		panic(n0LT0)
+	case len(z) < 4*n0:
+		panic(shortZ)
+	case pp != 0 && pp != 1:
+		panic(badPp)
+	}
+
 	const (
 		cnst1 = 0.563
 		cnst2 = 1.01

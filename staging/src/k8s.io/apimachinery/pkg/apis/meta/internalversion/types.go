@@ -35,6 +35,15 @@ type ListOptions struct {
 	FieldSelector fields.Selector
 	// If true, watch for changes to this list
 	Watch bool
+	// allowWatchBookmarks requests watch events with type "BOOKMARK".
+	// Servers that do not implement bookmarks may ignore this flag and
+	// bookmarks are sent at the server's discretion. Clients should not
+	// assume bookmarks are returned at any specific interval, nor may they
+	// assume the server will send any BOOKMARK event during a session.
+	// If this is not a watch, this field is ignored.
+	// If the feature gate WatchBookmarks is not enabled in apiserver,
+	// this field is ignored.
+	AllowWatchBookmarks bool
 	// When specified with a watch call, shows changes that occur after that particular version of a resource.
 	// Defaults to changes from the beginning of history.
 	// When specified for list:

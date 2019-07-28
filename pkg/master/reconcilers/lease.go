@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -106,7 +107,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 
 // RemoveLease removes the lease on a master IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
-	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &corev1.Endpoints{}, nil)
+	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc)
 }
 
 // NewLeases creates a new etcd-based Leases implementation.

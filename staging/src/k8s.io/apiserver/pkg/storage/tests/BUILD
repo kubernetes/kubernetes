@@ -1,15 +1,10 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "go_default_test",
     srcs = ["cacher_test.go"],
-    embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/apitesting:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -26,22 +21,16 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/cacher:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
     ],
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["utils.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/tests",
-    importpath = "k8s.io/apiserver/pkg/storage/tests",
-    deps = ["//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library"],
 )
 
 filegroup(

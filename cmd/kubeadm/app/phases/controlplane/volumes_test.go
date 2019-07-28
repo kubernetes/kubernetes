@@ -30,14 +30,14 @@ import (
 
 func TestGetEtcdCertVolumes(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	k8sCertifcatesDir := "/etc/kubernetes/pki"
+	k8sCertificatesDir := "/etc/kubernetes/pki"
 	var tests = []struct {
-		ca, cert, key string
-		vol           []v1.Volume
-		volMount      []v1.VolumeMount
+		name, ca, cert, key string
+		vol                 []v1.Volume
+		volMount            []v1.VolumeMount
 	}{
 		{
-			// Should ignore files in /etc/ssl/certs
+			name:     "Should ignore files in /etc/ssl/certs",
 			ca:       "/etc/ssl/certs/my-etcd-ca.crt",
 			cert:     "/etc/ssl/certs/my-etcd.crt",
 			key:      "/etc/ssl/certs/my-etcd.key",
@@ -45,7 +45,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			volMount: []v1.VolumeMount{},
 		},
 		{
-			// Should ignore files in subdirs of /etc/ssl/certs
+			name:     "Should ignore files in subdirs of /etc/ssl/certs",
 			ca:       "/etc/ssl/certs/etcd/my-etcd-ca.crt",
 			cert:     "/etc/ssl/certs/etcd/my-etcd.crt",
 			key:      "/etc/ssl/certs/etcd/my-etcd.key",
@@ -53,7 +53,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			volMount: []v1.VolumeMount{},
 		},
 		{
-			// Should ignore files in /etc/pki
+			name:     "Should ignore files in /etc/pki",
 			ca:       "/etc/pki/my-etcd-ca.crt",
 			cert:     "/etc/pki/my-etcd.crt",
 			key:      "/etc/pki/my-etcd.key",
@@ -61,15 +61,15 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			volMount: []v1.VolumeMount{},
 		},
 		{
-			// Should ignore files in Kubernetes PKI directory (and subdirs)
-			ca:       k8sCertifcatesDir + "/ca/my-etcd-ca.crt",
-			cert:     k8sCertifcatesDir + "/my-etcd.crt",
-			key:      k8sCertifcatesDir + "/my-etcd.key",
+			name:     "Should ignore files in Kubernetes PKI directory (and subdirs)",
+			ca:       k8sCertificatesDir + "/ca/my-etcd-ca.crt",
+			cert:     k8sCertificatesDir + "/my-etcd.crt",
+			key:      k8sCertificatesDir + "/my-etcd.key",
 			vol:      []v1.Volume{},
 			volMount: []v1.VolumeMount{},
 		},
 		{
-			// All in the same dir
+			name: "All certs are in the same dir",
 			ca:   "/var/lib/certs/etcd/my-etcd-ca.crt",
 			cert: "/var/lib/certs/etcd/my-etcd.crt",
 			key:  "/var/lib/certs/etcd/my-etcd.key",
@@ -93,7 +93,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			},
 		},
 		{
-			// One file + two files in separate dirs
+			name: "One file + two files in separate dirs",
 			ca:   "/etc/certs/etcd/my-etcd-ca.crt",
 			cert: "/var/lib/certs/etcd/my-etcd.crt",
 			key:  "/var/lib/certs/etcd/my-etcd.key",
@@ -131,7 +131,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			},
 		},
 		{
-			// All three files in different directories
+			name: "All three files in different directories",
 			ca:   "/etc/certs/etcd/my-etcd-ca.crt",
 			cert: "/var/lib/certs/etcd/my-etcd.crt",
 			key:  "/var/lib/certs/private/my-etcd.key",
@@ -183,7 +183,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			},
 		},
 		{
-			// The most top-level dir should be used
+			name: "The most top-level dir should be used",
 			ca:   "/etc/certs/etcd/my-etcd-ca.crt",
 			cert: "/etc/certs/etcd/serving/my-etcd.crt",
 			key:  "/etc/certs/etcd/serving/my-etcd.key",
@@ -207,7 +207,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			},
 		},
 		{
-			// The most top-level dir should be used, regardless of order
+			name: "The most top-level dir should be used, regardless of order",
 			ca:   "/etc/certs/etcd/ca/my-etcd-ca.crt",
 			cert: "/etc/certs/etcd/my-etcd.crt",
 			key:  "/etc/certs/etcd/my-etcd.key",
@@ -233,25 +233,27 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualVol, actualVolMount := getEtcdCertVolumes(&kubeadmapi.ExternalEtcd{
-			CAFile:   rt.ca,
-			CertFile: rt.cert,
-			KeyFile:  rt.key,
-		}, k8sCertifcatesDir)
-		if !reflect.DeepEqual(actualVol, rt.vol) {
-			t.Errorf(
-				"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
-				rt.vol,
-				actualVol,
-			)
-		}
-		if !reflect.DeepEqual(actualVolMount, rt.volMount) {
-			t.Errorf(
-				"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
-				rt.volMount,
-				actualVolMount,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actualVol, actualVolMount := getEtcdCertVolumes(&kubeadmapi.ExternalEtcd{
+				CAFile:   rt.ca,
+				CertFile: rt.cert,
+				KeyFile:  rt.key,
+			}, k8sCertificatesDir)
+			if !reflect.DeepEqual(actualVol, rt.vol) {
+				t.Errorf(
+					"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
+					rt.vol,
+					actualVol,
+				)
+			}
+			if !reflect.DeepEqual(actualVolMount, rt.volMount) {
+				t.Errorf(
+					"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
+					rt.volMount,
+					actualVolMount,
+				)
+			}
+		})
 	}
 }
 
@@ -472,12 +474,13 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		ReadOnly:  true,
 	}
 	var tests = []struct {
+		name     string
 		cfg      *kubeadmapi.ClusterConfiguration
 		vol      map[string]map[string]v1.Volume
 		volMount map[string]map[string]v1.VolumeMount
 	}{
 		{
-			// Should ignore files in /etc/ssl/certs
+			name: "Should ignore files in /etc/ssl/certs",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd:            kubeadmapi.Etcd{},
@@ -486,7 +489,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			volMount: volMountMap,
 		},
 		{
-			// Should ignore files in /etc/ssl/certs and in CertificatesDir
+			name: "Should ignore files in /etc/ssl/certs and in CertificatesDir",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
@@ -514,29 +517,27 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
-		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
+		t.Run(rt.name, func(t *testing.T) {
+			mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
 
-		// Avoid unit test errors when the flexvolume is mounted
-		if _, ok := mounts.volumes[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
+			// Avoid unit test errors when the flexvolume is mounted
 			delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
-		}
-		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
 			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
-		}
-		if !reflect.DeepEqual(mounts.volumes, rt.vol) {
-			t.Errorf(
-				"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
-				rt.vol,
-				mounts.volumes,
-			)
-		}
-		if !reflect.DeepEqual(mounts.volumeMounts, rt.volMount) {
-			t.Errorf(
-				"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
-				rt.volMount,
-				mounts.volumeMounts,
-			)
-		}
+			if !reflect.DeepEqual(mounts.volumes, rt.vol) {
+				t.Errorf(
+					"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
+					rt.vol,
+					mounts.volumes,
+				)
+			}
+			if !reflect.DeepEqual(mounts.volumeMounts, rt.volMount) {
+				t.Errorf(
+					"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
+					rt.volMount,
+					mounts.volumeMounts,
+				)
+			}
+		})
 	}
 }
 
@@ -609,32 +610,34 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 	}
 	mounts.AddExtraHostPathMounts("component", hostPathMounts)
 	for _, hostMount := range hostPathMounts {
-		volumeName := hostMount.Name
-		if _, ok := mounts.volumes["component"][volumeName]; !ok {
-			t.Errorf("Expected to find volume %q", volumeName)
-		}
-		vol := mounts.volumes["component"][volumeName]
-		if vol.Name != volumeName {
-			t.Errorf("Expected volume name %q", volumeName)
-		}
-		if vol.HostPath.Path != hostMount.HostPath {
-			t.Errorf("Expected host path %q", hostMount.HostPath)
-		}
-		if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
-			t.Errorf("Expected to find volume mount %q", volumeName)
-		}
-		if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
-			t.Errorf("Expected to host path type %q", hostMount.PathType)
-		}
-		volMount, _ := mounts.volumeMounts["component"][volumeName]
-		if volMount.Name != volumeName {
-			t.Errorf("Expected volume mount name %q", volumeName)
-		}
-		if volMount.MountPath != hostMount.MountPath {
-			t.Errorf("Expected container path %q", hostMount.MountPath)
-		}
-		if volMount.ReadOnly != hostMount.ReadOnly {
-			t.Errorf("Expected volume readOnly setting %t", hostMount.ReadOnly)
-		}
+		t.Run(hostMount.Name, func(t *testing.T) {
+			volumeName := hostMount.Name
+			if _, ok := mounts.volumes["component"][volumeName]; !ok {
+				t.Errorf("Expected to find volume %q", volumeName)
+			}
+			vol := mounts.volumes["component"][volumeName]
+			if vol.Name != volumeName {
+				t.Errorf("Expected volume name %q", volumeName)
+			}
+			if vol.HostPath.Path != hostMount.HostPath {
+				t.Errorf("Expected host path %q", hostMount.HostPath)
+			}
+			if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
+				t.Errorf("Expected to find volume mount %q", volumeName)
+			}
+			if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
+				t.Errorf("Expected to host path type %q", hostMount.PathType)
+			}
+			volMount := mounts.volumeMounts["component"][volumeName]
+			if volMount.Name != volumeName {
+				t.Errorf("Expected volume mount name %q", volumeName)
+			}
+			if volMount.MountPath != hostMount.MountPath {
+				t.Errorf("Expected container path %q", hostMount.MountPath)
+			}
+			if volMount.ReadOnly != hostMount.ReadOnly {
+				t.Errorf("Expected volume readOnly setting %t", hostMount.ReadOnly)
+			}
+		})
 	}
 }

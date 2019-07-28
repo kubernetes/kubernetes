@@ -21,6 +21,4 @@ const (
 	kubeSystemNamespace = "kube-system"
 
 	anonymousUser = "system:anonymous"
-
-	nodesGroup = "system:nodes"
 )

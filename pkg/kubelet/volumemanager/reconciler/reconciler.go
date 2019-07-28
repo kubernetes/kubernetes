@@ -87,6 +87,7 @@ type Reconciler interface {
 //   safely (prevents more than one operation from being triggered on the same
 //   volume)
 // mounter - mounter passed in from kubelet, passed down unmount path
+// hostutil - hostutil passed in from kubelet
 // volumePluginMgr - volume plugin manager passed from kubelet
 func NewReconciler(
 	kubeClient clientset.Interface,
@@ -99,6 +100,7 @@ func NewReconciler(
 	populatorHasAddedPods func() bool,
 	operationExecutor operationexecutor.OperationExecutor,
 	mounter mount.Interface,
+	hostutil mount.HostUtils,
 	volumePluginMgr *volumepkg.VolumePluginMgr,
 	kubeletPodsDir string) Reconciler {
 	return &reconciler{
@@ -112,6 +114,7 @@ func NewReconciler(
 		populatorHasAddedPods:         populatorHasAddedPods,
 		operationExecutor:             operationExecutor,
 		mounter:                       mounter,
+		hostutil:                      hostutil,
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
 		timeOfLastSync:                time.Time{},
@@ -130,6 +133,7 @@ type reconciler struct {
 	populatorHasAddedPods         func() bool
 	operationExecutor             operationexecutor.OperationExecutor
 	mounter                       mount.Interface
+	hostutil                      mount.HostUtils
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	kubeletPodsDir                string
 	timeOfLastSync                time.Time
@@ -252,8 +256,8 @@ func (rc *reconciler) reconcile() {
 			}
 		} else if cache.IsFSResizeRequiredError(err) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
-			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandVolumeFSWithoutUnmounting", ""))
-			err := rc.operationExecutor.ExpandVolumeFSWithoutUnmounting(
+			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandInUseVolume", ""))
+			err := rc.operationExecutor.ExpandInUseVolume(
 				volumeToMount.VolumeToMount,
 				rc.actualStateOfWorld)
 			if err != nil &&
@@ -261,10 +265,10 @@ func (rc *reconciler) reconcile() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				klog.Errorf(volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandVolumeFSWithoutUnmounting failed", err).Error())
+				klog.Errorf(volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandInUseVolume failed", err).Error())
 			}
 			if err == nil {
-				klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.ExpandVolumeFSWithoutUnmounting started", ""))
+				klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.ExpandInUseVolume started", ""))
 			}
 		}
 	}
@@ -278,7 +282,7 @@ func (rc *reconciler) reconcile() {
 				// Volume is globally mounted to device, unmount it
 				klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
 				err := rc.operationExecutor.UnmountDevice(
-					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
+					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.hostutil)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {

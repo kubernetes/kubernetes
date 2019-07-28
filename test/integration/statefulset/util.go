@@ -43,17 +43,7 @@ import (
 const (
 	pollInterval = 100 * time.Millisecond
 	pollTimeout  = 60 * time.Second
-
-	fakeImageName = "fake-name"
-	fakeImage     = "fakeimage"
 )
-
-type statefulsetTester struct {
-	t           *testing.T
-	c           clientset.Interface
-	service     *v1.Service
-	statefulset *appsv1.StatefulSet
-}
 
 func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}

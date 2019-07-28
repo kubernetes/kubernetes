@@ -18,7 +18,7 @@
 
 // Package codes defines the canonical error codes used by gRPC. It is
 // consistent across various languages.
-package codes
+package codes // import "google.golang.org/grpc/codes"
 
 import (
 	"fmt"

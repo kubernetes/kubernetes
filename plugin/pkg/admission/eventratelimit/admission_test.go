@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
@@ -46,6 +47,7 @@ func attributesForRequest(rq request) admission.Attributes {
 		api.Resource("resource").WithVersion("version"),
 		"",
 		admission.Create,
+		&metav1.CreateOptions{},
 		rq.dryRun,
 		&user.DefaultInfo{Name: rq.username})
 }

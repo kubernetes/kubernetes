@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -81,6 +82,9 @@ func ValidateAPIService(apiService *apiregistration.APIService) field.ErrorList 
 	}
 	if len(apiService.Spec.Service.Name) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "service", "name"), ""))
+	}
+	if errs := utilvalidation.IsValidPortNum(int(apiService.Spec.Service.Port)); errs != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "service", "port"), apiService.Spec.Service.Port, "port is not valid: "+strings.Join(errs, ", ")))
 	}
 	if apiService.Spec.InsecureSkipTLSVerify && len(apiService.Spec.CABundle) > 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "insecureSkipTLSVerify"), apiService.Spec.InsecureSkipTLSVerify, "may not be true if caBundle is present"))

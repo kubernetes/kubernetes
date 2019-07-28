@@ -25,10 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
+// TableConvertor struct - converts objects to metav1beta1.Table using printers.TableGenerator
 type TableConvertor struct {
-	printers.TablePrinter
+	printers.TableGenerator
 }
 
+// ConvertToTable method - converts objects to metav1beta1.Table objects using TableGenerator
 func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	noHeaders := false
 	if tableOptions != nil {
@@ -41,5 +43,5 @@ func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, 
 			return nil, fmt.Errorf("unrecognized type %T for table options, can't display tabular output", tableOptions)
 		}
 	}
-	return c.TablePrinter.PrintTable(obj, printers.PrintOptions{Wide: true, NoHeaders: noHeaders})
+	return c.TableGenerator.GenerateTable(obj, printers.PrintOptions{Wide: true, NoHeaders: noHeaders})
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package sts
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -25,7 +27,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	mrand "math/rand"
+	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -217,4 +224,105 @@ func (s *Signer) Sign(env soap.Envelope) ([]byte, error) {
 		Header: *env.Header,
 		Body:   body,
 	})
+}
+
+// SignRequest is a rest.Signer implementation which can be used to sign rest.Client.LoginByTokenBody requests.
+func (s *Signer) SignRequest(req *http.Request) error {
+	type param struct {
+		key, val string
+	}
+	var params []string
+	add := func(p param) {
+		params = append(params, fmt.Sprintf(`%s="%s"`, p.key, p.val))
+	}
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := io.WriteString(gz, s.Token); err != nil {
+		return fmt.Errorf("zip token: %s", err)
+	}
+	if err := gz.Close(); err != nil {
+		return fmt.Errorf("zip token: %s", err)
+	}
+	add(param{
+		key: "token",
+		val: base64.StdEncoding.EncodeToString(buf.Bytes()),
+	})
+
+	if s.Certificate != nil {
+		nonce := fmt.Sprintf("%d:%d", time.Now().UnixNano()/1e6, mrand.Int())
+		var body []byte
+		if req.GetBody != nil {
+			r, rerr := req.GetBody()
+			if rerr != nil {
+				return fmt.Errorf("sts: getting http.Request body: %s", rerr)
+			}
+			defer r.Close()
+			body, rerr = ioutil.ReadAll(r)
+			if rerr != nil {
+				return fmt.Errorf("sts: reading http.Request body: %s", rerr)
+			}
+		}
+		bhash := sha256.New().Sum(body)
+
+		port := req.URL.Port()
+		if port == "" {
+			port = "80" // Default port for the "Host" header on the server side
+		}
+
+		var buf bytes.Buffer
+		msg := []string{
+			nonce,
+			req.Method,
+			req.URL.Path,
+			strings.ToLower(req.URL.Hostname()),
+			port,
+		}
+		for i := range msg {
+			buf.WriteString(msg[i])
+			buf.WriteByte('\n')
+		}
+		buf.Write(bhash)
+		buf.WriteByte('\n')
+
+		sum := sha256.Sum256(buf.Bytes())
+		key, ok := s.Certificate.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			return errors.New("sts: rsa.PrivateKey is required to sign http.Request")
+		}
+		sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, sum[:])
+		if err != nil {
+			return err
+		}
+
+		add(param{
+			key: "signature_alg",
+			val: "RSA-SHA256",
+		})
+		add(param{
+			key: "signature",
+			val: base64.StdEncoding.EncodeToString(sig),
+		})
+		add(param{
+			key: "nonce",
+			val: nonce,
+		})
+		add(param{
+			key: "bodyhash",
+			val: base64.StdEncoding.EncodeToString(bhash),
+		})
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("SIGN %s", strings.Join(params, ", ")))
+
+	return nil
+}
+
+func (s *Signer) NewRequest() TokenRequest {
+	return TokenRequest{
+		Token:       s.Token,
+		Certificate: s.Certificate,
+		Userinfo:    s.user,
+		KeyID:       s.keyID,
+	}
 }

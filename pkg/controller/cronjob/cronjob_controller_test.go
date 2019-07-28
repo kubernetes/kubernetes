@@ -153,15 +153,15 @@ func newJob(UID string) batchv1.Job {
 }
 
 var (
-	shortDead  int64                          = 10
-	mediumDead int64                          = 2 * 60 * 60
-	longDead   int64                          = 1000000
-	noDead     int64                          = -12345
-	A          batchV1beta1.ConcurrencyPolicy = batchV1beta1.AllowConcurrent
-	f          batchV1beta1.ConcurrencyPolicy = batchV1beta1.ForbidConcurrent
-	R          batchV1beta1.ConcurrencyPolicy = batchV1beta1.ReplaceConcurrent
-	T                                         = true
-	F                                         = false
+	shortDead  int64 = 10
+	mediumDead int64 = 2 * 60 * 60
+	longDead   int64 = 1000000
+	noDead     int64 = -12345
+	A                = batchV1beta1.AllowConcurrent
+	f                = batchV1beta1.ForbidConcurrent
+	R                = batchV1beta1.ReplaceConcurrent
+	T                = true
+	F                = false
 )
 
 func TestSyncOne_RunOrNot(t *testing.T) {

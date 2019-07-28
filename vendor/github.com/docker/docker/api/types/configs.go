@@ -1,4 +1,4 @@
-package types
+package types // import "github.com/docker/docker/api/types"
 
 import (
 	"github.com/docker/docker/api/types/container"
@@ -54,4 +54,11 @@ type PluginEnableConfig struct {
 // PluginDisableConfig holds arguments for plugin disable.
 type PluginDisableConfig struct {
 	ForceDisable bool
+}
+
+// NetworkListConfig stores the options available for listing networks
+type NetworkListConfig struct {
+	// TODO(@cpuguy83): naming is hard, this is pulled from what was being used in the router before moving here
+	Detailed bool
+	Verbose  bool
 }

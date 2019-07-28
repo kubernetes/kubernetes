@@ -22,17 +22,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -40,15 +40,15 @@ import (
 )
 
 var (
-	deprecationDisabledFeature = utilfeature.NewFeatureGate()
-	deprecationEnabledFeature  = utilfeature.NewFeatureGate()
+	deprecationDisabledFeature = featuregate.NewFeatureGate()
+	deprecationEnabledFeature  = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := deprecationDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: false}}); err != nil {
+	if err := deprecationDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := deprecationEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: true}}); err != nil {
+	if err := deprecationEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: true}}); err != nil {
 		panic(err)
 	}
 }
@@ -64,16 +64,18 @@ func TestIgnoresNonCreate(t *testing.T) {
 
 func TestIgnoresNonPodResource(t *testing.T) {
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("CustomResource").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("CustomResource").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	handler := admissiontesting.WithReinvocationTesting(t, NewServiceAccount())
+	err := handler.Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Expected non-pod resource allowed, got err: %v", err)
 	}
 }
 
 func TestIgnoresNilObject(t *testing.T) {
-	attrs := admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	handler := admissiontesting.WithReinvocationTesting(t, NewServiceAccount())
+	err := handler.Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Expected nil object allowed allowed, got err: %v", err)
 	}
@@ -81,8 +83,9 @@ func TestIgnoresNilObject(t *testing.T) {
 
 func TestIgnoresNonPodObject(t *testing.T) {
 	obj := &api.Namespace{}
-	attrs := admission.NewAttributesRecord(obj, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(obj, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	handler := admissiontesting.WithReinvocationTesting(t, NewServiceAccount())
+	err := handler.Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Expected non pod object allowed, got err: %v", err)
 	}
@@ -101,8 +104,8 @@ func TestIgnoresMirrorPod(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, NewServiceAccount()).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Expected mirror pod without service account or secrets allowed, got err: %v", err)
 	}
@@ -119,8 +122,8 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 			ServiceAccountName: "default",
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, NewServiceAccount()).Admit(attrs, nil)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a service account")
 	}
@@ -139,8 +142,8 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, NewServiceAccount()).Admit(attrs, nil)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a secret volume")
 	}
@@ -164,8 +167,8 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := NewServiceAccount().Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, NewServiceAccount()).Admit(attrs, nil)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a ServiceAccountToken volume projection")
 	}
@@ -189,8 +192,8 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	})
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -217,8 +220,8 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	})
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("Expected server timeout error for missing API token: %v", err)
 	}
@@ -242,8 +245,8 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -264,15 +267,15 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 	admit.SetExternalKubeInformerFactory(informerFactory)
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err == nil {
 		t.Errorf("Expected error for missing service account, got none")
 	}
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*Plugin) *Plugin) {
 
 		admit := applyFeatures(NewServiceAccount())
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
@@ -330,8 +333,8 @@ func TestAutomountsAPIToken(t *testing.T) {
 				},
 			},
 		}
-		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-		err := admit.Admit(attrs, nil)
+		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+		err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -359,8 +362,8 @@ func TestAutomountsAPIToken(t *testing.T) {
 				},
 			},
 		}
-		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-		if err := admit.Admit(attrs, nil); err != nil {
+		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
@@ -382,7 +385,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 }
 
 func TestRespectsExistingMount(t *testing.T) {
-	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*Plugin) *Plugin) {
 		ns := "myns"
 		tokenName := "token-name"
 		serviceAccountName := DefaultServiceAccountName
@@ -441,8 +444,8 @@ func TestRespectsExistingMount(t *testing.T) {
 				},
 			},
 		}
-		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-		err := admit.Admit(attrs, nil)
+		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+		err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -471,8 +474,8 @@ func TestRespectsExistingMount(t *testing.T) {
 				},
 			},
 		}
-		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-		if err := admit.Admit(attrs, nil); err != nil {
+		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
@@ -517,8 +520,8 @@ func TestAllowsReferencedSecret(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod1, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err != nil {
+	attrs := admission.NewAttributesRecord(pod1, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -541,8 +544,8 @@ func TestAllowsReferencedSecret(t *testing.T) {
 			},
 		},
 	}
-	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err != nil {
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -565,8 +568,8 @@ func TestAllowsReferencedSecret(t *testing.T) {
 			},
 		},
 	}
-	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err != nil {
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -595,8 +598,8 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod1, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err == nil {
+	attrs := admission.NewAttributesRecord(pod1, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}
 
@@ -619,8 +622,8 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -643,8 +646,8 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -674,8 +677,8 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}
@@ -706,8 +709,8 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 			ImagePullSecrets: []api.LocalObjectReference{{Name: "foo"}},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -735,8 +738,8 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 			ImagePullSecrets: []api.LocalObjectReference{{Name: "foo"}},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}
@@ -768,8 +771,8 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 			ImagePullSecrets: []api.LocalObjectReference{{Name: "foo"}},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -802,8 +805,8 @@ func TestAddImagePullSecrets(t *testing.T) {
 	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(sa)
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -883,8 +886,8 @@ func TestMultipleReferencedSecrets(t *testing.T) {
 		},
 	}
 
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs, nil); err != nil {
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -911,7 +914,7 @@ func newSecret(secretType corev1.SecretType, namespace, name, serviceAccountName
 }
 
 func TestGetServiceAccountTokens(t *testing.T) {
-	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*Plugin) *Plugin) {
 		admit := applyFeatures(NewServiceAccount())
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		admit.secretLister = corev1listers.NewSecretLister(indexer)
@@ -1037,8 +1040,8 @@ func TestAutomountIsBackwardsCompatible(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs, nil)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(attrs, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1067,16 +1070,16 @@ func testGenerateName(n string) string {
 
 var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
 
-func testBoundServiceAccountTokenVolumePhases(t *testing.T, f func(*testing.T, func(*serviceAccount) *serviceAccount)) {
+func testBoundServiceAccountTokenVolumePhases(t *testing.T, f func(*testing.T, func(*Plugin) *Plugin)) {
 	t.Run("BoundServiceAccountTokenVolume disabled", func(t *testing.T) {
-		f(t, func(s *serviceAccount) *serviceAccount {
+		f(t, func(s *Plugin) *Plugin {
 			s.featureGate = deprecationDisabledFeature
 			return s
 		})
 	})
 
 	t.Run("BoundServiceAccountTokenVolume enabled", func(t *testing.T) {
-		f(t, func(s *serviceAccount) *serviceAccount {
+		f(t, func(s *Plugin) *Plugin {
 			s.featureGate = deprecationEnabledFeature
 			return s
 		})

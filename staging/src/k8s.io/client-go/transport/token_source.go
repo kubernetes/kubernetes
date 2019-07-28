@@ -59,6 +59,15 @@ func NewCachedFileTokenSource(path string) oauth2.TokenSource {
 	}
 }
 
+// NewCachedTokenSource returns a oauth2.TokenSource reads a token from a
+// designed TokenSource. The ts would provide the source of token.
+func NewCachedTokenSource(ts oauth2.TokenSource) oauth2.TokenSource {
+	return &cachingTokenSource{
+		now:  time.Now,
+		base: ts,
+	}
+}
+
 type tokenSourceTransport struct {
 	base http.RoundTripper
 	ort  http.RoundTripper

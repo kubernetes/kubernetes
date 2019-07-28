@@ -126,7 +126,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	}
 
 	// (2)
-	dataDirPath := path.Join(w.targetDir, dataDirName)
+	dataDirPath := filepath.Join(w.targetDir, dataDirName)
 	oldTsDir, err := os.Readlink(dataDirPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -137,7 +137,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 		// empty oldTsDir indicates that it didn't exist
 		oldTsDir = ""
 	}
-	oldTsPath := path.Join(w.targetDir, oldTsDir)
+	oldTsPath := filepath.Join(w.targetDir, oldTsDir)
 
 	var pathsToRemove sets.String
 	// if there was no old version, there's nothing to remove
@@ -183,7 +183,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	}
 
 	// (8)
-	newDataDirPath := path.Join(w.targetDir, newDataDirName)
+	newDataDirPath := filepath.Join(w.targetDir, newDataDirName)
 	if err = os.Symlink(tsDirName, newDataDirPath); err != nil {
 		os.RemoveAll(tsDir)
 		klog.Errorf("%s: error creating symbolic link for atomic update: %v", w.logContext, err)
@@ -279,7 +279,7 @@ func validatePath(targetPath string) error {
 // shouldWritePayload returns whether the payload should be written to disk.
 func shouldWritePayload(payload map[string]FileProjection, oldTsDir string) (bool, error) {
 	for userVisiblePath, fileProjection := range payload {
-		shouldWrite, err := shouldWriteFile(path.Join(oldTsDir, userVisiblePath), fileProjection.Data)
+		shouldWrite, err := shouldWriteFile(filepath.Join(oldTsDir, userVisiblePath), fileProjection.Data)
 		if err != nil {
 			return false, err
 		}
@@ -375,7 +375,7 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 	for userVisiblePath, fileProjection := range payload {
 		content := fileProjection.Data
 		mode := os.FileMode(fileProjection.Mode)
-		fullPath := path.Join(dir, userVisiblePath)
+		fullPath := filepath.Join(dir, userVisiblePath)
 		baseDir, _ := filepath.Split(fullPath)
 
 		err := os.MkdirAll(baseDir, os.ModePerm)
@@ -419,11 +419,11 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 			slashpos = len(userVisiblePath)
 		}
 		linkname := userVisiblePath[:slashpos]
-		_, err := os.Readlink(path.Join(w.targetDir, linkname))
+		_, err := os.Readlink(filepath.Join(w.targetDir, linkname))
 		if err != nil && os.IsNotExist(err) {
 			// The link into the data directory for this path doesn't exist; create it
-			visibleFile := path.Join(w.targetDir, linkname)
-			dataDirFile := path.Join(dataDirName, linkname)
+			visibleFile := filepath.Join(w.targetDir, linkname)
+			dataDirFile := filepath.Join(dataDirName, linkname)
 
 			err = os.Symlink(dataDirFile, visibleFile)
 			if err != nil {
@@ -444,7 +444,7 @@ func (w *AtomicWriter) removeUserVisiblePaths(paths sets.String) error {
 		if strings.Contains(p, ps) {
 			continue
 		}
-		if err := os.Remove(path.Join(w.targetDir, p)); err != nil {
+		if err := os.Remove(filepath.Join(w.targetDir, p)); err != nil {
 			klog.Errorf("%s: error pruning old user-visible path %s: %v", w.logContext, p, err)
 			lasterr = err
 		}

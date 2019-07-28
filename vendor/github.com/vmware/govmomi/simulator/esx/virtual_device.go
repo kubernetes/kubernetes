@@ -199,7 +199,7 @@ var VirtualDevice = []types.BaseVirtualDevice{
 			ControllerKey: 100,
 			UnitNumber:    types.NewInt32(17),
 		},
-		Id: -1,
+		Id:                             -1,
 		AllowUnrestrictedCommunication: types.NewBool(false),
 		FilterEnable:                   types.NewBool(true),
 		FilterInfo:                     (*types.VirtualMachineVMCIDeviceFilterInfo)(nil),

@@ -26,17 +26,16 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	coreDNSAddonLongDesc = normalizer.LongDesc(`
-		Installs the CoreDNS addon components via the API server.
+	coreDNSAddonLongDesc = cmdutil.LongDesc(`
+		Install the CoreDNS addon components via the API server.
 		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
 		`)
 
-	kubeProxyAddonLongDesc = normalizer.LongDesc(`
-		Installs the kube-proxy addon components via the API server.
+	kubeProxyAddonLongDesc = cmdutil.LongDesc(`
+		Install the kube-proxy addon components via the API server.
 		`)
 )
 
@@ -44,25 +43,25 @@ var (
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "addon",
-		Short: "Installs required addons for passing Conformance tests",
+		Short: "Install required addons for passing Conformance tests",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
-				Short:          "Installs all the addons",
+				Short:          "Install all the addons",
 				InheritFlags:   getAddonPhaseFlags("all"),
 				RunAllSiblings: true,
 			},
 			{
 				Name:         "coredns",
-				Short:        "Installs the CoreDNS addon to a Kubernetes cluster",
+				Short:        "Install the CoreDNS addon to a Kubernetes cluster",
 				Long:         coreDNSAddonLongDesc,
 				InheritFlags: getAddonPhaseFlags("coredns"),
 				Run:          runCoreDNSAddon,
 			},
 			{
 				Name:         "kube-proxy",
-				Short:        "Installs the kube-proxy addon to a Kubernetes cluster",
+				Short:        "Install the kube-proxy addon to a Kubernetes cluster",
 				Long:         kubeProxyAddonLongDesc,
 				InheritFlags: getAddonPhaseFlags("kube-proxy"),
 				Run:          runKubeProxyAddon,
@@ -112,6 +111,7 @@ func getAddonPhaseFlags(name string) []string {
 	if name == "all" || name == "kube-proxy" {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerBindPort,
 			options.NetworkingPodSubnet,
 		)

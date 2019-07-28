@@ -35,15 +35,26 @@ const (
 )
 
 // parseTaints takes a spec which is an array and creates slices for new taints to be added, taints to be deleted.
+// It also validates the spec. For example, the form `<key>` may be used to remove a taint, but not to add one.
 func parseTaints(spec []string) ([]corev1.Taint, []corev1.Taint, error) {
 	var taints, taintsToRemove []corev1.Taint
 	uniqueTaints := map[corev1.TaintEffect]sets.String{}
 
 	for _, taintSpec := range spec {
-		if strings.Index(taintSpec, "=") != -1 && strings.Index(taintSpec, ":") != -1 {
+		if strings.HasSuffix(taintSpec, "-") {
+			taintToRemove, err := parseTaint(strings.TrimSuffix(taintSpec, "-"))
+			if err != nil {
+				return nil, nil, err
+			}
+			taintsToRemove = append(taintsToRemove, corev1.Taint{Key: taintToRemove.Key, Effect: taintToRemove.Effect})
+		} else {
 			newTaint, err := parseTaint(taintSpec)
 			if err != nil {
 				return nil, nil, err
+			}
+			// validate that the taint has an effect, which is required to add the taint
+			if len(newTaint.Effect) == 0 {
+				return nil, nil, fmt.Errorf("invalid taint spec: %v", taintSpec)
 			}
 			// validate if taint is unique by <key, effect>
 			if len(uniqueTaints[newTaint.Effect]) > 0 && uniqueTaints[newTaint.Effect].Has(newTaint.Key) {
@@ -56,52 +67,51 @@ func parseTaints(spec []string) ([]corev1.Taint, []corev1.Taint, error) {
 			uniqueTaints[newTaint.Effect].Insert(newTaint.Key)
 
 			taints = append(taints, newTaint)
-		} else if strings.HasSuffix(taintSpec, "-") {
-			taintKey := taintSpec[:len(taintSpec)-1]
-			var effect corev1.TaintEffect
-			if strings.Index(taintKey, ":") != -1 {
-				parts := strings.Split(taintKey, ":")
-				taintKey = parts[0]
-				effect = corev1.TaintEffect(parts[1])
-			}
-
-			// If effect is specified, need to validate it.
-			if len(effect) > 0 {
-				err := validateTaintEffect(effect)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-			taintsToRemove = append(taintsToRemove, corev1.Taint{Key: taintKey, Effect: effect})
-		} else {
-			return nil, nil, fmt.Errorf("unknown taint spec: %v", taintSpec)
 		}
 	}
 	return taints, taintsToRemove, nil
 }
 
-// parseTaint parses a taint from a string. Taint must be of the format '<key>=<value>:<effect>'.
+// parseTaint parses a taint from a string, whose form must be either
+// '<key>=<value>:<effect>', '<key>:<effect>', or '<key>'.
 func parseTaint(st string) (corev1.Taint, error) {
 	var taint corev1.Taint
-	parts := strings.Split(st, "=")
-	if len(parts) != 2 || len(parts[1]) == 0 || len(validation.IsQualifiedName(parts[0])) > 0 {
+
+	var key string
+	var value string
+	var effect corev1.TaintEffect
+
+	parts := strings.Split(st, ":")
+	switch len(parts) {
+	case 1:
+		key = parts[0]
+	case 2:
+		effect = corev1.TaintEffect(parts[1])
+		if err := validateTaintEffect(effect); err != nil {
+			return taint, err
+		}
+
+		partsKV := strings.Split(parts[0], "=")
+		if len(partsKV) > 2 {
+			return taint, fmt.Errorf("invalid taint spec: %v", st)
+		}
+		key = partsKV[0]
+		if len(partsKV) == 2 {
+			value = partsKV[1]
+			if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+				return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
+			}
+		}
+	default:
 		return taint, fmt.Errorf("invalid taint spec: %v", st)
 	}
 
-	parts2 := strings.Split(parts[1], ":")
-
-	errs := validation.IsValidLabelValue(parts2[0])
-	if len(parts2) != 2 || len(errs) != 0 {
+	if errs := validation.IsQualifiedName(key); len(errs) > 0 {
 		return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
 	}
 
-	effect := corev1.TaintEffect(parts2[1])
-	if err := validateTaintEffect(effect); err != nil {
-		return taint, err
-	}
-
-	taint.Key = parts[0]
-	taint.Value = parts2[0]
+	taint.Key = key
+	taint.Value = value
 	taint.Effect = effect
 
 	return taint, nil

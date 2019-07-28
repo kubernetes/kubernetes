@@ -17,7 +17,13 @@ import (
 //
 // Dlasrt is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlasrt(s lapack.Sort, n int, d []float64) {
-	checkVector(n, d, 1)
+	switch {
+	case n < 0:
+		panic(nLT0)
+	case len(d) < n:
+		panic(shortD)
+	}
+
 	d = d[:n]
 	switch s {
 	default:

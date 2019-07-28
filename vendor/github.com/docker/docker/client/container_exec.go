@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -16,11 +16,11 @@ func (cli *Client) ContainerExecCreate(ctx context.Context, container string, co
 	}
 
 	resp, err := cli.post(ctx, "/containers/"+container+"/exec", nil, config, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 	err = json.NewDecoder(resp.body).Decode(&response)
-	ensureReaderClosed(resp)
 	return response, err
 }
 

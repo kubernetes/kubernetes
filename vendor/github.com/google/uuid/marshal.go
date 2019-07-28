@@ -15,8 +15,6 @@ func (uuid UUID) MarshalText() ([]byte, error) {
 
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (uuid *UUID) UnmarshalText(data []byte) error {
-	// See comment in ParseBytes why we do this.
-	// id, err := ParseBytes(data)
 	id, err := ParseBytes(data)
 	if err == nil {
 		*uuid = id

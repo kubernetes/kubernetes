@@ -91,15 +91,15 @@ func (m *Dense) Solve(a, b Matrix) error {
 		}
 		var lu LU
 		lu.Factorize(a)
-		return lu.Solve(m, false, b)
+		return lu.SolveTo(m, false, b)
 	case ar > ac:
 		var qr QR
 		qr.Factorize(a)
-		return qr.Solve(m, false, b)
+		return qr.SolveTo(m, false, b)
 	default:
 		var lq LQ
 		lq.Factorize(a)
-		return lq.Solve(m, false, b)
+		return lq.SolveTo(m, false, b)
 	}
 }
 
@@ -128,7 +128,7 @@ func (v *VecDense) SolveVec(a Matrix, b Vector) error {
 		// and bm as overlapping but not identical.
 		bm := m
 		if v != b {
-			b := VecDense{mat: bmat, n: b.Len()}
+			b := VecDense{mat: bmat}
 			bm = b.asDense()
 		}
 		return m.Solve(a, bm)

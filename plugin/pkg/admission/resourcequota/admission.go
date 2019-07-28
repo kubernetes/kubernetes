@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
+// PluginName is a string with the name of the plugin
 const PluginName = "ResourceQuota"
 
 // Register registers a plugin
@@ -93,14 +94,17 @@ func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int,
 	}, nil
 }
 
+// SetExternalKubeClientSet registers the client into QuotaAdmission
 func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
 	a.quotaAccessor.client = client
 }
 
+// SetExternalKubeInformerFactory registers an informer factory into QuotaAdmission
 func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	a.quotaAccessor.lister = f.Core().V1().ResourceQuotas().Lister()
 }
 
+// SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
 	a.quotaConfiguration = c
 	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)

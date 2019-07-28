@@ -24,11 +24,16 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+const (
+	statusSuccess     = "success"
+	statusFailUnknown = "fail-unknown"
+)
+
 var storageOperationMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name:    "storage_operation_duration_seconds",
 		Help:    "Storage operation duration",
-		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50},
+		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
 	},
 	[]string{"volume_plugin", "operation_name"},
 )
@@ -41,6 +46,23 @@ var storageOperationErrorMetric = prometheus.NewCounterVec(
 	[]string{"volume_plugin", "operation_name"},
 )
 
+var storageOperationStatusMetric = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "storage_operation_status_count",
+		Help: "Storage operation return statuses count",
+	},
+	[]string{"volume_plugin", "operation_name", "status"},
+)
+
+var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "volume_operation_total_seconds",
+		Help:    "Storage operation end to end duration in seconds",
+		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+	},
+	[]string{"plugin_name", "operation_name"},
+)
+
 func init() {
 	registerMetrics()
 }
@@ -48,6 +70,8 @@ func init() {
 func registerMetrics() {
 	prometheus.MustRegister(storageOperationMetric)
 	prometheus.MustRegister(storageOperationErrorMetric)
+	prometheus.MustRegister(storageOperationStatusMetric)
+	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
@@ -56,11 +80,16 @@ func OperationCompleteHook(plugin, operationName string) func(*error) {
 	opComplete := func(err *error) {
 		timeTaken := time.Since(requestTime).Seconds()
 		// Create metric with operation name and plugin name
+		status := statusSuccess
 		if *err != nil {
+			// TODO: Establish well-known error codes to be able to distinguish
+			// user configuration errors from system errors.
+			status = statusFailUnknown
 			storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
 		} else {
 			storageOperationMetric.WithLabelValues(plugin, operationName).Observe(timeTaken)
 		}
+		storageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
 	}
 	return opComplete
 }
@@ -75,4 +104,10 @@ func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) s
 		return fmt.Sprintf("%s:%s", pluginName, spec.PersistentVolume.Spec.CSI.Driver)
 	}
 	return pluginName
+}
+
+// RecordOperationLatencyMetric records the end to end latency for certain operation
+// into metric volume_operation_total_seconds
+func RecordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
+	storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
 }

@@ -56,7 +56,7 @@ type Client struct {
 	cfg      Config
 	creds    *credentials.TransportCredentials
 	balancer *healthBalancer
-	mu       *sync.Mutex
+	mu       *sync.RWMutex
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -110,11 +110,13 @@ func (c *Client) Close() error {
 func (c *Client) Ctx() context.Context { return c.ctx }
 
 // Endpoints lists the registered endpoints for the client.
-func (c *Client) Endpoints() (eps []string) {
+func (c *Client) Endpoints() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	// copy the slice; protect original endpoints from being changed
-	eps = make([]string, len(c.cfg.Endpoints))
+	eps := make([]string, len(c.cfg.Endpoints))
 	copy(eps, c.cfg.Endpoints)
-	return
+	return eps
 }
 
 // SetEndpoints updates client's endpoints.
@@ -387,7 +389,7 @@ func newClient(cfg *Config) (*Client, error) {
 		creds:    creds,
 		ctx:      ctx,
 		cancel:   cancel,
-		mu:       new(sync.Mutex),
+		mu:       new(sync.RWMutex),
 		callOpts: defaultCallOpts,
 	}
 	if cfg.Username != "" && cfg.Password != "" {

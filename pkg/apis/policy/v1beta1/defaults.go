@@ -18,12 +18,7 @@ package v1beta1
 
 import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
-
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return RegisterDefaults(scheme)
-}
 
 func SetDefaults_PodSecurityPolicySpec(obj *policyv1beta1.PodSecurityPolicySpec) {
 	// This field was added after PodSecurityPolicy was released.

@@ -21,16 +21,17 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -82,48 +83,12 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 	}
 }
 
-// ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
-// none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
-	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
-	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
-	if err != nil {
-		return err
-	}
-	if len(rcs.Items) == 0 {
-		return fmt.Errorf("RC with labels %v not found in ns %v", l, ns)
-	}
-	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
-	for _, labelRC := range rcs.Items {
-		name := labelRC.Name
-		if err := ScaleRC(clientset, scalesGetter, ns, name, replicas, false); err != nil {
-			return err
-		}
-		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if replicas == 0 {
-			ps, err := testutils.NewPodStore(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
-			if err != nil {
-				return err
-			}
-			defer ps.Stop()
-			if err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute); err != nil {
-				return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-			}
-		} else {
-			if err := testutils.WaitForPodsWithLabelRunning(
-				clientset, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector))); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 type updateRcFunc func(d *v1.ReplicationController)
 
+// UpdateReplicationControllerWithRetries retries updating the given rc on conflict with the following steps:
+// 1. Get latest resource
+// 2. applyUpdate
+// 3. Update the resource
 func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*v1.ReplicationController, error) {
 	var rc *v1.ReplicationController
 	var updateErr error
@@ -135,7 +100,7 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
 		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(rc); err == nil {
-			Logf("Updating replication controller %q", name)
+			e2elog.Logf("Updating replication controller %q", name)
 			return true, nil
 		}
 		updateErr = err
@@ -152,12 +117,15 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
 }
 
+// ScaleRC scales Replication Controller to be desired size.
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
 	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }
 
+// RunRC Launches (and verifies correctness) of a Replication Controller
+// and will wait for all pods it spawns to become "Running".
 func RunRC(config testutils.RCConfig) error {
-	By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
+	ginkgo.By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = DumpNodeDebugInfo
 	config.ContainerDumpFunc = LogFailedContainers
 	return testutils.RunRC(config)
@@ -170,7 +138,7 @@ func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) 
 	// NodeController evicts pod after 5 minutes, so we need timeout greater than that to observe effects.
 	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
 	// Otherwise, it goes to the 'Terminating' state till the kubelet confirms deletion.
-	return WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
+	return e2epod.WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
 }
 
 // WaitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
@@ -178,12 +146,11 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
+			e2elog.Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
-		} else {
-			Logf("ReplicationController %s in namespace %s found.", name, namespace)
-			return exist, nil
 		}
+		e2elog.Logf("ReplicationController %s in namespace %s found.", name, namespace)
+		return exist, nil
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
@@ -199,13 +166,13 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
-			Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
+			e2elog.Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
 			return exist, nil
 		case len(rcs.Items) == 0:
-			Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
+			e2elog.Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
 			return !exist, nil
 		default:
-			Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			e2elog.Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
 			return false, nil
 		}
 	})
@@ -249,38 +216,38 @@ func ValidateController(c clientset.Interface, containerImage string, replicas i
 
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
-	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < PodStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := RunKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
-			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
+			ginkgo.By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
 			continue
 		}
 		var runningPods []string
 		for _, podID := range pods {
 			running := RunKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
-				Logf("%s is created but not running", podID)
+				e2elog.Logf("%s is created but not running", podID)
 				continue waitLoop
 			}
 
 			currentImage := RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
 			currentImage = trimDockerRegistry(currentImage)
 			if currentImage != containerImage {
-				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
+				e2elog.Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue waitLoop
 			}
 
 			// Call the generic validator function here.
 			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
-				Logf("%s is running right image but validator function failed: %v", podID, err)
+				e2elog.Logf("%s is running right image but validator function failed: %v", podID, err)
 				continue waitLoop
 			}
 
-			Logf("%s is verified up and running", podID)
+			e2elog.Logf("%s is verified up and running", podID)
 			runningPods = append(runningPods, podID)
 		}
 		// If we reach here, then all our checks passed.
@@ -289,5 +256,5 @@ waitLoop:
 		}
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
-	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", PodStartTimeout.Seconds(), testname)
+	e2elog.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", PodStartTimeout.Seconds(), testname)
 }

@@ -8,6 +8,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"math/big"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 // Generate generates a DNSKEY of the given bit size.
@@ -36,6 +38,10 @@ func (k *DNSKEY) Generate(bits int) (crypto.PrivateKey, error) {
 		}
 	case ECDSAP384SHA384:
 		if bits != 384 {
+			return nil, ErrKeySize
+		}
+	case ED25519:
+		if bits != 256 {
 			return nil, ErrKeySize
 		}
 	}
@@ -74,6 +80,13 @@ func (k *DNSKEY) Generate(bits int) (crypto.PrivateKey, error) {
 			return nil, err
 		}
 		k.setPublicKeyECDSA(priv.PublicKey.X, priv.PublicKey.Y)
+		return priv, nil
+	case ED25519:
+		pub, priv, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		k.setPublicKeyED25519(pub)
 		return priv, nil
 	default:
 		return nil, ErrAlg
@@ -117,21 +130,30 @@ func (k *DNSKEY) setPublicKeyDSA(_Q, _P, _G, _Y *big.Int) bool {
 	return true
 }
 
+// Set the public key for Ed25519
+func (k *DNSKEY) setPublicKeyED25519(_K ed25519.PublicKey) bool {
+	if _K == nil {
+		return false
+	}
+	k.PublicKey = toBase64(_K)
+	return true
+}
+
 // Set the public key (the values E and N) for RSA
 // RFC 3110: Section 2. RSA Public KEY Resource Records
 func exponentToBuf(_E int) []byte {
 	var buf []byte
-	i := big.NewInt(int64(_E))
-	if len(i.Bytes()) < 256 {
-		buf = make([]byte, 1)
-		buf[0] = uint8(len(i.Bytes()))
+	i := big.NewInt(int64(_E)).Bytes()
+	if len(i) < 256 {
+		buf = make([]byte, 1, 1+len(i))
+		buf[0] = uint8(len(i))
 	} else {
-		buf = make([]byte, 3)
+		buf = make([]byte, 3, 3+len(i))
 		buf[0] = 0
-		buf[1] = uint8(len(i.Bytes()) >> 8)
-		buf[2] = uint8(len(i.Bytes()))
+		buf[1] = uint8(len(i) >> 8)
+		buf[2] = uint8(len(i))
 	}
-	buf = append(buf, i.Bytes()...)
+	buf = append(buf, i...)
 	return buf
 }
 

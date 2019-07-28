@@ -57,11 +57,11 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/version:go_default_library",
         "//pkg/kubectl/cmd/wait:go_default_library",
-        "//pkg/kubectl/util/i18n:go_default_library",
-        "//pkg/kubectl/util/templates:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
@@ -80,7 +80,6 @@ go_test(
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
-        "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
 

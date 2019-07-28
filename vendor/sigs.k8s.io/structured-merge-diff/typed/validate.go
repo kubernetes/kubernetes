@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/value"
 )
 
-func (tv typedValue) walker() *validatingObjectWalker {
+func (tv TypedValue) walker() *validatingObjectWalker {
 	return &validatingObjectWalker{
 		value:   tv.value,
 		schema:  tv.schema,
@@ -52,7 +52,7 @@ type validatingObjectWalker struct {
 }
 
 func (v validatingObjectWalker) validate() ValidationErrors {
-	return resolveSchema(v.schema, v.typeRef, v)
+	return resolveSchema(v.schema, v.typeRef, &v.value, v)
 }
 
 // doLeaf should be called on leaves before descending into children, if there
@@ -96,51 +96,6 @@ func (v validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
 	v.doLeaf()
 
 	return nil
-}
-
-func (v validatingObjectWalker) visitStructFields(t schema.Struct, m *value.Map) (errs ValidationErrors) {
-	allowedNames := map[string]struct{}{}
-	for i := range t.Fields {
-		// I don't want to use the loop variable since a reference
-		// might outlive the loop iteration (in an error message).
-		f := t.Fields[i]
-		allowedNames[f.Name] = struct{}{}
-		child, ok := m.Get(f.Name)
-		if !ok {
-			// All fields are optional
-			continue
-		}
-		v2 := v
-		v2.errorFormatter.descend(fieldpath.PathElement{FieldName: &f.Name})
-		v2.value = child.Value
-		v2.typeRef = f.Type
-		errs = append(errs, v2.validate()...)
-	}
-
-	// All fields may be optional, but unknown fields are not allowed.
-	return append(errs, v.rejectExtraStructFields(m, allowedNames, "")...)
-}
-
-func (v validatingObjectWalker) doStruct(t schema.Struct) (errs ValidationErrors) {
-	m, err := mapOrStructValue(v.value, "struct")
-	if err != nil {
-		return v.error(err)
-	}
-
-	if t.ElementRelationship == schema.Atomic {
-		v.doLeaf()
-	}
-
-	if m == nil {
-		// nil is a valid map!
-		return nil
-	}
-
-	errs = v.visitStructFields(t, m)
-
-	// TODO: Check unions.
-
-	return errs
 }
 
 func (v validatingObjectWalker) visitListItems(t schema.List, list *value.List) (errs ValidationErrors) {
@@ -190,21 +145,34 @@ func (v validatingObjectWalker) doList(t schema.List) (errs ValidationErrors) {
 }
 
 func (v validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs ValidationErrors) {
+	fieldTypes := map[string]schema.TypeRef{}
+	for i := range t.Fields {
+		// I don't want to use the loop variable since a reference
+		// might outlive the loop iteration (in an error message).
+		f := t.Fields[i]
+		fieldTypes[f.Name] = f.Type
+	}
+
 	for _, item := range m.Items {
 		v2 := v
 		name := item.Name
 		v2.errorFormatter.descend(fieldpath.PathElement{FieldName: &name})
 		v2.value = item.Value
-		v2.typeRef = t.ElementType
-		errs = append(errs, v2.validate()...)
 
-		v2.doNode()
+		var ok bool
+		if v2.typeRef, ok = fieldTypes[name]; ok {
+			errs = append(errs, v2.validate()...)
+		} else {
+			v2.typeRef = t.ElementType
+			errs = append(errs, v2.validate()...)
+			v2.doNode()
+		}
 	}
 	return errs
 }
 
 func (v validatingObjectWalker) doMap(t schema.Map) (errs ValidationErrors) {
-	m, err := mapOrStructValue(v.value, "map")
+	m, err := mapValue(v.value)
 	if err != nil {
 		return v.error(err)
 	}
@@ -220,13 +188,4 @@ func (v validatingObjectWalker) doMap(t schema.Map) (errs ValidationErrors) {
 	errs = v.visitMapItems(t, m)
 
 	return errs
-}
-
-func (v validatingObjectWalker) doUntyped(t schema.Untyped) (errs ValidationErrors) {
-	if t.ElementRelationship == "" || t.ElementRelationship == schema.Atomic {
-		// Untyped sections allow anything, and are considered leaf
-		// fields.
-		v.doLeaf()
-	}
-	return nil
 }

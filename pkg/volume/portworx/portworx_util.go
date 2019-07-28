@@ -72,10 +72,12 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	}
 
 	// Pass all parameters as volume labels for Portworx server-side processing
-	if len(p.options.Parameters) > 0 {
-		spec.VolumeLabels = p.options.Parameters
-	} else {
+	if spec.VolumeLabels == nil {
 		spec.VolumeLabels = make(map[string]string, 0)
+	}
+
+	for k, v := range p.options.Parameters {
+		spec.VolumeLabels[k] = v
 	}
 
 	// Update the requested size in the spec
@@ -261,11 +263,11 @@ func createDriverClient(hostname string, port int32) (*osdclient.Client, error) 
 		return nil, err
 	}
 
-	if isValid, err := isClientValid(client); isValid {
+	isValid, err := isClientValid(client)
+	if isValid {
 		return client, nil
-	} else {
-		return nil, err
 	}
+	return nil, err
 }
 
 // getPortworxDriver returns a Portworx volume driver which can be used for cluster wide operations.
@@ -363,7 +365,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	}
 
 	if svc == nil {
-		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it.", pxServiceName)
+		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
 		klog.Errorf(err.Error())
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -45,11 +45,11 @@ func (cli *Client) ContainerCommit(ctx context.Context, container string, option
 
 	var response types.IDResponse
 	resp, err := cli.post(ctx, "/commit", query, options.Config, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&response)
-	ensureReaderClosed(resp)
 	return response, err
 }

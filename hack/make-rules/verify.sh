@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
@@ -35,6 +35,7 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
+  "verify-import-aliases.sh"     # to be run periodically by folks working on conformance tests
   )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
@@ -45,12 +46,11 @@ if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
 fi
 
 
-# Exclude godep checks in certain cases, if they're running in a separate job.
+# Exclude vendor checks in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
-    "verify-godeps.sh"             # runs in separate godeps job
-    "verify-staging-godeps.sh"     # runs in separate godeps job
-    "verify-godep-licenses.sh"     # runs in separate godeps job
+    "verify-vendor.sh"             # runs in separate godeps job
+    "verify-vendor-licenses.sh"    # runs in separate godeps job
     )
 fi
 
@@ -63,12 +63,12 @@ fi
 
 # Only run whitelisted fast checks in quick mode.
 # These run in <10s each on enisoc's workstation, assuming that
-# `make` and `hack/godep-restore.sh` had already been run.
+# `make` had already been run.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
-  "verify-godep-licenses.sh"
+  "verify-vendor-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-pkg-names.sh"
@@ -81,11 +81,13 @@ QUICK_PATTERNS+=(
   "verify-test-owners.sh"
 )
 
-EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
-QUICK_CHECKS=$(ls ${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
+while IFS='' read -r line; do EXCLUDED_CHECKS+=("$line"); done < <(ls "${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/}" 2>/dev/null || true)
+while IFS='' read -r line; do QUICK_CHECKS+=("$line"); done < <(ls "${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/}" 2>/dev/null || true)
+TARGET_LIST=()
+IFS=" " read -r -a TARGET_LIST <<< "${WHAT:-}"
 
 function is-excluded {
-  for e in ${EXCLUDED_CHECKS[@]}; do
+  for e in "${EXCLUDED_CHECKS[@]}"; do
     if [[ $1 -ef "${e}" ]]; then
       return
     fi
@@ -94,7 +96,7 @@ function is-excluded {
 }
 
 function is-quick {
-  for e in ${QUICK_CHECKS[@]}; do
+  for e in "${QUICK_CHECKS[@]}"; do
     if [[ $1 -ef "${e}" ]]; then
       return
     fi
@@ -105,10 +107,13 @@ function is-quick {
 function is-explicitly-chosen {
   local name="${1#verify-}"
   name="${name%.*}"
-  for e in ${WHAT}; do
+  index=0
+  for e in "${TARGET_LIST[@]}"; do
     if [[ "${e}" == "${name}" ]]; then
+      TARGET_LIST[${index}]=""
       return
     fi
+    index=$((index + 1))
   done
   return 1
 }
@@ -134,9 +139,9 @@ FAILED_TESTS=()
 
 function print-failed-tests {
   echo -e "========================"
-  echo -e "${color_red}FAILED TESTS${color_norm}"
+  echo -e "${color_red:?}FAILED TESTS${color_norm:?}"
   echo -e "========================"
-  for t in ${FAILED_TESTS[@]}; do
+  for t in "${FAILED_TESTS[@]}"; do
       echo -e "${color_red}${t}${color_norm}"
   done
 }
@@ -146,10 +151,11 @@ function run-checks {
   local -r runner=$2
 
   local t
-  for t in $(ls ${pattern})
+  for t in ${pattern}
   do
-    local check_name="$(basename "${t}")"
-    if [[ ! -z ${WHAT:-} ]]; then
+    local check_name
+    check_name="$(basename "${t}")"
+    if [[ -n ${WHAT:-} ]]; then
       if ! is-explicitly-chosen "${check_name}"; then
         continue
       fi
@@ -164,16 +170,31 @@ function run-checks {
       fi
     fi
     echo -e "Verifying ${check_name}"
-    local start=$(date +%s)
+    local start
+    start=$(date +%s)
     run-cmd "${runner}" "${t}" && tr=$? || tr=$?
-    local elapsed=$(($(date +%s) - ${start}))
+    local elapsed=$(($(date +%s) - start))
     if [[ ${tr} -eq 0 ]]; then
-      echo -e "${color_green}SUCCESS${color_norm}  ${check_name}\t${elapsed}s"
+      echo -e "${color_green:?}SUCCESS${color_norm}  ${check_name}\t${elapsed}s"
     else
       echo -e "${color_red}FAILED${color_norm}   ${check_name}\t${elapsed}s"
       ret=1
-      FAILED_TESTS+=(${t})
+      FAILED_TESTS+=("${t}")
     fi
+  done
+}
+
+# Check invalid targets specified in "WHAT" and mark them as failure cases
+function missing-target-checks {
+  # In case WHAT is not specified
+  [[ ${#TARGET_LIST[@]} -eq 0 ]] && return
+
+  for v in "${TARGET_LIST[@]}"
+  do
+    [[ -z "${v}" ]] && continue
+      
+    FAILED_TESTS+=("${v}")
+    ret=1
   done
 }
 
@@ -191,6 +212,7 @@ fi
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+missing-target-checks
 
 if [[ ${ret} -eq 1 ]]; then
     print-failed-tests

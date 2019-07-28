@@ -29,22 +29,22 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 
 	f := framework.NewDefaultFramework("crd-watch")
 
-	Context("CustomResourceDefinition Watch", func() {
+	ginkgo.Context("CustomResourceDefinition Watch", func() {
 		/*
 			   	   Testname: crd-watch
 			   	   Description: Create a Custom Resource Definition and make sure
 				   watches observe events on create/delete.
 		*/
-		It("watch on custom resource definition objects", func() {
+		ginkgo.It("watch on custom resource definition objects", func() {
 
 			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
 
@@ -55,24 +55,24 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 
 			config, err := framework.LoadConfig()
 			if err != nil {
-				framework.Failf("failed to load config: %v", err)
+				e2elog.Failf("failed to load config: %v", err)
 			}
 
 			apiExtensionClient, err := clientset.NewForConfig(config)
 			if err != nil {
-				framework.Failf("failed to initialize apiExtensionClient: %v", err)
+				e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
 			}
 
 			noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 			noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
-				framework.Failf("failed to create CustomResourceDefinition: %v", err)
+				e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
 				err = fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient)
 				if err != nil {
-					framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+					e2elog.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}
 			}()
 
@@ -80,35 +80,35 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			noxuResourceClient := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
 
 			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
-			Expect(err).NotTo(HaveOccurred(), "failed to watch custom resource: %s", watchCRNameA)
+			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameA)
 
 			watchB, err := watchCRWithName(noxuResourceClient, watchCRNameB)
-			Expect(err).NotTo(HaveOccurred(), "failed to watch custom resource: %s", watchCRNameB)
+			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameB)
 
 			testCrA := fixtures.NewNoxuInstance(ns, watchCRNameA)
 			testCrB := fixtures.NewNoxuInstance(ns, watchCRNameB)
 
-			By("Creating first CR ")
+			ginkgo.By("Creating first CR ")
 			testCrA, err = instantiateCustomResource(testCrA, noxuResourceClient, noxuDefinition)
-			Expect(err).NotTo(HaveOccurred(), "failed to instantiate custom resource: %+v", testCrA)
+			framework.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrA)
 			expectEvent(watchA, watch.Added, testCrA)
 			expectNoEvent(watchB, watch.Added, testCrA)
 
-			By("Creating second CR")
+			ginkgo.By("Creating second CR")
 			testCrB, err = instantiateCustomResource(testCrB, noxuResourceClient, noxuDefinition)
-			Expect(err).NotTo(HaveOccurred(), "failed to instantiate custom resource: %+v", testCrB)
+			framework.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrB)
 			expectEvent(watchB, watch.Added, testCrB)
 			expectNoEvent(watchA, watch.Added, testCrB)
 
-			By("Deleting first CR")
+			ginkgo.By("Deleting first CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameA)
-			Expect(err).NotTo(HaveOccurred(), "failed to delete custom resource: %s", watchCRNameA)
+			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Deleted, nil)
 			expectNoEvent(watchB, watch.Deleted, nil)
 
-			By("Deleting second CR")
+			ginkgo.By("Deleting second CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameB)
-			Expect(err).NotTo(HaveOccurred(), "failed to delete custom resource: %s", watchCRNameB)
+			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Deleted, nil)
 			expectNoEvent(watchA, watch.Deleted, nil)
 		})
@@ -159,8 +159,7 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		return client.Resource(gvr).Namespace(ns)
-	} else {
-		return client.Resource(gvr)
 	}
+	return client.Resource(gvr)
 
 }

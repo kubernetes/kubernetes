@@ -25,25 +25,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/klog"
 )
 
 // HealthzChecker is a named healthz checker.
 type HealthzChecker interface {
 	Name() string
 	Check(req *http.Request) error
-}
-
-var defaultHealthz = sync.Once{}
-
-// DefaultHealthz installs the default healthz check to the http.DefaultServeMux.
-func DefaultHealthz(checks ...HealthzChecker) {
-	defaultHealthz.Do(func() {
-		InstallHandler(http.DefaultServeMux, checks...)
-	})
 }
 
 // PingHealthz returns true automatically when checked
@@ -100,6 +91,14 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 // than once for the same mux will result in a panic.
 func InstallHandler(mux mux, checks ...HealthzChecker) {
 	InstallPathHandler(mux, "/healthz", checks...)
+}
+
+// InstallReadyzHandler registers handlers for health checking on the path
+// "/readyz" to mux. *All handlers* for mux must be specified in
+// exactly one call to InstallHandler. Calling InstallHandler more
+// than once for the same mux will result in a panic.
+func InstallReadyzHandler(mux mux, checks ...HealthzChecker) {
+	InstallPathHandler(mux, "/readyz", checks...)
 }
 
 // InstallPathHandler registers handlers for health checking on
@@ -182,7 +181,7 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 		// always be verbose on failure
 		if failed {
 			klog.V(2).Infof("%vhealthz check failed", verboseOut.String())
-			http.Error(w, fmt.Sprintf("%vhealthz check failed", verboseOut.String()), http.StatusInternalServerError)
+			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%vhealthz check failed", verboseOut.String()), http.StatusInternalServerError)
 			return
 		}
 

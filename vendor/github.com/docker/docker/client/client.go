@@ -23,7 +23,7 @@ For example, to list running containers (the equivalent of "docker ps"):
 	)
 
 	func main() {
-		cli, err := client.NewEnvClient()
+		cli, err := client.NewClientWithOpts(client.FromEnv)
 		if err != nil {
 			panic(err)
 		}
@@ -39,7 +39,7 @@ For example, to list running containers (the equivalent of "docker ps"):
 	}
 
 */
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -47,16 +47,13 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/go-connections/sockets"
-	"github.com/docker/go-connections/tlsconfig"
 	"github.com/pkg/errors"
 )
 
@@ -90,7 +87,7 @@ type Client struct {
 // If the request is non-GET return `ErrRedirect`. Otherwise use the last response.
 //
 // Go 1.8 changes behavior for HTTP redirects (specifically 301, 307, and 308) in the client .
-// The Docker client (and by extension docker API client) can be made to to send a request
+// The Docker client (and by extension docker API client) can be made to send a request
 // like POST /containers//start where what would normally be in the name section of the URL is empty.
 // This triggers an HTTP 301 from the daemon.
 // In go 1.8 this 301 will be converted to a GET request, and ends up getting a 404 from the daemon.
@@ -101,130 +98,6 @@ func CheckRedirect(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
 	return ErrRedirect
-}
-
-// NewEnvClient initializes a new API client based on environment variables.
-// See FromEnv for a list of support environment variables.
-//
-// Deprecated: use NewClientWithOpts(FromEnv)
-func NewEnvClient() (*Client, error) {
-	return NewClientWithOpts(FromEnv)
-}
-
-// FromEnv configures the client with values from environment variables.
-//
-// Supported environment variables:
-// DOCKER_HOST to set the url to the docker server.
-// DOCKER_API_VERSION to set the version of the API to reach, leave empty for latest.
-// DOCKER_CERT_PATH to load the TLS certificates from.
-// DOCKER_TLS_VERIFY to enable or disable TLS verification, off by default.
-func FromEnv(c *Client) error {
-	if dockerCertPath := os.Getenv("DOCKER_CERT_PATH"); dockerCertPath != "" {
-		options := tlsconfig.Options{
-			CAFile:             filepath.Join(dockerCertPath, "ca.pem"),
-			CertFile:           filepath.Join(dockerCertPath, "cert.pem"),
-			KeyFile:            filepath.Join(dockerCertPath, "key.pem"),
-			InsecureSkipVerify: os.Getenv("DOCKER_TLS_VERIFY") == "",
-		}
-		tlsc, err := tlsconfig.Client(options)
-		if err != nil {
-			return err
-		}
-
-		c.client = &http.Client{
-			Transport:     &http.Transport{TLSClientConfig: tlsc},
-			CheckRedirect: CheckRedirect,
-		}
-	}
-
-	if host := os.Getenv("DOCKER_HOST"); host != "" {
-		if err := WithHost(host)(c); err != nil {
-			return err
-		}
-	}
-
-	if version := os.Getenv("DOCKER_API_VERSION"); version != "" {
-		c.version = version
-		c.manualOverride = true
-	}
-	return nil
-}
-
-// WithTLSClientConfig applies a tls config to the client transport.
-func WithTLSClientConfig(cacertPath, certPath, keyPath string) func(*Client) error {
-	return func(c *Client) error {
-		opts := tlsconfig.Options{
-			CAFile:             cacertPath,
-			CertFile:           certPath,
-			KeyFile:            keyPath,
-			ExclusiveRootPools: true,
-		}
-		config, err := tlsconfig.Client(opts)
-		if err != nil {
-			return errors.Wrap(err, "failed to create tls config")
-		}
-		if transport, ok := c.client.Transport.(*http.Transport); ok {
-			transport.TLSClientConfig = config
-			return nil
-		}
-		return errors.Errorf("cannot apply tls config to transport: %T", c.client.Transport)
-	}
-}
-
-// WithDialer applies the dialer.DialContext to the client transport. This can be
-// used to set the Timeout and KeepAlive settings of the client.
-func WithDialer(dialer *net.Dialer) func(*Client) error {
-	return func(c *Client) error {
-		if transport, ok := c.client.Transport.(*http.Transport); ok {
-			transport.DialContext = dialer.DialContext
-			return nil
-		}
-		return errors.Errorf("cannot apply dialer to transport: %T", c.client.Transport)
-	}
-}
-
-// WithVersion overrides the client version with the specified one
-func WithVersion(version string) func(*Client) error {
-	return func(c *Client) error {
-		c.version = version
-		return nil
-	}
-}
-
-// WithHost overrides the client host with the specified one.
-func WithHost(host string) func(*Client) error {
-	return func(c *Client) error {
-		hostURL, err := ParseHostURL(host)
-		if err != nil {
-			return err
-		}
-		c.host = host
-		c.proto = hostURL.Scheme
-		c.addr = hostURL.Host
-		c.basePath = hostURL.Path
-		if transport, ok := c.client.Transport.(*http.Transport); ok {
-			return sockets.ConfigureTransport(transport, c.proto, c.addr)
-		}
-		return errors.Errorf("cannot apply host to transport: %T", c.client.Transport)
-	}
-}
-
-// WithHTTPClient overrides the client http client with the specified one
-func WithHTTPClient(client *http.Client) func(*Client) error {
-	return func(c *Client) error {
-		if client != nil {
-			c.client = client
-		}
-		return nil
-	}
-}
-
-// WithHTTPHeaders overrides the client default http headers
-func WithHTTPHeaders(headers map[string]string) func(*Client) error {
-	return func(c *Client) error {
-		c.customHTTPHeaders = headers
-		return nil
-	}
 }
 
 // NewClientWithOpts initializes a new API client with default values. It takes functors
@@ -242,7 +115,6 @@ func NewClientWithOpts(ops ...func(*Client) error) (*Client, error) {
 	c := &Client{
 		host:    DefaultDockerHost,
 		version: api.DefaultVersion,
-		scheme:  "http",
 		client:  client,
 		proto:   defaultProto,
 		addr:    defaultAddr,
@@ -257,14 +129,18 @@ func NewClientWithOpts(ops ...func(*Client) error) (*Client, error) {
 	if _, ok := c.client.Transport.(http.RoundTripper); !ok {
 		return nil, fmt.Errorf("unable to verify TLS configuration, invalid transport %v", c.client.Transport)
 	}
-	tlsConfig := resolveTLSConfig(c.client.Transport)
-	if tlsConfig != nil {
-		// TODO(stevvooe): This isn't really the right way to write clients in Go.
-		// `NewClient` should probably only take an `*http.Client` and work from there.
-		// Unfortunately, the model of having a host-ish/url-thingy as the connection
-		// string has us confusing protocol and transport layers. We continue doing
-		// this to avoid breaking existing clients but this should be addressed.
-		c.scheme = "https"
+	if c.scheme == "" {
+		c.scheme = "http"
+
+		tlsConfig := resolveTLSConfig(c.client.Transport)
+		if tlsConfig != nil {
+			// TODO(stevvooe): This isn't really the right way to write clients in Go.
+			// `NewClient` should probably only take an `*http.Client` and work from there.
+			// Unfortunately, the model of having a host-ish/url-thingy as the connection
+			// string has us confusing protocol and transport layers. We continue doing
+			// this to avoid breaking existing clients but this should be addressed.
+			c.scheme = "https"
+		}
 	}
 
 	return c, nil
@@ -281,18 +157,6 @@ func defaultHTTPClient(host string) (*http.Client, error) {
 		Transport:     transport,
 		CheckRedirect: CheckRedirect,
 	}, nil
-}
-
-// NewClient initializes a new API client for the given host and API version.
-// It uses the given http client as transport.
-// It also initializes the custom http headers to add to each request.
-//
-// It won't send any version information if the version number is empty. It is
-// highly recommended that you set a version or your client may break if the
-// server is upgraded.
-// Deprecated: use NewClientWithOpts
-func NewClient(host string, version string, client *http.Client, httpHeaders map[string]string) (*Client, error) {
-	return NewClientWithOpts(WithHost(host), WithVersion(version), WithHTTPClient(client), WithHTTPHeaders(httpHeaders))
 }
 
 // Close the transport used by the client
@@ -399,4 +263,17 @@ func (cli *Client) CustomHTTPHeaders() map[string]string {
 // Deprecated: use WithHTTPHeaders when creating the client.
 func (cli *Client) SetCustomHTTPHeaders(headers map[string]string) {
 	cli.customHTTPHeaders = headers
+}
+
+// Dialer returns a dialer for a raw stream connection, with HTTP/1.1 header, that can be used for proxying the daemon connection.
+// Used by `docker dial-stdio` (docker/cli#889).
+func (cli *Client) Dialer() func(context.Context) (net.Conn, error) {
+	return func(ctx context.Context) (net.Conn, error) {
+		if transport, ok := cli.client.Transport.(*http.Transport); ok {
+			if transport.DialContext != nil && transport.TLSClientConfig == nil {
+				return transport.DialContext(ctx, cli.proto, cli.addr)
+			}
+		}
+		return fallbackDial(cli.proto, cli.addr, resolveTLSConfig(cli.client.Transport))
+	}
 }

@@ -28,10 +28,12 @@ import (
 	"github.com/liggitt/tabwriter"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
-	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
+	utilprinters "k8s.io/kubectl/pkg/util/printers"
 )
 
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
@@ -205,6 +207,21 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jsonpath.JSONPath, out io.Writer) error {
 	columns := make([]string, len(parsers))
 	switch u := obj.(type) {
+	case *metav1.WatchEvent:
+		if printers.InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(u.Object.Object)).Type().PkgPath()) {
+			return fmt.Errorf(printers.InternalObjectPrinterErr)
+		}
+		unstructuredObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(u.Object.Object)
+		if err != nil {
+			return err
+		}
+		obj = &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"type":   u.Type,
+				"object": unstructuredObject,
+			},
+		}
+
 	case *runtime.Unknown:
 		if len(u.Raw) > 0 {
 			var err error

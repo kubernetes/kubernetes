@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/docker/api/types/swarm"
 
 import "os"
 
@@ -27,9 +27,14 @@ type ConfigReferenceFileTarget struct {
 	Mode os.FileMode
 }
 
+// ConfigReferenceRuntimeTarget is a target for a config specifying that it
+// isn't mounted into the container but instead has some other purpose.
+type ConfigReferenceRuntimeTarget struct{}
+
 // ConfigReference is a reference to a config in swarm
 type ConfigReference struct {
-	File       *ConfigReferenceFileTarget
+	File       *ConfigReferenceFileTarget    `json:",omitempty"`
+	Runtime    *ConfigReferenceRuntimeTarget `json:",omitempty"`
 	ConfigID   string
 	ConfigName string
 }

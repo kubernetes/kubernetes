@@ -21,7 +21,12 @@ set -o xtrace
 
 retry() {
   for i in {1..5}; do
-    "$@" && return 0 || sleep "${i}"
+    if "$@"
+    then      
+      return 0
+    else
+      sleep "${i}"
+    fi
   done
   "$@"
 }
@@ -51,5 +56,5 @@ cd /go/src/k8s.io/kubernetes
 # Run the benchmark tests and pretty-print the results into a separate file.
 make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
   | tee \
-   >(prettybench -no-passthrough > ${ARTIFACTS}/BenchmarkResults.txt) \
-   >(go run test/integration/benchmark/jsonify/main.go ${ARTIFACTS}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json || cat > /dev/null)
+   >(prettybench -no-passthrough > "${ARTIFACTS}/BenchmarkResults.txt") \
+   >(go run test/integration/benchmark/jsonify/main.go "${ARTIFACTS}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json" || cat > /dev/null)

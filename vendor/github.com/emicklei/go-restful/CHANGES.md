@@ -1,6 +1,56 @@
-Change history of go-restful
-=
+## Change history of go-restful
+
+
+v2.9.5
+- fix panic in Response.WriteError if err == nil
+
+v2.9.4
+
+- fix issue #400 , parsing mime type quality
+- Route Builder added option for contentEncodingEnabled (#398)
+
+v2.9.3
+
+- Avoid return of 415 Unsupported Media Type when request body is empty (#396)
+
+v2.9.2
+
+- Reduce allocations in per-request methods to improve performance (#395)
+
+v2.9.1
+
+- Fix issue with default responses and invalid status code 0. (#393)
+
+v2.9.0
+
+- add per Route content encoding setting (overrides container setting)
+
+v2.8.0
+
+- add Request.QueryParameters()
+- add json-iterator (via build tag)
+- disable vgo module (until log is moved)
+
+v2.7.1
+
+- add vgo module
+
+v2.6.1
+
+- add JSONNewDecoderFunc to allow custom JSON Decoder usage (go 1.10+)
+
+v2.6.0
+
+- Make JSR 311 routing and path param processing consistent
+- Adding description to RouteBuilder.Reads()
+- Update example for Swagger12 and OpenAPI
+
+2017-09-13
+
+- added route condition functions using `.If(func)` in route building.
+
 2017-02-16
+
 - solved issue #304, make operation names unique
 
 2017-01-30

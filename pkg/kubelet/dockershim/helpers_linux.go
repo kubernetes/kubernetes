@@ -31,7 +31,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -136,8 +136,8 @@ func (ds *dockerService) updateCreateConfig(
 	return nil
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
-	return ""
+func (ds *dockerService) determinePodIPBySandboxID(uid string) []string {
+	return nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {

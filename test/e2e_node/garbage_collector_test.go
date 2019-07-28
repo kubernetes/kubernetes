@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -144,7 +144,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	BeforeEach(func() {
 		var err error
 		runtime, _, err = getCRIClient()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use CRI runtime client.
@@ -200,7 +200,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 						containerCount := 0
 						for _, containerName := range containerNames {
 							if containerName == pod.getContainerName(i) {
-								containerCount += 1
+								containerCount++
 							}
 						}
 						if containerCount > maxPerPodContainer+1 {
@@ -228,7 +228,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 							containerCount := 0
 							for _, containerName := range containerNames {
 								if containerName == pod.getContainerName(i) {
-									containerCount += 1
+									containerCount++
 								}
 							}
 							if pod.restartCount > 0 && containerCount < maxPerPodContainer+1 {

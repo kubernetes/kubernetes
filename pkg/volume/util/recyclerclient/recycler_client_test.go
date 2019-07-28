@@ -210,9 +210,8 @@ func (c *mockRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
 func (c *mockRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
 	if c.pod != nil {
 		return c.pod, nil
-	} else {
-		return nil, fmt.Errorf("pod does not exist")
 	}
+	return nil, fmt.Errorf("pod does not exist")
 }
 
 func (c *mockRecyclerClient) DeletePod(name, namespace string) error {

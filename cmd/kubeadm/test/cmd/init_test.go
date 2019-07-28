@@ -170,6 +170,16 @@ func TestCmdInitConfig(t *testing.T) {
 			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1beta1.yaml",
 			expected: false,
 		},
+		{
+			name:     "can load v1beta2 config",
+			args:     "--config=testdata/init/v1beta2.yaml",
+			expected: true,
+		},
+		{
+			name:     "don't allow mixed arguments v1beta2",
+			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1beta2.yaml",
+			expected: false,
+		},
 	}
 
 	for _, rt := range initTest {

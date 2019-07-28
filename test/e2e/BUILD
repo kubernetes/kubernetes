@@ -53,7 +53,7 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -64,8 +64,11 @@ go_library(
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/providers/aws:go_default_library",
         "//test/e2e/framework/providers/azure:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
@@ -80,6 +83,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

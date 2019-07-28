@@ -18,7 +18,6 @@ package gcepd
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -26,16 +25,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
-	cloudfeatures "k8s.io/cloud-provider/features"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
 	"k8s.io/utils/exec"
 	utilpath "k8s.io/utils/path"
 )
@@ -128,11 +125,6 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 				return "", 0, nil, "", err
 			}
 		case "replication-type":
-			if !utilfeature.DefaultFeatureGate.Enabled(cloudfeatures.GCERegionalPersistentDisk) {
-				return "", 0, nil, "",
-					fmt.Errorf("the %q option for volume plugin %v is only supported with the %q Kubernetes feature gate enabled",
-						k, c.plugin.GetPluginName(), cloudfeatures.GCERegionalPersistentDisk)
-			}
 			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
 			fstype = v
@@ -272,8 +264,8 @@ func parseScsiSerial(output string) (string, error) {
 // Returns list of all /dev/disk/by-id/* paths for given PD.
 func getDiskByIDPaths(pdName string, partition string) []string {
 	devicePaths := []string{
-		path.Join(diskByIDPath, diskGooglePrefix+pdName),
-		path.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
+		filepath.Join(diskByIDPath, diskGooglePrefix+pdName),
+		filepath.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
 	}
 
 	if partition != "" {

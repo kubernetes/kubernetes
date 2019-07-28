@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +28,7 @@ import (
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
@@ -64,27 +65,27 @@ func TestUploadConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
-			initialcfg := &kubeadmapiv1beta1.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
+			initialcfg := &kubeadmapiv1beta2.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
-				},
-				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
+				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
-						Token: &kubeadmapiv1beta1.BootstrapTokenString{
+						Token: &kubeadmapiv1beta2.BootstrapTokenString{
 							ID:     "abcdef",
 							Secret: "abcdef0123456789",
 						},
 					},
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 					Name:      "node-foo",
 					CRISocket: "/var/run/custom-cri.sock",
 				},
 			}
-			cfg, err := configutil.DefaultedInitConfiguration(initialcfg)
+			clustercfg := &kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
+			}
+			cfg, err := configutil.DefaultedInitConfiguration(initialcfg, clustercfg)
 
 			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
 			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}
@@ -153,5 +154,38 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMutateClusterStatus(t *testing.T) {
+	cm := &v1.ConfigMap{
+		Data: map[string]string{
+			kubeadmconstants.ClusterStatusConfigMapKey: "",
+		},
+	}
+
+	endpoints := map[string]kubeadmapi.APIEndpoint{
+		"some-node": {
+			AdvertiseAddress: "127.0.0.1",
+			BindPort:         6443,
+		},
+	}
+
+	err := mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
+		cs.APIEndpoints = endpoints
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("could not mutate cluster status: %v", err)
+	}
+
+	// Try to unmarshal the cluster status back and compare with the original mutated structure
+	cs, err := configutil.UnmarshalClusterStatus(cm.Data)
+	if err != nil {
+		t.Fatalf("could not unmarshal cluster status: %v", err)
+	}
+
+	if !reflect.DeepEqual(cs.APIEndpoints, endpoints) {
+		t.Fatalf("mutation of cluster status failed: %v", err)
 	}
 }

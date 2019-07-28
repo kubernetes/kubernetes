@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"gopkg.in/gcfg.v1"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 const (
@@ -130,13 +130,13 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 	if cfg.Workspace.VCenterIP == "" || cfg.Workspace.DefaultDatastore == "" || cfg.Workspace.Folder == "" || cfg.Workspace.Datacenter == "" {
 		msg := fmt.Sprintf("All fields in workspace are mandatory."+
 			" vsphere.conf does not have the workspace specified correctly. cfg.Workspace: %+v", cfg.Workspace)
-		framework.Logf(msg)
+		e2elog.Logf(msg)
 		return nil, errors.New(msg)
 	}
 	for vcServer, vcConfig := range cfg.VirtualCenter {
-		framework.Logf("Initializing vc server %s", vcServer)
+		e2elog.Logf("Initializing vc server %s", vcServer)
 		if vcServer == "" {
-			framework.Logf("vsphere.conf does not have the VirtualCenter IP address specified")
+			e2elog.Logf("vsphere.conf does not have the VirtualCenter IP address specified")
 			return nil, errors.New("vsphere.conf does not have the VirtualCenter IP address specified")
 		}
 		vcConfig.Hostname = vcServer
@@ -149,12 +149,12 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 		}
 		if vcConfig.Username == "" {
 			msg := fmt.Sprintf("vcConfig.Username is empty for vc %s!", vcServer)
-			framework.Logf(msg)
+			e2elog.Logf(msg)
 			return nil, errors.New(msg)
 		}
 		if vcConfig.Password == "" {
 			msg := fmt.Sprintf("vcConfig.Password is empty for vc %s!", vcServer)
-			framework.Logf(msg)
+			e2elog.Logf(msg)
 			return nil, errors.New(msg)
 		}
 		if vcConfig.Port == "" {
@@ -176,6 +176,6 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 		vsphereInstances[vcServer] = &vsphereIns
 	}
 
-	framework.Logf("ConfigFile %v \n vSphere instances %v", cfg, vsphereInstances)
+	e2elog.Logf("ConfigFile %v \n vSphere instances %v", cfg, vsphereInstances)
 	return vsphereInstances, nil
 }

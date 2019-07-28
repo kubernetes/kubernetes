@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Sets up the environment (e.g. installing godep and etcd if necessary)
+# Sets up the environment (e.g. installing etcd if necessary)
 # and then runs all of the verification checks.
 
 set -o errexit

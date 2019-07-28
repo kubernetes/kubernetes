@@ -24,12 +24,13 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -49,6 +50,7 @@ const (
 	defaultPVCName  = "pvc1"
 	defaultPodName  = "pod1"
 	defaultNodeName = "node1"
+	defaultUID      = "uid1"
 )
 
 func pod() *v1.Pod {
@@ -56,6 +58,7 @@ func pod() *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultPodName,
 			Namespace: defaultNS,
+			UID:       defaultUID,
 		},
 		Spec: v1.PodSpec{
 			NodeName: defaultNodeName,
@@ -97,6 +100,11 @@ func withEmptyDir(pod *v1.Pod) *v1.Pod {
 
 func withStatus(phase v1.PodPhase, pod *v1.Pod) *v1.Pod {
 	pod.Status.Phase = phase
+	return pod
+}
+
+func withUID(uid types.UID, pod *v1.Pod) *v1.Pod {
+	pod.ObjectMeta.UID = uid
 	return pod
 }
 
@@ -152,13 +160,13 @@ func TestPVCProtectionController(t *testing.T) {
 		// Optional client reactors.
 		reactors []reaction
 		// PVC event to simulate. This PVC will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPVC *v1.PersistentVolumeClaim
 		// Pod event to simulate. This Pod will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPod *v1.Pod
-		// Pod event to similate. This Pod is *not* added to
-		// initalObjects.
+		// Pod event to simulate. This Pod is *not* added to
+		// initialObjects.
 		deletedPod *v1.Pod
 		// List of expected kubeclient actions that should happen during the
 		// test.
@@ -177,7 +185,7 @@ func TestPVCProtectionController(t *testing.T) {
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:                                "StorageObjectInUseProtection Disabled, PVC without finalizer -> finalizer is added",
+			name:                                "StorageObjectInUseProtection Disabled, PVC without finalizer -> finalizer is not added",
 			updatedPVC:                          pvc(),
 			expectedActions:                     []clienttesting.Action{},
 			storageObjectInUseProtectionEnabled: false,
@@ -315,6 +323,48 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
+		{
+			name: "pod delete and create with same namespaced name seen as an update, old pod used deleted PVC -> finalizer is removed",
+			initialObjects: []runtime.Object{
+				deleted(withProtectionFinalizer(pvc())),
+			},
+			deletedPod: withPVC(defaultPVCName, pod()),
+			updatedPod: withUID("uid2", pod()),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "pod delete and create with same namespaced name seen as an update, old pod used non-deleted PVC -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withProtectionFinalizer(pvc()),
+			},
+			deletedPod:                          withPVC(defaultPVCName, pod()),
+			updatedPod:                          withUID("uid2", pod()),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "pod delete and create with same namespaced name seen as an update, both pods reference deleted PVC -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				deleted(withProtectionFinalizer(pvc())),
+			},
+			deletedPod:                          withPVC(defaultPVCName, pod()),
+			updatedPod:                          withUID("uid2", withPVC(defaultPVCName, pod())),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "pod update from unscheduled to scheduled, deleted PVC is referenced -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				deleted(withProtectionFinalizer(pvc())),
+			},
+			deletedPod:                          unscheduled(withPVC(defaultPVCName, pod())),
+			updatedPod:                          withPVC(defaultPVCName, pod()),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -358,11 +408,13 @@ func TestPVCProtectionController(t *testing.T) {
 		if test.updatedPVC != nil {
 			ctrl.pvcAddedUpdated(test.updatedPVC)
 		}
-		if test.updatedPod != nil {
-			ctrl.podAddedDeletedUpdated(test.updatedPod, false)
-		}
-		if test.deletedPod != nil {
-			ctrl.podAddedDeletedUpdated(test.deletedPod, true)
+		switch {
+		case test.deletedPod != nil && test.updatedPod != nil && test.deletedPod.Namespace == test.updatedPod.Namespace && test.deletedPod.Name == test.updatedPod.Name:
+			ctrl.podAddedDeletedUpdated(test.deletedPod, test.updatedPod, false)
+		case test.updatedPod != nil:
+			ctrl.podAddedDeletedUpdated(nil, test.updatedPod, false)
+		case test.deletedPod != nil:
+			ctrl.podAddedDeletedUpdated(nil, test.deletedPod, true)
 		}
 
 		// Process the controller queue until we get expected results

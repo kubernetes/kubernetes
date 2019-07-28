@@ -15,7 +15,7 @@
 //   import "google.golang.org/api/logging/v2beta1"
 //   ...
 //   loggingService, err := logging.New(oauthHttpClient)
-package logging
+package logging // import "google.golang.org/api/logging/v2beta1"
 
 import (
 	"bytes"

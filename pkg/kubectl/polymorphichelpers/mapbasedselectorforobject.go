@@ -18,6 +18,7 @@ package polymorphichelpers
 
 import (
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -25,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/generate"
 )
 
 // mapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
@@ -35,19 +35,19 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 	switch t := object.(type) {
 	case *corev1.ReplicationController:
-		return generate.MakeLabels(t.Spec.Selector), nil
+		return MakeLabels(t.Spec.Selector), nil
 
 	case *corev1.Pod:
 		if len(t.Labels) == 0 {
 			return "", fmt.Errorf("the pod has no labels and cannot be exposed")
 		}
-		return generate.MakeLabels(t.Labels), nil
+		return MakeLabels(t.Labels), nil
 
 	case *corev1.Service:
 		if t.Spec.Selector == nil {
 			return "", fmt.Errorf("the service has no pod selector set")
 		}
-		return generate.MakeLabels(t.Spec.Selector), nil
+		return MakeLabels(t.Spec.Selector), nil
 
 	case *extensionsv1beta1.Deployment:
 		// "extensions" deployments use pod template labels if selector is not set.
@@ -65,7 +65,7 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(labels) == 0 {
 			return "", fmt.Errorf("the deployment has no labels or selectors and cannot be exposed")
 		}
-		return generate.MakeLabels(labels), nil
+		return MakeLabels(labels), nil
 
 	case *appsv1.Deployment:
 		// "apps" deployments must have the selector set.
@@ -77,7 +77,7 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return MakeLabels(t.Spec.Selector.MatchLabels), nil
 
 	case *appsv1beta2.Deployment:
 		// "apps" deployments must have the selector set.
@@ -89,7 +89,7 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return MakeLabels(t.Spec.Selector.MatchLabels), nil
 
 	case *appsv1beta1.Deployment:
 		// "apps" deployments must have the selector set.
@@ -101,7 +101,7 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return MakeLabels(t.Spec.Selector.MatchLabels), nil
 
 	case *extensionsv1beta1.ReplicaSet:
 		// "extensions" replicasets use pod template labels if selector is not set.
@@ -119,7 +119,7 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(labels) == 0 {
 			return "", fmt.Errorf("the replica set has no labels or selectors and cannot be exposed")
 		}
-		return generate.MakeLabels(labels), nil
+		return MakeLabels(labels), nil
 
 	case *appsv1.ReplicaSet:
 		// "apps" replicasets must have the selector set.
@@ -131,7 +131,7 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return MakeLabels(t.Spec.Selector.MatchLabels), nil
 
 	case *appsv1beta2.ReplicaSet:
 		// "apps" replicasets must have the selector set.
@@ -143,10 +143,18 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return MakeLabels(t.Spec.Selector.MatchLabels), nil
 
 	default:
 		return "", fmt.Errorf("cannot extract pod selector from %T", object)
 	}
 
+}
+
+func MakeLabels(labels map[string]string) string {
+	out := []string{}
+	for key, value := range labels {
+		out = append(out, fmt.Sprintf("%s=%s", key, value))
+	}
+	return strings.Join(out, ",")
 }

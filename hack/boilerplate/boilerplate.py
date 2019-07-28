@@ -99,7 +99,7 @@ def file_passes(filename, refs, regexs):
     if extension == "go" or extension == "generatego":
         p = regexs["go_build_constraints"]
         (data, found) = p.subn("", data, 1)
-    elif extension == "sh":
+    elif extension in ["sh", "py"]:
         p = regexs["shebang"]
         (data, found) = p.subn("", data, 1)
 
@@ -149,7 +149,7 @@ def file_extension(filename):
 
 skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
-                "pkg/kubectl/generated/bindata.go"]
+                "staging/src/k8s.io/kubectl/pkg/generated/bindata.go"]
 
 # list all the files contain 'DO NOT EDIT', but are not generated
 skipped_ungenerated_files = ['hack/lib/swagger.sh', 'hack/boilerplate/boilerplate.py']
@@ -205,7 +205,7 @@ def get_regexs():
     regexs["date"] = re.compile(get_dates())
     # strip // +build \n\n build constraints
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
-    # strip #!.* from shell scripts
+    # strip #!.* from scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
     # Search for generated files
     regexs["generated"] = re.compile( 'DO NOT EDIT' )

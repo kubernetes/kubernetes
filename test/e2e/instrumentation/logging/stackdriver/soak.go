@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -85,7 +86,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 					// Starting one pod on each node.
 					for _, pod := range podsByRun[runIdx] {
 						if err := pod.Start(f); err != nil {
-							framework.Logf("Failed to start pod: %v", err)
+							e2elog.Logf("Failed to start pod: %v", err)
 						}
 					}
 					<-t.C

@@ -1,18 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- thockin
-- matchstick
+- sig-network-approvers
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- brendandburns
-- vishh
-- justinsb
-- freehan
-- dcbw
-- m1093782566
-- danwinship
+- sig-network-reviewers
 labels:
 - sig/network

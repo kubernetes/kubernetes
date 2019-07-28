@@ -122,6 +122,13 @@ func (c *crioClientImpl) ContainerInfo(id string) (*ContainerInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	// golang's http.Do doesn't return an error if non 200 response code is returned
+	// handle this case here, rather than failing to decode the body
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Error finding container %s: Status %d returned error %s", id, resp.StatusCode, resp.Body)
+	}
+
 	cInfo := ContainerInfo{}
 	if err := json.NewDecoder(resp.Body).Decode(&cInfo); err != nil {
 		return nil, err

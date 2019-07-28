@@ -26,9 +26,9 @@ run_kubectl_run_tests() {
   kube::log::status "Testing kubectl run"
   ## kubectl run should create deployments, jobs or cronjob
   # Pre-Condition: no Job exists
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert jobs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
-  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]:?}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Describe command (resource only) should print detailed information

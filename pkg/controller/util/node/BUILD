@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/util/node",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",

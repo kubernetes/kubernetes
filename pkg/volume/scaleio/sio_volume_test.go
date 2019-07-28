@@ -19,7 +19,7 @@ package scaleio
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -185,13 +185,13 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 	sioVol.sioMgr.client = sio
 	sioVol.sioMgr.CreateVolume(testSioVol, 8) //create vol ahead of time
 
-	volPath := path.Join(tmpDir, fmt.Sprintf("pods/%s/volumes/kubernetes.io~scaleio/%s", podUID, testSioVolName))
+	volPath := filepath.Join(tmpDir, fmt.Sprintf("pods/%s/volumes/kubernetes.io~scaleio/%s", podUID, testSioVolName))
 	path := sioMounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := sioMounter.SetUp(nil); err != nil {
+	if err := sioMounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -345,7 +345,7 @@ func TestVolumeProvisioner(t *testing.T) {
 		t.Fatalf("failed to create sio mgr: %v", err)
 	}
 	sioVol.sioMgr.client = sio
-	if err := sioMounter.SetUp(nil); err != nil {
+	if err := sioMounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Fatalf("Expected success, got: %v", err)
 	}
 

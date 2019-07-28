@@ -35,26 +35,34 @@ import (
 //
 // Dlaexc is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlaexc(wantq bool, n int, t []float64, ldt int, q []float64, ldq int, j1, n1, n2 int, work []float64) (ok bool) {
-	checkMatrix(n, n, t, ldt)
-	if wantq {
-		checkMatrix(n, n, q, ldq)
-	}
-	if j1 < 0 || n <= j1 {
-		panic("lapack: index j1 out of range")
-	}
-	if len(work) < n {
-		panic(badWork)
-	}
-	if n1 < 0 || 2 < n1 {
-		panic("lapack: invalid value of n1")
-	}
-	if n2 < 0 || 2 < n2 {
-		panic("lapack: invalid value of n2")
+	switch {
+	case n < 0:
+		panic(nLT0)
+	case ldt < max(1, n):
+		panic(badLdT)
+	case wantq && ldt < max(1, n):
+		panic(badLdQ)
+	case j1 < 0 || n <= j1:
+		panic(badJ1)
+	case len(work) < n:
+		panic(shortWork)
+	case n1 < 0 || 2 < n1:
+		panic(badN1)
+	case n2 < 0 || 2 < n2:
+		panic(badN2)
 	}
 
 	if n == 0 || n1 == 0 || n2 == 0 {
 		return true
 	}
+
+	switch {
+	case len(t) < (n-1)*ldt+n:
+		panic(shortT)
+	case wantq && len(q) < (n-1)*ldq+n:
+		panic(shortQ)
+	}
+
 	if j1+n1 >= n {
 		// TODO(vladimir-ch): Reference LAPACK does this check whether
 		// the start of the second block is in the matrix T. It returns

@@ -396,3 +396,50 @@ func TestGetNodeAddressses(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendPortIfNeeded(t *testing.T) {
+	testCases := []struct {
+		name   string
+		addr   string
+		port   int32
+		expect string
+	}{
+		{
+			name:   "IPv4 all-zeros bind address has port",
+			addr:   "0.0.0.0:12345",
+			port:   23456,
+			expect: "0.0.0.0:12345",
+		},
+		{
+			name:   "non-zeros IPv4 config",
+			addr:   "9.8.7.6",
+			port:   12345,
+			expect: "9.8.7.6:12345",
+		},
+		{
+			name:   "IPv6 \"[::]\" bind address has port",
+			addr:   "[::]:12345",
+			port:   23456,
+			expect: "[::]:12345",
+		},
+		{
+			name:   "IPv6 config",
+			addr:   "fd00:1::5",
+			port:   23456,
+			expect: "[fd00:1::5]:23456",
+		},
+		{
+			name:   "Invalid IPv6 Config",
+			addr:   "[fd00:1::5]",
+			port:   12345,
+			expect: "[fd00:1::5]",
+		},
+	}
+
+	for i := range testCases {
+		got := AppendPortIfNeeded(testCases[i].addr, testCases[i].port)
+		if testCases[i].expect != got {
+			t.Errorf("case %s: expected %v, got %v", testCases[i].name, testCases[i].expect, got)
+		}
+	}
+}

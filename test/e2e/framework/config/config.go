@@ -15,11 +15,22 @@ limitations under the License.
 */
 
 // Package config simplifies the declaration of configuration options.
-// Right now the implementation maps them directly command line
-// flags. When combined with test/e2e/framework/viper in a test suite,
-// those flags then can also be read from a config file.
+// Right now the implementation maps them directly to command line
+// flags. When combined with test/e2e/framework/viperconfig in a test
+// suite, those flags then can also be read from a config file.
 //
-// Instead of defining flags one-by-one, developers annotate a
+// The command line flags all get stored in a private flag set. The
+// developer of the E2E test suite decides how they are exposed. Options
+// include:
+// - exposing as normal flags in the actual command line:
+//   CopyFlags(Flags, flag.CommandLine)
+// - populate via test/e2e/framework/viperconfig:
+//   viperconfig.ViperizeFlags("my-config.yaml", "", Flags)
+// - a combination of both:
+//   CopyFlags(Flags, flag.CommandLine)
+//   viperconfig.ViperizeFlags("my-config.yaml", "", flag.CommandLine)
+//
+// Instead of defining flags one-by-one, test developers annotate a
 // structure with tags and then call a single function. This is the
 // same approach as in https://godoc.org/github.com/jessevdk/go-flags,
 // but implemented so that a test suite can continue to use the normal
@@ -84,10 +95,23 @@ import (
 	"unicode/utf8"
 )
 
-// CommandLine is the flag set that AddOptions adds to. Usually this
-// is the same as the default in the flag package, but can also be
-// something else (for example during testing).
-var CommandLine = flag.CommandLine
+// Flags is the flag set that AddOptions adds to. Test authors should
+// also use it instead of directly adding to the global command line.
+var Flags = flag.NewFlagSet("", flag.ContinueOnError)
+
+// CopyFlags ensures that all flags that are defined in the source flag
+// set appear in the target flag set as if they had been defined there
+// directly. From the flag package it inherits the behavior that there
+// is a panic if the target already contains a flag from the source.
+func CopyFlags(source *flag.FlagSet, target *flag.FlagSet) {
+	source.VisitAll(func(flag *flag.Flag) {
+		// We don't need to copy flag.DefValue. The original
+		// default (from, say, flag.String) was stored in
+		// the value and gets extracted by Var for the help
+		// message.
+		target.Var(flag.Value, flag.Name, flag.Usage)
+	})
+}
 
 // AddOptions analyzes the options value and creates the necessary
 // flags to populate it.
@@ -102,6 +126,11 @@ var CommandLine = flag.CommandLine
 // It panics when it encounters an error, like unsupported types
 // or option name conflicts.
 func AddOptions(options interface{}, prefix string) bool {
+	return AddOptionsToSet(Flags, options, prefix)
+}
+
+// AddOptionsToSet is the same as AddOption, except that it allows choosing the flag set.
+func AddOptionsToSet(flags *flag.FlagSet, options interface{}, prefix string) bool {
 	optionsType := reflect.TypeOf(options)
 	if optionsType == nil {
 		panic("options parameter without a type - nil?!")
@@ -109,11 +138,11 @@ func AddOptions(options interface{}, prefix string) bool {
 	if optionsType.Kind() != reflect.Ptr || optionsType.Elem().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("need a pointer to a struct, got instead: %T", options))
 	}
-	addStructFields(optionsType.Elem(), reflect.Indirect(reflect.ValueOf(options)), prefix)
+	addStructFields(flags, optionsType.Elem(), reflect.Indirect(reflect.ValueOf(options)), prefix)
 	return true
 }
 
-func addStructFields(structType reflect.Type, structValue reflect.Value, prefix string) {
+func addStructFields(flags *flag.FlagSet, structType reflect.Type, structValue reflect.Value, prefix string) {
 	for i := 0; i < structValue.NumField(); i++ {
 		entry := structValue.Field(i)
 		addr := entry.Addr()
@@ -134,12 +163,12 @@ func addStructFields(structType reflect.Type, structValue reflect.Value, prefix 
 			// Entries in embedded fields are treated like
 			// entries, in the struct itself, i.e. we add
 			// them with the same prefix.
-			addStructFields(structField.Type, entry, prefix)
+			addStructFields(flags, structField.Type, entry, prefix)
 			continue
 		}
 		if structField.Type.Kind() == reflect.Struct {
 			// Add nested options.
-			addStructFields(structField.Type, entry, name)
+			addStructFields(flags, structField.Type, entry, name)
 			continue
 		}
 		// We could switch based on structField.Type. Doing a
@@ -153,33 +182,33 @@ func addStructFields(structType reflect.Type, structValue reflect.Value, prefix 
 		case *bool:
 			var defValue bool
 			parseDefault(&defValue, name, def)
-			CommandLine.BoolVar(ptr, name, defValue, usage)
+			flags.BoolVar(ptr, name, defValue, usage)
 		case *time.Duration:
 			var defValue time.Duration
 			parseDefault(&defValue, name, def)
-			CommandLine.DurationVar(ptr, name, defValue, usage)
+			flags.DurationVar(ptr, name, defValue, usage)
 		case *float64:
 			var defValue float64
 			parseDefault(&defValue, name, def)
-			CommandLine.Float64Var(ptr, name, defValue, usage)
+			flags.Float64Var(ptr, name, defValue, usage)
 		case *string:
-			CommandLine.StringVar(ptr, name, def, usage)
+			flags.StringVar(ptr, name, def, usage)
 		case *int:
 			var defValue int
 			parseDefault(&defValue, name, def)
-			CommandLine.IntVar(ptr, name, defValue, usage)
+			flags.IntVar(ptr, name, defValue, usage)
 		case *int64:
 			var defValue int64
 			parseDefault(&defValue, name, def)
-			CommandLine.Int64Var(ptr, name, defValue, usage)
+			flags.Int64Var(ptr, name, defValue, usage)
 		case *uint:
 			var defValue uint
 			parseDefault(&defValue, name, def)
-			CommandLine.UintVar(ptr, name, defValue, usage)
+			flags.UintVar(ptr, name, defValue, usage)
 		case *uint64:
 			var defValue uint64
 			parseDefault(&defValue, name, def)
-			CommandLine.Uint64Var(ptr, name, defValue, usage)
+			flags.Uint64Var(ptr, name, defValue, usage)
 		default:
 			panic(fmt.Sprintf("unsupported struct entry type %q: %T", name, entry.Interface()))
 		}

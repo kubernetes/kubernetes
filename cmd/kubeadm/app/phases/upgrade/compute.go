@@ -60,9 +60,9 @@ func (u *Upgrade) CanUpgradeEtcd() bool {
 type ClusterState struct {
 	// KubeVersion describes the version of the Kubernetes API Server, Controller Manager, Scheduler and Proxy.
 	KubeVersion string
-	// DNSType
+	// DNSType describes the type of DNS add-on used in the cluster.
 	DNSType kubeadmapi.DNSAddOnType
-	// DNSVersion describes the version of the kube-dns images used and manifest version
+	// DNSVersion describes the version of the DNS add-on.
 	DNSVersion string
 	// KubeadmVersion describes the version of the kubeadm CLI
 	KubeadmVersion string

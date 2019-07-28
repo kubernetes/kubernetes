@@ -138,11 +138,13 @@ func (m *EventManager) formatMessage(event types.BaseEvent) {
 		}
 	}
 
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, event); err != nil {
-		log.Print(err)
+	if t != nil {
+		var buf bytes.Buffer
+		if err := t.Execute(&buf, event); err != nil {
+			log.Print(err)
+		}
+		e.FullFormattedMessage = buf.String()
 	}
-	e.FullFormattedMessage = buf.String()
 
 	if logEvents {
 		log.Printf("[%s] %s", id, e.FullFormattedMessage)
@@ -181,6 +183,7 @@ type EventHistoryCollector struct {
 
 	m    *EventManager
 	page *ring.Ring
+	pos  int
 }
 
 // doEntityEventArgument calls f for each entity argument in the event.
@@ -328,6 +331,7 @@ func (c *EventHistoryCollector) eventMatches(event types.BaseEvent) bool {
 
 // filePage copies the manager's latest events into the collector's page with Filter applied.
 func (c *EventHistoryCollector) fillPage(size int) {
+	c.pos = 0
 	l := c.page.Len()
 	delta := size - l
 
@@ -389,6 +393,66 @@ func (c *EventHistoryCollector) SetCollectorPageSize(ctx *Context, req *types.Se
 	})
 
 	body.Res = new(types.SetCollectorPageSizeResponse)
+	return body
+}
+
+func (c *EventHistoryCollector) RewindCollector(ctx *Context, req *types.RewindCollector) soap.HasFault {
+	c.pos = 0
+	return &methods.RewindCollectorBody{
+		Res: new(types.RewindCollectorResponse),
+	}
+}
+
+func (c *EventHistoryCollector) ReadNextEvents(ctx *Context, req *types.ReadNextEvents) soap.HasFault {
+	body := &methods.ReadNextEventsBody{}
+	if req.MaxCount <= 0 {
+		body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "maxCount"})
+		return body
+	}
+	body.Res = new(types.ReadNextEventsResponse)
+
+	events := c.GetLatestPage()
+	nevents := len(events)
+	if c.pos == nevents {
+		return body // already read to EOF
+	}
+
+	start := c.pos
+	end := start + int(req.MaxCount)
+	c.pos += int(req.MaxCount)
+	if end > nevents {
+		end = nevents
+		c.pos = nevents
+	}
+
+	body.Res.Returnval = events[start:end]
+
+	return body
+}
+
+func (c *EventHistoryCollector) ReadPreviousEvents(ctx *Context, req *types.ReadPreviousEvents) soap.HasFault {
+	body := &methods.ReadPreviousEventsBody{}
+	if req.MaxCount <= 0 {
+		body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "maxCount"})
+		return body
+	}
+	body.Res = new(types.ReadPreviousEventsResponse)
+
+	events := c.GetLatestPage()
+	if c.pos == 0 {
+		return body // already read to EOF
+	}
+
+	start := c.pos - int(req.MaxCount)
+	end := c.pos
+	c.pos -= int(req.MaxCount)
+	if start < 0 {
+		start = 0
+		c.pos = 0
+	}
+
+	body.Res.Returnval = events[start:end]
+
 	return body
 }
 

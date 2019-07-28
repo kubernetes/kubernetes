@@ -16,5 +16,6 @@ reviewers:
 - pohly
 - oomichi
 - neolit123
+- SataQiu
 labels:
 - area/e2e-test-framework

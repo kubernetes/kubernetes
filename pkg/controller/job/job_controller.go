@@ -631,16 +631,15 @@ func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
 	result := int32(0)
 	for i := range pods {
 		po := pods[i]
-		if po.Status.Phase != v1.PodRunning {
-			continue
-		}
-		for j := range po.Status.InitContainerStatuses {
-			stat := po.Status.InitContainerStatuses[j]
-			result += stat.RestartCount
-		}
-		for j := range po.Status.ContainerStatuses {
-			stat := po.Status.ContainerStatuses[j]
-			result += stat.RestartCount
+		if po.Status.Phase == v1.PodRunning || po.Status.Phase == v1.PodPending {
+			for j := range po.Status.InitContainerStatuses {
+				stat := po.Status.InitContainerStatuses[j]
+				result += stat.RestartCount
+			}
+			for j := range po.Status.ContainerStatuses {
+				stat := po.Status.ContainerStatuses[j]
+				result += stat.RestartCount
+			}
 		}
 	}
 	if *job.Spec.BackoffLimit == 0 {
@@ -746,6 +745,9 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 		if diff < 0 {
 			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
 			diff = 0
+		}
+		if diff == 0 {
+			return active, nil
 		}
 		jm.expectations.ExpectCreations(jobKey, int(diff))
 		errCh = make(chan error, diff)

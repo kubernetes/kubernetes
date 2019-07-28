@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
@@ -37,20 +37,20 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 
 	SIGDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
-		It(titleUp, func() {
+		ginkgo.It(titleUp, func() {
 			scaleUp("test-deployment", common.KindDeployment, false, rc, f)
 		})
-		It(titleDown, func() {
+		ginkgo.It(titleDown, func() {
 			scaleDown("test-deployment", common.KindDeployment, false, rc, f)
 		})
 	})
 
 	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via ReplicaSets
-		It(titleUp, func() {
+		ginkgo.It(titleUp, func() {
 			scaleUp("rs", common.KindReplicaSet, false, rc, f)
 		})
-		It(titleDown, func() {
+		ginkgo.It(titleDown, func() {
 			scaleDown("rs", common.KindReplicaSet, false, rc, f)
 		})
 	})
@@ -58,16 +58,16 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	// These tests take ~20 minutes each.
 	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
-		It(titleUp+" and verify decision stability", func() {
+		ginkgo.It(titleUp+" and verify decision stability", func() {
 			scaleUp("rc", common.KindRC, true, rc, f)
 		})
-		It(titleDown+" and verify decision stability", func() {
+		ginkgo.It(titleDown+" and verify decision stability", func() {
 			scaleDown("rc", common.KindRC, true, rc, f)
 		})
 	})
 
 	SIGDescribe("ReplicationController light", func() {
-		It("Should scale from 1 pod to 2 pods", func() {
+		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
@@ -79,7 +79,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 			}
 			scaleTest.run("rc-light", common.KindRC, rc, f)
 		})
-		It("Should scale from 2 pods to 1 pod", func() {
+		ginkgo.It("Should scale from 2 pods to 1 pod [Slow]", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    2,
 				totalInitialCPUUsage:        50,
@@ -116,7 +116,7 @@ type HPAScaleTest struct {
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
 func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *common.ResourceConsumer, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
 	defer rc.CleanUp()
 	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)

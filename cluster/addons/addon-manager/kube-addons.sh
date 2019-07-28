@@ -194,7 +194,7 @@ function is_leader() {
     log INFO "Leader election disabled."
     return 0;
   fi
-  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
+  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
     | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
   # If there was any problem with getting the leader election results, var will
@@ -209,9 +209,6 @@ function is_leader() {
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result of that. Start everything below that directory.
 log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
-
-# Create the namespace that will be used to host the cluster-level add-ons.
-start_addon /opt/namespace.yaml 100 10 "" &
 
 # Wait for the default service account to be created in the kube-system namespace.
 token_found=""

@@ -46,7 +46,7 @@ const (
 // V4Options contains details about which streams are required for port
 // forwarding.
 // All fields included in V4Options need to be expressed explicitly in the
-// CRI (pkg/kubelet/apis/cri/{version}/api.proto) PortForwardRequest.
+// CRI (k8s.io/cri-api/pkg/apis/{version}/api.proto) PortForwardRequest.
 type V4Options struct {
 	Ports []int32
 }
@@ -113,7 +113,7 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
-	_, streams, err := conn.Open(httplog.Unlogged(w), req)
+	_, streams, err := conn.Open(httplog.Unlogged(req, w), req)
 	if err != nil {
 		err = fmt.Errorf("Unable to upgrade websocket connection: %v", err)
 		return err

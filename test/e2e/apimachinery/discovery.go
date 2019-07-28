@@ -20,9 +20,10 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
@@ -31,16 +32,16 @@ var _ = SIGDescribe("Discovery", func() {
 
 	var namespaceName string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		namespaceName = f.Namespace.Name
 
 		framework.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
 
-		By("Setting up server cert")
+		ginkgo.By("Setting up server cert")
 		setupServerCert(namespaceName, serviceName)
 	})
 
-	It("[Feature:StorageVersionHash] Custom resource should have storage version hash", func() {
+	ginkgo.It("Custom resource should have storage version hash", func() {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -49,7 +50,7 @@ var _ = SIGDescribe("Discovery", func() {
 		spec := testcrd.Crd.Spec
 		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {
-			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
+			e2elog.Failf("failed to find the discovery doc for %v: %v", resources, err)
 		}
 		found := false
 		var storageVersion string
@@ -68,12 +69,12 @@ var _ = SIGDescribe("Discovery", func() {
 			if r.Name == spec.Names.Plural {
 				found = true
 				if r.StorageVersionHash != expected {
-					framework.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
+					e2elog.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
 				}
 			}
 		}
 		if !found {
-			framework.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
+			e2elog.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
 		}
 	})
 })

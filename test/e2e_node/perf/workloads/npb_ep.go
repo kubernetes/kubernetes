@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -39,19 +39,19 @@ func (w npbEPWorkload) Name() string {
 	return "npb-ep"
 }
 
-func (w npbEPWorkload) PodSpec() corev1.PodSpec {
-	var containers []corev1.Container
-	ctn := corev1.Container{
+func (w npbEPWorkload) PodSpec() v1.PodSpec {
+	var containers []v1.Container
+	ctn := v1.Container{
 		Name:  fmt.Sprintf("%s-ctn", w.Name()),
 		Image: "gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep:1.0",
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceCPU):    resource.MustParse("15000m"),
-				corev1.ResourceName(corev1.ResourceMemory): resource.MustParse("48Gi"),
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("15000m"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("48Gi"),
 			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceCPU):    resource.MustParse("15000m"),
-				corev1.ResourceName(corev1.ResourceMemory): resource.MustParse("48Gi"),
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("15000m"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("48Gi"),
 			},
 		},
 		Command: []string{"/bin/sh"},
@@ -59,8 +59,8 @@ func (w npbEPWorkload) PodSpec() corev1.PodSpec {
 	}
 	containers = append(containers, ctn)
 
-	return corev1.PodSpec{
-		RestartPolicy: corev1.RestartPolicyNever,
+	return v1.PodSpec{
+		RestartPolicy: v1.RestartPolicyNever,
 		Containers:    containers,
 	}
 }

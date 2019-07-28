@@ -22,6 +22,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
 )
@@ -40,15 +43,20 @@ var _ = SIGDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := framework.NewServiceTestJig(cs, serviceName)
-		nodeIP := framework.PickNodeIP(jig.Client)
+		jig := e2eservice.NewTestJig(cs, serviceName)
+		nodeIP, err := e2enode.PickIP(jig.Client)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		service := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+		e2eservice := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(service, v1.ServiceTypeNodePort)
-		nodePort := int(service.Spec.Ports[0].NodePort)
+		jig.SanityCheckService(e2eservice, v1.ServiceTypeNodePort)
+		nodePort := int(e2eservice.Spec.Ports[0].NodePort)
 
 		ginkgo.By("creating Pod to be part of service " + serviceName)
 		jig.RunOrFail(ns, nil)

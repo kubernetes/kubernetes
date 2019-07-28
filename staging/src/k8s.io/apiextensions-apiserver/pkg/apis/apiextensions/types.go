@@ -73,13 +73,20 @@ type CustomResourceDefinitionSpec struct {
 
 	// `conversion` defines conversion settings for the CRD.
 	Conversion *CustomResourceConversion
+
+	// preserveUnknownFields disables pruning of object fields which are not
+	// specified in the OpenAPI schema. apiVersion, kind, metadata and known
+	// fields inside metadata are always preserved.
+	// Defaults to true in v1beta and will default to false in v1.
+	PreserveUnknownFields *bool
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.
 type CustomResourceConversion struct {
 	// `strategy` specifies the conversion strategy. Allowed values are:
 	// - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
-	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information is needed for this option.
+	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
+	//   is needed for this option. This requires spec.preserveUnknownFields to be false.
 	Strategy ConversionStrategyType
 
 	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
@@ -132,8 +139,6 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// Port 443 will be used if it is open, otherwise it is an error.
-	//
 	// +optional
 	Service *ServiceReference
 
@@ -156,6 +161,11 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string
+
+	// If specified, the port on the service that hosting webhook.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port int32
 }
 
 // CustomResourceDefinitionVersion describes a version for CRD.
@@ -261,13 +271,34 @@ const (
 	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
 	// the group and are therefore accepted.
 	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
+	// NonStructuralSchema means that one or more OpenAPI schema is not structural.
+	//
+	// A schema is structural if it specifies types for all values, with the only exceptions of those with
+	// - x-kubernetes-int-or-string: true — for fields which can be integer or string
+	// - x-kubernetes-preserve-unknown-fields: true — for raw, unspecified JSON values
+	// and there is no type, additionalProperties, default, nullable or x-kubernetes-* vendor extenions
+	// specified under allOf, anyOf, oneOf or not.
+	//
+	// Non-structural schemas will not be allowed anymore in v1 API groups. Moreover, new features will not be
+	// available for non-structural CRDs:
+	// - pruning
+	// - defaulting
+	// - read-only
+	// - OpenAPI publishing
+	// - webhook conversion
+	NonStructuralSchema CustomResourceDefinitionConditionType = "NonStructuralSchema"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
+	// KubernetesAPIApprovalPolicyConformant indicates that an API in *.k8s.io or *.kubernetes.io is or is not approved.  For CRDs
+	// outside those groups, this condition will not be set.  For CRDs inside those groups, the condition will
+	// be true if .metadata.annotations["api-approved.kubernetes.io"] is set to a URL, otherwise it will be false.
+	// See https://github.com/kubernetes/enhancements/pull/1111 for more details.
+	KubernetesAPIApprovalPolicyConformant CustomResourceDefinitionConditionType = "KubernetesAPIApprovalPolicyConformant"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// Type is the type of the condition.
+	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -368,8 +399,11 @@ type CustomResourceSubresourceScale struct {
 	StatusReplicasPath string
 	// LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
 	// Only JSON paths without the array notation are allowed.
-	// Must be a JSON Path under .status.
+	// Must be a JSON Path under .status or .spec.
 	// Must be set to work with HPA.
+	// The field pointed by this JSON path must be a string field (not a complex selector struct)
+	// which contains a serialized label selector in string form.
+	// More info: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions#scale-subresource
 	// If there is no value under the given path in the CustomResource, the status label selector value in the /scale
 	// subresource will default to the empty string.
 	// +optional

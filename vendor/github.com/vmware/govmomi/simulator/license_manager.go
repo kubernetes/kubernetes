@@ -113,6 +113,43 @@ func (m *LicenseManager) RemoveLicense(req *types.RemoveLicense) soap.HasFault {
 	return body
 }
 
+func (m *LicenseManager) UpdateLicenseLabel(req *types.UpdateLicenseLabel) soap.HasFault {
+	body := &methods.UpdateLicenseLabelBody{}
+
+	for i := range m.Licenses {
+		license := &m.Licenses[i]
+
+		if req.LicenseKey != license.LicenseKey {
+			continue
+		}
+
+		body.Res = new(types.UpdateLicenseLabelResponse)
+
+		for j := range license.Labels {
+			label := &license.Labels[j]
+
+			if label.Key == req.LabelKey {
+				if req.LabelValue == "" {
+					license.Labels = append(license.Labels[:i], license.Labels[i+1:]...)
+				} else {
+					label.Value = req.LabelValue
+				}
+				return body
+			}
+		}
+
+		license.Labels = append(license.Labels, types.KeyValue{
+			Key:   req.LabelKey,
+			Value: req.LabelValue,
+		})
+
+		return body
+	}
+
+	body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "licenseKey"})
+	return body
+}
+
 type LicenseAssignmentManager struct {
 	mo.LicenseAssignmentManager
 }

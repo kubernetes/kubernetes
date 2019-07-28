@@ -21,13 +21,16 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Disruptive]NodeLease", func() {
@@ -37,37 +40,37 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 	var ns string
 	var group string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
-		Expect(err).To(BeNil())
+		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
+		gomega.Expect(err).To(gomega.BeNil())
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
 			group = framework.TestContext.CloudConfig.NodeInstanceGroup
 		}
 	})
 
-	Describe("NodeLease deletion", func() {
+	ginkgo.Describe("NodeLease deletion", func() {
 		var skipped bool
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			skipped = true
 			framework.SkipUnlessProviderIs("gce", "gke", "aws")
 			framework.SkipUnlessNodeCountIsAtLeast(2)
 			skipped = false
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			if skipped {
 				return
 			}
 
-			By("restoring the original node instance group size")
+			ginkgo.By("restoring the original node instance group size")
 			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
-				framework.Failf("Couldn't restore the original node instance group size: %v", err)
+				e2elog.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
 			// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
@@ -78,37 +81,37 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			//
 			// TODO(cjcullen) reduce this sleep (#19314)
 			if framework.ProviderIs("gke") {
-				By("waiting 5 minutes for all dead tunnels to be dropped")
+				ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
 			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
-				framework.Failf("Couldn't restore the original node instance group size: %v", err)
+				e2elog.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
-			if err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
-				framework.Failf("Couldn't restore the original cluster size: %v", err)
+			if err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+				e2elog.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
-			By("waiting for system pods to successfully restart")
-			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-			Expect(err).To(BeNil())
+			ginkgo.By("waiting for system pods to successfully restart")
+			err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 
-		It("node lease should be deleted when corresponding node is deleted", func() {
-			leaseClient := c.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
-			err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
-			Expect(err).To(BeNil())
+		ginkgo.It("node lease should be deleted when corresponding node is deleted", func() {
+			leaseClient := c.CoordinationV1().Leases(v1.NamespaceNodeLease)
+			err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
+			gomega.Expect(err).To(gomega.BeNil())
 
-			By("verify node lease exists for every nodes")
+			ginkgo.By("verify node lease exists for every nodes")
 			originalNodes := framework.GetReadySchedulableNodesOrDie(c)
-			Expect(len(originalNodes.Items)).To(Equal(framework.TestContext.CloudConfig.NumNodes))
+			framework.ExpectEqual(len(originalNodes.Items), framework.TestContext.CloudConfig.NumNodes)
 
-			Eventually(func() error {
+			gomega.Eventually(func() error {
 				pass := true
 				for _, node := range originalNodes.Items {
 					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
-						framework.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
+						e2elog.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
 						pass = false
 					}
 				}
@@ -116,20 +119,20 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 					return nil
 				}
 				return fmt.Errorf("some node lease is not ready")
-			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
-			By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
+			ginkgo.By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			Expect(err).To(BeNil())
-			err = framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
+			err = e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
+			gomega.Expect(err).To(gomega.BeNil())
 			targetNodes := framework.GetReadySchedulableNodesOrDie(c)
-			Expect(len(targetNodes.Items)).To(Equal(int(targetNumNodes)))
+			framework.ExpectEqual(len(targetNodes.Items), int(targetNumNodes))
 
-			By("verify node lease is deleted for the deleted node")
+			ginkgo.By("verify node lease is deleted for the deleted node")
 			var deletedNodeName string
 			for _, originalNode := range originalNodes.Items {
 				originalNodeName := originalNode.ObjectMeta.Name
@@ -141,23 +144,23 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				deletedNodeName = originalNodeName
 				break
 			}
-			Expect(deletedNodeName).NotTo(Equal(""))
-			Eventually(func() error {
+			framework.ExpectNotEqual(deletedNodeName, "")
+			gomega.Eventually(func() error {
 				if _, err := leaseClient.Get(deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)
 				}
 				return nil
-			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
-			By("verify node leases still exist for remaining nodes")
-			Eventually(func() error {
+			ginkgo.By("verify node leases still exist for remaining nodes")
+			gomega.Eventually(func() error {
 				for _, node := range targetNodes.Items {
 					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
 						return err
 					}
 				}
 				return nil
-			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 		})
 	})
 })

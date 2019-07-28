@@ -72,33 +72,41 @@ import (
 //
 // Dlahqr is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlahqr(wantt, wantz bool, n, ilo, ihi int, h []float64, ldh int, wr, wi []float64, iloz, ihiz int, z []float64, ldz int) (unconverged int) {
-	checkMatrix(n, n, h, ldh)
 	switch {
-	case ilo < 0 || max(0, ihi) < ilo:
+	case n < 0:
+		panic(nLT0)
+	case ilo < 0, max(0, ihi) < ilo:
 		panic(badIlo)
-	case n <= ihi:
+	case ihi >= n:
 		panic(badIhi)
-	case len(wr) != ihi+1:
-		panic("lapack: bad length of wr")
-	case len(wi) != ihi+1:
-		panic("lapack: bad length of wi")
-	case ilo > 0 && h[ilo*ldh+ilo-1] != 0:
-		panic("lapack: block is not isolated")
-	}
-	if wantz {
-		checkMatrix(n, n, z, ldz)
-		switch {
-		case iloz < 0 || ilo < iloz:
-			panic("lapack: iloz out of range")
-		case ihiz < ihi || n <= ihiz:
-			panic("lapack: ihiz out of range")
-		}
+	case ldh < max(1, n):
+		panic(badLdH)
+	case wantz && (iloz < 0 || ilo < iloz):
+		panic(badIloz)
+	case wantz && (ihiz < ihi || n <= ihiz):
+		panic(badIhiz)
+	case ldz < 1, wantz && ldz < n:
+		panic(badLdZ)
 	}
 
 	// Quick return if possible.
 	if n == 0 {
 		return 0
 	}
+
+	switch {
+	case len(h) < (n-1)*ldh+n:
+		panic(shortH)
+	case len(wr) != ihi+1:
+		panic(shortWr)
+	case len(wi) != ihi+1:
+		panic(shortWi)
+	case wantz && len(z) < (n-1)*ldz+n:
+		panic(shortZ)
+	case ilo > 0 && h[ilo*ldh+ilo-1] != 0:
+		panic(notIsolated)
+	}
+
 	if ilo == ihi {
 		wr[ilo] = h[ilo*ldh+ilo]
 		wi[ilo] = 0

@@ -32,8 +32,8 @@ const (
 )
 
 var (
-	// Use buckets ranging from 25 ms to ~2.5 seconds.
-	latencyBuckets       = prometheus.ExponentialBuckets(25000, 2.5, 5)
+	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
+	latencyBuckets       = []float64{0.005, 0.025, 0.1, 0.5, 2.5}
 	latencySummaryMaxAge = 5 * time.Hour
 
 	// Metrics provides access to all admission metrics.

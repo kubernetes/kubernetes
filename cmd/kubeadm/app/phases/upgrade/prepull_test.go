@@ -116,25 +116,25 @@ func TestPrepullImagesInParallel(t *testing.T) {
 		{
 			name:        "should error out; create failed",
 			p:           NewFailedCreatePrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: true,
 		},
 		{
 			name:        "should error out; timeout exceeded",
 			p:           NewForeverWaitPrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: true,
 		},
 		{
 			name:        "should error out; delete failed",
 			p:           NewFailedDeletePrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: true,
 		},
 		{
 			name:        "should work just fine",
 			p:           NewGoodPrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: false,
 		},
 	}

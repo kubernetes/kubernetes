@@ -30,6 +30,12 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
 
   # test `kubectl create clusterrole`
+  kubectl create "${kube_flags[@]:?}" clusterrole pod-admin --verb=* --resource=pods
+  kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+  output_message=$(kubectl delete clusterrole pod-admin -n test 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'clusterrole.rbac.authorization.k8s.io "pod-admin" deleted'
+
   kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
@@ -47,7 +53,7 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '/logs/\*:/healthz/\*:'
   kubectl create "${kube_flags[@]}" clusterrole aggregation-reader --aggregation-rule="foo1=foo2"
-  kube::test::get_object_assert clusterrole/aggregation-reader "{{$id_field}}" 'aggregation-reader'
+  kube::test::get_object_assert clusterrole/aggregation-reader "{{${id_field:?}}}" 'aggregation-reader'
 
   # test `kubectl create clusterrolebinding`
   # test `kubectl set subject clusterrolebinding`

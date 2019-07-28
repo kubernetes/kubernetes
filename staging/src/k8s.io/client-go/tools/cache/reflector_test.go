@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -385,5 +385,48 @@ func TestReflectorResync(t *testing.T) {
 	}
 	if iteration != 2 {
 		t.Errorf("exactly 2 iterations were expected, got: %v", iteration)
+	}
+}
+
+func TestReflectorWatchListPageSize(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			if options.Limit != 4 {
+				t.Fatalf("Expected list Limit of 4 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.Continue {
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C1"}, Items: pods[0:4]}, nil
+			case "C1":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C2"}, Items: pods[4:8]}, nil
+			case "C2":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[8:10]}, nil
+			default:
+				t.Fatalf("Unrecognized continue: %s", options.Continue)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	// Set the reflector to paginate the list request in 4 item chunks.
+	r.WatchListPageSize = 4
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
 	}
 }

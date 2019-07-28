@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Usage Instructions: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-release/cherry-picks.md
+# Usage Instructions: https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md
 
 # Checkout a PR from GitHub. (Yes, this is sitting in a Git tree. How
 # meta.) Assumes you care about pulls from remote "upstream" and
@@ -84,8 +84,10 @@ shift 1
 declare -r PULLS=( "$@" )
 
 function join { local IFS="$1"; shift; echo "$*"; }
-declare -r PULLDASH=$(join - "${PULLS[@]/#/#}") # Generates something like "#12345-#56789"
-declare -r PULLSUBJ=$(join " " "${PULLS[@]/#/#}") # Generates something like "#12345 #56789"
+PULLDASH=$(join - "${PULLS[@]/#/#}") # Generates something like "#12345-#56789"
+declare -r PULLDASH
+PULLSUBJ=$(join " " "${PULLS[@]/#/#}") # Generates something like "#12345 #56789"
+declare -r PULLSUBJ
 
 echo "+++ Updating remotes..."
 git remote update "${UPSTREAM_REMOTE}" "${FORK_REMOTE}"
@@ -96,9 +98,12 @@ if ! git log -n1 --format=%H "${BRANCH}" >/dev/null 2>&1; then
   exit 1
 fi
 
-declare -r NEWBRANCHREQ="automated-cherry-pick-of-${PULLDASH}" # "Required" portion for tools.
-declare -r NEWBRANCH="$(echo "${NEWBRANCHREQ}-${BRANCH}" | sed 's/\//-/g')"
-declare -r NEWBRANCHUNIQ="${NEWBRANCH}-$(date +%s)"
+NEWBRANCHREQ="automated-cherry-pick-of-${PULLDASH}" # "Required" portion for tools.
+declare -r NEWBRANCHREQ
+NEWBRANCH="$(echo "${NEWBRANCHREQ}-${BRANCH}" | sed 's/\//-/g')"
+declare -r NEWBRANCH
+NEWBRANCHUNIQ="${NEWBRANCH}-$(date +%s)"
+declare -r NEWBRANCHUNIQ
 echo "+++ Creating local branch ${NEWBRANCHUNIQ}"
 
 cleanbranch=""
@@ -128,7 +133,8 @@ trap return_to_kansas EXIT
 
 SUBJECTS=()
 function make-a-pr() {
-  local rel="$(basename "${BRANCH}")"
+  local rel
+  rel="$(basename "${BRANCH}")"
   echo
   echo "+++ Creating a pull request on GitHub at ${GITHUB_USER}:${NEWBRANCH}"
 
@@ -137,7 +143,8 @@ function make-a-pr() {
   # when we shove the heredoc at hub directly, tickling the ioctl
   # crash.
   prtext="$(mktemp -t prtext.XXXX)" # cleaned in return_to_kansas
-  local numandtitle=$(printf '%s\n' "${SUBJECTS[@]}")
+  local numandtitle
+  numandtitle=$(printf '%s\n' "${SUBJECTS[@]}")
   cat >"${prtext}" <<EOF
 Automated cherry pick of ${numandtitle}
 
@@ -218,7 +225,7 @@ if [[ -n "${DRY_RUN}" ]]; then
   exit 0
 fi
 
-if git remote -v | grep ^${FORK_REMOTE} | grep ${MAIN_REPO_ORG}/${MAIN_REPO_NAME}.git; then
+if git remote -v | grep ^"${FORK_REMOTE}" | grep "${MAIN_REPO_ORG}/${MAIN_REPO_NAME}.git"; then
   echo "!!! You have ${FORK_REMOTE} configured as your ${MAIN_REPO_ORG}/${MAIN_REPO_NAME}.git"
   echo "This isn't normal. Leaving you with push instructions:"
   echo

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -136,18 +135,18 @@ func scsiHostRescan(io ioHandler) {
 func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		w := strings.Join(wwns, "-")
-		return path.Join(host.GetPluginDir(fcPluginName), w+"-lun-"+lun)
+		return filepath.Join(host.GetPluginDir(fcPluginName), w+"-lun-"+lun)
 	}
-	return path.Join(host.GetPluginDir(fcPluginName), strings.Join(wwids, "-"))
+	return filepath.Join(host.GetPluginDir(fcPluginName), strings.Join(wwids, "-"))
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/volumeDevices/target-lun-0
 func makeVDPDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		w := strings.Join(wwns, "-")
-		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), w+"-lun-"+lun)
+		return filepath.Join(host.GetVolumeDevicePluginDir(fcPluginName), w+"-lun-"+lun)
 	}
-	return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), strings.Join(wwids, "-"))
+	return filepath.Join(host.GetVolumeDevicePluginDir(fcPluginName), strings.Join(wwids, "-"))
 }
 
 func parsePDName(path string) (wwns []string, lun int32, wwids []string, err error) {
@@ -360,7 +359,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	for _, fi := range fis {
 		if strings.Contains(fi.Name(), volumeInfo) {
-			devicePath = path.Join(searchPath, fi.Name())
+			devicePath = filepath.Join(searchPath, fi.Name())
 			klog.V(5).Infof("fc: updated devicePath: %s", devicePath)
 			break
 		}

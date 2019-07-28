@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
@@ -506,4 +508,100 @@ resources:
 			}
 		})
 	}
+}
+
+func TestKMSPluginHealthz(t *testing.T) {
+	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", kmsPluginConnectionTimeout)
+	if err != nil {
+		t.Fatalf("Could not initialize envelopeService, error: %v", err)
+	}
+
+	testCases := []struct {
+		desc    string
+		config  string
+		want    []*kmsPluginProbe
+		wantErr bool
+	}{
+		{
+			desc: "Install Healthz",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: []*kmsPluginProbe{
+				{
+					name:    "foo",
+					Service: service,
+				},
+			},
+		},
+		{
+			desc: "Install multiple healthz",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+    - kms:
+        name: bar
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: []*kmsPluginProbe{
+				{
+					name:    "foo",
+					Service: service,
+				},
+				{
+					name:    "bar",
+					Service: service,
+				},
+			},
+		},
+		{
+			desc: "No KMS Providers",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+`,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := getKMSPluginProbes(strings.NewReader(tt.config))
+			if err != nil && !tt.wantErr {
+				t.Fatalf("got %v, want nil for error", err)
+			}
+
+			if d := cmp.Diff(tt.want, got, cmp.Comparer(serviceComparer)); d != "" {
+				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+// As long as got and want contain envelope.Service we will return true.
+// If got has an envelope.Service and want does note (or vice versa) this will return false.
+func serviceComparer(_, _ envelope.Service) bool {
+	return true
 }

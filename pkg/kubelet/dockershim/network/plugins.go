@@ -34,16 +34,21 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
-const DefaultPluginName = "kubernetes.io/no-op"
+const (
+	DefaultPluginName = "kubernetes.io/no-op"
 
-// Called when the node's Pod CIDR is known when using the
-// controller manager's --allocate-node-cidrs=true option
-const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
-const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+	// Called when the node's Pod CIDR is known when using the
+	// controller manager's --allocate-node-cidrs=true option
+	NET_PLUGIN_EVENT_POD_CIDR_CHANGE             = "pod-cidr-change"
+	NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+)
 
-// Plugin is an interface to network plugins for the kubelet
+// NetworkPlugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
@@ -87,6 +92,8 @@ type PodNetworkStatus struct {
 	//   - service endpoints are constructed with
 	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
+	// IPs is the list of IPs assigned to Pod. IPs[0] == IP. The rest of the list is additional IPs
+	IPs []net.IP `json:"ips" description:"list of additional ips (inclusive of IP) assigned to pod"`
 }
 
 // Host is an interface that plugins can use to access the kubelet.
@@ -248,17 +255,37 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 }
 
 // GetPodIP gets the IP of the pod by inspecting the network info inside the pod's network namespace.
-func GetPodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) (net.IP, error) {
-	ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
-	if err != nil {
-		// Fall back to IPv6 address if no IPv4 address is present
-		ip, err = getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
-	}
-	if err != nil {
-		return nil, err
+// TODO (khenidak). The "primary ip" in dual stack world does not really exist. For now
+// we are defaulting to v4 as primary
+func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) ([]net.IP, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+		ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
+		if err != nil {
+			// Fall back to IPv6 address if no IPv4 address is present
+			ip, err = getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		return []net.IP{ip}, nil
 	}
 
-	return ip, nil
+	list := make([]net.IP, 0)
+	var err4, err6 error
+	if ipv4, err4 := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4"); err4 != nil {
+		list = append(list, ipv4)
+	}
+
+	if ipv6, err6 := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6"); err6 != nil {
+		list = append(list, ipv6)
+	}
+
+	if len(list) == 0 {
+		return nil, utilerrors.NewAggregate([]error{err4, err6})
+	}
+	return list, nil
+
 }
 
 type NoopPortMappingGetter struct{}

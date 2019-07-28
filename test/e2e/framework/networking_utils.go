@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -38,15 +38,23 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	k8utilnet "k8s.io/utils/net"
 )
 
 const (
-	EndpointHttpPort           = 8080
-	EndpointUdpPort            = 8081
-	TestContainerHttpPort      = 8080
-	ClusterHttpPort            = 80
-	ClusterUdpPort             = 90
+	// EndpointHTTPPort is an endpoint HTTP port for testing.
+	EndpointHTTPPort = 8080
+	// EndpointUDPPort is an endpoint UDP port for testing.
+	EndpointUDPPort       = 8081
+	testContainerHTTPPort = 8080
+	// ClusterHTTPPort is a cluster HTTP port for testing.
+	ClusterHTTPPort = 80
+	// ClusterUDPPort is a cluster UDP port for testing.
+	ClusterUDPPort             = 90
 	testPodName                = "test-container-pod"
 	hostTestPodName            = "host-test-container-pod"
 	nodePortServiceName        = "node-port-service"
@@ -59,30 +67,45 @@ const (
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
 	maxNetProxyPodsCount = 10
-	// Number of checks to hit a given set of endpoints when enable session affinity.
+	// SessionAffinityChecks is number of checks to hit a given set of endpoints when enable session affinity.
 	SessionAffinityChecks = 10
+	// RegexIPv4 is a regex to match IPv4 addresses
+	RegexIPv4 = "(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)"
+	// RegexIPv6 is a regex to match IPv6 addresses
+	RegexIPv6 = "(?:(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){6})(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:::(?:(?:(?:[0-9a-fA-F]{1,4})):){5})(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})))?::(?:(?:(?:[0-9a-fA-F]{1,4})):){4})(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){0,1}(?:(?:[0-9a-fA-F]{1,4})))?::(?:(?:(?:[0-9a-fA-F]{1,4})):){3})(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){0,2}(?:(?:[0-9a-fA-F]{1,4})))?::(?:(?:(?:[0-9a-fA-F]{1,4})):){2})(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){0,3}(?:(?:[0-9a-fA-F]{1,4})))?::(?:(?:[0-9a-fA-F]{1,4})):)(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){0,4}(?:(?:[0-9a-fA-F]{1,4})))?::)(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9]))\\.){3}(?:(?:25[0-5]|(?:[1-9]|1[0-9]|2[0-4])?[0-9])))))))|(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){0,5}(?:(?:[0-9a-fA-F]{1,4})))?::)(?:(?:[0-9a-fA-F]{1,4})))|(?:(?:(?:(?:(?:(?:[0-9a-fA-F]{1,4})):){0,6}(?:(?:[0-9a-fA-F]{1,4})))?::))))"
 )
 
-var NetexecImageName = imageutils.GetE2EImage(imageutils.Netexec)
+// NetexecImageName is the image name for agnhost.
+var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
+
+// TranslateIPv4ToIPv6 maps an IPv4 address into a valid IPv6 address
+// adding the well known prefix "0::ffff:" https://tools.ietf.org/html/rfc2765
+// if the ip is IPv4 and the cluster IPFamily is IPv6, otherwise returns the same ip
+func TranslateIPv4ToIPv6(ip string) string {
+	if TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
+		ip = "0::ffff:" + ip
+	}
+	return ip
+}
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *Framework) *NetworkingTestConfig {
 	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: true}
-	By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
+	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
 }
 
-// NewNetworkingTestNodeE2EConfig creates and sets up a new test config helper for Node E2E.
+// NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *Framework, hostNetwork bool) *NetworkingTestConfig {
 	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
-	By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
+	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
 }
 
 func getServiceSelector() map[string]string {
-	By("creating a selector")
+	ginkgo.By("creating a selector")
 	selectorName := "selector-" + string(uuid.NewUUID())
 	serviceSelector := map[string]string{
 		selectorName: "true",
@@ -124,19 +147,21 @@ type NetworkingTestConfig struct {
 	// External ip of first node for use in nodePort testing.
 	NodeIP string
 	// The http/udp nodePorts of the Service.
-	NodeHttpPort int
-	NodeUdpPort  int
+	NodeHTTPPort int
+	NodeUDPPort  int
 	// The kubernetes namespace within which all resources for this
 	// config are created
 	Namespace string
 }
 
+// DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.
 func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
-	config.DialFromContainer(protocol, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHttpPort, targetPort, maxTries, minTries, expectedEps)
+	config.DialFromContainer(protocol, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
+// DialFromTestContainer executes a curl via kubectl exec in a test container.
 func (config *NetworkingTestConfig) DialFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
-	config.DialFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, maxTries, minTries, expectedEps)
+	config.DialFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // diagnoseMissingEndpoints prints debug information about the endpoints that
@@ -147,10 +172,10 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 		if foundEndpoints.Has(e.Name) {
 			continue
 		}
-		Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
+		e2elog.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
 		desc, _ := RunKubectl(
 			"describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
-		Logf(desc)
+		e2elog.Logf(desc)
 	}
 }
 
@@ -163,7 +188,7 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	return expectedEps
 }
 
-// DialFromContainers executes a curl via kubectl exec in a test container,
+// DialFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol
 // argument in the url.
 // - minTries is the minimum number of curl attempts required before declaring
@@ -176,8 +201,8 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 // maxTries == minTries will confirm that we see the expected endpoints and no
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
-func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, maxTries, minTries int, expectedEps sets.String) {
-	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHttpPort))
+func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedEps sets.String) {
+	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	// The current versions of curl included in CentOS and RHEL distros
 	// misinterpret square brackets around IPv6 as globbing, so use the -g
 	// argument to disable globbing to handle the IPv6 case.
@@ -195,11 +220,11 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
 			// we confirm unreachability.
-			Logf("Failed to execute %q: %v, stdout: %q, stderr %q", cmd, err, stdout, stderr)
+			e2elog.Logf("Failed to execute %q: %v, stdout: %q, stderr %q", cmd, err, stdout, stderr)
 		} else {
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
-				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+				e2elog.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
 					cmd, config.HostTestContainerPod.Name, stdout, err)
 				continue
 			}
@@ -211,7 +236,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 				}
 			}
 		}
-		Logf("Waiting for endpoints: %v", expectedEps.Difference(eps))
+		e2elog.Logf("Waiting for endpoints: %v", expectedEps.Difference(eps))
 
 		// Check against i+1 so we exit if minTries == maxTries.
 		if (eps.Equal(expectedEps) || eps.Len() == 0 && expectedEps.Len() == 0) && i+1 >= minTries {
@@ -222,11 +247,12 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
+	e2elog.Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
+// GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.
 func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targetIP string, targetPort, tries int) (sets.String, error) {
-	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, tries)
+	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, tries)
 }
 
 // GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
@@ -234,8 +260,8 @@ func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targ
 // in the url. It returns all different endpoints from multiple retries.
 // - tries is the number of curl attempts. If this many attempts pass and
 //   we don't see any endpoints, the test fails.
-func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, tries int) (sets.String, error) {
-	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHttpPort))
+func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHTTPPort, targetPort, tries int) (sets.String, error) {
+	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	// The current versions of curl included in CentOS and RHEL distros
 	// misinterpret square brackets around IPv6 as globbing, so use the -g
 	// argument to disable globbing to handle the IPv6 case.
@@ -253,12 +279,12 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
 			// we confirm unreachability.
-			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
+			e2elog.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
-			Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
+			e2elog.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
-				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+				e2elog.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
 					cmd, config.HostTestContainerPod.Name, stdout, err)
 				continue
 			}
@@ -312,7 +338,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 			// A failure to exec command counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
 			// we confirm unreachability.
-			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", filterCmd, err, stdout, stderr)
+			e2elog.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", filterCmd, err, stdout, stderr)
 		} else {
 			trimmed := strings.TrimSpace(stdout)
 			if trimmed != "" {
@@ -322,18 +348,18 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 
 		// Check against i+1 so we exit if minTries == maxTries.
 		if eps.Equal(expectedEps) && i+1 >= minTries {
-			Logf("Found all expected endpoints: %+v", eps.List())
+			e2elog.Logf("Found all expected endpoints: %+v", eps.List())
 			return
 		}
 
-		Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
+		e2elog.Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
 
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
+	e2elog.Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
 // GetSelfURL executes a curl against the given path via kubectl exec into a
@@ -341,17 +367,17 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 // doesn't match the expected string.
 func (config *NetworkingTestConfig) GetSelfURL(port int32, path string, expected string) {
 	cmd := fmt.Sprintf("curl -i -q -s --connect-timeout 1 http://localhost:%d%s", port, path)
-	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
+	ginkgo.By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
 	config.executeCurlCmd(cmd, expected)
 }
 
-// GetSelfStatusCode executes a curl against the given path via kubectl exec into a
+// GetSelfURLStatusCode executes a curl against the given path via kubectl exec into a
 // test container running with host networking, and fails if the returned status
 // code doesn't match the expected string.
 func (config *NetworkingTestConfig) GetSelfURLStatusCode(port int32, path string, expected string) {
 	// check status code
 	cmd := fmt.Sprintf("curl -o /dev/null -i -q -s -w %%{http_code} --connect-timeout 1 http://localhost:%d%s", port, path)
-	By(fmt.Sprintf("Checking status code against http://localhost:%d%s", port, path))
+	ginkgo.By(fmt.Sprintf("Checking status code against http://localhost:%d%s", port, path))
 	config.executeCurlCmd(cmd, expected)
 }
 
@@ -366,21 +392,21 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 		stdout, err := RunHostCmd(config.Namespace, podName, cmd)
 		if err != nil {
 			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
-			Logf(msg)
+			e2elog.Logf(msg)
 			return false, nil
 		}
 		if !strings.Contains(stdout, expected) {
 			msg = fmt.Sprintf("successfully executed %v in %v/%v, but output '%v' doesn't contain expected string '%v'", cmd, config.Namespace, podName, stdout, expected)
-			Logf(msg)
+			e2elog.Logf(msg)
 			return false, nil
 		}
 		return true, nil
 	}); pollErr != nil {
-		Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
+		e2elog.Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
 		desc, _ := RunKubectl(
 			"describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
-		Logf("%s", desc)
-		Failf("Timed out in %v: %v", retryTimeout, msg)
+		e2elog.Logf("%s", desc)
+		e2elog.Failf("Timed out in %v: %v", retryTimeout, msg)
 	}
 }
 
@@ -394,7 +420,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/healthz",
-				Port: intstr.IntOrString{IntVal: EndpointHttpPort},
+				Port: intstr.IntOrString{IntVal: EndpointHTTPPort},
 			},
 		},
 	}
@@ -413,19 +439,19 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 					Name:            "webserver",
 					Image:           NetexecImageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
-					Command: []string{
-						"/netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHttpPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUdpPort),
+					Args: []string{
+						"netexec",
+						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
+						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
-							ContainerPort: EndpointHttpPort,
+							ContainerPort: EndpointHTTPPort,
 						},
 						{
 							Name:          "udp",
-							ContainerPort: EndpointUdpPort,
+							ContainerPort: EndpointUDPPort,
 							Protocol:      v1.ProtocolUDP,
 						},
 					},
@@ -457,15 +483,15 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 					Name:            "webserver",
 					Image:           NetexecImageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
-					Command: []string{
-						"/netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHttpPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUdpPort),
+					Args: []string{
+						"netexec",
+						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
+						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
-							ContainerPort: TestContainerHttpPort,
+							ContainerPort: testContainerHTTPPort,
 						},
 					},
 				},
@@ -487,8 +513,8 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
 			Ports: []v1.ServicePort{
-				{Port: ClusterHttpPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHttpPort)},
-				{Port: ClusterUdpPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUdpPort)},
+				{Port: ClusterHTTPPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHTTPPort)},
+				{Port: ClusterUDPPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUDPPort)},
 			},
 			Selector:        selector,
 			SessionAffinity: sessionAffinity,
@@ -504,6 +530,7 @@ func (config *NetworkingTestConfig) createSessionAffinityService(selector map[st
 	config.SessionAffinityService = config.createService(config.createNodePortServiceSpec(sessionAffinityServiceName, selector, true))
 }
 
+// DeleteNodePortService deletes NodePort service.
 func (config *NetworkingTestConfig) DeleteNodePortService() {
 	err := config.getServiceClient().Delete(config.NodePortService.Name, nil)
 	ExpectNoError(err, "error while deleting NodePortService. err:%v)", err)
@@ -512,7 +539,7 @@ func (config *NetworkingTestConfig) DeleteNodePortService() {
 
 func (config *NetworkingTestConfig) createTestPods() {
 	testContainerPod := config.createTestPodSpec()
-	hostTestContainerPod := NewExecPodSpec(config.Namespace, hostTestPodName, config.HostNetwork)
+	hostTestContainerPod := e2epod.NewExecPodSpec(config.Namespace, hostTestPodName, config.HostNetwork)
 
 	config.createPod(testContainerPod)
 	config.createPod(hostTestContainerPod)
@@ -523,12 +550,12 @@ func (config *NetworkingTestConfig) createTestPods() {
 	var err error
 	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
-		Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
+		e2elog.Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
 	}
 
 	config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
-		Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
+		e2elog.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
 	}
 }
 
@@ -548,11 +575,11 @@ func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.S
 // setupCore sets up the pods and core test config
 // mainly for simplified node e2e setup
 func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
-	By("Creating the service pods in kubernetes")
+	ginkgo.By("Creating the service pods in kubernetes")
 	podName := "netserver"
 	config.EndpointPods = config.createNetProxyPods(podName, selector)
 
-	By("Creating test pods")
+	ginkgo.By("Creating test pods")
 	config.createTestPods()
 
 	epCount := len(config.EndpointPods)
@@ -563,24 +590,24 @@ func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
 func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	config.setupCore(selector)
 
-	By("Getting node addresses")
+	ginkgo.By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
-	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
+	config.ExternalAddrs = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 
-	By("Creating the service on top of the pods in kubernetes")
+	ginkgo.By("Creating the service on top of the pods in kubernetes")
 	config.createNodePortService(selector)
 	config.createSessionAffinityService(selector)
 
 	for _, p := range config.NodePortService.Spec.Ports {
 		switch p.Protocol {
 		case v1.ProtocolUDP:
-			config.NodeUdpPort = int(p.NodePort)
+			config.NodeUDPPort = int(p.NodePort)
 		case v1.ProtocolTCP:
-			config.NodeHttpPort = int(p.NodePort)
+			config.NodeHTTPPort = int(p.NodePort)
 		default:
 			continue
 		}
@@ -589,7 +616,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	if len(config.ExternalAddrs) != 0 {
 		config.NodeIP = config.ExternalAddrs[0]
 	} else {
-		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		internalAddrs := e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
 		config.NodeIP = internalAddrs[0]
 	}
 }
@@ -652,19 +679,20 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	return runningPods
 }
 
+// DeleteNetProxyPod deletes the first endpoint pod and waits for it being removed.
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
 	config.getPodClient().Delete(pod.Name, metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
+	err := e2epod.WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
-		Failf("Failed to delete %s pod: %v", pod.Name, err)
+		e2elog.Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
 	// wait for endpoint being removed.
 	err = WaitForServiceEndpointsNum(config.f.ClientSet, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
-		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
+		e2elog.Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}
 	// wait for kube-proxy to catch up with the pod being deleted.
 	time.Sleep(5 * time.Second)
@@ -689,17 +717,18 @@ func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.Namespac
 	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
+// CheckReachabilityFromPod checks reachability from the specified pod.
 func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		_, err := RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
-			Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
+			e2elog.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
 			return false, nil
 		}
 
 		if !expectToBeReachable && err == nil {
-			Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
+			e2elog.Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
 			return false, nil
 		}
 		return true, nil
@@ -707,6 +736,7 @@ func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 	ExpectNoError(err)
 }
 
+// HTTPPokeParams is a struct for HTTP poke parameters.
 type HTTPPokeParams struct {
 	Timeout        time.Duration
 	ExpectCode     int // default = 200
@@ -714,6 +744,7 @@ type HTTPPokeParams struct {
 	RetriableCodes []int
 }
 
+// HTTPPokeResult is a struct for HTTP poke result.
 type HTTPPokeResult struct {
 	Status HTTPPokeStatus
 	Code   int    // HTTP code: 0 if the connection was not made
@@ -721,17 +752,25 @@ type HTTPPokeResult struct {
 	Body   []byte // if code != 0
 }
 
+// HTTPPokeStatus is string for representing HTTP poke status.
 type HTTPPokeStatus string
 
 const (
+	// HTTPSuccess is HTTP poke status which is success.
 	HTTPSuccess HTTPPokeStatus = "Success"
-	HTTPError   HTTPPokeStatus = "UnknownError"
-	// Any time we add new errors, we should audit all callers of this.
-	HTTPTimeout     HTTPPokeStatus = "TimedOut"
-	HTTPRefused     HTTPPokeStatus = "ConnectionRefused"
-	HTTPRetryCode   HTTPPokeStatus = "RetryCode"
-	HTTPWrongCode   HTTPPokeStatus = "WrongCode"
+	// HTTPError is HTTP poke status which is error.
+	HTTPError HTTPPokeStatus = "UnknownError"
+	// HTTPTimeout is HTTP poke status which is timeout.
+	HTTPTimeout HTTPPokeStatus = "TimedOut"
+	// HTTPRefused is HTTP poke status which is connection refused.
+	HTTPRefused HTTPPokeStatus = "ConnectionRefused"
+	// HTTPRetryCode is HTTP poke status which is retry code.
+	HTTPRetryCode HTTPPokeStatus = "RetryCode"
+	// HTTPWrongCode is HTTP poke status which is wrong code.
+	HTTPWrongCode HTTPPokeStatus = "WrongCode"
+	// HTTPBadResponse is HTTP poke status which is bad response.
 	HTTPBadResponse HTTPPokeStatus = "BadResponse"
+	// Any time we add new errors, we should audit all callers of this.
 )
 
 // PokeHTTP tries to connect to a host on a port for a given URL path.  Callers
@@ -757,11 +796,11 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	// Sanity check inputs, because it has happened.  These are the only things
 	// that should hard fail the test - they are basically ASSERT()s.
 	if host == "" {
-		Failf("Got empty host for HTTP poke (%s)", url)
+		e2elog.Failf("Got empty host for HTTP poke (%s)", url)
 		return ret
 	}
 	if port == 0 {
-		Failf("Got port==0 for HTTP poke (%s)", url)
+		e2elog.Failf("Got port==0 for HTTP poke (%s)", url)
 		return ret
 	}
 
@@ -773,7 +812,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		params.ExpectCode = http.StatusOK
 	}
 
-	Logf("Poking %q", url)
+	e2elog.Logf("Poking %q", url)
 
 	resp, err := httpGetNoConnectionPoolTimeout(url, params.Timeout)
 	if err != nil {
@@ -786,7 +825,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		} else {
 			ret.Status = HTTPError
 		}
-		Logf("Poke(%q): %v", url, err)
+		e2elog.Logf("Poke(%q): %v", url, err)
 		return ret
 	}
 
@@ -797,7 +836,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	if err != nil {
 		ret.Status = HTTPError
 		ret.Error = fmt.Errorf("error reading HTTP body: %v", err)
-		Logf("Poke(%q): %v", url, ret.Error)
+		e2elog.Logf("Poke(%q): %v", url, ret.Error)
 		return ret
 	}
 	ret.Body = make([]byte, len(body))
@@ -808,25 +847,25 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 			if resp.StatusCode == code {
 				ret.Error = fmt.Errorf("retriable status code: %d", resp.StatusCode)
 				ret.Status = HTTPRetryCode
-				Logf("Poke(%q): %v", url, ret.Error)
+				e2elog.Logf("Poke(%q): %v", url, ret.Error)
 				return ret
 			}
 		}
 		ret.Status = HTTPWrongCode
 		ret.Error = fmt.Errorf("bad status code: %d", resp.StatusCode)
-		Logf("Poke(%q): %v", url, ret.Error)
+		e2elog.Logf("Poke(%q): %v", url, ret.Error)
 		return ret
 	}
 
 	if params.BodyContains != "" && !strings.Contains(string(body), params.BodyContains) {
 		ret.Status = HTTPBadResponse
 		ret.Error = fmt.Errorf("response does not contain expected substring: %q", string(body))
-		Logf("Poke(%q): %v", url, ret.Error)
+		e2elog.Logf("Poke(%q): %v", url, ret.Error)
 		return ret
 	}
 
 	ret.Status = HTTPSuccess
-	Logf("Poke(%q): success", url)
+	e2elog.Logf("Poke(%q): success", url)
 	return ret
 }
 
@@ -844,26 +883,34 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 	return client.Get(url)
 }
 
+// UDPPokeParams is a struct for UDP poke parameters.
 type UDPPokeParams struct {
 	Timeout  time.Duration
 	Response string
 }
 
+// UDPPokeResult is a struct for UDP poke result.
 type UDPPokeResult struct {
 	Status   UDPPokeStatus
 	Error    error  // if there was any error
 	Response []byte // if code != 0
 }
 
+// UDPPokeStatus is string for representing UDP poke status.
 type UDPPokeStatus string
 
 const (
+	// UDPSuccess is UDP poke status which is success.
 	UDPSuccess UDPPokeStatus = "Success"
-	UDPError   UDPPokeStatus = "UnknownError"
-	// Any time we add new errors, we should audit all callers of this.
-	UDPTimeout     UDPPokeStatus = "TimedOut"
-	UDPRefused     UDPPokeStatus = "ConnectionRefused"
+	// UDPError is UDP poke status which is error.
+	UDPError UDPPokeStatus = "UnknownError"
+	// UDPTimeout is UDP poke status which is timeout.
+	UDPTimeout UDPPokeStatus = "TimedOut"
+	// UDPRefused is UDP poke status which is connection refused.
+	UDPRefused UDPPokeStatus = "ConnectionRefused"
+	// UDPBadResponse is UDP poke status which is bad response.
 	UDPBadResponse UDPPokeStatus = "BadResponse"
+	// Any time we add new errors, we should audit all callers of this.
 )
 
 // PokeUDP tries to connect to a host on a port and send the given request. Callers
@@ -885,11 +932,11 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	// Sanity check inputs, because it has happened.  These are the only things
 	// that should hard fail the test - they are basically ASSERT()s.
 	if host == "" {
-		Failf("Got empty host for UDP poke (%s)", url)
+		e2elog.Failf("Got empty host for UDP poke (%s)", url)
 		return ret
 	}
 	if port == 0 {
-		Failf("Got port==0 for UDP poke (%s)", url)
+		e2elog.Failf("Got port==0 for UDP poke (%s)", url)
 		return ret
 	}
 
@@ -898,13 +945,13 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 		params = &UDPPokeParams{}
 	}
 
-	Logf("Poking %v", url)
+	e2elog.Logf("Poking %v", url)
 
 	con, err := net.Dial("udp", hostPort)
 	if err != nil {
 		ret.Status = UDPError
 		ret.Error = err
-		Logf("Poke(%q): %v", url, err)
+		e2elog.Logf("Poke(%q): %v", url, err)
 		return ret
 	}
 
@@ -919,7 +966,7 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 		} else {
 			ret.Status = UDPError
 		}
-		Logf("Poke(%q): %v", url, err)
+		e2elog.Logf("Poke(%q): %v", url, err)
 		return ret
 	}
 
@@ -928,7 +975,7 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 		if err != nil {
 			ret.Status = UDPError
 			ret.Error = err
-			Logf("Poke(%q): %v", url, err)
+			e2elog.Logf("Poke(%q): %v", url, err)
 			return ret
 		}
 	}
@@ -937,7 +984,7 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	if bufsize == 0 {
 		bufsize = 4096
 	}
-	var buf []byte = make([]byte, bufsize)
+	var buf = make([]byte, bufsize)
 	n, err := con.Read(buf)
 	if err != nil {
 		ret.Error = err
@@ -949,7 +996,7 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 		} else {
 			ret.Status = UDPError
 		}
-		Logf("Poke(%q): %v", url, err)
+		e2elog.Logf("Poke(%q): %v", url, err)
 		return ret
 	}
 	ret.Response = buf[0:n]
@@ -957,22 +1004,24 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	if params.Response != "" && string(ret.Response) != params.Response {
 		ret.Status = UDPBadResponse
 		ret.Error = fmt.Errorf("response does not match expected string: %q", string(ret.Response))
-		Logf("Poke(%q): %v", url, ret.Error)
+		e2elog.Logf("Poke(%q): %v", url, ret.Error)
 		return ret
 	}
 
 	ret.Status = UDPSuccess
-	Logf("Poke(%q): success", url)
+	e2elog.Logf("Poke(%q): success", url)
 	return ret
 }
 
+// TestHitNodesFromOutside checkes HTTP connectivity from outside.
 func TestHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
 	return TestHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
 }
 
+// TestHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
 func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
 	countToSucceed int) error {
-	Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
+	e2elog.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
 	hittedHosts := sets.NewString()
 	count := 0
 	condition := func() (bool, error) {
@@ -983,13 +1032,13 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 
 		hittedHost := strings.TrimSpace(string(result.Body))
 		if !expectedHosts.Has(hittedHost) {
-			Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
+			e2elog.Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
 			count = 0
 			return false, nil
 		}
 		if !hittedHosts.Has(hittedHost) {
 			hittedHosts.Insert(hittedHost)
-			Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
+			e2elog.Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
 		}
 		if hittedHosts.Equal(expectedHosts) {
 			count++
@@ -1007,39 +1056,39 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 	return nil
 }
 
-// Blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.
+// TestUnderTemporaryNetworkFailure blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.
 // At the end (even in case of errors), the network traffic is brought back to normal.
 // This function executes commands on a node so it will work only for some
 // environments.
 func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host, err := GetNodeExternalIP(node)
+	host, err := e2enode.GetExternalIP(node)
 	if err != nil {
-		Failf("Error getting node external ip : %v", err)
+		e2elog.Failf("Error getting node external ip : %v", err)
 	}
 	masterAddresses := GetAllMasterAddresses(c)
-	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
+	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
 		// had been inserted. (yes, we could look at the error code and ssh error
 		// separately, but I prefer to stay on the safe side).
-		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
+		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
 		for _, masterAddress := range masterAddresses {
 			UnblockNetwork(host, masterAddress)
 		}
 	}()
 
-	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
-		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+	e2elog.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
+	if !e2enode.WaitConditionToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
+		e2elog.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	for _, masterAddress := range masterAddresses {
 		BlockNetwork(host, masterAddress)
 	}
 
-	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
-		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
+	e2elog.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
+	if !e2enode.WaitConditionToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
+		e2elog.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
 	testFunc()

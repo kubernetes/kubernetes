@@ -207,7 +207,7 @@ func (aggregator *Aggregator) announceSpec(specSummary *types.SpecSummary) {
 	case types.SpecStatePending:
 		aggregator.stenographer.AnnouncePendingSpec(specSummary, aggregator.config.NoisyPendings && !aggregator.config.Succinct)
 	case types.SpecStateSkipped:
-		aggregator.stenographer.AnnounceSkippedSpec(specSummary, aggregator.config.Succinct, aggregator.config.FullTrace)
+		aggregator.stenographer.AnnounceSkippedSpec(specSummary, aggregator.config.Succinct || !aggregator.config.NoisySkippings, aggregator.config.FullTrace)
 	case types.SpecStateTimedOut:
 		aggregator.stenographer.AnnounceSpecTimedOut(specSummary, aggregator.config.Succinct, aggregator.config.FullTrace)
 	case types.SpecStatePanicked:

@@ -21,6 +21,7 @@ import (
 )
 
 var (
+	separator = []byte{0}
 	// MetricNameRE is a regular expression matching valid metric
 	// names. Note that the IsValidMetricName function performs the same
 	// check but faster than a match with this regular expression.

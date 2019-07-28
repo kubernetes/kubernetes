@@ -32,8 +32,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubectl/pkg/scheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func fakecmd() *cobra.Command {
@@ -328,7 +328,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	err = options.RunDelete()
+	err = options.RunDelete(nil)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -408,7 +408,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	err = options.RunDelete()
+	err = options.RunDelete(nil)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -531,7 +531,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	err = options.RunDelete()
+	err = options.RunDelete(nil)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}

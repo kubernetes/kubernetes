@@ -34,12 +34,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -238,6 +238,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if serviceAccountStorage.Token != nil {
 		restStorageMap["serviceaccounts/token"] = serviceAccountStorage.Token
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		restStorageMap["pods/ephemeralcontainers"] = podStorage.EphemeralContainers
+	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
 
 	return restStorage, apiGroupInfo, nil
@@ -284,7 +287,7 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 			TLSConfig:   machine.TLSConfig,
 			Port:        port,
 			Path:        "/health",
-			Validate:    etcdutil.EtcdHealthCheck,
+			Validate:    etcd3.EtcdHealthCheck,
 		}
 	}
 	return serversToValidate

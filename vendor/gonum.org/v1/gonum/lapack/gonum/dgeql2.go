@@ -24,14 +24,30 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dgeql2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgeql2(m, n int, a []float64, lda int, tau, work []float64) {
-	checkMatrix(m, n, a, lda)
-	if len(tau) < min(m, n) {
-		panic(badTau)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if len(work) < n {
-		panic(badWork)
-	}
+
+	// Quick return if possible.
 	k := min(m, n)
+	if k == 0 {
+		return
+	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(tau) < k:
+		panic(shortTau)
+	case len(work) < n:
+		panic(shortWork)
+	}
+
 	var aii float64
 	for i := k - 1; i >= 0; i-- {
 		// Generate elementary reflector H_i to annihilate A[0:m-k+i-1, n-k+i].

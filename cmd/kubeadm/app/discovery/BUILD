@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/discovery",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/discovery/file:go_default_library",
         "//cmd/kubeadm/app/discovery/https:go_default_library",
         "//cmd/kubeadm/app/discovery/token:go_default_library",

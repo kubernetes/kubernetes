@@ -17,6 +17,7 @@ limitations under the License.
 package mutating
 
 import (
+	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
@@ -46,66 +47,80 @@ func TestAdmit(t *testing.T) {
 	defer close(stopCh)
 
 	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
-		webhooktesting.NewNonMutatingTestCases(serverURL)...)
+		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL))...)
 
 	for _, tt := range testCases {
-		wh, err := NewMutatingWebhook(nil)
-		if err != nil {
-			t.Errorf("%s: failed to create mutating webhook: %v", tt.Name, err)
-			continue
-		}
-
-		ns := "webhook-test"
-		client, informer := webhooktesting.NewFakeDataSource(ns, tt.Webhooks, true, stopCh)
-
-		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
-		wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
-		wh.SetExternalKubeClientSet(client)
-		wh.SetExternalKubeInformerFactory(informer)
-
-		informer.Start(stopCh)
-		informer.WaitForCacheSync(stopCh)
-
-		if err = wh.ValidateInitialization(); err != nil {
-			t.Errorf("%s: failed to validate initialization: %v", tt.Name, err)
-			continue
-		}
-
-		var attr admission.Attributes
-		if tt.IsCRD {
-			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
-		} else {
-			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
-		}
-
-		err = wh.Admit(attr, objectInterfaces)
-		if tt.ExpectAllow != (err == nil) {
-			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
-		}
-		if tt.ExpectLabels != nil {
-			if !reflect.DeepEqual(tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels()) {
-				t.Errorf("%s: expected labels '%v', but got '%v'", tt.Name, tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels())
+		t.Run(tt.Name, func(t *testing.T) {
+			wh, err := NewMutatingWebhook(nil)
+			if err != nil {
+				t.Errorf("failed to create mutating webhook: %v", err)
+				return
 			}
-		}
-		// ErrWebhookRejected is not an error for our purposes
-		if tt.ErrorContains != "" {
-			if err == nil || !strings.Contains(err.Error(), tt.ErrorContains) {
-				t.Errorf("%s: expected an error saying %q, but got: %v", tt.Name, tt.ErrorContains, err)
+
+			ns := "webhook-test"
+			client, informer := webhooktesting.NewFakeMutatingDataSource(ns, tt.Webhooks, stopCh)
+
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
+			wh.SetExternalKubeClientSet(client)
+			wh.SetExternalKubeInformerFactory(informer)
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
+
+			if err = wh.ValidateInitialization(); err != nil {
+				t.Errorf("failed to validate initialization: %v", err)
+				return
 			}
-		}
-		if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
-			t.Errorf("%s: expected a StatusError, got %T", tt.Name, err)
-		}
-		fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
-		if !ok {
-			t.Errorf("Unexpected error, failed to convert attr to webhooktesting.FakeAttributes")
-			continue
-		}
-		if len(tt.ExpectAnnotations) == 0 {
-			assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
-		} else {
-			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
-		}
+
+			var attr admission.Attributes
+			if tt.IsCRD {
+				attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
+			} else {
+				attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
+			}
+
+			err = wh.Admit(attr, objectInterfaces)
+			if tt.ExpectAllow != (err == nil) {
+				t.Errorf("expected allowed=%v, but got err=%v", tt.ExpectAllow, err)
+			}
+			if tt.ExpectLabels != nil {
+				if !reflect.DeepEqual(tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels()) {
+					t.Errorf("expected labels '%v', but got '%v'", tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels())
+				}
+			}
+			// ErrWebhookRejected is not an error for our purposes
+			if tt.ErrorContains != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.ErrorContains) {
+					t.Errorf("expected an error saying %q, but got: %v", tt.ErrorContains, err)
+				}
+			}
+			if statusErr, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
+				t.Errorf("expected a StatusError, got %T", err)
+			} else if isStatusErr {
+				if statusErr.ErrStatus.Code != tt.ExpectStatusCode {
+					t.Errorf("expected status code %d, got %d", tt.ExpectStatusCode, statusErr.ErrStatus.Code)
+				}
+			}
+			fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
+			if !ok {
+				t.Errorf("Unexpected error, failed to convert attr to webhooktesting.FakeAttributes")
+				return
+			}
+			if len(tt.ExpectAnnotations) == 0 {
+				assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+			} else {
+				assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+			}
+			reinvocationCtx := fakeAttr.Attributes.GetReinvocationContext()
+			reinvocationCtx.SetIsReinvoke()
+			for webhook, expectReinvoke := range tt.ExpectReinvokeWebhooks {
+				shouldReinvoke := reinvocationCtx.Value(PluginName).(*webhookReinvokeContext).ShouldReinvokeWebhook(fmt.Sprintf("test-webhooks/%s/0", webhook))
+				if expectReinvoke != shouldReinvoke {
+					t.Errorf("expected reinvocationContext.ShouldReinvokeWebhook(%s)=%t, but got %t", webhook, expectReinvoke, shouldReinvoke)
+				}
+			}
+		})
 	}
 }
 
@@ -132,7 +147,7 @@ func TestAdmitCachedClient(t *testing.T) {
 
 	for _, tt := range webhooktesting.NewCachedClientTestcases(serverURL) {
 		ns := "webhook-test"
-		client, informer := webhooktesting.NewFakeDataSource(ns, tt.Webhooks, true, stopCh)
+		client, informer := webhooktesting.NewFakeMutatingDataSource(ns, webhooktesting.ConvertToMutatingWebhooks(tt.Webhooks), stopCh)
 
 		// override the webhook source. The client cache will stay the same.
 		cacheMisses := new(int32)

@@ -169,7 +169,12 @@ func (i *Info) String() string {
 
 // Namespaced returns true if the object belongs to a namespace
 func (i *Info) Namespaced() bool {
-	return i.Mapping != nil && i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	if i.Mapping != nil {
+		// if we have RESTMapper info, use it
+		return i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	}
+	// otherwise, use the presence of a namespace in the info as an indicator
+	return len(i.Namespace) > 0
 }
 
 // Watch returns server changes to this object after it was retrieved.

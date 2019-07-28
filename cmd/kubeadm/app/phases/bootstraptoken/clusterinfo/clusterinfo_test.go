@@ -24,9 +24,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var testConfigTempl = template.Must(template.New("test").Parse(`apiVersion: v1
@@ -60,7 +60,7 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 		},
 		{
 			"if both create and update errors, return error",
-			apierrors.NewAlreadyExists(api.Resource("configmaps"), "test"),
+			apierrors.NewAlreadyExists(schema.GroupResource{Resource: "configmaps"}, "test"),
 			apierrors.NewUnauthorized("go away!"),
 			true,
 		},
@@ -95,19 +95,21 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			client := clientsetfake.NewSimpleClientset()
-			if tc.createErr != nil {
-				client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-					return true, nil, tc.createErr
-				})
-			}
+			t.Run(tc.name, func(t *testing.T) {
+				client := clientsetfake.NewSimpleClientset()
+				if tc.createErr != nil {
+					client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+						return true, nil, tc.createErr
+					})
+				}
 
-			err := CreateBootstrapConfigMapIfNotExists(client, file.Name())
-			if tc.expectErr && err == nil {
-				t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
-			} else if !tc.expectErr && err != nil {
-				t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
-			}
+				err := CreateBootstrapConfigMapIfNotExists(client, file.Name())
+				if tc.expectErr && err == nil {
+					t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
+				} else if !tc.expectErr && err != nil {
+					t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
+				}
+			})
 		}
 	}
 }

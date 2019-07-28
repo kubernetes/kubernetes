@@ -33,51 +33,38 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 var (
-	csiEnabledFeature          = utilfeature.NewFeatureGate()
-	csiDisabledFeature         = utilfeature.NewFeatureGate()
-	trEnabledFeature           = utilfeature.NewFeatureGate()
-	trDisabledFeature          = utilfeature.NewFeatureGate()
-	leaseEnabledFeature        = utilfeature.NewFeatureGate()
-	leaseDisabledFeature       = utilfeature.NewFeatureGate()
-	csiNodeInfoEnabledFeature  = utilfeature.NewFeatureGate()
-	csiNodeInfoDisabledFeature = utilfeature.NewFeatureGate()
+	trEnabledFeature           = featuregate.NewFeatureGate()
+	trDisabledFeature          = featuregate.NewFeatureGate()
+	leaseEnabledFeature        = featuregate.NewFeatureGate()
+	leaseDisabledFeature       = featuregate.NewFeatureGate()
+	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
+	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := csiEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSIPersistentVolume: {Default: true}}); err != nil {
+	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := csiDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSIPersistentVolume: {Default: false}}); err != nil {
+	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := trEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
+	if err := leaseEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := trDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
+	if err := leaseDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := leaseEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := leaseDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
+	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -109,7 +96,7 @@ func TestAuthorizer(t *testing.T) {
 		name     string
 		attrs    authorizer.AttributesRecord
 		expect   authorizer.Decision
-		features utilfeature.FeatureGate
+		features featuregate.FeatureGate
 	}{
 		{
 			name:   "allowed node configmap",
@@ -203,22 +190,9 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - no relationship",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "disallowed attachment - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "allowed attachment - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed svcacct token create - feature enabled",
@@ -722,7 +696,7 @@ func BenchmarkAuthorization(b *testing.B) {
 		name     string
 		attrs    authorizer.AttributesRecord
 		expect   authorizer.Decision
-		features utilfeature.FeatureGate
+		features featuregate.FeatureGate
 	}{
 		{
 			name:   "allowed node configmap",
@@ -776,22 +750,14 @@ func BenchmarkAuthorization(b *testing.B) {
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - no relationship",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed attachment - no relationship",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "allowed attachment - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
 		},
 	}
 
@@ -828,7 +794,7 @@ func BenchmarkAuthorization(b *testing.B) {
 								},
 							},
 						})
-						diff := time.Now().Sub(start)
+						diff := time.Since(start)
 						atomic.AddInt64(&writes, 1)
 						switch {
 						case diff < time.Millisecond:

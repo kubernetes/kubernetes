@@ -23,6 +23,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,11 +44,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -166,10 +168,6 @@ func (s sortableNodeAddress) Less(i, j int) bool {
 	return (string(s[i].Type) + s[i].Address) < (string(s[j].Type) + s[j].Address)
 }
 func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
-
-func sortNodeAddresses(addrs sortableNodeAddress) {
-	sort.Sort(addrs)
-}
 
 func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
@@ -798,7 +796,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithLease(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -1007,11 +1005,12 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Report node status if it is still within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
 	assert.Equal(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
-	podCIDR := "10.0.0.0/24"
-	updatedNode.Spec.PodCIDR = podCIDR
+	podCIDRs := []string{"10.0.0.0/24", "2000::/10"}
+	updatedNode.Spec.PodCIDR = podCIDRs[0]
+	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
 	assert.NoError(t, kubelet.updateNodeStatus())
-	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
+	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 9)
@@ -1022,7 +1021,8 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status when keeping the pod CIDR.
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+
 	assert.NoError(t, kubelet.updateNodeStatus())
 	// Only 1 more action (There were 9 actions before).
 	actions = kubeClient.Actions()
@@ -1031,7 +1031,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithoutNodeLease(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, false)()
 
 	cases := []struct {
 		desc                  string
@@ -1138,7 +1138,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithoutNodeLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	cases := []struct {
 		desc                  string
@@ -1740,17 +1740,21 @@ func TestUpdateDefaultLabels(t *testing.T) {
 func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
+	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	extendedResourceName1 := v1.ResourceName("test.com/resource1")
 	extendedResourceName2 := v1.ResourceName("test.com/resource2")
 
 	cases := []struct {
 		name         string
+		testKubelet  *TestKubelet
 		existingNode *v1.Node
 		expectedNode *v1.Node
 		needsUpdate  bool
 	}{
 		{
-			name: "no update needed without extended resource",
+			name:        "no update needed without extended resource",
+			testKubelet: testKubelet,
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -1782,7 +1786,41 @@ func TestReconcileExtendedResource(t *testing.T) {
 			needsUpdate: false,
 		},
 		{
-			name: "extended resource capacity is zeroed",
+			name:        "extended resource capacity is not zeroed due to presence of checkpoint file",
+			testKubelet: testKubelet,
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			needsUpdate: false,
+		},
+		{
+			name:        "extended resource capacity is zeroed",
+			testKubelet: testKubeletNoReset,
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -1953,7 +1991,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	// Make node to be unschedulable.
 	kubelet.registerSchedulable = false
 
-	forEachFeatureGate(t, []utilfeature.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
+	forEachFeatureGate(t, []featuregate.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
 		// Reset kubelet status for each test.
 		kubelet.registrationCompleted = false
 
@@ -2128,6 +2166,159 @@ func TestNodeStatusHasChanged(t *testing.T) {
 			assert.Equal(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
 			assert.True(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", diff.ObjectDiff(originalStatusCopy, tc.originalStatus))
 			assert.True(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", diff.ObjectDiff(statusCopy, tc.status))
+		})
+	}
+}
+
+func TestUpdateNodeAddresses(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+
+	tests := []struct {
+		Name   string
+		Before []v1.NodeAddress
+		After  []v1.NodeAddress
+	}{
+		{
+			Name:   "nil to populated",
+			Before: nil,
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name:   "empty to populated",
+			Before: []v1.NodeAddress{},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "populated to nil",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: nil,
+		},
+		{
+			Name: "populated to empty",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{},
+		},
+		{
+			Name: "multiple addresses of same type, no change",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "1 InternalIP to 2 InternalIP",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "2 InternalIP to 1 InternalIP",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "2 InternalIP to 2 different InternalIP",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.4"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "2 InternalIP to reversed order",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: test.Before,
+				},
+			}
+			expectedNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: test.After,
+				},
+			}
+
+			_, err := kubeClient.CoreV1().Nodes().Update(oldNode)
+			assert.NoError(t, err)
+			kubelet.setNodeStatusFuncs = []func(*v1.Node) error{
+				func(node *v1.Node) error {
+					node.Status.Addresses = expectedNode.Status.Addresses
+					return nil
+				},
+			}
+			assert.NoError(t, kubelet.updateNodeStatus())
+
+			actions := kubeClient.Actions()
+			lastAction := actions[len(actions)-1]
+			assert.IsType(t, core.PatchActionImpl{}, lastAction)
+			patchAction := lastAction.(core.PatchActionImpl)
+
+			updatedNode, err := applyNodeStatusPatch(oldNode, patchAction.GetPatch())
+			require.NoError(t, err)
+
+			assert.True(t, apiequality.Semantic.DeepEqual(updatedNode, expectedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 		})
 	}
 }

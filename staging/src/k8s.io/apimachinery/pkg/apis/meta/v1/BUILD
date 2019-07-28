@@ -38,6 +38,7 @@ go_library(
     srcs = [
         "controller_ref.go",
         "conversion.go",
+        "deepcopy.go",
         "doc.go",
         "duration.go",
         "generated.pb.go",

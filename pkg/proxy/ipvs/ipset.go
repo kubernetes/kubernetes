@@ -65,11 +65,21 @@ const (
 	kubeNodePortLocalSetUDPComment = "Kubernetes nodeport UDP port with externalTrafficPolicy=local"
 	kubeNodePortLocalSetUDP        = "KUBE-NODE-PORT-LOCAL-UDP"
 
-	kubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose"
-	kubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP"
+	// This ipset is no longer active but still used in previous versions.
+	// DO NOT create an ipset using this name
+	legacyKubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose"
+	legacyKubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP"
 
-	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local"
-	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP"
+	// This ipset is no longer active but still used in previous versions.
+	// DO NOT create an ipset using this name
+	legacyKubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local"
+	legacyKubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP"
+
+	kubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose with type 'hash ip:port'"
+	kubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP-HASH"
+
+	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local with type 'hash ip:port'"
+	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP-HASH"
 )
 
 // IPSetVersioner can query the current ipset version.

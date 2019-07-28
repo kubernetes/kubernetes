@@ -579,6 +579,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
 		Watching: watcher,
 
 		MediaType:       "testcase/json",
@@ -639,6 +640,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
 		Watching: watcher,
 
 		MediaType:       "testcase/json",
@@ -701,6 +703,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
 		Watching: watcher,
 
 		MediaType:       "testcase/json",
@@ -757,6 +760,30 @@ func TestWatchHTTPTimeout(t *testing.T) {
 func BenchmarkWatchHTTP(b *testing.B) {
 	items := benchmarkItems(b)
 
+	// use ASCII names to capture the cost of handling ASCII only self-links
+	for i := range items {
+		item := &items[i]
+		item.Namespace = fmt.Sprintf("namespace-%d", i)
+		item.Name = fmt.Sprintf("reasonable-name-%d", i)
+	}
+
+	runWatchHTTPBenchmark(b, items)
+}
+
+func BenchmarkWatchHTTP_UTF8(b *testing.B) {
+	items := benchmarkItems(b)
+
+	// use UTF names to capture the cost of handling UTF-8 escaping in self-links
+	for i := range items {
+		item := &items[i]
+		item.Namespace = fmt.Sprintf("躀痢疈蜧í柢-%d", i)
+		item.Name = fmt.Sprintf("翏Ŏ熡韐-%d", i)
+	}
+
+	runWatchHTTPBenchmark(b, items)
+}
+
+func runWatchHTTPBenchmark(b *testing.B, items []example.Pod) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)

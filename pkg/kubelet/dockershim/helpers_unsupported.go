@@ -23,8 +23,8 @@ import (
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -45,9 +45,9 @@ func (ds *dockerService) updateCreateConfig(
 	return nil
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
+func (ds *dockerService) determinePodIPBySandboxID(uid string) []string {
 	klog.Warningf("determinePodIPBySandboxID is unsupported in this build")
-	return ""
+	return nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {

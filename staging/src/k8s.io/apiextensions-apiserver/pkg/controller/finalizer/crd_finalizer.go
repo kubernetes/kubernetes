@@ -156,7 +156,12 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	// and now issue another delete, which should clean it all up if no finalizers remain or no-op if they do
-	return c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
+	// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
+	err = c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefinition) (apiextensions.CustomResourceDefinitionCondition, error) {
@@ -199,7 +204,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		// don't retry deleting the same namespace
 		deletedNamespaces.Insert(metadata.GetNamespace())
 		nsCtx := genericapirequest.WithNamespace(ctx, metadata.GetNamespace())
-		if _, err := crClient.DeleteCollection(nsCtx, nil, nil); err != nil {
+		if _, err := crClient.DeleteCollection(nsCtx, rest.ValidateAllObjectFunc, nil, nil); err != nil {
 			deleteErrors = append(deleteErrors, err)
 			continue
 		}
@@ -289,7 +294,7 @@ func (c *CRDFinalizer) processNextWorkItem() bool {
 func (c *CRDFinalizer) enqueue(obj *apiextensions.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 

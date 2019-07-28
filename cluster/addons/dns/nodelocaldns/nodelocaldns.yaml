@@ -29,7 +29,7 @@ metadata:
   name: node-local-dns
   namespace: kube-system
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
 data:
   Corefile: |
     __PILLAR__DNS__DOMAIN__:53 {
@@ -111,7 +111,7 @@ spec:
         operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/k8s-dns-node-cache:1.15.0
+        image: k8s.gcr.io/k8s-dns-node-cache:1.15.3
         resources:
           limits:
             memory: 30Mi

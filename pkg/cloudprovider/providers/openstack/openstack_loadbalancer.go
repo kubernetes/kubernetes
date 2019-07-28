@@ -85,8 +85,6 @@ type LbaasV2 struct {
 	LoadBalancer
 }
 
-type empty struct{}
-
 func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, error) {
 	seen := make(map[string]bool)
 
@@ -700,7 +698,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "false")
 	switch internal {
 	case "true":
-		klog.V(4).Infof("Ensure an internal loadbalancer service.")
+		klog.V(4).Info("Ensure an internal loadbalancer service.")
 		internalAnnotation = true
 	case "false":
 		if len(floatingPool) != 0 {
@@ -895,7 +893,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 				return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
 			}
 			monitorID = monitor.ID
-		} else if lbaas.opts.CreateMonitor == false {
+		} else if !lbaas.opts.CreateMonitor {
 			klog.V(4).Infof("Do not create monitor for pool %s when create-monitor is false", pool.ID)
 		}
 
@@ -931,17 +929,15 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 			if err != nil && !isNotFound(err) {
 				return nil, fmt.Errorf("error getting members for pool %s: %v", pool.ID, err)
 			}
-			if members != nil {
-				for _, member := range members {
-					klog.V(4).Infof("Deleting obsolete member %s for pool %s address %s", member.ID, pool.ID, member.Address)
-					err := v2pools.DeleteMember(lbaas.lb, pool.ID, member.ID).ExtractErr()
-					if err != nil && !isNotFound(err) {
-						return nil, fmt.Errorf("error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
-					}
-					provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
-					if err != nil {
-						return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
-					}
+			for _, member := range members {
+				klog.V(4).Infof("Deleting obsolete member %s for pool %s address %s", member.ID, pool.ID, member.Address)
+				err := v2pools.DeleteMember(lbaas.lb, pool.ID, member.ID).ExtractErr()
+				if err != nil && !isNotFound(err) {
+					return nil, fmt.Errorf("error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
+				}
+				provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
 				}
 			}
 			klog.V(4).Infof("Deleting obsolete pool %s for listener %s", pool.ID, listener.ID)
@@ -1523,7 +1519,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(ctx context.Context, clusterName
 	if lbaas.opts.ManageSecurityGroups {
 		err := lbaas.EnsureSecurityGroupDeleted(clusterName, service)
 		if err != nil {
-			return fmt.Errorf("Failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+			return fmt.Errorf("failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 		}
 	}
 
@@ -1540,7 +1536,7 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 			// It is OK when the security group has been deleted by others.
 			return nil
 		}
-		return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
+		return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
 	}
 
 	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
@@ -1571,7 +1567,7 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 			for _, rule := range secGroupRules {
 				res := rules.Delete(lbaas.network, rule.ID)
 				if res.Err != nil && !isNotFound(res.Err) {
-					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
+					return fmt.Errorf("error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
 				}
 			}
 		}

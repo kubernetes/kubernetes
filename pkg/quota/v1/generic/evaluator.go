@@ -18,6 +18,7 @@ package generic
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,15 +34,81 @@ import (
 // InformerForResourceFunc knows how to provision an informer
 type InformerForResourceFunc func(schema.GroupVersionResource) (informers.GenericInformer, error)
 
-// ListerFuncForResourceFunc knows how to provision a lister from an informer func
+// ListerFuncForResourceFunc knows how to provision a lister from an informer func.
+// The lister returns errors until the informer has synced.
 func ListerFuncForResourceFunc(f InformerForResourceFunc) quota.ListerForResourceFunc {
 	return func(gvr schema.GroupVersionResource) (cache.GenericLister, error) {
 		informer, err := f(gvr)
 		if err != nil {
 			return nil, err
 		}
-		return informer.Lister(), nil
+		return &protectedLister{
+			hasSynced:   cachedHasSynced(informer.Informer().HasSynced),
+			notReadyErr: fmt.Errorf("%v not yet synced", gvr),
+			delegate:    informer.Lister(),
+		}, nil
 	}
+}
+
+// cachedHasSynced returns a function that calls hasSynced() until it returns true once, then returns true
+func cachedHasSynced(hasSynced func() bool) func() bool {
+	cache := &atomic.Value{}
+	cache.Store(false)
+	return func() bool {
+		if cache.Load().(bool) {
+			// short-circuit if already synced
+			return true
+		}
+		if hasSynced() {
+			// remember we synced
+			cache.Store(true)
+			return true
+		}
+		return false
+	}
+}
+
+// protectedLister returns notReadyError if hasSynced returns false, otherwise delegates to delegate
+type protectedLister struct {
+	hasSynced   func() bool
+	notReadyErr error
+	delegate    cache.GenericLister
+}
+
+func (p *protectedLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	if !p.hasSynced() {
+		return nil, p.notReadyErr
+	}
+	return p.delegate.List(selector)
+}
+func (p *protectedLister) Get(name string) (runtime.Object, error) {
+	if !p.hasSynced() {
+		return nil, p.notReadyErr
+	}
+	return p.delegate.Get(name)
+}
+func (p *protectedLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
+	return &protectedNamespaceLister{p.hasSynced, p.notReadyErr, p.delegate.ByNamespace(namespace)}
+}
+
+// protectedNamespaceLister returns notReadyError if hasSynced returns false, otherwise delegates to delegate
+type protectedNamespaceLister struct {
+	hasSynced   func() bool
+	notReadyErr error
+	delegate    cache.GenericNamespaceLister
+}
+
+func (p *protectedNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	if !p.hasSynced() {
+		return nil, p.notReadyErr
+	}
+	return p.delegate.List(selector)
+}
+func (p *protectedNamespaceLister) Get(name string) (runtime.Object, error) {
+	if !p.hasSynced() {
+		return nil, p.notReadyErr
+	}
+	return p.delegate.Get(name)
 }
 
 // ListResourceUsingListerFunc returns a listing function based on the shared informer factory for the specified resource.

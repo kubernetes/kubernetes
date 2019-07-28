@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,17 +36,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	rbacv1beta1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
+
+const (
+	aggregatorServicePort = 7443
+)
 
 var _ = SIGDescribe("Aggregator", func() {
 	var ns string
@@ -57,7 +65,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want cleanTest to happen before the namespace cleanup AfterEach
 	// inserted by NewDefaultFramework, so we put this AfterEach in front
 	// of NewDefaultFramework.
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		cleanTest(c, aggrclient, ns)
 	})
 
@@ -66,10 +74,20 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
 	// after NewDefaultFramework.
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		aggrclient = f.AggregatorClient
+
+		if aggrclient == nil {
+			config, err := framework.LoadConfig()
+			if err != nil {
+				e2elog.Failf("could not load config: %v", err)
+			}
+			aggrclient, err = aggregatorclient.NewForConfig(config)
+			if err != nil {
+				e2elog.Failf("could not create aggregator client: %v", err)
+			}
+		}
 	})
 
 	/*
@@ -79,31 +97,30 @@ var _ = SIGDescribe("Aggregator", func() {
 	*/
 	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.10 version of the sample-apiserver
-		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
+		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
 
 func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
 	// delete the APIService first to avoid causing discovery errors
-	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
+	_ = aggrclient.ApiregistrationV1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
 
 	_ = client.AppsV1().Deployments(namespace).Delete("sample-apiserver-deployment", nil)
 	_ = client.CoreV1().Secrets(namespace).Delete("sample-apiserver-secret", nil)
 	_ = client.CoreV1().Services(namespace).Delete("sample-api", nil)
 	_ = client.CoreV1().ServiceAccounts(namespace).Delete("sample-apiserver", nil)
-	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete("wardler-auth-reader", nil)
-	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":auth-delegator", nil)
-	_ = client.RbacV1beta1().ClusterRoles().Delete("sample-apiserver-reader", nil)
-	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
+	_ = client.RbacV1().RoleBindings("kube-system").Delete("wardler-auth-reader", nil)
+	_ = client.RbacV1().ClusterRoleBindings().Delete("wardler:"+namespace+":auth-delegator", nil)
+	_ = client.RbacV1().ClusterRoles().Delete("sample-apiserver-reader", nil)
+	_ = client.RbacV1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
 }
 
-// A basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image string) {
-	By("Registering the sample API server.")
+func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string) {
+	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
-	aggrclient := f.AggregatorClient
 
 	namespace := f.Namespace.Name
 	context := setupServerCert(namespace, "sample-api")
@@ -127,26 +144,26 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
 
 	// kubectl create -f clusterrole.yaml
-	_, err = client.RbacV1beta1().ClusterRoles().Create(&rbacv1beta1.ClusterRole{
+	_, err = client.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
 		// role for listing ValidatingWebhookConfiguration/MutatingWebhookConfiguration/Namespaces
 		ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
-		Rules: []rbacv1beta1.PolicyRule{
-			rbacv1beta1helpers.NewRule("list").Groups("").Resources("namespaces").RuleOrDie(),
-			rbacv1beta1helpers.NewRule("list").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("list").Groups("").Resources("namespaces").RuleOrDie(),
+			rbacv1helpers.NewRule("list").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
 		},
 	})
 	framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
 
-	_, err = client.RbacV1beta1().ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{
+	_, err = client.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "wardler:" + namespace + ":sample-apiserver-reader",
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     "sample-apiserver-reader",
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				APIGroup:  "",
 				Kind:      "ServiceAccount",
@@ -158,16 +175,16 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":sample-apiserver-reader")
 
 	// kubectl create -f authDelegator.yaml
-	_, err = client.RbacV1beta1().ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{
+	_, err = client.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "wardler:" + namespace + ":auth-delegator",
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     "system:auth-delegator",
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				APIGroup:  "",
 				Kind:      "ServiceAccount",
@@ -216,20 +233,23 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		{
 			Name:  "etcd",
 			Image: etcdImage,
+			Command: []string{
+				"/usr/local/bin/etcd",
+			},
 		},
 	}
-	d := &apps.Deployment{
+	d := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   deploymentName,
 			Labels: podLabels,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,
 			},
-			Strategy: apps.DeploymentStrategy{
-				Type: apps.RollingUpdateDeploymentStrategyType,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -245,9 +265,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}
 	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s to complete", etcdImage, deploymentName, namespace)
 
 	// kubectl create -f service.yaml
@@ -263,7 +283,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",
-					Port:       443,
+					Port:       aggregatorServicePort,
 					TargetPort: intstr.FromInt(443),
 				},
 			},
@@ -278,19 +298,19 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	framework.ExpectNoError(err, "creating service account %s in namespace %s", "sample-apiserver", namespace)
 
 	// kubectl create -f auth-reader.yaml
-	_, err = client.RbacV1beta1().RoleBindings("kube-system").Create(&rbacv1beta1.RoleBinding{
+	_, err = client.RbacV1().RoleBindings("kube-system").Create(&rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "wardler-auth-reader",
 			Annotations: map[string]string{
-				rbacv1beta1.AutoUpdateAnnotationKey: "true",
+				rbacv1.AutoUpdateAnnotationKey: "true",
 			},
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "",
 			Kind:     "Role",
 			Name:     "extension-apiserver-authentication-reader",
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Name:      "default", // "sample-apiserver",
@@ -304,16 +324,17 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
 	// NOTE: aggregated apis should generally be set up in their own namespace (<aggregated-api-namespace>). As the test framework
 	// is setting up a new namespace, we are just using that.
-	err = framework.WaitForDeploymentComplete(client, deployment)
+	err = e2edeploy.WaitForDeploymentComplete(client, deployment)
 	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
 
 	// kubectl create -f apiservice.yaml
-	_, err = aggrclient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
+	_, err = aggrclient.ApiregistrationV1().APIServices().Create(&apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
-		Spec: apiregistrationv1beta1.APIServiceSpec{
-			Service: &apiregistrationv1beta1.ServiceReference{
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
+				Port:      pointer.Int32Ptr(aggregatorServicePort),
 			},
 			Group:                "wardle.k8s.io",
 			Version:              "v1alpha1",
@@ -325,13 +346,13 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
 
 	var (
-		currentAPIService *apiregistrationv1beta1.APIService
+		currentAPIService *apiregistrationv1.APIService
 		currentPods       *v1.PodList
 	)
 
 	err = pollTimed(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 
-		currentAPIService, _ = aggrclient.ApiregistrationV1beta1().APIServices().Get("v1alpha1.wardle.k8s.io", metav1.GetOptions{})
+		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get("v1alpha1.wardle.k8s.io", metav1.GetOptions{})
 		currentPods, _ = client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 
 		request := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
@@ -354,16 +375,16 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}, "Waited %s for the sample-apiserver to be ready to handle requests.")
 	if err != nil {
 		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
-		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
+		e2elog.Logf("current APIService: %s", string(currentAPIServiceJSON))
 
 		currentPodsJSON, _ := json.Marshal(currentPods)
-		framework.Logf("current pods: %s", string(currentPodsJSON))
+		e2elog.Logf("current pods: %s", string(currentPodsJSON))
 
 		if currentPods != nil {
 			for _, pod := range currentPods.Items {
 				for _, container := range pod.Spec.Containers {
-					logs, err := framework.GetPodLogs(client, namespace, pod.Name, container.Name)
-					framework.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
+					logs, err := e2epod.GetPodLogs(client, namespace, pod.Name, container.Name)
+					e2elog.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
 				}
 			}
 		}
@@ -381,7 +402,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	var statusCode int
 	result.StatusCode(&statusCode)
 	if statusCode != 201 {
-		framework.Failf("Flunders client creation response was status %d, not 201", statusCode)
+		e2elog.Failf("Flunders client creation response was status %d, not 201", statusCode)
 	}
 
 	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
@@ -395,7 +416,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	err = json.Unmarshal(contents, &flundersList)
 	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 1 {
-		framework.Failf("failed to get back the correct flunders list %v", flundersList)
+		e2elog.Failf("failed to get back the correct flunders list %v", flundersList)
 	}
 
 	// kubectl delete flunder test-flunder -v 9
@@ -410,7 +431,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	err = json.Unmarshal(contents, &flundersList)
 	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 0 {
-		framework.Failf("failed to get back the correct deleted flunders list %v", flundersList)
+		e2elog.Failf("failed to get back the correct deleted flunders list %v", flundersList)
 	}
 
 	flunderName = generateFlunderName("dynamic-flunder")
@@ -422,7 +443,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	gvr := schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
-		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
+		e2elog.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
 	}
 	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
@@ -448,7 +469,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 1 {
-		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
+		e2elog.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
@@ -459,19 +480,19 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 0 {
-		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
+		e2elog.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	cleanTest(client, aggrclient, namespace)
 }
 
 // pollTimed will call Poll but time how long Poll actually took.
-// It will then framework.logf the msg with the duration of the Poll.
+// It will then e2elog.Logf the msg with the duration of the Poll.
 // It is assumed that msg will contain one %s for the elapsed time.
 func pollTimed(interval, timeout time.Duration, condition wait.ConditionFunc, msg string) error {
 	defer func(start time.Time, msg string) {
 		elapsed := time.Since(start)
-		framework.Logf(msg, elapsed)
+		e2elog.Logf(msg, elapsed)
 	}(time.Now(), msg)
 	return wait.Poll(interval, timeout, condition)
 }
@@ -492,7 +513,7 @@ func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodL
 			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
-		framework.Failf(msg)
+		e2elog.Failf(msg)
 	}
 }
 

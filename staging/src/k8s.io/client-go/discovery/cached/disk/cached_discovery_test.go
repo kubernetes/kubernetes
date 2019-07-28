@@ -19,6 +19,7 @@ package disk
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -94,6 +95,32 @@ func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 
 	cdc.ServerGroups()
 	assert.Equal(c.groupCalls, 2)
+}
+
+func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
+	assert := assert.New(t)
+
+	d, err := ioutil.TempDir("", "")
+	assert.NoError(err)
+	os.RemoveAll(d)
+	defer os.RemoveAll(d)
+
+	c := fakeDiscoveryClient{}
+	cdc := newCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
+	cdc.ServerGroups()
+
+	err = filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			assert.Equal(os.FileMode(0750), info.Mode().Perm())
+		} else {
+			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+		}
+		return nil
+	})
+	assert.NoError(err)
 }
 
 type fakeDiscoveryClient struct {

@@ -4,7 +4,6 @@ metadata:
   name: heapster
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 apiVersion: v1
@@ -13,7 +12,6 @@ metadata:
   name: heapster-config
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: EnsureExists
 data:
   NannyConfiguration: |-
@@ -26,7 +24,6 @@ metadata:
   name: eventer-config
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: EnsureExists
 data:
   NannyConfiguration: |-
@@ -40,7 +37,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: heapster
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     version: v1.6.0-beta.1
 spec:
@@ -83,7 +79,7 @@ spec:
             - /eventer
             - --source=kubernetes:''
             - --sink=gcl
-        - image: k8s.gcr.io/addon-resizer:1.8.4
+        - image: k8s.gcr.io/addon-resizer:1.8.5
           name: heapster-nanny
           resources:
             limits:
@@ -119,7 +115,7 @@ spec:
             # Specifies the smallest cluster (defined in number of nodes)
             # resources will be scaled to.
             - --minClusterSize={{ heapster_min_cluster_size }}
-        - image: k8s.gcr.io/addon-resizer:1.8.4
+        - image: k8s.gcr.io/addon-resizer:1.8.5
           name: eventer-nanny
           resources:
             limits:

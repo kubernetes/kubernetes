@@ -29,13 +29,13 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	"k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -53,6 +53,7 @@ var (
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
+// AutoscaleOptions declare the arguments accepted by the Autoscale command
 type AutoscaleOptions struct {
 	FilenameOptions *resource.FilenameOptions
 
@@ -82,6 +83,7 @@ type AutoscaleOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewAutoscaleOptions creates the options for autoscale
 func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
 	return &AutoscaleOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("autoscaled").WithTypeSetter(scheme.Scheme),
@@ -93,6 +95,7 @@ func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOption
 	}
 }
 
+// NewCmdAutoscale returns the autoscale Cobra command
 func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAutoscaleOptions(ioStreams)
 
@@ -128,6 +131,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	return cmd
 }
 
+// Complete verifies command line arguments and loads data from the command environment
 func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
@@ -187,6 +191,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	return nil
 }
 
+// Validate checks that the provided attach options are specified.
 func (o *AutoscaleOptions) Validate() error {
 	if o.Max < 1 {
 		return fmt.Errorf("--max=MAXPODS is required and must be at least 1, max: %d", o.Max)
@@ -198,6 +203,7 @@ func (o *AutoscaleOptions) Validate() error {
 	return nil
 }
 
+// Run performs the execution
 func (o *AutoscaleOptions) Run() error {
 	r := o.builder.
 		Unstructured().
@@ -252,7 +258,7 @@ func (o *AutoscaleOptions) Run() error {
 			return printer.PrintObj(hpa, o.Out)
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa, scheme.DefaultJSONEncoder()); err != nil {
+		if err := util.CreateOrUpdateAnnotation(o.createAnnotation, hpa, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 

@@ -27,7 +27,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -45,9 +45,9 @@ func SetupTempDir(t *testing.T) string {
 	return tmpdir
 }
 
-// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
+// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a InitConfiguration file
 // into /config subfolder of a given temporary directory.
-// The function returns the path of the created master configuration file.
+// The function returns the path of the created InitConfiguration file.
 func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.InitConfiguration) string {
 
 	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
@@ -56,7 +56,7 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 	}
 
 	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(fmt.Sprintf(`
-		apiVersion: kubeadm.k8s.io/v1beta1
+		apiVersion: kubeadm.k8s.io/v1beta2
 		kind: InitConfiguration
 		apiEndpoint:
 		  advertiseAddress: {{.LocalAPIEndpoint.AdvertiseAddress}}
@@ -64,7 +64,7 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		nodeRegistration:
 		  name: {{.NodeRegistration.Name}}
 		---
-		apiVersion: kubeadm.k8s.io/v1beta1
+		apiVersion: kubeadm.k8s.io/v1beta2
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
 		kubernetesVersion: %s
@@ -157,7 +157,7 @@ func AssertError(t *testing.T, err error, expected string) {
 
 // GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
 func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
-	internalcfg, err := configutil.DefaultedInitConfiguration(&kubeadmapiv1beta1.InitConfiguration{})
+	internalcfg, err := configutil.DefaultedInitConfiguration(&kubeadmapiv1beta2.InitConfiguration{}, &kubeadmapiv1beta2.ClusterConfiguration{})
 	if err != nil {
 		t.Fatalf("unexpected error getting default config: %v", err)
 	}

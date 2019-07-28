@@ -84,6 +84,16 @@ const (
 	Fail FailurePolicyType = "Fail"
 )
 
+// MatchPolicyType specifies the type of match policy
+type MatchPolicyType string
+
+const (
+	// Exact means requests should only be sent to the webhook if they exactly match a given rule
+	Exact MatchPolicyType = "Exact"
+	// Equivalent means requests should be sent to the webhook if they modify a resource listed in rules via another API group or version.
+	Equivalent MatchPolicyType = "Equivalent"
+)
+
 type SideEffectClass string
 
 const (
@@ -114,7 +124,7 @@ type ValidatingWebhookConfiguration struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	Webhooks []Webhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
+	Webhooks []ValidatingWebhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -144,7 +154,7 @@ type MutatingWebhookConfiguration struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	Webhooks []Webhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
+	Webhooks []MutatingWebhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -160,8 +170,8 @@ type MutatingWebhookConfigurationList struct {
 	Items []MutatingWebhookConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// Webhook describes an admission webhook and the resources and operations it applies to.
-type Webhook struct {
+// ValidatingWebhook describes an admission webhook and the resources and operations it applies to.
+type ValidatingWebhook struct {
 	// The name of the admission webhook.
 	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
@@ -185,6 +195,155 @@ type Webhook struct {
 	// allowed values are Ignore or Fail. Defaults to Ignore.
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
+
+	// matchPolicy defines how the "rules" list is used to match incoming requests.
+	// Allowed values are "Exact" or "Equivalent".
+	//
+	// - Exact: match a request only if it exactly matches a specified rule.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// but "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would not be sent to the webhook.
+	//
+	// - Equivalent: match a request if modifies a resource listed in rules, even via another API group or version.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// and "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would be converted to apps/v1 and sent to the webhook.
+	//
+	// Defaults to "Exact"
+	// +optional
+	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
+
+	// NamespaceSelector decides whether to run the webhook on an object based
+	// on whether the namespace for that object matches the selector. If the
+	// object itself is a namespace, the matching is performed on
+	// object.metadata.labels. If the object is another cluster scoped resource,
+	// it never skips the webhook.
+	//
+	// For example, to run the webhook on any objects whose namespace is not
+	// associated with "runlevel" of "0" or "1";  you will set the selector as
+	// follows:
+	// "namespaceSelector": {
+	//   "matchExpressions": [
+	//     {
+	//       "key": "runlevel",
+	//       "operator": "NotIn",
+	//       "values": [
+	//         "0",
+	//         "1"
+	//       ]
+	//     }
+	//   ]
+	// }
+	//
+	// If instead you want to only run the webhook on any objects whose
+	// namespace is associated with the "environment" of "prod" or "staging";
+	// you will set the selector as follows:
+	// "namespaceSelector": {
+	//   "matchExpressions": [
+	//     {
+	//       "key": "environment",
+	//       "operator": "In",
+	//       "values": [
+	//         "prod",
+	//         "staging"
+	//       ]
+	//     }
+	//   ]
+	// }
+	//
+	// See
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
+	// for more examples of label selectors.
+	//
+	// Default to the empty LabelSelector, which matches everything.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
+
+	// ObjectSelector decides whether to run the webhook based on if the
+	// object has matching labels. objectSelector is evaluated against both
+	// the oldObject and newObject that would be sent to the webhook, and
+	// is considered to match if either object matches the selector. A null
+	// object (oldObject in the case of create, or newObject in the case of
+	// delete) or an object that cannot have labels (like a
+	// DeploymentRollback or a PodProxyOptions object) is not considered to
+	// match.
+	// Use the object selector only if the webhook is opt-in, because end
+	// users may skip the admission webhook by setting the labels.
+	// Default to the empty LabelSelector, which matches everything.
+	// +optional
+	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,10,opt,name=objectSelector"`
+
+	// SideEffects states whether this webhookk has side effects.
+	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
+	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
+	// sideEffects == Unknown or Some. Defaults to Unknown.
+	// +optional
+	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// Default to 30 seconds.
+	// +optional
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If a persisted webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail
+	// and be subject to the failure policy.
+	// Default to `['v1beta1']`.
+	// +optional
+	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+}
+
+// MutatingWebhook describes an admission webhook and the resources and operations it applies to.
+type MutatingWebhook struct {
+	// The name of the admission webhook.
+	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
+	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
+	// of the organization.
+	// Required.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// ClientConfig defines how to communicate with the hook.
+	// Required
+	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
+
+	// Rules describes what operations on what resources/subresources the webhook cares about.
+	// The webhook cares about an operation if it matches _any_ Rule.
+	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
+	// from putting the cluster in a state which cannot be recovered from without completely
+	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
+	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
+
+	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
+	// allowed values are Ignore or Fail. Defaults to Ignore.
+	// +optional
+	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
+
+	// matchPolicy defines how the "rules" list is used to match incoming requests.
+	// Allowed values are "Exact" or "Equivalent".
+	//
+	// - Exact: match a request only if it exactly matches a specified rule.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// but "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would not be sent to the webhook.
+	//
+	// - Equivalent: match a request if modifies a resource listed in rules, even via another API group or version.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// and "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would be converted to apps/v1 and sent to the webhook.
+	//
+	// Defaults to "Exact"
+	// +optional
+	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
 
 	// NamespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
@@ -232,6 +391,20 @@ type Webhook struct {
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
 
+	// ObjectSelector decides whether to run the webhook based on if the
+	// object has matching labels. objectSelector is evaluated against both
+	// the oldObject and newObject that would be sent to the webhook, and
+	// is considered to match if either object matches the selector. A null
+	// object (oldObject in the case of create, or newObject in the case of
+	// delete) or an object that cannot have labels (like a
+	// DeploymentRollback or a PodProxyOptions object) is not considered to
+	// match.
+	// Use the object selector only if the webhook is opt-in, because end
+	// users may skip the admission webhook by setting the labels.
+	// Default to the empty LabelSelector, which matches everything.
+	// +optional
+	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,11,opt,name=objectSelector"`
+
 	// SideEffects states whether this webhookk has side effects.
 	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
@@ -259,7 +432,38 @@ type Webhook struct {
 	// Default to `['v1beta1']`.
 	// +optional
 	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+
+	// reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
+	// Allowed values are "Never" and "IfNeeded".
+	//
+	// Never: the webhook will not be called more than once in a single admission evaluation.
+	//
+	// IfNeeded: the webhook will be called at least one additional time as part of the admission evaluation
+	// if the object being admitted is modified by other admission plugins after the initial webhook call.
+	// Webhooks that specify this option *must* be idempotent, able to process objects they previously admitted.
+	// Note:
+	// * the number of additional invocations is not guaranteed to be exactly one.
+	// * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again.
+	// * webhooks that use this option may be reordered to minimize the number of additional invocations.
+	// * to validate an object after all mutations are guaranteed complete, use a validating admission webhook instead.
+	//
+	// Defaults to "Never".
+	// +optional
+	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 }
+
+// ReinvocationPolicyType specifies what type of policy the admission hook uses.
+type ReinvocationPolicyType string
+
+const (
+	// NeverReinvocationPolicy indicates that the webhook must not be called more than once in a
+	// single admission evaluation.
+	NeverReinvocationPolicy ReinvocationPolicyType = "Never"
+	// IfNeededReinvocationPolicy indicates that the webhook may be called at least one
+	// additional time as part of the admission evaluation if the object being admitted is
+	// modified by other admission plugins after the initial webhook call.
+	IfNeededReinvocationPolicy ReinvocationPolicyType = "IfNeeded"
+)
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
@@ -322,8 +526,6 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// Port 443 will be used if it is open, otherwise it is an error.
-	//
 	// +optional
 	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
@@ -346,4 +548,10 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
+
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }

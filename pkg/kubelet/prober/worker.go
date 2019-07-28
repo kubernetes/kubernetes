@@ -68,8 +68,10 @@ type worker struct {
 	onHold bool
 
 	// proberResultsMetricLabels holds the labels attached to this worker
-	// for the ProberResults metric.
-	proberResultsMetricLabels prometheus.Labels
+	// for the ProberResults metric by result.
+	proberResultsSuccessfulMetricLabels prometheus.Labels
+	proberResultsFailedMetricLabels     prometheus.Labels
+	proberResultsUnknownMetricLabels    prometheus.Labels
 }
 
 // Creates and starts a new probe worker.
@@ -98,15 +100,22 @@ func newWorker(
 		w.initialValue = results.Success
 	}
 
-	w.proberResultsMetricLabels = prometheus.Labels{
-		"probe_type":     w.probeType.String(),
-		"container_name": w.container.Name,
-		"container":      w.container.Name,
-		"pod_name":       w.pod.Name,
-		"pod":            w.pod.Name,
-		"namespace":      w.pod.Namespace,
-		"pod_uid":        string(w.pod.UID),
+	basicMetricLabels := prometheus.Labels{
+		"probe_type": w.probeType.String(),
+		"container":  w.container.Name,
+		"pod":        w.pod.Name,
+		"namespace":  w.pod.Namespace,
+		"pod_uid":    string(w.pod.UID),
 	}
+
+	w.proberResultsSuccessfulMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
+	w.proberResultsSuccessfulMetricLabels["result"] = probeResultSuccessful
+
+	w.proberResultsFailedMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
+	w.proberResultsFailedMetricLabels["result"] = probeResultFailed
+
+	w.proberResultsUnknownMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
+	w.proberResultsUnknownMetricLabels["result"] = probeResultUnknown
 
 	return w
 }
@@ -129,7 +138,9 @@ func (w *worker) run() {
 		}
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
-		ProberResults.Delete(w.proberResultsMetricLabels)
+		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
+		ProberResults.Delete(w.proberResultsFailedMetricLabels)
+		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
 	}()
 
 probeLoop:
@@ -220,6 +231,15 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return true
 	}
 
+	switch result {
+	case results.Success:
+		ProberResults.With(w.proberResultsSuccessfulMetricLabels).Inc()
+	case results.Failure:
+		ProberResults.With(w.proberResultsFailedMetricLabels).Inc()
+	default:
+		ProberResults.With(w.proberResultsUnknownMetricLabels).Inc()
+	}
+
 	if w.lastResult == result {
 		w.resultRun++
 	} else {
@@ -234,7 +254,6 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
-	ProberResults.With(w.proberResultsMetricLabels).Set(result.ToPrometheusType())
 
 	if w.probeType == liveness && result == results.Failure {
 		// The container fails a liveness check, it will need to be restarted.
@@ -246,4 +265,12 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	return true
+}
+
+func deepCopyPrometheusLabels(m prometheus.Labels) prometheus.Labels {
+	ret := make(prometheus.Labels, len(m))
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

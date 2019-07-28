@@ -32,6 +32,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
+	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -97,6 +98,17 @@ func validSignal(signal evictionapi.Signal) bool {
 	return found
 }
 
+// getReclaimableThreshold finds the threshold and resource to reclaim
+func getReclaimableThreshold(thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
+	for _, thresholdToReclaim := range thresholds {
+		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
+			return thresholdToReclaim, resourceToReclaim, true
+		}
+		klog.V(3).Infof("eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", thresholdToReclaim.Signal)
+	}
+	return evictionapi.Threshold{}, "", false
+}
+
 // ParseThresholdConfig parses the flags for thresholds.
 func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
@@ -127,11 +139,8 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 	}
 	results = append(results, softThresholds...)
 	for i := range results {
-		for signal, minReclaim := range minReclaims {
-			if results[i].Signal == signal {
-				results[i].MinReclaim = &minReclaim
-				break
-			}
+		if minReclaim, ok := minReclaims[results[i].Signal]; ok {
+			results[i].MinReclaim = &minReclaim
 		}
 	}
 	for _, key := range allocatableConfig {
@@ -399,9 +408,7 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 func localEphemeralVolumeNames(pod *v1.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {
-		if volume.GitRepo != nil ||
-			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-			volume.ConfigMap != nil || volume.DownwardAPI != nil {
+		if volumeutils.IsLocalEphemeralVolume(volume) {
 			result = append(result, volume.Name)
 		}
 	}
@@ -432,14 +439,6 @@ func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, stat
 // formatThreshold formats a threshold for logging.
 func formatThreshold(threshold evictionapi.Threshold) string {
 	return fmt.Sprintf("threshold(signal=%v, operator=%v, value=%v, gracePeriod=%v)", threshold.Signal, threshold.Operator, evictionapi.ThresholdValue(threshold.Value), threshold.GracePeriod)
-}
-
-// formatevictionapi.ThresholdValue formats a thresholdValue for logging.
-func formatThresholdValue(value evictionapi.ThresholdValue) string {
-	if value.Quantity != nil {
-		return value.Quantity.String()
-	}
-	return fmt.Sprintf("%f%%", value.Percentage*float32(100))
 }
 
 // cachedStatsFunc returns a statsFunc based on the provided pod stats.
@@ -514,10 +513,6 @@ func (ms *multiSorter) Less(i, j int) bool {
 
 // priority compares pods by Priority, if priority is enabled.
 func priority(p1, p2 *v1.Pod) int {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		// If priority is not enabled, all pods are equal.
-		return 0
-	}
 	priority1 := schedulerutils.GetPodPriority(p1)
 	priority2 := schedulerutils.GetPodPriority(p2)
 	if priority1 == priority2 {

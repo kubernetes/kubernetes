@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -31,15 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/apis/audit/v1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/evanphx/json-patch"
-	. "github.com/onsi/ginkgo"
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/onsi/ginkgo"
 )
 
 var (
@@ -59,24 +62,24 @@ var (
 var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	f := framework.NewDefaultFramework("audit")
 	var namespace string
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
 		namespace = f.Namespace.Name
 	})
 
-	It("should audit API calls to create, get, update, patch, delete, list, watch pods.", func() {
-		pod := &apiv1.Pod{
+	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch pods.", func() {
+		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-pod",
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
 					Name:  "pause",
 					Image: imageutils.GetPauseImageName(),
 				}},
 			},
 		}
-		updatePod := func(pod *apiv1.Pod) {}
+		updatePod := func(pod *v1.Pod) {}
 
 		f.PodClient().CreateSync(pod)
 
@@ -198,9 +201,9 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		})
 	})
 
-	It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
+	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := framework.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), apps.RecreateDeploymentStrategyType)
+		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), appsv1.RecreateDeploymentStrategyType)
 
 		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
 		framework.ExpectNoError(err, "failed to create audit-deployment")
@@ -325,8 +328,8 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		})
 	})
 
-	It("should audit API calls to create, get, update, patch, delete, list, watch configmaps.", func() {
-		configMap := &apiv1.ConfigMap{
+	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch configmaps.", func() {
+		configMap := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-configmap",
 			},
@@ -458,8 +461,8 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		})
 	})
 
-	It("should audit API calls to create, get, update, patch, delete, list, watch secrets.", func() {
-		secret := &apiv1.Secret{
+	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch secrets.", func() {
+		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-secret",
 			},
@@ -590,7 +593,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		})
 	})
 
-	It("should audit API calls to create and delete custom resource definition.", func() {
+	ginkgo.It("should audit API calls to create and delete custom resource definition.", func() {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "failed to load config")
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
@@ -651,12 +654,12 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	})
 
 	// test authorizer annotations, RBAC is required.
-	It("should audit API calls to get a pod with unauthorized user.", func() {
-		if !framework.IsRBACEnabled(f) {
+	ginkgo.It("should audit API calls to get a pod with unauthorized user.", func() {
+		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			framework.Skipf("RBAC not enabled.")
 		}
 
-		By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
+		ginkgo.By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 		config.Impersonate = restclient.ImpersonationConfig{
@@ -688,8 +691,8 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		})
 	})
 
-	It("should list pods as impersonated user.", func() {
-		By("Creating a kubernetes client that impersonates an authorized user")
+	ginkgo.It("should list pods as impersonated user.", func() {
+		ginkgo.By("Creating a kubernetes client that impersonates an authorized user")
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 		config.Impersonate = restclient.ImpersonationConfig{
@@ -735,11 +738,11 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 			return false, err
 		}
 		defer stream.Close()
-		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, v1.SchemeGroupVersion)
+		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, auditv1.SchemeGroupVersion)
 		if err != nil {
-			framework.Logf("Failed to observe audit events: %v", err)
+			e2elog.Logf("Failed to observe audit events: %v", err)
 		} else if len(missingReport.MissingEvents) > 0 {
-			framework.Logf(missingReport.String())
+			e2elog.Logf(missingReport.String())
 		}
 		return len(missingReport.MissingEvents) == 0, nil
 	})

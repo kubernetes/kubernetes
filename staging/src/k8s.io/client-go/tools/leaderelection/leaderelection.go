@@ -16,12 +16,16 @@ limitations under the License.
 
 // Package leaderelection implements leader election of a set of endpoints.
 // It uses an annotation in the endpoints object to store the record of the
-// election state.
+// election state. This implementation does not guarantee that only one
+// client is acting as a leader (a.k.a. fencing).
 //
-// This implementation does not guarantee that only one client is acting as a
-// leader (a.k.a. fencing). A client observes timestamps captured locally to
-// infer the state of the leader election. Thus the implementation is tolerant
-// to arbitrary clock skew, but is not tolerant to arbitrary clock skew rate.
+// A client only acts on timestamps captured locally to infer the state of the
+// leader election. The client does not consider timestamps in the leader
+// election record to be accurate because these timestamps may not have been
+// produced by a local clock. The implemention does not depend on their
+// accuracy and only uses their change to indicate that another client has
+// renewed the leader lease. Thus the implementation is tolerant to arbitrary
+// clock skew, but is not tolerant to arbitrary clock skew rate.
 //
 // However the level of tolerance to skew rate can be configured by setting
 // RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
@@ -105,12 +109,26 @@ type LeaderElectionConfig struct {
 	// LeaseDuration is the duration that non-leader candidates will
 	// wait to force acquire leadership. This is measured against time of
 	// last observed ack.
+	//
+	// A client needs to wait a full LeaseDuration without observing a change to
+	// the record before it can attempt to take over. When all clients are
+	// shutdown and a new set of clients are started with different names against
+	// the same leader record, they must wait the full LeaseDuration before
+	// attempting to acquire the lease. Thus LeaseDuration should be as short as
+	// possible (within your tolerance for clock skew rate) to avoid a possible
+	// long waits in the scenario.
+	//
+	// Core clients default this value to 15 seconds.
 	LeaseDuration time.Duration
 	// RenewDeadline is the duration that the acting master will retry
 	// refreshing leadership before giving up.
+	//
+	// Core clients default this value to 10 seconds.
 	RenewDeadline time.Duration
 	// RetryPeriod is the duration the LeaderElector clients should wait
 	// between tries of actions.
+	//
+	// Core clients default this value to 2 seconds.
 	RetryPeriod time.Duration
 
 	// Callbacks are callbacks that are triggered during certain lifecycle

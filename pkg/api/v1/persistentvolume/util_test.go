@@ -142,9 +142,17 @@ func TestPVSecrets(t *testing.T) {
 					NodeStageSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
 						Namespace: "csi"}}}}},
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					ControllerExpandSecretRef: &corev1.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
+						Namespace: "csi"}}}}},
 	}
 	extractedNames := sets.NewString()
 	extractedNamesWithNamespace := sets.NewString()
+
 	for _, pv := range pvs {
 		VisitPVSecretNames(pv, func(namespace, name string, kubeletVisible bool) bool {
 			extractedNames.Insert(name)
@@ -172,6 +180,7 @@ func TestPVSecrets(t *testing.T) {
 		"Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
 		"Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
 		"Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
+		"Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&api.PersistentVolume{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -219,6 +228,7 @@ func TestPVSecrets(t *testing.T) {
 		"csi/Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
 		"csi/Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
 		"csi/Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
+		"csi/Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
 	)
 	if missingNames := expectedNamespacedNames.Difference(extractedNamesWithNamespace); len(missingNames) > 0 {
 		t.Logf("Missing expected namespaced names:\n%s", strings.Join(missingNames.List(), "\n"))
@@ -267,10 +277,4 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	}
 
 	return secretPaths
-}
-
-func newHostPathType(pathType string) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = corev1.HostPathType(pathType)
-	return hostPathType
 }

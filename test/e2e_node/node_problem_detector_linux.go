@@ -34,6 +34,8 @@ import (
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -159,13 +161,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
 			By("Create the test log file")
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			By("Create config map for the node problem detector")
 			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
@@ -236,7 +238,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				},
 			})
 			pod, err := f.PodClient().Get(name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
@@ -338,7 +340,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				if test.messageNum > 0 {
 					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
 					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 				}
 
 				By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
@@ -368,14 +370,14 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
 				By("Get node problem detector log")
-				log, err := framework.GetPodLogs(c, ns, name, name)
+				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				Expect(err).ShouldNot(HaveOccurred())
-				framework.Logf("Node Problem Detector logs:\n %s", log)
+				e2elog.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			By("Delete the node problem detector")
 			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))
 			By("Wait for the node problem detector to disappear")
-			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
+			Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
 			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
 			By("Clean up the events")

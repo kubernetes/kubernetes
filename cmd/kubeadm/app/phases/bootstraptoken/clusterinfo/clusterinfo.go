@@ -30,7 +30,6 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 const (
@@ -41,7 +40,7 @@ const (
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
 func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
 
-	fmt.Printf("[bootstrap-token] creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
+	fmt.Printf("[bootstrap-token] Creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
 	klog.V(1).Infoln("[bootstrap-token] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
@@ -84,7 +83,12 @@ func CreateClusterInfoRBACRules(client clientset.Interface) error {
 			Namespace: metav1.NamespacePublic,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(bootstrapapi.ConfigMapClusterInfo).RuleOrDie(),
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{""},
+				Resources:     []string{"configmaps"},
+				ResourceNames: []string{bootstrapapi.ConfigMapClusterInfo},
+			},
 		},
 	})
 	if err != nil {

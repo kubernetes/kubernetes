@@ -98,7 +98,7 @@ var onceLogDirs sync.Once
 // successfully, create also attempts to update the symlink for that tag, ignoring
 // errors.
 // The startup argument indicates whether this is the initial startup of klog.
-// If startup is true, existing files are opened for apending instead of truncated.
+// If startup is true, existing files are opened for appending instead of truncated.
 func create(tag string, t time.Time, startup bool) (f *os.File, filename string, err error) {
 	if logging.logFile != "" {
 		f, err := openOrCreate(logging.logFile, startup)

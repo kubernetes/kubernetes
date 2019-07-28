@@ -23,6 +23,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // TODO: These should really just use the GCE API client library or at least use
@@ -46,9 +48,9 @@ func lookupClusterImageSources() (string, string, error) {
 		str = strings.Replace(str, ";", "\n", -1)
 		lines := strings.Split(str, "\n")
 		if err != nil {
-			Logf("lookupDiskImageSources: gcloud error with [%#v]; err:%v", argv, err)
+			e2elog.Logf("lookupDiskImageSources: gcloud error with [%#v]; err:%v", argv, err)
 			for _, l := range lines {
-				Logf(" > %s", l)
+				e2elog.Logf(" > %s", l)
 			}
 		}
 		return lines, err
@@ -108,14 +110,15 @@ func lookupClusterImageSources() (string, string, error) {
 	return masterImg, nodeImg, nil
 }
 
+// LogClusterImageSources writes out cluster image sources.
 func LogClusterImageSources() {
 	masterImg, nodeImg, err := lookupClusterImageSources()
 	if err != nil {
-		Logf("Cluster image sources lookup failed: %v\n", err)
+		e2elog.Logf("Cluster image sources lookup failed: %v\n", err)
 		return
 	}
-	Logf("cluster-master-image: %s", masterImg)
-	Logf("cluster-node-image: %s", nodeImg)
+	e2elog.Logf("cluster-master-image: %s", masterImg)
+	e2elog.Logf("cluster-node-image: %s", nodeImg)
 
 	images := map[string]string{
 		"master_os_image": masterImg,
@@ -125,10 +128,11 @@ func LogClusterImageSources() {
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
 	filePath := filepath.Join(TestContext.ReportDir, "images.json")
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
-		Logf("cluster images sources, could not write to %q: %v", filePath, err)
+		e2elog.Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }
 
+// CreateManagedInstanceGroup creates a Compute Engine managed instance group.
 func CreateManagedInstanceGroup(size int64, zone, template string) error {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud.
@@ -145,6 +149,7 @@ func CreateManagedInstanceGroup(size int64, zone, template string) error {
 	return nil
 }
 
+// GetManagedInstanceGroupTemplateName returns the list of Google Compute Engine managed instance groups.
 func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud. Use InstanceGroupManager to get Instance Template name.
@@ -167,6 +172,7 @@ func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
 	return templateName, nil
 }
 
+// DeleteManagedInstanceGroup deletes Google Compute Engine managed instance group.
 func DeleteManagedInstanceGroup(zone string) error {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud.

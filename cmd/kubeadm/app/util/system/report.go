@@ -18,9 +18,10 @@ package system
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 // ValidationResultType is type of the validation result. Different validation results
@@ -38,21 +39,22 @@ type color int32
 
 const (
 	red    color = 31
-	green        = 32
-	yellow       = 33
-	white        = 37
+	green  color = 32
+	yellow color = 33
+	white  color = 37
 )
 
 func colorize(s string, c color) string {
 	return fmt.Sprintf("\033[0;%dm%s\033[0m", c, s)
 }
 
-// The default reporter for the system verification test
+// StreamReporter is the default reporter for the system verification test.
 type StreamReporter struct {
 	// The stream that this reporter is writing to
 	WriteStream io.Writer
 }
 
+// Report reports validation result in different color depending on the result type.
 func (dr *StreamReporter) Report(key, value string, resultType ValidationResultType) error {
 	var c color
 	switch resultType {

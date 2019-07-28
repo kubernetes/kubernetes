@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const devicePath = "/mnt/volume1"
@@ -82,20 +81,20 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	}
 	t.pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
 	t.pvc, err = framework.CreatePVC(cs, ns, t.pvc)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	t.pvc, err = cs.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Get(t.pvc.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	t.pv, err = cs.CoreV1().PersistentVolumes().Get(t.pvc.Spec.VolumeName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Consuming the PVC before downgrade")
 	t.pod, err = framework.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, false, "", false, false, framework.SELinuxLabel, nil, framework.PodStartTimeout)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")
 	utils.CheckVolumeModeOfPath(t.pod, block, devicePath)

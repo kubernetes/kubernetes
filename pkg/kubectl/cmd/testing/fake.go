@@ -44,12 +44,12 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/validation"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 // InternalType is the schema for internal type
@@ -211,13 +211,6 @@ func NewInternalNamespacedType(kind, apiversion, name, namespace string) *Intern
 }
 
 var errInvalidVersion = errors.New("not a version")
-
-func versionErrIfFalse(b bool) error {
-	if b {
-		return nil
-	}
-	return errInvalidVersion
-}
 
 // ValidVersion of API
 var ValidVersion = "v1"

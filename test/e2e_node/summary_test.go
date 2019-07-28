@@ -26,8 +26,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	systemdutil "github.com/coreos/go-systemd/util"
 	. "github.com/onsi/ginkgo"
@@ -44,7 +46,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
 			By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -80,7 +82,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
-			fsCapacityBounds := bounded(100*framework.Mb, 10*framework.Tb)
+			fsCapacityBounds := bounded(100*volume.Mb, 10*volume.Tb)
 			// Expectations for system containers.
 			sysContExpectations := func() types.GomegaMatcher {
 				return gstruct.MatchAllFields(gstruct.Fields{
@@ -95,10 +97,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time": recent(maxStatsAge),
 						// We don't limit system container memory.
 						"AvailableBytes":  BeNil(),
-						"UsageBytes":      bounded(1*framework.Mb, memoryLimit),
-						"WorkingSetBytes": bounded(1*framework.Mb, memoryLimit),
+						"UsageBytes":      bounded(1*volume.Mb, memoryLimit),
+						"WorkingSetBytes": bounded(1*volume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
-						"RSSBytes":        bounded(1*framework.Mb, memoryLimit),
+						"RSSBytes":        bounded(1*volume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -112,10 +114,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
 				"Time": recent(maxStatsAge),
 				// Pods are limited by Node Allocatable
-				"AvailableBytes":  bounded(1*framework.Kb, memoryLimit),
-				"UsageBytes":      bounded(10*framework.Kb, memoryLimit),
-				"WorkingSetBytes": bounded(10*framework.Kb, memoryLimit),
-				"RSSBytes":        bounded(1*framework.Kb, memoryLimit),
+				"AvailableBytes":  bounded(1*volume.Kb, memoryLimit),
+				"UsageBytes":      bounded(10*volume.Kb, memoryLimit),
+				"WorkingSetBytes": bounded(10*volume.Kb, memoryLimit),
+				"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
 				"PageFaults":      bounded(0, 1000000),
 				"MajorPageFaults": bounded(0, 10),
 			})
@@ -150,16 +152,16 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
-				framework.Logf("Host not running systemd; expecting 'misc' system container.")
+				e2elog.Logf("Host not running systemd; expecting 'misc' system container.")
 				miscContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 				// Misc processes are system-dependent, so relax the memory constraints.
 				miscContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
 					"Time": recent(maxStatsAge),
 					// We don't limit system container memory.
 					"AvailableBytes":  BeNil(),
-					"UsageBytes":      bounded(100*framework.Kb, memoryLimit),
-					"WorkingSetBytes": bounded(100*framework.Kb, memoryLimit),
-					"RSSBytes":        bounded(100*framework.Kb, memoryLimit),
+					"UsageBytes":      bounded(100*volume.Kb, memoryLimit),
+					"WorkingSetBytes": bounded(100*volume.Kb, memoryLimit),
+					"RSSBytes":        bounded(100*volume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
 				})
@@ -180,10 +182,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
-							"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
-							"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
-							"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
-							"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
+							"AvailableBytes":  bounded(1*volume.Kb, 80*volume.Mb),
+							"UsageBytes":      bounded(10*volume.Kb, 80*volume.Mb),
+							"WorkingSetBytes": bounded(10*volume.Kb, 80*volume.Mb),
+							"RSSBytes":        bounded(1*volume.Kb, 80*volume.Mb),
 							"PageFaults":      bounded(100, 1000000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
@@ -192,7 +194,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 10*framework.Mb),
+							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
 							"InodesFree":     bounded(1E4, 1E8),
 							"Inodes":         bounded(1E4, 1E8),
 							"InodesUsed":     bounded(0, 1E8),
@@ -201,7 +203,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 10*framework.Mb),
+							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
 							"InodesFree":     bounded(1E4, 1E8),
 							"Inodes":         bounded(1E4, 1E8),
 							"InodesUsed":     bounded(0, 1E8),
@@ -213,9 +215,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time": recent(maxStatsAge),
 					"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
 						"Name":     Equal("eth0"),
-						"RxBytes":  bounded(10, 10*framework.Mb),
+						"RxBytes":  bounded(10, 10*volume.Mb),
 						"RxErrors": bounded(0, 1000),
-						"TxBytes":  bounded(10, 10*framework.Mb),
+						"TxBytes":  bounded(10, 10*volume.Mb),
 						"TxErrors": bounded(0, 1000),
 					}),
 					"Interfaces": Not(BeNil()),
@@ -227,10 +229,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
 					"Time":            recent(maxStatsAge),
-					"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
-					"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
-					"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
-					"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
+					"AvailableBytes":  bounded(1*volume.Kb, 80*volume.Mb),
+					"UsageBytes":      bounded(10*volume.Kb, 80*volume.Mb),
+					"WorkingSetBytes": bounded(10*volume.Kb, 80*volume.Mb),
+					"RSSBytes":        bounded(1*volume.Kb, 80*volume.Mb),
 					"PageFaults":      bounded(0, 1000000),
 					"MajorPageFaults": bounded(0, 10),
 				}),
@@ -242,7 +244,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 1*framework.Mb),
+							"UsedBytes":      bounded(volume.Kb, 1*volume.Mb),
 							"InodesFree":     bounded(1E4, 1E8),
 							"Inodes":         bounded(1E4, 1E8),
 							"InodesUsed":     bounded(0, 1E8),
@@ -253,7 +255,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time":           recent(maxStatsAge),
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      bounded(framework.Kb, 21*framework.Mb),
+					"UsedBytes":      bounded(volume.Kb, 21*volume.Mb),
 					"InodesFree":     bounded(1E4, 1E8),
 					"Inodes":         bounded(1E4, 1E8),
 					"InodesUsed":     bounded(0, 1E8),
@@ -272,11 +274,11 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
 						"Time":            recent(maxStatsAge),
-						"AvailableBytes":  bounded(100*framework.Mb, memoryLimit),
-						"UsageBytes":      bounded(10*framework.Mb, memoryLimit),
-						"WorkingSetBytes": bounded(10*framework.Mb, memoryLimit),
+						"AvailableBytes":  bounded(100*volume.Mb, memoryLimit),
+						"UsageBytes":      bounded(10*volume.Mb, memoryLimit),
+						"WorkingSetBytes": bounded(10*volume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
-						"RSSBytes":        bounded(1*framework.Kb, memoryLimit),
+						"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -285,9 +287,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time": recent(maxStatsAge),
 						"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Name":     Or(BeEmpty(), Equal("eth0")),
-							"RxBytes":  Or(BeNil(), bounded(1*framework.Mb, 100*framework.Gb)),
+							"RxBytes":  Or(BeNil(), bounded(1*volume.Mb, 100*volume.Gb)),
 							"RxErrors": Or(BeNil(), bounded(0, 100000)),
-							"TxBytes":  Or(BeNil(), bounded(10*framework.Kb, 10*framework.Gb)),
+							"TxBytes":  Or(BeNil(), bounded(10*volume.Kb, 10*volume.Gb)),
 							"TxErrors": Or(BeNil(), bounded(0, 100000)),
 						}),
 						"Interfaces": Not(BeNil()),
@@ -297,7 +299,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
 						// we assume we are not running tests on machines < 10tb of disk
-						"UsedBytes":  bounded(framework.Kb, 10*framework.Tb),
+						"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
 						"InodesFree": bounded(1E4, 1E8),
 						"Inodes":     bounded(1E4, 1E8),
 						"InodesUsed": bounded(0, 1E8),
@@ -308,7 +310,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							// we assume we are not running tests on machines < 10tb of disk
-							"UsedBytes":  bounded(framework.Kb, 10*framework.Tb),
+							"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
 							"InodesFree": bounded(1E4, 1E8),
 							"Inodes":     bounded(1E4, 1E8),
 							"InodesUsed": bounded(0, 1E8),
@@ -380,16 +382,16 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 // Mapping function for gstruct.MatchAllElements
 func summaryObjectID(element interface{}) string {
 	switch el := element.(type) {
-	case stats.PodStats:
+	case kubeletstatsv1alpha1.PodStats:
 		return fmt.Sprintf("%s::%s", el.PodRef.Namespace, el.PodRef.Name)
-	case stats.ContainerStats:
+	case kubeletstatsv1alpha1.ContainerStats:
 		return el.Name
-	case stats.VolumeStats:
+	case kubeletstatsv1alpha1.VolumeStats:
 		return el.Name
-	case stats.UserDefinedMetric:
+	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
-		framework.Failf("Unknown type: %T", el)
+		e2elog.Failf("Unknown type: %T", el)
 		return "???"
 	}
 }
@@ -417,7 +419,7 @@ func recent(d time.Duration) types.GomegaMatcher {
 func recordSystemCgroupProcesses() {
 	cfg, err := getCurrentKubeletConfig()
 	if err != nil {
-		framework.Logf("Failed to read kubelet config: %v", err)
+		e2elog.Logf("Failed to read kubelet config: %v", err)
 		return
 	}
 	cgroups := map[string]string{
@@ -426,24 +428,24 @@ func recordSystemCgroupProcesses() {
 	}
 	for name, cgroup := range cgroups {
 		if cgroup == "" {
-			framework.Logf("Skipping unconfigured cgroup %s", name)
+			e2elog.Logf("Skipping unconfigured cgroup %s", name)
 			continue
 		}
 
 		pids, err := ioutil.ReadFile(fmt.Sprintf("/sys/fs/cgroup/cpu/%s/cgroup.procs", cgroup))
 		if err != nil {
-			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
+			e2elog.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
 		}
 
-		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
+		e2elog.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
 			cmd, err := ioutil.ReadFile(path)
 			if err != nil {
-				framework.Logf("  Failed to read %s: %v", path, err)
+				e2elog.Logf("  Failed to read %s: %v", path, err)
 			} else {
-				framework.Logf("  %s", cmd)
+				e2elog.Logf("  %s", cmd)
 			}
 		}
 	}

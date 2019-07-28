@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/url"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/klog"
-	utiltrace "k8s.io/utils/trace"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -52,13 +50,19 @@ type RequestScope struct {
 	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
+	// StandardSerializers, if set, restricts which serializers can be used when
+	// we aren't transforming the output (into Table or PartialObjectMetadata).
+	// Used only by CRDs which do not yet support Protobuf.
+	StandardSerializers []runtime.SerializerInfo
+
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
 	Defaulter       runtime.ObjectDefaulter
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 	Authorizer      authorizer.Authorizer
-	Trace           *utiltrace.Trace
+
+	EquivalentResourceMapper runtime.EquivalentResourceMapper
 
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
@@ -79,9 +83,23 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
-func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind, mimeType, mimeSubType string) bool {
+func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {
+	// some handlers like CRDs can't serve all the mime types that PartialObjectMetadata or Table can - if
+	// gvk is nil (no conversion) allow StandardSerializers to further restrict the set of mime types.
+	if gvk == nil {
+		if len(scope.StandardSerializers) == 0 {
+			return true
+		}
+		for _, info := range scope.StandardSerializers {
+			if info.MediaTypeType == mimeType && info.MediaTypeSubType == mimeSubType {
+				return true
+			}
+		}
+		return false
+	}
+
 	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
-	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion {
+	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion || gvk.GroupVersion() == metav1.SchemeGroupVersion {
 		switch gvk.Kind {
 		case "Table":
 			return scope.TableConvertor != nil &&
@@ -111,9 +129,12 @@ func (r *RequestScope) GetObjectCreater() runtime.ObjectCreater     { return r.C
 func (r *RequestScope) GetObjectTyper() runtime.ObjectTyper         { return r.Typer }
 func (r *RequestScope) GetObjectDefaulter() runtime.ObjectDefaulter { return r.Defaulter }
 func (r *RequestScope) GetObjectConvertor() runtime.ObjectConvertor { return r.Convertor }
+func (r *RequestScope) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
+	return r.EquivalentResourceMapper
+}
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
+func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if isDryRun(req.URL) {
 			scope.err(errors.NewBadRequest("dryRun is not supported"), w, req)
@@ -140,14 +161,14 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), &scope)
+				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), &scope)
+				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -168,13 +189,13 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
 type responder struct {
-	scope RequestScope
+	scope *RequestScope
 	req   *http.Request
 	w     http.ResponseWriter
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObjectNegotiated(r.scope.Serializer, &r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
 }
 
 func (r *responder) Error(err error) {
@@ -197,10 +218,12 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 		defer func() {
 			panicReason := recover()
 			if panicReason != nil {
+				// Same as stdlib http server code. Manually allocate stack
+				// trace buffer size to prevent excessively large logs
 				const size = 64 << 10
 				buf := make([]byte, size)
 				buf = buf[:goruntime.Stack(buf, false)]
-				panicReason = strings.TrimSuffix(fmt.Sprintf("%v\n%s", panicReason, string(buf)), "\n")
+				panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
 				// Propagate to parent goroutine
 				panicCh <- panicReason
 			}
@@ -230,11 +253,11 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	}
 }
 
-// transformDecodeError adds additional information when a decode fails.
+// transformDecodeError adds additional information into a bad-request api error when a decode fails.
 func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *schema.GroupVersionKind, body []byte) error {
 	objGVKs, _, err := typer.ObjectKinds(into)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(err.Error())
 	}
 	objGVK := objGVKs[0]
 	if gvk != nil && len(gvk.Kind) > 0 {

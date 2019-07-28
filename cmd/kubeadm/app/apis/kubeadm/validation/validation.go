@@ -33,13 +33,12 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -50,6 +49,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
+	// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
 	return allErrs
 }
 
@@ -91,6 +91,7 @@ func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	if c != nil {
 		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
+		// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
 	}
 	return allErrs
 }
@@ -101,7 +102,10 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 	if len(nro.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "--node-name or .nodeRegistration.name in the config file is a required value. It seems like this value couldn't be automatically detected in your environment, please specify the desired value using the CLI or config file."))
 	} else {
-		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(nro.Name, field.NewPath("name"))...)
+		nameFldPath := fldPath.Child("name")
+		for _, err := range validation.IsDNS1123Subdomain(nro.Name) {
+			allErrs = append(allErrs, field.Invalid(nameFldPath, nro.Name, err))
+		}
 	}
 	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
@@ -144,11 +148,11 @@ func ValidateDiscoveryBootstrapToken(b *kubeadm.BootstrapTokenDiscovery, fldPath
 	}
 
 	if len(b.CACertHashes) == 0 && !b.UnsafeSkipCAVerification {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "using token-based discovery without caCertHashes can be unsafe. Set unsafeSkipCAVerification to continue"))
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "using token-based discovery without caCertHashes can be unsafe. Set unsafeSkipCAVerification as true in your kubeadm config file or pass --discovery-token-unsafe-skip-ca-verification flag to continue"))
 	}
 
 	allErrs = append(allErrs, ValidateToken(b.Token, fldPath.Child(kubeadmcmdoptions.TokenStr))...)
-	allErrs = append(allErrs, ValidateDiscoveryTokenAPIServer(b.APIServerEndpoint, fldPath.Child("apiServerEndpoints"))...)
+	allErrs = append(allErrs, ValidateDiscoveryTokenAPIServer(b.APIServerEndpoint, fldPath.Child("apiServerEndpoint"))...)
 
 	return allErrs
 }
@@ -308,15 +312,17 @@ func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
 		if errs := validation.IsDNS1123Subdomain(altname); len(errs) != 0 {
-			if net.ParseIP(altname) == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address or DNS label: %s", strings.Join(errs, "; "))))
+			if errs2 := validation.IsWildcardDNS1123Subdomain(altname); len(errs2) != 0 {
+				if net.ParseIP(altname) == nil {
+					allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address, DNS label or a DNS label with subdomain wildcards: %s; %s", strings.Join(errs, "; "), strings.Join(errs2, "; "))))
+				}
 			}
 		}
 	}
 	return allErrs
 }
 
-// ValidateURLs validates the URLs given in the string slice, makes sure they are parseable. Optionally, it can enforcs HTTPS usage.
+// ValidateURLs validates the URLs given in the string slice, makes sure they are parsable. Optionally, it can enforces HTTPS usage.
 func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, urlstr := range urls {
@@ -380,7 +386,10 @@ func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path)
 // ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dnsDomain"))...)
+	dnsDomainFldPath := field.NewPath("dnsDomain")
+	for _, err := range validation.IsDNS1123Subdomain(c.DNSDomain) {
+		allErrs = append(allErrs, field.Invalid(dnsDomainFldPath, c.DNSDomain, err))
+	}
 	allErrs = append(allErrs, ValidateIPNetFromString(c.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("serviceSubnet"))...)
 	if len(c.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.PodSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("podSubnet"))...)
@@ -428,7 +437,6 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.CertificateKey,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {
 		return true
@@ -459,12 +467,25 @@ func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
-// ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
-func ValidateIgnorePreflightErrors(ignorePreflightErrors []string) (sets.String, error) {
+// ValidateIgnorePreflightErrors validates duplicates in:
+// - ignore-preflight-errors flag and
+// - ignorePreflightErrors field in {Init,Join}Configuration files.
+func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
-	for _, item := range ignorePreflightErrors {
+	for _, item := range ignorePreflightErrorsFromConfigFile {
+		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
+	}
+
+	if ignoreErrors.Has("all") {
+		// "all" is forbidden in config files. Administrators should use an
+		// explicit list of errors they want to ignore, as it can be risky to
+		// mask all errors in such a way. Hence, we return an error:
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignorePreflightErrors"), "all", "'all' cannot be used in configuration file"))
+	}
+
+	for _, item := range ignorePreflightErrorsFromCLI {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
 
@@ -488,7 +509,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 		if !filepath.IsAbs(u.Path) {
 			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
 		}
-	} else if u.Scheme != kubeadmapiv1beta1.DefaultUrlScheme {
+	} else if u.Scheme != kubeadmapiv1beta2.DefaultUrlScheme {
 		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL scheme %s is not supported", u.Scheme)))
 	}
 

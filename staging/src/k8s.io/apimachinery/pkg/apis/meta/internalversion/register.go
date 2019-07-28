@@ -66,9 +66,6 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 
 		metav1.Convert_Map_string_To_string_To_v1_LabelSelector,
 		metav1.Convert_v1_LabelSelector_To_Map_string_To_string,
-
-		Convert_internalversion_ListOptions_To_v1_ListOptions,
-		Convert_v1_ListOptions_To_internalversion_ListOptions,
 	)
 	if err != nil {
 		return err
@@ -89,12 +86,12 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1beta1.PartialObjectMetadata{},
 		&metav1beta1.PartialObjectMetadataList{},
 	)
-	scheme.AddKnownTypes(metav1beta1.SchemeGroupVersion,
-		&metav1beta1.Table{},
-		&metav1beta1.TableOptions{},
-		&metav1beta1.PartialObjectMetadata{},
-		&metav1beta1.PartialObjectMetadataList{},
-	)
+	if err := metav1beta1.AddMetaToScheme(scheme); err != nil {
+		return err
+	}
+	if err := metav1.AddMetaToScheme(scheme); err != nil {
+		return err
+	}
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
 	scheme.AddUnversionedTypes(SchemeGroupVersion,
 		&metav1.DeleteOptions{},

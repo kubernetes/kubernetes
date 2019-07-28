@@ -49,20 +49,20 @@ function gcloud-list() {
   local attempt=1
   local result=""
   while true; do
-    if result=$(gcloud ${group} ${resource} list --project=${PROJECT} ${filter:+--filter="$filter"} ${@:4}); then
-      if [[ ! -z "${GREP_REGEX}" ]]; then
+    if result=$(gcloud "${group}" "${resource}" list --project="${PROJECT}" ${filter:+--filter="$filter"} "${@:4}"); then
+      if [[ -n "${GREP_REGEX:-}" ]]; then
         result=$(echo "${result}" | grep "${GREP_REGEX}" || true)
       fi
       echo "${result}"
       return
     fi
     echo -e "Attempt ${attempt} failed to list ${resource}. Retrying." >&2
-    attempt=$(($attempt+1))
+    attempt=$((attempt + 1))
     if [[ ${attempt} -gt 5 ]]; then
       echo -e "List ${resource} failed!" >&2
       exit 2
     fi
-    sleep $((5*${attempt}))
+    sleep $((5 * attempt))
   done
 }
 

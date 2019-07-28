@@ -24,6 +24,8 @@ spec:
             - name: ADDRESS
               value: /csi/csi.sock
           imagePullPolicy: Always
+          securityContext:
+            privileged: true
           volumeMounts:
           - mountPath: /csi
             name: socket-dir

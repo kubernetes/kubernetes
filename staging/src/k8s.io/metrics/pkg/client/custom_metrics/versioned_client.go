@@ -56,6 +56,9 @@ func NewForVersion(client rest.Interface, mapper meta.RESTMapper, version schema
 func NewForVersionForConfig(c *rest.Config, mapper meta.RESTMapper, version schema.GroupVersion) (CustomMetricsClient, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	configShallowCopy.APIPath = "/apis"
@@ -63,7 +66,7 @@ func NewForVersionForConfig(c *rest.Config, mapper meta.RESTMapper, version sche
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &version
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {

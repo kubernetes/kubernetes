@@ -85,7 +85,7 @@ spec:
         fsGroup: 65534
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.4.0
+        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.6.0
         resources:
             requests:
                 cpu: "20m"

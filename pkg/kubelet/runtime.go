@@ -85,13 +85,13 @@ func (s *runtimeState) runtimeErrors() error {
 	defer s.RUnlock()
 	errs := []error{}
 	if s.lastBaseRuntimeSync.IsZero() {
-		errs = append(errs, errors.New("container runtime status check may not have completed yet."))
+		errs = append(errs, errors.New("container runtime status check may not have completed yet"))
 	} else if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
-		errs = append(errs, errors.New("container runtime is down."))
+		errs = append(errs, errors.New("container runtime is down"))
 	}
 	for _, hc := range s.healthChecks {
 		if ok, err := hc.fn(); !ok {
-			errs = append(errs, fmt.Errorf("%s is not healthy: %v.", hc.name, err))
+			errs = append(errs, fmt.Errorf("%s is not healthy: %v", hc.name, err))
 		}
 	}
 

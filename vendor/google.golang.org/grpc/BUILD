@@ -75,7 +75,6 @@ filegroup(
         "//vendor/google.golang.org/grpc/connectivity:all-srcs",
         "//vendor/google.golang.org/grpc/credentials:all-srcs",
         "//vendor/google.golang.org/grpc/encoding:all-srcs",
-        "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1/messages:all-srcs",
         "//vendor/google.golang.org/grpc/grpclog:all-srcs",
         "//vendor/google.golang.org/grpc/health:all-srcs",
         "//vendor/google.golang.org/grpc/internal:all-srcs",

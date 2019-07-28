@@ -149,35 +149,42 @@ func (suite *Suite) PushContainerNode(text string, body func(), flag types.FlagT
 
 func (suite *Suite) PushItNode(text string, body interface{}, flag types.FlagType, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call It from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call It from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSubjectNode(leafnodes.NewItNode(text, body, flag, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
 func (suite *Suite) PushMeasureNode(text string, body interface{}, flag types.FlagType, codeLocation types.CodeLocation, samples int) {
 	if suite.running {
-		suite.failer.Fail("You may only call Measure from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call Measure from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSubjectNode(leafnodes.NewMeasureNode(text, body, flag, codeLocation, samples, suite.failer, suite.containerIndex))
 }
 
 func (suite *Suite) PushBeforeEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call BeforeEach from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call BeforeEach from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSetupNode(leafnodes.NewBeforeEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
 func (suite *Suite) PushJustBeforeEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call JustBeforeEach from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call JustBeforeEach from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSetupNode(leafnodes.NewJustBeforeEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
+func (suite *Suite) PushJustAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
+	if suite.running {
+		suite.failer.Fail("You may only call JustAfterEach from within a Describe or Context", codeLocation)
+	}
+	suite.currentContainer.PushSetupNode(leafnodes.NewJustAfterEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
+}
+
 func (suite *Suite) PushAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call AfterEach from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call AfterEach from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSetupNode(leafnodes.NewAfterEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }

@@ -68,6 +68,12 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("token is required for TokenReview in authentication"))
 	}
 
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	if r.tokenAuthenticator == nil {
 		return tokenReview, nil
 	}
