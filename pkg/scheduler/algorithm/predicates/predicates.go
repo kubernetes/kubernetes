@@ -855,7 +855,8 @@ func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSele
 
 // PodMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
 // the requirements in both NodeAffinity and nodeSelector.
-func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
+func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) bool {
+	node := nodeInfo.Node()
 	// Check if node.Labels match pod.Spec.NodeSelector.
 	if len(pod.Spec.NodeSelector) > 0 {
 		selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
@@ -879,6 +880,11 @@ func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 		if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 			// if nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution == nil && nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 			return true
+		}
+		for _, existingPod := range nodeInfo.Pods() {
+			if pod.Namespace == existingPod.Namespace && pod.Name == existingPod.Name {
+				return true
+			}
 		}
 
 		// Match node selector for requiredDuringSchedulingRequiredDuringExecution.
@@ -906,7 +912,7 @@ func PodMatchNodeSelector(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedul
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
-	if PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
+	if PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo) {
 		return true, nil, nil
 	}
 	return false, []PredicateFailureReason{ErrNodeSelectorNotMatch}, nil

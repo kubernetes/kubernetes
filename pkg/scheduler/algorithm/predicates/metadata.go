@@ -229,7 +229,7 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		}
 		// In accordance to design, if NodeAffinity or NodeSelector is defined,
 		// spreading is applied to nodes that pass those filters.
-		if !PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
+		if !PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo) {
 			return
 		}
 

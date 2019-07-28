@@ -108,7 +108,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) All topologyKeys need to be present in `node`
-		if !predicates.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
+		if !predicates.PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo) ||
 			!predicates.NodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 			return
 		}
