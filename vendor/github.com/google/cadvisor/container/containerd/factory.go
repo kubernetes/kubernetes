@@ -21,17 +21,18 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/manager/watcher"
+	"github.com/google/cadvisor/watcher"
 )
 
-var ArgContainerdEndpoint = flag.String("containerd", "unix:///var/run/containerd.sock", "containerd endpoint")
+var ArgContainerdEndpoint = flag.String("containerd", "/run/containerd/containerd.sock", "containerd endpoint")
+var ArgContainerdNamespace = flag.String("containerd-namespace", "k8s.io", "containerd namespace")
 
 // The namespace under which containerd aliases are unique.
 const k8sContainerdNamespace = "containerd"
@@ -56,7 +57,7 @@ func (self *containerdFactory) String() string {
 }
 
 func (self *containerdFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
-	client, err := Client()
+	client, err := Client(*ArgContainerdEndpoint, *ArgContainerdNamespace)
 	if err != nil {
 		return
 	}
@@ -118,7 +119,7 @@ func (self *containerdFactory) DebugInfo() map[string][]string {
 
 // Register root container before running this function!
 func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
-	client, err := Client()
+	client, err := Client(*ArgContainerdEndpoint, *ArgContainerdNamespace)
 	if err != nil {
 		return fmt.Errorf("unable to create containerd client: %v", err)
 	}
@@ -128,12 +129,12 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		return fmt.Errorf("failed to fetch containerd client version: %v", err)
 	}
 
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	glog.V(1).Infof("Registering containerd factory")
+	klog.V(1).Infof("Registering containerd factory")
 	f := &containerdFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,

@@ -23,9 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,24 +36,26 @@ import (
 	"k8s.io/client-go/tools/cache"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
-	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/pkg/scheduler/util"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 const (
-	enableEquivalenceCache = true
-	disablePodPreemption   = false
-	bindTimeoutSeconds     = 600
+	disablePodPreemption = false
+	bindTimeoutSeconds   = 600
 )
 
 func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 	factory.Create()
 }
 
@@ -63,7 +66,9 @@ func TestCreateFromConfig(t *testing.T) {
 	var policy schedulerapi.Policy
 
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -101,7 +106,9 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	var policy schedulerapi.Policy
 
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -140,7 +147,9 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	var policy schedulerapi.Policy
 
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
@@ -155,7 +164,9 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 // The predicate/priority from DefaultProvider will be used.
 func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
@@ -188,7 +199,9 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 // Empty predicate/priority sets will be used.
 func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
@@ -218,19 +231,19 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	}
 }
 
-func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateTwo(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
@@ -240,73 +253,126 @@ func TestDefaultErrorFunc(t *testing.T) {
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
-	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
-	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
-	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
+	timestamp := time.Now()
+	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
+
+	// Trigger error handling again to put the pod in unschedulable queue
 	errFunc(testPod, nil)
 
-	for {
-		// This is a terrible way to do this but I plan on replacing this
-		// whole error handling system in the future. The test will time
-		// out if something doesn't work.
-		time.Sleep(10 * time.Millisecond)
-		got, exists, _ := queue.Get(testPod)
-		if !exists {
+	// Try up to a minute to retrieve the error pod from priority queue
+	foundPodFlag := false
+	maxIterations := 10 * 60
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
 			continue
 		}
-		requestReceived := false
-		actions := client.Actions()
-		for _, a := range actions {
-			if a.GetVerb() == "get" {
-				getAction, ok := a.(clienttesting.GetAction)
-				if !ok {
-					t.Errorf("Can't cast action object to GetAction interface")
-					break
-				}
-				name := getAction.GetName()
-				ns := a.GetNamespace()
-				if name != "foo" || ns != "bar" {
-					t.Errorf("Expected name %s namespace %s, got %s %s",
-						"foo", "bar", name, ns)
-				}
-				requestReceived = true
-			}
-		}
-		if !requestReceived {
-			t.Errorf("Get pod request not received")
-		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+
+		foundPodFlag = true
 		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
+	}
+
+	// Remove the pod from priority queue to test putting error
+	// pod in backoff queue.
+	queue.Delete(testPod)
+
+	// Trigger a move request
+	queue.MoveAllToActiveQueue()
+
+	// Trigger error handling again to put the pod in backoff queue
+	errFunc(testPod, nil)
+
+	foundPodFlag = false
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		// The pod should be found from backoff queue at this time
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
+			continue
+		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
+		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+
+		foundPodFlag = true
+		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the backoff queue after waiting for a minute: %v", testPod)
 	}
 }
 
-func TestNodeEnumerator(t *testing.T) {
-	testList := &v1.NodeList{
-		Items: []v1.Node{
-			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
-		},
+// getPodfromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
+// the specific pod from the given priority queue. It returns the found pod in the priority queue.
+func getPodfromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
+	podList := queue.PendingPods()
+	if len(podList) == 0 {
+		return nil
 	}
-	me := nodeEnumerator{testList}
 
-	if e, a := 3, me.Len(); e != a {
-		t.Fatalf("expected %v, got %v", e, a)
+	queryPodKey, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		return nil
 	}
-	for i := range testList.Items {
-		t.Run(fmt.Sprintf("node enumerator/%v", i), func(t *testing.T) {
-			gotObj := me.Get(i)
-			if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-				t.Errorf("Expected %v, got %v", e, a)
+
+	for _, foundPod := range podList {
+		foundPodKey, err := cache.MetaNamespaceKeyFunc(foundPod)
+		if err != nil {
+			return nil
+		}
+
+		if foundPodKey == queryPodKey {
+			return foundPod
+		}
+	}
+
+	return nil
+}
+
+// testClientGetPodRequest function provides a routine used by TestDefaultErrorFunc test.
+// It tests whether the fake client can receive request and correctly "get" the namespace
+// and name of the error pod.
+func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string, podName string) {
+	requestReceived := false
+	actions := client.Actions()
+	for _, a := range actions {
+		if a.GetVerb() == "get" {
+			getAction, ok := a.(clienttesting.GetAction)
+			if !ok {
+				t.Errorf("Can't cast action object to GetAction interface")
+				break
 			}
-			if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-				t.Errorf("Expected %#v, got %v#", e, a)
+			name := getAction.GetName()
+			ns := a.GetNamespace()
+			if name != podName || ns != podNs {
+				t.Errorf("Expected name %s namespace %s, got %s %s",
+					podName, podNs, name, ns)
 			}
-		})
+			requestReceived = true
+		}
+	}
+	if !requestReceived {
+		t.Errorf("Get pod request not received")
 	}
 }
 
@@ -352,25 +418,24 @@ func testBind(binding *v1.Binding, t *testing.T) {
 
 	pod := client.CoreV1().Pods(metav1.NamespaceDefault).(*fakeV1.FakePods)
 
-	bind, err := pod.GetBinding(binding.GetName())
+	actualBinding, err := pod.GetBinding(binding.GetName())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 		return
 	}
-
-	expectedBody := runtime.EncodeOrDie(schedulertesting.Test.Codec(), binding)
-	bind.APIVersion = ""
-	bind.Kind = ""
-	body := runtime.EncodeOrDie(schedulertesting.Test.Codec(), bind)
-	if expectedBody != body {
-		t.Errorf("Expected body %s, Got %s", expectedBody, body)
+	if !reflect.DeepEqual(binding, actualBinding) {
+		t.Errorf("Binding did not match expectation")
+		t.Logf("Expected: %v", binding)
+		t.Logf("Actual:   %v", actualBinding)
 	}
 }
 
 func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	// factory of "default-scheduler"
-	factory := newConfigFactory(client, -1)
+	stopCh := make(chan struct{})
+	factory := newConfigFactory(client, -1, stopCh)
+	defer close(stopCh)
 	_, err := factory.Create()
 	if err == nil {
 		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
@@ -399,7 +464,9 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight)
+			stopCh := make(chan struct{})
+			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
+			defer close(stopCh)
 			_, err := factory.Create()
 			if err == nil {
 				t.Errorf("expected err: %s, got nothing", test.expectErr)
@@ -409,99 +476,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 }
 
-func TestSkipPodUpdate(t *testing.T) {
-	table := []struct {
-		pod              *v1.Pod
-		isAssumedPodFunc func(*v1.Pod) bool
-		getPodFunc       func(*v1.Pod) *v1.Pod
-		expected         bool
-		name             string
-	}{
-		{
-			name: "Non-assumed pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool { return false },
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod-0",
-					},
-				}
-			},
-			expected: false,
-		},
-		{
-			name: "with changes on ResourceVersion, Spec.NodeName and/or Annotations",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "pod-0",
-					Annotations:     map[string]string{"a": "b"},
-					ResourceVersion: "0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "node-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "pod-0",
-						Annotations:     map[string]string{"c": "d"},
-						ResourceVersion: "1",
-					},
-					Spec: v1.PodSpec{
-						NodeName: "node-1",
-					},
-				}
-			},
-			expected: true,
-		},
-		{
-			name: "with changes on Labels",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "pod-0",
-					Labels: map[string]string{"a": "b"},
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "pod-0",
-						Labels: map[string]string{"c": "d"},
-					},
-				}
-			},
-			expected: false,
-		},
-	}
-	for _, test := range table {
-		t.Run(test.name, func(t *testing.T) {
-			c := &configFactory{
-				schedulerCache: &fakecache.Cache{
-					IsAssumedPodFunc: test.isAssumedPodFunc,
-					GetPodFunc:       test.getPodFunc,
-				},
-			}
-			got := c.skipPodUpdate(test.pod)
-			if got != test.expected {
-				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-			}
-		})
-	}
-}
-
-func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32) Configurator {
+func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
 		v1.DefaultSchedulerName,
@@ -516,11 +491,15 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Storage().V1beta1().CSINodes(),
 		hardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
 		disablePodPreemption,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
+		stopCh,
+		framework.NewRegistry(),
+		nil,
+		[]config.PluginConfig{},
 	})
 }
 
@@ -530,6 +509,10 @@ type fakeExtender struct {
 	ignorable         bool
 }
 
+func (f *fakeExtender) Name() string {
+	return "fakeExtender"
+}
+
 func (f *fakeExtender) IsIgnorable() bool {
 	return f.ignorable
 }
@@ -537,7 +520,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	return nil, nil
 }
@@ -549,7 +532,7 @@ func (f *fakeExtender) SupportsPreemption() bool {
 func (f *fakeExtender) Filter(
 	pod *v1.Pod,
 	nodes []*v1.Node,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
 	return nil, nil, nil
 }
@@ -626,7 +609,7 @@ func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm
 	}
 
 	f := &configFactory{}
-	binderFunc := f.getBinderFunc(extenders)
+	binderFunc := getBinderFunc(f.client, extenders)
 	binder := binderFunc(pod)
 
 	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))

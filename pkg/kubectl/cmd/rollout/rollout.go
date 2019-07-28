@@ -17,27 +17,26 @@ limitations under the License.
 package rollout
 
 import (
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
-	rollout_long = templates.LongDesc(`
-		Manage the rollout of a resource.` + rollout_valid_resources)
+	rolloutLong = templates.LongDesc(`
+		Manage the rollout of a resource.` + rolloutValidResources)
 
-	rollout_example = templates.Examples(`
+	rolloutExample = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
-		
+
 		# Check the rollout status of a daemonset
 		kubectl rollout status daemonset/foo`)
 
-	rollout_valid_resources = dedent.Dedent(`
+	rolloutValidResources = dedent.Dedent(`
 		Valid resource types include:
 
 		   * deployments
@@ -46,13 +45,14 @@ var (
 		`)
 )
 
+// NewCmdRollout returns a Command instance for 'rollout' sub command
 func NewCmdRollout(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "rollout SUBCOMMAND",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Manage the rollout of a resource"),
-		Long:                  rollout_long,
-		Example:               rollout_example,
+		Long:                  rolloutLong,
+		Example:               rolloutExample,
 		Run:                   cmdutil.DefaultSubCommandRun(streams.Out),
 	}
 	// subcommands
@@ -61,6 +61,7 @@ func NewCmdRollout(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.AddCommand(NewCmdRolloutResume(f, streams))
 	cmd.AddCommand(NewCmdRolloutUndo(f, streams))
 	cmd.AddCommand(NewCmdRolloutStatus(f, streams))
+	cmd.AddCommand(NewCmdRolloutRestart(f, streams))
 
 	return cmd
 }

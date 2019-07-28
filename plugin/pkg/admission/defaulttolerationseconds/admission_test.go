@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -32,7 +33,7 @@ func TestForgivenessAdmission(t *testing.T) {
 		return &s
 	}
 
-	handler := NewDefaultTolerationSeconds()
+	handler := admissiontesting.WithReinvocationTesting(t, NewDefaultTolerationSeconds())
 	// NOTE: for anyone who want to modify this test, the order of tolerations matters!
 	tests := []struct {
 		description  string
@@ -47,138 +48,6 @@ func TestForgivenessAdmission(t *testing.T) {
 			expectedPod: api.Pod{
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.TaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "pod has alpha tolerations, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`" +
-				", the alpha tolerations will not be touched",
-			requestedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-			expectedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "pod has alpha not-ready toleration, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`" +
-				", the alpha tolerations will not be touched",
-			requestedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-			expectedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "pod has alpha unreachable toleration, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`" +
-				", the alpha tolerations will not be touched",
-			requestedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-			expectedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
 						{
 							Key:               schedulerapi.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
@@ -395,7 +264,7 @@ func TestForgivenessAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil), nil)
 		if err != nil {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)
 		}

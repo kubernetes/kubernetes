@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/klog"
 
-	"reflect"
-
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -117,8 +117,9 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	if ae.ObjectRef == nil {
 		ae.ObjectRef = &auditinternal.ObjectReference{}
 	}
-	if acc, ok := obj.(metav1.ObjectMetaAccessor); ok {
-		meta := acc.GetObjectMeta()
+
+	// meta.Accessor is more general than ObjectMetaAccessor, but if it fails, we can just skip setting these bits
+	if meta, err := meta.Accessor(obj); err == nil {
 		if len(ae.ObjectRef.Namespace) == 0 {
 			ae.ObjectRef.Namespace = meta.GetNamespace()
 		}
@@ -152,7 +153,7 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
-		glog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
 		return
 	}
 }
@@ -191,27 +192,27 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
-		glog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
+		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
 	}
 }
 
 func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime.NegotiatedSerializer) (*runtime.Unknown, error) {
-	supported := serializer.SupportedMediaTypes()
-	for i := range supported {
-		if supported[i].MediaType == "application/json" {
-			enc := serializer.EncoderForVersion(supported[i].Serializer, gv)
-			var buf bytes.Buffer
-			if err := enc.Encode(obj, &buf); err != nil {
-				return nil, fmt.Errorf("encoding failed: %v", err)
-			}
-
-			return &runtime.Unknown{
-				Raw:         buf.Bytes(),
-				ContentType: runtime.ContentTypeJSON,
-			}, nil
-		}
+	const mediaType = runtime.ContentTypeJSON
+	info, ok := runtime.SerializerInfoForMediaType(serializer.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return nil, fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
-	return nil, fmt.Errorf("no json encoder found")
+
+	enc := serializer.EncoderForVersion(info.Serializer, gv)
+	var buf bytes.Buffer
+	if err := enc.Encode(obj, &buf); err != nil {
+		return nil, fmt.Errorf("encoding failed: %v", err)
+	}
+
+	return &runtime.Unknown{
+		Raw:         buf.Bytes(),
+		ContentType: runtime.ContentTypeJSON,
+	}, nil
 }
 
 // LogAnnotation fills in the Annotations according to the key value pair.
@@ -223,7 +224,7 @@ func LogAnnotation(ae *auditinternal.Event, key, value string) {
 		ae.Annotations = make(map[string]string)
 	}
 	if v, ok := ae.Annotations[key]; ok && v != value {
-		glog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
+		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
 		return
 	}
 	ae.Annotations[key] = value

@@ -147,63 +147,6 @@ func TestIsOvercommitAllowed(t *testing.T) {
 	}
 }
 
-func TestAddToNodeAddresses(t *testing.T) {
-	testCases := []struct {
-		existing []v1.NodeAddress
-		toAdd    []v1.NodeAddress
-		expected []v1.NodeAddress
-	}{
-		{
-			existing: []v1.NodeAddress{},
-			toAdd:    []v1.NodeAddress{},
-			expected: []v1.NodeAddress{},
-		},
-		{
-			existing: []v1.NodeAddress{},
-			toAdd: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-			expected: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-		},
-		{
-			existing: []v1.NodeAddress{},
-			toAdd: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-			},
-			expected: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-			},
-		},
-		{
-			existing: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-			},
-			toAdd: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-			expected: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
-		}
-	}
-}
-
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
 	if !containsAccessMode(modes, v1.ReadOnlyMany) {
@@ -813,7 +756,7 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 
 // TestMatchNodeSelectorTermsStateless ensures MatchNodeSelectorTerms()
 // is invoked in a "stateless" manner, i.e. nodeSelectorTerms should NOT
-// be deeply modifed after invoking
+// be deeply modified after invoking
 func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 	type args struct {
 		nodeSelectorTerms []v1.NodeSelectorTerm

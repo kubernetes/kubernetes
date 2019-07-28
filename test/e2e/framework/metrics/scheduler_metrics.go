@@ -16,19 +16,21 @@ limitations under the License.
 
 package metrics
 
+// SchedulerMetrics is metrics for scheduler
 type SchedulerMetrics Metrics
 
+// Equal returns true if all metrics are the same as the arguments.
 func (m *SchedulerMetrics) Equal(o SchedulerMetrics) bool {
 	return (*Metrics)(m).Equal(Metrics(o))
 }
 
-func NewSchedulerMetrics() SchedulerMetrics {
+func newSchedulerMetrics() SchedulerMetrics {
 	result := NewMetrics()
 	return SchedulerMetrics(result)
 }
 
 func parseSchedulerMetrics(data string) (SchedulerMetrics, error) {
-	result := NewSchedulerMetrics()
+	result := newSchedulerMetrics()
 	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
 		return SchedulerMetrics{}, err
 	}

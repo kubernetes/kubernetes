@@ -17,7 +17,6 @@ limitations under the License.
 package generic
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -28,33 +27,29 @@ import (
 // and an associated DestroyFunc from given parameters.
 type StorageDecorator func(
 	config *storagebackend.Config,
-	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),
+	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
+	trigger storage.IndexerFuncs) (storage.Interface, factory.DestroyFunc, error)
 
 // UndecoratedStorage returns the given a new storage from the given config
 // without any decoration.
 func UndecoratedStorage(
 	config *storagebackend.Config,
-	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),
+	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+	trigger storage.IndexerFuncs) (storage.Interface, factory.DestroyFunc, error) {
 	return NewRawStorage(config)
 }
 
 // NewRawStorage creates the low level kv storage. This is a work-around for current
 // two layer of same storage interface.
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
-func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc) {
-	s, d, err := factory.Create(*config)
-	if err != nil {
-		glog.Fatalf("Unable to create storage backend: config (%v), err (%v)", config, err)
-	}
-	return s, d
+func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc, error) {
+	return factory.Create(*config)
 }

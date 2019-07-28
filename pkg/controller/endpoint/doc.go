@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package service provides EndpointController implementation
+// Package endpoint provides EndpointController implementation
 // to manage and sync service endpoints.
 package endpoint // import "k8s.io/kubernetes/pkg/controller/endpoint"

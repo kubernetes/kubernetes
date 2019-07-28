@@ -26,6 +26,7 @@ import (
 type containerManager struct {
 }
 
+// NewContainerManager creates a new instance of ContainerManager
 func NewContainerManager(_ string, _ libdocker.Interface) ContainerManager {
 	return &containerManager{}
 }

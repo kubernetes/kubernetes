@@ -29,6 +29,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/coordination/install:all-srcs",
+        "//pkg/apis/coordination/v1:all-srcs",
         "//pkg/apis/coordination/v1beta1:all-srcs",
         "//pkg/apis/coordination/validation:all-srcs",
     ],

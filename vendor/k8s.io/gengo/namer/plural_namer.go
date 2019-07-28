@@ -59,7 +59,7 @@ func (r *pluralNamer) Name(t *types.Type) string {
 		return r.finalize(plural)
 	}
 	if len(singular) < 2 {
-		return r.finalize(plural)
+		return r.finalize(singular)
 	}
 
 	switch rune(singular[len(singular)-1]) {
@@ -87,7 +87,7 @@ func (r *pluralNamer) Name(t *types.Type) string {
 			plural = sPlural(singular)
 		}
 	case 'f':
-			plural = vesPlural(singular)
+		plural = vesPlural(singular)
 	default:
 		plural = sPlural(singular)
 	}

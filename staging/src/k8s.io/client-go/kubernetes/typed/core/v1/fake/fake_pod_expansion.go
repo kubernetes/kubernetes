@@ -60,6 +60,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 func (c *FakePods) Evict(eviction *policy.Eviction) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
+	action.Namespace = c.ns
 	action.Resource = podsResource
 	action.Subresource = "eviction"
 	action.Object = eviction

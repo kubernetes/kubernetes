@@ -837,7 +837,7 @@
         "notificationChannels": {
           "methods": {
             "create": {
-              "description": "Creates a new notification channel, representing a single notification endpoint such as an email address, SMS number, or pagerduty service.",
+              "description": "Creates a new notification channel, representing a single notification endpoint such as an email address, SMS number, or PagerDuty service.",
               "flatPath": "v3/projects/{projectsId}/notificationChannels",
               "httpMethod": "POST",
               "id": "monitoring.projects.notificationChannels.create",
@@ -1452,7 +1452,7 @@
       }
     }
   },
-  "revision": "20180603",
+  "revision": "20181211",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -1801,11 +1801,11 @@
       "type": "object"
     },
     "ContentMatcher": {
-      "description": "Used to perform string matching. Currently, this matches on the exact content. In the future, it can be expanded to allow for regular expressions and more complex matching.",
+      "description": "Used to perform string matching. It allows substring and regular expressions, together with their negations.",
       "id": "ContentMatcher",
       "properties": {
         "content": {
-          "description": "String content to match (max 1024 bytes)",
+          "description": "String or regex content to match (max 1024 bytes)",
           "type": "string"
         }
       },
@@ -1852,7 +1852,7 @@
       "id": "CreateTimeSeriesRequest",
       "properties": {
         "timeSeries": {
-          "description": "The new data to be added to a list of time series. Adds at most one data point to each of several time series. The new data point must be more recent than any other point in its time series. Each TimeSeries value must fully specify a unique time series by supplying all label values for the metric and the monitored resource.",
+          "description": "The new data to be added to a list of time series. Adds at most one data point to each of several time series. The new data point must be more recent than any other point in its time series. Each TimeSeries value must fully specify a unique time series by supplying all label values for the metric and the monitored resource.The maximum number of TimeSeries objects per Create request is 200.",
           "items": {
             "$ref": "TimeSeries"
           },
@@ -1917,6 +1917,20 @@
         "mimeType": {
           "description": "The format of the content field. Presently, only the value \"text/markdown\" is supported. See Markdown (https://en.wikipedia.org/wiki/Markdown) for more information.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DroppedLabels": {
+      "description": "A set of (label, value) pairs which were dropped during aggregation, attached to google.api.Distribution.Exemplars in google.api.Distribution values during aggregation.These values are used in combination with the label values that remain on the aggregated Distribution timeseries to construct the full label set for the exemplar values. The resulting full label set may be used to identify the specific task/job/instance (for example) which may be contributing to a long-tail, while allowing the storage savings of only storing aggregated distribution values for a large group.Note that there are no guarantees on ordering of the labels from exemplar-to-exemplar and from distribution-to-distribution in the same stream, and there may be duplicates. It is up to clients to resolve any ambiguities.",
+      "id": "DroppedLabels",
+      "properties": {
+        "label": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Map from label to its value, for all labels dropped in any aggregation.",
+          "type": "object"
         }
       },
       "type": "object"
@@ -2189,27 +2203,41 @@
       "type": "object"
     },
     "InternalChecker": {
-      "description": "Nimbus InternalCheckers.",
+      "description": "An internal checker allows uptime checks to run on private/internal GCP resources.",
       "id": "InternalChecker",
       "properties": {
-        "checkerId": {
-          "description": "The checker ID.",
-          "type": "string"
-        },
         "displayName": {
-          "description": "The checker's human-readable name.",
+          "description": "The checker's human-readable name. The display name should be unique within a Stackdriver Workspace in order to make it easier to identify; however, uniqueness is not enforced.",
           "type": "string"
         },
         "gcpZone": {
           "description": "The GCP zone the uptime check should egress from. Only respected for internal uptime checks, where internal_network is specified.",
           "type": "string"
         },
-        "network": {
-          "description": "The internal network to perform this uptime check on.",
+        "name": {
+          "description": "A unique resource name for this InternalChecker. The format is:projects/[PROJECT_ID]/internalCheckers/[INTERNAL_CHECKER_ID].PROJECT_ID is the stackdriver workspace project for the uptime check config associated with the internal checker.",
           "type": "string"
         },
-        "projectId": {
-          "description": "The GCP project ID. Not necessarily the same as the project_id for the config.",
+        "network": {
+          "description": "The GCP VPC network (https://cloud.google.com/vpc/docs/vpc) where the internal resource lives (ex: \"default\").",
+          "type": "string"
+        },
+        "peerProjectId": {
+          "description": "The GCP project_id where the internal checker lives. Not necessary the same as the workspace project.",
+          "type": "string"
+        },
+        "state": {
+          "description": "The current operational state of the internal checker.",
+          "enum": [
+            "UNSPECIFIED",
+            "CREATING",
+            "RUNNING"
+          ],
+          "enumDescriptions": [
+            "An internal checker should never be in the unspecified state.",
+            "The checker is being created, provisioned, and configured. A checker in this state can be returned by ListInternalCheckers or GetInternalChecker, as well as by examining the longrunning.Operation that created it.",
+            "The checker is running and available for use. A checker in this state can be returned by ListInternalCheckers or GetInternalChecker as well as by examining the longrunning.Operation that created it. If a checker is being torn down, it is neither visible nor usable, so there is no \"deleting\" or \"down\" state."
+          ],
           "type": "string"
         }
       },
@@ -2527,6 +2555,10 @@
           },
           "type": "array"
         },
+        "metadata": {
+          "$ref": "MetricDescriptorMetadata",
+          "description": "Optional. Metadata which can be used to guide usage of the metric."
+        },
         "metricKind": {
           "description": "Whether the metric records instantaneous values, changes to a value, etc. Some combinations of metric_kind and value_type might not be supported.",
           "enum": [
@@ -2548,11 +2580,11 @@
           "type": "string"
         },
         "type": {
-          "description": "The metric type, including its DNS name prefix. The type is not URL-encoded. All user-defined custom metric types have the DNS name custom.googleapis.com. Metric types should use a natural hierarchical grouping. For example:\n\"custom.googleapis.com/invoice/paid/amount\"\n\"appengine.googleapis.com/http/server/response_latencies\"\n",
+          "description": "The metric type, including its DNS name prefix. The type is not URL-encoded. All user-defined metric types have the DNS name custom.googleapis.com or external.googleapis.com. Metric types should use a natural hierarchical grouping. For example:\n\"custom.googleapis.com/invoice/paid/amount\"\n\"external.googleapis.com/prometheus/up\"\n\"appengine.googleapis.com/http/server/response_latencies\"\n",
           "type": "string"
         },
         "unit": {
-          "description": "Optional. The unit in which the metric value is reported. For example, kBy/s means kilobytes/sec, and 1 is the dimensionless unit. The supported units are a subset of The Unified Code for Units of Measure standard (http://unitsofmeasure.org/ucum.html).\u003cbr\u003e\u003cbr\u003e This field is part of the metric's documentation, but it is ignored by Stackdriver.",
+          "description": "The unit in which the metric value is reported. It is only applicable if the value_type is INT64, DOUBLE, or DISTRIBUTION. The supported units are a subset of The Unified Code for Units of Measure (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)\nbit bit\nBy byte\ns second\nmin minute\nh hour\nd dayPrefixes (PREFIX)\nk kilo (10**3)\nM mega (10**6)\nG giga (10**9)\nT tera (10**12)\nP peta (10**15)\nE exa (10**18)\nZ zetta (10**21)\nY yotta (10**24)\nm milli (10**-3)\nu micro (10**-6)\nn nano (10**-9)\np pico (10**-12)\nf femto (10**-15)\na atto (10**-18)\nz zepto (10**-21)\ny yocto (10**-24)\nKi kibi (2**10)\nMi mebi (2**20)\nGi gibi (2**30)\nTi tebi (2**40)GrammarThe grammar also includes these connectors:\n/ division (as an infix operator, e.g. 1/s).\n. multiplication (as an infix operator, e.g. GBy.d)The grammar for a unit is as follows:\nExpression = Component { \".\" Component } { \"/\" Component } ;\n\nComponent = ( [ PREFIX ] UNIT | \"%\" ) [ Annotation ]\n          | Annotation\n          | \"1\"\n          ;\n\nAnnotation = \"{\" NAME \"}\" ;\nNotes:\nAnnotation is just a comment if it follows a UNIT and is  equivalent to 1 if it is used alone. For examples,  {requests}/s == 1/s, By{transmitted}/s == By/s.\nNAME is a sequence of non-blank printable ASCII characters not  containing '{' or '}'.\n1 represents dimensionless value 1, such as in 1/s.\n% represents dimensionless value 1/100, and annotates values giving  a percentage.",
           "type": "string"
         },
         "valueType": {
@@ -2575,6 +2607,43 @@
             "The value is a Distribution.",
             "The value is money."
           ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MetricDescriptorMetadata": {
+      "description": "Additional annotations that can be used to guide the usage of a metric.",
+      "id": "MetricDescriptorMetadata",
+      "properties": {
+        "ingestDelay": {
+          "description": "The delay of data points caused by ingestion. Data points older than this age are guaranteed to be ingested and available to be read, excluding data loss due to errors.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "launchStage": {
+          "description": "The launch stage of the metric definition.",
+          "enum": [
+            "LAUNCH_STAGE_UNSPECIFIED",
+            "EARLY_ACCESS",
+            "ALPHA",
+            "BETA",
+            "GA",
+            "DEPRECATED"
+          ],
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects whitelisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
+            "GA features are open to all developers and are considered stable and fully qualified for production use.",
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+          ],
+          "type": "string"
+        },
+        "samplePeriod": {
+          "description": "The sampling period of metric data points. For metrics which are written periodically, consecutive data points are stored at this time interval, excluding data loss due to errors. Metrics with a higher granularity have a smaller sampling period.",
+          "format": "google-duration",
           "type": "string"
         }
       },
@@ -2657,7 +2726,7 @@
           "type": "object"
         },
         "type": {
-          "description": "Required. The monitored resource type. This field must match the type field of a MonitoredResourceDescriptor object. For example, the type of a Compute Engine VM instance is gce_instance.",
+          "description": "Required. The monitored resource type. This field must match the type field of a MonitoredResourceDescriptor object. For example, the type of a Compute Engine VM instance is gce_instance. For a list of types, see Monitoring resource types and Logging resource types.",
           "type": "string"
         }
       },
@@ -2694,7 +2763,7 @@
       "type": "object"
     },
     "MonitoredResourceMetadata": {
-      "description": "Auxiliary metadata for a MonitoredResource object. MonitoredResource objects contain the minimum set of information to uniquely identify a monitored resource instance. There is some other useful auxiliary metadata. Google Stackdriver Monitoring \u0026 Logging uses an ingestion pipeline to extract metadata for cloud resources of all types , and stores the metadata in this message.",
+      "description": "Auxiliary metadata for a MonitoredResource object. MonitoredResource objects contain the minimum set of information to uniquely identify a monitored resource instance. There is some other useful auxiliary metadata. Monitoring and Logging use an ingestion pipeline to extract metadata for cloud resources of all types, and store the metadata in this message.",
       "id": "MonitoredResourceMetadata",
       "properties": {
         "systemLabels": {
@@ -2702,7 +2771,7 @@
             "description": "Properties of the object.",
             "type": "any"
           },
-          "description": "Output only. Values for predefined system metadata labels. System labels are a kind of metadata extracted by Google Stackdriver. Stackdriver determines what system labels are useful and how to obtain their values. Some examples: \"machine_image\", \"vpc\", \"subnet_id\", \"security_group\", \"name\", etc. System label values can be only strings, Boolean values, or a list of strings. For example:\n{ \"name\": \"my-test-instance\",\n  \"security_group\": [\"a\", \"b\", \"c\"],\n  \"spot_instance\": false }\n",
+          "description": "Output only. Values for predefined system metadata labels. System labels are a kind of metadata extracted by Google, including \"machine_image\", \"vpc\", \"subnet_id\", \"security_group\", \"name\", etc. System label values can be only strings, Boolean values, or a list of strings. For example:\n{ \"name\": \"my-test-instance\",\n  \"security_group\": [\"a\", \"b\", \"c\"],\n  \"spot_instance\": false }\n",
           "type": "object"
         },
         "userLabels": {
@@ -2813,8 +2882,8 @@
           "description": "The tiers that support this notification channel; the project service tier must be one of the supported_tiers.",
           "enumDescriptions": [
             "An invalid sentinel value, used to indicate that a tier has not been provided explicitly.",
-            "The Stackdriver Basic tier, a free tier of service that provides basic features, a moderate allotment of logs, and access to built-in metrics. A number of features are not available in this tier. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/accounts/tiers).",
-            "The Stackdriver Premium tier, a higher, more expensive tier of service that provides access to all Stackdriver features, lets you use Stackdriver with AWS accounts, and has a larger allotments for logs and metrics. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/accounts/tiers)."
+            "The Stackdriver Basic tier, a free tier of service that provides basic features, a moderate allotment of logs, and access to built-in metrics. A number of features are not available in this tier. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers).",
+            "The Stackdriver Premium tier, a higher, more expensive tier of service that provides access to all Stackdriver features, lets you use Stackdriver with AWS accounts, and has a larger allotments for logs and metrics. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers)."
           ],
           "items": {
             "enum": [
@@ -2926,6 +2995,17 @@
       },
       "type": "object"
     },
+    "SpanContext": {
+      "description": "The context of a span, attached to google.api.Distribution.Exemplars in google.api.Distribution values during aggregation.It contains the name of a span with format:  projects/PROJECT_ID/traces/TRACE_ID/spans/SPAN_ID",
+      "id": "SpanContext",
+      "properties": {
+        "spanName": {
+          "description": "The resource name of the span in the following format:\nprojects/[PROJECT_ID]/traces/[TRACE_ID]/spans/[SPAN_ID]\nTRACE_ID is a unique identifier for a trace within a project; it is a 32-character hexadecimal encoding of a 16-byte array.SPAN_ID is a unique identifier for a span within a trace; it is a 16-character hexadecimal encoding of an 8-byte array.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "Status": {
       "description": "The Status type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by gRPC (https://github.com/grpc). The error model is designed to be:\nSimple to use and understand for most users\nFlexible enough to meet unexpected needsOverviewThe Status message contains three pieces of data: error code, error message, and error details. The error code should be an enum value of google.rpc.Code, but it may accept additional error codes if needed. The error message should be a developer-facing English message that helps developers understand and resolve the error. If a localized user-facing error message is needed, put the localized message in the error details or localize it in the client. The optional error details may contain arbitrary information about the error. There is a predefined set of error detail types in the package google.rpc that can be used for common error conditions.Language mappingThe Status message is the logical representation of the error model, but it is not necessarily the actual wire format. When the Status message is exposed in different client libraries and different wire protocols, it can be mapped differently. For example, it will likely be mapped to some exceptions in Java, but more likely mapped to some error codes in C.Other usesThe error model and the Status message can be used in a variety of environments, either with or without APIs, to provide a consistent developer experience across different environments.Example uses of this error model include:\nPartial errors. If a service needs to return partial errors to the client, it may embed the Status in the normal response to indicate the partial errors.\nWorkflow errors. A typical workflow has multiple steps. Each step may have a Status message for error reporting.\nBatch operations. If a client uses batch request and batch response, the Status message should be used directly inside batch response, one for each error sub-response.\nAsynchronous operations. If an API call embeds asynchronous operation results in its response, the status of those operations should be represented directly using the Status message.\nLogging. If some API errors are stored in logs, the message Status could be used directly after any stripping needed for security/privacy reasons.",
       "id": "Status",
@@ -2966,7 +3046,7 @@
       "type": "object"
     },
     "TimeInterval": {
-      "description": "A time interval extending just after a start time through an end time. If the start time is the same as the end time, then the interval represents a single point in time.",
+      "description": "A time interval extending just after a start time through an end time. The start time must not be later than the end time. The default start time is the end time, making the startTime value technically optional. Whether this is useful depends on the MetricKind. If the start and end times are the same, the interval represents a point in time. This is appropriate for GAUGE metrics, but not for DELTA and CUMULATIVE metrics, which cover a span of time.",
       "id": "TimeInterval",
       "properties": {
         "endTime": {
@@ -3152,7 +3232,7 @@
           "type": "array"
         },
         "displayName": {
-          "description": "A human-friendly name for the uptime check configuration. The display name should be unique within a Stackdriver Account in order to make it easier to identify; however, uniqueness is not enforced. Required.",
+          "description": "A human-friendly name for the uptime check configuration. The display name should be unique within a Stackdriver Workspace in order to make it easier to identify; however, uniqueness is not enforced. Required.",
           "type": "string"
         },
         "httpCheck": {
@@ -3160,14 +3240,14 @@
           "description": "Contains information needed to make an HTTP or HTTPS check."
         },
         "internalCheckers": {
-          "description": "The internal checkers that this check will egress from. If is_internal is true and this list is empty, the check will egress from all InternalCheckers configured for the project that owns this CheckConfig.",
+          "description": "The internal checkers that this check will egress from. If is_internal is true and this list is empty, the check will egress from all the InternalCheckers configured for the project that owns this CheckConfig.",
           "items": {
             "$ref": "InternalChecker"
           },
           "type": "array"
         },
         "isInternal": {
-          "description": "Denotes whether this is a check that egresses from InternalCheckers.",
+          "description": "If this is true, then checks are made only from the 'internal_checkers'. If it is false, then checks are made only from the 'selected_regions'. It is an error to provide 'selected_regions' when is_internal is true, or to provide 'internal_checkers' when is_internal is false.",
           "type": "boolean"
         },
         "monitoredResource": {
@@ -3188,7 +3268,7 @@
           "description": "The group resource associated with the configuration."
         },
         "selectedRegions": {
-          "description": "The list of regions from which the check will be run. If this field is specified, enough regions to include a minimum of 3 locations must be provided, or an error message is returned. Not specifying this field will result in uptime checks running from all regions.",
+          "description": "The list of regions from which the check will be run. Some regions contain one location, and others contain more than one. If this field is specified, enough regions to include a minimum of 3 locations must be provided, or an error message is returned. Not specifying this field will result in uptime checks running from all regions.",
           "enumDescriptions": [
             "Default value if no region is specified. Will result in uptime checks running from all regions.",
             "Allows checks to run from locations within the United States of America.",

@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// PrintFlags composes common printer flag structs
+// DeleteFlags composes common printer flag structs
 // used for commands requiring deletion logic.
 type DeleteFlags struct {
 	FileNameFlags *genericclioptions.FileNameFlags
@@ -33,6 +33,7 @@ type DeleteFlags struct {
 	FieldSelector *string
 
 	All            *bool
+	AllNamespaces  *bool
 	Cascade        *bool
 	Force          *bool
 	GracePeriod    *int
@@ -41,6 +42,7 @@ type DeleteFlags struct {
 	Timeout        *time.Duration
 	Wait           *bool
 	Output         *string
+	Raw            *string
 }
 
 func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) *DeleteOptions {
@@ -68,6 +70,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.All != nil {
 		options.DeleteAll = *f.All
 	}
+	if f.AllNamespaces != nil {
+		options.DeleteAllNamespaces = *f.AllNamespaces
+	}
 	if f.Cascade != nil {
 		options.Cascade = *f.Cascade
 	}
@@ -89,6 +94,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Wait != nil {
 		options.WaitForDeletion = *f.Wait
 	}
+	if f.Raw != nil {
+		options.Raw = *f.Raw
+	}
 
 	return options
 }
@@ -103,6 +111,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	}
 	if f.All != nil {
 		cmd.Flags().BoolVar(f.All, "all", *f.All, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
+	}
+	if f.AllNamespaces != nil {
+		cmd.Flags().BoolVarP(f.AllNamespaces, "all-namespaces", "A", *f.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	}
 	if f.Force != nil {
 		cmd.Flags().BoolVar(f.Force, "force", *f.Force, "Only used when grace-period=0. If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
@@ -128,6 +139,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Output != nil {
 		cmd.Flags().StringVarP(f.Output, "output", "o", *f.Output, "Output mode. Use \"-o name\" for shorter output (resource/name).")
 	}
+	if f.Raw != nil {
+		cmd.Flags().StringVar(f.Raw, "raw", *f.Raw, "Raw URI to DELETE to the server.  Uses the transport specified by the kubeconfig file.")
+	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
@@ -137,6 +151,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 
 	// setup command defaults
 	all := false
+	allNamespaces := false
 	force := false
 	ignoreNotFound := false
 	now := false
@@ -145,12 +160,15 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	fieldSelector := ""
 	timeout := time.Duration(0)
 	wait := true
+	raw := ""
 
 	filenames := []string{}
 	recursive := false
+	kustomize := ""
 
 	return &DeleteFlags{
-		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
+		// Not using helpers.go since it provides function to add '-k' for FileNameOptions, but not FileNameFlags
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
 		LabelSelector: &labelSelector,
 		FieldSelector: &fieldSelector,
 
@@ -158,12 +176,14 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		GracePeriod: &gracePeriod,
 
 		All:            &all,
+		AllNamespaces:  &allNamespaces,
 		Force:          &force,
 		IgnoreNotFound: &ignoreNotFound,
 		Now:            &now,
 		Timeout:        &timeout,
 		Wait:           &wait,
 		Output:         &output,
+		Raw:            &raw,
 	}
 }
 
@@ -177,10 +197,11 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	wait := false
 
 	filenames := []string{}
+	kustomize := ""
 	recursive := false
 
 	return &DeleteFlags{
-		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
 
 		Cascade:     &cascade,
 		GracePeriod: &gracePeriod,

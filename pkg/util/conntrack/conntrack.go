@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 // Utilities for dealing with conntrack
@@ -104,6 +104,22 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby sit all udp connections to kubernetes services.
 		return fmt.Errorf("error deleting conntrack entries for UDP peer {%s, %s}, error: %v", origin, dest, err)
+	}
+	return nil
+}
+
+// ClearEntriesForPortNAT uses the conntrack tool to delete the contrack entries
+// for connections specified by the {dest IP, port} pair.
+// Known issue:
+// https://github.com/kubernetes/kubernetes/issues/59368
+func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protocol v1.Protocol) error {
+	if port <= 0 {
+		return fmt.Errorf("Wrong port number. The port number must be greater then zero")
+	}
+	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
+	err := Exec(execer, parameters...)
+	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
 	return nil
 }

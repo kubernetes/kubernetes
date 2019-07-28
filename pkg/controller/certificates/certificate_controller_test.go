@@ -47,7 +47,7 @@ func TestCertificateController(t *testing.T) {
 			Reason:  "test reason",
 			Message: "test message",
 		})
-		_, err := client.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+		_, err := client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
 		if err != nil {
 			return err
 		}

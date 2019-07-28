@@ -91,6 +91,10 @@ type Framer interface {
 type SerializerInfo struct {
 	// MediaType is the value that represents this serializer over the wire.
 	MediaType string
+	// MediaTypeType is the first part of the MediaType ("application" in "application/json").
+	MediaTypeType string
+	// MediaTypeSubType is the second part of the MediaType ("json" in "application/json").
+	MediaTypeSubType string
 	// EncodesAsText indicates this serializer can be encoded to UTF-8 safely.
 	EncodesAsText bool
 	// Serializer is the individual object serializer for this media type.
@@ -206,6 +210,25 @@ type ObjectCreater interface {
 	New(kind schema.GroupVersionKind) (out Object, err error)
 }
 
+// EquivalentResourceMapper provides information about resources that address the same underlying data as a specified resource
+type EquivalentResourceMapper interface {
+	// EquivalentResourcesFor returns a list of resources that address the same underlying data as resource.
+	// If subresource is specified, only equivalent resources which also have the same subresource are included.
+	// The specified resource can be included in the returned list.
+	EquivalentResourcesFor(resource schema.GroupVersionResource, subresource string) []schema.GroupVersionResource
+	// KindFor returns the kind expected by the specified resource[/subresource].
+	// A zero value is returned if the kind is unknown.
+	KindFor(resource schema.GroupVersionResource, subresource string) schema.GroupVersionKind
+}
+
+// EquivalentResourceRegistry provides an EquivalentResourceMapper interface,
+// and allows registering known resource[/subresource] -> kind
+type EquivalentResourceRegistry interface {
+	EquivalentResourceMapper
+	// RegisterKindFor registers the existence of the specified resource[/subresource] along with its expected kind.
+	RegisterKindFor(resource schema.GroupVersionResource, subresource string, kind schema.GroupVersionKind)
+}
+
 // ResourceVersioner provides methods for setting and retrieving
 // the resource version from an API object.
 type ResourceVersioner interface {
@@ -237,6 +260,9 @@ type Object interface {
 // to JSON allowed.
 type Unstructured interface {
 	Object
+	// NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
+	// This should be called instead of reflect.New() for unstructured types because the go type alone does not preserve kind/apiVersion info.
+	NewEmptyInstance() Unstructured
 	// UnstructuredContent returns a non-nil map with this object's contents. Values may be
 	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
 	// and from JSON. SetUnstructuredContent should be used to mutate the contents.

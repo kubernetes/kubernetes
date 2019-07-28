@@ -22,59 +22,97 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
-
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
-	"k8s.io/apiserver/pkg/util/webhook"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/klog"
 )
 
 type validatingDispatcher struct {
-	cm *webhook.ClientManager
+	cm     *webhookutil.ClientManager
+	plugin *Plugin
 }
 
-func newValidatingDispatcher(cm *webhook.ClientManager) generic.Dispatcher {
-	return &validatingDispatcher{cm}
+func newValidatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
+	return func(cm *webhookutil.ClientManager) generic.Dispatcher {
+		return &validatingDispatcher{cm, p}
+	}
 }
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
+	var relevantHooks []*generic.WebhookInvocation
+	// Construct all the versions we need to call our webhooks
+	versionedAttrs := map[schema.GroupVersionKind]*generic.VersionedAttributes{}
+	for _, hook := range hooks {
+		invocation, statusError := d.plugin.ShouldCallHook(hook, attr, o)
+		if statusError != nil {
+			return statusError
+		}
+		if invocation == nil {
+			continue
+		}
+		relevantHooks = append(relevantHooks, invocation)
+		// If we already have this version, continue
+		if _, ok := versionedAttrs[invocation.Kind]; ok {
+			continue
+		}
+		versionedAttr, err := generic.NewVersionedAttributes(attr, invocation.Kind, o)
+		if err != nil {
+			return apierrors.NewInternalError(err)
+		}
+		versionedAttrs[invocation.Kind] = versionedAttr
+	}
+
+	if len(relevantHooks) == 0 {
+		// no matching hooks
+		return nil
+	}
+
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, len(relevantHooks))
 	wg.Add(len(relevantHooks))
 	for i := range relevantHooks {
-		go func(hook *v1beta1.Webhook) {
+		go func(invocation *generic.WebhookInvocation) {
 			defer wg.Done()
-
+			hook, ok := invocation.Webhook.GetValidatingWebhook()
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch requires v1beta1.ValidatingWebhook, but got %T", hook))
+				return
+			}
+			versionedAttr := versionedAttrs[invocation.Kind]
 			t := time.Now()
-			err := d.callHook(ctx, hook, attr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "validating", hook.Name)
+			err := d.callHook(ctx, hook, invocation, versionedAttr)
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}
 
 			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
-			if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
+			if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
-					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
+					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 					utilruntime.HandleError(callErr)
 					return
 				}
 
-				glog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+				klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 				errCh <- apierrors.NewInternalError(err)
 				return
 			}
 
-			glog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
+			klog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
 			errCh <- err
 		}(relevantHooks[i])
 	}
@@ -97,34 +135,44 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
-	if attr.IsDryRun() {
+func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
+	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
-			return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
 		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
 			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
 		}
 	}
 
+	// Currently dispatcher only supports `v1beta1` AdmissionReview
+	// TODO: Make the dispatcher capable of sending multiple AdmissionReview versions
+	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, invocation.Webhook) {
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReviewRequest")}
+	}
+
 	// Make the webhook request
-	request := request.CreateAdmissionReview(attr)
-	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(h))
+	request := request.CreateAdmissionReview(attr, invocation)
+	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
 	if err != nil {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
-	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+	r := client.Post().Context(ctx).Body(&request)
+	if h.TimeoutSeconds != nil {
+		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
+	}
+	if err := r.Do().Into(response); err != nil {
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Response == nil {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
 	}
 	for k, v := range response.Response.AuditAnnotations {
 		key := h.Name + "/" + k
-		if err := attr.AddAnnotation(key, v); err != nil {
-			glog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, v, h.Name, err)
+		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
+			klog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, v, h.Name, err)
 		}
 	}
 	if response.Response.Allowed {

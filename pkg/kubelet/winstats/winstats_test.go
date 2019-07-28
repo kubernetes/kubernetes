@@ -38,6 +38,7 @@ func (f fakeWinNodeStatsClient) startMonitoring() error {
 func (f fakeWinNodeStatsClient) getNodeMetrics() (nodeMetrics, error) {
 	return nodeMetrics{
 		cpuUsageCoreNanoSeconds:   123,
+		cpuUsageNanoCores:         23,
 		memoryPrivWorkingSetBytes: 1234,
 		memoryCommittedBytes:      12345,
 		timeStamp:                 timeStamp,
@@ -55,6 +56,7 @@ func (f fakeWinNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo, erro
 		NumCores:       4,
 		MemoryCapacity: 1.6e+10,
 		MachineID:      "somehostname",
+		SystemUUID:     "E6C8AC43-582B-3575-4E1F-6DA170888906",
 	}, nil
 }
 
@@ -78,6 +80,11 @@ func TestWinContainerInfos(t *testing.T) {
 				Total: 123,
 			},
 		},
+		CpuInst: &cadvisorapiv2.CpuInstStats{
+			Usage: cadvisorapiv2.CpuInstUsage{
+				Total: 23,
+			},
+		},
 		Memory: &cadvisorapi.MemoryStats{
 			WorkingSet: 1234,
 			Usage:      12345,
@@ -86,8 +93,9 @@ func TestWinContainerInfos(t *testing.T) {
 	infos := make(map[string]cadvisorapiv2.ContainerInfo)
 	infos["/"] = cadvisorapiv2.ContainerInfo{
 		Spec: cadvisorapiv2.ContainerSpec{
-			HasCpu:    true,
-			HasMemory: true,
+			HasCpu:     true,
+			HasMemory:  true,
+			HasNetwork: true,
 			Memory: cadvisorapiv2.MemorySpec{
 				Limit: 1.6e+10,
 			},
@@ -95,7 +103,12 @@ func TestWinContainerInfos(t *testing.T) {
 		Stats: stats,
 	}
 
-	assert.Equal(t, actualRootInfos, infos)
+	assert.Equal(t, len(actualRootInfos), len(infos))
+	assert.Equal(t, actualRootInfos["/"].Spec, infos["/"].Spec)
+	assert.Equal(t, len(actualRootInfos["/"].Stats), len(infos["/"].Stats))
+	assert.Equal(t, actualRootInfos["/"].Stats[0].Cpu, infos["/"].Stats[0].Cpu)
+	assert.Equal(t, actualRootInfos["/"].Stats[0].CpuInst, infos["/"].Stats[0].CpuInst)
+	assert.Equal(t, actualRootInfos["/"].Stats[0].Memory, infos["/"].Stats[0].Memory)
 }
 
 func TestWinMachineInfo(t *testing.T) {
@@ -106,7 +119,8 @@ func TestWinMachineInfo(t *testing.T) {
 	assert.Equal(t, machineInfo, &cadvisorapi.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 1.6e+10,
-		MachineID:      "somehostname"})
+		MachineID:      "somehostname",
+		SystemUUID:     "E6C8AC43-582B-3575-4E1F-6DA170888906"})
 }
 
 func TestWinVersionInfo(t *testing.T) {
@@ -116,6 +130,46 @@ func TestWinVersionInfo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, versionInfo, &cadvisorapi.VersionInfo{
 		KernelVersion: "v42"})
+}
+
+func TestConvertCPUValue(t *testing.T) {
+	testCases := []struct {
+		cpuValue uint64
+		expected uint64
+	}{
+		{cpuValue: uint64(50), expected: uint64(2000000000)},
+		{cpuValue: uint64(0), expected: uint64(0)},
+		{cpuValue: uint64(100), expected: uint64(4000000000)},
+	}
+	var cpuCores = 4
+
+	for _, tc := range testCases {
+		p := perfCounterNodeStatsClient{}
+		newValue := p.convertCPUValue(cpuCores, tc.cpuValue)
+		assert.Equal(t, newValue, tc.expected)
+	}
+}
+
+func TestGetCPUUsageNanoCores(t *testing.T) {
+	testCases := []struct {
+		latestValue   uint64
+		previousValue uint64
+		expected      uint64
+	}{
+		{latestValue: uint64(0), previousValue: uint64(0), expected: uint64(0)},
+		{latestValue: uint64(2000000000), previousValue: uint64(0), expected: uint64(200000000)},
+		{latestValue: uint64(5000000000), previousValue: uint64(2000000000), expected: uint64(300000000)},
+	}
+
+	for _, tc := range testCases {
+		p := perfCounterNodeStatsClient{}
+		p.cpuUsageCoreNanoSecondsCache = cpuUsageCoreNanoSecondsCache{
+			latestValue:   tc.latestValue,
+			previousValue: tc.previousValue,
+		}
+		cpuUsageNanoCores := p.getCPUUsageNanoCores()
+		assert.Equal(t, cpuUsageNanoCores, tc.expected)
+	}
 }
 
 func getClient(t *testing.T) Client {

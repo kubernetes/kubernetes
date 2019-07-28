@@ -114,10 +114,9 @@ func (k *keepAlive) RoundTrip(ctx context.Context, req, res soap.HasFault) error
 	if err != nil {
 		return err
 	}
-
 	// Start ticker on login, stop ticker on logout.
 	switch req.(type) {
-	case *methods.LoginBody, *methods.LoginExtensionByCertificateBody:
+	case *methods.LoginBody, *methods.LoginExtensionByCertificateBody, *methods.LoginByTokenBody:
 		k.start()
 	case *methods.LogoutBody:
 		k.stop()

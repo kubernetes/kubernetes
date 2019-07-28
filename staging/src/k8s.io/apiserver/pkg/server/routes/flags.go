@@ -24,7 +24,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/server/mux"
 )
@@ -57,7 +57,7 @@ func (f DebugFlags) Index(w http.ResponseWriter, r *http.Request) {
 	lock.RLock()
 	defer lock.RUnlock()
 	if err := indexTmpl.Execute(w, registeredFlags); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 	}
 }
 

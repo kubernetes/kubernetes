@@ -17,6 +17,7 @@ limitations under the License.
 package group
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -27,15 +28,15 @@ import (
 func TestTokenGroupAdder(t *testing.T) {
 	adder := authenticator.Token(
 		NewTokenGroupAdder(
-			authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
-				return &user.DefaultInfo{Name: "user", Groups: []string{"original"}}, true, nil
+			authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
 			}),
 			[]string{"added"},
 		),
 	)
 
-	user, _, _ := adder.AuthenticateToken("")
-	if !reflect.DeepEqual(user.GetGroups(), []string{"original", "added"}) {
-		t.Errorf("Expected original,added groups, got %#v", user.GetGroups())
+	r, _, _ := adder.AuthenticateToken(context.Background(), "")
+	if !reflect.DeepEqual(r.User.GetGroups(), []string{"original", "added"}) {
+		t.Errorf("Expected original,added groups, got %#v", r.User.GetGroups())
 	}
 }

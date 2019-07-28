@@ -99,7 +99,7 @@ func GemvT(m, n uintptr, alpha float64, a []float64, lda uintptr, x []float64, i
 	case int(incY) < 0:
 		ScalInc(beta, y, n, uintptr(int(-incY)))
 	case incY == 1:
-		ScalUnitary(beta, y)
+		ScalUnitary(beta, y[:n])
 	default:
 		ScalInc(beta, y, n, incY)
 	}

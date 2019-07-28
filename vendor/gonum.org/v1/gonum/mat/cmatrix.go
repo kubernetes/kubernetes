@@ -4,6 +4,13 @@
 
 package mat
 
+import (
+	"math"
+	"math/cmplx"
+
+	"gonum.org/v1/gonum/floats"
+)
+
 // CMatrix is the basic matrix interface type for complex matrices.
 type CMatrix interface {
 	// Dims returns the dimensions of a Matrix.
@@ -32,11 +39,11 @@ type Conjugate struct {
 	CMatrix CMatrix
 }
 
-// At returns the value of the element at row i and column j of the transposed
-// matrix, that is, row j and column i of the Matrix field.
+// At returns the value of the element at row i and column j of the conjugate
+// transposed matrix, that is, row j and column i of the Matrix field.
 func (t Conjugate) At(i, j int) complex128 {
 	z := t.CMatrix.At(j, i)
-	return complex(real(z), -imag(z))
+	return cmplx.Conj(z)
 }
 
 // Dims returns the dimensions of the transposed matrix. The number of rows returned
@@ -68,4 +75,136 @@ type Unconjugator interface {
 	// Unconjugate returns the underlying Matrix stored for the implicit
 	// conjugate transpose.
 	Unconjugate() CMatrix
+}
+
+// useC returns a complex128 slice with l elements, using c if it
+// has the necessary capacity, otherwise creating a new slice.
+func useC(c []complex128, l int) []complex128 {
+	if l <= cap(c) {
+		return c[:l]
+	}
+	return make([]complex128, l)
+}
+
+// useZeroedC returns a complex128 slice with l elements, using c if it
+// has the necessary capacity, otherwise creating a new slice. The
+// elements of the returned slice are guaranteed to be zero.
+func useZeroedC(c []complex128, l int) []complex128 {
+	if l <= cap(c) {
+		c = c[:l]
+		zeroC(c)
+		return c
+	}
+	return make([]complex128, l)
+}
+
+// zeroC zeros the given slice's elements.
+func zeroC(c []complex128) {
+	for i := range c {
+		c[i] = 0
+	}
+}
+
+// unconjugate unconjugates a matrix if applicable. If a is an Unconjugator, then
+// unconjugate returns the underlying matrix and true. If it is not, then it returns
+// the input matrix and false.
+func unconjugate(a CMatrix) (CMatrix, bool) {
+	if ut, ok := a.(Unconjugator); ok {
+		return ut.Unconjugate(), true
+	}
+	return a, false
+}
+
+// CEqual returns whether the matrices a and b have the same size
+// and are element-wise equal.
+func CEqual(a, b CMatrix) bool {
+	ar, ac := a.Dims()
+	br, bc := b.Dims()
+	if ar != br || ac != bc {
+		return false
+	}
+	// TODO(btracey): Add in fast-paths.
+	for i := 0; i < ar; i++ {
+		for j := 0; j < ac; j++ {
+			if a.At(i, j) != b.At(i, j) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// CEqualApprox returns whether the matrices a and b have the same size and contain all equal
+// elements with tolerance for element-wise equality specified by epsilon. Matrices
+// with non-equal shapes are not equal.
+func CEqualApprox(a, b CMatrix, epsilon float64) bool {
+	// TODO(btracey):
+	ar, ac := a.Dims()
+	br, bc := b.Dims()
+	if ar != br || ac != bc {
+		return false
+	}
+	for i := 0; i < ar; i++ {
+		for j := 0; j < ac; j++ {
+			if !cEqualWithinAbsOrRel(a.At(i, j), b.At(i, j), epsilon, epsilon) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// TODO(btracey): Move these into a cmplxs if/when we have one.
+
+func cEqualWithinAbsOrRel(a, b complex128, absTol, relTol float64) bool {
+	if cEqualWithinAbs(a, b, absTol) {
+		return true
+	}
+	return cEqualWithinRel(a, b, relTol)
+}
+
+// cEqualWithinAbs returns true if a and b have an absolute
+// difference of less than tol.
+func cEqualWithinAbs(a, b complex128, tol float64) bool {
+	return a == b || cmplx.Abs(a-b) <= tol
+}
+
+const minNormalFloat64 = 2.2250738585072014e-308
+
+// cEqualWithinRel returns true if the difference between a and b
+// is not greater than tol times the greater value.
+func cEqualWithinRel(a, b complex128, tol float64) bool {
+	if a == b {
+		return true
+	}
+	if cmplx.IsNaN(a) || cmplx.IsNaN(b) {
+		return false
+	}
+	// Cannot play the same trick as in floats because there are multiple
+	// possible infinities.
+	if cmplx.IsInf(a) {
+		if !cmplx.IsInf(b) {
+			return false
+		}
+		ra := real(a)
+		if math.IsInf(ra, 0) {
+			if ra == real(b) {
+				return floats.EqualWithinRel(imag(a), imag(b), tol)
+			}
+			return false
+		}
+		if imag(a) == imag(b) {
+			return floats.EqualWithinRel(ra, real(b), tol)
+		}
+		return false
+	}
+	if cmplx.IsInf(b) {
+		return false
+	}
+
+	delta := cmplx.Abs(a - b)
+	if delta <= minNormalFloat64 {
+		return delta <= tol*minNormalFloat64
+	}
+	return delta/math.Max(cmplx.Abs(a), cmplx.Abs(b)) <= tol
 }

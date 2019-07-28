@@ -40,10 +40,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
 		panic(err) // TODO: Propagate error up
 	}
 
-	// We explicitly do NOT do any decoration here - switching on Cacher
-	// for events will lead to too high memory consumption.
-	opts.Decorator = generic.UndecoratedStorage // TODO use watchCacheSize=-1 to signal UndecoratedStorage
-
 	store := &genericregistry.Store{
 		NewFunc:       func() runtime.Object { return &api.Event{} },
 		NewListFunc:   func() runtime.Object { return &api.EventList{} },
@@ -57,7 +53,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
 		UpdateStrategy: event.Strategy,
 		DeleteStrategy: event.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: opts, AttrFunc: event.GetAttrs} // Pass in opts to use UndecoratedStorage
 	if err := store.CompleteWithOptions(options); err != nil {

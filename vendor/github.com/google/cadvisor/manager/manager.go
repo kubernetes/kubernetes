@@ -30,38 +30,29 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
-	"github.com/google/cadvisor/container/containerd"
-	"github.com/google/cadvisor/container/crio"
 	"github.com/google/cadvisor/container/docker"
-	"github.com/google/cadvisor/container/mesos"
 	"github.com/google/cadvisor/container/raw"
-	"github.com/google/cadvisor/container/rkt"
-	"github.com/google/cadvisor/container/systemd"
 	"github.com/google/cadvisor/events"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/machine"
-	"github.com/google/cadvisor/manager/watcher"
-	rawwatcher "github.com/google/cadvisor/manager/watcher/raw"
-	rktwatcher "github.com/google/cadvisor/manager/watcher/rkt"
 	"github.com/google/cadvisor/utils/oomparser"
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/version"
+	"github.com/google/cadvisor/watcher"
 
-	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"golang.org/x/net/context"
+	"k8s.io/klog"
 	"k8s.io/utils/clock"
 )
 
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
+var updateMachineInfoInterval = flag.Duration("update_machine_info_interval", 5*time.Minute, "Interval between machine info updates.")
 var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
 var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
 var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 var applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
-
-const dockerClientTimeout = 10 * time.Second
 
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
@@ -152,42 +143,14 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("cAdvisor running in container: %q", selfContainer)
+	klog.V(2).Infof("cAdvisor running in container: %q", selfContainer)
 
-	var (
-		dockerStatus info.DockerStatus
-		rktPath      string
-	)
-	docker.SetTimeout(dockerClientTimeout)
-	// Try to connect to docker indefinitely on startup.
-	dockerStatus = retryDockerStatus()
+	context := fs.Context{}
 
-	if tmpRktPath, err := rkt.RktPath(); err != nil {
-		glog.V(5).Infof("Rkt not connected: %v", err)
-	} else {
-		rktPath = tmpRktPath
-	}
-
-	crioClient, err := crio.Client()
-	if err != nil {
+	if err := container.InitializeFSContext(&context); err != nil {
 		return nil, err
 	}
-	crioInfo, err := crioClient.Info()
-	if err != nil {
-		glog.V(5).Infof("CRI-O not connected: %v", err)
-	}
 
-	context := fs.Context{
-		Docker: fs.DockerContext{
-			Root:         docker.RootDir(),
-			Driver:       dockerStatus.Driver,
-			DriverStatus: dockerStatus.DriverStatus,
-		},
-		RktPath: rktPath,
-		Crio: fs.CrioContext{
-			Root: crioInfo.StorageRoot,
-		},
-	}
 	fsInfo, err := fs.NewFsInfo(context)
 	if err != nil {
 		return nil, err
@@ -208,6 +171,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		quitChannels:                          make([]chan error, 0, 2),
 		memoryCache:                           memoryCache,
 		fsInfo:                                fsInfo,
+		sysFs:                                 sysfs,
 		cadvisorContainer:                     selfContainer,
 		inHostNamespace:                       inHostNamespace,
 		startupTime:                           time.Now(),
@@ -226,41 +190,16 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		return nil, err
 	}
 	newManager.machineInfo = *machineInfo
-	glog.V(1).Infof("Machine: %+v", newManager.machineInfo)
+	klog.V(1).Infof("Machine: %+v", newManager.machineInfo)
 
 	versionInfo, err := getVersionInfo()
 	if err != nil {
 		return nil, err
 	}
-	glog.V(1).Infof("Version: %+v", *versionInfo)
+	klog.V(1).Infof("Version: %+v", *versionInfo)
 
 	newManager.eventHandler = events.NewEventManager(parseEventsStoragePolicy())
 	return newManager, nil
-}
-
-func retryDockerStatus() info.DockerStatus {
-	startupTimeout := dockerClientTimeout
-	maxTimeout := 4 * startupTimeout
-	for {
-		ctx, _ := context.WithTimeout(context.Background(), startupTimeout)
-		dockerStatus, err := docker.StatusWithContext(ctx)
-		if err == nil {
-			return dockerStatus
-		}
-
-		switch err {
-		case context.DeadlineExceeded:
-			glog.Warningf("Timeout trying to communicate with docker during initialization, will retry")
-		default:
-			glog.V(5).Infof("Docker not connected: %v", err)
-			return info.DockerStatus{}
-		}
-
-		startupTimeout = 2 * startupTimeout
-		if startupTimeout > maxTimeout {
-			startupTimeout = maxTimeout
-		}
-	}
 }
 
 // A namespaced container name.
@@ -277,6 +216,8 @@ type manager struct {
 	containersLock           sync.RWMutex
 	memoryCache              *memory.InMemoryCache
 	fsInfo                   fs.FsInfo
+	sysFs                    sysfs.SysFs
+	machineMu                sync.RWMutex // protects machineInfo
 	machineInfo              info.MachineInfo
 	quitChannels             []chan error
 	cadvisorContainer        string
@@ -296,48 +237,14 @@ type manager struct {
 
 // Start the container manager.
 func (self *manager) Start() error {
-	err := docker.Register(self, self.fsInfo, self.includedMetrics)
+	self.containerWatchers = container.InitializePlugins(self, self.fsInfo, self.includedMetrics)
+
+	err := raw.Register(self, self.fsInfo, self.includedMetrics, self.rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
-		glog.V(5).Infof("Registration of the Docker container factory failed: %v.", err)
+		klog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
 
-	err = rkt.Register(self, self.fsInfo, self.includedMetrics)
-	if err != nil {
-		glog.V(5).Infof("Registration of the rkt container factory failed: %v", err)
-	} else {
-		watcher, err := rktwatcher.NewRktContainerWatcher()
-		if err != nil {
-			return err
-		}
-		self.containerWatchers = append(self.containerWatchers, watcher)
-	}
-
-	err = containerd.Register(self, self.fsInfo, self.includedMetrics)
-	if err != nil {
-		glog.V(5).Infof("Registration of the containerd container factory failed: %v", err)
-	}
-
-	err = crio.Register(self, self.fsInfo, self.includedMetrics)
-	if err != nil {
-		glog.V(5).Infof("Registration of the crio container factory failed: %v", err)
-	}
-
-	err = mesos.Register(self, self.fsInfo, self.includedMetrics)
-	if err != nil {
-		glog.V(5).Infof("Registration of the mesos container factory failed: %v", err)
-	}
-
-	err = systemd.Register(self, self.fsInfo, self.includedMetrics)
-	if err != nil {
-		glog.V(5).Infof("Registration of the systemd container factory failed: %v", err)
-	}
-
-	err = raw.Register(self, self.fsInfo, self.includedMetrics, self.rawContainerCgroupPathPrefixWhiteList)
-	if err != nil {
-		glog.Errorf("Registration of the raw container factory failed: %v", err)
-	}
-
-	rawWatcher, err := rawwatcher.NewRawContainerWatcher()
+	rawWatcher, err := raw.NewRawContainerWatcher()
 	if err != nil {
 		return err
 	}
@@ -346,7 +253,7 @@ func (self *manager) Start() error {
 	// Watch for OOMs.
 	err = self.watchForNewOoms()
 	if err != nil {
-		glog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
+		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
 	}
 
 	// If there are no factories, don't start any housekeeping and serve the information we do have.
@@ -362,12 +269,12 @@ func (self *manager) Start() error {
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("Starting recovery of all containers")
+	klog.V(2).Infof("Starting recovery of all containers")
 	err = self.detectSubcontainers("/")
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("Recovery completed")
+	klog.V(2).Infof("Recovery completed")
 
 	// Watch for new container.
 	quitWatcher := make(chan error)
@@ -381,6 +288,10 @@ func (self *manager) Start() error {
 	quitGlobalHousekeeping := make(chan error)
 	self.quitChannels = append(self.quitChannels, quitGlobalHousekeeping)
 	go self.globalHousekeeping(quitGlobalHousekeeping)
+
+	quitUpdateMachineInfo := make(chan error)
+	self.quitChannels = append(self.quitChannels, quitUpdateMachineInfo)
+	go self.updateMachineInfo(quitUpdateMachineInfo)
 
 	return nil
 }
@@ -402,6 +313,28 @@ func (self *manager) Stop() error {
 	return nil
 }
 
+func (self *manager) updateMachineInfo(quit chan error) {
+	ticker := time.NewTicker(*updateMachineInfoInterval)
+	for {
+		select {
+		case <-ticker.C:
+			info, err := machine.Info(self.sysFs, self.fsInfo, self.inHostNamespace)
+			if err != nil {
+				klog.Errorf("Could not get machine info: %v", err)
+				break
+			}
+			self.machineMu.Lock()
+			self.machineInfo = *info
+			self.machineMu.Unlock()
+			klog.V(5).Infof("Update machine info: %+v", *info)
+		case <-quit:
+			ticker.Stop()
+			quit <- nil
+			return
+		}
+	}
+}
+
 func (self *manager) globalHousekeeping(quit chan error) {
 	// Long housekeeping is either 100ms or half of the housekeeping interval.
 	longHousekeeping := 100 * time.Millisecond
@@ -418,18 +351,18 @@ func (self *manager) globalHousekeeping(quit chan error) {
 			// Check for new containers.
 			err := self.detectSubcontainers("/")
 			if err != nil {
-				glog.Errorf("Failed to detect containers: %s", err)
+				klog.Errorf("Failed to detect containers: %s", err)
 			}
 
 			// Log if housekeeping took too long.
 			duration := time.Since(start)
 			if duration >= longHousekeeping {
-				glog.V(3).Infof("Global Housekeeping(%d) took %s", t.Unix(), duration)
+				klog.V(3).Infof("Global Housekeeping(%d) took %s", t.Unix(), duration)
 			}
 		case <-quit:
 			// Quit if asked to do so.
 			quit <- nil
-			glog.Infof("Exiting global housekeeping thread")
+			klog.Infof("Exiting global housekeeping thread")
 			return
 		}
 	}
@@ -501,7 +434,9 @@ func (self *manager) getAdjustedSpec(cinfo *containerInfo) info.ContainerSpec {
 	if spec.HasMemory {
 		// Memory.Limit is 0 means there's no limit
 		if spec.Memory.Limit == 0 {
+			self.machineMu.RLock()
 			spec.Memory.Limit = uint64(self.machineInfo.MemoryCapacity)
+			self.machineMu.RUnlock()
 		}
 	}
 	return spec
@@ -630,7 +565,7 @@ func (self *manager) AllDockerContainers(query *info.ContainerInfoRequest) (map[
 		if err != nil {
 			// Ignore the error because of race condition and return best-effort result.
 			if err == memory.ErrDataNotFound {
-				glog.Warningf("Error getting data for container %s because of race condition", name)
+				klog.Warningf("Error getting data for container %s because of race condition", name)
 				continue
 			}
 			return nil, err
@@ -834,6 +769,8 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 }
 
 func (m *manager) GetMachineInfo() (*info.MachineInfo, error) {
+	m.machineMu.RLock()
+	defer m.machineMu.RUnlock()
 	// Copy and return the MachineInfo.
 	return &m.machineInfo, nil
 }
@@ -890,7 +827,7 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 		if err != nil {
 			return fmt.Errorf("failed to read config file %q for config %q, container %q: %v", k, v, cont.info.Name, err)
 		}
-		glog.V(4).Infof("Got config from %q: %q", v, configFile)
+		klog.V(4).Infof("Got config from %q: %q", v, configFile)
 
 		if strings.HasPrefix(k, "prometheus") || strings.HasPrefix(k, "Prometheus") {
 			newCollector, err := collector.NewPrometheusCollector(k, configFile, *applicationMetricsCountLimit, cont.handler, m.collectorHttpClient)
@@ -968,7 +905,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 	if !accept {
 		// ignoring this container.
-		glog.V(4).Infof("ignoring container %q", containerName)
+		klog.V(4).Infof("ignoring container %q", containerName)
 		return nil
 	}
 	collectorManager, err := collector.NewCollectorManager()
@@ -983,11 +920,11 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 	devicesCgroupPath, err := handler.GetCgroupPath("devices")
 	if err != nil {
-		glog.Warningf("Error getting devices cgroup path: %v", err)
+		klog.Warningf("Error getting devices cgroup path: %v", err)
 	} else {
 		cont.nvidiaCollector, err = m.nvidiaManager.GetCollector(devicesCgroupPath)
 		if err != nil {
-			glog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %q: %v", cont.info.Name, err)
+			klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %q: %v", cont.info.Name, err)
 		}
 	}
 
@@ -996,7 +933,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	collectorConfigs := collector.GetCollectorConfigs(labels)
 	err = m.registerCollectors(collectorConfigs, cont)
 	if err != nil {
-		glog.Warningf("Failed to register collectors for %q: %v", containerName, err)
+		klog.Warningf("Failed to register collectors for %q: %v", containerName, err)
 	}
 
 	// Add the container name and all its aliases. The aliases must be within the namespace of the factory.
@@ -1008,7 +945,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		}] = cont
 	}
 
-	glog.V(3).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	klog.V(3).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contSpec, err := cont.handler.GetSpec()
 	if err != nil {
@@ -1065,7 +1002,7 @@ func (m *manager) destroyContainerLocked(containerName string) error {
 			Name:      alias,
 		})
 	}
-	glog.V(3).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	klog.V(3).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contRef, err := cont.handler.ContainerReference()
 	if err != nil {
@@ -1144,7 +1081,7 @@ func (m *manager) detectSubcontainers(containerName string) error {
 	for _, cont := range added {
 		err = m.createContainer(cont.Name, watcher.Raw)
 		if err != nil {
-			glog.Errorf("Failed to create existing container: %s: %s", cont.Name, err)
+			klog.Errorf("Failed to create existing container: %s: %s", cont.Name, err)
 		}
 	}
 
@@ -1152,7 +1089,7 @@ func (m *manager) detectSubcontainers(containerName string) error {
 	for _, cont := range removed {
 		err = m.destroyContainer(cont.Name)
 		if err != nil {
-			glog.Errorf("Failed to destroy existing container: %s: %s", cont.Name, err)
+			klog.Errorf("Failed to destroy existing container: %s: %s", cont.Name, err)
 		}
 	}
 
@@ -1192,7 +1129,7 @@ func (self *manager) watchForNewContainers(quit chan error) error {
 					err = self.destroyContainer(event.Name)
 				}
 				if err != nil {
-					glog.Warningf("Failed to process watch event %+v: %v", event, err)
+					klog.Warningf("Failed to process watch event %+v: %v", event, err)
 				}
 			case <-quit:
 				var errs partialFailure
@@ -1209,7 +1146,7 @@ func (self *manager) watchForNewContainers(quit chan error) error {
 					quit <- errs
 				} else {
 					quit <- nil
-					glog.Infof("Exiting thread watching subcontainers")
+					klog.Infof("Exiting thread watching subcontainers")
 					return
 				}
 			}
@@ -1219,7 +1156,7 @@ func (self *manager) watchForNewContainers(quit chan error) error {
 }
 
 func (self *manager) watchForNewOoms() error {
-	glog.V(2).Infof("Started watching for new ooms in manager")
+	klog.V(2).Infof("Started watching for new ooms in manager")
 	outStream := make(chan *oomparser.OomInstance, 10)
 	oomLog, err := oomparser.New()
 	if err != nil {
@@ -1237,9 +1174,9 @@ func (self *manager) watchForNewOoms() error {
 			}
 			err := self.eventHandler.AddEvent(newEvent)
 			if err != nil {
-				glog.Errorf("failed to add OOM event for %q: %v", oomInstance.ContainerName, err)
+				klog.Errorf("failed to add OOM event for %q: %v", oomInstance.ContainerName, err)
 			}
-			glog.V(3).Infof("Created an OOM event in container %q at %v", oomInstance.ContainerName, oomInstance.TimeOfDeath)
+			klog.V(3).Infof("Created an OOM event in container %q at %v", oomInstance.ContainerName, oomInstance.TimeOfDeath)
 
 			newEvent = &info.Event{
 				ContainerName: oomInstance.VictimContainerName,
@@ -1254,7 +1191,7 @@ func (self *manager) watchForNewOoms() error {
 			}
 			err = self.eventHandler.AddEvent(newEvent)
 			if err != nil {
-				glog.Errorf("failed to add OOM kill event for %q: %v", oomInstance.ContainerName, err)
+				klog.Errorf("failed to add OOM kill event for %q: %v", oomInstance.ContainerName, err)
 			}
 		}
 	}()
@@ -1285,12 +1222,12 @@ func parseEventsStoragePolicy() events.StoragePolicy {
 	for _, part := range parts {
 		items := strings.Split(part, "=")
 		if len(items) != 2 {
-			glog.Warningf("Unknown event storage policy %q when parsing max age", part)
+			klog.Warningf("Unknown event storage policy %q when parsing max age", part)
 			continue
 		}
 		dur, err := time.ParseDuration(items[1])
 		if err != nil {
-			glog.Warningf("Unable to parse event max age duration %q: %v", items[1], err)
+			klog.Warningf("Unable to parse event max age duration %q: %v", items[1], err)
 			continue
 		}
 		if items[0] == "default" {
@@ -1305,12 +1242,12 @@ func parseEventsStoragePolicy() events.StoragePolicy {
 	for _, part := range parts {
 		items := strings.Split(part, "=")
 		if len(items) != 2 {
-			glog.Warningf("Unknown event storage policy %q when parsing max event limit", part)
+			klog.Warningf("Unknown event storage policy %q when parsing max event limit", part)
 			continue
 		}
 		val, err := strconv.Atoi(items[1])
 		if err != nil {
-			glog.Warningf("Unable to parse integer from %q: %v", items[1], err)
+			klog.Warningf("Unable to parse integer from %q: %v", items[1], err)
 			continue
 		}
 		if items[0] == "default" {

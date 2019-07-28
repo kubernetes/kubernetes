@@ -17,14 +17,19 @@ limitations under the License.
 package serviceaccount_test
 
 import (
+	"context"
 	"reflect"
+	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	certutil "k8s.io/client-go/util/cert"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/keyutil"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -93,12 +98,12 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END PUBLIC KEY-----`
 
 func getPrivateKey(data string) interface{} {
-	key, _ := certutil.ParsePrivateKeyPEM([]byte(data))
+	key, _ := keyutil.ParsePrivateKeyPEM([]byte(data))
 	return key
 }
 
 func getPublicKey(data string) interface{} {
-	keys, _ := certutil.ParsePublicKeysPEM([]byte(data))
+	keys, _ := keyutil.ParsePublicKeysPEM([]byte(data))
 	return keys[0]
 }
 func TestTokenGenerateAndValidate(t *testing.T) {
@@ -274,16 +279,29 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
-		authenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		auds := authenticator.Audiences{"api"}
+		getter := serviceaccountcontroller.NewGetterFromClient(
+			tc.Client,
+			v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
+				return tc.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+			})),
+			v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
+				return tc.Client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+			})),
+			v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
+				return tc.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+			})),
+		)
+		authn := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
 
 		// An invalid, non-JWT token should always fail
-		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {
+		ctx := authenticator.WithAudiences(context.Background(), auds)
+		if _, ok, err := authn.AuthenticateToken(ctx, "invalid token"); err != nil || ok {
 			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
 			continue
 		}
 
-		user, ok, err := authenticator.AuthenticateToken(tc.Token)
+		resp, ok, err := authn.AuthenticateToken(ctx, tc.Token)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
 			continue
@@ -298,17 +316,37 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			continue
 		}
 
-		if user.GetName() != tc.ExpectedUserName {
-			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, user.GetName())
+		if resp.User.GetName() != tc.ExpectedUserName {
+			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, resp.User.GetName())
 			continue
 		}
-		if user.GetUID() != tc.ExpectedUserUID {
-			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, user.GetUID())
+		if resp.User.GetUID() != tc.ExpectedUserUID {
+			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, resp.User.GetUID())
 			continue
 		}
-		if !reflect.DeepEqual(user.GetGroups(), tc.ExpectedGroups) {
-			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, user.GetGroups())
+		if !reflect.DeepEqual(resp.User.GetGroups(), tc.ExpectedGroups) {
+			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, resp.User.GetGroups())
 			continue
 		}
 	}
+}
+
+func newIndexer(get func(namespace, name string) (interface{}, error)) cache.Indexer {
+	return &fakeIndexer{get: get}
+}
+
+type fakeIndexer struct {
+	cache.Indexer
+	get func(namespace, name string) (interface{}, error)
+}
+
+func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
+	parts := strings.SplitN(key, "/", 2)
+	namespace := parts[0]
+	name := ""
+	if len(parts) == 2 {
+		name = parts[1]
+	}
+	obj, err := f.get(namespace, name)
+	return obj, err == nil, err
 }

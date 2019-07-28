@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientapi "k8s.io/client-go/tools/clientcmd/api"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/klog"
 )
 
 func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, error) {
@@ -48,7 +48,7 @@ func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, 
 		&clientcmd.ConfigOverrides{ClusterInfo: clientapi.Cluster{Server: masterURL}}).ClientConfig()
 }
 
-func flattenSubsets(subsets []api.EndpointSubset) []string {
+func flattenSubsets(subsets []corev1.EndpointSubset) []string {
 	ips := []string{}
 	for _, ss := range subsets {
 		for _, addr := range ss.Addresses {
@@ -61,27 +61,27 @@ func flattenSubsets(subsets []api.EndpointSubset) []string {
 func main() {
 	flag.Parse()
 
-	glog.Info("Kubernetes Elasticsearch logging discovery")
+	klog.Info("Kubernetes Elasticsearch logging discovery")
 
 	cc, err := buildConfigFromEnvs(os.Getenv("APISERVER_HOST"), os.Getenv("KUBE_CONFIG_FILE"))
 	if err != nil {
-		glog.Fatalf("Failed to make client: %v", err)
+		klog.Fatalf("Failed to make client: %v", err)
 	}
 	client, err := clientset.NewForConfig(cc)
 
 	if err != nil {
-		glog.Fatalf("Failed to make client: %v", err)
+		klog.Fatalf("Failed to make client: %v", err)
 	}
 	namespace := metav1.NamespaceSystem
 	envNamespace := os.Getenv("NAMESPACE")
 	if envNamespace != "" {
-		if _, err := client.Core().Namespaces().Get(envNamespace, metav1.GetOptions{}); err != nil {
-			glog.Fatalf("%s namespace doesn't exist: %v", envNamespace, err)
+		if _, err := client.CoreV1().Namespaces().Get(envNamespace, metav1.GetOptions{}); err != nil {
+			klog.Fatalf("%s namespace doesn't exist: %v", envNamespace, err)
 		}
 		namespace = envNamespace
 	}
 
-	var elasticsearch *api.Service
+	var elasticsearch *corev1.Service
 	serviceName := os.Getenv("ELASTICSEARCH_SERVICE_NAME")
 	if serviceName == "" {
 		serviceName = "elasticsearch-logging"
@@ -90,7 +90,7 @@ func main() {
 	// Look for endpoints associated with the Elasticsearch logging service.
 	// First wait for the service to become available.
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		elasticsearch, err = client.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		elasticsearch, err = client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err == nil {
 			break
 		}
@@ -98,31 +98,32 @@ func main() {
 	// If we did not find an elasticsearch logging service then log a warning
 	// and return without adding any unicast hosts.
 	if elasticsearch == nil {
-		glog.Warningf("Failed to find the elasticsearch-logging service: %v", err)
+		klog.Warningf("Failed to find the elasticsearch-logging service: %v", err)
 		return
 	}
 
-	var endpoints *api.Endpoints
+	var endpoints *corev1.Endpoints
 	addrs := []string{}
 	// Wait for some endpoints.
 	count, _ := strconv.Atoi(os.Getenv("MINIMUM_MASTER_NODES"))
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		endpoints, err = client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		endpoints, err = client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			continue
 		}
 		addrs = flattenSubsets(endpoints.Subsets)
-		glog.Infof("Found %s", addrs)
-		if len(addrs) > 0 && len(addrs) == count {
+		klog.Infof("Found %s", addrs)
+		if len(addrs) > 0 && len(addrs) >= count {
 			break
 		}
 	}
 	// If there was an error finding endpoints then log a warning and quit.
 	if err != nil {
-		glog.Warningf("Error finding endpoints: %v", err)
+		klog.Warningf("Error finding endpoints: %v", err)
 		return
 	}
 
-	glog.Infof("Endpoints = %s", addrs)
-	fmt.Printf("discovery.zen.ping.unicast.hosts: [%s]\n", strings.Join(addrs, ", "))
+	klog.Infof("Endpoints = %s", addrs)
+	fmt.Printf("discovery.seed_hosts: [%s]\n", strings.Join(addrs, ", "))
+	fmt.Printf("cluster.initial_master_nodes: [%s]\n", strings.Join(addrs, ", "))
 }

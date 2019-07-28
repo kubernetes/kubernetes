@@ -351,6 +351,8 @@ const (
 	CSTOP                          = 0x13
 	CSTOPB                         = 0x400
 	CSUSP                          = 0x1a
+	CTL_HW                         = 0x6
+	CTL_KERN                       = 0x1
 	CTL_MAXNAME                    = 0x18
 	CTL_NET                        = 0x4
 	DLT_A429                       = 0xb8
@@ -615,6 +617,7 @@ const (
 	F_UNLCKSYS                     = 0x4
 	F_WRLCK                        = 0x3
 	HUPCL                          = 0x4000
+	HW_MACHINE                     = 0x1
 	ICANON                         = 0x100
 	ICMP6_FILTER                   = 0x12
 	ICRNL                          = 0x100
@@ -951,6 +954,10 @@ const (
 	IXANY                          = 0x800
 	IXOFF                          = 0x400
 	IXON                           = 0x200
+	KERN_HOSTNAME                  = 0xa
+	KERN_OSRELEASE                 = 0x2
+	KERN_OSTYPE                    = 0x1
+	KERN_VERSION                   = 0x4
 	LOCK_EX                        = 0x2
 	LOCK_NB                        = 0x4
 	LOCK_SH                        = 0x1
@@ -1347,6 +1354,35 @@ const (
 	SO_USELOOPBACK                 = 0x40
 	SO_USER_COOKIE                 = 0x1015
 	SO_VENDOR                      = 0x80000000
+	S_BLKSIZE                      = 0x200
+	S_IEXEC                        = 0x40
+	S_IFBLK                        = 0x6000
+	S_IFCHR                        = 0x2000
+	S_IFDIR                        = 0x4000
+	S_IFIFO                        = 0x1000
+	S_IFLNK                        = 0xa000
+	S_IFMT                         = 0xf000
+	S_IFREG                        = 0x8000
+	S_IFSOCK                       = 0xc000
+	S_IFWHT                        = 0xe000
+	S_IREAD                        = 0x100
+	S_IRGRP                        = 0x20
+	S_IROTH                        = 0x4
+	S_IRUSR                        = 0x100
+	S_IRWXG                        = 0x38
+	S_IRWXO                        = 0x7
+	S_IRWXU                        = 0x1c0
+	S_ISGID                        = 0x400
+	S_ISTXT                        = 0x200
+	S_ISUID                        = 0x800
+	S_ISVTX                        = 0x200
+	S_IWGRP                        = 0x10
+	S_IWOTH                        = 0x2
+	S_IWRITE                       = 0x80
+	S_IWUSR                        = 0x80
+	S_IXGRP                        = 0x8
+	S_IXOTH                        = 0x1
+	S_IXUSR                        = 0x40
 	TAB0                           = 0x0
 	TAB3                           = 0x4
 	TABDLY                         = 0x4
@@ -1621,138 +1657,146 @@ const (
 )
 
 // Error table
-var errors = [...]string{
-	1:  "operation not permitted",
-	2:  "no such file or directory",
-	3:  "no such process",
-	4:  "interrupted system call",
-	5:  "input/output error",
-	6:  "device not configured",
-	7:  "argument list too long",
-	8:  "exec format error",
-	9:  "bad file descriptor",
-	10: "no child processes",
-	11: "resource deadlock avoided",
-	12: "cannot allocate memory",
-	13: "permission denied",
-	14: "bad address",
-	15: "block device required",
-	16: "device busy",
-	17: "file exists",
-	18: "cross-device link",
-	19: "operation not supported by device",
-	20: "not a directory",
-	21: "is a directory",
-	22: "invalid argument",
-	23: "too many open files in system",
-	24: "too many open files",
-	25: "inappropriate ioctl for device",
-	26: "text file busy",
-	27: "file too large",
-	28: "no space left on device",
-	29: "illegal seek",
-	30: "read-only file system",
-	31: "too many links",
-	32: "broken pipe",
-	33: "numerical argument out of domain",
-	34: "result too large",
-	35: "resource temporarily unavailable",
-	36: "operation now in progress",
-	37: "operation already in progress",
-	38: "socket operation on non-socket",
-	39: "destination address required",
-	40: "message too long",
-	41: "protocol wrong type for socket",
-	42: "protocol not available",
-	43: "protocol not supported",
-	44: "socket type not supported",
-	45: "operation not supported",
-	46: "protocol family not supported",
-	47: "address family not supported by protocol family",
-	48: "address already in use",
-	49: "can't assign requested address",
-	50: "network is down",
-	51: "network is unreachable",
-	52: "network dropped connection on reset",
-	53: "software caused connection abort",
-	54: "connection reset by peer",
-	55: "no buffer space available",
-	56: "socket is already connected",
-	57: "socket is not connected",
-	58: "can't send after socket shutdown",
-	59: "too many references: can't splice",
-	60: "operation timed out",
-	61: "connection refused",
-	62: "too many levels of symbolic links",
-	63: "file name too long",
-	64: "host is down",
-	65: "no route to host",
-	66: "directory not empty",
-	67: "too many processes",
-	68: "too many users",
-	69: "disc quota exceeded",
-	70: "stale NFS file handle",
-	71: "too many levels of remote in path",
-	72: "RPC struct is bad",
-	73: "RPC version wrong",
-	74: "RPC prog. not avail",
-	75: "program version wrong",
-	76: "bad procedure for program",
-	77: "no locks available",
-	78: "function not implemented",
-	79: "inappropriate file type or format",
-	80: "authentication error",
-	81: "need authenticator",
-	82: "identifier removed",
-	83: "no message of desired type",
-	84: "value too large to be stored in data type",
-	85: "operation canceled",
-	86: "illegal byte sequence",
-	87: "attribute not found",
-	88: "programming error",
-	89: "bad message",
-	90: "multihop attempted",
-	91: "link has been severed",
-	92: "protocol error",
-	93: "capabilities insufficient",
-	94: "not permitted in capability mode",
-	95: "state not recoverable",
-	96: "previous owner died",
+var errorList = [...]struct {
+	num  syscall.Errno
+	name string
+	desc string
+}{
+	{1, "EPERM", "operation not permitted"},
+	{2, "ENOENT", "no such file or directory"},
+	{3, "ESRCH", "no such process"},
+	{4, "EINTR", "interrupted system call"},
+	{5, "EIO", "input/output error"},
+	{6, "ENXIO", "device not configured"},
+	{7, "E2BIG", "argument list too long"},
+	{8, "ENOEXEC", "exec format error"},
+	{9, "EBADF", "bad file descriptor"},
+	{10, "ECHILD", "no child processes"},
+	{11, "EDEADLK", "resource deadlock avoided"},
+	{12, "ENOMEM", "cannot allocate memory"},
+	{13, "EACCES", "permission denied"},
+	{14, "EFAULT", "bad address"},
+	{15, "ENOTBLK", "block device required"},
+	{16, "EBUSY", "device busy"},
+	{17, "EEXIST", "file exists"},
+	{18, "EXDEV", "cross-device link"},
+	{19, "ENODEV", "operation not supported by device"},
+	{20, "ENOTDIR", "not a directory"},
+	{21, "EISDIR", "is a directory"},
+	{22, "EINVAL", "invalid argument"},
+	{23, "ENFILE", "too many open files in system"},
+	{24, "EMFILE", "too many open files"},
+	{25, "ENOTTY", "inappropriate ioctl for device"},
+	{26, "ETXTBSY", "text file busy"},
+	{27, "EFBIG", "file too large"},
+	{28, "ENOSPC", "no space left on device"},
+	{29, "ESPIPE", "illegal seek"},
+	{30, "EROFS", "read-only file system"},
+	{31, "EMLINK", "too many links"},
+	{32, "EPIPE", "broken pipe"},
+	{33, "EDOM", "numerical argument out of domain"},
+	{34, "ERANGE", "result too large"},
+	{35, "EAGAIN", "resource temporarily unavailable"},
+	{36, "EINPROGRESS", "operation now in progress"},
+	{37, "EALREADY", "operation already in progress"},
+	{38, "ENOTSOCK", "socket operation on non-socket"},
+	{39, "EDESTADDRREQ", "destination address required"},
+	{40, "EMSGSIZE", "message too long"},
+	{41, "EPROTOTYPE", "protocol wrong type for socket"},
+	{42, "ENOPROTOOPT", "protocol not available"},
+	{43, "EPROTONOSUPPORT", "protocol not supported"},
+	{44, "ESOCKTNOSUPPORT", "socket type not supported"},
+	{45, "EOPNOTSUPP", "operation not supported"},
+	{46, "EPFNOSUPPORT", "protocol family not supported"},
+	{47, "EAFNOSUPPORT", "address family not supported by protocol family"},
+	{48, "EADDRINUSE", "address already in use"},
+	{49, "EADDRNOTAVAIL", "can't assign requested address"},
+	{50, "ENETDOWN", "network is down"},
+	{51, "ENETUNREACH", "network is unreachable"},
+	{52, "ENETRESET", "network dropped connection on reset"},
+	{53, "ECONNABORTED", "software caused connection abort"},
+	{54, "ECONNRESET", "connection reset by peer"},
+	{55, "ENOBUFS", "no buffer space available"},
+	{56, "EISCONN", "socket is already connected"},
+	{57, "ENOTCONN", "socket is not connected"},
+	{58, "ESHUTDOWN", "can't send after socket shutdown"},
+	{59, "ETOOMANYREFS", "too many references: can't splice"},
+	{60, "ETIMEDOUT", "operation timed out"},
+	{61, "ECONNREFUSED", "connection refused"},
+	{62, "ELOOP", "too many levels of symbolic links"},
+	{63, "ENAMETOOLONG", "file name too long"},
+	{64, "EHOSTDOWN", "host is down"},
+	{65, "EHOSTUNREACH", "no route to host"},
+	{66, "ENOTEMPTY", "directory not empty"},
+	{67, "EPROCLIM", "too many processes"},
+	{68, "EUSERS", "too many users"},
+	{69, "EDQUOT", "disc quota exceeded"},
+	{70, "ESTALE", "stale NFS file handle"},
+	{71, "EREMOTE", "too many levels of remote in path"},
+	{72, "EBADRPC", "RPC struct is bad"},
+	{73, "ERPCMISMATCH", "RPC version wrong"},
+	{74, "EPROGUNAVAIL", "RPC prog. not avail"},
+	{75, "EPROGMISMATCH", "program version wrong"},
+	{76, "EPROCUNAVAIL", "bad procedure for program"},
+	{77, "ENOLCK", "no locks available"},
+	{78, "ENOSYS", "function not implemented"},
+	{79, "EFTYPE", "inappropriate file type or format"},
+	{80, "EAUTH", "authentication error"},
+	{81, "ENEEDAUTH", "need authenticator"},
+	{82, "EIDRM", "identifier removed"},
+	{83, "ENOMSG", "no message of desired type"},
+	{84, "EOVERFLOW", "value too large to be stored in data type"},
+	{85, "ECANCELED", "operation canceled"},
+	{86, "EILSEQ", "illegal byte sequence"},
+	{87, "ENOATTR", "attribute not found"},
+	{88, "EDOOFUS", "programming error"},
+	{89, "EBADMSG", "bad message"},
+	{90, "EMULTIHOP", "multihop attempted"},
+	{91, "ENOLINK", "link has been severed"},
+	{92, "EPROTO", "protocol error"},
+	{93, "ENOTCAPABLE", "capabilities insufficient"},
+	{94, "ECAPMODE", "not permitted in capability mode"},
+	{95, "ENOTRECOVERABLE", "state not recoverable"},
+	{96, "EOWNERDEAD", "previous owner died"},
 }
 
 // Signal table
-var signals = [...]string{
-	1:  "hangup",
-	2:  "interrupt",
-	3:  "quit",
-	4:  "illegal instruction",
-	5:  "trace/BPT trap",
-	6:  "abort trap",
-	7:  "EMT trap",
-	8:  "floating point exception",
-	9:  "killed",
-	10: "bus error",
-	11: "segmentation fault",
-	12: "bad system call",
-	13: "broken pipe",
-	14: "alarm clock",
-	15: "terminated",
-	16: "urgent I/O condition",
-	17: "suspended (signal)",
-	18: "suspended",
-	19: "continued",
-	20: "child exited",
-	21: "stopped (tty input)",
-	22: "stopped (tty output)",
-	23: "I/O possible",
-	24: "cputime limit exceeded",
-	25: "filesize limit exceeded",
-	26: "virtual timer expired",
-	27: "profiling timer expired",
-	28: "window size changes",
-	29: "information request",
-	30: "user defined signal 1",
-	31: "user defined signal 2",
-	32: "unknown signal",
-	33: "unknown signal",
+var signalList = [...]struct {
+	num  syscall.Signal
+	name string
+	desc string
+}{
+	{1, "SIGHUP", "hangup"},
+	{2, "SIGINT", "interrupt"},
+	{3, "SIGQUIT", "quit"},
+	{4, "SIGILL", "illegal instruction"},
+	{5, "SIGTRAP", "trace/BPT trap"},
+	{6, "SIGIOT", "abort trap"},
+	{7, "SIGEMT", "EMT trap"},
+	{8, "SIGFPE", "floating point exception"},
+	{9, "SIGKILL", "killed"},
+	{10, "SIGBUS", "bus error"},
+	{11, "SIGSEGV", "segmentation fault"},
+	{12, "SIGSYS", "bad system call"},
+	{13, "SIGPIPE", "broken pipe"},
+	{14, "SIGALRM", "alarm clock"},
+	{15, "SIGTERM", "terminated"},
+	{16, "SIGURG", "urgent I/O condition"},
+	{17, "SIGSTOP", "suspended (signal)"},
+	{18, "SIGTSTP", "suspended"},
+	{19, "SIGCONT", "continued"},
+	{20, "SIGCHLD", "child exited"},
+	{21, "SIGTTIN", "stopped (tty input)"},
+	{22, "SIGTTOU", "stopped (tty output)"},
+	{23, "SIGIO", "I/O possible"},
+	{24, "SIGXCPU", "cputime limit exceeded"},
+	{25, "SIGXFSZ", "filesize limit exceeded"},
+	{26, "SIGVTALRM", "virtual timer expired"},
+	{27, "SIGPROF", "profiling timer expired"},
+	{28, "SIGWINCH", "window size changes"},
+	{29, "SIGINFO", "information request"},
+	{30, "SIGUSR1", "user defined signal 1"},
+	{31, "SIGUSR2", "user defined signal 2"},
+	{32, "SIGTHR", "unknown signal"},
+	{33, "SIGLIBRT", "unknown signal"},
 }

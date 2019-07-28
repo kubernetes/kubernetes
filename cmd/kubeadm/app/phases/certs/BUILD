@@ -16,10 +16,13 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
+        "//cmd/kubeadm/app/util/certs:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
-        "//cmd/kubeadm/test/certs:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 
@@ -34,9 +37,11 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -51,7 +56,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//cmd/kubeadm/app/phases/certs/pkiutil:all-srcs",
         "//cmd/kubeadm/app/phases/certs/renewal:all-srcs",
     ],
     tags = ["automanaged"],

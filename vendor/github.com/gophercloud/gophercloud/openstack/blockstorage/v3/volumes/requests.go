@@ -38,6 +38,8 @@ type CreateOpts struct {
 	ImageID string `json:"imageRef,omitempty"`
 	// The associated volume type
 	VolumeType string `json:"volume_type,omitempty"`
+	// Multiattach denotes if the volume is multi-attach capable.
+	Multiattach bool `json:"multiattach,omitempty"`
 }
 
 // ToVolumeCreateMap assembles a request body based on the contents of a
@@ -61,9 +63,37 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r Create
 	return
 }
 
+// DeleteOptsBuilder allows extensions to add additional parameters to the
+// Delete request.
+type DeleteOptsBuilder interface {
+	ToVolumeDeleteQuery() (string, error)
+}
+
+// DeleteOpts contains options for deleting a Volume. This object is passed to
+// the volumes.Delete function.
+type DeleteOpts struct {
+	// Delete all snapshots of this volume as well.
+	Cascade bool `q:"cascade"`
+}
+
+// ToLoadBalancerDeleteQuery formats a DeleteOpts into a query string.
+func (opts DeleteOpts) ToVolumeDeleteQuery() (string, error) {
+	q, err := gophercloud.BuildQueryString(opts)
+	return q.String(), err
+}
+
 // Delete will delete the existing Volume with the provided ID.
-func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
-	_, r.Err = client.Delete(deleteURL(client, id), nil)
+func Delete(client *gophercloud.ServiceClient, id string, opts DeleteOptsBuilder) (r DeleteResult) {
+	url := deleteURL(client, id)
+	if opts != nil {
+		query, err := opts.ToVolumeDeleteQuery()
+		if err != nil {
+			r.Err = err
+			return
+		}
+		url += query
+	}
+	_, r.Err = client.Delete(url, nil)
 	return
 }
 
@@ -145,8 +175,8 @@ type UpdateOptsBuilder interface {
 // to the volumes.Update function. For more information about the parameters, see
 // the Volume object.
 type UpdateOpts struct {
-	Name        string            `json:"name,omitempty"`
-	Description string            `json:"description,omitempty"`
+	Name        *string           `json:"name,omitempty"`
+	Description *string           `json:"description,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
@@ -174,7 +204,12 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	pages, err := List(client, nil).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	pages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}

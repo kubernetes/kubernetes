@@ -20,18 +20,16 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
-
-var TestMinVersion = version.MustParseSemantic("v1.11.0-alpha.1")
 
 func TestKnownFeatures(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
-		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature3": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}},
-		"hidden":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}, HiddenInHelpText: true},
+		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}},
+		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"feature3": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.GA}},
+		"hidden":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.GA}, HiddenInHelpText: true},
 	}
 
 	r := KnownFeatures(&someFeatures)
@@ -59,9 +57,9 @@ func TestKnownFeatures(t *testing.T) {
 
 func TestNewFeatureGate(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature1":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2":   {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
-		"deprecated": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}},
+		"feature1":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"feature2":   {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}},
+		"deprecated": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}},
 	}
 
 	var tests = []struct {
@@ -110,92 +108,66 @@ func TestNewFeatureGate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			r, err := NewFeatureGate(&someFeatures, test.value)
 
-		r, err := NewFeatureGate(&someFeatures, test.value)
+			if !test.expectedError && err != nil {
+				t.Errorf("NewFeatureGate failed when not expected: %v", err)
+				return
+			} else if test.expectedError && err == nil {
+				t.Error("NewFeatureGate didn't failed when expected")
+				return
+			}
 
-		if !test.expectedError && err != nil {
-			t.Errorf("NewFeatureGate failed when not expected: %v", err)
-			continue
-		} else if test.expectedError && err == nil {
-			t.Error("NewFeatureGate didn't failed when expected")
-			continue
-		}
-
-		if !reflect.DeepEqual(r, test.expectedFeaturesGate) {
-			t.Errorf("NewFeatureGate returned a unexpected value")
-		}
+			if !reflect.DeepEqual(r, test.expectedFeaturesGate) {
+				t.Errorf("NewFeatureGate returned a unexpected value")
+			}
+		})
 	}
 }
 
 func TestValidateVersion(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}, MinimumVersion: TestMinVersion},
+		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}, MinimumVersion: constants.MinimumControlPlaneVersion.WithPreRelease("alpha.1")},
 	}
 
 	var tests = []struct {
+		name              string
 		requestedVersion  string
 		requestedFeatures map[string]bool
 		expectedError     bool
 	}{
-		{ //no min version
+		{
+			name:              "no min version",
 			requestedFeatures: map[string]bool{"feature1": true},
 			expectedError:     false,
 		},
-		{ //min version but correct value given
+		{
+			name:              "min version but correct value given",
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.11.0",
+			requestedVersion:  constants.MinimumControlPlaneVersion.String(),
 			expectedError:     false,
 		},
-		{ //min version and incorrect value given
+		{
+			name:              "min version and incorrect value given",
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.10.2",
+			requestedVersion:  "v1.11.2",
 			expectedError:     true,
 		},
 	}
 
 	for _, test := range tests {
-		err := ValidateVersion(someFeatures, test.requestedFeatures, test.requestedVersion)
-		if !test.expectedError && err != nil {
-			t.Errorf("ValidateVersion failed when not expected: %v", err)
-			continue
-		} else if test.expectedError && err == nil {
-			t.Error("ValidateVersion didn't failed when expected")
-			continue
-		}
-	}
-}
-
-func TestResolveFeatureGateDependencies(t *testing.T) {
-
-	var tests = []struct {
-		inputFeatures    map[string]bool
-		expectedFeatures map[string]bool
-	}{
-		{ // no flags
-			inputFeatures:    map[string]bool{},
-			expectedFeatures: map[string]bool{},
-		},
-		{ // others flags
-			inputFeatures:    map[string]bool{CoreDNS: false},
-			expectedFeatures: map[string]bool{CoreDNS: false},
-		},
-		{ // just StoreCertsInSecrets flags
-			inputFeatures:    map[string]bool{StoreCertsInSecrets: true},
-			expectedFeatures: map[string]bool{StoreCertsInSecrets: true, SelfHosting: true},
-		},
-		{ // just HighAvailability flags
-			inputFeatures:    map[string]bool{HighAvailability: true},
-			expectedFeatures: map[string]bool{HighAvailability: true, StoreCertsInSecrets: true, SelfHosting: true},
-		},
-	}
-
-	for _, test := range tests {
-		ResolveFeatureGateDependencies(test.inputFeatures)
-		if !reflect.DeepEqual(test.inputFeatures, test.expectedFeatures) {
-			t.Errorf("ResolveFeatureGateDependencies failed, expected: %v, got: %v", test.inputFeatures, test.expectedFeatures)
-
-		}
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateVersion(someFeatures, test.requestedFeatures, test.requestedVersion)
+			if !test.expectedError && err != nil {
+				t.Errorf("ValidateVersion failed when not expected: %v", err)
+				return
+			} else if test.expectedError && err == nil {
+				t.Error("ValidateVersion didn't failed when expected")
+				return
+			}
+		})
 	}
 }
 
@@ -215,28 +187,33 @@ func TestEnabledDefaults(t *testing.T) {
 func TestCheckDeprecatedFlags(t *testing.T) {
 	dummyMessage := "dummy message"
 	var someFeatures = FeatureList{
-		"feature1":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"deprecated": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, DeprecationMessage: dummyMessage},
+		"feature1":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"deprecated": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}, DeprecationMessage: dummyMessage},
 	}
 
 	var tests = []struct {
+		name        string
 		features    map[string]bool
 		expectedMsg map[string]string
 	}{
-		{ // feature deprecated
+		{
+			name:        "deprecated feature",
 			features:    map[string]bool{"deprecated": true},
 			expectedMsg: map[string]string{"deprecated": dummyMessage},
 		},
-		{ // valid feature
+		{
+			name:        "valid feature",
 			features:    map[string]bool{"feature1": true},
 			expectedMsg: map[string]string{},
 		},
 	}
 
 	for _, test := range tests {
-		msg := CheckDeprecatedFlags(&someFeatures, test.features)
-		if !reflect.DeepEqual(test.expectedMsg, msg) {
-			t.Error("CheckDeprecatedFlags didn't returned expected message")
-		}
+		t.Run(test.name, func(t *testing.T) {
+			msg := CheckDeprecatedFlags(&someFeatures, test.features)
+			if !reflect.DeepEqual(test.expectedMsg, msg) {
+				t.Error("CheckDeprecatedFlags didn't returned expected message")
+			}
+		})
 	}
 }

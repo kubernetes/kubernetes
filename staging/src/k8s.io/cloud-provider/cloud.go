@@ -42,8 +42,9 @@ type ControllerClientBuilder interface {
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
-	// to perform housekeeping activities within the cloud provider.
-	Initialize(clientBuilder ControllerClientBuilder)
+	// to perform housekeeping or run custom controllers specific to the cloud provider.
+	// Any tasks started here should be cleaned up when the stop channel closes.
+	Initialize(clientBuilder ControllerClientBuilder, stop <-chan struct{})
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.

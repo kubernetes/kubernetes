@@ -19,20 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 )
 
 // NodeLifecycleControllerOptions holds the NodeLifecycleController options.
 type NodeLifecycleControllerOptions struct {
-	EnableTaintManager        bool
-	NodeEvictionRate          float32
-	SecondaryNodeEvictionRate float32
-	NodeStartupGracePeriod    metav1.Duration
-	NodeMonitorGracePeriod    metav1.Duration
-	PodEvictionTimeout        metav1.Duration
-	LargeClusterSizeThreshold int32
-	UnhealthyZoneThreshold    float32
+	*nodelifecycleconfig.NodeLifecycleControllerConfiguration
 }
 
 // AddFlags adds flags related to NodeLifecycleController for controller manager to the specified FlagSet.
@@ -56,7 +48,7 @@ func (o *NodeLifecycleControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NodeLifecycleController config with options.
-func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.NodeLifecycleControllerConfiguration) error {
+func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *nodelifecycleconfig.NodeLifecycleControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

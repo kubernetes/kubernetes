@@ -56,16 +56,29 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dgehd2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgehd2(n, ilo, ihi int, a []float64, lda int, tau, work []float64) {
-	checkMatrix(n, n, a, lda)
 	switch {
-	case ilo < 0 || ilo > max(0, n-1):
+	case n < 0:
+		panic(nLT0)
+	case ilo < 0 || max(0, n-1) < ilo:
 		panic(badIlo)
-	case ihi < min(ilo, n-1) || ihi >= n:
+	case ihi < min(ilo, n-1) || n <= ihi:
 		panic(badIhi)
+	case lda < max(1, n):
+		panic(badLdA)
+	}
+
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
 	case len(tau) != n-1:
-		panic(badTau)
+		panic(badLenTau)
 	case len(work) < n:
-		panic(badWork)
+		panic(shortWork)
 	}
 
 	for i := ilo; i < ihi; i++ {

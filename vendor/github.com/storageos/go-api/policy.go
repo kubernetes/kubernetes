@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/storageos/go-api/types"
 	"net/http"
 	"net/url"
+
+	"github.com/storageos/go-api/types"
 )
 
 var (
-
 	// PolicyAPIPrefix is a partial path to the HTTP endpoint.
 	PolicyAPIPrefix = "policies"
-
 	// ErrNoSuchPolicy is the error returned when the policy does not exist.
 	ErrNoSuchPolicy = errors.New("no such policy")
 )

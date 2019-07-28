@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 const (
-	// Healthy means that the device is healty
+	// Healthy means that the device is healthy
 	Healthy = "Healthy"
 	// UnHealthy means that the device is unhealthy
 	Unhealthy = "Unhealthy"

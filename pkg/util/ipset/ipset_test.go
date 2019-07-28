@@ -461,14 +461,14 @@ func TestTestEntry(t *testing.T) {
 		Protocol: ProtocolTCP,
 		SetType:  HashIPPort,
 	}
-
+	setName := "NOT"
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// Success
-			func() ([]byte, error) { return []byte("10.120.7.100,tcp:8080 is in set FOOBAR."), nil },
+			func() ([]byte, error) { return []byte("10.120.7.100,tcp:8080 is in set " + setName + "."), nil },
 			// Failure
 			func() ([]byte, error) {
-				return []byte("192.168.1.3,tcp:8080 is NOT in set FOOBAR."), &fakeexec.FakeExitError{Status: 1}
+				return []byte("192.168.1.3,tcp:8080 is NOT in set " + setName + "."), &fakeexec.FakeExitError{Status: 1}
 			},
 		},
 	}
@@ -480,14 +480,14 @@ func TestTestEntry(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Success
-	ok, err := runner.TestEntry(testEntry.String(), "FOOBAR")
+	ok, err := runner.TestEntry(testEntry.String(), setName)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
 	if fcmd.CombinedOutputCalls != 1 {
 		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", "FOOBAR", "10.120.7.100,tcp:8080") {
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "10.120.7.100,tcp:8080") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	if !ok {

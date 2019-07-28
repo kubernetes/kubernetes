@@ -35,7 +35,7 @@ go_test(
         "openapi_suite_test.go",
         "openapi_test.go",
     ],
-    data = ["//api/openapi-spec:swagger-spec"],
+    data = ["//api/openapi-spec"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

@@ -22,10 +22,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -67,6 +67,7 @@ var (
 		kubectl edit deployment/mydeployment -o yaml --save-config`))
 )
 
+// NewCmdEdit creates the `edit` command
 func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.NormalEditMode, ioStreams)
 	o.ValidateOptions = cmdutil.ValidateOptions{EnableValidation: true}

@@ -140,8 +140,8 @@ func register(client autorest.Client, originalReq *http.Request, re RequestError
 	}
 
 	// poll for registered provisioning state
-	now := time.Now()
-	for err == nil && time.Since(now) < client.PollingDuration {
+	registrationStartTime := time.Now()
+	for err == nil && (client.PollingDuration == 0 || (client.PollingDuration != 0 && time.Since(registrationStartTime) < client.PollingDuration)) {
 		// taken from the resources SDK
 		// https://github.com/Azure/azure-sdk-for-go/blob/9f366792afa3e0ddaecdc860e793ba9d75e76c27/arm/resources/resources/providers.go#L45
 		preparer := autorest.CreatePreparer(
@@ -183,7 +183,7 @@ func register(client autorest.Client, originalReq *http.Request, re RequestError
 			return originalReq.Context().Err()
 		}
 	}
-	if !(time.Since(now) < client.PollingDuration) {
+	if client.PollingDuration != 0 && !(time.Since(registrationStartTime) < client.PollingDuration) {
 		return errors.New("polling for resource provider registration has exceeded the polling duration")
 	}
 	return err

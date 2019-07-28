@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.scheduling.v1alpha1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -28,6 +29,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
+// DEPRECATED - This group version of PriorityClass is deprecated by scheduling.k8s.io/v1/PriorityClass.
 // PriorityClass defines mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.
 message PriorityClass {
@@ -52,6 +54,13 @@ message PriorityClass {
   // when this priority class should be used.
   // +optional
   optional string description = 4;
+
+  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // Defaults to PreemptLowerPriority if unset.
+  // This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+  // +optional
+  optional string preemptionPolicy = 5;
 }
 
 // PriorityClassList is a collection of priority classes.

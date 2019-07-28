@@ -20,19 +20,21 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 // strategy implements behavior for CustomResources.
@@ -55,13 +57,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	crd.Status = apiextensions.CustomResourceDefinitionStatus{}
 	crd.Generation = 1
 
-	// if the feature gate is disabled, drop the feature.
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
-		crd.Spec.Validation = nil
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
-		crd.Spec.Subresources = nil
-	}
+	dropDisabledFields(&crd.Spec, nil)
 
 	for _, v := range crd.Spec.Versions {
 		if v.Storage {
@@ -91,14 +87,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 		newCRD.Generation = oldCRD.Generation + 1
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
-		newCRD.Spec.Validation = nil
-		oldCRD.Spec.Validation = nil
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
-		newCRD.Spec.Subresources = nil
-		oldCRD.Spec.Subresources = nil
-	}
+	dropDisabledFields(&newCRD.Spec, &oldCRD.Spec)
 
 	for _, v := range newCRD.Spec.Versions {
 		if v.Storage {
@@ -112,7 +101,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 // Validate validates a new CustomResourceDefinition.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition))
+	fieldErrors := validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition))
+	return append(fieldErrors, validateAPIApproval(ctx, obj.(*apiextensions.CustomResourceDefinition), nil)...)
 }
 
 // AllowCreateOnUpdate is false for CustomResourceDefinition; this means a POST is
@@ -132,7 +122,47 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+	fieldErrors := validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+
+	return append(fieldErrors, validateAPIApproval(ctx, obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))...)
+}
+
+// validateAPIApproval returns a list of errors if the API approval annotation isn't valid
+func validateAPIApproval(ctx context.Context, newCRD, oldCRD *apiextensions.CustomResourceDefinition) field.ErrorList {
+	// check to see if we need confirm API approval for kube group.  Do nothing for non-protected groups and do nothing in v1beta1.
+	if requestInfo, ok := request.RequestInfoFrom(ctx); !ok || requestInfo.APIVersion == "v1beta1" {
+		return field.ErrorList{}
+	}
+	if !apihelpers.IsProtectedCommunityGroup(newCRD.Spec.Group) {
+		return field.ErrorList{}
+	}
+
+	// default to a state that allows missing values to continue to be missing
+	var oldApprovalState *apihelpers.APIApprovalState
+	if oldCRD != nil {
+		t, _ := apihelpers.GetAPIApprovalState(oldCRD.Annotations)
+		oldApprovalState = &t
+	}
+	newApprovalState, reason := apihelpers.GetAPIApprovalState(newCRD.Annotations)
+
+	// if the approval state hasn't changed, never fail on approval validation
+	// this is allowed so that a v1 client that is simply updating spec and not mutating this value doesn't get rejected.  Imagine a controller controlling a CRD spec.
+	if oldApprovalState != nil && *oldApprovalState == newApprovalState {
+		return field.ErrorList{}
+	}
+
+	// in v1, we require valid approval strings
+	switch newApprovalState {
+	case apihelpers.APIApprovalInvalid:
+		return field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), newCRD.Annotations[v1beta1.KubeAPIApprovedAnnotation], reason)}
+	case apihelpers.APIApprovalMissing:
+		return field.ErrorList{field.Required(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), reason)}
+	case apihelpers.APIApproved, apihelpers.APIApprovalBypassed:
+		// success
+		return field.ErrorList{}
+	default:
+		return field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), newCRD.Annotations[v1beta1.KubeAPIApprovedAnnotation], reason)}
+	}
 }
 
 type statusStrategy struct {
@@ -178,12 +208,12 @@ func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Objec
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*apiextensions.CustomResourceDefinition)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition")
+		return nil, nil, fmt.Errorf("given object is not a CustomResourceDefinition")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), nil
 }
 
 // MatchCustomResourceDefinition is the filter used by the generic etcd backend to watch events
@@ -199,4 +229,103 @@ func MatchCustomResourceDefinition(label labels.Selector, field fields.Selector)
 // CustomResourceDefinitionToSelectableFields returns a field set that represents the object.
 func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourceDefinition) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
+}
+
+func dropDisabledFields(crdSpec, oldCrdSpec *apiextensions.CustomResourceDefinitionSpec) {
+	// if the feature gate is disabled, drop the feature.
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) &&
+		!validationInUse(oldCrdSpec) {
+		crdSpec.Validation = nil
+		for i := range crdSpec.Versions {
+			crdSpec.Versions[i].Schema = nil
+		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) &&
+		!subresourceInUse(oldCrdSpec) {
+		crdSpec.Subresources = nil
+		for i := range crdSpec.Versions {
+			crdSpec.Versions[i].Subresources = nil
+		}
+	}
+
+	// 1. On CREATE (in which case the old CRD spec is nil), if the CustomResourceWebhookConversion feature gate is off, we auto-clear
+	// the per-version fields. This is to be consistent with the other built-in types, as the
+	// apiserver drops unknown fields.
+	// 2. On UPDATE, if the CustomResourceWebhookConversion feature gate is off, we auto-clear
+	// the per-version fields if the old CRD doesn't use per-version fields already.
+	// This is to be consistent with the other built-in types, as the apiserver drops unknown
+	// fields. If the old CRD already uses per-version fields, the CRD is allowed to continue
+	// use per-version fields.
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) &&
+		!hasPerVersionField(oldCrdSpec) {
+		for i := range crdSpec.Versions {
+			crdSpec.Versions[i].Schema = nil
+			crdSpec.Versions[i].Subresources = nil
+			crdSpec.Versions[i].AdditionalPrinterColumns = nil
+		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) &&
+		!conversionWebhookInUse(oldCrdSpec) {
+		if crdSpec.Conversion != nil {
+			crdSpec.Conversion.WebhookClientConfig = nil
+		}
+	}
+
+}
+
+func validationInUse(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if crdSpec == nil {
+		return false
+	}
+	if crdSpec.Validation != nil {
+		return true
+	}
+
+	for i := range crdSpec.Versions {
+		if crdSpec.Versions[i].Schema != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func subresourceInUse(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if crdSpec == nil {
+		return false
+	}
+	if crdSpec.Subresources != nil {
+		return true
+	}
+
+	for i := range crdSpec.Versions {
+		if crdSpec.Versions[i].Subresources != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// hasPerVersionField returns true if a CRD uses per-version schema/subresources/columns fields.
+//func hasPerVersionField(versions []apiextensions.CustomResourceDefinitionVersion) bool {
+func hasPerVersionField(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if crdSpec == nil {
+		return false
+	}
+	for _, v := range crdSpec.Versions {
+		if v.Schema != nil || v.Subresources != nil || len(v.AdditionalPrinterColumns) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func conversionWebhookInUse(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if crdSpec == nil {
+		return false
+	}
+	if crdSpec.Conversion == nil {
+		return false
+	}
+	return crdSpec.Conversion.WebhookClientConfig != nil
 }

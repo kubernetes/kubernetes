@@ -27,23 +27,26 @@ func TestCmdCompletion(t *testing.T) {
 	}
 
 	var tests = []struct {
+		name     string
 		args     string
 		expected bool
 	}{
-		{"", false},    // shell not specified
-		{"foo", false}, // unsupported shell type
+		{"shell not expected", "", false},
+		{"unsupported shell type", "foo", false},
 	}
 
 	for _, rt := range tests {
-		_, _, actual := RunCmd(kubeadmPath, "completion", rt.args)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed CmdCompletion running 'kubeadm completion %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
-				rt.args,
-				actual,
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			_, _, actual := RunCmd(kubeadmPath, "completion", rt.args)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed CmdCompletion running 'kubeadm completion %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+					rt.args,
+					actual,
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }

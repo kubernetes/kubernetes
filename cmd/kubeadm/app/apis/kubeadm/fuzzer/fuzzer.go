@@ -18,11 +18,10 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -31,12 +30,13 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		fuzzInitConfiguration,
 		fuzzClusterConfiguration,
-		fuzzAuditPolicyConfiguration,
 		fuzzComponentConfigs,
+		fuzzDNS,
 		fuzzNodeRegistration,
 		fuzzLocalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
+		fuzzJoinControlPlane,
 	}
 }
 
@@ -50,22 +50,26 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	// More specifically:
 	// internal with manually applied defaults -> external object : loosing ClusterConfiguration) -> internal object with automatically applied defaults
 	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{
-		AuditPolicyConfiguration: kubeadm.AuditPolicyConfiguration{
-			LogDir:    constants.StaticPodAuditPolicyLogDir,
-			LogMaxAge: &v1beta1.DefaultAuditPolicyLogMaxAge,
-		},
-		CertificatesDir: v1beta1.DefaultCertificatesDir,
-		ClusterName:     v1beta1.DefaultClusterName,
-		Etcd: kubeadm.Etcd{
-			Local: &kubeadm.LocalEtcd{
-				DataDir: v1beta1.DefaultEtcdDataDir,
+		APIServer: kubeadm.APIServer{
+			TimeoutForControlPlane: &metav1.Duration{
+				Duration: constants.DefaultControlPlaneTimeout,
 			},
 		},
-		ImageRepository:   v1beta1.DefaultImageRepository,
-		KubernetesVersion: v1beta1.DefaultKubernetesVersion,
+		DNS: kubeadm.DNS{
+			Type: kubeadm.CoreDNS,
+		},
+		CertificatesDir: v1beta2.DefaultCertificatesDir,
+		ClusterName:     v1beta2.DefaultClusterName,
+		Etcd: kubeadm.Etcd{
+			Local: &kubeadm.LocalEtcd{
+				DataDir: v1beta2.DefaultEtcdDataDir,
+			},
+		},
+		ImageRepository:   v1beta2.DefaultImageRepository,
+		KubernetesVersion: v1beta2.DefaultKubernetesVersion,
 		Networking: kubeadm.Networking{
-			ServiceSubnet: v1beta1.DefaultServicesSubnet,
-			DNSDomain:     v1beta1.DefaultServiceDNSDomain,
+			ServiceSubnet: v1beta2.DefaultServicesSubnet,
+			DNSDomain:     v1beta2.DefaultServiceDNSDomain,
 		},
 	}
 	// Adds the default bootstrap token to get the round working
@@ -79,13 +83,16 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			Usages: []string{"foo"},
 		},
 	}
+
+	// Pin values for fields that are not present in v1beta1
+	obj.CertificateKey = ""
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
-	obj.CRISocket = "foo"
+	obj.IgnorePreflightErrors = nil
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
@@ -97,14 +104,16 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.ClusterName = "bar"
 	obj.ImageRepository = "baz"
 	obj.KubernetesVersion = "qux"
+	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
+		Duration: constants.DefaultControlPlaneTimeout,
+	}
 }
 
-func fuzzAuditPolicyConfiguration(obj *kubeadm.AuditPolicyConfiguration, c fuzz.Continue) {
+func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
-	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
-	obj.LogDir = "foo"
-	obj.LogMaxAge = new(int32)
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil
+	obj.Type = kubeadm.CoreDNS
 }
 
 func fuzzComponentConfigs(obj *kubeadm.ComponentConfigs, c fuzz.Continue) {
@@ -132,8 +141,16 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CACertPath = "foo"
-	obj.ClusterName = "bar"
-	obj.DiscoveryTimeout = &metav1.Duration{Duration: 1234}
-	obj.DiscoveryToken = "baz"
-	obj.TLSBootstrapToken = "qux"
+	obj.Discovery = kubeadm.Discovery{
+		BootstrapToken:    &kubeadm.BootstrapTokenDiscovery{Token: "baz"},
+		TLSBootstrapToken: "qux",
+		Timeout:           &metav1.Duration{Duration: 1234},
+	}
+}
+
+func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pin values for fields that are not present in v1beta1
+	obj.CertificateKey = ""
 }

@@ -41,12 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 
-	"github.com/golang/glog"
-)
-
-const (
-	// period to relist statefulsets and verify pets
-	statefulSetResyncPeriod = 30 * time.Second
+	"k8s.io/klog"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -86,7 +81,7 @@ func NewStatefulSetController(
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 
@@ -121,20 +116,19 @@ func NewStatefulSetController(
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
 
-	setInformer.Informer().AddEventHandlerWithResyncPeriod(
+	setInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
 			UpdateFunc: func(old, cur interface{}) {
 				oldPS := old.(*apps.StatefulSet)
 				curPS := cur.(*apps.StatefulSet)
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
-					glog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
+					klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
 				}
 				ssc.enqueueStatefulSet(cur)
 			},
 			DeleteFunc: ssc.enqueueStatefulSet,
 		},
-		statefulSetResyncPeriod,
 	)
 	ssc.setLister = setInformer.Lister()
 	ssc.setListerSynced = setInformer.Informer().HasSynced
@@ -148,8 +142,8 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ssc.queue.ShutDown()
 
-	glog.Infof("Starting stateful set controller")
-	defer glog.Infof("Shutting down statefulset controller")
+	klog.Infof("Starting stateful set controller")
+	defer klog.Infof("Shutting down statefulset controller")
 
 	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
@@ -179,7 +173,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 		if set == nil {
 			return
 		}
-		glog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
+		klog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -190,7 +184,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 	if len(sets) == 0 {
 		return
 	}
-	glog.V(4).Infof("Orphan Pod %s created, labels: %+v", pod.Name, pod.Labels)
+	klog.V(4).Infof("Orphan Pod %s created, labels: %+v", pod.Name, pod.Labels)
 	for _, set := range sets {
 		ssc.enqueueStatefulSet(set)
 	}
@@ -201,7 +195,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
-		// Periodic resync will send update events for all known pods.
+		// In the event of a re-list we may receive update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
@@ -224,7 +218,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		if set == nil {
 			return
 		}
-		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -236,7 +230,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		if len(sets) == 0 {
 			return
 		}
-		glog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 		for _, set := range sets {
 			ssc.enqueueStatefulSet(set)
 		}
@@ -249,8 +243,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new StatefulSet will not be woken up till the periodic resync.
+	// the deleted key/value. Note that this value might be stale.
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -273,7 +266,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 	if set == nil {
 		return
 	}
-	glog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
+	klog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
 	ssc.enqueueStatefulSet(set)
 }
 
@@ -382,7 +375,7 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Cound't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 	ssc.queue.Add(key)
@@ -415,7 +408,7 @@ func (ssc *StatefulSetController) worker() {
 func (ssc *StatefulSetController) sync(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -424,7 +417,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 	}
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.Infof("StatefulSet has been deleted %v", key)
+		klog.Infof("StatefulSet has been deleted %v", key)
 		return nil
 	}
 	if err != nil {
@@ -453,11 +446,11 @@ func (ssc *StatefulSetController) sync(key string) error {
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
 func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
-	glog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
+	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
 	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {
 		return err
 	}
-	glog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	klog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
 	return nil
 }

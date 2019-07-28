@@ -20,7 +20,6 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -30,9 +29,9 @@ type ExtensionsV1beta1Interface interface {
 	DaemonSetsGetter
 	DeploymentsGetter
 	IngressesGetter
+	NetworkPoliciesGetter
 	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
-	ScalesGetter
 }
 
 // ExtensionsV1beta1Client is used to interact with features provided by the extensions group.
@@ -52,16 +51,16 @@ func (c *ExtensionsV1beta1Client) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
 }
 
+func (c *ExtensionsV1beta1Client) NetworkPolicies(namespace string) NetworkPolicyInterface {
+	return newNetworkPolicies(c, namespace)
+}
+
 func (c *ExtensionsV1beta1Client) PodSecurityPolicies() PodSecurityPolicyInterface {
 	return newPodSecurityPolicies(c)
 }
 
 func (c *ExtensionsV1beta1Client) ReplicaSets(namespace string) ReplicaSetInterface {
 	return newReplicaSets(c, namespace)
-}
-
-func (c *ExtensionsV1beta1Client) Scales(namespace string) ScaleInterface {
-	return newScales(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsV1beta1Client for the given config.
@@ -96,7 +95,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

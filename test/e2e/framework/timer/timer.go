@@ -22,14 +22,14 @@ import (
 	"bytes"
 	"fmt"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	"sync"
 )
 
 var now = time.Now
 
-// Represents a phase of a test. Phases can overlap.
+// Phase represents a phase of a test. Phases can overlap.
 type Phase struct {
 	sequenceNumber int
 	name           string
@@ -63,9 +63,8 @@ func (phase *Phase) duration() time.Duration {
 func (phase *Phase) humanReadable() string {
 	if phase.ended() {
 		return fmt.Sprintf("Phase %s: %v\n", phase.label(), phase.duration())
-	} else {
-		return fmt.Sprintf("Phase %s: %v so far\n", phase.label(), phase.duration())
 	}
+	return fmt.Sprintf("Phase %s: %v so far\n", phase.label(), phase.duration())
 }
 
 // A TestPhaseTimer groups phases and provides a way to export their measurements as JSON or human-readable text.
@@ -93,10 +92,12 @@ func (timer *TestPhaseTimer) StartPhase(sequenceNumber int, phaseName string) *P
 	return newPhase
 }
 
+// SummaryKind returns the summary of test summary.
 func (timer *TestPhaseTimer) SummaryKind() string {
 	return "TestPhaseTimer"
 }
 
+// PrintHumanReadable returns durations of all phases.
 func (timer *TestPhaseTimer) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
 	timer.lock.Lock()
@@ -107,6 +108,7 @@ func (timer *TestPhaseTimer) PrintHumanReadable() string {
 	return buf.String()
 }
 
+// PrintJSON returns durations of all phases with JSON format.
 func (timer *TestPhaseTimer) PrintJSON() string {
 	data := perftype.PerfData{
 		Version: "v1",
@@ -122,5 +124,5 @@ func (timer *TestPhaseTimer) PrintJSON() string {
 			data.DataItems[0].Labels["ended"] = "false"
 		}
 	}
-	return framework.PrettyPrintJSON(data)
+	return e2emetrics.PrettyPrintJSON(data)
 }

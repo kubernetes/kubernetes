@@ -1,21 +1,23 @@
-APIEndpoint:
-  AdvertiseAddress: 192.168.2.2
-  BindPort: 6443
 CACertPath: /etc/kubernetes/pki/ca.crt
-ClusterName: kubernetes
-ControlPlane: false
-DiscoveryFile: ""
-DiscoveryTimeout: 5m0s
-DiscoveryToken: abcdef.0123456789abcdef
-DiscoveryTokenAPIServers:
-- kube-apiserver:6443
-DiscoveryTokenCACertHashes: null
-DiscoveryTokenUnsafeSkipCAVerification: true
-FeatureGates: null
+ControlPlane:
+  CertificateKey: ""
+  LocalAPIEndpoint:
+    AdvertiseAddress: 192.168.2.2
+    BindPort: 6443
+Discovery:
+  BootstrapToken:
+    APIServerEndpoint: kube-apiserver:6443
+    CACertHashes: null
+    Token: abcdef.0123456789abcdef
+    UnsafeSkipCAVerification: true
+  File: null
+  TLSBootstrapToken: abcdef.0123456789abcdef
+  Timeout: 5m0s
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
+  IgnorePreflightErrors: null
   KubeletExtraArgs: null
-  Name: master-1
-  Taints: null
-TLSBootstrapToken: abcdef.0123456789abcdef
-Token: abcdef.0123456789abcdef
+  Name: control-plane-1
+  Taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master

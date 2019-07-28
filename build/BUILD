@@ -1,7 +1,13 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
-load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load(":code_generation_test.bzl", "code_generation_test_suite")
+load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
+load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
+
+code_generation_test_suite(
+    name = "code_generation_tests",
+)
 
 filegroup(
     name = "package-srcs",
@@ -21,62 +27,66 @@ filegroup(
     tags = ["automanaged"],
 )
 
-# ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
-container_image(
-    name = "busybox-with-nsswitch",
-    base = "@official_busybox//image",
-    directory = "/etc",
-    files = ["nsswitch.conf"],
-    mode = "0644",
-)
-
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": "@debian-iptables-amd64//image",
+        "base": "@debian-iptables-{ARCH}//image",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
 
-[container_image(
-    name = binary + "-internal",
+# When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
+# manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
+[multi_arch_container(
+    name = binary,
+    architectures = SERVER_PLATFORMS["linux"],
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = [
-        "//build/debs:%s.deb" % binary,
-    ],
+    debs = select(for_platforms(
+        for_server = ["//build/debs:%s-{ARCH}.deb" % binary],
+        only_os = "linux",
+    )),
+    # Since the multi_arch_container macro replaces the {ARCH} format string,
+    # we need to escape the stamping vars.
+    docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
         # but the debs install the binaries into /usr/bin.
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
+    tags = ["manual"],
+    visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
-[container_bundle(
-    name = binary,
-    images = {
-        "k8s.gcr.io/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
+# Also roll up all images into a single bundle to push with one target.
+multi_arch_container_push(
+    name = "server-images",
+    architectures = SERVER_PLATFORMS["linux"],
+    docker_tags_images = {
+        "{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary: "%s-internal" % binary
+        for binary in DOCKERIZED_BINARIES.keys()
     },
-    stamp = True,
-) for binary in DOCKERIZED_BINARIES.keys()]
+    tags = ["manual"],
+)
 
 [genrule(
     name = binary + "_docker_tag",
@@ -98,12 +108,6 @@ grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
     stamp = 1,
 )
 
-genrule(
-    name = "cni_package_version",
-    outs = ["cni_version"],
-    cmd = "echo 0.5.1 >$@",
-)
-
 release_filegroup(
     name = "docker-artifacts",
     srcs = [":%s.tar" % binary for binary in DOCKERIZED_BINARIES.keys()] +
@@ -113,19 +117,19 @@ release_filegroup(
 # KUBE_CLIENT_TARGETS
 release_filegroup(
     name = "client-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_client = [
         "//cmd/kubectl",
-    ],
+    ]),
 )
 
 # KUBE_NODE_TARGETS
 release_filegroup(
     name = "node-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_node = [
         "//cmd/kube-proxy",
         "//cmd/kubeadm",
         "//cmd/kubelet",
-    ],
+    ]),
 )
 
 # KUBE_SERVER_TARGETS
@@ -133,31 +137,36 @@ release_filegroup(
 # since we include them in the actual build rule.
 release_filegroup(
     name = "server-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
         "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
-    ],
+    ]),
 )
 
 # kube::golang::test_targets
 filegroup(
     name = "test-targets",
-    srcs = [
-        "//cmd/gendocs",
-        "//cmd/genkubedocs",
-        "//cmd/genman",
-        "//cmd/genswaggertypedocs",
-        "//cmd/genyaml",
-        "//cmd/kubemark",  # TODO: server platforms only
-        "//cmd/linkcheck",
-        "//test/e2e:e2e.test",
-        "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
-        "//vendor/github.com/onsi/ginkgo/ginkgo",
-    ],
+    srcs = select(for_platforms(
+        for_server = [
+            "//cmd/kubemark",
+            "//test/e2e_node:e2e_node.test_binary",
+        ],
+        for_test = [
+            "//cmd/gendocs",
+            "//cmd/genkubedocs",
+            "//cmd/genman",
+            "//cmd/genswaggertypedocs",
+            "//cmd/genyaml",
+            "//cmd/linkcheck",
+            "//test/e2e:e2e.test_binary",
+            "//vendor/github.com/onsi/ginkgo/ginkgo",
+            "//cluster/images/conformance/go-runner",
+        ],
+    )),
 )
 
 # KUBE_TEST_PORTABLE

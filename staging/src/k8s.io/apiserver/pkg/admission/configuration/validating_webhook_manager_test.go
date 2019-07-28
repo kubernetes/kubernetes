@@ -46,7 +46,7 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 
 	webhookConfiguration := &v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
-		Webhooks:   []v1beta1.Webhook{{Name: "webhook1.1"}},
+		Webhooks:   []v1beta1.ValidatingWebhook{{Name: "webhook1.1"}},
 	}
 
 	validatingInformer := informerFactory.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
@@ -59,7 +59,14 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 	if len(configurations) == 0 {
 		t.Errorf("expected non empty webhooks")
 	}
-	if !reflect.DeepEqual(configurations, webhookConfiguration.Webhooks) {
-		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations)
+	for i := range configurations {
+		h, ok := configurations[i].GetValidatingWebhook()
+		if !ok {
+			t.Errorf("Expected validating webhook")
+			continue
+		}
+		if !reflect.DeepEqual(h, &webhookConfiguration.Webhooks[i]) {
+			t.Errorf("Expected\n%#v\ngot\n%#v", &webhookConfiguration.Webhooks[i], h)
+		}
 	}
 }

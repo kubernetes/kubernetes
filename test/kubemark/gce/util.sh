@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 
 source "${KUBE_ROOT}/test/kubemark/common/util.sh"
 
@@ -31,116 +31,79 @@ function authenticate-docker {
   gcloud beta auth configure-docker -q
 }
 
-# This function isn't too robust to race, but that should be ok given its one-off usage during setup.
-function get-or-create-master-ip {
-  MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)') 2>/dev/null || true
+function create-kubemark-master {
+  # We intentionally override env vars in subshell to preserve original values.
+  # shellcheck disable=SC2030,SC2031
+  (
+    # All calls to e2e-grow-cluster must share temp dir with initial e2e-up.sh.
+    kube::util::ensure-temp-dir
+    export KUBE_TEMP="${KUBE_TEMP}"
 
-  if [[ -z "${MASTER_IP:-}" ]]; then
-    run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --region "${REGION}" -q
+    export KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"
+    export CLUSTER_NAME="${CLUSTER_NAME}-kubemark"
+    export KUBE_CREATE_NODES=false
+    export KUBE_GCE_INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX}-kubemark"
 
-    MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  fi
+    # Even if the "real cluster" is private, we shouldn't manage cloud nat.
+    export KUBE_GCE_PRIVATE_CLUSTER=false
+
+    # Quite tricky cidr setup: we set KUBE_GCE_ENABLE_IP_ALIASES=true to avoid creating
+    # cloud routes and RangeAllocator to assign cidrs by kube-controller-manager.
+    export KUBE_GCE_ENABLE_IP_ALIASES=true
+    export KUBE_GCE_NODE_IPAM_MODE=RangeAllocator
+
+    # Disable all addons. They are running outside of the kubemark cluster.
+    export KUBE_ENABLE_CLUSTER_AUTOSCALER=false
+    export KUBE_ENABLE_CLUSTER_DNS=false
+    export KUBE_ENABLE_NODE_LOGGING=false
+    export KUBE_ENABLE_METRICS_SERVER=false
+    export KUBE_ENABLE_CLUSTER_MONITORING="none"
+    export KUBE_ENABLE_L7_LOADBALANCING="none"
+
+    # Unset env variables set by kubetest for 'root cluster'. We need recompute them
+    # for kubemark master.
+    # TODO(mborsz): Figure out some better way to filter out such env variables than
+    # listing them here.
+    unset MASTER_SIZE MASTER_DISK_SIZE MASTER_ROOT_DISK_SIZE
+
+    # Set kubemark-specific overrides:
+    # for each defined env KUBEMARK_X=Y call export X=Y.
+    for var in ${!KUBEMARK_*}; do
+      dst_var=${var#KUBEMARK_}
+      val=${!var}
+      echo "Setting ${dst_var} to '${val}'"
+      export "${dst_var}"="${val}"
+    done
+
+    "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
+
+    if [[ "${KUBEMARK_HA_MASTER:-}" == "true" && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
+        for KUBE_GCE_ZONE in ${KUBEMARK_MASTER_ADDITIONAL_ZONES}; do
+          KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_REPLICATE_EXISTING_MASTER=true \
+            "${KUBE_ROOT}/hack/e2e-internal/e2e-grow-cluster.sh"
+        done
+    fi
+    )
 }
 
-function create-master-instance-with-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
-  # Override the master image project to cos-cloud for COS images staring with `cos` string prefix.
-  DEFAULT_GCI_PROJECT=google-containers
-  if [[ "${GCI_VERSION}" == "cos"* ]]; then
-      DEFAULT_GCI_PROJECT=cos-cloud
-  fi
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+function delete-kubemark-master {
+  # We intentionally override env vars in subshell to preserve original values.
+  # shellcheck disable=SC2030,SC2031
+  (
+    export CLUSTER_NAME="${CLUSTER_NAME}-kubemark"
+    export KUBE_GCE_INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX}-kubemark"
 
-  run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}" &
-  
-  if [ "${EVENT_PD:-}" == "true" ]; then
-    run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} \
-      --type "${MASTER_DISK_TYPE}" \
-      --size "${MASTER_DISK_SIZE}" &
-  fi
+    export KUBE_DELETE_NETWORK=false
+    # Even if the "real cluster" is private, we shouldn't manage cloud nat.
+    export KUBE_GCE_PRIVATE_CLUSTER=false
 
-  get-or-create-master-ip &
+    if [[ "${KUBEMARK_HA_MASTER:-}" == "true" && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
+      for KUBE_GCE_ZONE in ${KUBEMARK_MASTER_ADDITIONAL_ZONES}; do
+        KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_REPLICATE_EXISTING_MASTER=true \
+          "${KUBE_ROOT}/hack/e2e-internal/e2e-shrink-cluster.sh"
+      done
+    fi
 
-  wait
-
-  run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --address "${MASTER_IP}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${MASTER_IMAGE_PROJECT}" \
-    --image "${MASTER_IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --subnet "${SUBNETWORK:-${NETWORK}}" \
-    --scopes "storage-ro,logging-write" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
-
-  run-gcloud-compute-with-retries instances add-metadata "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh" &
-  
-  if [ "${EVENT_PD:-}" == "true" ]; then
-    echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
-    run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --disk "${MASTER_NAME}-event-pd" \
-    --device-name="master-event-pd" &
-  fi
-  
-  run-gcloud-compute-with-retries firewall-rules create "${MASTER_NAME}-https" \
-    --project "${PROJECT}" \
-    --network "${NETWORK}" \
-    --source-ranges "0.0.0.0/0" \
-    --target-tags "${MASTER_TAG}" \
-    --allow "tcp:443" &
-
-  wait
-}
-
-# Command to be executed is '$1'.
-# No. of retries is '$2' (if provided) or 1 (default).
-function execute-cmd-on-master-with-retries() {
-  RETRIES="${2:-1}" run-gcloud-compute-with-retries ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" --command="$1"
-}
-
-function copy-files() {
-	run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" $@
-}
-
-function delete-master-instance-and-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
-
-  gcloud compute instances delete "${MASTER_NAME}" \
-      ${GCLOUD_COMMON_ARGS} || true
-  
-  gcloud compute disks delete "${MASTER_NAME}-pd" \
-      ${GCLOUD_COMMON_ARGS} || true
-  
-  gcloud compute disks delete "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} &> /dev/null || true
-  
-  gcloud compute addresses delete "${MASTER_NAME}-ip" \
-      --project "${PROJECT}" \
-      --region "${REGION}" \
-      --quiet || true
-  
-  gcloud compute firewall-rules delete "${MASTER_NAME}-https" \
-	  --project "${PROJECT}" \
-	  --quiet || true
-  
-  if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
-	  gcloud compute instances delete "${EVENT_STORE_NAME}" \
-    	  ${GCLOUD_COMMON_ARGS} || true
-  
-	  gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
-    	  ${GCLOUD_COMMON_ARGS} || true
-  fi
+    "${KUBE_ROOT}/hack/e2e-internal/e2e-down.sh"
+  )
 }

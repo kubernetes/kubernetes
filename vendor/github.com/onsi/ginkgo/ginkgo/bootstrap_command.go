@@ -43,10 +43,10 @@ func BuildBootstrapCommand() *Command {
 var bootstrapText = `package {{.Package}}
 
 import (
+	"testing"
+
 	{{.GinkgoImport}}
 	{{.GomegaImport}}
-
-	"testing"
 )
 
 func Test{{.FormattedName}}(t *testing.T) {
@@ -58,11 +58,11 @@ func Test{{.FormattedName}}(t *testing.T) {
 var agoutiBootstrapText = `package {{.Package}}
 
 import (
+	"testing"
+
 	{{.GinkgoImport}}
 	{{.GomegaImport}}
 	"github.com/sclevine/agouti"
-
-	"testing"
 )
 
 func Test{{.FormattedName}}(t *testing.T) {

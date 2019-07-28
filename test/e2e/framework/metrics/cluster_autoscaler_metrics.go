@@ -16,19 +16,21 @@ limitations under the License.
 
 package metrics
 
+// ClusterAutoscalerMetrics is metrics for cluster autoscaler
 type ClusterAutoscalerMetrics Metrics
 
+// Equal returns true if all metrics are the same as the arguments.
 func (m *ClusterAutoscalerMetrics) Equal(o ClusterAutoscalerMetrics) bool {
 	return (*Metrics)(m).Equal(Metrics(o))
 }
 
-func NewClusterAutoscalerMetrics() ClusterAutoscalerMetrics {
+func newClusterAutoscalerMetrics() ClusterAutoscalerMetrics {
 	result := NewMetrics()
 	return ClusterAutoscalerMetrics(result)
 }
 
 func parseClusterAutoscalerMetrics(data string) (ClusterAutoscalerMetrics, error) {
-	result := NewClusterAutoscalerMetrics()
+	result := newClusterAutoscalerMetrics()
 	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
 		return ClusterAutoscalerMetrics{}, err
 	}

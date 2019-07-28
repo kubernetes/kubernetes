@@ -47,6 +47,9 @@ func NestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{
 	var val interface{} = obj
 
 	for i, field := range fields {
+		if val == nil {
+			return nil, false, nil
+		}
 		if m, ok := val.(map[string]interface{}); ok {
 			val, ok = m[field]
 			if !ok {
@@ -270,6 +273,22 @@ func getNestedString(obj map[string]interface{}, fields ...string) string {
 		return ""
 	}
 	return val
+}
+
+func getNestedInt64(obj map[string]interface{}, fields ...string) int64 {
+	val, found, err := NestedInt64(obj, fields...)
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+
+func getNestedInt64Pointer(obj map[string]interface{}, fields ...string) *int64 {
+	val, found, err := NestedInt64(obj, fields...)
+	if !found || err != nil {
+		return nil
+	}
+	return &val
 }
 
 func jsonPath(fields []string) string {

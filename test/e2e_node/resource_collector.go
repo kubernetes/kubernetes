@@ -40,9 +40,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
 	. "github.com/onsi/ginkgo"
@@ -67,7 +70,7 @@ type ResourceCollector struct {
 	request *cadvisorapiv2.RequestOptions
 
 	pollingInterval time.Duration
-	buffers         map[string][]*framework.ContainerResourceUsage
+	buffers         map[string][]*e2ekubelet.ContainerResourceUsage
 	lock            sync.RWMutex
 	stopCh          chan struct{}
 }
@@ -75,7 +78,7 @@ type ResourceCollector struct {
 // NewResourceCollector creates a resource collector object which collects
 // resource usage periodically from Cadvisor
 func NewResourceCollector(interval time.Duration) *ResourceCollector {
-	buffers := make(map[string][]*framework.ContainerResourceUsage)
+	buffers := make(map[string][]*e2ekubelet.ContainerResourceUsage)
 	return &ResourceCollector{
 		pollingInterval: interval,
 		buffers:         buffers,
@@ -90,11 +93,11 @@ func (r *ResourceCollector) Start() {
 	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 	if err1 == nil && err2 == nil {
 		systemContainers = map[string]string{
-			stats.SystemContainerKubelet: kubeletContainer,
-			stats.SystemContainerRuntime: runtimeContainer,
+			kubeletstatsv1alpha1.SystemContainerKubelet: kubeletContainer,
+			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
 		}
 	} else {
-		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
+		e2elog.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -125,13 +128,13 @@ func (r *ResourceCollector) Reset() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	for _, name := range systemContainers {
-		r.buffers[name] = []*framework.ContainerResourceUsage{}
+		r.buffers[name] = []*e2ekubelet.ContainerResourceUsage{}
 	}
 }
 
 // GetCPUSummary gets CPU usage in percentile.
-func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
-	result := make(framework.ContainersCPUSummary)
+func (r *ResourceCollector) GetCPUSummary() e2ekubelet.ContainersCPUSummary {
+	result := make(e2ekubelet.ContainersCPUSummary)
 	for key, name := range systemContainers {
 		data := r.GetBasicCPUStats(name)
 		result[key] = data
@@ -143,9 +146,9 @@ func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
 func (r *ResourceCollector) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
-		framework.Logf("%v", err)
+		e2elog.Logf("%v", err)
 	}
-	framework.Logf("%s", formatResourceUsageStats(summary))
+	e2elog.Logf("%s", formatResourceUsageStats(summary))
 }
 
 // collectStats collects resource usage from Cadvisor.
@@ -153,12 +156,12 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 	for _, name := range systemContainers {
 		ret, err := r.client.Stats(name, r.request)
 		if err != nil {
-			framework.Logf("Error getting container stats, err: %v", err)
+			e2elog.Logf("Error getting container stats, err: %v", err)
 			return
 		}
 		cStats, ok := ret[name]
 		if !ok {
-			framework.Logf("Missing info/stats for container %q", name)
+			e2elog.Logf("Missing info/stats for container %q", name)
 			return
 		}
 
@@ -172,8 +175,8 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 }
 
 // computeContainerResourceUsage computes resource usage based on new data sample.
-func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv2.ContainerStats) *framework.ContainerResourceUsage {
-	return &framework.ContainerResourceUsage{
+func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv2.ContainerStats) *e2ekubelet.ContainerResourceUsage {
+	return &e2ekubelet.ContainerResourceUsage{
 		Name:                    name,
 		Timestamp:               newStats.Timestamp,
 		CPUUsageInCores:         float64(newStats.Cpu.Usage.Total-oldStats.Cpu.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
@@ -185,21 +188,21 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 }
 
 // GetLatest gets the latest resource usage from stats buffer.
-func (r *ResourceCollector) GetLatest() (framework.ResourceUsagePerContainer, error) {
+func (r *ResourceCollector) GetLatest() (e2ekubelet.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	stats := make(framework.ResourceUsagePerContainer)
+	kubeletstatsv1alpha1 := make(e2ekubelet.ResourceUsagePerContainer)
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
 			return nil, fmt.Errorf("No resource usage data for %s container (%s)", key, name)
 		}
-		stats[key] = contStats[len(contStats)-1]
+		kubeletstatsv1alpha1[key] = contStats[len(contStats)-1]
 	}
-	return stats, nil
+	return kubeletstatsv1alpha1, nil
 }
 
-type resourceUsageByCPU []*framework.ContainerResourceUsage
+type resourceUsageByCPU []*e2ekubelet.ContainerResourceUsage
 
 func (r resourceUsageByCPU) Len() int           { return len(r) }
 func (r resourceUsageByCPU) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
@@ -216,7 +219,7 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	result := make(map[float64]float64, len(percentiles))
 
 	// We must make a copy of array, otherwise the timeseries order is changed.
-	usages := make([]*framework.ContainerResourceUsage, 0)
+	usages := make([]*e2ekubelet.ContainerResourceUsage, 0)
 	usages = append(usages, r.buffers[containerName]...)
 
 	sort.Sort(resourceUsageByCPU(usages))
@@ -232,7 +235,7 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	return result
 }
 
-func formatResourceUsageStats(containerStats framework.ResourceUsagePerContainer) string {
+func formatResourceUsageStats(containerStats e2ekubelet.ResourceUsagePerContainer) string {
 	// Example output:
 	//
 	// Resource usage:
@@ -250,7 +253,7 @@ func formatResourceUsageStats(containerStats framework.ResourceUsagePerContainer
 	return fmt.Sprintf("Resource usage:\n%s", buf.String())
 }
 
-func formatCPUSummary(summary framework.ContainersCPUSummary) string {
+func formatCPUSummary(summary e2ekubelet.ContainersCPUSummary) string {
 	// Example output for a node (the percentiles may differ):
 	// CPU usage of containers:
 	// container        5th%  50th% 90th% 95th%
@@ -372,9 +375,9 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+			Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
 		}(pod)
 	}

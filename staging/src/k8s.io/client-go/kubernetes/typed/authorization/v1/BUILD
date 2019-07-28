@@ -24,7 +24,6 @@ go_library(
     importpath = "k8s.io/client-go/kubernetes/typed/authorization/v1",
     deps = [
         "//staging/src/k8s.io/api/authorization/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
     ],

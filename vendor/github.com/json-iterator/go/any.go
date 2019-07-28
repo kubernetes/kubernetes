@@ -312,6 +312,10 @@ func (codec *directAnyCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 
 func (codec *directAnyCodec) Encode(ptr unsafe.Pointer, stream *Stream) {
 	any := *(*Any)(ptr)
+	if any == nil {
+		stream.WriteNil()
+		return
+	}
 	any.WriteTo(stream)
 }
 

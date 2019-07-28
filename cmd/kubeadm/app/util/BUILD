@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -17,14 +11,16 @@ go_library(
         "endpoint.go",
         "error.go",
         "marshal.go",
+        "net.go",
         "template.go",
         "version.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util",
+    visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//pkg/version:go_default_library",
+        "//cmd/kubeadm/app/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
@@ -34,9 +30,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -45,23 +42,24 @@ go_test(
     srcs = [
         "arguments_test.go",
         "cgroupdriver_test.go",
-        "chroot_test.go",
         "endpoint_test.go",
         "error_test.go",
         "marshal_test.go",
+        "net_test.go",
         "template_test.go",
         "version_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 
@@ -78,14 +76,19 @@ filegroup(
         ":package-srcs",
         "//cmd/kubeadm/app/util/apiclient:all-srcs",
         "//cmd/kubeadm/app/util/audit:all-srcs",
+        "//cmd/kubeadm/app/util/certs:all-srcs",
         "//cmd/kubeadm/app/util/config:all-srcs",
+        "//cmd/kubeadm/app/util/crypto:all-srcs",
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
         "//cmd/kubeadm/app/util/etcd:all-srcs",
+        "//cmd/kubeadm/app/util/initsystem:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
+        "//cmd/kubeadm/app/util/pkiutil:all-srcs",
         "//cmd/kubeadm/app/util/pubkeypin:all-srcs",
         "//cmd/kubeadm/app/util/runtime:all-srcs",
         "//cmd/kubeadm/app/util/staticpod:all-srcs",
         "//cmd/kubeadm/app/util/system:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

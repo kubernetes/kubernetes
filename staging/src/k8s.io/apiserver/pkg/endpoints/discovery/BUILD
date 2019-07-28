@@ -32,6 +32,7 @@ go_library(
         "group.go",
         "legacy.go",
         "root.go",
+        "storageversionhash.go",
         "util.go",
         "version.go",
     ],

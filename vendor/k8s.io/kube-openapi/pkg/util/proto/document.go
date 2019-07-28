@@ -92,13 +92,16 @@ func NewOpenAPIData(doc *openapi_v2.Document) (Models, error) {
 // We believe the schema is a reference, verify that and returns a new
 // Schema
 func (d *Definitions) parseReference(s *openapi_v2.Schema, path *Path) (Schema, error) {
+	// TODO(wrong): a schema with a $ref can have properties. We can ignore them (would be incomplete), but we cannot return an error.
 	if len(s.GetProperties().GetAdditionalProperties()) > 0 {
 		return nil, newSchemaError(path, "unallowed embedded type definition")
 	}
+	// TODO(wrong): a schema with a $ref can have a type. We can ignore it (would be incomplete), but we cannot return an error.
 	if len(s.GetType().GetValue()) > 0 {
 		return nil, newSchemaError(path, "definition reference can't have a type")
 	}
 
+	// TODO(wrong): $refs outside of the definitions are completely valid. We can ignore them (would be incomplete), but we cannot return an error.
 	if !strings.HasPrefix(s.GetXRef(), "#/definitions/") {
 		return nil, newSchemaError(path, "unallowed reference to non-definition %q", s.GetXRef())
 	}
@@ -127,6 +130,7 @@ func (d *Definitions) parseMap(s *openapi_v2.Schema, path *Path) (Schema, error)
 		return nil, newSchemaError(path, "invalid object type")
 	}
 	var sub Schema
+	// TODO(incomplete): this misses the boolean case as AdditionalProperties is a bool+schema sum type.
 	if s.GetAdditionalProperties().GetSchema() == nil {
 		sub = &Arbitrary{
 			BaseSchema: d.parseBaseSchema(s, path),
@@ -157,6 +161,7 @@ func (d *Definitions) parsePrimitive(s *openapi_v2.Schema, path *Path) (Schema, 
 	case Number: // do nothing
 	case Integer: // do nothing
 	case Boolean: // do nothing
+	// TODO(wrong): this misses "null". Would skip the null case (would be incomplete), but we cannot return an error.
 	default:
 		return nil, newSchemaError(path, "Unknown primitive type: %q", t)
 	}
@@ -175,6 +180,8 @@ func (d *Definitions) parseArray(s *openapi_v2.Schema, path *Path) (Schema, erro
 		return nil, newSchemaError(path, `array should have type "array"`)
 	}
 	if len(s.GetItems().GetSchema()) != 1 {
+		// TODO(wrong): Items can have multiple elements. We can ignore Items then (would be incomplete), but we cannot return an error.
+		// TODO(wrong): "type: array" witohut any items at all is completely valid.
 		return nil, newSchemaError(path, "array should have exactly one sub-item")
 	}
 	sub, err := d.ParseSchema(s.GetItems().GetSchema()[0], path)
@@ -196,20 +203,24 @@ func (d *Definitions) parseKind(s *openapi_v2.Schema, path *Path) (Schema, error
 	}
 
 	fields := map[string]Schema{}
+	fieldOrder := []string{}
 
 	for _, namedSchema := range s.GetProperties().GetAdditionalProperties() {
 		var err error
-		path := path.FieldPath(namedSchema.GetName())
-		fields[namedSchema.GetName()], err = d.ParseSchema(namedSchema.GetValue(), &path)
+		name := namedSchema.GetName()
+		path := path.FieldPath(name)
+		fields[name], err = d.ParseSchema(namedSchema.GetValue(), &path)
 		if err != nil {
 			return nil, err
 		}
+		fieldOrder = append(fieldOrder, name)
 	}
 
 	return &Kind{
 		BaseSchema:     d.parseBaseSchema(s, path),
 		RequiredFields: s.GetRequired(),
 		Fields:         fields,
+		FieldOrder:     fieldOrder,
 	}, nil
 }
 
@@ -223,6 +234,8 @@ func (d *Definitions) parseArbitrary(s *openapi_v2.Schema, path *Path) (Schema, 
 // this function is public, it doesn't leak through the interface.
 func (d *Definitions) ParseSchema(s *openapi_v2.Schema, path *Path) (Schema, error) {
 	if s.GetXRef() != "" {
+		// TODO(incomplete): ignoring the rest of s is wrong. As long as there are no conflict, everything from s must be considered
+		// Reference: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#path-item-object
 		return d.parseReference(s, path)
 	}
 	objectTypes := s.GetType().GetValue()
@@ -230,11 +243,15 @@ func (d *Definitions) ParseSchema(s *openapi_v2.Schema, path *Path) (Schema, err
 	case 0:
 		// in the OpenAPI schema served by older k8s versions, object definitions created from structs did not include
 		// the type:object property (they only included the "properties" property), so we need to handle this case
+		// TODO: validate that we ever published empty, non-nil properties. JSON roundtripping nils them.
 		if s.GetProperties() != nil {
+			// TODO(wrong): when verifying a non-object later against this, it will be rejected as invalid type.
+			// TODO(CRD validation schema publishing): we have to filter properties (empty or not) if type=object is not given
 			return d.parseKind(s, path)
 		} else {
 			// Definition has no type and no properties. Treat it as an arbitrary value
-			// TODO: what if it has additionalProperties or patternProperties?
+			// TODO(incomplete): what if it has additionalProperties=false or patternProperties?
+			// ANSWER: parseArbitrary is less strict than it has to be with patternProperties (which is ignored). So this is correct (of course not complete).
 			return d.parseArbitrary(s, path)
 		}
 	case 1:
@@ -252,6 +269,8 @@ func (d *Definitions) ParseSchema(s *openapi_v2.Schema, path *Path) (Schema, err
 		return d.parsePrimitive(s, path)
 	default:
 		// the OpenAPI generator never generates (nor it ever did in the past) OpenAPI type definitions with multiple types
+		// TODO(wrong): this is rejecting a completely valid OpenAPI spec
+		// TODO(CRD validation schema publishing): filter these out
 		return nil, newSchemaError(path, "definitions with multiple types aren't supported")
 	}
 }

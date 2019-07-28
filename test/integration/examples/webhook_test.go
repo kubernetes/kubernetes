@@ -22,7 +22,7 @@ import (
 	"time"
 
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestWebhookLoopback(t *testing.T) {
@@ -40,7 +41,7 @@ func TestWebhookLoopback(t *testing.T) {
 
 	called := int32(0)
 
-	client, _ := startTestServer(t, stopCh, TestServerSetup{
+	client, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
 		ModifyServerConfig: func(config *master.Config) {
@@ -64,7 +65,7 @@ func TestWebhookLoopback(t *testing.T) {
 	fail := admissionv1beta1.Fail
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhooktest.example.com"},
-		Webhooks: []admissionv1beta1.Webhook{{
+		Webhooks: []admissionv1beta1.MutatingWebhook{{
 			Name: "webhooktest.example.com",
 			ClientConfig: admissionv1beta1.WebhookClientConfig{
 				Service: &admissionv1beta1.ServiceReference{Namespace: "default", Name: "kubernetes", Path: &webhookPath},
@@ -108,8 +109,9 @@ func (f auditChecker) LevelAndStages(attrs authorizer.Attributes) (auditinternal
 
 type auditSinkFunc func(events ...*auditinternal.Event)
 
-func (f auditSinkFunc) ProcessEvents(events ...*auditinternal.Event) {
+func (f auditSinkFunc) ProcessEvents(events ...*auditinternal.Event) bool {
 	f(events...)
+	return true
 }
 
 func (auditSinkFunc) Run(stopCh <-chan struct{}) error {

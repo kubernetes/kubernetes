@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,7 +30,9 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -78,13 +79,13 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 	e.podListerSynced = podInformer.Informer().HasSynced
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			e.podAddedDeletedUpdated(obj, false)
+			e.podAddedDeletedUpdated(nil, obj, false)
 		},
 		DeleteFunc: func(obj interface{}) {
-			e.podAddedDeletedUpdated(obj, true)
+			e.podAddedDeletedUpdated(nil, obj, true)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			e.podAddedDeletedUpdated(new, false)
+			e.podAddedDeletedUpdated(old, new, false)
 		},
 	})
 
@@ -96,8 +97,8 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting PVC protection controller")
-	defer glog.Infof("Shutting down PVC protection controller")
+	klog.Infof("Starting PVC protection controller")
+	defer klog.Infof("Shutting down PVC protection controller")
 
 	if !controller.WaitForCacheSync("PVC protection", stopCh, c.pvcListerSynced, c.podListerSynced) {
 		return
@@ -142,22 +143,22 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
-	glog.V(4).Infof("Processing PVC %s/%s", pvcNamespace, pvcName)
+	klog.V(4).Infof("Processing PVC %s/%s", pvcNamespace, pvcName)
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Since(startTime))
+		klog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Since(startTime))
 	}()
 
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
 	if apierrs.IsNotFound(err) {
-		glog.V(4).Infof("PVC %s/%s not found, ignoring", pvcNamespace, pvcName)
+		klog.V(4).Infof("PVC %s/%s not found, ignoring", pvcNamespace, pvcName)
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	if isDeletionCandidate(pvc) {
+	if protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		// PVC should be deleted. Check if it's used and remove finalizer if
 		// it's not.
 		isUsed, err := c.isBeingUsed(pvc)
@@ -169,7 +170,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 		}
 	}
 
-	if needToAddFinalizer(pvc) {
+	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) {
 		// PVC is not being deleted -> it should have the finalizer. The
 		// finalizer should be added by admission plugin, this is just to add
 		// the finalizer to old PVCs that were created before the admission
@@ -188,10 +189,10 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
 	if err != nil {
-		glog.V(3).Infof("Error adding protection finalizer to PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
+		klog.V(3).Infof("Error adding protection finalizer to PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		return err
 	}
-	glog.V(3).Infof("Added protection finalizer to PVC %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(3).Infof("Added protection finalizer to PVC %s/%s", pvc.Namespace, pvc.Name)
 	return nil
 }
 
@@ -200,10 +201,10 @@ func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	claimClone.ObjectMeta.Finalizers = slice.RemoveString(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
 	if err != nil {
-		glog.V(3).Infof("Error removing protection finalizer from PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
+		klog.V(3).Infof("Error removing protection finalizer from PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		return err
 	}
-	glog.V(3).Infof("Removed protection finalizer from PVC %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(3).Infof("Removed protection finalizer from PVC %s/%s", pvc.Namespace, pvc.Name)
 	return nil
 }
 
@@ -218,7 +219,7 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 			// prevents scheduling pods with deletion timestamp, so we can be
 			// pretty sure it won't be scheduled in parallel to this check.
 			// Therefore this pod does not block the PVC from deletion.
-			glog.V(4).Infof("Skipping unscheduled pod %s when checking PVC %s/%s", pod.Name, pvc.Namespace, pvc.Name)
+			klog.V(4).Infof("Skipping unscheduled pod %s when checking PVC %s/%s", pod.Name, pvc.Namespace, pvc.Name)
 			continue
 		}
 		for _, volume := range pod.Spec.Volumes {
@@ -226,13 +227,13 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 				continue
 			}
 			if volume.PersistentVolumeClaim.ClaimName == pvc.Name {
-				glog.V(2).Infof("Keeping PVC %s/%s, it is used by pod %s/%s", pvc.Namespace, pvc.Name, pod.Namespace, pod.Name)
+				klog.V(2).Infof("Keeping PVC %s/%s, it is used by pod %s/%s", pvc.Namespace, pvc.Name, pod.Namespace, pod.Name)
 				return true, nil
 			}
 		}
 	}
 
-	glog.V(3).Infof("PVC %s/%s is unused", pvc.Namespace, pvc.Name)
+	klog.V(3).Infof("PVC %s/%s is unused", pvc.Namespace, pvc.Name)
 	return false, nil
 }
 
@@ -248,35 +249,56 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
 		return
 	}
-	glog.V(4).Infof("Got event on PVC %s", key)
+	klog.V(4).Infof("Got event on PVC %s", key)
 
-	if needToAddFinalizer(pvc) || isDeletionCandidate(pvc) {
+	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)
 	}
 }
 
 // podAddedDeletedUpdated reacts to Pod events
-func (c *Controller) podAddedDeletedUpdated(obj interface{}, deleted bool) {
+func (c *Controller) podAddedDeletedUpdated(old, new interface{}, deleted bool) {
+	if pod := c.parsePod(new); pod != nil {
+		c.enqueuePVCs(pod, deleted)
+
+		// An update notification might mask the deletion of a pod X and the
+		// following creation of a pod Y with the same namespaced name as X. If
+		// that's the case X needs to be processed as well to handle the case
+		// where it is blocking deletion of a PVC not referenced by Y, otherwise
+		// such PVC will never be deleted.
+		if oldPod := c.parsePod(old); oldPod != nil && oldPod.UID != pod.UID {
+			c.enqueuePVCs(oldPod, true)
+		}
+	}
+}
+
+func (*Controller) parsePod(obj interface{}) *v1.Pod {
+	if obj == nil {
+		return nil
+	}
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
-			return
+			return nil
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod %#v", obj))
-			return
+			return nil
 		}
 	}
+	return pod
+}
 
+func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 	// Filter out pods that can't help us to remove a finalizer on PVC
 	if !deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
 		return
 	}
 
-	glog.V(4).Infof("Got event on pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(4).Infof("Enqueuing PVCs for Pod %s/%s (UID=%s)", pod.Namespace, pod.Name, pod.UID)
 
 	// Enqueue all PVCs that the pod uses
 	for _, volume := range pod.Spec.Volumes {
@@ -284,12 +306,4 @@ func (c *Controller) podAddedDeletedUpdated(obj interface{}, deleted bool) {
 			c.queue.Add(pod.Namespace + "/" + volume.PersistentVolumeClaim.ClaimName)
 		}
 	}
-}
-
-func isDeletionCandidate(pvc *v1.PersistentVolumeClaim) bool {
-	return pvc.ObjectMeta.DeletionTimestamp != nil && slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
-}
-
-func needToAddFinalizer(pvc *v1.PersistentVolumeClaim) bool {
-	return pvc.ObjectMeta.DeletionTimestamp == nil && !slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
 }

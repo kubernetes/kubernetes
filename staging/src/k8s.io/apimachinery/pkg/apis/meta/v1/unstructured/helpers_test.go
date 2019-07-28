@@ -95,6 +95,19 @@ func TestNestedFieldNoCopy(t *testing.T) {
 	assert.False(t, exists)
 	assert.Nil(t, err)
 	assert.Nil(t, res)
+
+	// case 5: intermediate field does not exist
+	res, exists, err = NestedFieldNoCopy(obj, "a", "e", "f")
+	assert.False(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
+
+	// case 6: intermediate field is null
+	//         (background: happens easily in YAML)
+	res, exists, err = NestedFieldNoCopy(obj, "a", "c", "f")
+	assert.False(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
 }
 
 func TestNestedFieldCopy(t *testing.T) {

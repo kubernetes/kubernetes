@@ -14,7 +14,11 @@ Input to cgo -godefs.  See README.md
 package unix
 
 /*
-#define KERNEL
+#define	_WANT_FREEBSD11_STAT	1
+#define	_WANT_FREEBSD11_STATFS	1
+#define	_WANT_FREEBSD11_DIRENT	1
+#define	_WANT_FREEBSD11_KEVENT  1
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -22,7 +26,7 @@ package unix
 #include <termios.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/capability.h>
+#include <sys/capsicum.h>
 #include <sys/event.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
@@ -36,6 +40,7 @@ package unix
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <net/bpf.h>
 #include <net/if.h>
@@ -60,50 +65,6 @@ union sockaddr_all {
 struct sockaddr_any {
 	struct sockaddr addr;
 	char pad[sizeof(union sockaddr_all) - sizeof(struct sockaddr)];
-};
-
-// This structure is a duplicate of stat on FreeBSD 8-STABLE.
-// See /usr/include/sys/stat.h.
-struct stat8 {
-#undef st_atimespec	st_atim
-#undef st_mtimespec	st_mtim
-#undef st_ctimespec	st_ctim
-#undef st_birthtimespec	st_birthtim
-	__dev_t   st_dev;
-	ino_t     st_ino;
-	mode_t    st_mode;
-	nlink_t   st_nlink;
-	uid_t     st_uid;
-	gid_t     st_gid;
-	__dev_t   st_rdev;
-#if __BSD_VISIBLE
-	struct  timespec st_atimespec;
-	struct  timespec st_mtimespec;
-	struct  timespec st_ctimespec;
-#else
-	time_t    st_atime;
-	long      __st_atimensec;
-	time_t    st_mtime;
-	long      __st_mtimensec;
-	time_t    st_ctime;
-	long      __st_ctimensec;
-#endif
-	off_t     st_size;
-	blkcnt_t st_blocks;
-	blksize_t st_blksize;
-	fflags_t  st_flags;
-	__uint32_t st_gen;
-	__int32_t st_lspare;
-#if __BSD_VISIBLE
-	struct timespec st_birthtimespec;
-	unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
-	unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
-#else
-	time_t    st_birthtime;
-	long      st_birthtimensec;
-	unsigned int :(8 / 2) * (16 - (int)sizeof(struct __timespec));
-	unsigned int :(8 / 2) * (16 - (int)sizeof(struct __timespec));
-#endif
 };
 
 // This structure is a duplicate of if_data on FreeBSD 8-STABLE.
@@ -153,14 +114,14 @@ struct if_msghdr8 {
 */
 import "C"
 
-// Machine characteristics; for internal use.
+// Machine characteristics
 
 const (
-	sizeofPtr      = C.sizeofPtr
-	sizeofShort    = C.sizeof_short
-	sizeofInt      = C.sizeof_int
-	sizeofLong     = C.sizeof_long
-	sizeofLongLong = C.sizeof_longlong
+	SizeofPtr      = C.sizeofPtr
+	SizeofShort    = C.sizeof_short
+	SizeofInt      = C.sizeof_int
+	SizeofLong     = C.sizeof_long
+	SizeofLongLong = C.sizeof_longlong
 )
 
 // Basic types
@@ -188,32 +149,32 @@ type _Gid_t C.gid_t
 
 // Files
 
-const ( // Directory mode bits
-	S_IFMT   = C.S_IFMT
-	S_IFIFO  = C.S_IFIFO
-	S_IFCHR  = C.S_IFCHR
-	S_IFDIR  = C.S_IFDIR
-	S_IFBLK  = C.S_IFBLK
-	S_IFREG  = C.S_IFREG
-	S_IFLNK  = C.S_IFLNK
-	S_IFSOCK = C.S_IFSOCK
-	S_ISUID  = C.S_ISUID
-	S_ISGID  = C.S_ISGID
-	S_ISVTX  = C.S_ISVTX
-	S_IRUSR  = C.S_IRUSR
-	S_IWUSR  = C.S_IWUSR
-	S_IXUSR  = C.S_IXUSR
+const (
+	_statfsVersion = C.STATFS_VERSION
+	_dirblksiz     = C.DIRBLKSIZ
 )
 
-type Stat_t C.struct_stat8
+type Stat_t C.struct_stat
+
+type stat_freebsd11_t C.struct_freebsd11_stat
 
 type Statfs_t C.struct_statfs
+
+type statfs_freebsd11_t C.struct_freebsd11_statfs
 
 type Flock_t C.struct_flock
 
 type Dirent C.struct_dirent
 
+type dirent_freebsd11 C.struct_freebsd11_dirent
+
 type Fsid C.struct_fsid
+
+// File system limits
+
+const (
+	PathMax = C.PATH_MAX
+)
 
 // Advice to Fadvise
 
@@ -289,7 +250,7 @@ const (
 
 // Events (kqueue, kevent)
 
-type Kevent_t C.struct_kevent
+type Kevent_t C.struct_kevent_freebsd11
 
 // Select
 
@@ -389,3 +350,7 @@ const (
 // Capabilities
 
 type CapRights C.struct_cap_rights
+
+// Uname
+
+type Utsname C.struct_utsname

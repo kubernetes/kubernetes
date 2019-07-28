@@ -17,7 +17,6 @@ limitations under the License.
 package cronjob
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,8 +36,8 @@ import (
 
 var (
 	// schedule is hourly on the hour
-	onTheHour     string = "0 * * * ?"
-	errorSchedule string = "obvious error schedule"
+	onTheHour     = "0 * * * ?"
+	errorSchedule = "obvious error schedule"
 )
 
 func justBeforeTheHour() time.Time {
@@ -154,15 +153,15 @@ func newJob(UID string) batchv1.Job {
 }
 
 var (
-	shortDead  int64                          = 10
-	mediumDead int64                          = 2 * 60 * 60
-	longDead   int64                          = 1000000
-	noDead     int64                          = -12345
-	A          batchV1beta1.ConcurrencyPolicy = batchV1beta1.AllowConcurrent
-	f          batchV1beta1.ConcurrencyPolicy = batchV1beta1.ForbidConcurrent
-	R          batchV1beta1.ConcurrencyPolicy = batchV1beta1.ReplaceConcurrent
-	T          bool                           = true
-	F          bool                           = false
+	shortDead  int64 = 10
+	mediumDead int64 = 2 * 60 * 60
+	longDead   int64 = 1000000
+	noDead     int64 = -12345
+	A                = batchV1beta1.AllowConcurrent
+	f                = batchV1beta1.ForbidConcurrent
+	R                = batchV1beta1.ReplaceConcurrent
+	T                = true
+	F                = false
 )
 
 func TestSyncOne_RunOrNot(t *testing.T) {
@@ -286,10 +285,9 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 		jc := &fakeJobControl{Job: job}
 		sjc := &fakeSJControl{}
-		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
-		syncOne(&sj, js, tc.now, jc, sjc, pc, recorder)
+		syncOne(&sj, js, tc.now, jc, sjc, recorder)
 		expectedCreates := 0
 		if tc.expectCreate {
 			expectedCreates = 1
@@ -349,7 +347,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		for i := 1; i <= len(recorder.Events); i++ {
 			e := <-recorder.Events
 			if strings.HasPrefix(e, v1.EventTypeWarning) {
-				numWarnings += 1
+				numWarnings++
 			}
 		}
 		if numWarnings != tc.expectedWarnings {
@@ -485,16 +483,6 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", F, F, F, F},
 			}, justBeforeTheHour(), &limitZero, &limitZero, 6},
-
-		"failed list pod err": {
-			[]CleanupJobSpec{
-				{"2016-05-19T04:00:00Z", T, F, F, F},
-				{"2016-05-19T05:00:00Z", T, F, F, F},
-				{"2016-05-19T06:00:00Z", T, T, F, F},
-				{"2016-05-19T07:00:00Z", T, T, F, F},
-				{"2016-05-19T08:00:00Z", T, F, F, F},
-				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitZero, &limitZero, 0},
 	}
 
 	for name, tc := range testCases {
@@ -563,14 +551,10 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		}
 
 		jc := &fakeJobControl{Job: job}
-		pc := &fakePodControl{}
 		sjc := &fakeSJControl{}
 		recorder := record.NewFakeRecorder(10)
-		if name == "failed list pod err" {
-			pc.Err = errors.New("fakePodControl err")
-		}
 
-		cleanupFinishedJobs(&sj, js, jc, sjc, pc, recorder)
+		cleanupFinishedJobs(&sj, js, jc, sjc, recorder)
 
 		// Check we have actually deleted the correct jobs
 		if len(jc.DeleteJobName) != len(jobsToDelete) {
@@ -728,11 +712,10 @@ func TestSyncOne_Status(t *testing.T) {
 
 		jc := &fakeJobControl{}
 		sjc := &fakeSJControl{}
-		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
 		// Run the code
-		syncOne(&sj, jobs, tc.now, jc, sjc, pc, recorder)
+		syncOne(&sj, jobs, tc.now, jc, sjc, recorder)
 
 		// Status update happens once when ranging through job list, and another one if create jobs.
 		expectUpdates := 1

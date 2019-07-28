@@ -20,47 +20,57 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/util/term"
-	"k8s.io/kubernetes/pkg/util/interrupt"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 )
 
 var (
-	exec_example = templates.Examples(i18n.T(`
-		# Get output from running 'date' from pod 123456-7890, using the first container by default
-		kubectl exec 123456-7890 date
+	execExample = templates.Examples(i18n.T(`
+		# Get output from running 'date' command from pod mypod, using the first container by default
+		kubectl exec mypod date
 
-		# Get output from running 'date' in ruby-container from pod 123456-7890
-		kubectl exec 123456-7890 -c ruby-container date
+		# Get output from running 'date' command in ruby-container from pod mypod
+		kubectl exec mypod -c ruby-container date
 
-		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
+		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod mypod
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
+		kubectl exec mypod -c ruby-container -i -t -- bash -il
 
-		# List contents of /usr from the first container of pod 123456-7890 and sort by modification time.
+		# List contents of /usr from the first container of pod mypod and sort by modification time.
 		# If the command you want to execute in the pod has any flags in common (e.g. -i),
 		# you must use two dashes (--) to separate your command's flags/arguments.
 		# Also note, do not surround your command and its flags/arguments with quotes
 		# unless that is how you would execute it normally (i.e., do ls -t /usr, not "ls -t /usr").
-		kubectl exec 123456-7890 -i -t -- ls -t /usr
+		kubectl exec mypod -i -t -- ls -t /usr
+
+		# Get output from running 'date' command from the first pod of the deployment mydeployment, using the first container by default
+		kubectl exec deploy/mydeployment date
+
+		# Get output from running 'date' command from the first pod of the service myservice, using the first container by default
+		kubectl exec svc/myservice date
 		`))
 )
 
 const (
-	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
+	execUsageStr          = "expected 'exec (POD | TYPE/NAME) COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD or TYPE/NAME and COMMAND are required arguments for the exec command"
+	defaultPodExecTimeout = 60 * time.Second
 )
 
 func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -72,11 +82,11 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use:                   "exec POD [-c CONTAINER] -- COMMAND [args...]",
+		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Execute a command in a container"),
 		Long:                  "Execute a command in a container.",
-		Example:               exec_example,
+		Example:               execExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
@@ -84,8 +94,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			cmdutil.CheckErr(options.Run())
 		},
 	}
-	cmd.Flags().StringVarP(&options.PodName, "pod", "p", options.PodName, "Pod name")
-	cmd.Flags().MarkDeprecated("pod", "This flag is deprecated and will be removed in future. Use exec POD_NAME instead.")
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
@@ -137,54 +146,62 @@ type StreamOptions struct {
 type ExecOptions struct {
 	StreamOptions
 
-	Command []string
+	ResourceName string
+	Command      []string
 
-	FullCmdName       string
-	SuggestedCmdUsage string
+	ParentCommandName       string
+	EnableSuggestedCmdUsage bool
 
-	Executor  RemoteExecutor
-	PodClient coreclient.PodsGetter
-	Config    *restclient.Config
+	Builder          func() *resource.Builder
+	ExecutablePodFn  polymorphichelpers.AttachablePodForObjectFunc
+	restClientGetter genericclioptions.RESTClientGetter
+
+	Pod           *corev1.Pod
+	Executor      RemoteExecutor
+	PodClient     coreclient.PodsGetter
+	GetPodTimeout time.Duration
+	Config        *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
-	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
+	if len(argsIn) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
-	if len(p.PodName) != 0 {
-		if len(argsIn) < 1 {
-			return cmdutil.UsageErrorf(cmd, execUsageStr)
-		}
-		p.Command = argsIn
-	} else {
-		p.PodName = argsIn[0]
-		p.Command = argsIn[1:]
-		if len(p.Command) < 1 {
-			return cmdutil.UsageErrorf(cmd, execUsageStr)
-		}
-	}
 
-	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
+	p.ResourceName = argsIn[0]
+	p.Command = argsIn[1:]
+
+	var err error
+
+	p.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
-	p.Namespace = namespace
+
+	p.ExecutablePodFn = polymorphichelpers.AttachablePodForObjectFn
+
+	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return cmdutil.UsageErrorf(cmd, err.Error())
+	}
+
+	p.Builder = f.NewBuilder
+	p.restClientGetter = f
 
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
-		p.FullCmdName = cmdParent.CommandPath()
+		p.ParentCommandName = cmdParent.CommandPath()
 	}
-	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.PodName, p.Namespace)
+	if len(p.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.EnableSuggestedCmdUsage = true
 	}
 
-	config, err := f.ToRESTConfig()
+	p.Config, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
-	p.Config = config
 
 	clientset, err := f.KubernetesClientSet()
 	if err != nil {
@@ -197,17 +214,14 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 // Validate checks that the provided exec options are specified.
 func (p *ExecOptions) Validate() error {
-	if len(p.PodName) == 0 {
-		return fmt.Errorf("pod name must be specified")
+	if len(p.PodName) == 0 && len(p.ResourceName) == 0 {
+		return fmt.Errorf("pod or type/name must be specified")
 	}
 	if len(p.Command) == 0 {
 		return fmt.Errorf("you must specify at least one command for the container")
 	}
 	if p.Out == nil || p.ErrOut == nil {
 		return fmt.Errorf("both output and error output must be provided")
-	}
-	if p.Executor == nil || p.PodClient == nil || p.Config == nil {
-		return fmt.Errorf("client, client config, and executor must be provided")
 	}
 	return nil
 }
@@ -266,10 +280,32 @@ func (o *StreamOptions) SetupTTY() term.TTY {
 
 // Run executes a validated remote execution against a pod.
 func (p *ExecOptions) Run() error {
-	pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
-	if err != nil {
-		return err
+	var err error
+	// we still need legacy pod getter when PodName in ExecOptions struct is provided,
+	// since there are any other command run this function by providing Podname with PodsGetter
+	// and without resource builder, eg: `kubectl cp`.
+	if len(p.PodName) != 0 {
+		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+	} else {
+		builder := p.Builder().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+			NamespaceParam(p.Namespace).DefaultNamespace().ResourceNames("pods", p.ResourceName)
+
+		obj, err := builder.Do().Object()
+		if err != nil {
+			return err
+		}
+
+		p.Pod, err = p.ExecutablePodFn(p.restClientGetter, obj, p.GetPodTimeout)
+		if err != nil {
+			return err
+		}
 	}
+
+	pod := p.Pod
 
 	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
@@ -278,11 +314,10 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			usageString := fmt.Sprintf("Defaulting container name to %s.", pod.Spec.Containers[0].Name)
-			if len(p.SuggestedCmdUsage) > 0 {
-				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
+			if p.EnableSuggestedCmdUsage {
+				fmt.Fprintf(p.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", p.ParentCommandName, pod.Name, p.Namespace)
 			}
-			fmt.Fprintf(p.ErrOut, "%s\n", usageString)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}
@@ -311,8 +346,7 @@ func (p *ExecOptions) Run() error {
 			Resource("pods").
 			Name(pod.Name).
 			Namespace(pod.Namespace).
-			SubResource("exec").
-			Param("container", containerName)
+			SubResource("exec")
 		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,

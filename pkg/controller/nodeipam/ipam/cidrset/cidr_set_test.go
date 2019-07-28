@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func TestCIDRSetFullyAllocated(t *testing.T) {
@@ -478,17 +478,17 @@ func TestGetBitforCIDR(t *testing.T) {
 
 		got, err := cs.getIndexForCIDR(subnetCIDR)
 		if err == nil && tc.expectErr {
-			glog.Errorf("expected error but got null for %v", tc.description)
+			klog.Errorf("expected error but got null for %v", tc.description)
 			continue
 		}
 
 		if err != nil && !tc.expectErr {
-			glog.Errorf("unexpected error: %v for %v", err, tc.description)
+			klog.Errorf("unexpected error: %v for %v", err, tc.description)
 			continue
 		}
 
 		if got != tc.expectedBit {
-			glog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
+			klog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
 		}
 	}
 }

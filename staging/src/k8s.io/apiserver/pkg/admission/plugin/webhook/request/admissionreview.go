@@ -26,9 +26,14 @@ import (
 )
 
 // CreateAdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func CreateAdmissionReview(attr *generic.VersionedAttributes) admissionv1beta1.AdmissionReview {
-	gvk := attr.GetKind()
-	gvr := attr.GetResource()
+func CreateAdmissionReview(versionedAttributes *generic.VersionedAttributes, invocation *generic.WebhookInvocation) admissionv1beta1.AdmissionReview {
+	attr := versionedAttributes.Attributes
+	gvk := invocation.Kind
+	gvr := invocation.Resource
+	subresource := invocation.Subresource
+	requestGVK := attr.GetKind()
+	requestGVR := attr.GetResource()
+	requestSubResource := attr.GetSubresource()
 	aUserInfo := attr.GetUserInfo()
 	userInfo := authenticationv1.UserInfo{
 		Extra:    make(map[string]authenticationv1.ExtraValue),
@@ -56,18 +61,32 @@ func CreateAdmissionReview(attr *generic.VersionedAttributes) admissionv1beta1.A
 				Resource: gvr.Resource,
 				Version:  gvr.Version,
 			},
-			SubResource: attr.GetSubresource(),
-			Name:        attr.GetName(),
-			Namespace:   attr.GetNamespace(),
-			Operation:   admissionv1beta1.Operation(attr.GetOperation()),
-			UserInfo:    userInfo,
+			SubResource: subresource,
+			RequestKind: &metav1.GroupVersionKind{
+				Group:   requestGVK.Group,
+				Kind:    requestGVK.Kind,
+				Version: requestGVK.Version,
+			},
+			RequestResource: &metav1.GroupVersionResource{
+				Group:    requestGVR.Group,
+				Resource: requestGVR.Resource,
+				Version:  requestGVR.Version,
+			},
+			RequestSubResource: requestSubResource,
+			Name:               attr.GetName(),
+			Namespace:          attr.GetNamespace(),
+			Operation:          admissionv1beta1.Operation(attr.GetOperation()),
+			UserInfo:           userInfo,
 			Object: runtime.RawExtension{
-				Object: attr.VersionedObject,
+				Object: versionedAttributes.VersionedObject,
 			},
 			OldObject: runtime.RawExtension{
-				Object: attr.VersionedOldObject,
+				Object: versionedAttributes.VersionedOldObject,
 			},
 			DryRun: &dryRun,
+			Options: runtime.RawExtension{
+				Object: attr.GetOperationOptions(),
+			},
 		},
 	}
 }

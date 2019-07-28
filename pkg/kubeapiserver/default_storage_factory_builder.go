@@ -19,7 +19,6 @@ package kubeapiserver
 import (
 	"strings"
 
-	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -27,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -37,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
-	kubeapiserveroptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -47,19 +46,30 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "", Resource: "nodes"}:                         "minions",
 	{Group: "", Resource: "services"}:                      "services/specs",
 	{Group: "extensions", Resource: "ingresses"}:           "ingress",
+	{Group: "networking.k8s.io", Resource: "ingresses"}:    "ingress",
 	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
 func NewStorageFactoryConfig() *StorageFactoryConfig {
+
+	resources := []schema.GroupVersionResource{
+		batch.Resource("cronjobs").WithVersion("v1beta1"),
+		networking.Resource("ingresses").WithVersion("v1beta1"),
+	}
+	// add csinodes if CSINodeInfo feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		resources = append(resources, apisstorage.Resource("csinodes").WithVersion("v1beta1"))
+	}
+	// add csidrivers if CSIDriverRegistry feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		resources = append(resources, apisstorage.Resource("csidrivers").WithVersion("v1beta1"))
+	}
+
 	return &StorageFactoryConfig{
-		Serializer:              legacyscheme.Codecs,
-		DefaultResourceEncoding: serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme),
-		ResourceEncodingOverrides: []schema.GroupVersionResource{
-			batch.Resource("cronjobs").WithVersion("v1beta1"),
-			apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
-			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
-		},
+		Serializer:                legacyscheme.Codecs,
+		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme),
+		ResourceEncodingOverrides: resources,
 	}
 }
 
@@ -69,18 +79,12 @@ type StorageFactoryConfig struct {
 	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
 	DefaultStorageMediaType          string
 	Serializer                       runtime.StorageSerializer
-	StorageEncodingOverrides         map[string]schema.GroupVersion
 	ResourceEncodingOverrides        []schema.GroupVersionResource
 	EtcdServersOverrides             []string
 	EncryptionProviderConfigFilepath string
 }
 
-func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, serializationOptions *kubeapiserveroptions.StorageSerializationOptions) (*completedStorageFactoryConfig, error) {
-	storageGroupsToEncodingVersion, err := serializationOptions.StorageGroupsToEncodingVersion()
-	if err != nil {
-		return nil, fmt.Errorf("error generating storage version map: %s", err)
-	}
-	c.StorageEncodingOverrides = storageGroupsToEncodingVersion
+func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*completedStorageFactoryConfig, error) {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
@@ -93,8 +97,7 @@ type completedStorageFactoryConfig struct {
 }
 
 func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
-	resourceEncodingConfig := resourceconfig.MergeGroupEncodingConfigs(c.DefaultResourceEncoding, c.StorageEncodingOverrides)
-	resourceEncodingConfig = resourceconfig.MergeResourceEncodingConfigs(resourceEncodingConfig, c.ResourceEncodingOverrides)
+	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
 		c.StorageConfig,
 		c.DefaultStorageMediaType,
@@ -108,7 +111,9 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
 	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
 	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
+	storageFactory.AddCohabitatingResources(api.Resource("replicationcontrollers"), extensions.Resource("replicationcontrollers")) // to make scale subresources equivalent
 	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
+	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
 
 	for _, override := range c.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

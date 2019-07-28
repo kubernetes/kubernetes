@@ -26,7 +26,7 @@ var _ = Describe("Merging fields of type map with openapi for some fields", func
 	Context("where a field has been deleted", func() {
 		It("should delete the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -35,14 +35,14 @@ spec:
     image: "1"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
   foo2: null
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -57,7 +57,7 @@ spec:
     image: "3"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -72,7 +72,7 @@ spec:
 	Context("where a field is has been added", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1:
@@ -80,7 +80,7 @@ spec:
     image: "1"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -92,12 +92,12 @@ spec:
     image: "2"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -115,7 +115,7 @@ spec:
 	Context("where a field is has been updated", func() {
 		It("should update the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1:
@@ -123,7 +123,7 @@ spec:
     image: "1-1"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -135,7 +135,7 @@ spec:
     image: "2-1"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 2
@@ -147,7 +147,7 @@ spec:
     image: "2-0"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3

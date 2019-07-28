@@ -22,11 +22,11 @@ type AsyncAssertion struct {
 	actualInput     interface{}
 	timeoutInterval time.Duration
 	pollingInterval time.Duration
-	fail            types.GomegaFailHandler
+	failWrapper     *types.GomegaFailWrapper
 	offset          int
 }
 
-func New(asyncType AsyncAssertionType, actualInput interface{}, fail types.GomegaFailHandler, timeoutInterval time.Duration, pollingInterval time.Duration, offset int) *AsyncAssertion {
+func New(asyncType AsyncAssertionType, actualInput interface{}, failWrapper *types.GomegaFailWrapper, timeoutInterval time.Duration, pollingInterval time.Duration, offset int) *AsyncAssertion {
 	actualType := reflect.TypeOf(actualInput)
 	if actualType.Kind() == reflect.Func {
 		if actualType.NumIn() != 0 || actualType.NumOut() == 0 {
@@ -37,7 +37,7 @@ func New(asyncType AsyncAssertionType, actualInput interface{}, fail types.Gomeg
 	return &AsyncAssertion{
 		asyncType:       asyncType,
 		actualInput:     actualInput,
-		fail:            fail,
+		failWrapper:     failWrapper,
 		timeoutInterval: timeoutInterval,
 		pollingInterval: pollingInterval,
 		offset:          offset,
@@ -45,10 +45,12 @@ func New(asyncType AsyncAssertionType, actualInput interface{}, fail types.Gomeg
 }
 
 func (assertion *AsyncAssertion) Should(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+	assertion.failWrapper.TWithHelper.Helper()
 	return assertion.match(matcher, true, optionalDescription...)
 }
 
 func (assertion *AsyncAssertion) ShouldNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
+	assertion.failWrapper.TWithHelper.Helper()
 	return assertion.match(matcher, false, optionalDescription...)
 }
 
@@ -110,6 +112,8 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 		matches, err = matcher.Match(value)
 	}
 
+	assertion.failWrapper.TWithHelper.Helper()
+
 	fail := func(preamble string) {
 		errMsg := ""
 		message := ""
@@ -122,7 +126,8 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 				message = matcher.NegatedFailureMessage(value)
 			}
 		}
-		assertion.fail(fmt.Sprintf("%s after %.3fs.\n%s%s%s", preamble, time.Since(timer).Seconds(), description, message, errMsg), 3+assertion.offset)
+		assertion.failWrapper.TWithHelper.Helper()
+		assertion.failWrapper.Fail(fmt.Sprintf("%s after %.3fs.\n%s%s%s", preamble, time.Since(timer).Seconds(), description, message, errMsg), 3+assertion.offset)
 	}
 
 	if assertion.asyncType == AsyncAssertionTypeEventually {

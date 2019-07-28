@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -28,17 +28,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
+// APIHandlerManager defines the behaviour that an API handler should have.
 type APIHandlerManager interface {
-	AddAPIService(apiService *apiregistration.APIService) error
+	AddAPIService(apiService *v1.APIService) error
 	RemoveAPIService(apiServiceName string)
 }
 
+// APIServiceRegistrationController is responsible for registering and removing API services.
 type APIServiceRegistrationController struct {
 	apiHandlerManager APIHandlerManager
 
@@ -51,6 +53,7 @@ type APIServiceRegistrationController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewAPIServiceRegistrationController returns a new APIServiceRegistrationController.
 func NewAPIServiceRegistrationController(apiServiceInformer informers.APIServiceInformer, apiHandlerManager APIHandlerManager) *APIServiceRegistrationController {
 	c := &APIServiceRegistrationController{
 		apiHandlerManager: apiHandlerManager,
@@ -83,12 +86,13 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 	return c.apiHandlerManager.AddAPIService(apiService)
 }
 
+// Run starts APIServiceRegistrationController which will process all registration requests until stopCh is closed.
 func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting APIServiceRegistrationController")
-	defer glog.Infof("Shutting down APIServiceRegistrationController")
+	klog.Infof("Starting APIServiceRegistrationController")
+	defer klog.Infof("Shutting down APIServiceRegistrationController")
 
 	if !controllers.WaitForCacheSync("APIServiceRegistrationController", stopCh, c.apiServiceSynced) {
 		return
@@ -126,10 +130,10 @@ func (c *APIServiceRegistrationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *APIServiceRegistrationController) enqueue(obj *apiregistration.APIService) {
+func (c *APIServiceRegistrationController) enqueue(obj *v1.APIService) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
+		klog.Errorf("Couldn't get key for object %#v: %v", obj, err)
 		return
 	}
 
@@ -137,31 +141,31 @@ func (c *APIServiceRegistrationController) enqueue(obj *apiregistration.APIServi
 }
 
 func (c *APIServiceRegistrationController) addAPIService(obj interface{}) {
-	castObj := obj.(*apiregistration.APIService)
-	glog.V(4).Infof("Adding %s", castObj.Name)
+	castObj := obj.(*v1.APIService)
+	klog.V(4).Infof("Adding %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *APIServiceRegistrationController) updateAPIService(obj, _ interface{}) {
-	castObj := obj.(*apiregistration.APIService)
-	glog.V(4).Infof("Updating %s", castObj.Name)
+	castObj := obj.(*v1.APIService)
+	klog.V(4).Infof("Updating %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
-	castObj, ok := obj.(*apiregistration.APIService)
+	castObj, ok := obj.(*v1.APIService)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiregistration.APIService)
+		castObj, ok = tombstone.Obj.(*v1.APIService)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not expected %#v", obj)
+			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
 		}
 	}
-	glog.V(4).Infof("Deleting %q", castObj.Name)
+	klog.V(4).Infof("Deleting %q", castObj.Name)
 	c.enqueue(castObj)
 }

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit"
 )
 
+// ValidatePolicy validates the audit policy
 func ValidatePolicy(policy *audit.Policy) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateOmitStages(policy.OmitStages, field.NewPath("omitStages"))...)
@@ -99,7 +100,7 @@ func validateResources(groupResources []audit.GroupResources, fldPath *field.Pat
 		// The empty string represents the core API group.
 		if len(groupResource.Group) != 0 {
 			// Group names must be lower case and be valid DNS subdomains.
-			// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
+			// reference: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
 			// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
 			// rbac.authorization.k8s.io is the valid one
 			if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {

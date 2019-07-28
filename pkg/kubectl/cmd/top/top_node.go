@@ -27,10 +27,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsV1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
@@ -40,6 +40,7 @@ import (
 type TopNodeOptions struct {
 	ResourceName    string
 	Selector        string
+	SortBy          string
 	NoHeaders       bool
 	NodeClient      corev1client.CoreV1Interface
 	HeapsterOptions HeapsterTopOptions
@@ -106,19 +107,14 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		Long:                  topNodeLong,
 		Example:               topNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, cmd, args); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := o.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
-			}
-			if err := o.RunTopNode(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunTopNode())
 		},
 		Aliases: []string{"nodes", "no"},
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
 
 	o.HeapsterOptions.Bind(cmd.Flags())
@@ -156,6 +152,11 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 }
 
 func (o *TopNodeOptions) Validate() error {
+	if len(o.SortBy) > 0 {
+		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
+			return errors.New("--sort-by accepts only cpu or memory")
+		}
+	}
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
 	}
@@ -219,13 +220,13 @@ func (o TopNodeOptions) RunTopNode() error {
 		allocatable[n.Name] = n.Status.Allocatable
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders)
+	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders, o.SortBy)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
 	var err error
 	versionedMetrics := &metricsV1beta1api.NodeMetricsList{}
-	mc := metricsClient.Metrics()
+	mc := metricsClient.MetricsV1beta1()
 	nm := mc.NodeMetricses()
 	if resourceName != "" {
 		m, err := nm.Get(resourceName, metav1.GetOptions{})

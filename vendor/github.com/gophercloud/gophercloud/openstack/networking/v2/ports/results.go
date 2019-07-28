@@ -68,6 +68,9 @@ type Port struct {
 	// Human-readable name for the port. Might not be unique.
 	Name string `json:"name"`
 
+	// Describes the port.
+	Description string `json:"description"`
+
 	// Administrative state of port. If false (down), port does not forward
 	// packets.
 	AdminStateUp bool `json:"admin_state_up"`
@@ -101,6 +104,9 @@ type Port struct {
 
 	// Identifies the list of IP addresses the port will recognize/accept
 	AllowedAddressPairs []AddressPair `json:"allowed_address_pairs"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 // PortPage is the page returned by a pager when traversing over a collection

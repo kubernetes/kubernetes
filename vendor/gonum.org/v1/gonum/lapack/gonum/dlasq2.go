@@ -35,31 +35,34 @@ import (
 //
 // Dlasq2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlasq2(n int, z []float64) (info int) {
-	// TODO(btracey): make info an error.
-	if len(z) < 4*n {
-		panic(badZ)
-	}
-	const cbias = 1.5
-
-	eps := dlamchP
-	safmin := dlamchS
-	tol := eps * 100
-	tol2 := tol * tol
 	if n < 0 {
 		panic(nLT0)
 	}
+
 	if n == 0 {
 		return info
 	}
+
+	if len(z) < 4*n {
+		panic(shortZ)
+	}
+
 	if n == 1 {
 		if z[0] < 0 {
 			panic(negZ)
 		}
 		return info
 	}
+
+	const cbias = 1.5
+
+	eps := dlamchP
+	safmin := dlamchS
+	tol := eps * 100
+	tol2 := tol * tol
 	if n == 2 {
 		if z[1] < 0 || z[2] < 0 {
-			panic("lapack: bad z value")
+			panic(negZ)
 		} else if z[2] > z[0] {
 			z[0], z[2] = z[2], z[0]
 		}
@@ -87,7 +90,7 @@ func (impl Implementation) Dlasq2(n int, z []float64) (info int) {
 	var i1, n1 int
 	for k := 0; k < 2*(n-1); k += 2 {
 		if z[k] < 0 || z[k+1] < 0 {
-			panic("lapack: bad z value")
+			panic(negZ)
 		}
 		d += z[k]
 		e += z[k+1]
@@ -95,10 +98,9 @@ func (impl Implementation) Dlasq2(n int, z []float64) (info int) {
 		emin = math.Min(emin, z[k+1])
 	}
 	if z[2*(n-1)] < 0 {
-		panic("lapack: bad z value")
+		panic(negZ)
 	}
 	d += z[2*(n-1)]
-	qmax = math.Max(qmax, z[2*(n-1)])
 	// Check for diagonality.
 	if e == 0 {
 		for k := 1; k < n; k++ {
@@ -330,7 +332,6 @@ outer:
 		// This might need to be done for several blocks.
 		info = 2
 		i1 = i0
-		n1 = n0
 		for {
 			tempq = z[4*i0]
 			z[4*i0] += sigma

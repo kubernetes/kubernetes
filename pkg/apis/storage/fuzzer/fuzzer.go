@@ -34,5 +34,18 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			bindingModes := []storage.VolumeBindingMode{storage.VolumeBindingImmediate, storage.VolumeBindingWaitForFirstConsumer}
 			obj.VolumeBindingMode = &bindingModes[c.Rand.Intn(len(bindingModes))]
 		},
+		func(obj *storage.CSIDriver, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+
+			// match defaulting
+			if obj.Spec.AttachRequired == nil {
+				obj.Spec.AttachRequired = new(bool)
+				*(obj.Spec.AttachRequired) = true
+			}
+			if obj.Spec.PodInfoOnMount == nil {
+				obj.Spec.PodInfoOnMount = new(bool)
+				*(obj.Spec.PodInfoOnMount) = false
+			}
+		},
 	}
 }

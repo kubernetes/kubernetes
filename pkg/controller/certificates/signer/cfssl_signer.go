@@ -59,6 +59,9 @@ type cfsslSigner struct {
 	sigAlgo             x509.SignatureAlgorithm
 	client              clientset.Interface
 	certificateDuration time.Duration
+
+	// nowFn returns the current time.  We have here for unit testing
+	nowFn func() time.Time
 }
 
 func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*cfsslSigner, error) {
@@ -84,7 +87,7 @@ func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certif
 
 	priv, err := helpers.ParsePrivateKeyPEMWithPassword(cakey, password)
 	if err != nil {
-		return nil, fmt.Errorf("Malformed private key %v", err)
+		return nil, fmt.Errorf("malformed private key %v", err)
 	}
 	return &cfsslSigner{
 		priv:                priv,
@@ -92,6 +95,7 @@ func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certif
 		sigAlgo:             signer.DefaultSigAlgo(priv),
 		client:              client,
 		certificateDuration: certificateDuration,
+		nowFn:               time.Now,
 	}, nil
 }
 
@@ -115,11 +119,21 @@ func (s *cfsslSigner) sign(csr *capi.CertificateSigningRequest) (*capi.Certifica
 	for _, usage := range csr.Spec.Usages {
 		usages = append(usages, string(usage))
 	}
+
+	certExpiryDuration := s.certificateDuration
+	durationUntilExpiry := s.ca.NotAfter.Sub(s.nowFn())
+	if durationUntilExpiry <= 0 {
+		return nil, fmt.Errorf("the signer has expired: %v", s.ca.NotAfter)
+	}
+	if durationUntilExpiry < certExpiryDuration {
+		certExpiryDuration = durationUntilExpiry
+	}
+
 	policy := &config.Signing{
 		Default: &config.SigningProfile{
 			Usage:        usages,
-			Expiry:       s.certificateDuration,
-			ExpiryString: s.certificateDuration.String(),
+			Expiry:       certExpiryDuration,
+			ExpiryString: certExpiryDuration.String(),
 		},
 	}
 	cfs, err := local.NewSigner(s.priv, s.ca, s.sigAlgo, policy)

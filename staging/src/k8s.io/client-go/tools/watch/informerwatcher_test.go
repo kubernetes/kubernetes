@@ -17,8 +17,9 @@ limitations under the License.
 package watch
 
 import (
-	"math/rand"
+	"context"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
@@ -28,12 +29,93 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
+
+// TestEventProcessorExit is expected to timeout if the event processor fails
+// to exit when stopped.
+func TestEventProcessorExit(t *testing.T) {
+	event := watch.Event{}
+
+	tests := []struct {
+		name  string
+		write func(e *eventProcessor)
+	}{
+		{
+			name: "exit on blocked read",
+			write: func(e *eventProcessor) {
+				e.push(event)
+			},
+		},
+		{
+			name: "exit on blocked write",
+			write: func(e *eventProcessor) {
+				e.push(event)
+				e.push(event)
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			out := make(chan watch.Event)
+			e := newEventProcessor(out)
+
+			test.write(e)
+
+			exited := make(chan struct{})
+			go func() {
+				e.run()
+				close(exited)
+			}()
+
+			<-out
+			e.stop()
+			goruntime.Gosched()
+			<-exited
+		})
+	}
+}
+
+type apiInt int
+
+func (apiInt) GetObjectKind() schema.ObjectKind { return nil }
+func (apiInt) DeepCopyObject() runtime.Object   { return nil }
+
+func TestEventProcessorOrdersEvents(t *testing.T) {
+	out := make(chan watch.Event)
+	e := newEventProcessor(out)
+	go e.run()
+
+	numProcessed := 0
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	go func() {
+		for i := 0; i < 1000; i++ {
+			e := <-out
+			if got, want := int(e.Object.(apiInt)), i; got != want {
+				t.Errorf("unexpected event: got=%d, want=%d", got, want)
+			}
+			numProcessed++
+		}
+		cancel()
+	}()
+
+	for i := 0; i < 1000; i++ {
+		e.push(watch.Event{Object: apiInt(i)})
+	}
+
+	<-ctx.Done()
+	e.stop()
+
+	if numProcessed != 1000 {
+		t.Errorf("unexpected number of events processed: %d", numProcessed)
+	}
+
+}
 
 type byEventTypeAndName []watch.Event
 
@@ -49,44 +131,6 @@ func (a byEventTypeAndName) Less(i, j int) bool {
 	}
 
 	return a[i].Object.(*corev1.Secret).Name < a[j].Object.(*corev1.Secret).Name
-}
-
-func TestTicketer(t *testing.T) {
-	tg := newTicketer()
-
-	const numTickets = 100 // current golang limit for race detector is 8192 simultaneously alive goroutines
-	var tickets []uint64
-	for i := 0; i < numTickets; i++ {
-		ticket := tg.GetTicket()
-		tickets = append(tickets, ticket)
-
-		exp, got := uint64(i), ticket
-		if got != exp {
-			t.Fatalf("expected ticket %d, got %d", exp, got)
-		}
-	}
-
-	// shuffle tickets
-	rand.Shuffle(len(tickets), func(i, j int) {
-		tickets[i], tickets[j] = tickets[j], tickets[i]
-	})
-
-	res := make(chan uint64, len(tickets))
-	for _, ticket := range tickets {
-		go func(ticket uint64) {
-			time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
-			tg.WaitForTicket(ticket, func() {
-				res <- ticket
-			})
-		}(ticket)
-	}
-
-	for i := 0; i < numTickets; i++ {
-		exp, got := uint64(i), <-res
-		if got != exp {
-			t.Fatalf("expected ticket %d, got %d", exp, got)
-		}
-	}
 }
 
 func TestNewInformerWatcher(t *testing.T) {
@@ -182,13 +226,13 @@ func TestNewInformerWatcher(t *testing.T) {
 
 			lw := &cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return fake.Core().Secrets("").List(options)
+					return fake.CoreV1().Secrets("").List(options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return fake.Core().Secrets("").Watch(options)
+					return fake.CoreV1().Secrets("").Watch(options)
 				},
 			}
-			_, _, w := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+			_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
 
 			var result []watch.Event
 		loop:
@@ -227,9 +271,7 @@ func TestNewInformerWatcher(t *testing.T) {
 			// Stop before reading all the data to make sure the informer can deal with closed channel
 			w.Stop()
 
-			// Wait a bit to see if the informer won't panic
-			// TODO: Try to figure out a more reliable mechanism than time.Sleep (https://github.com/kubernetes/kubernetes/pull/50102/files#r184716591)
-			time.Sleep(1 * time.Second)
+			<-done
 		})
 	}
 

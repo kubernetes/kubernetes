@@ -34,7 +34,7 @@ type strategy struct {
 	names.NameGenerator
 }
 
-// strategy is the default logic that applies when creating and updating
+// Strategy is the default logic that applies when creating and updating
 // ClusterRole objects.
 var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
@@ -44,7 +44,7 @@ var _ rest.RESTCreateStrategy = Strategy
 // Strategy should implement rest.RESTUpdateStrategy
 var _ rest.RESTUpdateStrategy = Strategy
 
-// NamespaceScoped is true for ClusterRoles.
+// NamespaceScoped is false for ClusterRoles.
 func (strategy) NamespaceScoped() bool {
 	return false
 }

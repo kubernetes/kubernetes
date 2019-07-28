@@ -8,9 +8,9 @@ go_library(
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/editor:go_default_library",
-        "//pkg/kubectl/util/i18n:go_default_library",
-        "//pkg/kubectl/util/templates:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
@@ -31,7 +31,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",

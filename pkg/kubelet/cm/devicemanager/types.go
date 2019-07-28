@@ -19,12 +19,13 @@ package devicemanager
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Manager manages all the Device Plugins running on a node.
@@ -40,7 +41,7 @@ type Manager interface {
 	// variables, mount points and device files). The node object is provided
 	// for the device manager to update the node capacity to reflect the
 	// currently available devices.
-	Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
+	Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
 
 	// Stop stops the manager.
 	Stop() error
@@ -53,7 +54,15 @@ type Manager interface {
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
 	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
-	GetWatcherHandler() watcher.PluginHandler
+	GetWatcherHandler() cache.PluginHandler
+
+	// GetDevices returns information about the devices assigned to pods and containers
+	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+
+	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
+	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
+	// the node has been recreated.
+	ShouldResetExtendedResourceCapacity() bool
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

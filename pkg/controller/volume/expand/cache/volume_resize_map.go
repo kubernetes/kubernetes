@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	commontypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -92,12 +92,12 @@ func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 // AddPVCUpdate adds pvc for resizing
 // This function intentionally allows addition of PVCs for which pv.Spec.Size >= pvc.Spec.Size,
 // the reason being - lack of transaction in k8s means after successful resize, we can't guarantee that when we update PV,
-// pvc update will be successful too and after resize we alyways update PV first.
+// pvc update will be successful too and after resize we always update PV first.
 // If for some reason we weren't able to update PVC after successful resize, then we are going to reprocess
 // the PVC and hopefully after a no-op resize in volume plugin, PVC will be updated with right values as well.
 func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
-		glog.V(4).Infof("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
+		klog.V(4).Infof("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
 		return
 	}
 
@@ -112,7 +112,7 @@ func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv
 		return
 	}
 
-	glog.V(4).Infof("Adding pvc %s with Size %s/%s for resizing", util.ClaimToClaimKey(pvc), pvcSize.String(), pvcStatusSize.String())
+	klog.V(4).Infof("Adding pvc %s with Size %s/%s for resizing", util.ClaimToClaimKey(pvc), pvcSize.String(), pvcStatusSize.String())
 
 	pvcRequest := &PVCWithResizeRequest{
 		PVC:              pvc,
@@ -144,7 +144,7 @@ func (resizeMap *volumeResizeMap) GetPVCsWithResizeRequest() []*PVCWithResizeReq
 // deleting a pvc in this map doesn't affect operations that are already inflight.
 func (resizeMap *volumeResizeMap) DeletePVC(pvc *v1.PersistentVolumeClaim) {
 	pvcUniqueName := types.UniquePVCName(pvc.UID)
-	glog.V(5).Infof("Removing PVC %v from resize map", pvcUniqueName)
+	klog.V(5).Infof("Removing PVC %v from resize map", pvcUniqueName)
 	resizeMap.Lock()
 	defer resizeMap.Unlock()
 	delete(resizeMap.pvcrs, pvcUniqueName)
@@ -156,7 +156,7 @@ func (resizeMap *volumeResizeMap) MarkAsResized(pvcr *PVCWithResizeRequest, newS
 
 	err := resizeMap.updatePVCCapacityAndConditions(pvcr, newSize, emptyCondition)
 	if err != nil {
-		glog.V(4).Infof("Error updating PV spec capacity for volume %q with : %v", pvcr.QualifiedName(), err)
+		klog.V(4).Infof("Error updating PV spec capacity for volume %q with : %v", pvcr.QualifiedName(), err)
 		return err
 	}
 	return nil
@@ -185,7 +185,7 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	oldData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Unexpected error marshaling old PV %q with error : %v", pvClone.Name, err)
 	}
 
 	pvClone.Spec.Capacity[v1.ResourceStorage] = newSize
@@ -193,19 +193,19 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	newData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Unexpected error marshaling new PV %q with error : %v", pvClone.Name, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Error Creating two way merge patch for  PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
 	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, commontypes.StrategicMergePatchType, patchBytes)
 
 	if updateErr != nil {
-		glog.V(4).Infof("Error updating pv %q with error : %v", pvClone.Name, updateErr)
+		klog.V(4).Infof("Error updating pv %q with error : %v", pvClone.Name, updateErr)
 		return updateErr
 	}
 	return nil

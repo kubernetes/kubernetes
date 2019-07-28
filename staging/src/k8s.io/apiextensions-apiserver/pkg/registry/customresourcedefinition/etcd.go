@@ -67,7 +67,7 @@ func (r *REST) ShortNames() []string {
 }
 
 // Delete adds the CRD finalizer to the list
-func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	obj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -92,6 +92,14 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		)
 		return nil, false, err
 	}
+	if options.Preconditions.ResourceVersion != nil && *options.Preconditions.ResourceVersion != crd.ResourceVersion {
+		err = apierrors.NewConflict(
+			apiextensions.Resource("customresourcedefinitions"),
+			name,
+			fmt.Errorf("Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v", *options.Preconditions.ResourceVersion, crd.ResourceVersion),
+		)
+		return nil, false, err
+	}
 
 	// upon first request to delete, add our finalizer and then delegate
 	if crd.DeletionTimestamp.IsZero() {
@@ -100,7 +108,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 			return nil, false, err
 		}
 
-		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+		preconditions := storage.Preconditions{UID: options.Preconditions.UID, ResourceVersion: options.Preconditions.ResourceVersion}
 
 		out := r.Store.NewFunc()
 		err = r.Store.Storage.GuaranteedUpdate(
@@ -110,6 +118,9 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 				if !ok {
 					// wrong type
 					return nil, fmt.Errorf("expected *apiextensions.CustomResourceDefinition, got %v", existing)
+				}
+				if err := deleteValidation(existingCRD); err != nil {
+					return nil, err
 				}
 
 				// Set the deletion timestamp if needed
@@ -145,7 +156,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		return out, false, nil
 	}
 
-	return r.Store.Delete(ctx, name, options)
+	return r.Store.Delete(ctx, name, deleteValidation, options)
 }
 
 // NewStatusREST makes a RESTStorage for status that has more limited options.

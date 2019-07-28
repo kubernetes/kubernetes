@@ -23,7 +23,6 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	restclient "k8s.io/client-go/rest"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -152,6 +151,33 @@ type ExtenderManagedResource struct {
 	IgnoredByScheduler bool `json:"ignoredByScheduler,omitempty"`
 }
 
+// ExtenderTLSConfig contains settings to enable TLS with extender
+type ExtenderTLSConfig struct {
+	// Server should be accessed without verifying the TLS certificate. For testing only.
+	Insecure bool `json:"insecure,omitempty"`
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// certificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	ServerName string `json:"serverName,omitempty"`
+
+	// Server requires TLS client certificate authentication
+	CertFile string `json:"certFile,omitempty"`
+	// Server requires TLS client certificate authentication
+	KeyFile string `json:"keyFile,omitempty"`
+	// Trusted root certificates for server
+	CAFile string `json:"caFile,omitempty"`
+
+	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
+	// CertData takes precedence over CertFile
+	CertData []byte `json:"certData,omitempty"`
+	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
+	// KeyData takes precedence over KeyFile
+	KeyData []byte `json:"keyData,omitempty"`
+	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
+	// CAData takes precedence over CAFile
+	CAData []byte `json:"caData,omitempty"`
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -169,11 +195,11 @@ type ExtenderConfig struct {
 	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
-	BindVerb string
+	BindVerb string `json:"bindVerb,omitempty"`
 	// EnableHTTPS specifies whether https should be used to communicate with the extender
 	EnableHTTPS bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
-	TLSConfig *restclient.TLSClientConfig `json:"tlsConfig,omitempty"`
+	TLSConfig *ExtenderTLSConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout time.Duration `json:"httpTimeout,omitempty"`

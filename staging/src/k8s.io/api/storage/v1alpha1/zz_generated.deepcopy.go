@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -56,7 +57,7 @@ func (in *VolumeAttachment) DeepCopyObject() runtime.Object {
 func (in *VolumeAttachmentList) DeepCopyInto(out *VolumeAttachmentList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]VolumeAttachment, len(*in))
@@ -92,6 +93,11 @@ func (in *VolumeAttachmentSource) DeepCopyInto(out *VolumeAttachmentSource) {
 		in, out := &in.PersistentVolumeName, &out.PersistentVolumeName
 		*out = new(string)
 		**out = **in
+	}
+	if in.InlineVolumeSpec != nil {
+		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
+		*out = new(v1.PersistentVolumeSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

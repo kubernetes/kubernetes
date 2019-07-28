@@ -17,9 +17,9 @@ limitations under the License.
 package system
 
 import (
+	"reflect"
 	"testing"
 
-	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,71 +28,120 @@ func TestValidateDockerInfo(t *testing.T) {
 		Reporter: DefaultReporter,
 	}
 	spec := &DockerSpec{
-		Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.06\..*`},
+		Version:     []string{`1\.13\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`},
 		GraphDriver: []string{"driver_1", "driver_2"},
 	}
 	for _, test := range []struct {
-		info types.Info
+		name string
+		info dockerInfo
 		err  bool
 		warn bool
 	}{
 		{
-			info: types.Info{Driver: "driver_1", ServerVersion: "1.10.1"},
+			name: "unsupported Docker version 1.12.1",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "1.12.1"},
 			err:  true,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "bad_driver", ServerVersion: "1.11.1"},
+			name: "unsupported driver",
+			info: dockerInfo{Driver: "bad_driver", ServerVersion: "1.13.1"},
 			err:  true,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_1", ServerVersion: "1.11.1"},
+			name: "valid Docker version 1.13.1",
+			info: dockerInfo{Driver: "driver_1", ServerVersion: "1.13.1"},
 			err:  false,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "1.12.1"},
+			name: "valid Docker version 17.03.0-ce",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "17.03.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "1.13.1"},
+			name: "valid Docker version 17.06.0-ce",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "17.06.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "17.03.0-ce"},
+			name: "valid Docker version 17.09.0-ce",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "17.09.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "17.06.0-ce"},
+			name: "valid Docker version 18.06.0-ce",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "18.06.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "17.09.0-ce"},
+			name: "valid Docker version 18.09.1-ce",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "18.09.1-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "18.06.0-ce"},
+			name: "Docker version 19.01.0 is not in the list of validated versions",
+			info: dockerInfo{Driver: "driver_2", ServerVersion: "19.01.0"},
 			err:  false,
-			warn: false,
+			warn: true,
 		},
 	} {
-		warn, err := v.validateDockerInfo(spec, test.info)
-		if !test.err {
-			assert.Nil(t, err, "Expect error not to occur with docker info %+v", test.info)
-		} else {
-			assert.NotNil(t, err, "Expect error to occur with docker info %+v", test.info)
-		}
-		if !test.warn {
-			assert.Nil(t, warn, "Expect error not to occur with docker info %+v", test.info)
-		} else {
-			assert.NotNil(t, warn, "Expect error to occur with docker info %+v", test.info)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			warn, err := v.validateDockerInfo(spec, test.info)
+			if !test.err {
+				assert.Nil(t, err, "Expect error not to occur with docker info %+v", test.info)
+			} else {
+				assert.NotNil(t, err, "Expect error to occur with docker info %+v", test.info)
+			}
+			if !test.warn {
+				assert.Nil(t, warn, "Expect error not to occur with docker info %+v", test.info)
+			} else {
+				assert.NotNil(t, warn, "Expect error to occur with docker info %+v", test.info)
+			}
+		})
+	}
+}
 
+func TestUnmarshalDockerInfo(t *testing.T) {
+	v := &DockerValidator{}
+
+	testCases := []struct {
+		name          string
+		input         string
+		expectedInfo  dockerInfo
+		expectedError bool
+	}{
+		{
+			name:         "valid: expected dockerInfo is valid",
+			input:        `{ "Driver":"foo", "ServerVersion":"bar" }`,
+			expectedInfo: dockerInfo{Driver: "foo", ServerVersion: "bar"},
+		},
+		{
+			name:          "invalid: the JSON input is not valid",
+			input:         `{ "Driver":"foo"`,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var err error
+			info := dockerInfo{}
+			if err = v.unmarshalDockerInfo([]byte(tc.input), &info); (err != nil) != tc.expectedError {
+				t.Fatalf("failed unmarshaling; expected error: %v, got: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+			if err != nil {
+				return
+			}
+			if !reflect.DeepEqual(tc.expectedInfo, info) {
+				t.Fatalf("dockerInfo do not match, expected: %#v, got: %#v", tc.expectedInfo, info)
+			}
+		})
 	}
 }

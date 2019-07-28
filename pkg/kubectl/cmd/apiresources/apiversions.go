@@ -25,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -36,34 +36,41 @@ var (
 		kubectl api-versions`))
 )
 
-type ApiVersionsOptions struct {
+// APIVersionsOptions have the data required for API versions
+type APIVersionsOptions struct {
 	discoveryClient discovery.CachedDiscoveryInterface
 
 	genericclioptions.IOStreams
 }
 
-func NewApiVersionsOptions(ioStreams genericclioptions.IOStreams) *ApiVersionsOptions {
-	return &ApiVersionsOptions{
+// NewAPIVersionsOptions creates the options for APIVersions
+func NewAPIVersionsOptions(ioStreams genericclioptions.IOStreams) *APIVersionsOptions {
+	return &APIVersionsOptions{
 		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdApiVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewApiVersionsOptions(ioStreams)
+// NewCmdAPIVersions creates the `api-versions` command
+func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewAPIVersionsOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "api-versions",
 		Short:   "Print the supported API versions on the server, in the form of \"group/version\"",
 		Long:    "Print the supported API versions on the server, in the form of \"group/version\"",
 		Example: apiversionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f))
-			cmdutil.CheckErr(o.RunApiVersions())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.RunAPIVersions())
 		},
 	}
 	return cmd
 }
 
-func (o *ApiVersionsOptions) Complete(f cmdutil.Factory) error {
+// Complete adapts from the command line args and factory to the data required
+func (o *APIVersionsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+	}
 	var err error
 	o.discoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
@@ -72,13 +79,14 @@ func (o *ApiVersionsOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *ApiVersionsOptions) RunApiVersions() error {
+// RunAPIVersions does the work
+func (o *APIVersionsOptions) RunAPIVersions() error {
 	// Always request fresh data from the server
 	o.discoveryClient.Invalidate()
 
 	groupList, err := o.discoveryClient.ServerGroups()
 	if err != nil {
-		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
+		return fmt.Errorf("couldn't get available api versions from server: %v", err)
 	}
 	apiVersions := metav1.ExtractGroupVersions(groupList)
 	sort.Strings(apiVersions)

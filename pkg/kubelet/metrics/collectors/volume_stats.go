@@ -17,9 +17,9 @@ limitations under the License.
 package collectors
 
 import (
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -59,11 +59,11 @@ var (
 )
 
 type volumeStatsCollector struct {
-	statsProvider serverstats.StatsProvider
+	statsProvider serverstats.Provider
 }
 
 // NewVolumeStatsCollector creates a volume stats prometheus collector.
-func NewVolumeStatsCollector(statsProvider serverstats.StatsProvider) prometheus.Collector {
+func NewVolumeStatsCollector(statsProvider serverstats.Provider) prometheus.Collector {
 	return &volumeStatsCollector{statsProvider: statsProvider}
 }
 
@@ -87,7 +87,7 @@ func (collector *volumeStatsCollector) Collect(ch chan<- prometheus.Metric) {
 		lv = append([]string{pvcRef.Namespace, pvcRef.Name}, lv...)
 		metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, v, lv...)
 		if err != nil {
-			glog.Warningf("Failed to generate metric: %v", err)
+			klog.Warningf("Failed to generate metric: %v", err)
 			return
 		}
 		ch <- metric

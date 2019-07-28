@@ -27,20 +27,35 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dlarfx is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlarfx(side blas.Side, m, n int, v []float64, tau float64, c []float64, ldc int, work []float64) {
-	checkMatrix(m, n, c, ldc)
-	switch side {
-	case blas.Left:
-		checkVector(m, v, 1)
-		if m > 10 && len(work) < n {
-			panic(badWork)
-		}
-	case blas.Right:
-		checkVector(n, v, 1)
-		if n > 10 && len(work) < m {
-			panic(badWork)
-		}
-	default:
+	switch {
+	case side != blas.Left && side != blas.Right:
 		panic(badSide)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case ldc < max(1, n):
+		panic(badLdC)
+	}
+
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		return
+	}
+
+	nh := m
+	lwork := n
+	if side == blas.Right {
+		nh = n
+		lwork = m
+	}
+	switch {
+	case len(v) < nh:
+		panic(shortV)
+	case len(c) < (m-1)*ldc+n:
+		panic(shortC)
+	case nh > 10 && len(work) < lwork:
+		panic(shortWork)
 	}
 
 	if tau == 0 {

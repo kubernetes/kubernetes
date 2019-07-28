@@ -24,15 +24,15 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func onePVCPod(filterName string) *v1.Pod {
@@ -243,6 +243,33 @@ func TestVolumeCountConflicts(t *testing.T) {
 						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "anotherUnboundPVC",
 						},
+					},
+				},
+			},
+		},
+	}
+	twoVolCinderPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp1"},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp2"},
+					},
+				},
+			},
+		},
+	}
+	oneVolCinderPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "ovp"},
 					},
 				},
 			},
@@ -740,15 +767,32 @@ func TestVolumeCountConflicts(t *testing.T) {
 			fits:         true,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 		},
+		// filterName:CinderVolumeFilterType
+		{
+			newPod:       oneVolCinderPod,
+			existingPods: []*v1.Pod{twoVolCinderPod},
+			filterName:   CinderVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's Cinder volumes",
+		},
+		{
+			newPod:       oneVolCinderPod,
+			existingPods: []*v1.Pod{twoVolCinderPod},
+			filterName:   CinderVolumeFilterType,
+			maxVols:      2,
+			fits:         false,
+			test:         "not fit when node capacity < new pod's Cinder volumes",
+		},
 	}
 
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
+	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	// running attachable predicate tests without feature gate and no limit present on nodes
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
 		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
+		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), schedulernodeinfo.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
@@ -760,13 +804,13 @@ func TestVolumeCountConflicts(t *testing.T) {
 		}
 	}
 
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
-		node := getNodeWithPodAndVolumeLimits(test.existingPods, int64(test.maxVols), test.filterName)
+		node := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), node)
+		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
@@ -832,7 +876,7 @@ func TestMaxVolumeFuncM5(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-m5-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "m5.large",
+				v1.LabelInstanceType: "m5.large",
 			},
 		},
 	}
@@ -849,7 +893,7 @@ func TestMaxVolumeFuncT3(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-t3-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "t3.medium",
+				v1.LabelInstanceType: "t3.medium",
 			},
 		},
 	}
@@ -866,7 +910,7 @@ func TestMaxVolumeFuncR5(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-r5-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "r5d.xlarge",
+				v1.LabelInstanceType: "r5d.xlarge",
 			},
 		},
 	}
@@ -883,7 +927,7 @@ func TestMaxVolumeFuncM4(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-m4-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "m4.2xlarge",
+				v1.LabelInstanceType: "m4.2xlarge",
 			},
 		},
 	}
@@ -895,17 +939,63 @@ func TestMaxVolumeFuncM4(t *testing.T) {
 	}
 }
 
-func getNodeWithPodAndVolumeLimits(pods []*v1.Pod, limit int64, filter string) *schedulercache.NodeInfo {
-	nodeInfo := schedulercache.NewNodeInfo(pods...)
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
-		Status: v1.NodeStatus{
-			Allocatable: v1.ResourceList{
-				getVolumeLimitKey(filter): *resource.NewQuantity(limit, resource.DecimalSI),
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) *schedulernodeinfo.NodeInfo {
+	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
+	addLimitToNode := func() {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{},
 			},
-		},
+		}
+		for _, driver := range driverNames {
+			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
+		}
+		nodeInfo.SetNode(node)
 	}
-	nodeInfo.SetNode(node)
+
+	createCSINode := func() *v1beta1.CSINode {
+		return &v1beta1.CSINode{
+			ObjectMeta: metav1.ObjectMeta{Name: "csi-node-for-max-pd-test-1"},
+			Spec: v1beta1.CSINodeSpec{
+				Drivers: []v1beta1.CSINodeDriver{},
+			},
+		}
+	}
+
+	addLimitToCSINode := func(addLimits bool) {
+		csiNode := createCSINode()
+		for _, driver := range driverNames {
+			driver := v1beta1.CSINodeDriver{
+				Name:   driver,
+				NodeID: "node-for-max-pd-test-1",
+			}
+			if addLimits {
+				driver.Allocatable = &v1beta1.VolumeNodeResources{
+					Count: utilpointer.Int32Ptr(int32(limit)),
+				}
+			}
+			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, driver)
+		}
+
+		nodeInfo.SetCSINode(csiNode)
+	}
+	switch limitSource {
+	case "node":
+		addLimitToNode()
+	case "csinode":
+		addLimitToCSINode(true)
+	case "both":
+		addLimitToNode()
+		addLimitToCSINode(true)
+	case "csinode-with-no-limit":
+		addLimitToCSINode(false)
+	case "no-csi-driver":
+		csiNode := createCSINode()
+		nodeInfo.SetCSINode(csiNode)
+	default:
+		return nodeInfo
+	}
 	return nodeInfo
 }
 
@@ -917,6 +1007,8 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case AzureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
 	}

@@ -52,19 +52,28 @@ type AuthOptions struct {
 	// authentication token ID.
 	TokenID string `json:"-"`
 
+	// Authentication through Application Credentials requires supplying name, project and secret
+	// For project we can use TenantID
+	ApplicationCredentialID     string `json:"-"`
+	ApplicationCredentialName   string `json:"-"`
+	ApplicationCredentialSecret string `json:"-"`
+
 	Scope Scope `json:"-"`
 }
 
 // ToTokenV3CreateMap builds a request body from AuthOptions.
 func (opts *AuthOptions) ToTokenV3CreateMap(scope map[string]interface{}) (map[string]interface{}, error) {
 	gophercloudAuthOpts := gophercloud.AuthOptions{
-		Username:    opts.Username,
-		UserID:      opts.UserID,
-		Password:    opts.Password,
-		DomainID:    opts.DomainID,
-		DomainName:  opts.DomainName,
-		AllowReauth: opts.AllowReauth,
-		TokenID:     opts.TokenID,
+		Username:                    opts.Username,
+		UserID:                      opts.UserID,
+		Password:                    opts.Password,
+		DomainID:                    opts.DomainID,
+		DomainName:                  opts.DomainName,
+		AllowReauth:                 opts.AllowReauth,
+		TokenID:                     opts.TokenID,
+		ApplicationCredentialID:     opts.ApplicationCredentialID,
+		ApplicationCredentialName:   opts.ApplicationCredentialName,
+		ApplicationCredentialSecret: opts.ApplicationCredentialSecret,
 	}
 
 	return gophercloudAuthOpts.ToTokenV3CreateMap(scope)
@@ -72,72 +81,15 @@ func (opts *AuthOptions) ToTokenV3CreateMap(scope map[string]interface{}) (map[s
 
 // ToTokenV3CreateMap builds a scope request body from AuthOptions.
 func (opts *AuthOptions) ToTokenV3ScopeMap() (map[string]interface{}, error) {
-	if opts.Scope.ProjectName != "" {
-		// ProjectName provided: either DomainID or DomainName must also be supplied.
-		// ProjectID may not be supplied.
-		if opts.Scope.DomainID == "" && opts.Scope.DomainName == "" {
-			return nil, gophercloud.ErrScopeDomainIDOrDomainName{}
-		}
-		if opts.Scope.ProjectID != "" {
-			return nil, gophercloud.ErrScopeProjectIDOrProjectName{}
-		}
+	scope := gophercloud.AuthScope(opts.Scope)
 
-		if opts.Scope.DomainID != "" {
-			// ProjectName + DomainID
-			return map[string]interface{}{
-				"project": map[string]interface{}{
-					"name":   &opts.Scope.ProjectName,
-					"domain": map[string]interface{}{"id": &opts.Scope.DomainID},
-				},
-			}, nil
-		}
-
-		if opts.Scope.DomainName != "" {
-			// ProjectName + DomainName
-			return map[string]interface{}{
-				"project": map[string]interface{}{
-					"name":   &opts.Scope.ProjectName,
-					"domain": map[string]interface{}{"name": &opts.Scope.DomainName},
-				},
-			}, nil
-		}
-	} else if opts.Scope.ProjectID != "" {
-		// ProjectID provided. ProjectName, DomainID, and DomainName may not be provided.
-		if opts.Scope.DomainID != "" {
-			return nil, gophercloud.ErrScopeProjectIDAlone{}
-		}
-		if opts.Scope.DomainName != "" {
-			return nil, gophercloud.ErrScopeProjectIDAlone{}
-		}
-
-		// ProjectID
-		return map[string]interface{}{
-			"project": map[string]interface{}{
-				"id": &opts.Scope.ProjectID,
-			},
-		}, nil
-	} else if opts.Scope.DomainID != "" {
-		// DomainID provided. ProjectID, ProjectName, and DomainName may not be provided.
-		if opts.Scope.DomainName != "" {
-			return nil, gophercloud.ErrScopeDomainIDOrDomainName{}
-		}
-
-		// DomainID
-		return map[string]interface{}{
-			"domain": map[string]interface{}{
-				"id": &opts.Scope.DomainID,
-			},
-		}, nil
-	} else if opts.Scope.DomainName != "" {
-		// DomainName
-		return map[string]interface{}{
-			"domain": map[string]interface{}{
-				"name": &opts.Scope.DomainName,
-			},
-		}, nil
+	gophercloudAuthOpts := gophercloud.AuthOptions{
+		Scope:      &scope,
+		DomainID:   opts.DomainID,
+		DomainName: opts.DomainName,
 	}
 
-	return nil, nil
+	return gophercloudAuthOpts.ToTokenV3ScopeMap()
 }
 
 func (opts *AuthOptions) CanReauth() bool {
@@ -182,15 +134,15 @@ func Get(c *gophercloud.ServiceClient, token string) (r GetResult) {
 		OkCodes:     []int{200, 203},
 	})
 	if resp != nil {
-		r.Err = err
 		r.Header = resp.Header
 	}
+	r.Err = err
 	return
 }
 
 // Validate determines if a specified token is valid or not.
 func Validate(c *gophercloud.ServiceClient, token string) (bool, error) {
-	resp, err := c.Request("HEAD", tokenURL(c), &gophercloud.RequestOpts{
+	resp, err := c.Head(tokenURL(c), &gophercloud.RequestOpts{
 		MoreHeaders: subjectTokenHeaders(c, token),
 		OkCodes:     []int{200, 204, 404},
 	})

@@ -49,6 +49,7 @@ type ClientConfigService struct {
 	Name      string
 	Namespace string
 	Path      string
+	Port      int32
 }
 
 // ClientManager builds REST clients to talk to webhooks. It caches the clients
@@ -66,14 +67,14 @@ func NewClientManager(gv schema.GroupVersion, addToSchemaFunc func(s *runtime.Sc
 	if err != nil {
 		return ClientManager{}, err
 	}
-	admissionScheme := runtime.NewScheme()
-	if err := addToSchemaFunc(admissionScheme); err != nil {
+	hookScheme := runtime.NewScheme()
+	if err := addToSchemaFunc(hookScheme); err != nil {
 		return ClientManager{}, err
 	}
 	return ClientManager{
 		cache: cache,
 		negotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(admissionScheme).LegacyCodec(gv),
+			Serializer: serializer.NewCodecFactory(hookScheme).LegacyCodec(gv),
 		}),
 	}, nil
 }
@@ -164,7 +165,11 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 		}
 		cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == host {
-				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name)
+				port := cc.Service.Port
+				if port == 0 {
+					port = 443
+				}
+				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name, port)
 				if err != nil {
 					return nil, err
 				}

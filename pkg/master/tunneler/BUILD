@@ -22,11 +22,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/master/tunneler",
     deps = [
         "//pkg/ssh:go_default_library",
-        "//pkg/util/file:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/path:go_default_library",
     ],
 )
 

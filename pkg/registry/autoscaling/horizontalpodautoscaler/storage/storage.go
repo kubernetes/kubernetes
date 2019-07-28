@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
 )
 
+// REST implements a RESTStorage for pod disruption budgets against etcd
 type REST struct {
 	*genericregistry.Store
 }
@@ -46,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: horizontalpodautoscaler.Strategy,
 		DeleteStrategy: horizontalpodautoscaler.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -74,11 +75,12 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-/// StatusREST implements the REST endpoint for changing the status of a daemonset
+// StatusREST implements the REST endpoint for changing the status of a daemonset
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new HorizontalPodAutoscaler object.
 func (r *StatusREST) New() runtime.Object {
 	return &autoscaling.HorizontalPodAutoscaler{}
 }

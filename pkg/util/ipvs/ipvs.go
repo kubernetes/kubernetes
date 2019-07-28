@@ -19,6 +19,11 @@ package ipvs
 import (
 	"net"
 	"strconv"
+	"strings"
+
+	"fmt"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/utils/exec"
 )
 
 // Interface is an injectable interface for running ipvs commands.  Implementations must be goroutine-safe.
@@ -67,14 +72,21 @@ const (
 	IPVSProxyMode = "ipvs"
 )
 
-// Sets of IPVS required kernel modules.
-var ipvsModules = []string{
-	"ip_vs",
-	"ip_vs_rr",
-	"ip_vs_wrr",
-	"ip_vs_sh",
-	"nf_conntrack_ipv4",
-}
+// IPVS required kernel modules.
+const (
+	// ModIPVS is the kernel module "ip_vs"
+	ModIPVS string = "ip_vs"
+	// ModIPVSRR is the kernel module "ip_vs_rr"
+	ModIPVSRR string = "ip_vs_rr"
+	// ModIPVSWRR is the kernel module "ip_vs_wrr"
+	ModIPVSWRR string = "ip_vs_wrr"
+	// ModIPVSSH is the kernel module "ip_vs_sh"
+	ModIPVSSH string = "ip_vs_sh"
+	// ModNfConntrackIPV4 is the module "nf_conntrack_ipv4"
+	ModNfConntrackIPV4 string = "nf_conntrack_ipv4"
+	// ModNfConntrack is the kernel module "nf_conntrack"
+	ModNfConntrack string = "nf_conntrack"
+)
 
 // Equal check the equality of virtual server.
 // We don't use struct == since it doesn't work because of slice.
@@ -109,4 +121,30 @@ func (rs *RealServer) String() string {
 func (rs *RealServer) Equal(other *RealServer) bool {
 	return rs.Address.Equal(other.Address) &&
 		rs.Port == other.Port
+}
+
+// GetKernelVersionAndIPVSMods returns the linux kernel version and the required ipvs modules
+func GetKernelVersionAndIPVSMods(Executor exec.Interface) (kernelVersion string, ipvsModules []string, err error) {
+	kernelVersionFile := "/proc/sys/kernel/osrelease"
+	out, err := Executor.Command("cut", "-f1", "-d", " ", kernelVersionFile).CombinedOutput()
+	if err != nil {
+		return "", nil, fmt.Errorf("error getting os release kernel version: %v(%s)", err, out)
+	}
+	kernelVersion = strings.TrimSpace(string(out))
+	// parse kernel version
+	ver1, err := version.ParseGeneric(kernelVersion)
+	if err != nil {
+		return kernelVersion, nil, fmt.Errorf("error parsing kernel version: %v(%s)", err, kernelVersion)
+	}
+	// "nf_conntrack_ipv4" has been removed since v4.19
+	// see https://github.com/torvalds/linux/commit/a0ae2562c6c4b2721d9fddba63b7286c13517d9f
+	ver2, _ := version.ParseGeneric("4.19")
+	// get required ipvs modules
+	if ver1.LessThan(ver2) {
+		ipvsModules = append(ipvsModules, ModIPVS, ModIPVSRR, ModIPVSWRR, ModIPVSSH, ModNfConntrackIPV4)
+	} else {
+		ipvsModules = append(ipvsModules, ModIPVS, ModIPVSRR, ModIPVSWRR, ModIPVSSH, ModNfConntrack)
+	}
+
+	return kernelVersion, ipvsModules, nil
 }

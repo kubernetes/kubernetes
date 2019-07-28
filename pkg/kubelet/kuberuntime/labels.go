@@ -20,11 +20,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -58,7 +56,6 @@ type annotatedPodSandboxInfo struct {
 
 type labeledContainerInfo struct {
 	ContainerName string
-	ContainerType kubecontainer.ContainerType
 	PodName       string
 	PodNamespace  string
 	PodUID        kubetypes.UID
@@ -97,15 +94,12 @@ func newPodAnnotations(pod *v1.Pod) map[string]string {
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.
-func newContainerLabels(container *v1.Container, pod *v1.Pod, containerType kubecontainer.ContainerType) map[string]string {
+func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string {
 	labels := map[string]string{}
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
-		labels[types.KubernetesContainerTypeLabel] = string(containerType)
-	}
 
 	return labels
 }
@@ -135,7 +129,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		// Using json encoding so that the PreStop handler object is readable after writing as a label
 		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
 		if err != nil {
-			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
+			klog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
 			annotations[containerPreStopHandlerLabel] = string(rawPreStop)
 		}
@@ -144,7 +138,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	if len(container.Ports) > 0 {
 		rawContainerPorts, err := json.Marshal(container.Ports)
 		if err != nil {
-			glog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
+			klog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
 			annotations[containerPortsLabel] = string(rawContainerPorts)
 		}
@@ -181,16 +175,11 @@ func getPodSandboxInfoFromAnnotations(annotations map[string]string) *annotatedP
 
 // getContainerInfoFromLabels gets labeledContainerInfo from labels.
 func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo {
-	var containerType kubecontainer.ContainerType
-	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
-		containerType = kubecontainer.ContainerType(getStringValueFromLabel(labels, types.KubernetesContainerTypeLabel))
-	}
 	return &labeledContainerInfo{
 		PodName:       getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
 		PodNamespace:  getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:        kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		ContainerName: getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
-		ContainerType: containerType,
 	}
 }
 
@@ -203,28 +192,28 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	}
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerHashLabel, annotations, err)
+		klog.Errorf("Unable to get %q from annotations %q: %v", containerHashLabel, annotations, err)
 	}
 	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerRestartCountLabel, annotations, err)
+		klog.Errorf("Unable to get %q from annotations %q: %v", containerRestartCountLabel, annotations, err)
 	}
 	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, podDeletionGracePeriodLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", podDeletionGracePeriodLabel, annotations, err)
+		klog.Errorf("Unable to get %q from annotations %q: %v", podDeletionGracePeriodLabel, annotations, err)
 	}
 	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, podTerminationGracePeriodLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
+		klog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
 	}
 
 	preStopHandler := &v1.Handler{}
 	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
+		klog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
 	}
 
 	containerPorts := []v1.ContainerPort{}
 	if found, err := getJSONObjectFromLabel(annotations, containerPortsLabel, &containerPorts); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerPortsLabel, annotations, err)
+		klog.Errorf("Unable to get %q from annotations %q: %v", containerPortsLabel, annotations, err)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
 	}
@@ -237,7 +226,7 @@ func getStringValueFromLabel(labels map[string]string, label string) string {
 		return value
 	}
 	// Do not report error, because there should be many old containers without label now.
-	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	klog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
 	// Return empty string "" for these containers, the caller will get value by other ways.
 	return ""
 }
@@ -252,7 +241,7 @@ func getIntValueFromLabel(labels map[string]string, label string) (int, error) {
 		return intValue, nil
 	}
 	// Do not report error, because there should be many old containers without label now.
-	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	klog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
 	// Just set the value to 0
 	return 0, nil
 }
@@ -267,7 +256,7 @@ func getUint64ValueFromLabel(labels map[string]string, label string) (uint64, er
 		return intValue, nil
 	}
 	// Do not report error, because there should be many old containers without label now.
-	glog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	klog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
 	// Just set the value to 0
 	return 0, nil
 }

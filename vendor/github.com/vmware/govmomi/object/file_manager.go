@@ -85,8 +85,8 @@ func (f FileManager) DeleteDatastoreFile(ctx context.Context, name string, dc *D
 // MakeDirectory creates a folder using the specified name.
 func (f FileManager) MakeDirectory(ctx context.Context, name string, dc *Datacenter, createParentDirectories bool) error {
 	req := types.MakeDirectory{
-		This: f.Reference(),
-		Name: name,
+		This:                    f.Reference(),
+		Name:                    name,
 		CreateParentDirectories: types.NewBool(createParentDirectories),
 	}
 

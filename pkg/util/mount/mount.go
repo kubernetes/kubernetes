@@ -29,13 +29,12 @@ type FileType string
 
 const (
 	// Default mount command if mounter path is not specified
-	defaultMountCommand           = "mount"
-	MountsInGlobalPDPath          = "mounts"
-	FileTypeDirectory    FileType = "Directory"
-	FileTypeFile         FileType = "File"
-	FileTypeSocket       FileType = "Socket"
-	FileTypeCharDev      FileType = "CharDevice"
-	FileTypeBlockDev     FileType = "BlockDevice"
+	defaultMountCommand          = "mount"
+	FileTypeDirectory   FileType = "Directory"
+	FileTypeFile        FileType = "File"
+	FileTypeSocket      FileType = "Socket"
+	FileTypeCharDev     FileType = "CharDevice"
+	FileTypeBlockDev    FileType = "BlockDevice"
 )
 
 type Interface interface {
@@ -50,28 +49,27 @@ type Interface interface {
 	List() ([]MountPoint, error)
 	// IsMountPointMatch determines if the mountpoint matches the dir
 	IsMountPointMatch(mp MountPoint, dir string) bool
-	// IsNotMountPoint determines if a directory is a mountpoint.
-	// It should return ErrNotExist when the directory does not exist.
-	// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
-	// IsNotMountPoint detects bind mounts in linux.
-	// IsNotMountPoint enumerates all the mountpoints using List() and
-	// the list of mountpoints may be large, then it uses
-	// IsMountPointMatch to evaluate whether the directory is a mountpoint
-	IsNotMountPoint(file string) (bool, error)
 	// IsLikelyNotMountPoint uses heuristics to determine if a directory
 	// is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsLikelyNotMountPoint does NOT properly detect all mountpoint types
-	// most notably linux bind mounts.
+	// most notably linux bind mounts and symbolic link.
 	IsLikelyNotMountPoint(file string) (bool, error)
+	// GetMountRefs finds all mount references to the path, returns a
+	// list of paths. Path could be a mountpoint path, device or a normal
+	// directory (for bind mount).
+	GetMountRefs(pathname string) ([]string, error)
+}
+
+type HostUtils interface {
 	// DeviceOpened determines if the device is in use elsewhere
 	// on the system, i.e. still mounted.
 	DeviceOpened(pathname string) (bool, error)
 	// PathIsDevice determines if a path is a device.
 	PathIsDevice(pathname string) (bool, error)
 	// GetDeviceNameFromMount finds the device name by checking the mount path
-	// to get the global mount path which matches its plugin directory
-	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
+	// to get the global mount path within its plugin directory
+	GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error)
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error
@@ -84,39 +82,12 @@ type Interface interface {
 	// MakeDir creates a new directory.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	MakeDir(pathname string) error
-	// SafeMakeDir creates subdir within given base. It makes sure that the
-	// created directory does not escape given base directory mis-using
-	// symlinks. Note that the function makes sure that it creates the directory
-	// somewhere under the base, nothing else. E.g. if the directory already
-	// exists, it may exist outside of the base due to symlinks.
-	// This method should be used if the directory to create is inside volume
-	// that's under user control. User must not be able to use symlinks to
-	// escape the volume to create directories somewhere else.
-	SafeMakeDir(subdir string, base string, perm os.FileMode) error
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	// Error is returned on any other error than "file not found".
 	ExistsPath(pathname string) (bool, error)
 	// EvalHostSymlinks returns the path name after evaluating symlinks.
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	EvalHostSymlinks(pathname string) (string, error)
-	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
-	// pod volume directory.
-	CleanSubPaths(podDir string, volumeName string) error
-	// PrepareSafeSubpath does everything that's necessary to prepare a subPath
-	// that's 1) inside given volumePath and 2) immutable after this call.
-	//
-	// newHostPath - location of prepared subPath. It should be used instead of
-	// hostName when running the container.
-	// cleanupAction - action to run when the container is running or it failed to start.
-	//
-	// CleanupAction must be called immediately after the container with given
-	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
-	// when the pod finishes.
-	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
-	// GetMountRefs finds all mount references to the path, returns a
-	// list of paths. Path could be a mountpoint path, device or a normal
-	// directory (for bind mount).
-	GetMountRefs(pathname string) ([]string, error)
 	// GetFSGroup returns FSGroup of the path.
 	GetFSGroup(pathname string) (int64, error)
 	// GetSELinuxSupport returns true if given path is on a mount that supports
@@ -143,7 +114,7 @@ type Subpath struct {
 
 // Exec executes command where mount utilities are. This can be either the host,
 // container where kubelet runs or even a remote pod with mount utilities.
-// Usual pkg/util/exec interface is not used because kubelet.RunInContainer does
+// Usual k8s.io/utils/exec interface is not used because kubelet.RunInContainer does
 // not provide stdin/stdout/stderr streams.
 type Exec interface {
 	// Run executes a command and returns its stdout + stderr combined in one
@@ -154,6 +125,10 @@ type Exec interface {
 // Compile-time check to ensure all Mounter implementations satisfy
 // the mount interface
 var _ Interface = &Mounter{}
+
+// Compile-time check to ensure all HostUtil implementations satisfy
+// the HostUtils Interface
+var _ HostUtils = &hostUtil{}
 
 // This represents a single line in /proc/mounts or /etc/fstab.
 type MountPoint struct {
@@ -247,9 +222,11 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 
 // IsNotMountPoint determines if a directory is a mountpoint.
 // It should return ErrNotExist when the directory does not exist.
-// This method uses the List() of all mountpoints
-// It is more extensive than IsLikelyNotMountPoint
-// and it detects bind mounts in linux
+// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
+// IsNotMountPoint detects bind mounts in linux.
+// IsNotMountPoint enumerates all the mountpoints using List() and
+// the list of mountpoints may be large, then it uses
+// IsMountPointMatch to evaluate whether the directory is a mountpoint
 func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
@@ -269,7 +246,8 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	}
 
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
-	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	hu := NewHostUtil()
+	resolvedFile, err := hu.EvalHostSymlinks(file)
 	if err != nil {
 		return true, err
 	}
@@ -289,11 +267,11 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	return notMnt, nil
 }
 
-// isBind detects whether a bind mount is being requested and makes the remount options to
+// IsBind detects whether a bind mount is being requested and makes the remount options to
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
-func isBind(options []string) (bool, []string, []string) {
+func IsBind(options []string) (bool, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.
@@ -343,13 +321,12 @@ func checkForNetDev(options []string) bool {
 // Plan to work on better approach to solve this issue.
 
 func HasMountRefs(mountPath string, mountRefs []string) bool {
-	count := 0
 	for _, ref := range mountRefs {
 		if !strings.Contains(ref, mountPath) {
-			count = count + 1
+			return true
 		}
 	}
-	return count > 0
+	return false
 }
 
 // PathWithinBase checks if give path is within given base directory.
@@ -358,15 +335,15 @@ func PathWithinBase(fullPath, basePath string) bool {
 	if err != nil {
 		return false
 	}
-	if startsWithBackstep(rel) {
+	if StartsWithBackstep(rel) {
 		// Needed to escape the base path
 		return false
 	}
 	return true
 }
 
-// startsWithBackstep checks if the given path starts with a backstep segment
-func startsWithBackstep(rel string) bool {
+// StartsWithBackstep checks if the given path starts with a backstep segment
+func StartsWithBackstep(rel string) bool {
 	// normalize to / and check for ../
 	return rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../")
 }

@@ -85,12 +85,12 @@ func SelectableFields(pip *api.Event) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pip, ok := obj.(*api.Event)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Event")
+		return nil, nil, fmt.Errorf("given object is not a Event")
 	}
-	return labels.Set(pip.ObjectMeta.Labels), SelectableFields(pip), pip.Initializers != nil, nil
+	return labels.Set(pip.ObjectMeta.Labels), SelectableFields(pip), nil
 }
 
 // Matcher is the filter used by the generic etcd backend to watch events

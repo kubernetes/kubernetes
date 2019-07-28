@@ -17,6 +17,41 @@ go_library(
     importpath = "github.com/opencontainers/runc/libcontainer/system",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "//conditions:default": [],
+    }) + select({
         "@io_bazel_rules_go//go/platform:linux_386": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

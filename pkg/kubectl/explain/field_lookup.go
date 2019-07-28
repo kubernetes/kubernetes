@@ -89,6 +89,10 @@ func (f *fieldLookup) VisitKind(k *proto.Kind) {
 	subSchema.Accept(f)
 }
 
+func (f *fieldLookup) VisitArbitrary(a *proto.Arbitrary) {
+	f.Schema = a
+}
+
 // VisitReference is mostly a passthrough.
 func (f *fieldLookup) VisitReference(r proto.Reference) {
 	if f.SaveLeafSchema(r) {

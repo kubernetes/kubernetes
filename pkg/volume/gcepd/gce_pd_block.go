@@ -18,18 +18,17 @@ package gcepd
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strconv"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
@@ -46,7 +45,7 @@ func (plugin *gcePersistentDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	klog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 
 	globalMapPath := filepath.Dir(globalMapPathUUID)
 	if len(globalMapPath) <= 1 {
@@ -163,12 +162,12 @@ func (pd *gcePersistentDisk) GetGlobalMapPath(spec *volume.Spec) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return path.Join(pd.plugin.host.GetVolumeDevicePluginDir(gcePersistentDiskPluginName), string(volumeSource.PDName)), nil
+	return filepath.Join(pd.plugin.host.GetVolumeDevicePluginDir(gcePersistentDiskPluginName), string(volumeSource.PDName)), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name
 // path: pods/{podUid}/volumeDevices/kubernetes.io~aws
 func (pd *gcePersistentDisk) GetPodDeviceMapPath() (string, string) {
 	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDeviceDir(pd.podUID, kstrings.EscapeQualifiedNameForDisk(name)), pd.volName
+	return pd.plugin.host.GetPodVolumeDeviceDir(pd.podUID, utilstrings.EscapeQualifiedName(name)), pd.volName
 }

@@ -51,7 +51,7 @@ func UnsafeObjectConvertor(scheme *Scheme) ObjectConvertor {
 func SetField(src interface{}, v reflect.Value, fieldName string) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	srcValue := reflect.ValueOf(src)
 	if srcValue.Type().AssignableTo(field.Type()) {
@@ -70,7 +70,7 @@ func SetField(src interface{}, v reflect.Value, fieldName string) error {
 func Field(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	destValue, err := conversion.EnforcePtr(dest)
 	if err != nil {
@@ -93,7 +93,7 @@ func Field(v reflect.Value, fieldName string, dest interface{}) error {
 func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	v, err := conversion.EnforcePtr(dest)
 	if err != nil {
@@ -210,3 +210,50 @@ type defaultFramer struct{}
 
 func (defaultFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser { return r }
 func (defaultFramer) NewFrameWriter(w io.Writer) io.Writer         { return w }
+
+// WithVersionEncoder serializes an object and ensures the GVK is set.
+type WithVersionEncoder struct {
+	Version GroupVersioner
+	Encoder
+	ObjectTyper
+}
+
+// Encode does not do conversion. It sets the gvk during serialization.
+func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
+	gvks, _, err := e.ObjectTyper.ObjectKinds(obj)
+	if err != nil {
+		if IsNotRegisteredError(err) {
+			return e.Encoder.Encode(obj, stream)
+		}
+		return err
+	}
+	kind := obj.GetObjectKind()
+	oldGVK := kind.GroupVersionKind()
+	gvk := gvks[0]
+	if e.Version != nil {
+		preferredGVK, ok := e.Version.KindForGroupVersionKinds(gvks)
+		if ok {
+			gvk = preferredGVK
+		}
+	}
+	kind.SetGroupVersionKind(gvk)
+	err = e.Encoder.Encode(obj, stream)
+	kind.SetGroupVersionKind(oldGVK)
+	return err
+}
+
+// WithoutVersionDecoder clears the group version kind of a deserialized object.
+type WithoutVersionDecoder struct {
+	Decoder
+}
+
+// Decode does not do conversion. It removes the gvk during deserialization.
+func (d WithoutVersionDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
+	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
+	if obj != nil {
+		kind := obj.GetObjectKind()
+		// clearing the gvk is just a convention of a codec
+		kind.SetGroupVersionKind(schema.GroupVersionKind{})
+	}
+	return obj, gvk, err
+}

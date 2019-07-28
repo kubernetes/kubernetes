@@ -26,9 +26,9 @@ run_kubectl_get_tests() {
   kube::log::status "Testing kubectl get"
   ### Test retrieval of non-existing pods
   # Pre-condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
-  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}")
+  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]:?}")
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 
@@ -98,7 +98,7 @@ run_kubectl_get_tests() {
   # Post-condition: make sure we don't display an empty List
   if kube::test::if_has_string "${output_message}" 'List'; then
     echo 'Unexpected List output'
-    echo "${LINENO} $(basename $0)"
+    echo "${LINENO} $(basename "$0")"
     exit 1
   fi
 
@@ -129,9 +129,19 @@ run_kubectl_get_tests() {
   # Post-condition: Check if we get a limit and continue
   kube::test::if_has_string "${output_message}" "/clusterroles?limit=500 200 OK"
 
+  ### Test kubectl get accumulates pages
+  output_message=$(kubectl get namespaces --chunk-size=1 --no-headers "${kube_flags[@]}")
+  # Post-condition: Check we got multiple pages worth of namespaces
+  kube::test::if_has_string "${output_message}" "default"
+  kube::test::if_has_string "${output_message}" "kube-public"
+  kube::test::if_has_string "${output_message}" "kube-system"
+
   ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
-  # Pre-condition: no ConfigMaps exist
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: ConfigMap one two tree does not exist
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"one\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"two\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"three\\\" }}found{{end}}{{end}}:" ':'
+
   # Post-condition: Create three configmaps and ensure that we can --watch them with a --chunk-size of 1
   kubectl create cm one "${kube_flags[@]}"
   kubectl create cm two "${kube_flags[@]}"
@@ -162,7 +172,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" 'valid-pod:'
 
   ## check --allow-missing-template-keys=false results in an error for a missing key with jsonpath
-  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' "${kube_flags[@]}")
+  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'missing is not found'
 
   ## check --allow-missing-template-keys=false results in an error for a missing key with go
@@ -198,6 +208,29 @@ run_kubectl_get_tests() {
 
   # cleanup
   kubectl delete pods redis-master valid-pod "${kube_flags[@]}"
+
+  ### Test 'kubectl get -k <dir>' prints all the items built from a kustomization directory
+  # Pre-condition: no ConfigMap, Deployment, Service exist
+  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl apply -k hack/testdata/kustomize
+  # Post-condition: test-the-map, test-the-deployment, test-the-service exist
+
+  # Check that all items in the list are printed
+  output_message=$(kubectl get -k hack/testdata/kustomize -o jsonpath="{..metadata.name}" "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "test-the-map"
+  kube::test::if_has_string "${output_message}" "test-the-deployment"
+  kube::test::if_has_string "${output_message}" "test-the-service"
+
+  # cleanup
+  kubectl delete -k hack/testdata/kustomize
+
+  # Check that all items in the list are deleted
+  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
 
   set +o nounset
   set +o errexit
@@ -330,8 +363,12 @@ run_kubectl_all_namespace_tests() {
   kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-1
   kubectl create "${kube_flags[@]}" namespace all-ns-test-2
   kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-2
-  # Ensure listing across namespaces displays the namespace
+  # Ensure listing across namespaces displays the namespace (--all-namespaces)
   output_message=$(kubectl get serviceaccounts --all-namespaces "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "all-ns-test-1"
+  kube::test::if_has_string "${output_message}" "all-ns-test-2"
+  # Ensure listing across namespaces displays the namespace (-A)
+  output_message=$(kubectl get serviceaccounts -A "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" "all-ns-test-1"
   kube::test::if_has_string "${output_message}" "all-ns-test-2"
   # Clean up

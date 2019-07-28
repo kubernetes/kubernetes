@@ -22,7 +22,6 @@ go_library(
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -63,6 +63,12 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("spec.resourceAttributes.namespace must match namespace: %v", namespace))
 	}
 
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(localSubjectAccessReview.Spec)
 	decision, reason, evaluationErr := r.authorizer.Authorize(authorizationAttributes)
 

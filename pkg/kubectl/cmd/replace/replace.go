@@ -19,26 +19,29 @@ package replace
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var (
@@ -48,9 +51,7 @@ var (
 		JSON and YAML formats are accepted. If replacing an existing resource, the
 		complete resource spec must be provided. This can be obtained by
 
-		    $ kubectl get TYPE NAME -o yaml
-
-		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
+		    $ kubectl get TYPE NAME -o yaml`))
 
 	replaceExample = templates.Examples(i18n.T(`
 		# Replace a pod using the data in pod.json.
@@ -84,6 +85,7 @@ type ReplaceOptions struct {
 
 	Namespace        string
 	EnforceNamespace bool
+	Raw              string
 
 	Recorder genericclioptions.Recorder
 
@@ -111,7 +113,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.Run(f))
 		},
 	}
 
@@ -119,9 +121,10 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o.DeleteFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
+
+	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 
 	return cmd
 }
@@ -165,6 +168,11 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 	o.DeleteOptions = deleteOpts
 
+	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
+
 	schema, err := f.Validator(o.validate)
 	if err != nil {
 		return err
@@ -191,14 +199,42 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames) {
+	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
 		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
+	}
+
+	if len(o.Raw) > 0 {
+		if len(o.DeleteOptions.FilenameOptions.Filenames) != 1 {
+			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+		}
+		if strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "https://") == 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+		}
+		if o.DeleteOptions.FilenameOptions.Recursive {
+			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+		}
+		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		}
+		if _, err := url.ParseRequestURI(o.Raw); err != nil {
+			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+		}
 	}
 
 	return nil
 }
 
-func (o *ReplaceOptions) Run() error {
+func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
+	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
+	// the validator enforces this, so
+	if len(o.Raw) > 0 {
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+		return rawhttp.RawPut(restClient, o.IOStreams, o.Raw, o.DeleteOptions.Filenames[0])
+	}
+
 	if o.DeleteOptions.ForceDeletion {
 		return o.forceReplace()
 	}
@@ -220,12 +256,12 @@ func (o *ReplaceOptions) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
+		if err := util.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		// Serialize the object with the annotation applied.
@@ -311,12 +347,12 @@ func (o *ReplaceOptions) forceReplace() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
+		if err := util.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, nil)

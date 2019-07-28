@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "decode.go",
         "doc.go",
-        "dot.go",
         "encode.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/gonum.org/v1/gonum/graph/encoding/dot",

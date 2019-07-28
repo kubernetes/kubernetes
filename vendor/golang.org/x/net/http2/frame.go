@@ -14,8 +14,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
-	"golang.org/x/net/lex/httplex"
 )
 
 const frameHeaderLen = 9
@@ -733,32 +733,67 @@ func (f *SettingsFrame) IsAck() bool {
 	return f.FrameHeader.Flags.Has(FlagSettingsAck)
 }
 
-func (f *SettingsFrame) Value(s SettingID) (v uint32, ok bool) {
+func (f *SettingsFrame) Value(id SettingID) (v uint32, ok bool) {
 	f.checkValid()
-	buf := f.p
-	for len(buf) > 0 {
-		settingID := SettingID(binary.BigEndian.Uint16(buf[:2]))
-		if settingID == s {
-			return binary.BigEndian.Uint32(buf[2:6]), true
+	for i := 0; i < f.NumSettings(); i++ {
+		if s := f.Setting(i); s.ID == id {
+			return s.Val, true
 		}
-		buf = buf[6:]
 	}
 	return 0, false
+}
+
+// Setting returns the setting from the frame at the given 0-based index.
+// The index must be >= 0 and less than f.NumSettings().
+func (f *SettingsFrame) Setting(i int) Setting {
+	buf := f.p
+	return Setting{
+		ID:  SettingID(binary.BigEndian.Uint16(buf[i*6 : i*6+2])),
+		Val: binary.BigEndian.Uint32(buf[i*6+2 : i*6+6]),
+	}
+}
+
+func (f *SettingsFrame) NumSettings() int { return len(f.p) / 6 }
+
+// HasDuplicates reports whether f contains any duplicate setting IDs.
+func (f *SettingsFrame) HasDuplicates() bool {
+	num := f.NumSettings()
+	if num == 0 {
+		return false
+	}
+	// If it's small enough (the common case), just do the n^2
+	// thing and avoid a map allocation.
+	if num < 10 {
+		for i := 0; i < num; i++ {
+			idi := f.Setting(i).ID
+			for j := i + 1; j < num; j++ {
+				idj := f.Setting(j).ID
+				if idi == idj {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	seen := map[SettingID]bool{}
+	for i := 0; i < num; i++ {
+		id := f.Setting(i).ID
+		if seen[id] {
+			return true
+		}
+		seen[id] = true
+	}
+	return false
 }
 
 // ForeachSetting runs fn for each setting.
 // It stops and returns the first error.
 func (f *SettingsFrame) ForeachSetting(fn func(Setting) error) error {
 	f.checkValid()
-	buf := f.p
-	for len(buf) > 0 {
-		if err := fn(Setting{
-			SettingID(binary.BigEndian.Uint16(buf[:2])),
-			binary.BigEndian.Uint32(buf[2:6]),
-		}); err != nil {
+	for i := 0; i < f.NumSettings(); i++ {
+		if err := fn(f.Setting(i)); err != nil {
 			return err
 		}
-		buf = buf[6:]
 	}
 	return nil
 }
@@ -1442,7 +1477,7 @@ func (fr *Framer) maxHeaderStringLen() int {
 }
 
 // readMetaFrame returns 0 or more CONTINUATION frames from fr and
-// merge them into into the provided hf and returns a MetaHeadersFrame
+// merge them into the provided hf and returns a MetaHeadersFrame
 // with the decoded hpack values.
 func (fr *Framer) readMetaFrame(hf *HeadersFrame) (*MetaHeadersFrame, error) {
 	if fr.AllowIllegalReads {
@@ -1462,7 +1497,7 @@ func (fr *Framer) readMetaFrame(hf *HeadersFrame) (*MetaHeadersFrame, error) {
 		if VerboseLogs && fr.logReads {
 			fr.debugReadLoggerf("http2: decoded hpack field %+v", hf)
 		}
-		if !httplex.ValidHeaderFieldValue(hf.Value) {
+		if !httpguts.ValidHeaderFieldValue(hf.Value) {
 			invalid = headerFieldValueError(hf.Value)
 		}
 		isPseudo := strings.HasPrefix(hf.Name, ":")

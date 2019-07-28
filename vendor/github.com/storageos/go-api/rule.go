@@ -3,7 +3,6 @@ package storageos
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -98,7 +97,7 @@ func (c *Client) RuleUpdate(opts types.RuleUpdateOptions) (*types.Rule, error) {
 	if IsUUID(opts.ID) {
 		ref = opts.ID
 	}
-	fmt.Printf("%#v\n", opts)
+
 	path, err := namespacedRefPath(opts.Namespace, RuleAPIPrefix, ref)
 	if err != nil {
 		return nil, err

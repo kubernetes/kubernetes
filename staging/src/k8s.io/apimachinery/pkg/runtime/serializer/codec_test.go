@@ -32,9 +32,9 @@ import (
 	serializertesting "k8s.io/apimachinery/pkg/runtime/serializer/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 
-	"github.com/ghodss/yaml"
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
+	"sigs.k8s.io/yaml"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
@@ -312,7 +312,7 @@ func TestDirectCodec(t *testing.T) {
 	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	serializer := info.Serializer
-	df := DirectCodecFactory{cf}
+	df := cf.WithoutConversion()
 	ignoredGV, err := schema.ParseGroupVersion("ignored group/ignored version")
 	if err != nil {
 		t.Fatal(err)

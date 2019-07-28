@@ -27,6 +27,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,9 +42,9 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -239,6 +240,16 @@ func (c conversionClient) Patch(name string, pt types.PatchType, data []byte, su
 	return nil, errors.New("Patch() is not implemented for conversionClient")
 }
 
+func (c conversionClient) GetScale(name string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	// This is not used by RSC.
+	return nil, errors.New("GetScale() is not implemented for conversionClient")
+}
+
+func (c conversionClient) UpdateScale(name string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+	// This is not used by RSC.
+	return nil, errors.New("UpdateScale() is not implemented for conversionClient")
+}
+
 func convertSlice(rcList []*v1.ReplicationController) ([]*apps.ReplicaSet, error) {
 	rsList := make([]*apps.ReplicaSet, 0, len(rcList))
 	for _, rc := range rcList {
@@ -276,26 +287,26 @@ func convertCall(fn func(*v1.ReplicationController) (*v1.ReplicationController, 
 }
 
 func convertRCtoRS(rc *v1.ReplicationController, out *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	var rsInternal extensions.ReplicaSet
-	if err := apiv1.Convert_v1_ReplicationController_To_extensions_ReplicaSet(rc, &rsInternal, nil); err != nil {
+	var rsInternal appsinternal.ReplicaSet
+	if err := apiv1.Convert_v1_ReplicationController_To_apps_ReplicaSet(rc, &rsInternal, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicationController %v/%v to ReplicaSet: %v", rc.Namespace, rc.Name, err)
 	}
 	if out == nil {
 		out = new(apps.ReplicaSet)
 	}
-	if err := appsconversion.Convert_extensions_ReplicaSet_To_v1_ReplicaSet(&rsInternal, out, nil); err != nil {
-		return nil, fmt.Errorf("can't convert ReplicaSet (converted from ReplicationController %v/%v) from internal to extensions/v1beta1: %v", rc.Namespace, rc.Name, err)
+	if err := appsconversion.Convert_apps_ReplicaSet_To_v1_ReplicaSet(&rsInternal, out, nil); err != nil {
+		return nil, fmt.Errorf("can't convert ReplicaSet (converted from ReplicationController %v/%v) from internal to apps/v1: %v", rc.Namespace, rc.Name, err)
 	}
 	return out, nil
 }
 
 func convertRStoRC(rs *apps.ReplicaSet) (*v1.ReplicationController, error) {
-	var rsInternal extensions.ReplicaSet
-	if err := appsconversion.Convert_v1_ReplicaSet_To_extensions_ReplicaSet(rs, &rsInternal, nil); err != nil {
-		return nil, fmt.Errorf("can't convert ReplicaSet (converting to ReplicationController %v/%v) from extensions/v1beta1 to internal: %v", rs.Namespace, rs.Name, err)
+	var rsInternal appsinternal.ReplicaSet
+	if err := appsconversion.Convert_v1_ReplicaSet_To_apps_ReplicaSet(rs, &rsInternal, nil); err != nil {
+		return nil, fmt.Errorf("can't convert ReplicaSet (converting to ReplicationController %v/%v) from apps/v1 to internal: %v", rs.Namespace, rs.Name, err)
 	}
 	var rc v1.ReplicationController
-	if err := apiv1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(&rsInternal, &rc, nil); err != nil {
+	if err := apiv1.Convert_apps_ReplicaSet_To_v1_ReplicationController(&rsInternal, &rc, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicaSet to ReplicationController %v/%v: %v", rs.Namespace, rs.Name, err)
 	}
 	return &rc, nil

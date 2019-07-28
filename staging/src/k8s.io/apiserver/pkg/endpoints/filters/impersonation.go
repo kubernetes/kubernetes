@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
@@ -42,7 +42,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		impersonationRequests, err := buildImpersonationRequests(req.Header)
 		if err != nil {
-			glog.V(4).Infof("%v", err)
+			klog.V(4).Infof("%v", err)
 			responsewriters.InternalError(w, req, err)
 			return
 		}
@@ -68,16 +68,18 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		groups := []string{}
 		userExtra := map[string][]string{}
 		for _, impersonationRequest := range impersonationRequests {
+			gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
 			actingAsAttributes := &authorizer.AttributesRecord{
 				User:            requestor,
 				Verb:            "impersonate",
-				APIGroup:        impersonationRequest.GetObjectKind().GroupVersionKind().Group,
+				APIGroup:        gvk.Group,
+				APIVersion:      gvk.Version,
 				Namespace:       impersonationRequest.Namespace,
 				Name:            impersonationRequest.Name,
 				ResourceRequest: true,
 			}
 
-			switch impersonationRequest.GetObjectKind().GroupVersionKind().GroupKind() {
+			switch gvk.GroupKind() {
 			case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
 				actingAsAttributes.Resource = "serviceaccounts"
 				username = serviceaccount.MakeUsername(impersonationRequest.Namespace, impersonationRequest.Name)
@@ -102,15 +104,15 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
 
 			default:
-				glog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
+				klog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
-				glog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, "", s)
+				klog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
+				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return
 			}
 		}

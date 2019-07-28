@@ -19,8 +19,8 @@ package admit
 import (
 	"io"
 
-	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/klog"
 )
 
 // PluginName indicates name of admission plugin.
@@ -40,12 +40,12 @@ var _ admission.MutationInterface = alwaysAdmit{}
 var _ admission.ValidationInterface = alwaysAdmit{}
 
 // Admit makes an admission decision based on the request attributes
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+func (alwaysAdmit) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 
 // Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
-func (alwaysAdmit) Validate(a admission.Attributes) (err error) {
+func (alwaysAdmit) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 
@@ -58,7 +58,7 @@ func (alwaysAdmit) Handles(operation admission.Operation) bool {
 // NewAlwaysAdmit creates a new always admit admission handler
 func NewAlwaysAdmit() admission.Interface {
 	// DEPRECATED: AlwaysAdmit admit all admission request, it is no use.
-	glog.Warningf("%s admission controller is deprecated. "+
+	klog.Warningf("%s admission controller is deprecated. "+
 		"Please remove this controller from your configuration files and scripts.", PluginName)
 	return new(alwaysAdmit)
 }

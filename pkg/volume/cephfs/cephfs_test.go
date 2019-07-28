@@ -18,7 +18,7 @@ package cephfs
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -83,11 +83,11 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 	volumePath := mounter.GetPath()
-	volpath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cephfs/vol1")
+	volpath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cephfs/vol1")
 	if volumePath != volpath {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err != nil {

@@ -34,7 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
+	"k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -66,12 +66,14 @@ func TestTLSConnection(t *testing.T) {
 	defer cluster.Terminate(t)
 
 	cfg := storagebackend.Config{
-		Type:       storagebackend.StorageTypeETCD3,
-		ServerList: []string{cluster.Members[0].GRPCAddr()},
-		CertFile:   certFile,
-		KeyFile:    keyFile,
-		CAFile:     caFile,
-		Codec:      codec,
+		Type: storagebackend.StorageTypeETCD3,
+		Transport: storagebackend.TransportConfig{
+			ServerList: []string{cluster.Members[0].GRPCAddr()},
+			CertFile:   certFile,
+			KeyFile:    keyFile,
+			CAFile:     caFile,
+		},
+		Codec: codec,
 	}
 	storage, destroyFunc, err := newETCD3Storage(cfg)
 	defer destroyFunc()

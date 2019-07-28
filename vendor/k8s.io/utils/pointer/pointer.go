@@ -56,7 +56,7 @@ func Int64Ptr(i int64) *int64 {
 	return &i
 }
 
-// Int32PtrDerefOr dereference the int32 ptr and returns it i not nil,
+// Int32PtrDerefOr dereference the int32 ptr and returns it if not nil,
 // else returns def.
 func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 	if ptr != nil {
@@ -73,4 +73,14 @@ func BoolPtr(b bool) *bool {
 // StringPtr returns a pointer to the passed string.
 func StringPtr(s string) *string {
 	return &s
+}
+
+// Float32Ptr returns a pointer to the passed float32.
+func Float32Ptr(i float32) *float32 {
+	return &i
+}
+
+// Float64Ptr returns a pointer to the passed float64.
+func Float64Ptr(i float64) *float64 {
+	return &i
 }

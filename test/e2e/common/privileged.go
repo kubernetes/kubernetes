@@ -19,14 +19,14 @@ package common
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// PrivilegedPodTestConfig is configuration struct for privileged pod test
 type PrivilegedPodTestConfig struct {
 	f *framework.Framework
 
@@ -45,14 +45,15 @@ var _ = framework.KubeDescribe("PrivilegedPod [NodeConformance]", func() {
 		notPrivilegedContainer: "not-privileged-container",
 	}
 
-	It("should enable privileged commands", func() {
-		By("Creating a pod with a privileged container")
+	ginkgo.It("should enable privileged commands [LinuxOnly]", func() {
+		// Windows does not support privileged containers.
+		ginkgo.By("Creating a pod with a privileged container")
 		config.createPods()
 
-		By("Executing in the privileged container")
+		ginkgo.By("Executing in the privileged container")
 		config.run(config.privilegedContainer, true)
 
-		By("Executing in the non-privileged container")
+		ginkgo.By("Executing in the non-privileged container")
 		config.run(config.notPrivilegedContainer, false)
 	})
 })
@@ -66,15 +67,15 @@ func (c *PrivilegedPodTestConfig) run(containerName string, expectSuccess bool) 
 	msg := fmt.Sprintf("cmd %v, stdout %q, stderr %q", cmd, stdout, stderr)
 
 	if expectSuccess {
-		Expect(err).NotTo(HaveOccurred(), msg)
+		framework.ExpectNoError(err, msg)
 		// We need to clean up the dummy link that was created, as it
 		// leaks out into the node level -- yuck.
 		_, _, err := c.f.ExecCommandInContainerWithFullOutput(
 			c.privilegedPod, containerName, reverseCmd...)
-		Expect(err).NotTo(HaveOccurred(),
+		framework.ExpectNoError(err,
 			fmt.Sprintf("could not remove dummy1 link: %v", err))
 	} else {
-		Expect(err).To(HaveOccurred(), msg)
+		framework.ExpectError(err, msg)
 	}
 }
 

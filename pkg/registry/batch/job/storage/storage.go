@@ -37,6 +37,7 @@ type JobStorage struct {
 	Status *StatusREST
 }
 
+// NewStorage creates a new JobStorage against etcd.
 func NewStorage(optsGetter generic.RESTOptionsGetter) JobStorage {
 	jobRest, jobStatusRest := NewREST(optsGetter)
 
@@ -63,7 +64,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: job.Strategy,
 		DeleteStrategy: job.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: job.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -89,6 +90,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new Job object.
 func (r *StatusREST) New() runtime.Object {
 	return &batch.Job{}
 }

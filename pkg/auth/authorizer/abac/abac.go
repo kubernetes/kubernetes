@@ -14,10 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package abac authorizes Kubernetes API actions using an Attribute-based access control scheme.
 package abac
-
-// Policy authorizes Kubernetes API actions using an Attribute-based access
-// control scheme.
 
 import (
 	"bufio"
@@ -25,12 +23,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/abac"
+
+	// Import latest API for init/side-effects
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 )
@@ -49,10 +49,13 @@ func (p policyLoadError) Error() string {
 	return fmt.Sprintf("error reading policy file %s: %v", p.path, p.err)
 }
 
-type policyList []*abac.Policy
+// PolicyList is simply a slice of Policy structs.
+type PolicyList []*abac.Policy
 
+// NewFromFile attempts to create a policy list from the given file.
+//
 // TODO: Have policies be created via an API call and stored in REST storage.
-func NewFromFile(path string) (policyList, error) {
+func NewFromFile(path string) (PolicyList, error) {
 	// File format is one map per line.  This allows easy concatenation of files,
 	// comments in files, and identification of errors by line number.
 	file, err := os.Open(path)
@@ -62,7 +65,7 @@ func NewFromFile(path string) (policyList, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	pl := make(policyList, 0)
+	pl := make(PolicyList, 0)
 
 	decoder := abac.Codecs.UniversalDecoder()
 
@@ -105,7 +108,7 @@ func NewFromFile(path string) (policyList, error) {
 	}
 
 	if unversionedLines > 0 {
-		glog.Warningf("Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", path)
+		klog.Warningf("Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", path)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -220,20 +223,21 @@ func resourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 	return false
 }
 
-// Authorizer implements authorizer.Authorize
-func (pl policyList) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+// Authorize implements authorizer.Authorize
+func (pl PolicyList) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	for _, p := range pl {
 		if matches(*p, a) {
 			return authorizer.DecisionAllow, "", nil
 		}
 	}
-	return authorizer.DecisionNoOpinion, "no ABAC policy matched", nil
+	return authorizer.DecisionNoOpinion, "No policy matched.", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.
 }
 
-func (pl policyList) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+// RulesFor returns rules for the given user and namespace.
+func (pl PolicyList) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo
 		nonResourceRules []authorizer.NonResourceRuleInfo

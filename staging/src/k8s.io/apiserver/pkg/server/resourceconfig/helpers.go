@@ -24,7 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog"
 )
 
 // GroupVersionRegistry provides access to registered group versions.
@@ -50,24 +51,12 @@ func MergeResourceEncodingConfigs(
 	return resourceEncodingConfig
 }
 
-// MergeGroupEncodingConfigs merges the given defaultResourceConfig with specific GroupVersion overrides.
-func MergeGroupEncodingConfigs(
-	defaultResourceEncoding *serverstore.DefaultResourceEncodingConfig,
-	storageEncodingOverrides map[string]schema.GroupVersion,
-) *serverstore.DefaultResourceEncodingConfig {
-	resourceEncodingConfig := defaultResourceEncoding
-	for group, storageEncodingVersion := range storageEncodingOverrides {
-		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
-	}
-	return resourceEncodingConfig
-}
-
 // MergeAPIResourceConfigs merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
 // Exclude the groups not registered in registry, and check if version is
 // not registered in group, then it will fail.
 func MergeAPIResourceConfigs(
 	defaultAPIResourceConfig *serverstore.ResourceConfig,
-	resourceConfigOverrides utilflag.ConfigurationMap,
+	resourceConfigOverrides cliflag.ConfigurationMap,
 	registry GroupVersionRegistry,
 ) (*serverstore.ResourceConfig, error) {
 	resourceConfig := defaultAPIResourceConfig
@@ -94,13 +83,20 @@ func MergeAPIResourceConfigs(
 		}
 
 		tokens := strings.Split(key, "/")
-		if len(tokens) != 2 {
+		if len(tokens) < 2 {
 			continue
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
+		}
+
+		// individual resource enablement/disablement is only supported in the extensions/v1beta1 API group for legacy reasons.
+		// all other API groups are expected to contain coherent sets of resources that are enabled/disabled together.
+		if len(tokens) > 2 && (groupVersion != schema.GroupVersion{Group: "extensions", Version: "v1beta1"}) {
+			klog.Warningf("ignoring invalid key %s, individual resource enablement/disablement is not supported in %s, and will prevent starting in future releases", key, groupVersion.String())
+			continue
 		}
 
 		// Exclude group not registered into the registry.
@@ -117,16 +113,28 @@ func MergeAPIResourceConfigs(
 			return nil, err
 		}
 		if enabled {
+			// enable the groupVersion for "group/version=true" and "group/version/resource=true"
 			resourceConfig.EnableVersions(groupVersion)
-		} else {
+		} else if len(tokens) == 2 {
+			// disable the groupVersion only for "group/version=false", not "group/version/resource=false"
 			resourceConfig.DisableVersions(groupVersion)
+		}
+
+		if len(tokens) < 3 {
+			continue
+		}
+		groupVersionResource := groupVersion.WithResource(tokens[2])
+		if enabled {
+			resourceConfig.EnableResources(groupVersionResource)
+		} else {
+			resourceConfig.DisableResources(groupVersionResource)
 		}
 	}
 
 	return resourceConfig, nil
 }
 
-func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+func getRuntimeConfigValue(overrides cliflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
 	flagValue, ok := overrides[apiKey]
 	if ok {
 		if flagValue == "" {
@@ -142,7 +150,7 @@ func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, d
 }
 
 // ParseGroups takes in resourceConfig and returns parsed groups.
-func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
+func ParseGroups(resourceConfig cliflag.ConfigurationMap) ([]string, error) {
 	groups := []string{}
 	for key := range resourceConfig {
 		if key == "api/all" {

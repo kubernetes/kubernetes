@@ -223,7 +223,7 @@ type UpdateOpts struct {
 	ExpectedCodes string `json:"expected_codes,omitempty"`
 
 	// The Name of the Monitor.
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// The administrative state of the Monitor. A valid value is true (UP)
 	// or false (DOWN).

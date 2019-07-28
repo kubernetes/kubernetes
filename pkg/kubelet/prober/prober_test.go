@@ -233,6 +233,11 @@ func TestProbe(t *testing.T) {
 			execResult:     probe.Success,
 			expectedResult: results.Success,
 		},
+		{ // Probe result is warning
+			probe:          execProbe,
+			execResult:     probe.Warning,
+			expectedResult: results.Success,
+		},
 		{ // Probe result is unknown
 			probe:          execProbe,
 			execResult:     probe.Unknown,

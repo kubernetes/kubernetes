@@ -22,8 +22,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -47,6 +48,8 @@ type cadvisorStatsProvider struct {
 	resourceAnalyzer stats.ResourceAnalyzer
 	// imageService is used to get the stats of the image filesystem.
 	imageService kubecontainer.ImageService
+	// statusProvider is used to get pod metadata
+	statusProvider status.PodStatusProvider
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -55,11 +58,13 @@ func newCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	imageService kubecontainer.ImageService,
+	statusProvider status.PodStatusProvider,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
 		cadvisor:         cadvisor,
 		resourceAnalyzer: resourceAnalyzer,
 		imageService:     imageService,
+		statusProvider:   statusProvider,
 	}
 }
 
@@ -114,7 +119,6 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			// Special case for infrastructure container which is hidden from
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats("pod:"+ref.Namespace+"_"+ref.Name, &cinfo)
-			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
 		} else {
 			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo))
 		}
@@ -131,7 +135,83 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			copy(ephemeralStats, vstats.EphemeralVolumes)
 			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
 		}
-		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo)
+		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, nil, false)
+		// Lookup the pod-level cgroup's CPU and memory stats
+		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
+		if podInfo != nil {
+			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
+			podStats.CPU = cpu
+			podStats.Memory = memory
+		}
+
+		status, found := p.statusProvider.GetPodStatus(podUID)
+		if found && status.StartTime != nil && !status.StartTime.IsZero() {
+			podStats.StartTime = *status.StartTime
+			// only append stats if we were able to get the start time of the pod
+			result = append(result, *podStats)
+		}
+	}
+
+	return result, nil
+}
+
+// ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
+// the containers and returns the stats for all the pod-managed containers.
+// For cadvisor, cpu nano core usages are pre-computed and cached, so this
+// function simply calls ListPodStats.
+func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return p.ListPodStats()
+}
+
+// ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
+func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+	infos, err := getCadvisorContainerInfo(p.cadvisor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
+	}
+	// removeTerminatedContainerInfo will also remove pod level cgroups, so save the infos into allInfos first
+	allInfos := infos
+	infos = removeTerminatedContainerInfo(infos)
+	// Map each container to a pod and update the PodStats with container data.
+	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
+	for key, cinfo := range infos {
+		// On systemd using devicemapper each mount into the container has an
+		// associated cgroup. We ignore them to ensure we do not get duplicate
+		// entries in our summary. For details on .mount units:
+		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
+		if strings.HasSuffix(key, ".mount") {
+			continue
+		}
+		// Build the Pod key if this container is managed by a Pod
+		if !isPodManagedContainer(&cinfo) {
+			continue
+		}
+		ref := buildPodRef(cinfo.Spec.Labels)
+
+		// Lookup the PodStats for the pod using the PodRef. If none exists,
+		// initialize a new entry.
+		podStats, found := podToStats[ref]
+		if !found {
+			podStats = &statsapi.PodStats{PodRef: ref}
+			podToStats[ref] = podStats
+		}
+
+		// Update the PodStats entry with the stats from the container by
+		// adding it to podStats.Containers.
+		containerName := kubetypes.GetContainerName(cinfo.Spec.Labels)
+		if containerName == leaky.PodInfraContainerName {
+			// Special case for infrastructure container which is hidden from
+			// the user and has network stats.
+			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
+		} else {
+			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerCPUAndMemoryStats(containerName, &cinfo))
+		}
+	}
+
+	// Add each PodStats to the result.
+	result := make([]statsapi.PodStats, 0, len(podToStats))
+	for _, podStats := range podToStats {
+		podUID := types.UID(podStats.PodRef.UID)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {
@@ -143,53 +223,6 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	}
 
 	return result, nil
-}
-
-func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
-	result := &statsapi.FsStats{
-		Time:           metav1.NewTime(rootFsInfo.Timestamp),
-		AvailableBytes: &rootFsInfo.Available,
-		CapacityBytes:  &rootFsInfo.Capacity,
-		InodesFree:     rootFsInfo.InodesFree,
-		Inodes:         rootFsInfo.Inodes,
-	}
-	for _, container := range containers {
-		addContainerUsage(result, &container)
-	}
-	for _, volume := range volumes {
-		result.UsedBytes = addUsage(result.UsedBytes, volume.FsStats.UsedBytes)
-		result.InodesUsed = addUsage(result.InodesUsed, volume.InodesUsed)
-		result.Time = maxUpdateTime(&result.Time, &volume.FsStats.Time)
-	}
-	return result
-}
-
-func addContainerUsage(stat *statsapi.FsStats, container *statsapi.ContainerStats) {
-	if rootFs := container.Rootfs; rootFs != nil {
-		stat.Time = maxUpdateTime(&stat.Time, &rootFs.Time)
-		stat.InodesUsed = addUsage(stat.InodesUsed, rootFs.InodesUsed)
-		stat.UsedBytes = addUsage(stat.UsedBytes, rootFs.UsedBytes)
-		if logs := container.Logs; logs != nil {
-			stat.UsedBytes = addUsage(stat.UsedBytes, logs.UsedBytes)
-			stat.Time = maxUpdateTime(&stat.Time, &logs.Time)
-		}
-	}
-}
-
-func maxUpdateTime(first, second *metav1.Time) metav1.Time {
-	if first.Before(second) {
-		return *second
-	}
-	return *first
-}
-func addUsage(first, second *uint64) *uint64 {
-	if first == nil {
-		return second
-	} else if second == nil {
-		return first
-	}
-	total := *first + *second
-	return &total
 }
 
 // ImageFsStats returns the stats of the filesystem for storing images.
@@ -244,7 +277,7 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
-		glog.Warningf(
+		klog.Warningf(
 			"Expect container to have either both podName (%s) and podNamespace (%s) labels, or neither.",
 			podName, podNamespace)
 	}
@@ -367,7 +400,7 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 		if _, ok := infos["/"]; ok {
 			// If the failure is partial, log it and return a best-effort
 			// response.
-			glog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
+			klog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
 		} else {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 		}

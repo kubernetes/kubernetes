@@ -85,11 +85,15 @@ func (r Responses) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
+// ResponsesProps describes all responses for an operation.
+// It tells what is the default response and maps all responses with a
+// HTTP status code.
 type ResponsesProps struct {
 	Default             *Response
 	StatusCodeResponses map[int]Response
 }
 
+// MarshalJSON marshals responses as JSON
 func (r ResponsesProps) MarshalJSON() ([]byte, error) {
 	toser := map[string]Response{}
 	if r.Default != nil {
@@ -101,6 +105,7 @@ func (r ResponsesProps) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toser)
 }
 
+// UnmarshalJSON unmarshals responses from JSON
 func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
 	var res map[string]Response
 	if err := json.Unmarshal(data, &res); err != nil {

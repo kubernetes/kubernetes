@@ -74,9 +74,10 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
 		},
-		Username:    c.Username,
-		Password:    c.Password,
-		BearerToken: c.BearerToken,
+		Username:        c.Username,
+		Password:        c.Password,
+		BearerToken:     c.BearerToken,
+		BearerTokenFile: c.BearerTokenFile,
 		Impersonate: transport.ImpersonationConfig{
 			UserName: c.Impersonate.UserName,
 			Groups:   c.Impersonate.Groups,
@@ -103,14 +104,15 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		wt := conf.WrapTransport
-		if wt != nil {
-			conf.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-				return provider.WrapTransport(wt(rt))
-			}
-		} else {
-			conf.WrapTransport = provider.WrapTransport
-		}
+		conf.Wrap(provider.WrapTransport)
 	}
 	return conf, nil
+}
+
+// Wrap adds a transport middleware function that will give the caller
+// an opportunity to wrap the underlying http.RoundTripper prior to the
+// first API call being made. The provided function is invoked after any
+// existing transport wrappers are invoked.
+func (c *Config) Wrap(fn transport.WrapperFunc) {
+	c.WrapTransport = transport.Wrappers(c.WrapTransport, fn)
 }

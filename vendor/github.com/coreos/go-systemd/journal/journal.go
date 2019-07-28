@@ -103,7 +103,10 @@ func Send(message string, priority Priority, vars map[string]string) error {
 		if !ok {
 			return journalError("can't send file through non-Unix connection")
 		}
-		unixConn.WriteMsgUnix([]byte{}, rights, nil)
+		_, _, err = unixConn.WriteMsgUnix([]byte{}, rights, nil)
+		if err != nil {
+			return journalError(err.Error())
+		}
 	} else if err != nil {
 		return journalError(err.Error())
 	}
@@ -165,7 +168,7 @@ func tempFd() (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	syscall.Unlink(file.Name())
+	err = syscall.Unlink(file.Name())
 	if err != nil {
 		return nil, err
 	}

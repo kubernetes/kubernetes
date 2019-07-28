@@ -41,8 +41,29 @@ func (c *Client) PoolList(opts types.ListOptions) ([]*types.Pool, error) {
 }
 
 // PoolCreate creates a pool on the server and returns the new object.
-func (c *Client) PoolCreate(opts types.PoolCreateOptions) (*types.Pool, error) {
+func (c *Client) PoolCreate(opts types.PoolOptions) (*types.Pool, error) {
 	resp, err := c.do("POST", PoolAPIPrefix, doOptions{
+		data:    opts,
+		context: opts.Context,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var pool types.Pool
+	if err := json.NewDecoder(resp.Body).Decode(&pool); err != nil {
+		return nil, err
+	}
+	return &pool, nil
+}
+
+// PoolUpdate - update pool
+func (c *Client) PoolUpdate(opts types.PoolOptions) (*types.Pool, error) {
+	ref := opts.Name
+	if IsUUID(opts.ID) {
+		ref = opts.ID
+	}
+
+	resp, err := c.do("PUT", PoolAPIPrefix+"/"+ref, doOptions{
 		data:    opts,
 		context: opts.Context,
 	})

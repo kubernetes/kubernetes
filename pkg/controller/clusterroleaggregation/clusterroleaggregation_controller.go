@@ -21,7 +21,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -145,8 +145,8 @@ func (c *ClusterRoleAggregationController) Run(workers int, stopCh <-chan struct
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting ClusterRoleAggregator")
-	defer glog.Infof("Shutting down ClusterRoleAggregator")
+	klog.Infof("Starting ClusterRoleAggregator")
+	defer klog.Infof("Shutting down ClusterRoleAggregator")
 
 	if !controller.WaitForCacheSync("ClusterRoleAggregator", stopCh, c.clusterRolesSynced) {
 		return

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,10 +31,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 type durations []time.Duration
@@ -49,7 +50,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	/*
 		Release : v1.9
 		Testname: Service endpoint latency, thresholds
-		Description: Run 100 iterations of create service with the Pod running the pause image, measure the time it takes for creating the service and the endpoint with the service name is available. These durations are captured for 100 iterations, then the durations are sorted to compue 50th, 90th and 99th percentile. The single server latency MUST not exceed liberally set thresholds of 20s for 50th percentile and 50s for the 90th percentile.
+		Description: Run 100 iterations of create service with the Pod running the pause image, measure the time it takes for creating the service and the endpoint with the service name is available. These durations are captured for 100 iterations, then the durations are sorted to compute 50th, 90th and 99th percentile. The single server latency MUST not exceed liberally set thresholds of 20s for 50th percentile and 50s for the 90th percentile.
 	*/
 	framework.ConformanceIt("should not be very high ", func() {
 		const (
@@ -71,6 +72,9 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			totalTrials    = 200
 			parallelTrials = 15
 			minSampleSize  = 100
+
+			// Acceptable failure ratio for getting service latencies.
+			acceptableFailureRatio = .05
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
@@ -79,7 +83,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		defer func() { f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
 
 		failing := sets.NewString()
-		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
+		d, err := runServiceLatencies(f, parallelTrials, totalTrials, acceptableFailureRatio)
 		if err != nil {
 			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
 		}
@@ -91,7 +95,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		}
 		if n < 2 {
 			failing.Insert("Less than two runs succeeded; aborting.")
-			framework.Failf(strings.Join(failing.List(), "\n"))
+			e2elog.Failf(strings.Join(failing.List(), "\n"))
 		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
@@ -100,14 +104,14 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			}
 			return dSorted[est]
 		}
-		framework.Logf("Latencies: %v", dSorted)
+		e2elog.Logf("Latencies: %v", dSorted)
 		p50 := percentile(50)
 		p90 := percentile(90)
 		p99 := percentile(99)
-		framework.Logf("50 %%ile: %v", p50)
-		framework.Logf("90 %%ile: %v", p90)
-		framework.Logf("99 %%ile: %v", p99)
-		framework.Logf("Total sample count: %v", len(dSorted))
+		e2elog.Logf("50 %%ile: %v", p50)
+		e2elog.Logf("90 %%ile: %v", p90)
+		e2elog.Logf("99 %%ile: %v", p99)
+		e2elog.Logf("Total sample count: %v", len(dSorted))
 
 		if p50 > limitMedian {
 			failing.Insert("Median latency should be less than " + limitMedian.String())
@@ -118,20 +122,19 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		if failing.Len() > 0 {
 			errList := strings.Join(failing.List(), "\n")
 			helpfulInfo := fmt.Sprintf("\n50, 90, 99 percentiles: %v %v %v", p50, p90, p99)
-			framework.Failf(errList + helpfulInfo)
+			e2elog.Failf(errList + helpfulInfo)
 		}
 	})
 })
 
-func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
+func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Image:          imageutils.GetPauseImageName(),
-		Name:           "svc-latency-rc",
-		Namespace:      f.Namespace.Name,
-		Replicas:       1,
-		PollInterval:   time.Second,
+		Client:       f.ClientSet,
+		Image:        imageutils.GetPauseImageName(),
+		Name:         "svc-latency-rc",
+		Namespace:    f.Namespace.Name,
+		Replicas:     1,
+		PollInterval: time.Second,
 	}
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
@@ -158,7 +161,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	blocker := make(chan struct{}, inParallel)
 	for i := 0; i < total; i++ {
 		go func() {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
 			if d, err := singleServiceLatency(f, cfg.Name, endpointQueries); err != nil {
@@ -173,14 +176,18 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
-			framework.Logf("Got error: %v", e)
-			errCount += 1
+			e2elog.Logf("Got error: %v", e)
+			errCount++
 		case d := <-durations:
 			output = append(output, d)
 		}
 	}
 	if errCount != 0 {
-		return output, fmt.Errorf("got %v errors", errCount)
+		e2elog.Logf("Got %d errors out of %d tries", errCount, total)
+		errRatio := float32(errCount) / float32(total)
+		if errRatio > acceptableFailureRatio {
+			return output, fmt.Errorf("error ratio %g is higher than the acceptable ratio %g", errRatio, acceptableFailureRatio)
+		}
 	}
 	return output, nil
 }
@@ -339,13 +346,13 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 	if err != nil {
 		return 0, err
 	}
-	framework.Logf("Created: %v", gotSvc.Name)
+	e2elog.Logf("Created: %v", gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
 		return 0, fmt.Errorf("Never got a result for endpoint %v", gotSvc.Name)
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
-	framework.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
+	e2elog.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
 	return d, nil
 }

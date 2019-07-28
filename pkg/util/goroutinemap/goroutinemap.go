@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 )
 
@@ -135,7 +135,7 @@ func (grm *goRoutineMap) operationComplete(
 		delete(grm.operations, operationName)
 		if *err != nil {
 			// Log error
-			glog.Errorf("operation for %q failed with: %v",
+			klog.Errorf("operation for %q failed with: %v",
 				operationName,
 				*err)
 		}
@@ -147,7 +147,7 @@ func (grm *goRoutineMap) operationComplete(
 		grm.operations[operationName] = existingOp
 
 		// Log error
-		glog.Errorf("%v",
+		klog.Errorf("%v",
 			existingOp.expBackoff.GenerateNoRetriesPermittedMsg(operationName))
 	}
 }

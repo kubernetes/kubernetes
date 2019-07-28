@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -88,7 +88,7 @@ type Runtime interface {
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *v1.Pod, apiPodStatus v1.PodStatus, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -98,17 +98,6 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visible in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
-	// Returns the filesystem path of the pod's network namespace; if the
-	// runtime does not handle namespace creation itself, or cannot return
-	// the network namespace path, it should return an error.
-	// TODO: Change ContainerID to a Pod ID since the namespace is shared
-	// by all containers in the pod.
-	GetNetNS(containerID ContainerID) (string, error)
-	// Returns the container ID that represents the Pod, as passed to network
-	// plugins. For example, if the runtime uses an infra container, returns
-	// the infra container's ContainerID.
-	// TODO: Change ContainerID to a Pod ID, see GetNetNS()
-	GetPodContainerID(*Pod) (ContainerID, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
@@ -137,7 +126,7 @@ type StreamingRuntime interface {
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error)
+	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(image ImageSpec) (string, error)
@@ -155,7 +144,7 @@ type ContainerAttacher interface {
 
 type ContainerCommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
-	// If the command completes with a non-0 exit code, a pkg/util/exec.ExitError will be returned.
+	// If the command completes with a non-0 exit code, a k8s.io/utils/exec.ExitError will be returned.
 	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 
@@ -203,7 +192,7 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 	}
 	return id
 }
@@ -254,13 +243,6 @@ const (
 	ContainerStateUnknown ContainerState = "unknown"
 )
 
-type ContainerType string
-
-const (
-	ContainerTypeInit    ContainerType = "INIT"
-	ContainerTypeRegular ContainerType = "REGULAR"
-)
-
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
 type Container struct {
@@ -289,10 +271,10 @@ type PodStatus struct {
 	ID types.UID
 	// Name of the pod.
 	Name string
-	// Namspace of the pod.
+	// Namespace of the pod.
 	Namespace string
-	// IP of the pod.
-	IP string
+	// All IPs assigned to this pod
+	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
 	// Status of the pod sandbox.

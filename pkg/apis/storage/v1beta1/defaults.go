@@ -20,8 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -34,8 +32,19 @@ func SetDefaults_StorageClass(obj *storagev1beta1.StorageClass) {
 		*obj.ReclaimPolicy = v1.PersistentVolumeReclaimDelete
 	}
 
-	if obj.VolumeBindingMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+	if obj.VolumeBindingMode == nil {
 		obj.VolumeBindingMode = new(storagev1beta1.VolumeBindingMode)
 		*obj.VolumeBindingMode = storagev1beta1.VolumeBindingImmediate
+	}
+}
+
+func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
+	if obj.Spec.AttachRequired == nil {
+		obj.Spec.AttachRequired = new(bool)
+		*(obj.Spec.AttachRequired) = true
+	}
+	if obj.Spec.PodInfoOnMount == nil {
+		obj.Spec.PodInfoOnMount = new(bool)
+		*(obj.Spec.PodInfoOnMount) = false
 	}
 }

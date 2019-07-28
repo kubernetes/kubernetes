@@ -19,7 +19,7 @@ package storageos
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -75,13 +75,14 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 type fakePDManager struct {
-	api           apiImplementer
-	attachCalled  bool
-	detachCalled  bool
-	mountCalled   bool
-	unmountCalled bool
-	createCalled  bool
-	deleteCalled  bool
+	api                apiImplementer
+	attachCalled       bool
+	attachDeviceCalled bool
+	detachCalled       bool
+	mountCalled        bool
+	unmountCalled      bool
+	createCalled       bool
+	deleteCalled       bool
 }
 
 func (fake *fakePDManager) NewAPI(apiCfg *storageosAPIConfig) error {
@@ -106,6 +107,11 @@ func (fake *fakePDManager) CreateVolume(p *storageosProvisioner) (*storageosVolu
 func (fake *fakePDManager) AttachVolume(b *storageosMounter) (string, error) {
 	fake.attachCalled = true
 	return "", nil
+}
+
+func (fake *fakePDManager) AttachDevice(b *storageosMounter, dir string) error {
+	fake.attachDeviceCalled = true
+	return nil
 }
 
 func (fake *fakePDManager) DetachVolume(b *storageosUnmounter, loopDevice string) error {
@@ -165,7 +171,7 @@ func TestPlugin(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	client.Core().Secrets("default").Create(&v1.Secret{
+	client.CoreV1().Secrets("default").Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: "default",
@@ -196,13 +202,13 @@ func TestPlugin(t *testing.T) {
 		t.Fatalf("Got a nil Mounter")
 	}
 
-	expectedPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~storageos/vol1-pvname.ns1.vol1")
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~storageos/vol1-pvname.ns1.vol1")
 	volPath := mounter.GetPath()
 	if volPath != expectedPath {
 		t.Errorf("Expected path: '%s' got: '%s'", expectedPath, volPath)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volPath); err != nil {
@@ -213,6 +219,9 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
+	if !fakeManager.attachDeviceCalled {
+		t.Errorf("AttachDevice not called")
+	}
 	if !fakeManager.attachCalled {
 		t.Errorf("Attach not called")
 	}

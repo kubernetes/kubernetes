@@ -20,7 +20,8 @@ const (
 // FileBasicInfo contains file access time and file attributes information.
 type FileBasicInfo struct {
 	CreationTime, LastAccessTime, LastWriteTime, ChangeTime syscall.Filetime
-	FileAttributes                                          uintptr // includes padding
+	FileAttributes                                          uint32
+	pad                                                     uint32 // padding
 }
 
 // GetFileBasicInfo retrieves times and attributes for a file.

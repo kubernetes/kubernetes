@@ -23,9 +23,10 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
@@ -137,7 +138,8 @@ func TestToAuthenticationConfig(t *testing.T) {
 		TokenFailureCacheTTL: 0,
 	}
 
-	expectConfig := authenticator.AuthenticatorConfig{
+	expectConfig := kubeauthenticator.Config{
+		APIAudiences:                authenticator.Audiences{"http://foo.bar.com"},
 		Anonymous:                   false,
 		BasicAuthFile:               "/testBasicAuthFile",
 		BootstrapToken:              false,
@@ -167,6 +169,6 @@ func TestToAuthenticationConfig(t *testing.T) {
 
 	resultConfig := testOptions.ToAuthenticationConfig()
 	if !reflect.DeepEqual(resultConfig, expectConfig) {
-		t.Errorf("Got AuthenticationConfig: %v, Expected AuthenticationConfig: %v", resultConfig, expectConfig)
+		t.Errorf("Got AuthenticationConfig:\n\t%v\nExpected AuthenticationConfig:\n\t%v", resultConfig, expectConfig)
 	}
 }

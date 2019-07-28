@@ -18,8 +18,23 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+
+kube::util::ensure_clean_working_dir
+
+_tmpdir="$(kube::realpath "$(mktemp -d -t verify-generated-files.XXXXXX)")"
+kube::util::trap_add "rm -rf ${_tmpdir}" EXIT
+
+_tmp_gopath="${_tmpdir}/go"
+_tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
+mkdir -p "${_tmp_kuberoot}/.."
+cp -a "${KUBE_ROOT}" "${_tmp_kuberoot}/.."
+
+cd "${_tmp_kuberoot}"
+
+# clean out anything from the temp dir that's not checked in
+git clean -ffxd
 
 # $1 = filename pattern as in "zz_generated.$1.go"
 function find_genfiles() {
@@ -37,31 +52,32 @@ function find_genfiles() {
 # $1 = filename pattern as in "zz_generated.$1.go"
 # $2 timestamp file
 function newer() {
-    find_genfiles "$1" | while read F; do
+    find_genfiles "$1" | while read -r F; do
         if [[ "${F}" -nt "$2" ]]; then
             echo "${F}"
         fi
-    done
+    done | LC_ALL=C sort
 }
 
 # $1 = filename pattern as in "zz_generated.$1.go"
 # $2 timestamp file
 function older() {
-    find_genfiles "$1" | while read F; do
+    find_genfiles "$1" | while read -r F; do
         if [[ "$2" -nt "${F}" ]]; then
             echo "${F}"
         fi
-    done
+    done | LC_ALL=C sort
 }
 
 function assert_clean() {
     make generated_files >/dev/null
     touch "${STAMP}"
     make generated_files >/dev/null
-    X=($(newer deepcopy "${STAMP}"))
-    if [[ "${#X[*]}" != 0 ]]; then
+    X="$(newer deepcopy "${STAMP}")"
+    if [[ -n "${X}" ]]; then
         echo "Generated files changed on back-to-back 'make' runs:"
-        echo "  ${X[@]:-(none)}"
+        echo "  ${X}" | tr '\n' ' '
+        echo ""
         return 1
     fi
     true
@@ -76,25 +92,28 @@ STAMP=/tmp/stamp.$RANDOM
 assert_clean
 
 DIR=staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
-touch "$DIR/types.go"
+touch "${DIR}/types.go"
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(newer deepcopy "${STAMP}"))
-if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "${DIR}/zz_generated.deepcopy.go" ) ]]; then
+X="$(newer deepcopy "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./${DIR}/zz_generated.deepcopy.go" ]]; then
     echo "Wrong generated deepcopy files changed after touching src file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
-X=($(newer defaults "${STAMP}"))
-if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "${DIR}/zz_generated.defaults.go" ) ]]; then
+X="$(newer defaults "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./${DIR}/zz_generated.defaults.go" ]]; then
     echo "Wrong generated defaults files changed after touching src file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
-X=($(newer conversion "${STAMP}"))
-if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "${DIR}/zz_generated.conversion.go" ) ]]; then
+X="$(newer conversion "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./${DIR}/zz_generated.conversion.go" ]]; then
     echo "Wrong generated conversion files changed after touching src file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -107,10 +126,11 @@ assert_clean
 touch staging/src/k8s.io/code-generator/cmd/deepcopy-gen/main.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older deepcopy "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older deepcopy "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated deepcopy files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -119,10 +139,11 @@ assert_clean
 touch staging/src/k8s.io/code-generator/cmd/deepcopy-gen/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older deepcopy "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older deepcopy "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated deepcopy files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -131,10 +152,11 @@ assert_clean
 touch vendor/k8s.io/gengo/examples/deepcopy-gen/generators/deepcopy.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older deepcopy "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older deepcopy "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated deepcopy files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -143,10 +165,11 @@ assert_clean
 touch vendor/k8s.io/gengo/examples/deepcopy-gen/generators/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older deepcopy "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older deepcopy "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated deepcopy files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -159,10 +182,11 @@ assert_clean
 touch staging/src/k8s.io/code-generator/cmd/defaulter-gen/main.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older defaults "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older defaults "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated defaults files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -171,10 +195,11 @@ assert_clean
 touch staging/src/k8s.io/code-generator/cmd/defaulter-gen/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older defaults "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older defaults "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated defaults files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -183,10 +208,11 @@ assert_clean
 touch vendor/k8s.io/gengo/examples/defaulter-gen/generators/defaulter.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older defaults "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older defaults "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated defaults files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -195,10 +221,11 @@ assert_clean
 touch vendor/k8s.io/gengo/examples/defaulter-gen/generators/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older defaults "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older defaults "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated defaults files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -211,10 +238,11 @@ assert_clean
 touch staging/src/k8s.io/code-generator/cmd/conversion-gen/main.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older conversion "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older conversion "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated conversion files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -223,10 +251,11 @@ assert_clean
 touch staging/src/k8s.io/code-generator/cmd/conversion-gen/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older conversion "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older conversion "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated conversion files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -235,10 +264,11 @@ assert_clean
 touch vendor/k8s.io/code-generator/cmd/conversion-gen/generators/conversion.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older conversion "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older conversion "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated conversion files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -247,28 +277,84 @@ assert_clean
 touch vendor/k8s.io/code-generator/cmd/conversion-gen/generators/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older conversion "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older conversion "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated conversion files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
 #
-# Test when we touch a file in a package that needs codegen.
+# Test when we touch a file in a package that needs codegen for all openapi specs.
 #
 
 assert_clean
 
-touch "staging/src/k8s.io/api/core/v1/types.go"
+touch "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go"
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(newer openapi "${STAMP}"))
-if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "pkg/generated/openapi/zz_generated.openapi.go" ) ]]; then
+X="$(newer openapi "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after touching src file:"
-    echo "${X[@]:-(none)}"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
+
+#
+# Test when we touch a file in a package that needs codegen for only the main openapi spec.
+#
+
+assert_clean
+
+touch "staging/src/k8s.io/api/apps/v1/types.go"
+touch "${STAMP}"
+make generated_files >/dev/null
+X="$(newer openapi "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go" ]]; then
+    echo "Wrong generated openapi files changed after touching src file:"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
+    exit 1
+fi
+
+#
+# Test when we touch a file, modify the violation file it should fail, and UPDATE_API_KNOWN_VIOLATIONS=true updates it.
+#
+
+assert_clean
+
+touch "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go"
+echo > api/api-rules/violation_exceptions.list
+echo > api/api-rules/codegen_violation_exceptions.list
+if make generated_files >/dev/null; then
+    echo "Expected make generated_files to fail with API violations."
+    echo ""
+    exit 1
+fi
+touch "${STAMP}"
+make generated_files UPDATE_API_KNOWN_VIOLATIONS=true >/dev/null
+X="$(newer openapi "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
+    echo "Wrong generated openapi files changed after updating violation files:"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
+    exit 1
+fi
+for f in api/api-rules/violation_exceptions.list api/api-rules/codegen_violation_exceptions.list; do
+    if ! git diff --quiet "$f"; then
+        echo "Violation file \"$f\" was not updated with UPDATE_API_KNOWN_VIOLATIONS=true."
+        echo ""
+        exit 1
+    fi
+done
 
 #
 # Test when the codegen tool itself changes: openapi
@@ -279,10 +365,11 @@ assert_clean
 touch vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older openapi "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older openapi "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated openapi files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -291,10 +378,11 @@ assert_clean
 touch vendor/k8s.io/kube-openapi/cmd/openapi-gen/
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older openapi "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older openapi "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated openapi files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -303,10 +391,11 @@ assert_clean
 touch vendor/k8s.io/kube-openapi/pkg/generators/openapi.go
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older openapi "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older openapi "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated openapi files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi
 
@@ -315,9 +404,10 @@ assert_clean
 touch vendor/k8s.io/kube-openapi/pkg/generators
 touch "${STAMP}"
 make generated_files >/dev/null
-X=($(older openapi "${STAMP}"))
-if [[ "${#X[*]}" != 0 ]]; then
+X="$(older openapi "${STAMP}")"
+if [[ -n "${X}" ]]; then
     echo "Generated openapi files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X}" | tr '\n' ' '
+    echo ""
     exit 1
 fi

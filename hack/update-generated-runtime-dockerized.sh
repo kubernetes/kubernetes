@@ -18,8 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/cri/runtime/v1alpha2/"
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -40,22 +40,24 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
 fi
 
 function cleanup {
-	rm -f ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak
+	rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak"
+	rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.tmp"
 }
 
 trap cleanup EXIT
 
-gogopath=$(dirname $(kube::util::find-binary "protoc-gen-gogo"))
+gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
 
 PATH="${gogopath}:${PATH}" \
   protoc \
   --proto_path="${KUBE_REMOTE_RUNTIME_ROOT}" \
   --proto_path="${KUBE_ROOT}/vendor" \
-  --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
+  --gogo_out=plugins=grpc:"${KUBE_REMOTE_RUNTIME_ROOT}" "${KUBE_REMOTE_RUNTIME_ROOT}/api.proto"
 
 # Update boilerplate for the generated file.
-echo "$(cat hack/boilerplate/boilerplate.generatego.txt ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go)" > ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go" > "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.tmp"
+mv "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.tmp" "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go"
 
 # Run gofmt to clean up the generated code.
 kube::golang::verify_go_version
-gofmt -l -s -w ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+gofmt -l -s -w "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go"

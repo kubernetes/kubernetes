@@ -183,12 +183,22 @@ type CreateOpts struct {
 	// AccessIPv4 specifies an IPv4 address for the instance.
 	AccessIPv4 string `json:"accessIPv4,omitempty"`
 
-	// AccessIPv6 pecifies an IPv6 address for the instance.
+	// AccessIPv6 specifies an IPv6 address for the instance.
 	AccessIPv6 string `json:"accessIPv6,omitempty"`
+
+	// Min specifies Minimum number of servers to launch.
+	Min int `json:"min_count,omitempty"`
+
+	// Max specifies Maximum number of servers to launch.
+	Max int `json:"max_count,omitempty"`
 
 	// ServiceClient will allow calls to be made to retrieve an image or
 	// flavor ID by name.
 	ServiceClient *gophercloud.ServiceClient `json:"-"`
+
+	// Tags allows a server to be tagged with single-word metadata.
+	// Requires microversion 2.52 or later.
+	Tags []string `json:"tags,omitempty"`
 }
 
 // ToServerCreateMap assembles a request body based on the contents of a
@@ -270,6 +280,14 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 			return nil, err
 		}
 		b["flavorRef"] = flavorID
+	}
+
+	if opts.Min != 0 {
+		b["min_count"] = opts.Min
+	}
+
+	if opts.Max != 0 {
+		b["max_count"] = opts.Max
 	}
 
 	return map[string]interface{}{"server": b}, nil
@@ -383,7 +401,7 @@ type RebootOpts struct {
 }
 
 // ToServerRebootMap builds a body for the reboot request.
-func (opts *RebootOpts) ToServerRebootMap() (map[string]interface{}, error) {
+func (opts RebootOpts) ToServerRebootMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "reboot")
 }
 
@@ -542,39 +560,6 @@ func ConfirmResize(client *gophercloud.ServiceClient, id string) (r ActionResult
 // See Resize() for more details.
 func RevertResize(client *gophercloud.ServiceClient, id string) (r ActionResult) {
 	_, r.Err = client.Post(actionURL(client, id), map[string]interface{}{"revertResize": nil}, nil, nil)
-	return
-}
-
-// RescueOptsBuilder is an interface that allows extensions to override the
-// default structure of a Rescue request.
-type RescueOptsBuilder interface {
-	ToServerRescueMap() (map[string]interface{}, error)
-}
-
-// RescueOpts represents the configuration options used to control a Rescue
-// option.
-type RescueOpts struct {
-	// AdminPass is the desired administrative password for the instance in
-	// RESCUE mode. If it's left blank, the server will generate a password.
-	AdminPass string `json:"adminPass,omitempty"`
-}
-
-// ToServerRescueMap formats a RescueOpts as a map that can be used as a JSON
-// request body for the Rescue request.
-func (opts RescueOpts) ToServerRescueMap() (map[string]interface{}, error) {
-	return gophercloud.BuildRequestBody(opts, "rescue")
-}
-
-// Rescue instructs the provider to place the server into RESCUE mode.
-func Rescue(client *gophercloud.ServiceClient, id string, opts RescueOptsBuilder) (r RescueResult) {
-	b, err := opts.ToServerRescueMap()
-	if err != nil {
-		r.Err = err
-		return
-	}
-	_, r.Err = client.Post(actionURL(client, id), b, &r.Body, &gophercloud.RequestOpts{
-		OkCodes: []int{200},
-	})
 	return
 }
 
@@ -756,7 +741,12 @@ func CreateImage(client *gophercloud.ServiceClient, id string, opts CreateImageO
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	allPages, err := List(client, nil).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	allPages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}
@@ -787,5 +777,36 @@ func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) 
 // administrative password.
 func GetPassword(client *gophercloud.ServiceClient, serverId string) (r GetPasswordResult) {
 	_, r.Err = client.Get(passwordURL(client, serverId), &r.Body, nil)
+	return
+}
+
+// ShowConsoleOutputOptsBuilder is the interface types must satisfy in order to be
+// used as ShowConsoleOutput options
+type ShowConsoleOutputOptsBuilder interface {
+	ToServerShowConsoleOutputMap() (map[string]interface{}, error)
+}
+
+// ShowConsoleOutputOpts satisfies the ShowConsoleOutputOptsBuilder
+type ShowConsoleOutputOpts struct {
+	// The number of lines to fetch from the end of console log.
+	// All lines will be returned if this is not specified.
+	Length int `json:"length,omitempty"`
+}
+
+// ToServerShowConsoleOutputMap formats a ShowConsoleOutputOpts structure into a request body.
+func (opts ShowConsoleOutputOpts) ToServerShowConsoleOutputMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "os-getConsoleOutput")
+}
+
+// ShowConsoleOutput makes a request against the nova API to get console log from the server
+func ShowConsoleOutput(client *gophercloud.ServiceClient, id string, opts ShowConsoleOutputOptsBuilder) (r ShowConsoleOutputResult) {
+	b, err := opts.ToServerShowConsoleOutputMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(actionURL(client, id), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
 	return
 }

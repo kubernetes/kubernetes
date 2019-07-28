@@ -50,7 +50,7 @@ func NewSecurityContextDeny() *Plugin {
 }
 
 // Validate will deny any pod that defines SupplementalGroups, SELinuxOptions, RunAsUser or FSGroup
-func (p *Plugin) Validate(a admission.Attributes) (err error) {
+func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

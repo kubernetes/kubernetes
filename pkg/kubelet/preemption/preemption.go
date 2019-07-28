@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -30,13 +30,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
 const message = "Preempted in order to admit critical pod"
 
-// CriticalPodAdmissionFailureHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
+// CriticalPodAdmissionHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
 // If the ONLY admission failures are due to insufficient resources, then CriticalPodAdmissionHandler evicts pods
 // so that the critical pod can be admitted.  For evictions, the CriticalPodAdmissionHandler evicts a set of pods that
 // frees up the required resource requests.  The set of pods is designed to minimize impact, and is prioritized according to the ordering:
@@ -61,13 +60,13 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
 	// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
-	nonResourceReasons := []algorithm.PredicateFailureReason{}
+	nonResourceReasons := []predicates.PredicateFailureReason{}
 	resourceReasons := []*admissionRequirement{}
 	for _, reason := range failureReasons {
 		if r, ok := reason.(*predicates.InsufficientResourceError); ok {
@@ -96,7 +95,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	glog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
+	klog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -108,9 +107,11 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := c.killPodFunc(pod, status, nil)
 		if err != nil {
-			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			klog.Warningf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
+			continue
 		}
-		glog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
+		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
 	return nil
 }
@@ -190,10 +191,9 @@ func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
 		remainingRequest := float64(req.quantity - resource.GetResourceRequest(pod, req.resourceName))
-		if remainingRequest < 0 {
-			remainingRequest = 0
+		if remainingRequest > 0 {
+			dist += math.Pow(remainingRequest/float64(req.quantity), 2)
 		}
-		dist += math.Pow(remainingRequest/float64(req.quantity), 2)
 	}
 	return dist
 }
@@ -206,6 +206,9 @@ func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirement
 		newQuantity := req.quantity
 		for _, pod := range pods {
 			newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
+			if newQuantity <= 0 {
+				break
+			}
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{

@@ -195,8 +195,6 @@ type FindResult struct {
 	// a matched rule.
 	Label label.Label
 
-	Rule *rule.Rule
-
 	// Embeds is the transitive closure of labels for rules that the matched
 	// rule embeds. It may contains duplicates and does not include the label
 	// for the rule itself.
@@ -222,7 +220,6 @@ func (ix *RuleIndex) FindRulesByImport(imp ImportSpec, lang string) []FindResult
 		}
 		results = append(results, FindResult{
 			Label:  m.label,
-			Rule:   m.rule,
 			Embeds: m.embeds,
 		})
 	}

@@ -27,6 +27,8 @@ import (
 	"k8s.io/cluster-bootstrap/token/api"
 )
 
+// TODO(dixudx): refactor this to util/secrets and util/tokens
+
 // validBootstrapTokenChars defines the characters a bootstrap token can consist of
 const validBootstrapTokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -110,6 +112,7 @@ func BootstrapTokenSecretName(tokenID string) string {
 
 // ValidateBootstrapGroupName checks if the provided group name is a valid
 // bootstrap group name. Returns nil if valid or a validation error if invalid.
+// TODO(dixudx): should be moved to util/secrets
 func ValidateBootstrapGroupName(name string) error {
 	if BootstrapGroupRegexp.Match([]byte(name)) {
 		return nil

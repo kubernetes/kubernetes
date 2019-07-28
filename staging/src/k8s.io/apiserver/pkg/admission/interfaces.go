@@ -41,6 +41,8 @@ type Attributes interface {
 	GetSubresource() string
 	// GetOperation is the operation being performed
 	GetOperation() Operation
+	// GetOperationOptions is the options for the operation being performed
+	GetOperationOptions() runtime.Object
 	// IsDryRun indicates that modifications will definitely not be persisted for this request. This is to prevent
 	// admission controllers with side effects and a method of reconciliation from being overwhelmed.
 	// However, a value of false for this does not mean that the modification will be persisted, because it
@@ -60,6 +62,25 @@ type Attributes interface {
 	// An error is returned if the format of key is invalid. When trying to overwrite annotation with a new value, an error is returned.
 	// Both ValidationInterface and MutationInterface are allowed to add Annotations.
 	AddAnnotation(key, value string) error
+
+	// GetReinvocationContext tracks the admission request information relevant to the re-invocation policy.
+	GetReinvocationContext() ReinvocationContext
+}
+
+// ObjectInterfaces is an interface used by AdmissionController to get object interfaces
+// such as Converter or Defaulter. These interfaces are normally coming from Request Scope
+// to handle special cases like CRDs.
+type ObjectInterfaces interface {
+	// GetObjectCreater is the ObjectCreator appropriate for the requested object.
+	GetObjectCreater() runtime.ObjectCreater
+	// GetObjectTyper is the ObjectTyper appropriate for the requested object.
+	GetObjectTyper() runtime.ObjectTyper
+	// GetObjectDefaulter is the ObjectDefaulter appropriate for the requested object.
+	GetObjectDefaulter() runtime.ObjectDefaulter
+	// GetObjectConvertor is the ObjectConvertor appropriate for the requested object.
+	GetObjectConvertor() runtime.ObjectConvertor
+	// GetEquivalentResourceMapper is the EquivalentResourceMapper appropriate for finding equivalent resources and expected kind for the requested object.
+	GetEquivalentResourceMapper() runtime.EquivalentResourceMapper
 }
 
 // privateAnnotationsGetter is a private interface which allows users to get annotations from Attributes.
@@ -73,6 +94,22 @@ type AnnotationsGetter interface {
 	GetAnnotations() map[string]string
 }
 
+// ReinvocationContext provides access to the admission related state required to implement the re-invocation policy.
+type ReinvocationContext interface {
+	// IsReinvoke returns true if the current admission check is a re-invocation.
+	IsReinvoke() bool
+	// SetIsReinvoke sets the current admission check as a re-invocation.
+	SetIsReinvoke()
+	// ShouldReinvoke returns true if any plugin has requested a re-invocation.
+	ShouldReinvoke() bool
+	// SetShouldReinvoke signals that a re-invocation is desired.
+	SetShouldReinvoke()
+	// AddValue set a value for a plugin name, possibly overriding a previous value.
+	SetValue(plugin string, v interface{})
+	// Value reads a value for a webhook.
+	Value(plugin string) interface{}
+}
+
 // Interface is an abstract, pluggable interface for Admission Control decisions.
 type Interface interface {
 	// Handles returns true if this admission controller can handle the given operation
@@ -84,7 +121,7 @@ type MutationInterface interface {
 	Interface
 
 	// Admit makes an admission decision based on the request attributes
-	Admit(a Attributes) (err error)
+	Admit(a Attributes, o ObjectInterfaces) (err error)
 }
 
 // ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
@@ -92,7 +129,7 @@ type ValidationInterface interface {
 	Interface
 
 	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
-	Validate(a Attributes) (err error)
+	Validate(a Attributes, o ObjectInterfaces) (err error)
 }
 
 // Operation is the type of resource operation being checked for admission control

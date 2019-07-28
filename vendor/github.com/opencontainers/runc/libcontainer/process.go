@@ -72,7 +72,12 @@ type Process struct {
 	// ConsoleSocket provides the masterfd console.
 	ConsoleSocket *os.File
 
+	// Init specifies whether the process is the first process in the container.
+	Init bool
+
 	ops processOperations
+
+	LogLevel string
 }
 
 // Wait waits for the process to exit.

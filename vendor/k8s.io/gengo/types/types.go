@@ -51,10 +51,10 @@ func ParseFullyQualifiedName(fqn string) Name {
 	cs := strings.Split(fqn, ".")
 	pkg := ""
 	if len(cs) > 1 {
-		pkg = strings.Join(cs[0:len(cs) - 1], ".")
+		pkg = strings.Join(cs[0:len(cs)-1], ".")
 	}
 	return Name{
-		Name: cs[len(cs) - 1],
+		Name:    cs[len(cs)-1],
 		Package: pkg,
 	}
 }

@@ -34,9 +34,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/framer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
         "//vendor/github.com/modern-go/reflect2:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

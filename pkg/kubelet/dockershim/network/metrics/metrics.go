@@ -27,7 +27,9 @@ const (
 	// NetworkPluginOperationsKey is the key for operation count metrics.
 	NetworkPluginOperationsKey = "network_plugin_operations"
 	// NetworkPluginOperationsLatencyKey is the key for the operation latency metrics.
-	NetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_microseconds"
+	NetworkPluginOperationsLatencyKey = "network_plugin_operations_duration_seconds"
+	// DeprecatedNetworkPluginOperationsLatencyKey is the deprecated key for the operation latency metrics.
+	DeprecatedNetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_microseconds"
 
 	// Keep the "kubelet" subsystem for backward compatibility.
 	kubeletSubsystem = "kubelet"
@@ -36,11 +38,23 @@ const (
 var (
 	// NetworkPluginOperationsLatency collects operation latency numbers by operation
 	// type.
-	NetworkPluginOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	NetworkPluginOperationsLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      NetworkPluginOperationsLatencyKey,
-			Help:      "Latency in microseconds of network plugin operations. Broken down by operation type.",
+			Help:      "Latency in seconds of network plugin operations. Broken down by operation type.",
+			Buckets:   prometheus.DefBuckets,
+		},
+		[]string{"operation_type"},
+	)
+
+	// DeprecatedNetworkPluginOperationsLatency collects operation latency numbers by operation
+	// type.
+	DeprecatedNetworkPluginOperationsLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      DeprecatedNetworkPluginOperationsLatencyKey,
+			Help:      "(Deprecated) Latency in microseconds of network plugin operations. Broken down by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -52,10 +66,16 @@ var registerMetrics sync.Once
 func Register() {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(NetworkPluginOperationsLatency)
+		prometheus.MustRegister(DeprecatedNetworkPluginOperationsLatency)
 	})
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+}
+
+// SinceInSeconds gets the time since the specified start in seconds.
+func SinceInSeconds(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }

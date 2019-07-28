@@ -185,8 +185,10 @@ func Convert_v2beta1_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *au
 }
 
 func Convert_autoscaling_PodsMetricSource_To_v2beta1_PodsMetricSource(in *autoscaling.PodsMetricSource, out *autoscalingv2beta1.PodsMetricSource, s conversion.Scope) error {
-	targetAverageValue := *in.Target.AverageValue
-	out.TargetAverageValue = targetAverageValue
+	if in.Target.AverageValue != nil {
+		targetAverageValue := *in.Target.AverageValue
+		out.TargetAverageValue = targetAverageValue
+	}
 
 	out.MetricName = in.Metric.Name
 	out.Selector = in.Metric.Selector
@@ -196,8 +198,7 @@ func Convert_autoscaling_PodsMetricSource_To_v2beta1_PodsMetricSource(in *autosc
 
 func Convert_v2beta1_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autoscalingv2beta1.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
 	targetAverageValue := &in.TargetAverageValue
-	var metricType autoscaling.MetricTargetType
-	metricType = autoscaling.AverageValueMetricType
+	metricType := autoscaling.AverageValueMetricType
 
 	out.Target = autoscaling.MetricTarget{
 		Type:         metricType,
@@ -211,9 +212,7 @@ func Convert_v2beta1_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autosc
 }
 
 func Convert_autoscaling_ExternalMetricStatus_To_v2beta1_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *autoscalingv2beta1.ExternalMetricStatus, s conversion.Scope) error {
-	if &in.Current.AverageValue != nil {
-		out.CurrentAverageValue = in.Current.AverageValue
-	}
+	out.CurrentAverageValue = in.Current.AverageValue
 	out.MetricName = in.Metric.Name
 	if in.Current.Value != nil {
 		out.CurrentValue = *in.Current.Value
@@ -247,8 +246,10 @@ func Convert_autoscaling_ObjectMetricStatus_To_v2beta1_ObjectMetricStatus(in *au
 	}
 	out.MetricName = in.Metric.Name
 	out.Selector = in.Metric.Selector
-	currentAverageValue := *in.Current.AverageValue
-	out.AverageValue = &currentAverageValue
+	if in.Current.AverageValue != nil {
+		currentAverageValue := *in.Current.AverageValue
+		out.AverageValue = &currentAverageValue
+	}
 	return nil
 }
 

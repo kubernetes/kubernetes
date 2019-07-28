@@ -1,0 +1,7 @@
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: ClusterConfiguration
+networking:
+  dnsDomain: INVALID-DOMAIN-!!!!
+  podSubnet: ""
+  serviceSubnet: 10.96.0.0/12
+useHyperKubeImage: false

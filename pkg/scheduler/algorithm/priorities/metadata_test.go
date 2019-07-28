@@ -25,18 +25,24 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestPriorityMetadata(t *testing.T) {
-	nonZeroReqs := &schedulercache.Resource{}
+	nonZeroReqs := &schedulernodeinfo.Resource{}
 	nonZeroReqs.MilliCPU = priorityutil.DefaultMilliCPURequest
 	nonZeroReqs.Memory = priorityutil.DefaultMemoryRequest
 
-	specifiedReqs := &schedulercache.Resource{}
+	specifiedReqs := &schedulernodeinfo.Resource{}
 	specifiedReqs.MilliCPU = 200
 	specifiedReqs.Memory = 2000
+
+	nonPodLimits := &schedulernodeinfo.Resource{}
+
+	specifiedPodLimits := &schedulernodeinfo.Resource{}
+	specifiedPodLimits.MilliCPU = 200
+	specifiedPodLimits.Memory = 2000
 
 	tolerations := []v1.Toleration{{
 		Key:      "foo",
@@ -104,6 +110,10 @@ func TestPriorityMetadata(t *testing.T) {
 					Image:           "image",
 					ImagePullPolicy: "Always",
 					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("2000"),
+						},
 						Requests: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("200m"),
 							v1.ResourceMemory: resource.MustParse("2000"),
@@ -128,6 +138,7 @@ func TestPriorityMetadata(t *testing.T) {
 			pod: podWithTolerationsAndAffinity,
 			expected: &priorityMetadata{
 				nonZeroRequest: nonZeroReqs,
+				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       podAffinity,
 			},
@@ -137,6 +148,7 @@ func TestPriorityMetadata(t *testing.T) {
 			pod: podWithTolerationsAndRequests,
 			expected: &priorityMetadata{
 				nonZeroRequest: specifiedReqs,
+				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       nil,
 			},
@@ -146,20 +158,21 @@ func TestPriorityMetadata(t *testing.T) {
 			pod: podWithAffinityAndRequests,
 			expected: &priorityMetadata{
 				nonZeroRequest: specifiedReqs,
+				podLimits:      specifiedPodLimits,
 				podTolerations: nil,
 				affinity:       podAffinity,
 			},
 			name: "Produce a priorityMetadata with specified requests",
 		},
 	}
-	mataDataProducer := NewPriorityMetadataFactory(
+	metaDataProducer := NewPriorityMetadataFactory(
 		schedulertesting.FakeServiceLister([]*v1.Service{}),
 		schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 		schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
 		schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ptData := mataDataProducer(test.pod, nil)
+			ptData := metaDataProducer(test.pod, nil)
 			if !reflect.DeepEqual(test.expected, ptData) {
 				t.Errorf("expected %#v, got %#v", test.expected, ptData)
 			}

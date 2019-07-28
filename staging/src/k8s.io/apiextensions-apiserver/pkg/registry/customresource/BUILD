@@ -19,6 +19,8 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -64,6 +66,7 @@ go_test(
     srcs = [
         "etcd_test.go",
         "status_strategy_test.go",
+        "strategy_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -85,6 +88,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
     ],
 )

@@ -64,7 +64,7 @@ func NewHeapsterMetricsClient(svcClient corev1client.ServicesGetter, namespace, 
 	}
 }
 
-func podMetricsUrl(namespace string, name string) (string, error) {
+func podMetricsURL(namespace string, name string) (string, error) {
 	if namespace == metav1.NamespaceAll {
 		return fmt.Sprintf("%s/pods", metricsRoot), nil
 	}
@@ -83,7 +83,7 @@ func podMetricsUrl(namespace string, name string) (string, error) {
 	return fmt.Sprintf("%s/namespaces/%s/pods/%s", metricsRoot, namespace, name), nil
 }
 
-func nodeMetricsUrl(name string) (string, error) {
+func nodeMetricsURL(name string) (string, error) {
 	if len(name) > 0 {
 		errs := validation.NameIsDNSSubdomain(name, false)
 		if len(errs) > 0 {
@@ -96,7 +96,7 @@ func nodeMetricsUrl(name string) (string, error) {
 
 func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector string) (*metricsapi.NodeMetricsList, error) {
 	params := map[string]string{"labelSelector": selector}
-	path, err := nodeMetricsUrl(nodeName)
+	path, err := nodeMetricsURL(nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 	if allNamespaces {
 		namespace = metav1.NamespaceAll
 	}
-	path, err := podMetricsUrl(namespace, podName)
+	path, err := podMetricsURL(namespace, podName)
 	if err != nil {
 		return nil, err
 	}

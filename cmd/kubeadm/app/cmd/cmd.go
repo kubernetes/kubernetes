@@ -19,11 +19,10 @@ package cmd
 import (
 	"io"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	// Register the kubeadm configuration types because CLI flag generation
@@ -38,32 +37,31 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
 		Long: dedent.Dedent(`
-			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ KUBEADM IS CURRENTLY IN BETA                             │
+			    │ KUBEADM                                                  │
+			    │ Easily bootstrap a secure Kubernetes cluster             │
 			    │                                                          │
-			    │ But please, try it out and give us feedback at:          │
+			    │ Please give us feedback at:                              │
 			    │ https://github.com/kubernetes/kubeadm/issues             │
-			    │ and at-mention @kubernetes/sig-cluster-lifecycle-bugs    │
-			    │ or @kubernetes/sig-cluster-lifecycle-feature-requests    │
 			    └──────────────────────────────────────────────────────────┘
 
 			Example usage:
 
-			    Create a two-machine cluster with one master (which controls the cluster),
-			    and one node (where your workloads, like Pods and Deployments run).
+			    Create a two-machine cluster with one control-plane node
+			    (which controls the cluster), and one worker node
+			    (where your workloads, like Pods and Deployments run).
 
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the first machine:                                    │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ master# kubeadm init                                     │
+			    │ control-plane# kubeadm init                              │
 			    └──────────────────────────────────────────────────────────┘
 
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the second machine:                                   │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join <arguments-returned-from-init>        │
+			    │ worker# kubeadm join <arguments-returned-from-init>      │
 			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
@@ -84,30 +82,15 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	cmds.AddCommand(NewCmdCompletion(out, ""))
 	cmds.AddCommand(NewCmdConfig(out))
-	cmds.AddCommand(NewCmdInit(out))
-	cmds.AddCommand(NewCmdJoin(out))
-	cmds.AddCommand(NewCmdReset(in, out))
+	cmds.AddCommand(NewCmdInit(out, nil))
+	cmds.AddCommand(NewCmdJoin(out, nil))
+	cmds.AddCommand(NewCmdReset(in, out, nil))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
+	cmds.AddCommand(alpha.NewCmdAlpha(in, out))
 
-	// Wrap not yet fully supported commands in an alpha subcommand
-	experimentalCmd := &cobra.Command{
-		Use:   "alpha",
-		Short: "Experimental sub-commands not yet fully functional.",
-	}
-	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
-	cmds.AddCommand(experimentalCmd)
-
-	AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
+	options.AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
 
 	return cmds
-}
-
-// AddKubeadmOtherFlags adds flags that are not bound to a configuration file to the given flagset
-func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
-	flagSet.StringVar(
-		rootfsPath, "rootfs", *rootfsPath,
-		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
-	)
 }

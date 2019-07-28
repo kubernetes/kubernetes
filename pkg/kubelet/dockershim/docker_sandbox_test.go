@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -106,7 +106,7 @@ func TestSandboxStatus(t *testing.T) {
 		State:     state,
 		CreatedAt: ct,
 		Metadata:  config.Metadata,
-		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP},
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP, AdditionalIps: []*runtimeapi.PodIP{}},
 		Linux: &runtimeapi.LinuxPodSandboxStatus{
 			Namespaces: &runtimeapi.Namespace{
 				Options: &runtimeapi.NamespaceOption{
@@ -142,6 +142,7 @@ func TestSandboxStatus(t *testing.T) {
 	require.NoError(t, err)
 	// IP not valid after sandbox stop
 	expected.Network.Ip = ""
+	expected.Network.AdditionalIps = []*runtimeapi.PodIP{}
 	statusResp, err = ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
 	require.NoError(t, err)
 	assert.Equal(t, expected, statusResp.Status)
@@ -161,14 +162,13 @@ func TestSandboxStatusAfterRestart(t *testing.T) {
 	config := makeSandboxConfig("foo", "bar", "1", 0)
 	r := rand.New(rand.NewSource(0)).Uint32()
 	podIP := fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
-
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
 	expected := &runtimeapi.PodSandboxStatus{
 		State:     state,
 		CreatedAt: ct,
 		Metadata:  config.Metadata,
-		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP},
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP, AdditionalIps: []*runtimeapi.PodIP{}},
 		Linux: &runtimeapi.LinuxPodSandboxStatus{
 			Namespaces: &runtimeapi.Namespace{
 				Options: &runtimeapi.NamespaceOption{

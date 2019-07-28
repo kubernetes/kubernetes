@@ -130,6 +130,7 @@ var (
 	ErrTriangle            = Error{"matrix: triangular storage mismatch"}
 	ErrTriangleSet         = Error{"matrix: triangular set out of bounds"}
 	ErrBandSet             = Error{"matrix: band set out of bounds"}
+	ErrDiagSet             = Error{"matrix: diagonal set out of bounds"}
 	ErrSliceLengthMismatch = Error{"matrix: input slice length mismatch"}
 	ErrNotPSD              = Error{"matrix: input not positive symmetric definite"}
 	ErrFailedEigen         = Error{"matrix: eigendecomposition not successful"}

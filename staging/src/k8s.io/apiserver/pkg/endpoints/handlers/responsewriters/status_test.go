@@ -27,6 +27,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+func TestBadStatusErrorToAPIStatus(t *testing.T) {
+	err := errors.StatusError{}
+	actual := ErrorToAPIStatus(&err)
+	expected := &metav1.Status{
+		TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+		Status:   metav1.StatusFailure,
+		Code:     500,
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("%s: Expected %#v, Got %#v", actual, expected, actual)
+	}
+}
+
 func TestAPIStatus(t *testing.T) {
 	cases := map[error]metav1.Status{
 		errors.NewNotFound(schema.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {

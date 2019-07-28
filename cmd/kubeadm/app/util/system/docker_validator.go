@@ -17,12 +17,11 @@ limitations under the License.
 package system
 
 import (
-	"context"
-	"fmt"
+	"encoding/json"
+	"os/exec"
 	"regexp"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 )
 
 var _ Validator = &DockerValidator{}
@@ -32,15 +31,25 @@ type DockerValidator struct {
 	Reporter Reporter
 }
 
+// dockerInfo holds a local subset of the Info struct from
+// github.com/docker/docker/api/types.
+// The JSON output from 'docker info' should map to this struct.
+type dockerInfo struct {
+	Driver        string `json:"Driver"`
+	ServerVersion string `json:"ServerVersion"`
+}
+
+// Name is part of the system.Validator interface.
 func (d *DockerValidator) Name() string {
 	return "docker"
 }
 
 const (
 	dockerConfigPrefix           = "DOCKER_"
-	latestValidatedDockerVersion = "18.06"
+	latestValidatedDockerVersion = "18.09"
 )
 
+// Validate is part of the system.Validator interface.
 // TODO(random-liu): Add more validating items.
 func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 	if spec.RuntimeSpec.DockerSpec == nil {
@@ -49,18 +58,28 @@ func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 		return nil, nil
 	}
 
-	c, err := client.NewClient(dockerEndpoint, "", nil, nil)
+	// Run 'docker info' with a JSON output and unmarshal it into a dockerInfo object
+	info := dockerInfo{}
+	out, err := exec.Command("docker", "info", "--format", "{{json .}}").CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %v", err)
+		return nil, errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nerror: %v`, string(out), err)
 	}
-	info, err := c.Info(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get docker info: %v", err)
+	if err := d.unmarshalDockerInfo(out, &info); err != nil {
+		return nil, err
 	}
+
+	// validate the resulted docker info object against the spec
 	return d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
 }
 
-func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) (error, error) {
+func (d *DockerValidator) unmarshalDockerInfo(b []byte, info *dockerInfo) error {
+	if err := json.Unmarshal(b, &info); err != nil {
+		return errors.Wrap(err, "could not unmarshal the JSON output of 'docker info'")
+	}
+	return nil
+}
+
+func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) (error, error) {
 	// Validate docker version.
 	matched := false
 	for _, v := range spec.Version {
@@ -73,11 +92,11 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 	if !matched {
 		// If it's of the new Docker version scheme but didn't match above, it
 		// must be a newer version than the most recently validated one.
-		ver := `\d{2}\.\d+\.\d+-[a-z]{2}`
+		ver := `\d{2}\.\d+\.\d+(?:-[a-z]{2})?`
 		r := regexp.MustCompile(ver)
 		if r.MatchString(info.ServerVersion) {
 			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)
-			w := fmt.Errorf(
+			w := errors.Errorf(
 				"this Docker version is not on the list of validated versions: %s. Latest validated version: %s",
 				info.ServerVersion,
 				latestValidatedDockerVersion,
@@ -85,7 +104,7 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 			return w, nil
 		}
 		d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, bad)
-		return nil, fmt.Errorf("unsupported docker version: %s", info.ServerVersion)
+		return nil, errors.Errorf("unsupported docker version: %s", info.ServerVersion)
 	}
 	// Validate graph driver.
 	item := dockerConfigPrefix + "GRAPH_DRIVER"
@@ -96,5 +115,5 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 		}
 	}
 	d.Reporter.Report(item, info.Driver, bad)
-	return nil, fmt.Errorf("unsupported graph driver: %s", info.Driver)
+	return nil, errors.Errorf("unsupported graph driver: %s", info.Driver)
 }

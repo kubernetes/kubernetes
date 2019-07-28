@@ -2,11 +2,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake_client.go"],
+    srcs = [
+        "fake_client.go",
+        "fake_closer.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/volume/csi/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],
 )

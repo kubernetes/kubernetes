@@ -218,6 +218,9 @@ func assignValue(val reflect.Value, fi []int, pv reflect.Value) {
 			} else {
 				panic(fmt.Sprintf("type %s doesn't implement %s", pt.Name(), rt.Name()))
 			}
+		} else if rt.Kind() == reflect.Struct && pt.Kind() == reflect.Ptr {
+			pv = pv.Elem()
+			pt = pv.Type()
 		}
 
 		if pt.AssignableTo(rt) {

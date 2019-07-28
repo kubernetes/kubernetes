@@ -26,7 +26,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -42,6 +42,7 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",

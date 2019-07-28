@@ -21,17 +21,19 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
-	"github.com/golang/glog"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
 )
 
 // interface exposed by the cloud provider implementing Disk functionality
@@ -43,9 +45,9 @@ type DiskController interface {
 	DeleteManagedDisk(diskURI string) error
 
 	// Attaches the disk to the host machine.
-	AttachDisk(isManagedDisk bool, diskName, diskUri string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
+	AttachDisk(isManagedDisk bool, diskName, diskUri string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error)
 	// Detaches the disk, identified by disk name or uri, from the host machine.
-	DetachDiskByName(diskName, diskUri string, nodeName types.NodeName) error
+	DetachDisk(diskName, diskUri string, nodeName types.NodeName) error
 
 	// Check if a list of volumes are attached to the node with the specified NodeName
 	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
@@ -86,9 +88,6 @@ var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.DeviceMountableVolumePlugin = &azureDataDiskPlugin{}
 
-// store vm size list in current region
-var vmSizeList *[]compute.VirtualMachineSize
-
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
 	defaultAzureVolumeLimit = 16
@@ -121,6 +120,11 @@ func (plugin *azureDataDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureDisk != nil)
 }
 
+func (plugin *azureDataDiskPlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+}
+
 func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
 	return false
 }
@@ -149,48 +153,32 @@ func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 
 	instances, ok := az.Instances()
 	if !ok {
-		glog.Warningf("Failed to get instances from cloud provider")
+		klog.Warningf("Failed to get instances from cloud provider")
 		return volumeLimits, nil
 	}
 
 	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
 	if err != nil {
-		glog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
+		klog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
 		return volumeLimits, nil
 	}
 
-	if vmSizeList == nil {
-		result, err := az.VirtualMachineSizesClient.List(context.TODO(), az.Location)
-		if err != nil || result.Value == nil {
-			glog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
-			return volumeLimits, nil
-		}
-		vmSizeList = result.Value
-	}
-
 	volumeLimits = map[string]int64{
-		util.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType, vmSizeList),
+		util.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType),
 	}
 
 	return volumeLimits, nil
 }
 
-func getMaxDataDiskCount(instanceType string, sizeList *[]compute.VirtualMachineSize) int64 {
-	if sizeList == nil {
-		return defaultAzureVolumeLimit
+func getMaxDataDiskCount(instanceType string) int64 {
+	vmsize := strings.ToUpper(instanceType)
+	maxDataDiskCount, exists := maxDataDiskCountMap[vmsize]
+	if exists {
+		klog.V(12).Infof("got a matching size in getMaxDataDiskCount, VM Size: %s, MaxDataDiskCount: %d", vmsize, maxDataDiskCount)
+		return maxDataDiskCount
 	}
 
-	vmsize := strings.ToUpper(instanceType)
-	for _, size := range *sizeList {
-		if size.Name == nil || size.MaxDataDiskCount == nil {
-			glog.Errorf("failed to get vm size in getMaxDataDiskCount")
-			continue
-		}
-		if strings.ToUpper(*size.Name) == vmsize {
-			glog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %d", *size.Name, *size.MaxDataDiskCount)
-			return int64(*size.MaxDataDiskCount)
-		}
-	}
+	klog.V(12).Infof("not found a matching size in getMaxDataDiskCount, VM Size: %s, use default volume limit: %d", vmsize, defaultAzureVolumeLimit)
 	return defaultAzureVolumeLimit
 }
 
@@ -208,7 +196,7 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessM
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	azure, err := getCloud(plugin.host)
 	if err != nil {
-		glog.Errorf("failed to get azure cloud in NewAttacher, plugin.host : %s, err:%v", plugin.host.GetHostName(), err)
+		klog.Errorf("failed to get azure cloud in NewAttacher, plugin.host : %s, err:%v", plugin.host.GetHostName(), err)
 		return nil, err
 	}
 
@@ -221,7 +209,7 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	azure, err := getCloud(plugin.host)
 	if err != nil {
-		glog.V(4).Infof("failed to get azure cloud in NewDetacher, plugin.host : %s", plugin.host.GetHostName())
+		klog.V(4).Infof("failed to get azure cloud in NewDetacher, plugin.host : %s", plugin.host.GetHostName())
 		return nil, err
 	}
 
@@ -229,6 +217,14 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 		plugin: plugin,
 		cloud:  azure,
 	}, nil
+}
+
+func (plugin *azureDataDiskPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *azureDataDiskPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -301,10 +297,25 @@ func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
 	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DataDiskURI, oldSize, newSize)
 }
 
+func (plugin *azureDataDiskPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+var _ volume.NodeExpandableVolumePlugin = &azureDataDiskPlugin{}
+
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
+	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 
 	if err != nil {
 		return nil, err

@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	binary build push
+.PHONY:	build push
 
-PREFIX = staging-k8s.gcr.io
+PREFIX = quay.io/fluentd_elasticsearch
 IMAGE = elasticsearch
-TAG = v6.3.0
+TAG = v7.2.0
 
 build:
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
+	docker build --tag ${PREFIX}/${IMAGE}:${TAG} .
+	docker build --tag ${PREFIX}/${IMAGE}:latest .
 
 push:
-	docker push $(PREFIX)/$(IMAGE):$(TAG)
-
-binary:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-w" elasticsearch_logging_discovery.go
-
-clean:
-	rm elasticsearch_logging_discovery
+	docker push ${PREFIX}/${IMAGE}:${TAG}
+	docker push ${PREFIX}/${IMAGE}:latest

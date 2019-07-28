@@ -131,17 +131,17 @@ message GroupResources {
   optional string group = 1;
 
   // Resources is a list of resources this rule applies to.
-  // 
+  //
   // For example:
   // 'pods' matches pods.
   // 'pods/log' matches the log subresource of pods.
   // '*' matches all resources and their subresources.
   // 'pods/*' matches all subresources of pods.
   // '*/scale' matches all scale subresources.
-  // 
+  //
   // If wildcard is present, the validation rule will ensure resources do not
   // overlap with each other.
-  // 
+  //
   // An empty list implies all resources and subresources in this API groups apply.
   // +optional
   repeated string resources = 2;

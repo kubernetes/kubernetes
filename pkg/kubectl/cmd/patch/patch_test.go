@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubectl/pkg/scheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestPatchObject(t *testing.T) {

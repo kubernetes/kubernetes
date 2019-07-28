@@ -62,7 +62,7 @@ func parseBuddyInfo(r io.Reader) ([]BuddyInfo, error) {
 	for scanner.Scan() {
 		var err error
 		line := scanner.Text()
-		parts := strings.Fields(string(line))
+		parts := strings.Fields(line)
 
 		if len(parts) < 4 {
 			return nil, fmt.Errorf("invalid number of fields when parsing buddyinfo")

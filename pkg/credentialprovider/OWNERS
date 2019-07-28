@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - erictune
@@ -23,3 +25,5 @@ reviewers:
 - therc
 - lixiaobing10051267
 - goltermann
+- andrewsykim
+- mcrute

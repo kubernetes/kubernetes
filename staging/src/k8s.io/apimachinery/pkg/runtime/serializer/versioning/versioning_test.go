@@ -102,6 +102,28 @@ func TestNestedEncode(t *testing.T) {
 	}
 }
 
+func TestNestedEncodeError(t *testing.T) {
+	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to encode")}
+	gvk1 := schema.GroupVersionKind{Kind: "test", Group: "other", Version: "v1"}
+	gvk2 := schema.GroupVersionKind{Kind: "test", Group: "other", Version: "v2"}
+	n.SetGroupVersionKind(gvk1)
+	codec := NewCodec(
+		nil, nil,
+		&mockConvertor{},
+		nil,
+		&mockTyper{gvks: []schema.GroupVersionKind{gvk1, gvk2}},
+		nil,
+		schema.GroupVersion{Group: "other", Version: "v2"}, nil,
+		"TestNestedEncodeError",
+	)
+	if err := codec.Encode(n, ioutil.Discard); err != n.nestedErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if n.GroupVersionKind() != gvk1 {
+		t.Errorf("unexpected gvk of input object: %v", n.GroupVersionKind())
+	}
+}
+
 func TestDecode(t *testing.T) {
 	gvk1 := &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}
 	decodable1 := &testDecodable{}
@@ -311,6 +333,28 @@ func (c *checkConvertor) ConvertFieldLabel(gvk schema.GroupVersionKind, label, v
 	return "", "", fmt.Errorf("unexpected call to ConvertFieldLabel")
 }
 
+type mockConvertor struct {
+}
+
+func (c *mockConvertor) Convert(in, out, context interface{}) error {
+	return fmt.Errorf("unexpect call to Convert")
+}
+
+func (c *mockConvertor) ConvertToVersion(in runtime.Object, outVersion runtime.GroupVersioner) (out runtime.Object, err error) {
+	objectKind := in.GetObjectKind()
+	inGVK := objectKind.GroupVersionKind()
+	if out, ok := outVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{inGVK}); ok {
+		objectKind.SetGroupVersionKind(out)
+	} else {
+		return nil, fmt.Errorf("unexpected conversion")
+	}
+	return in, nil
+}
+
+func (c *mockConvertor) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
+	return "", "", fmt.Errorf("unexpected call to ConvertFieldLabel")
+}
+
 type mockSerializer struct {
 	err            error
 	obj            runtime.Object
@@ -370,7 +414,7 @@ func TestDirectCodecEncode(t *testing.T) {
 		},
 	}
 
-	c := DirectEncoder{
+	c := runtime.WithVersionEncoder{
 		Version:     schema.GroupVersion{Group: "expected_group"},
 		Encoder:     &serializer,
 		ObjectTyper: &typer,

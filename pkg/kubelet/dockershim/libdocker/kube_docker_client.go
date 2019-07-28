@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -85,15 +85,12 @@ func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePu
 		timeout:                   requestTimeout,
 		imagePullProgressDeadline: imagePullProgressDeadline,
 	}
+
 	// Notice that this assumes that docker is running before kubelet is started.
-	v, err := k.Version()
-	if err != nil {
-		glog.Errorf("failed to retrieve docker version: %v", err)
-		glog.Warningf("Using empty version for docker client, this may sometimes cause compatibility issue.")
-	} else {
-		// Update client version with real api version.
-		dockerClient.NegotiateAPIVersionPing(dockertypes.Ping{APIVersion: v.APIVersion})
-	}
+	ctx, cancel := k.getTimeoutContext()
+	defer cancel()
+	dockerClient.NegotiateAPIVersion(ctx)
+
 	return k
 }
 
@@ -338,14 +335,14 @@ func (p *progressReporter) start() {
 				progress, timestamp := p.progress.get()
 				// If there is no progress for p.imagePullProgressDeadline, cancel the operation.
 				if time.Since(timestamp) > p.imagePullProgressDeadline {
-					glog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, p.imagePullProgressDeadline, progress)
+					klog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, p.imagePullProgressDeadline, progress)
 					p.cancel()
 					return
 				}
-				glog.V(2).Infof("Pulling image %q: %q", p.image, progress)
+				klog.V(2).Infof("Pulling image %q: %q", p.image, progress)
 			case <-p.stopCh:
 				progress, _ := p.progress.get()
-				glog.V(2).Infof("Stop pulling image %q: %q", p.image, progress)
+				klog.V(2).Infof("Stop pulling image %q: %q", p.image, progress)
 				return
 			}
 		}
@@ -399,7 +396,7 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
-	if isImageNotFoundError(err) {
+	if dockerapi.IsErrNotFound(err) {
 		return nil, ImageNotFoundError{ID: image}
 	}
 	return resp, err

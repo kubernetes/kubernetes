@@ -89,7 +89,8 @@ func DateTimeProperty() *Schema {
 
 // MapProperty creates a map property
 func MapProperty(property *Schema) *Schema {
-	return &Schema{SchemaProps: SchemaProps{Type: []string{"object"}, AdditionalProperties: &SchemaOrBool{Allows: true, Schema: property}}}
+	return &Schema{SchemaProps: SchemaProps{Type: []string{"object"},
+		AdditionalProperties: &SchemaOrBool{Allows: true, Schema: property}}}
 }
 
 // RefProperty creates a ref property
@@ -155,60 +156,14 @@ func (r *SchemaURL) fromMap(v map[string]interface{}) error {
 	return nil
 }
 
-// type ExtraSchemaProps map[string]interface{}
-
-// // JSONSchema represents a structure that is a json schema draft 04
-// type JSONSchema struct {
-// 	SchemaProps
-// 	ExtraSchemaProps
-// }
-
-// // MarshalJSON marshal this to JSON
-// func (s JSONSchema) MarshalJSON() ([]byte, error) {
-// 	b1, err := json.Marshal(s.SchemaProps)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	b2, err := s.Ref.MarshalJSON()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	b3, err := s.Schema.MarshalJSON()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	b4, err := json.Marshal(s.ExtraSchemaProps)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return swag.ConcatJSON(b1, b2, b3, b4), nil
-// }
-
-// // UnmarshalJSON marshal this from JSON
-// func (s *JSONSchema) UnmarshalJSON(data []byte) error {
-// 	var sch JSONSchema
-// 	if err := json.Unmarshal(data, &sch.SchemaProps); err != nil {
-// 		return err
-// 	}
-// 	if err := json.Unmarshal(data, &sch.Ref); err != nil {
-// 		return err
-// 	}
-// 	if err := json.Unmarshal(data, &sch.Schema); err != nil {
-// 		return err
-// 	}
-// 	if err := json.Unmarshal(data, &sch.ExtraSchemaProps); err != nil {
-// 		return err
-// 	}
-// 	*s = sch
-// 	return nil
-// }
-
+// SchemaProps describes a JSON schema (draft 4)
 type SchemaProps struct {
 	ID                   string            `json:"id,omitempty"`
 	Ref                  Ref               `json:"-"`
 	Schema               SchemaURL         `json:"-"`
 	Description          string            `json:"description,omitempty"`
 	Type                 StringOrArray     `json:"type,omitempty"`
+	Nullable             bool              `json:"nullable,omitempty"`
 	Format               string            `json:"format,omitempty"`
 	Title                string            `json:"title,omitempty"`
 	Default              interface{}       `json:"default,omitempty"`
@@ -240,6 +195,7 @@ type SchemaProps struct {
 	Definitions          Definitions       `json:"definitions,omitempty"`
 }
 
+// SwaggerSchemaProps are additional properties supported by swagger schemas, but not JSON-schema (draft 4)
 type SwaggerSchemaProps struct {
 	Discriminator string                 `json:"discriminator,omitempty"`
 	ReadOnly      bool                   `json:"readOnly,omitempty"`
@@ -347,9 +303,15 @@ func (s *Schema) AddType(tpe, format string) *Schema {
 	return s
 }
 
+// AsNullable flags this schema as nullable.
+func (s *Schema) AsNullable() *Schema {
+	s.Nullable = true
+	return s
+}
+
 // CollectionOf a fluent builder method for an array parameter
 func (s *Schema) CollectionOf(items Schema) *Schema {
-	s.Type = []string{"array"}
+	s.Type = []string{jsonArray}
 	s.Items = &SchemaOrArray{Schema: &items}
 	return s
 }
@@ -604,8 +566,8 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	sch.Ref.fromMap(d)
-	sch.Schema.fromMap(d)
+	_ = sch.Ref.fromMap(d)
+	_ = sch.Schema.fromMap(d)
 
 	delete(d, "$ref")
 	delete(d, "$schema")

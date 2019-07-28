@@ -13,7 +13,7 @@ Example to List Pools
 		panic(err)
 	}
 
-	allPools, err := pools.ExtractMonitors(allPages)
+	allPools, err := pools.ExtractPools(allPages)
 	if err != nil {
 		panic(err)
 	}
@@ -83,12 +83,13 @@ Example to Create a Member
 
 	poolID := "d67d56a6-4a86-4688-a282-f46444705c64"
 
+	weight := 10
 	createOpts := pools.CreateMemberOpts{
 		Name:         "db",
 		SubnetID:     "1981f108-3c48-48d2-b908-30f7d28532c9",
 		Address:      "10.0.2.11",
 		ProtocolPort: 80,
-		Weight:       10,
+		Weight:       &weight,
 	}
 
 	member, err := pools.CreateMember(networkClient, poolID, createOpts).Extract()
@@ -101,9 +102,10 @@ Example to Update a Member
 	poolID := "d67d56a6-4a86-4688-a282-f46444705c64"
 	memberID := "64dba99f-8af8-4200-8882-e32a0660f23e"
 
+	weight := 4
 	updateOpts := pools.UpdateMemberOpts{
 		Name:   "new-name",
-		Weight: 4,
+		Weight: &weight,
 	}
 
 	member, err := pools.UpdateMember(networkClient, poolID, memberID, updateOpts).Extract()

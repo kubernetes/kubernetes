@@ -25,29 +25,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // LogsForObjectFunc is a function type that can tell you how to get logs for a runtime.object
-type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error)
+type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]rest.ResponseWrapper, error)
 
 // LogsForObjectFn gives a way to easily override the function for unit testing if needed.
 var LogsForObjectFn LogsForObjectFunc = logsForObject
 
-// AttachableLogsForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
-type AttachableLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*v1.Pod, error)
+// AttachablePodForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
+type AttachablePodForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*v1.Pod, error)
 
 // AttachablePodForObjectFn gives a way to easily override the function for unit testing if needed.
-var AttachablePodForObjectFn AttachableLogsForObjectFunc = attachablePodForObject
+var AttachablePodForObjectFn AttachablePodForObjectFunc = attachablePodForObject
 
 // HistoryViewerFunc is a function type that can tell you how to view change history
-type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
+type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (HistoryViewer, error)
 
 // HistoryViewerFn gives a way to easily override the function for unit testing if needed
 var HistoryViewerFn HistoryViewerFunc = historyViewer
 
 // StatusViewerFunc is a function type that can tell you how to print rollout status
-type StatusViewerFunc func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
+type StatusViewerFunc func(mapping *meta.RESTMapping) (StatusViewer, error)
 
 // StatusViewerFn gives a way to easily override the function for unit testing if needed
 var StatusViewerFn StatusViewerFunc = statusViewer
@@ -79,12 +78,6 @@ type PortsForObjectFunc func(object runtime.Object) ([]string, error)
 // PortsForObjectFn gives a way to easily override the function for unit testing if needed
 var PortsForObjectFn PortsForObjectFunc = portsForObject
 
-// CanBeAutoscaledFunc checks whether the kind of resources could be autoscaled
-type CanBeAutoscaledFunc func(kind schema.GroupKind) error
-
-// CanBeAutoscaledFn gives a way to easily override the function for unit testing if needed
-var CanBeAutoscaledFn CanBeAutoscaledFunc = canBeAutoscaled
-
 // CanBeExposedFunc is a function type that can tell you whether a given GroupKind is capable of being exposed
 type CanBeExposedFunc func(kind schema.GroupKind) error
 
@@ -108,7 +101,14 @@ type ObjectResumerFunc func(runtime.Object) ([]byte, error)
 var ObjectResumerFn ObjectResumerFunc = defaultObjectResumer
 
 // RollbackerFunc gives a way to change the rollback version of the specified RESTMapping type
-type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
+type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (Rollbacker, error)
 
 // RollbackerFn gives a way to easily override the function for unit testing if needed
 var RollbackerFn RollbackerFunc = rollbacker
+
+// ObjectRestarterFunc is a function type that updates an annotation in a deployment to restart it..
+type ObjectRestarterFunc func(runtime.Object) ([]byte, error)
+
+// ObjectRestarterFn gives a way to easily override the function for unit testing if needed.
+// Returns the patched object in bytes and any error that occurred during the encoding.
+var ObjectRestarterFn ObjectRestarterFunc = defaultObjectRestarter

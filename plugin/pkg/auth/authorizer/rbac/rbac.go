@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -81,7 +81,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 
 	// Build a detailed log of the denial.
 	// Make the whole block conditional so we don't do a lot of string-building we won't use.
-	if glog.V(5) {
+	if klog.V(5) {
 		var operation string
 		if requestAttributes.IsResourceRequest() {
 			b := &bytes.Buffer{}
@@ -115,14 +115,12 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 			scope = "cluster-wide"
 		}
 
-		glog.Infof("RBAC DENY: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+		klog.Infof("RBAC DENY: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
 	}
 
 	reason := ""
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
-	} else {
-		reason = "no RBAC policy matched"
 	}
 	return authorizer.DecisionNoOpinion, reason, nil
 }

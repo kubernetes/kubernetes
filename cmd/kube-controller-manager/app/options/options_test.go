@@ -25,13 +25,31 @@ import (
 
 	"github.com/spf13/pflag"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	componentbaseconfig "k8s.io/component-base/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
+	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
+	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
+	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
+	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
+	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
+	poautosclerconfig "k8s.io/kubernetes/pkg/controller/podautoscaler/config"
+	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
+	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
+	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
+	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
+	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
+	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
+	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
+	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -125,139 +143,187 @@ func TestAddFlags(t *testing.T) {
 
 	expected := &KubeControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
-			Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
-			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
-				ContentType: "application/json",
-				QPS:         50.0,
-				Burst:       100,
-			},
-			ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
-			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
-				ResourceLock:  "configmap",
-				LeaderElect:   false,
-				LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
-				RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
-				RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
+			GenericControllerManagerConfiguration: &kubectrlmgrconfig.GenericControllerManagerConfiguration{
+				Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					ContentType: "application/json",
+					QPS:         50.0,
+					Burst:       100,
+				},
+				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					ResourceLock:  "configmap",
+					LeaderElect:   false,
+					LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
+					RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
+					RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
+				},
+				Controllers: []string{"foo", "bar"},
 			},
 			Debugging: &cmoptions.DebuggingOptions{
-				EnableProfiling:           false,
-				EnableContentionProfiling: true,
+				DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           false,
+					EnableContentionProfiling: true,
+				},
 			},
-			Controllers: []string{"foo", "bar"},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			UseServiceAccountCredentials: true,
-			RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-			NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
-			ClusterName:                  "k8s",
-			ClusterCIDR:                  "1.2.3.4/24",
-			AllocateNodeCIDRs:            true,
-			CIDRAllocatorType:            "CloudAllocator",
-			ConfigureCloudRoutes:         false,
+			KubeCloudSharedConfiguration: &kubectrlmgrconfig.KubeCloudSharedConfiguration{
+				UseServiceAccountCredentials: true,
+				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
+				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
+				ClusterName:                  "k8s",
+				ClusterCIDR:                  "1.2.3.4/24",
+				AllocateNodeCIDRs:            true,
+				CIDRAllocatorType:            "CloudAllocator",
+				ConfigureCloudRoutes:         false,
+			},
 			CloudProvider: &cmoptions.CloudProviderOptions{
-				Name:            "gce",
-				CloudConfigFile: "/cloud-config",
+				CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{
+					Name:            "gce",
+					CloudConfigFile: "/cloud-config",
+				},
+			},
+		},
+		ServiceController: &cmoptions.ServiceControllerOptions{
+			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
+				ConcurrentServiceSyncs: 2,
 			},
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
-			ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
-			DisableAttachDetachReconcilerSync: true,
+			&attachdetachconfig.AttachDetachControllerConfiguration{
+				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
+				DisableAttachDetachReconcilerSync: true,
+			},
 		},
 		CSRSigningController: &CSRSigningControllerOptions{
-			ClusterSigningCertFile: "/cluster-signing-cert",
-			ClusterSigningKeyFile:  "/cluster-signing-key",
-			ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+			&csrsigningconfig.CSRSigningControllerConfiguration{
+				ClusterSigningCertFile: "/cluster-signing-cert",
+				ClusterSigningKeyFile:  "/cluster-signing-key",
+				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+			},
 		},
 		DaemonSetController: &DaemonSetControllerOptions{
-			ConcurrentDaemonSetSyncs: 2,
+			&daemonconfig.DaemonSetControllerConfiguration{
+				ConcurrentDaemonSetSyncs: 2,
+			},
 		},
 		DeploymentController: &DeploymentControllerOptions{
-			ConcurrentDeploymentSyncs:      10,
-			DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
+			&deploymentconfig.DeploymentControllerConfiguration{
+				ConcurrentDeploymentSyncs:      10,
+				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
+			},
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
-			DeletingPodsQPS:    0.1,
-			RegisterRetryCount: 10,
+			&kubectrlmgrconfig.DeprecatedControllerConfiguration{
+				DeletingPodsQPS:    0.1,
+				RegisterRetryCount: 10,
+			},
 		},
 		EndpointController: &EndpointControllerOptions{
-			ConcurrentEndpointSyncs: 10,
+			&endpointconfig.EndpointControllerConfiguration{
+				ConcurrentEndpointSyncs: 10,
+			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
-			ConcurrentGCSyncs: 30,
-			GCIgnoredResources: []kubectrlmgrconfig.GroupResource{
-				{Group: "", Resource: "events"},
+			&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
+				ConcurrentGCSyncs: 30,
+				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
+					{Group: "", Resource: "events"},
+				},
+				EnableGarbageCollector: false,
 			},
-			EnableGarbageCollector: false,
 		},
 		HPAController: &HPAControllerOptions{
-			HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-			HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-			HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
-			HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
-			HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
-			HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
-			HorizontalPodAutoscalerTolerance:                    0.1,
-			HorizontalPodAutoscalerUseRESTClients:               true,
+			&poautosclerconfig.HPAControllerConfiguration{
+				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
+				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
+				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
+				HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
+				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
+				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
+				HorizontalPodAutoscalerTolerance:                    0.1,
+				HorizontalPodAutoscalerUseRESTClients:               true,
+			},
 		},
 		JobController: &JobControllerOptions{
-			ConcurrentJobSyncs: 5,
+			&jobconfig.JobControllerConfiguration{
+				ConcurrentJobSyncs: 5,
+			},
 		},
 		NamespaceController: &NamespaceControllerOptions{
-			NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
-			ConcurrentNamespaceSyncs: 20,
+			&namespaceconfig.NamespaceControllerConfiguration{
+				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
+				ConcurrentNamespaceSyncs: 20,
+			},
 		},
 		NodeIPAMController: &NodeIPAMControllerOptions{
-			NodeCIDRMaskSize: 48,
+			&nodeipamconfig.NodeIPAMControllerConfiguration{
+				NodeCIDRMaskSize: 48,
+			},
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{
-			EnableTaintManager:        false,
-			NodeEvictionRate:          0.2,
-			SecondaryNodeEvictionRate: 0.05,
-			NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
-			NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
-			PodEvictionTimeout:        metav1.Duration{Duration: 2 * time.Minute},
-			LargeClusterSizeThreshold: 100,
-			UnhealthyZoneThreshold:    0.6,
+			&nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				EnableTaintManager:        false,
+				NodeEvictionRate:          0.2,
+				SecondaryNodeEvictionRate: 0.05,
+				NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+				PodEvictionTimeout:        metav1.Duration{Duration: 2 * time.Minute},
+				LargeClusterSizeThreshold: 100,
+				UnhealthyZoneThreshold:    0.6,
+			},
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
-			PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-			VolumeConfiguration: kubectrlmgrconfig.VolumeConfiguration{
-				EnableDynamicProvisioning:  false,
-				EnableHostPathProvisioning: true,
-				FlexVolumePluginDir:        "/flex-volume-plugin",
-				PersistentVolumeRecyclerConfiguration: kubectrlmgrconfig.PersistentVolumeRecyclerConfiguration{
-					MaximumRetry:             3,
-					MinimumTimeoutNFS:        200,
-					IncrementTimeoutNFS:      45,
-					MinimumTimeoutHostPath:   45,
-					IncrementTimeoutHostPath: 45,
+			&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
+				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
+					EnableDynamicProvisioning:  false,
+					EnableHostPathProvisioning: true,
+					FlexVolumePluginDir:        "/flex-volume-plugin",
+					PersistentVolumeRecyclerConfiguration: persistentvolumeconfig.PersistentVolumeRecyclerConfiguration{
+						MaximumRetry:             3,
+						MinimumTimeoutNFS:        200,
+						IncrementTimeoutNFS:      45,
+						MinimumTimeoutHostPath:   45,
+						IncrementTimeoutHostPath: 45,
+					},
 				},
 			},
 		},
 		PodGCController: &PodGCControllerOptions{
-			TerminatedPodGCThreshold: 12000,
+			&podgcconfig.PodGCControllerConfiguration{
+				TerminatedPodGCThreshold: 12000,
+			},
 		},
 		ReplicaSetController: &ReplicaSetControllerOptions{
-			ConcurrentRSSyncs: 10,
+			&replicasetconfig.ReplicaSetControllerConfiguration{
+				ConcurrentRSSyncs: 10,
+			},
 		},
 		ReplicationController: &ReplicationControllerOptions{
-			ConcurrentRCSyncs: 10,
+			&replicationconfig.ReplicationControllerConfiguration{
+				ConcurrentRCSyncs: 10,
+			},
 		},
 		ResourceQuotaController: &ResourceQuotaControllerOptions{
-			ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
-			ConcurrentResourceQuotaSyncs: 10,
+			&resourcequotaconfig.ResourceQuotaControllerConfiguration{
+				ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
+				ConcurrentResourceQuotaSyncs: 10,
+			},
 		},
 		SAController: &SAControllerOptions{
-			ServiceAccountKeyFile:  "/service-account-private-key",
-			ConcurrentSATokenSyncs: 10,
-		},
-		ServiceController: &cmoptions.ServiceControllerOptions{
-			ConcurrentServiceSyncs: 2,
+			&serviceaccountconfig.SAControllerConfiguration{
+				ServiceAccountKeyFile:  "/service-account-private-key",
+				ConcurrentSATokenSyncs: 10,
+			},
 		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
-			ConcurrentTTLSyncs: 8,
+			&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
+				ConcurrentTTLSyncs: 8,
+			},
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
@@ -302,7 +368,7 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
-type sortedGCIgnoredResources []kubectrlmgrconfig.GroupResource
+type sortedGCIgnoredResources []garbagecollectorconfig.GroupResource
 
 func (r sortedGCIgnoredResources) Len() int {
 	return len(r)

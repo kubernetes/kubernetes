@@ -31,21 +31,21 @@ import (
 // orthogonal factor that reduces a matrix A to Schur form T, then Q*X and Q*Y
 // are the matrices of right and left eigenvectors of A.
 //
-// If side == lapack.RightEV, only right eigenvectors will be computed.
-// If side == lapack.LeftEV, only left eigenvectors will be computed.
-// If side == lapack.RightLeftEV, both right and left eigenvectors will be computed.
+// If side == lapack.EVRight, only right eigenvectors will be computed.
+// If side == lapack.EVLeft, only left eigenvectors will be computed.
+// If side == lapack.EVBoth, both right and left eigenvectors will be computed.
 // For other values of side, Dtrevc3 will panic.
 //
-// If howmny == lapack.AllEV, all right and/or left eigenvectors will be
+// If howmny == lapack.EVAll, all right and/or left eigenvectors will be
 // computed.
-// If howmny == lapack.AllEVMulQ, all right and/or left eigenvectors will be
+// If howmny == lapack.EVAllMulQ, all right and/or left eigenvectors will be
 // computed and multiplied from left by the matrices in VR and/or VL.
-// If howmny == lapack.SelectedEV, right and/or left eigenvectors will be
+// If howmny == lapack.EVSelected, right and/or left eigenvectors will be
 // computed as indicated by selected.
 // For other values of howmny, Dtrevc3 will panic.
 //
 // selected specifies which eigenvectors will be computed. It must have length n
-// if howmny == lapack.SelectedEV, and it is not referenced otherwise.
+// if howmny == lapack.EVSelected, and it is not referenced otherwise.
 // If w_j is a real eigenvalue, the corresponding real eigenvector will be
 // computed if selected[j] is true.
 // If w_j and w_{j+1} are the real and imaginary parts of a complex eigenvalue,
@@ -53,38 +53,38 @@ import (
 // selected[j+1] is true, and on return selected[j] will be set to true and
 // selected[j+1] will be set to false.
 //
-// VL and VR are n×mm matrices. If howmny is lapack.AllEV or
-// lapack.AllEVMulQ, mm must be at least n. If howmny ==
-// lapack.SelectedEV, mm must be large enough to store the selected
+// VL and VR are n×mm matrices. If howmny is lapack.EVAll or
+// lapack.AllEVMulQ, mm must be at least n. If howmny is
+// lapack.EVSelected, mm must be large enough to store the selected
 // eigenvectors. Each selected real eigenvector occupies one column and each
 // selected complex eigenvector occupies two columns. If mm is not sufficiently
 // large, Dtrevc3 will panic.
 //
-// On entry, if howmny == lapack.AllEVMulQ, it is assumed that VL (if side
-// is lapack.LeftEV or lapack.RightLeftEV) contains an n×n matrix QL,
-// and that VR (if side is lapack.LeftEV or lapack.RightLeftEV) contains
+// On entry, if howmny is lapack.EVAllMulQ, it is assumed that VL (if side
+// is lapack.EVLeft or lapack.EVBoth) contains an n×n matrix QL,
+// and that VR (if side is lapack.EVLeft or lapack.EVBoth) contains
 // an n×n matrix QR. QL and QR are typically the orthogonal matrix Q of Schur
 // vectors returned by Dhseqr.
 //
-// On return, if side is lapack.LeftEV or lapack.RightLeftEV,
+// On return, if side is lapack.EVLeft or lapack.EVBoth,
 // VL will contain:
-//  if howmny == lapack.AllEV,      the matrix Y of left eigenvectors of T,
-//  if howmny == lapack.AllEVMulQ,  the matrix Q*Y,
-//  if howmny == lapack.SelectedEV, the left eigenvectors of T specified by
+//  if howmny == lapack.EVAll,      the matrix Y of left eigenvectors of T,
+//  if howmny == lapack.EVAllMulQ,  the matrix Q*Y,
+//  if howmny == lapack.EVSelected, the left eigenvectors of T specified by
 //                                  selected, stored consecutively in the
 //                                  columns of VL, in the same order as their
 //                                  eigenvalues.
-// VL is not referenced if side == lapack.RightEV.
+// VL is not referenced if side == lapack.EVRight.
 //
-// On return, if side is lapack.RightEV or lapack.RightLeftEV,
+// On return, if side is lapack.EVRight or lapack.EVBoth,
 // VR will contain:
-//  if howmny == lapack.AllEV,      the matrix X of right eigenvectors of T,
-//  if howmny == lapack.AllEVMulQ,  the matrix Q*X,
-//  if howmny == lapack.SelectedEV, the left eigenvectors of T specified by
+//  if howmny == lapack.EVAll,      the matrix X of right eigenvectors of T,
+//  if howmny == lapack.EVAllMulQ,  the matrix Q*X,
+//  if howmny == lapack.EVSelected, the left eigenvectors of T specified by
 //                                  selected, stored consecutively in the
 //                                  columns of VR, in the same order as their
 //                                  eigenvalues.
-// VR is not referenced if side == lapack.LeftEV.
+// VR is not referenced if side == lapack.EVLeft.
 //
 // Complex eigenvectors corresponding to a complex eigenvalue are stored in VL
 // and VR in two consecutive columns, the first holding the real part, and the
@@ -105,88 +105,112 @@ import (
 // the eigenvectors.
 //
 // Dtrevc3 is an internal routine. It is exported for testing purposes.
-func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.HowMany, selected []bool, n int, t []float64, ldt int, vl []float64, ldvl int, vr []float64, ldvr int, mm int, work []float64, lwork int) (m int) {
-	switch side {
-	default:
-		panic(badEVSide)
-	case lapack.RightEV, lapack.LeftEV, lapack.RightLeftEV:
-	}
-	switch howmny {
-	default:
-		panic(badHowMany)
-	case lapack.AllEV, lapack.AllEVMulQ, lapack.SelectedEV:
-	}
+func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.EVHowMany, selected []bool, n int, t []float64, ldt int, vl []float64, ldvl int, vr []float64, ldvr int, mm int, work []float64, lwork int) (m int) {
+	bothv := side == lapack.EVBoth
+	rightv := side == lapack.EVRight || bothv
+	leftv := side == lapack.EVLeft || bothv
 	switch {
+	case !rightv && !leftv:
+		panic(badEVSide)
+	case howmny != lapack.EVAll && howmny != lapack.EVAllMulQ && howmny != lapack.EVSelected:
+		panic(badEVHowMany)
 	case n < 0:
 		panic(nLT0)
-	case len(work) < lwork:
-		panic(shortWork)
+	case ldt < max(1, n):
+		panic(badLdT)
+	case mm < 0:
+		panic(mmLT0)
+	case ldvl < 1:
+		// ldvl and ldvr are also checked below after the computation of
+		// m (number of columns of VL and VR) in case of howmny == EVSelected.
+		panic(badLdVL)
+	case ldvr < 1:
+		panic(badLdVR)
 	case lwork < max(1, 3*n) && lwork != -1:
-		panic(badWork)
-	}
-	if lwork != -1 {
-		if howmny == lapack.SelectedEV {
-			if len(selected) != n {
-				panic("lapack: bad selected length")
-			}
-			// Set m to the number of columns required to store the
-			// selected eigenvectors, and standardize the slice
-			// selected.
-			for j := 0; j < n; {
-				if j == n-1 || t[(j+1)*ldt+j] == 0 {
-					// Diagonal 1×1 block corresponding to a
-					// real eigenvalue.
-					if selected[j] {
-						m++
-					}
-					j++
-				} else {
-					// Diagonal 2×2 block corresponding to a
-					// complex eigenvalue.
-					if selected[j] || selected[j+1] {
-						selected[j] = true
-						selected[j+1] = false
-						m += 2
-					}
-					j += 2
-				}
-			}
-		} else {
-			m = n
-		}
-		if m > mm {
-			panic("lapack: insufficient number of columns")
-		}
-		checkMatrix(n, n, t, ldt)
-		if (side == lapack.RightEV || side == lapack.RightLeftEV) && m > 0 {
-			checkMatrix(n, m, vr, ldvr)
-		}
-		if (side == lapack.LeftEV || side == lapack.RightLeftEV) && m > 0 {
-			checkMatrix(n, m, vl, ldvl)
-		}
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
 
 	// Quick return if possible.
 	if n == 0 {
 		work[0] = 1
-		return m
+		return 0
 	}
 
-	const (
-		nbmin = 8
-		nbmax = 128
-	)
-	nb := impl.Ilaenv(1, "DTREVC", string(side)+string(howmny), n, -1, -1, -1)
+	// Normally we don't check slice lengths until after the workspace
+	// query. However, even in case of the workspace query we need to
+	// compute and return the value of m, and since the computation accesses t,
+	// we put the length check of t here.
+	if len(t) < (n-1)*ldt+n {
+		panic(shortT)
+	}
+
+	if howmny == lapack.EVSelected {
+		if len(selected) != n {
+			panic(badLenSelected)
+		}
+		// Set m to the number of columns required to store the selected
+		// eigenvectors, and standardize the slice selected.
+		// Each selected real eigenvector occupies one column and each
+		// selected complex eigenvector occupies two columns.
+		for j := 0; j < n; {
+			if j == n-1 || t[(j+1)*ldt+j] == 0 {
+				// Diagonal 1×1 block corresponding to a
+				// real eigenvalue.
+				if selected[j] {
+					m++
+				}
+				j++
+			} else {
+				// Diagonal 2×2 block corresponding to a
+				// complex eigenvalue.
+				if selected[j] || selected[j+1] {
+					selected[j] = true
+					selected[j+1] = false
+					m += 2
+				}
+				j += 2
+			}
+		}
+	} else {
+		m = n
+	}
+	if mm < m {
+		panic(badMm)
+	}
 
 	// Quick return in case of a workspace query.
+	nb := impl.Ilaenv(1, "DTREVC", string(side)+string(howmny), n, -1, -1, -1)
 	if lwork == -1 {
 		work[0] = float64(n + 2*n*nb)
 		return m
 	}
 
+	// Quick return if no eigenvectors were selected.
+	if m == 0 {
+		return 0
+	}
+
+	switch {
+	case leftv && ldvl < mm:
+		panic(badLdVL)
+	case leftv && len(vl) < (n-1)*ldvl+mm:
+		panic(shortVL)
+
+	case rightv && ldvr < mm:
+		panic(badLdVR)
+	case rightv && len(vr) < (n-1)*ldvr+mm:
+		panic(shortVR)
+	}
+
 	// Use blocked version of back-transformation if sufficient workspace.
 	// Zero-out the workspace to avoid potential NaN propagation.
-	if howmny == lapack.AllEVMulQ && lwork >= n+2*n*nbmin {
+	const (
+		nbmin = 8
+		nbmax = 128
+	)
+	if howmny == lapack.EVAllMulQ && lwork >= n+2*n*nbmin {
 		nb = min((lwork-n)/(2*n), nbmax)
 		impl.Dlaset(blas.All, n, 1+2*nb, 0, 0, work[:n+2*nb*n], 1+2*nb)
 	} else {
@@ -230,7 +254,7 @@ func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.HowMany, se
 		iscomplex [nbmax]int // Stores ip for each column in current block.
 	)
 
-	if side == lapack.LeftEV {
+	if side == lapack.EVLeft {
 		goto leftev
 	}
 
@@ -261,7 +285,7 @@ func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.HowMany, se
 			ip = -1
 		}
 
-		if howmny == lapack.SelectedEV {
+		if howmny == lapack.EVSelected {
 			if ip == 0 {
 				if !selected[ki] {
 					continue
@@ -336,7 +360,7 @@ func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.HowMany, se
 			}
 			// Copy the vector x or Q*x to VR and normalize.
 			switch {
-			case howmny != lapack.AllEVMulQ:
+			case howmny != lapack.EVAllMulQ:
 				// No back-transform: copy x to VR and normalize.
 				bi.Dcopy(ki+1, b[iv:], ldb, vr[is:], ldvr)
 				ii := bi.Idamax(ki+1, vr[is:], ldvr)
@@ -447,7 +471,7 @@ func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.HowMany, se
 
 			// Copy the vector x or Q*x to VR and normalize.
 			switch {
-			case howmny != lapack.AllEVMulQ:
+			case howmny != lapack.EVAllMulQ:
 				// No back-transform: copy x to VR and normalize.
 				bi.Dcopy(ki+1, b[iv-1:], ldb, vr[is-1:], ldvr)
 				bi.Dcopy(ki+1, b[iv:], ldb, vr[is:], ldvr)
@@ -539,7 +563,7 @@ func (impl Implementation) Dtrevc3(side lapack.EVSide, howmny lapack.HowMany, se
 		}
 	}
 
-	if side == lapack.RightEV {
+	if side == lapack.EVRight {
 		return m
 	}
 
@@ -569,7 +593,7 @@ leftev:
 			// conjugate pair.
 			ip = 1
 		}
-		if howmny == lapack.SelectedEV && !selected[ki] {
+		if howmny == lapack.EVSelected && !selected[ki] {
 			continue
 		}
 
@@ -603,7 +627,6 @@ leftev:
 						rec := 1 / vmax
 						bi.Dscal(n-ki, rec, b[ki*ldb+iv:], ldb)
 						vmax = 1
-						vcrit = bignum
 					}
 					b[j*ldb+iv] -= bi.Ddot(j-ki-1, t[(ki+1)*ldt+j:], ldt, b[(ki+1)*ldb+iv:], ldb)
 					// Solve [ T[j,j] - wr ]^T * X = b.
@@ -626,7 +649,6 @@ leftev:
 					if beta > vcrit {
 						bi.Dscal(n-ki+1, 1/vmax, b[ki*ldb+iv:], 1)
 						vmax = 1
-						vcrit = bignum
 					}
 					b[j*ldb+iv] -= bi.Ddot(j-ki-1, t[(ki+1)*ldt+j:], ldt, b[(ki+1)*ldb+iv:], ldb)
 					b[(j+1)*ldb+iv] -= bi.Ddot(j-ki-1, t[(ki+1)*ldt+j+1:], ldt, b[(ki+1)*ldb+iv:], ldb)
@@ -648,7 +670,7 @@ leftev:
 			}
 			// Copy the vector x or Q*x to VL and normalize.
 			switch {
-			case howmny != lapack.AllEVMulQ:
+			case howmny != lapack.EVAllMulQ:
 				// No back-transform: copy x to VL and normalize.
 				bi.Dcopy(n-ki, b[ki*ldb+iv:], ldb, vl[ki*ldvl+is:], ldvl)
 				ii := bi.Idamax(n-ki, vl[ki*ldvl+is:], ldvl) + ki
@@ -711,7 +733,6 @@ leftev:
 						bi.Dscal(n-ki, rec, b[ki*ldb+iv:], ldb)
 						bi.Dscal(n-ki, rec, b[ki*ldb+iv+1:], ldb)
 						vmax = 1
-						vcrit = bignum
 					}
 					b[j*ldb+iv] -= bi.Ddot(j-ki-2, t[(ki+2)*ldt+j:], ldt, b[(ki+2)*ldb+iv:], ldb)
 					b[j*ldb+iv+1] -= bi.Ddot(j-ki-2, t[(ki+2)*ldt+j:], ldt, b[(ki+2)*ldb+iv+1:], ldb)
@@ -738,7 +759,6 @@ leftev:
 						bi.Dscal(n-ki, rec, b[ki*ldb+iv:], ldb)
 						bi.Dscal(n-ki, rec, b[ki*ldb+iv+1:], ldb)
 						vmax = 1
-						vcrit = bignum
 					}
 					b[j*ldb+iv] -= bi.Ddot(j-ki-2, t[(ki+2)*ldt+j:], ldt, b[(ki+2)*ldb+iv:], ldb)
 					b[j*ldb+iv+1] -= bi.Ddot(j-ki-2, t[(ki+2)*ldt+j:], ldt, b[(ki+2)*ldb+iv+1:], ldb)
@@ -767,7 +787,7 @@ leftev:
 			}
 			// Copy the vector x or Q*x to VL and normalize.
 			switch {
-			case howmny != lapack.AllEVMulQ:
+			case howmny != lapack.EVAllMulQ:
 				// No back-transform: copy x to VL and normalize.
 				bi.Dcopy(n-ki, b[ki*ldb+iv:], ldb, vl[ki*ldvl+is:], ldvl)
 				bi.Dcopy(n-ki, b[ki*ldb+iv+1:], ldb, vl[ki*ldvl+is+1:], ldvl)

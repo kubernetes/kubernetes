@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
@@ -132,7 +132,7 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 	case remotecommand.StreamProtocolV2Name:
 		streamer = newStreamProtocolV2(options)
 	case "":
-		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
 		streamer = newStreamProtocolV1(options)

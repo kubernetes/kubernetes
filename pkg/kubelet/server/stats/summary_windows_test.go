@@ -57,6 +57,7 @@ func TestSummaryProvider(t *testing.T) {
 		On("GetNodeConfig").Return(nodeConfig).
 		On("GetPodCgroupRoot").Return(cgroupRoot).
 		On("ListPodStats").Return(podStats, nil).
+		On("ListPodStatsAndUpdateCPUNanoCoreUsage").Return(podStats, nil).
 		On("ImageFsStats").Return(imageFsStats, nil).
 		On("RootFsStats").Return(rootFsStats, nil).
 		On("RlimitStats").Return(nil, nil).

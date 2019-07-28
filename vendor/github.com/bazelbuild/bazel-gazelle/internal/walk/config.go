@@ -18,7 +18,6 @@ package walk
 import (
 	"flag"
 	"path"
-	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/internal/config"
 	"github.com/bazelbuild/bazel-gazelle/internal/rule"
@@ -27,60 +26,55 @@ import (
 type walkConfig struct {
 	excludes []string
 	ignore   bool
+	follow   []string
 }
 
 const walkName = "_walk"
 
-func getWalkConfig(c *config.Config) walkConfig {
-	return c.Exts[walkName].(walkConfig)
+func getWalkConfig(c *config.Config) *walkConfig {
+	return c.Exts[walkName].(*walkConfig)
 }
 
-func (wc *walkConfig) isExcluded(base string) bool {
+func (wc *walkConfig) isExcluded(rel, base string) bool {
+	f := path.Join(rel, base)
 	for _, x := range wc.excludes {
-		if base == x {
+		if f == x {
 			return true
 		}
 	}
 	return false
 }
 
-type walkConfigurer struct{}
+type Configurer struct{}
 
-func (_ *walkConfigurer) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {}
-
-func (_ *walkConfigurer) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
-
-func (_ *walkConfigurer) KnownDirectives() []string {
-	return []string{"exclude", "ignore"}
+func (_ *Configurer) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
+	c.Exts[walkName] = &walkConfig{}
 }
 
-func (_ *walkConfigurer) Configure(c *config.Config, rel string, f *rule.File) {
-	var wc walkConfig
-	if raw, ok := c.Exts[walkName]; ok {
-		wc = raw.(walkConfig)
-		wc.ignore = false
-		if rel != "" {
-			prefix := path.Base(rel) + "/"
-			excludes := make([]string, 0, len(wc.excludes))
-			for _, x := range wc.excludes {
-				if strings.HasPrefix(x, prefix) {
-					excludes = append(excludes, x[len(prefix):])
-				}
-			}
-			wc.excludes = excludes
-		}
-	}
+func (_ *Configurer) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
+
+func (_ *Configurer) KnownDirectives() []string {
+	return []string{"exclude", "follow", "ignore"}
+}
+
+func (_ *Configurer) Configure(c *config.Config, rel string, f *rule.File) {
+	wc := getWalkConfig(c)
+	wcCopy := &walkConfig{}
+	*wcCopy = *wc
+	wcCopy.ignore = false
 
 	if f != nil {
 		for _, d := range f.Directives {
 			switch d.Key {
 			case "exclude":
-				wc.excludes = append(wc.excludes, d.Value)
+				wcCopy.excludes = append(wcCopy.excludes, path.Join(rel, d.Value))
+			case "follow":
+				wcCopy.follow = append(wcCopy.follow, path.Join(rel, d.Value))
 			case "ignore":
-				wc.ignore = true
+				wcCopy.ignore = true
 			}
 		}
 	}
 
-	c.Exts[walkName] = wc
+	c.Exts[walkName] = wcCopy
 }

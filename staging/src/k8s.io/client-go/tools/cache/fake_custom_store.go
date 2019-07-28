@@ -25,7 +25,7 @@ type FakeCustomStore struct {
 	ListKeysFunc func() []string
 	GetFunc      func(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKeyFunc func(key string) (item interface{}, exists bool, err error)
-	ReplaceFunc  func(list []interface{}, resourceVerion string) error
+	ReplaceFunc  func(list []interface{}, resourceVersion string) error
 	ResyncFunc   func() error
 }
 
@@ -40,7 +40,7 @@ func (f *FakeCustomStore) Add(obj interface{}) error {
 // Update calls the custom Update function if defined
 func (f *FakeCustomStore) Update(obj interface{}) error {
 	if f.UpdateFunc != nil {
-		return f.Update(obj)
+		return f.UpdateFunc(obj)
 	}
 	return nil
 }

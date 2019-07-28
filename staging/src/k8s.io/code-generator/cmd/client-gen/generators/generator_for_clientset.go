@@ -88,10 +88,6 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	sw.Do(clientsetTemplate, m)
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
-		// don't generated the default method if generating internalversion clientset
-		if g.IsDefaultVersion && g.Version != "" {
-			sw.Do(clientsetInterfaceDefaultVersionImpl, g)
-		}
 	}
 	sw.Do(getDiscoveryTemplate, m)
 	sw.Do(newClientsetForConfigTemplate, m)
@@ -105,9 +101,7 @@ var clientsetInterface = `
 type Interface interface {
 	Discovery() $.DiscoveryInterface|raw$
     $range .allGroups$$.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface
-	$if .IsDefaultVersion$// Deprecated: please explicitly pick a version if possible.
-	$.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface
-	$end$$end$
+	$end$
 }
 `
 
@@ -128,14 +122,6 @@ func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.V
 }
 `
 
-var clientsetInterfaceDefaultVersionImpl = `
-// Deprecated: $.GroupGoName$ retrieves the default version of $.GroupGoName$Client.
-// Please explicitly pick a version.
-func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
-	return c.$.LowerCaseGroupGoName$$.Version$
-}
-`
-
 var getDiscoveryTemplate = `
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
@@ -148,9 +134,14 @@ func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
 
 var newClientsetForConfigTemplate = `
 // NewForConfig creates a new Clientset for the given config.
+// If config's RateLimiter is not set and QPS and Burst are acceptable, 
+// NewForConfig will generate a rate-limiter in configShallowCopy.
 func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	var cs Clientset

@@ -44,8 +44,8 @@ func TestFakeClock(t *testing.T) {
 
 	tt := tc.Now()
 	tc.SetTime(tt.Add(time.Hour))
-	if tc.Now().Sub(tt) != time.Hour {
-		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Now().Sub(tt), time.Hour)
+	if tc.Since(tt) != time.Hour {
+		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Since(tt), time.Hour)
 	}
 }
 
@@ -114,6 +114,108 @@ func TestFakeAfter(t *testing.T) {
 		t.Errorf("unexpected channel read")
 	default:
 		t.Errorf("unexpected non-channel read")
+	}
+}
+
+func TestFakeTimer(t *testing.T) {
+	tc := NewFakeClock(time.Now())
+	if tc.HasWaiters() {
+		t.Errorf("unexpected waiter?")
+	}
+	oneSec := tc.NewTimer(time.Second)
+	twoSec := tc.NewTimer(time.Second * 2)
+	treSec := tc.NewTimer(time.Second * 3)
+	if !tc.HasWaiters() {
+		t.Errorf("unexpected lack of waiter?")
+	}
+	select {
+	case <-oneSec.C():
+		t.Errorf("unexpected channel read")
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	case <-treSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	tc.Step(999999999 * time.Nanosecond) // t=.999,999,999
+	select {
+	case <-oneSec.C():
+		t.Errorf("unexpected channel read")
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	case <-treSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	tc.Step(time.Nanosecond) // t=1
+	select {
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	case <-treSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	select {
+	case <-oneSec.C():
+		// Expected!
+	default:
+		t.Errorf("unexpected channel non-read")
+	}
+	tc.Step(time.Nanosecond) // t=1.000,000,001
+	select {
+	case <-oneSec.C():
+		t.Errorf("unexpected channel read")
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	case <-treSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	if oneSec.Stop() {
+		t.Errorf("Expected oneSec.Stop() to return false")
+	}
+	if !twoSec.Stop() {
+		t.Errorf("Expected twoSec.Stop() to return true")
+	}
+	tc.Step(time.Second) // t=2.000,000,001
+	select {
+	case <-oneSec.C():
+		t.Errorf("unexpected channel read")
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	case <-treSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	if twoSec.Reset(time.Second) {
+		t.Errorf("Expected twoSec.Reset() to return false")
+	}
+	if !treSec.Reset(time.Second) {
+		t.Errorf("Expected treSec.Reset() to return true")
+	}
+	tc.Step(time.Nanosecond * 999999999) // t=3.0
+	select {
+	case <-oneSec.C():
+		t.Errorf("unexpected channel read")
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	case <-treSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	tc.Step(time.Nanosecond) // t=3.000,000,001
+	select {
+	case <-oneSec.C():
+		t.Errorf("unexpected channel read")
+	case <-twoSec.C():
+		t.Errorf("unexpected channel read")
+	default:
+	}
+	select {
+	case <-treSec.C():
+		// Expected!
+	default:
+		t.Errorf("unexpected channel non-read")
 	}
 }
 

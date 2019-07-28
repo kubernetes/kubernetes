@@ -138,6 +138,7 @@ var (
 	// KubeletConfiguration fields that do not contain file paths.
 	kubeletConfigurationNonPathFieldPaths = sets.NewString(
 		"Address",
+		"AllowedUnsafeSysctls[*]",
 		"Authentication.Anonymous.Enabled",
 		"Authentication.Webhook.CacheTTL.Duration",
 		"Authentication.Webhook.Enabled",
@@ -148,6 +149,7 @@ var (
 		"CPUCFSQuotaPeriod.Duration",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
+		"TopologyManagerPolicy",
 		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",
@@ -197,6 +199,7 @@ var (
 		"MaxOpenFiles",
 		"MaxPods",
 		"NodeStatusUpdateFrequency.Duration",
+		"NodeStatusReportFrequency.Duration",
 		"NodeLeaseDurationSeconds",
 		"OOMScoreAdj",
 		"PodCIDR",

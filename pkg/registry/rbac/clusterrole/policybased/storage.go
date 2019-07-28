@@ -50,6 +50,16 @@ func (r *Storage) NamespaceScoped() bool {
 	return false
 }
 
+func (r *Storage) StorageVersion() runtime.GroupVersioner {
+	svp, ok := r.StandardStorage.(rest.StorageVersionProvider)
+	if !ok {
+		return nil
+	}
+	return svp.StorageVersion()
+}
+
+var _ rest.StorageVersionProvider = &Storage{}
+
 var fullAuthority = []rbac.PolicyRule{
 	rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
 	rbac.NewRule("*").URLs("*").RuleOrDie(),

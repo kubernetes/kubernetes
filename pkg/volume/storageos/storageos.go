@@ -20,21 +20,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -64,9 +63,9 @@ const (
 
 func getPath(uid types.UID, volNamespace string, volName string, pvName string, host volume.VolumeHost) string {
 	if len(volNamespace) != 0 && len(volName) != 0 && strings.Count(volName, ".") == 0 {
-		return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName+"."+volNamespace+"."+volName)
+		return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName+"."+volNamespace+"."+volName)
 	}
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName)
 }
 
 func (plugin *storageosPlugin) Init(host volume.VolumeHost) error {
@@ -89,6 +88,10 @@ func (plugin *storageosPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.StorageOS != nil) ||
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
+}
+
+func (plugin *storageosPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *storageosPlugin) RequiresRemount() bool {
@@ -277,6 +280,8 @@ type storageosManager interface {
 	CreateVolume(provisioner *storageosProvisioner) (*storageosVolume, error)
 	// Attaches the disk to the kubelet's host machine.
 	AttachVolume(mounter *storageosMounter) (string, error)
+	// Attaches the device to the host at a mount path.
+	AttachDevice(mounter *storageosMounter, deviceMountPath string) error
 	// Detaches the disk from the kubelet's host machine.
 	DetachVolume(unmounter *storageosUnmounter, dir string) error
 	// Mounts the disk on the Kubelet's host machine.
@@ -340,38 +345,45 @@ func (b *storageosMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *storageosMounter) SetUp(fsGroup *int64) error {
+func (b *storageosMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	// Need a namespace to find the volume, try pod's namespace if not set.
 	if b.volNamespace == "" {
-		glog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
+		klog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
 		b.volNamespace = b.podNamespace
+	}
+
+	targetPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
+
+	// Attach the device to the host.
+	if err := b.manager.AttachDevice(b, targetPath); err != nil {
+		klog.Errorf("Failed to attach device at %s: %s", targetPath, err.Error())
+		return err
 	}
 
 	// Attach the StorageOS volume as a block device
 	devicePath, err := b.manager.AttachVolume(b)
 	if err != nil {
-		glog.Errorf("Failed to attach StorageOS volume %s: %s", b.volName, err.Error())
+		klog.Errorf("Failed to attach StorageOS volume %s: %s", b.volName, err.Error())
 		return err
 	}
 
 	// Mount the loop device into the plugin's disk global mount dir.
-	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.podNamespace, b.volName)
-	err = b.manager.MountVolume(b, devicePath, globalPDPath)
+	err = b.manager.MountVolume(b, devicePath, targetPath)
 	if err != nil {
 		return err
 	}
-	glog.V(4).Infof("Successfully mounted StorageOS volume %s into global mount directory", b.volName)
+	klog.V(4).Infof("Successfully mounted StorageOS volume %s into global mount directory", b.volName)
 
 	// Bind mount the volume into the pod
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
-func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *storageosMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("StorageOS volume set up: %s %v %v", dir, !notMnt, err)
+	klog.V(4).Infof("StorageOS volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notMnt {
@@ -379,7 +391,7 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err = os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
 
@@ -391,44 +403,44 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
-	glog.V(4).Infof("Attempting to bind mount to pod volume at %s", dir)
+	klog.V(4).Infof("Attempting to bind mount to pod volume at %s", dir)
 
 	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("Mount of disk %s failed: %v", dir, err)
+		klog.Errorf("Mount of disk %s failed: %v", dir, err)
 		return err
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
 	}
-	glog.V(4).Infof("StorageOS volume setup complete on %s", dir)
+	klog.V(4).Infof("StorageOS volume setup complete on %s", dir)
 	return nil
 }
 
 func makeGlobalPDName(host volume.VolumeHost, pvName, volNamespace, volName string) string {
-	return path.Join(host.GetPluginDir(kstrings.EscapeQualifiedNameForDisk(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
+	return filepath.Join(host.GetPluginDir(utilstrings.EscapeQualifiedName(storageosPluginName)), util.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
 }
 
 // Given the pod id and PV name, finds the volume's namespace and name from the
@@ -440,7 +452,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 		return volNamespace, volName, nil
 	}
 
-	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName))
+	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
 	files, err := ioutil.ReadDir(volumeDir)
 	if err != nil {
 		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)
@@ -487,7 +499,7 @@ func (b *storageosUnmounter) GetPath() string {
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDown() error {
 	if len(b.volNamespace) == 0 || len(b.volName) == 0 {
-		glog.Warningf("volNamespace: %q, volName: %q not set, skipping TearDown", b.volNamespace, b.volName)
+		klog.Warningf("volNamespace: %q, volName: %q not set, skipping TearDown", b.volNamespace, b.volName)
 		return fmt.Errorf("pvName not specified for TearDown, waiting for next sync loop")
 	}
 	// Unmount from pod
@@ -495,7 +507,7 @@ func (b *storageosUnmounter) TearDown() error {
 
 	err := b.TearDownAt(mountPath)
 	if err != nil {
-		glog.Errorf("Unmount from pod failed: %v", err)
+		klog.Errorf("Unmount from pod failed: %v", err)
 		return err
 	}
 
@@ -503,25 +515,25 @@ func (b *storageosUnmounter) TearDown() error {
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
 	devicePath, _, err := mount.GetDeviceNameFromMount(b.mounter, globalPDPath)
 	if err != nil {
-		glog.Errorf("Detach failed when getting device from global mount: %v", err)
+		klog.Errorf("Detach failed when getting device from global mount: %v", err)
 		return err
 	}
 
 	// Unmount from plugin's disk global mount dir.
 	err = b.TearDownAt(globalPDPath)
 	if err != nil {
-		glog.Errorf("Detach failed during unmount: %v", err)
+		klog.Errorf("Detach failed during unmount: %v", err)
 		return err
 	}
 
 	// Detach loop device
 	err = b.manager.DetachVolume(b, devicePath)
 	if err != nil {
-		glog.Errorf("Detach device %s failed for volume %s: %v", devicePath, b.pvName, err)
+		klog.Errorf("Detach device %s failed for volume %s: %v", devicePath, b.pvName, err)
 		return err
 	}
 
-	glog.V(4).Infof("Successfully unmounted StorageOS volume %s and detached devices", b.pvName)
+	klog.V(4).Infof("Successfully unmounted StorageOS volume %s and detached devices", b.pvName)
 
 	return nil
 }
@@ -529,11 +541,11 @@ func (b *storageosUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDownAt(dir string) error {
-	if err := util.UnmountPath(dir, b.mounter); err != nil {
-		glog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
+	if err := mount.CleanupMountPoint(dir, b.mounter, false); err != nil {
+		klog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
 	}
 	if err := b.manager.UnmountVolume(b); err != nil {
-		glog.V(4).Infof("Mount reference for volume %s could not be removed from StorageOS: %v", b.pvName, err)
+		klog.V(4).Infof("Mount reference for volume %s could not be removed from StorageOS: %v", b.pvName, err)
 	}
 	return nil
 }
@@ -603,7 +615,7 @@ func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	}
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	var err error
-	c.sizeGB, err = util.RoundUpToGiBInt(capacity)
+	c.sizeGB, err = volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +628,7 @@ func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 	vol, err := c.manager.CreateVolume(c)
 	if err != nil {
-		glog.Errorf("failed to create volume: %v", err)
+		klog.Errorf("failed to create volume: %v", err)
 		return nil, err
 	}
 	if vol.FSType == "" {
@@ -717,7 +729,7 @@ func getAPICfg(spec *volume.Spec, pod *v1.Pod, kubeClient clientset.Interface) (
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (*storageosAPIConfig, error) {
 	secret, err := util.GetSecretForPod(pod, secretName, kubeClient)
 	if err != nil {
-		glog.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
+		klog.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
 		return nil, fmt.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
 	}
 	return parseAPIConfig(secret)
@@ -728,7 +740,7 @@ func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interfa
 func parsePVSecret(namespace, secretName string, kubeClient clientset.Interface) (*storageosAPIConfig, error) {
 	secret, err := util.GetSecretForPV(namespace, secretName, storageosPluginName, kubeClient)
 	if err != nil {
-		glog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
+		klog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
 		return nil, fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
 	}
 	return parseAPIConfig(secret)

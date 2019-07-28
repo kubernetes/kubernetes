@@ -22,8 +22,9 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var crdVersion = utilversion.MustParseSemantic("v1.7.0")
@@ -32,7 +33,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
-	Context("Simple CustomResourceDefinition", func() {
+	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*
 			Release : v1.9
 			Testname: Custom Resource Definition, create
@@ -40,16 +41,14 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
-			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
-
 			config, err := framework.LoadConfig()
 			if err != nil {
-				framework.Failf("failed to load config: %v", err)
+				e2elog.Failf("failed to load config: %v", err)
 			}
 
 			apiExtensionClient, err := clientset.NewForConfig(config)
 			if err != nil {
-				framework.Failf("failed to initialize apiExtensionClient: %v", err)
+				e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
 			}
 
 			randomDefinition := fixtures.NewRandomNameCustomResourceDefinition(v1beta1.ClusterScoped)
@@ -57,13 +56,13 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			//create CRD and waits for the resource to be recognized and available.
 			randomDefinition, err = fixtures.CreateNewCustomResourceDefinition(randomDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
-				framework.Failf("failed to create CustomResourceDefinition: %v", err)
+				e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
 				err = fixtures.DeleteCustomResourceDefinition(randomDefinition, apiExtensionClient)
 				if err != nil {
-					framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+					e2elog.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}
 			}()
 		})

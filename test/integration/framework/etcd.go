@@ -24,9 +24,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
-	"github.com/golang/glog"
+	"github.com/coreos/etcd/clientv3"
+	"google.golang.org/grpc/grpclog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/util/env"
 )
@@ -35,7 +39,7 @@ var etcdURL = ""
 
 const installEtcd = `
 Cannot find etcd, cannot run integration tests
-Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions.
+Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions.
 
 You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
@@ -43,7 +47,8 @@ You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
 // getEtcdPath returns a path to an etcd executable.
 func getEtcdPath() (string, error) {
-	bazelPath := filepath.Join(os.Getenv("RUNFILES_DIR"), "com_coreos_etcd/etcd")
+	bazelPath := filepath.Join(os.Getenv("RUNFILES_DIR"), fmt.Sprintf("com_coreos_etcd_%s", runtime.GOARCH), "etcd")
+
 	p, err := exec.LookPath(bazelPath)
 	if err == nil {
 		return p, nil
@@ -66,14 +71,18 @@ func getAvailablePort() (int, error) {
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
 func startEtcd() (func(), error) {
+	if runtime.GOARCH == "arm64" {
+		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
+	}
+
 	etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
 	if err == nil {
-		glog.Infof("etcd already running at %s", etcdURL)
+		klog.Infof("etcd already running at %s", etcdURL)
 		conn.Close()
 		return func() {}, nil
 	}
-	glog.V(1).Infof("could not connect to etcd: %v", err)
+	klog.V(1).Infof("could not connect to etcd: %v", err)
 
 	// TODO: Check for valid etcd version.
 	etcdPath, err := getEtcdPath()
@@ -86,13 +95,14 @@ func startEtcd() (func(), error) {
 		return nil, fmt.Errorf("could not get a port: %v", err)
 	}
 	etcdURL = fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
-	glog.Infof("starting etcd on %s", etcdURL)
+
+	klog.Infof("starting etcd on %s", etcdURL)
 
 	etcdDataDir, err := ioutil.TempDir(os.TempDir(), "integration_test_etcd_data")
 	if err != nil {
 		return nil, fmt.Errorf("unable to make temp etcd data dir: %v", err)
 	}
-	glog.Infof("storing etcd data in: %v", etcdDataDir)
+	klog.Infof("storing etcd data in: %v", etcdDataDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(
@@ -106,22 +116,50 @@ func startEtcd() (func(), error) {
 		GetEtcdURL(),
 		"--listen-peer-urls",
 		"http://127.0.0.1:0",
+		"--log-package-levels",
+		"*=NOTICE", // set to INFO or DEBUG for more logs
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	stop := func() {
 		cancel()
 		err := cmd.Wait()
-		glog.Infof("etcd exit status: %v", err)
+		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
-			glog.Warningf("error during etcd cleanup: %v", err)
+			klog.Warningf("error during etcd cleanup: %v", err)
 		}
 	}
+
+	// Quiet etcd logs for integration tests
+	// Comment out to get verbose logs if desired
+	clientv3.SetLogger(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to run etcd: %v", err)
 	}
+
+	var i int32 = 1
+	const pollCount = int32(300)
+
+	for i <= pollCount {
+		conn, err = net.DialTimeout("tcp", strings.TrimPrefix(etcdURL, "http://"), 1*time.Second)
+		if err == nil {
+			conn.Close()
+			break
+		}
+
+		if i == pollCount {
+			stop()
+			return nil, fmt.Errorf("could not start etcd")
+		}
+
+		time.Sleep(100 * time.Millisecond)
+		i = i + 1
+	}
+
+	os.Setenv("KUBE_INTEGRATION_ETCD_URL", etcdURL)
+
 	return stop, nil
 }
 
@@ -129,7 +167,7 @@ func startEtcd() (func(), error) {
 func EtcdMain(tests func() int) {
 	stop, err := startEtcd()
 	if err != nil {
-		glog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
+		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
 	result := tests()
 	stop() // Don't defer this. See os.Exit documentation.

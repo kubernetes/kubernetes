@@ -86,10 +86,7 @@ func newCrioContainerHandler(
 	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
-	for key, val := range cgroupSubsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager := &cgroupfs.Manager{
@@ -176,7 +173,7 @@ func newCrioContainerHandler(
 	}
 	// TODO for env vars we wanted to show from container.Config.Env from whitelist
 	//for _, exposedEnv := range metadataEnvs {
-	//glog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
+	//klog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
 	//}
 
 	return handler, nil

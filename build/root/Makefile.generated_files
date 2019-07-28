@@ -69,7 +69,7 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    --prune  k8s.io/kubernetes/staging            \
 	    --prune  k8s.io/kubernetes/vendor             \
 	    k8s.io/kubernetes/vendor/k8s.io/...           \
-	    github.com/jteeuwen/go-bindata/go-bindata/... \
+	    github.com/go-bindata/go-bindata/go-bindata/... \
 	    > $@.tmp
 	if ! cmp -s $@.tmp $@; then                       \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
@@ -296,16 +296,23 @@ $(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter
 
 
 # Conversion generation
+
+# Any package that wants conversion functions generated into it must
+# include one or more comment-tags in its `doc.go` file, of the form:
+#     // +k8s:conversion-gen=<INTERNAL_TYPES_DIR>
 #
-# Any package that wants conversion functions generated must include one or
-# more comment-tags in any .go file, in column 0, of the form:
-#     // +k8s:conversion-gen=<CONVERSION_TARGET_DIR>
+# The INTERNAL_TYPES_DIR is a project-local path to another directory
+# which should be considered when evaluating peer types for
+# conversions.  An optional additional comment of the form
+#     // +k8s:conversion-gen-external-types=<EXTERNAL_TYPES_DIR>
 #
-# The CONVERSION_TARGET_DIR is a project-local path to another directory which
-# should be considered when evaluating peer types for conversions.  Types which
-# are found in the source package (where conversions are being generated)
-# but do not have a peer in one of the target directories will not have
-# conversions generated.
+# identifies where to find the external types; if there is no such
+# comment then the external types are sought in the package where the
+# `k8s:conversion` tag is found.
+#
+# Conversions, in both directions, are generated for every type name
+# that is defined in both an internal types package and the external
+# types package.
 #
 # TODO: it might be better in the long term to make peer-types explicit in the
 # IDL.
@@ -401,59 +408,102 @@ $(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversi
 # The result file, in each pkg, of open-api generation.
 OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
 OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
-OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
-REPORT_FILENAME := $(OUT_DIR)/violations.report
-KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
-API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to api/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
+IGNORED_REPORT_FILENAME := $(OUT_DIR)/ignored_violations.report
+
+API_RULE_CHECK_FAILURE_MESSAGE = "ERROR: \n\t $(1) API rule check failed. Reported violations differ from known violations. Please read api/api-rules/README.md to resolve the failure in $(2). \n"
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
 
-# Find all the directories that request open-api generation.
-ifeq ($(DBG_MAKEFILE),1)
-    $(warning ***** finding all +k8s:openapi-gen tags)
+KUBE_KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
+APIEXTENSIONS_KNOWN_VIOLATION_FILENAME := api/api-rules/apiextensions_violation_exceptions.list
+CODEGEN_KNOWN_VIOLATION_FILENAME := api/api-rules/codegen_violation_exceptions.list
+SAMPLEAPISERVER_KNOWN_VIOLATION_FILENAME := api/api-rules/sample_apiserver_violation_exceptions.list
+
+APIMACHINERY_DEFAULT_TAG_FILES := vendor/k8s.io/apimachinery/pkg/apis/meta/v1/% vendor/k8s.io/apimachinery/pkg/runtime/% vendor/k8s.io/apimachinery/pkg/version/%
+
+KUBE_OPENAPI_TAG_FILES :=            $(filter-out vendor/k8s.io/code-generator/% vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
+APIEXTENSIONS_OPENAPI_TAG_FILES :=   $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/apiextensions/% vendor/k8s.io/api/autoscaling/v1/%, $(ALL_K8S_TAG_FILES))
+CODEGEN_OPENAPI_TAG_FILES :=         $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/code-generator/%, $(ALL_K8S_TAG_FILES))
+SAMPLEAPISERVER_OPENAPI_TAG_FILES := $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
+
+KUBE_OPENAPI_OUTPUT_PKG := pkg/generated/openapi
+APIEXTENSIONS_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi
+CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/_examples/apiserver/openapi
+SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/generated/openapi
+
+OPENAPI_TARGETS := KUBE APIEXTENSIONS CODEGEN SAMPLEAPISERVER
+
+# Find all the directories that request openapi generation.
+define OPENAPI_DIR_DEF
+ifeq ($$(DBG_MAKEFILE),1)
+    $$(warning ***** finding all +k8s:openapi-gen tags for $(prefix))
 endif
-OPENAPI_DIRS := $(shell                                             \
-    grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
-        | xargs -n1 dirname                                         \
-        | LC_ALL=C sort -u                                          \
+$(prefix)_OPENAPI_DIRS := $(shell                                            \
+    grep --color=never -l '+k8s:openapi-gen=' $($(prefix)_OPENAPI_TAG_FILES) \
+        | xargs -n1 dirname                                                  \
+        | LC_ALL=C sort -u                                                   \
 )
+endef
+$(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_DIR_DEF)))
 
-OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
+# Compute all openapi output file names
+$(foreach prefix, $(OPENAPI_TARGETS), $(eval                                         \
+    $(prefix)_OPENAPI_OUTFILE := $($(prefix)_OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME) \
+))
 
-# This rule is the user-friendly entrypoint for openapi generation.
-.PHONY: gen_openapi
-gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
-
-# For each dir in OPENAPI_DIRS, this establishes a dependency between the
-# output file and the input files that should trigger a rebuild.
+# For each openapi target compute the spec
+define OPENAPI_TARGETS_DEF
+# For each dir in $(prefix)_OPENAPI_DIRS, this establishes a dependency
+# between the output file and the input files that should trigger a rebuild.
 #
-# Note that this is a deps-only statement, not a full rule (see below for that).
+# Note that this is a deps-only statement, not a full rule
+# (see below for that).
 #
 # The '$(eval)' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(OPENAPI_DIRS), $(eval             \
-    $(OPENAPI_OUTFILE): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval            \
+    $($(prefix)_OPENAPI_OUTFILE): $($(PRJ_SRC_PATH)/$(dir)) \
 ))
 
-# How to regenerate open-api code.  This emits a single file for all results.
-# The Make rule fails if generated API rule violation report differs from the checked-in
-# violation file, and prints error message to request developer to fix either the API
-# source code, or the known API rule violation file.
-$(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
-	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
-	    --v $(KUBE_VERBOSE)                                                         \
-	    --logtostderr                                                               \
-	    -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
-	    -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
-	    -O $(OPENAPI_BASENAME)                                                      \
-	    -h $(BOILERPLATE_FILENAME)                                                  \
-	    -r $(REPORT_FILENAME)                                                       \
-	    "$$@";                                                                      \
-	diff $(REPORT_FILENAME) $(KNOWN_VIOLATION_FILENAME) ||                          \
-	(echo $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
+# Rebuild spec if the violation file changed.
+$($(prefix)_OPENAPI_OUTFILE): $($(prefix)_KNOWN_VIOLATION_FILENAME)
 
+# When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
+# updated API violations to the known API violation exceptions list.
+ifeq ($(UPDATE_API_KNOWN_VIOLATIONS),true)
+    $(prefix)_REPORT_FILENAME := $($(prefix)_KNOWN_VIOLATION_FILENAME)
+    # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, touch the exceptions
+    # list so that the $(prefix)_OPENAPI_OUTFILE target re-run instead of being cached.
+    $$(shell touch $($(prefix)_KNOWN_VIOLATION_FILENAME))
+else
+    $(prefix)_REPORT_FILENAME := $(OUT_DIR)/$(prefix)_violations.report
+endif
+
+# How to regenerate open-api code.  This emits a single file for all results.
+# The Make rule fails if generated API rule violation report differs from the
+# checked-in violation file, and prints error message to request developer to
+# fix either the API source code, or the known API rule violation file.
+$$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME:-)
+	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                                     \
+	    --v $(KUBE_VERBOSE)                                                                    \
+	    --logtostderr                                                                          \
+	    -i $$$$(echo $(addprefix $(PRJ_SRC_PATH)/, $($(prefix)_OPENAPI_DIRS)) | sed 's/ /,/g') \
+	    -p $(PRJ_SRC_PATH)/$($(prefix)_OPENAPI_OUTPUT_PKG)                                     \
+	    -O $(OPENAPI_BASENAME)                                                                 \
+	    -h $(BOILERPLATE_FILENAME)                                                             \
+	    -r $$($(prefix)_REPORT_FILENAME)                                                       \
+	    "$$$$@"
+	test -f $($(prefix)_KNOWN_VIOLATION_FILENAME) || touch $($(prefix)_KNOWN_VIOLATION_FILENAME)
+	diff $$($(prefix)_REPORT_FILENAME) $($(prefix)_KNOWN_VIOLATION_FILENAME) || \
+	(echo -e $(call API_RULE_CHECK_FAILURE_MESSAGE,$(prefix),$($(prefix)_KNOWN_VIOLATION_FILENAME)); exit 1)
+endef
+$(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_TARGETS_DEF)))
+
+# This rule is the user-friendly entrypoint for openapi generation.
+.PHONY: gen_openapi
+gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(APIEXTENSIONS_OPENAPI_OUTFILE) $(CODEGEN_OPENAPI_OUTFILE) $(SAMPLEAPISERVER_OPENAPI_OUTFILE)
 
 # How to build the generator tool.  The deps for this are defined in
 # the $(GO_PKGDEPS_FILE), above.
@@ -493,6 +543,6 @@ gen_bindata: $(BINDATA_GEN) FORCE
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bindata)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
+$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/go-bindata/go-bindata/go-bindata
 	touch $@

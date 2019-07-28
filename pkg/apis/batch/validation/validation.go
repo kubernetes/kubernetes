@@ -24,11 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
@@ -119,13 +117,8 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	if spec.BackoffLimit != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.BackoffLimit), fldPath.Child("backoffLimit"))...)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-		// normal validation for TTLSecondsAfterFinished
-		if spec.TTLSecondsAfterFinished != nil {
-			allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.TTLSecondsAfterFinished), fldPath.Child("ttlSecondsAfterFinished"))...)
-		}
-	} else if spec.TTLSecondsAfterFinished != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("ttlSecondsAfterFinished"), "disabled by feature-gate"))
+	if spec.TTLSecondsAfterFinished != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.TTLSecondsAfterFinished), fldPath.Child("ttlSecondsAfterFinished"))...)
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)

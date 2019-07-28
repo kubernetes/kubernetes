@@ -148,12 +148,19 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 	}
 	index := c.indices[indexName]
 
-	// need to de-dupe the return list.  Since multiple keys are allowed, this can happen.
-	returnKeySet := sets.String{}
-	for _, indexKey := range indexKeys {
-		set := index[indexKey]
-		for _, key := range set.UnsortedList() {
-			returnKeySet.Insert(key)
+	var returnKeySet sets.String
+	if len(indexKeys) == 1 {
+		// In majority of cases, there is exactly one value matching.
+		// Optimize the most common path - deduping is not needed here.
+		returnKeySet = index[indexKeys[0]]
+	} else {
+		// Need to de-dupe the return list.
+		// Since multiple keys are allowed, this can happen.
+		returnKeySet = sets.String{}
+		for _, indexKey := range indexKeys {
+			for key := range index[indexKey] {
+				returnKeySet.Insert(key)
+			}
 		}
 	}
 
@@ -178,7 +185,7 @@ func (c *threadSafeMap) ByIndex(indexName, indexKey string) ([]interface{}, erro
 
 	set := index[indexKey]
 	list := make([]interface{}, 0, set.Len())
-	for _, key := range set.List() {
+	for key := range set {
 		list = append(list, c.items[key])
 	}
 

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // podTemplateStrategy implements behavior for PodTemplates
@@ -47,13 +47,15 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	template := obj.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&template.Template.Spec)
+	pod.DropDisabledTemplateFields(&template.Template, nil)
 }
 
 // Validate validates a new pod template.
 func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	pod := obj.(*api.PodTemplate)
-	return validation.ValidatePodTemplate(pod)
+	template := obj.(*api.PodTemplate)
+	allErrs := corevalidation.ValidatePodTemplate(template)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&template.Template, nil, field.NewPath("template"))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -70,13 +72,16 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	newTemplate := obj.(*api.PodTemplate)
 	oldTemplate := old.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&newTemplate.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldTemplate.Template.Spec)
+	pod.DropDisabledTemplateFields(&newTemplate.Template, &oldTemplate.Template)
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
+	template := obj.(*api.PodTemplate)
+	oldTemplate := old.(*api.PodTemplate)
+	allErrs := corevalidation.ValidatePodTemplateUpdate(template, oldTemplate)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&template.Template, &oldTemplate.Template, field.NewPath("template"))...)
+	return allErrs
 }
 
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {

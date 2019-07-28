@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -235,7 +234,7 @@ func TestPathsToRemove(t *testing.T) {
 			continue
 		}
 
-		dataDirPath := path.Join(targetDir, dataDirName)
+		dataDirPath := filepath.Join(targetDir, dataDirName)
 		oldTsDir, err := os.Readlink(dataDirPath)
 		if err != nil && os.IsNotExist(err) {
 			t.Errorf("Data symlink does not exist: %v", dataDirPath)
@@ -245,7 +244,7 @@ func TestPathsToRemove(t *testing.T) {
 			continue
 		}
 
-		actual, err := writer.pathsToRemove(tc.payload2, path.Join(targetDir, oldTsDir))
+		actual, err := writer.pathsToRemove(tc.payload2, filepath.Join(targetDir, oldTsDir))
 		if err != nil {
 			t.Errorf("%v: unexpected error determining paths to remove: %v", tc.name, err)
 			continue
@@ -751,7 +750,7 @@ func TestMultipleUpdates(t *testing.T) {
 }
 
 func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjection, t *testing.T) {
-	dataDirPath := path.Join(targetDir, dataDirName)
+	dataDirPath := filepath.Join(targetDir, dataDirName)
 	// use filepath.Walk to reconstruct the payload, then deep equal
 	observedPayload := make(map[string]FileProjection)
 	visitor := func(path string, info os.FileInfo, err error) error {
@@ -790,13 +789,13 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 			continue
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			p := path.Join(targetDir, info.Name())
+			p := filepath.Join(targetDir, info.Name())
 			actual, err := os.Readlink(p)
 			if err != nil {
 				t.Errorf("Unable to read symlink %v: %v", p, err)
 				continue
 			}
-			if err := filepath.Walk(path.Join(targetDir, actual), visitor); err != nil {
+			if err := filepath.Walk(filepath.Join(targetDir, actual), visitor); err != nil {
 				t.Errorf("%v: unexpected error walking directory: %v", tcName, err)
 			}
 		}
@@ -953,7 +952,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 		}
 		defer os.RemoveAll(targetDir)
 
-		dataDirPath := path.Join(targetDir, dataDirName)
+		dataDirPath := filepath.Join(targetDir, dataDirName)
 		err = os.MkdirAll(dataDirPath, 0755)
 		if err != nil {
 			t.Fatalf("%v: unexpected error creating data path: %v", tc.name, err)
@@ -970,7 +969,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 		}
 
 		for subpath, expectedDest := range tc.expected {
-			visiblePath := path.Join(targetDir, subpath)
+			visiblePath := filepath.Join(targetDir, subpath)
 			destination, err := os.Readlink(visiblePath)
 			if err != nil && os.IsNotExist(err) {
 				t.Fatalf("%v: visible symlink does not exist: %v", tc.name, visiblePath)

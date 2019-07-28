@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # For help output
 ARGHELP=""
@@ -40,4 +40,4 @@ echo "The equivalent of this invocation is: "
 echo "    make test-e2e-node ${ARGHELP}"
 echo
 echo
-make --no-print-directory -C "${KUBE_ROOT}" test-e2e-node FOCUS=${FOCUS:-} SKIP=${SKIP:-}
+make --no-print-directory -C "${KUBE_ROOT}" test-e2e-node FOCUS="${FOCUS:-}" SKIP="${SKIP:-}"

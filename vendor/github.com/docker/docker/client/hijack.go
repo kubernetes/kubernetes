@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bufio"
@@ -30,7 +30,7 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 	}
 	req = cli.addHeaders(req, headers)
 
-	conn, err := cli.setupHijackConn(req, "tcp")
+	conn, err := cli.setupHijackConn(ctx, req, "tcp")
 	if err != nil {
 		return types.HijackedResponse{}, err
 	}
@@ -38,7 +38,9 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 	return types.HijackedResponse{Conn: conn, Reader: bufio.NewReader(conn)}, err
 }
 
-func dial(proto, addr string, tlsConfig *tls.Config) (net.Conn, error) {
+// fallbackDial is used when WithDialer() was not called.
+// See cli.Dialer().
+func fallbackDial(proto, addr string, tlsConfig *tls.Config) (net.Conn, error) {
 	if tlsConfig != nil && proto != "unix" && proto != "npipe" {
 		return tls.Dial(proto, addr, tlsConfig)
 	}
@@ -48,12 +50,13 @@ func dial(proto, addr string, tlsConfig *tls.Config) (net.Conn, error) {
 	return net.Dial(proto, addr)
 }
 
-func (cli *Client) setupHijackConn(req *http.Request, proto string) (net.Conn, error) {
+func (cli *Client) setupHijackConn(ctx context.Context, req *http.Request, proto string) (net.Conn, error) {
 	req.Host = cli.addr
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", proto)
 
-	conn, err := dial(cli.proto, cli.addr, resolveTLSConfig(cli.client.Transport))
+	dialer := cli.Dialer()
+	conn, err := dialer(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot connect to the Docker daemon. Is 'docker daemon' running on this host?")
 	}

@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	testUpgradeDiffConfig   = `testdata/diff_master_config.yaml`
+	testUpgradeDiffConfig   = `testdata/diff_controlplane_config.yaml`
 	testUpgradeDiffManifest = `testdata/diff_dummy_manifest.yaml`
 )
 
@@ -32,6 +32,7 @@ func TestRunDiff(t *testing.T) {
 		out:     ioutil.Discard,
 	}
 
+	// TODO: Add test cases for empty cfgPath, it should automatically fetch cfg from cluster
 	testCases := []struct {
 		name            string
 		args            []string

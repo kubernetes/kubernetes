@@ -38,7 +38,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
     ],
 )
@@ -75,7 +75,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

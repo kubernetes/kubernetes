@@ -32,22 +32,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -159,12 +156,12 @@ type FailDeletionStorage struct {
 	Called *bool
 }
 
-func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions) error {
+func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions, _ storage.ValidateObjectFunc) error {
 	*f.Called = true
 	return storage.NewKeyNotFoundError(key, 0)
 }
 
-func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
+func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -186,7 +183,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	defer registry.Store.DestroyFunc()
 
 	// should fail if pod A is not created yet.
-	_, _, err := registry.Delete(testContext, pod.Name, nil)
+	_, _, err := registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -201,7 +198,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	// registry shouldn't get any error since we ignore the NotFound error.
 	zero := int64(0)
 	opt := &metav1.DeleteOptions{GracePeriodSeconds: &zero}
-	obj, _, err := registry.Delete(testContext, pod.Name, opt)
+	obj, _, err := registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, opt)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -249,6 +246,7 @@ func TestCreateSetsFields(t *testing.T) {
 
 func TestResourceLocation(t *testing.T) {
 	expectedIP := "1.2.3.4"
+	expectedIP6 := "2001:db8::"
 	testCases := []struct {
 		pod      api.Pod
 		query    string
@@ -257,7 +255,7 @@ func TestResourceLocation(t *testing.T) {
 		{
 			pod: api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     api.PodStatus{PodIP: expectedIP},
+				Status:     api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
 			},
 			query:    "foo",
 			location: expectedIP,
@@ -265,7 +263,7 @@ func TestResourceLocation(t *testing.T) {
 		{
 			pod: api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     api.PodStatus{PodIP: expectedIP},
+				Status:     api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
 			},
 			query:    "foo:12345",
 			location: expectedIP + ":12345",
@@ -278,7 +276,7 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr"},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
 			},
 			query:    "foo",
 			location: expectedIP,
@@ -291,7 +289,7 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
 			},
 			query:    "foo",
 			location: expectedIP + ":9376",
@@ -304,7 +302,7 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
 			},
 			query:    "foo:12345",
 			location: expectedIP + ":12345",
@@ -318,7 +316,7 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
 			},
 			query:    "foo",
 			location: expectedIP + ":9376",
@@ -332,7 +330,21 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 1234}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}}},
+			},
+			query:    "foo",
+			location: expectedIP + ":9376",
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr1", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
+						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 1234}}},
+					},
+				},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP}, {IP: expectedIP6}}},
 			},
 			query:    "foo",
 			location: expectedIP + ":9376",
@@ -421,8 +433,11 @@ func TestConvertToTableList(t *testing.T) {
 		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
 		{Name: "Nominated Node", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
+		{Name: "Readiness Gates", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["readinessGates"]},
 	}
 
+	condition1 := "condition1"
+	condition2 := "condition2"
 	pod1 := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
 		Spec: api.PodSpec{
@@ -431,10 +446,66 @@ func TestConvertToTableList(t *testing.T) {
 				{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 			},
 			NodeName: "test-node",
+			ReadinessGates: []api.PodReadinessGate{
+				{
+					ConditionType: api.PodConditionType(condition1),
+				},
+				{
+					ConditionType: api.PodConditionType(condition2),
+				},
+			},
 		},
 		Status: api.PodStatus{
-			PodIP: "10.1.2.3",
-			Phase: api.PodPending,
+			Conditions: []api.PodCondition{
+				{
+					Type:   api.PodConditionType(condition1),
+					Status: api.ConditionFalse,
+				},
+				{
+					Type:   api.PodConditionType(condition2),
+					Status: api.ConditionTrue,
+				},
+			},
+			PodIPs: []api.PodIP{{IP: "10.1.2.3"}},
+			Phase:  api.PodPending,
+			ContainerStatuses: []api.ContainerStatus{
+				{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
+				{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
+			},
+			NominatedNodeName: "nominated-node",
+		},
+	}
+
+	multiIPsPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "ctr1"},
+				{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
+			},
+			NodeName: "test-node",
+			ReadinessGates: []api.PodReadinessGate{
+				{
+					ConditionType: api.PodConditionType(condition1),
+				},
+				{
+					ConditionType: api.PodConditionType(condition2),
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Conditions: []api.PodCondition{
+				{
+					Type:   api.PodConditionType(condition1),
+					Status: api.ConditionFalse,
+				},
+				{
+					Type:   api.PodConditionType(condition2),
+					Status: api.ConditionTrue,
+				},
+			},
+			PodIPs: []api.PodIP{{IP: "10.1.2.3"}, {IP: "2001:db8::"}},
+			Phase:  api.PodPending,
 			ContainerStatuses: []api.ContainerStatus{
 				{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
 				{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
@@ -457,7 +528,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -466,13 +537,22 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node", "1/2"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},
 		{
 			in:  &api.PodList{},
 			out: &metav1beta1.Table{ColumnDefinitions: columns},
+		},
+		{
+			in: multiIPsPod,
+			out: &metav1beta1.Table{
+				ColumnDefinitions: columns,
+				Rows: []metav1beta1.TableRow{
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node", "1/2"}, Object: runtime.RawExtension{Object: multiIPsPod}},
+				},
+			},
 		},
 	}
 	for i, test := range testCases {
@@ -708,76 +788,6 @@ func TestEtcdCreateBinding(t *testing.T) {
 	}
 }
 
-func TestEtcdUpdateUninitialized(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
-	storage, _, _, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
-
-	pod := validNewPod()
-	// add pending initializers to the pod
-	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{IncludeUninitialized: true}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	podIn := *pod
-	// only uninitialized pod is allowed to add containers via update
-	podIn.Spec.Containers = append(podIn.Spec.Containers, api.Container{
-		Name:                     "foo2",
-		Image:                    "test",
-		ImagePullPolicy:          api.PullAlways,
-		TerminationMessagePath:   api.TerminationMessagePathDefault,
-		TerminationMessagePolicy: api.TerminationMessageReadFile,
-		SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
-	})
-	podIn.ObjectMeta.Initializers = nil
-
-	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	obj, err := storage.Get(ctx, podIn.ObjectMeta.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	podOut := obj.(*api.Pod)
-	if podOut.GetInitializers() != nil {
-		t.Errorf("expect nil initializers, got %v", podOut.ObjectMeta.Initializers)
-	}
-	if !apiequality.Semantic.DeepEqual(podIn.Spec.Containers, podOut.Spec.Containers) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, &podIn))
-	}
-}
-
-func TestEtcdStatusUpdateUninitialized(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
-	storage, _, statusStorage, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
-
-	pod := validNewPod()
-	// add pending initializers to the pod
-	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{IncludeUninitialized: true}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	podIn := *pod
-	// only uninitialized pod is allowed to add containers via update
-	podIn.Status.Phase = api.PodRunning
-	podIn.ObjectMeta.Initializers = nil
-
-	_, _, err := statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	expected := "Forbidden: must not update status when the object is uninitialized"
-	if err == nil {
-		t.Fatalf("Unexpected no err, expected %q", expected)
-	}
-	if !strings.Contains(err.Error(), expected) {
-		t.Errorf("unexpected error: %v, expected %q", err, expected)
-	}
-}
-
 func TestEtcdUpdateNotScheduled(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
@@ -907,60 +917,89 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	podIn := api.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-			Labels: map[string]string{
-				"foo": "bar",
-			},
-		},
-		Spec: api.PodSpec{
-			NodeName: "machine",
-			Containers: []api.Container{
-				{
-					Image:                  "foo:v2",
-					ImagePullPolicy:        api.PullIfNotPresent,
-					TerminationMessagePath: api.TerminationMessagePathDefault,
+	podsIn := []api.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+				Labels: map[string]string{
+					"foo": "bar",
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			Spec: api.PodSpec{
+				NodeName: "machine",
+				Containers: []api.Container{
+					{
+						Image:                  "foo:v2",
+						ImagePullPolicy:        api.PullIfNotPresent,
+						TerminationMessagePath: api.TerminationMessagePathDefault,
+					},
+				},
+				SecurityContext: &api.PodSecurityContext{},
+				SchedulerName:   api.DefaultSchedulerName,
+			},
+			Status: api.PodStatus{
+				Phase:   api.PodRunning,
+				PodIPs:  []api.PodIP{{IP: "127.0.0.1"}},
+				Message: "is now scheduled",
+			},
 		},
-		Status: api.PodStatus{
-			Phase:   api.PodRunning,
-			PodIP:   "127.0.0.1",
-			Message: "is now scheduled",
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Spec: api.PodSpec{
+				NodeName: "machine",
+				Containers: []api.Container{
+					{
+						Image:                  "foo:v2",
+						ImagePullPolicy:        api.PullIfNotPresent,
+						TerminationMessagePath: api.TerminationMessagePathDefault,
+					},
+				},
+				SecurityContext: &api.PodSecurityContext{},
+				SchedulerName:   api.DefaultSchedulerName,
+			},
+			Status: api.PodStatus{
+				Phase:   api.PodRunning,
+				PodIPs:  []api.PodIP{{IP: "127.0.0.1"}, {IP: "2001:db8::"}},
+				Message: "is now scheduled",
+			},
 		},
 	}
 
-	expected := podStart
-	expected.ResourceVersion = "2"
-	grace := int64(30)
-	enableServiceLinks := v1.DefaultEnableServiceLinks
-	expected.Spec.TerminationGracePeriodSeconds = &grace
-	expected.Spec.RestartPolicy = api.RestartPolicyAlways
-	expected.Spec.DNSPolicy = api.DNSClusterFirst
-	expected.Spec.EnableServiceLinks = &enableServiceLinks
-	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
-	expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
-	expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile
-	expected.Labels = podIn.Labels
-	expected.Status = podIn.Status
+	for _, podIn := range podsIn {
+		expected := podStart
+		expected.ResourceVersion = "2"
+		grace := int64(30)
+		enableServiceLinks := v1.DefaultEnableServiceLinks
+		expected.Spec.TerminationGracePeriodSeconds = &grace
+		expected.Spec.RestartPolicy = api.RestartPolicyAlways
+		expected.Spec.DNSPolicy = api.DNSClusterFirst
+		expected.Spec.EnableServiceLinks = &enableServiceLinks
+		expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
+		expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
+		expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile
+		expected.Labels = podIn.Labels
+		expected.Status = podIn.Status
 
-	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	podOut := obj.(*api.Pod)
-	// Check to verify the Label, and Status updates match from change above.  Those are the fields changed.
-	if !apiequality.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
-		!apiequality.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
-		!apiequality.Semantic.DeepEqual(podOut.Status, expected.Status) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
+		_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		podOut := obj.(*api.Pod)
+		// Check to verify the Label, and Status updates match from change above.  Those are the fields changed.
+		if !apiequality.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
+			!apiequality.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
+			!apiequality.Semantic.DeepEqual(podOut.Status, expected.Status) {
+			t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
+		}
 	}
 }
 

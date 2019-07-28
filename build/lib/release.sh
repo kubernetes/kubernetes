@@ -29,7 +29,13 @@ readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
 KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
-KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
+KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
+KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
+
+# The mondo test tarball is deprecated as of Kubernetes 1.14, and the default
+# will be set to 'n' in a future release.
+# See KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball
+KUBE_BUILD_MONDO_TEST_TARBALL=${KUBE_BUILD_MONDO_TEST_TARBALL:-y}
 
 # Validate a ci version
 #
@@ -88,7 +94,7 @@ function kube::release::package_tarballs() {
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_final_tarball & # _final depends on some of the previous phases
-  kube::release::package_test_tarball & # _test doesn't depend on anything
+  kube::release::package_test_tarballs & # _test doesn't depend on anything
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
@@ -109,7 +115,7 @@ function kube::release::package_src_tarball() {
           \) -prune \
         \))
     )
-    "${TAR}" czf "${src_tarball}" -C "${KUBE_ROOT}" "${source_files[@]}"
+    "${TAR}" czf "${src_tarball}" --transform 's|^\.|kubernetes|' -C "${KUBE_ROOT}" "${source_files[@]}"
   fi
 }
 
@@ -135,7 +141,7 @@ function kube::release::package_client_tarballs() {
 
       # This fancy expression will expand to prepend a path
       # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # KUBE_CLIENT_BINARIES array.
+      # client_bins array.
       cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/client/bin/"
 
@@ -168,7 +174,7 @@ function kube::release::package_node_tarballs() {
     fi
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_NODE_BINARIES array.
+    # node_bins array.
     cp "${node_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
@@ -180,6 +186,9 @@ function kube::release::package_node_tarballs() {
     if [[ "${platform%/*}" == "windows" ]]; then
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # client_bins array.
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
@@ -247,6 +256,9 @@ function kube::release::package_server_tarballs() {
     if [[ "${platform%/*}" == "windows" ]]; then
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # client_bins array.
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
@@ -325,7 +337,7 @@ function kube::release::create_docker_images_for_server() {
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    local -r docker_registry="k8s.gcr.io"
+    local -r docker_registry="${KUBE_DOCKER_REGISTRY}"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -345,17 +357,7 @@ function kube::release::create_docker_images_for_server() {
       local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
-      local docker_image_tag="${docker_registry}"
-      if [[ ${arch} == "amd64" ]]; then
-        # If we are building a amd64 docker image, preserve the original
-        # image name
-        docker_image_tag+="/${binary_name}:${docker_tag}"
-      else
-        # If we are building a docker image for another architecture,
-        # append the arch in the image tag
-        docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-      fi
-
+      local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
@@ -372,27 +374,30 @@ EOF
         if [[ "${base_image}" =~ busybox ]]; then
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
-        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
+
+        # provide `--pull` argument to `docker build` if `KUBE_BUILD_PULL_LATEST_IMAGES`
+        # is set to y or Y; otherwise try to build the image without forcefully
+        # pulling the latest base image.
+        local -a docker_build_opts=()
+        if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
+            docker_build_opts+=("--pull")
+        fi
+        "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        # If we are building an official/alpha/beta release we want to keep
+        # docker images and tag them appropriately.
+        local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
+        if [[ "${release_docker_image_tag}" != "${docker_image_tag}" ]]; then
+          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
+          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+        fi
+        "${DOCKER[@]}" save -o "${binary_dir}/${binary_name}.tar" "${docker_image_tag}" ${release_docker_image_tag}
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
-        # If we are building an official/alpha/beta release we want to keep
-        # docker images and tag them appropriately.
-        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-          local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-          # Only rmi and tag if name is different
-          if [[ $docker_image_tag != $release_docker_image_tag ]]; then
-            kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-            "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
-            "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
-          fi
-        else
-          # not a release
-          kube::log::status "Deleting docker image ${docker_image_tag}"
-          "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-        fi
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
       ) &
     done
 
@@ -457,39 +462,111 @@ function kube::release::package_kube_manifests_tarball() {
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
+# Builds tarballs for each test platform containing the appropriate binaries.
+function kube::release::package_test_platform_tarballs() {
+  local platform
+  rm -rf "${RELEASE_STAGE}/test"
+  # KUBE_TEST_SERVER_PLATFORMS is a subset of KUBE_TEST_PLATFORMS,
+  # so process it first.
+  for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
+    local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local release_stage="${RELEASE_STAGE}/test/${platform_tag}/kubernetes"
+    mkdir -p "${release_stage}/test/bin"
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_TEST_SERVER_BINARIES array.
+    cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/test/bin/"
+  done
+  for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
+    (
+      local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+      kube::log::status "Starting tarball: test $platform_tag"
+      local release_stage="${RELEASE_STAGE}/test/${platform_tag}/kubernetes"
+      mkdir -p "${release_stage}/test/bin"
+
+      local test_bins=("${KUBE_TEST_BINARIES[@]}")
+      if [[ "${platform%/*}" == "windows" ]]; then
+        test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
+      fi
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # test_bins array.
+      cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/test/bin/"
+
+      local package_name="${RELEASE_TARS}/kubernetes-test-${platform_tag}.tar.gz"
+      kube::release::create_tarball "${package_name}" "${release_stage}/.."
+    ) &
+  done
+
+  kube::log::status "Waiting on test tarballs"
+  kube::util::wait-for-jobs || { kube::log::error "test tarball creation failed"; exit 1; }
+}
+
+
 # This is the stuff you need to run tests from the binary distribution.
-function kube::release::package_test_tarball() {
-  kube::log::status "Building tarball: test"
+function kube::release::package_test_tarballs() {
+  kube::release::package_test_platform_tarballs
+
+  kube::log::status "Building tarball: test portable"
 
   local release_stage="${RELEASE_STAGE}/test/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
-  local platform
-  for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
-    local test_bins=("${KUBE_TEST_BINARIES[@]}")
-    if [[ "${platform%/*}" == "windows" ]]; then
-      test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
-    fi
-    mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/platforms/${platform}"
-  done
-  for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
-    mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/platforms/${platform}"
-  done
-
-  # Add the test image files
+  # First add test image files and other portable sources so we can create
+  # the portable test tarball.
   mkdir -p "${release_stage}/test/images"
   cp -fR "${KUBE_ROOT}/test/images" "${release_stage}/test/"
   tar c "${KUBE_TEST_PORTABLE[@]}" | tar x -C "${release_stage}"
 
   kube::release::clean_cruft
 
-  local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
-  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+  local portable_tarball_name="${RELEASE_TARS}/kubernetes-test-portable.tar.gz"
+  kube::release::create_tarball "${portable_tarball_name}" "${release_stage}/.."
+
+  if [[ "${KUBE_BUILD_MONDO_TEST_TARBALL}" =~ [yY] ]]; then
+    kube::log::status "Building tarball: test mondo (deprecated by KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball)"
+    local platform
+    for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
+      local test_bins=("${KUBE_TEST_BINARIES[@]}")
+      if [[ "${platform%/*}" == "windows" ]]; then
+        test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
+      fi
+      mkdir -p "${release_stage}/platforms/${platform}"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # test_bins array.
+      cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/platforms/${platform}"
+    done
+    for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
+      mkdir -p "${release_stage}/platforms/${platform}"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # KUBE_TEST_SERVER_BINARIES array.
+      cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/platforms/${platform}"
+    done
+
+    cat <<EOF > "${release_stage}/DEPRECATION_NOTICE"
+The mondo test tarball containing binaries for all platforms is
+DEPRECATED as of Kubernetes 1.14.
+
+Users of this tarball should migrate to using the platform-specific
+tarballs in combination with the "portable" tarball which contains
+scripts, test images, and other manifests.
+
+For more details, please see KEP
+sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball.
+EOF
+
+    kube::release::clean_cruft
+
+    local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
+  fi
 }
 
 # This is all the platform-independent stuff you need to run/install kubernetes.

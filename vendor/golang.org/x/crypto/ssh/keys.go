@@ -903,8 +903,8 @@ func ParseDSAPrivateKey(der []byte) (*dsa.PrivateKey, error) {
 // Implemented based on the documentation at
 // https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.key
 func parseOpenSSHPrivateKey(key []byte) (crypto.PrivateKey, error) {
-	magic := append([]byte("openssh-key-v1"), 0)
-	if !bytes.Equal(magic, key[0:len(magic)]) {
+	const magic = "openssh-key-v1\x00"
+	if len(key) < len(magic) || string(key[:len(magic)]) != magic {
 		return nil, errors.New("ssh: invalid openssh private key format")
 	}
 	remaining := key[len(magic):]

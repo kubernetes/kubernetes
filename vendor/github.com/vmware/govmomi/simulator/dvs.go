@@ -31,6 +31,9 @@ func (s *DistributedVirtualSwitch) AddDVPortgroupTask(c *types.AddDVPortgroup_Ta
 	task := CreateTask(s, "addDVPortgroup", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		f := Map.getEntityParent(s, "Folder").(*Folder)
 
+		portgroups := s.Portgroup
+		portgroupNames := s.Summary.PortgroupName
+
 		for _, spec := range c.Spec {
 			pg := &DistributedVirtualPortgroup{}
 			pg.Name = spec.Name
@@ -71,16 +74,27 @@ func (s *DistributedVirtualSwitch) AddDVPortgroupTask(c *types.AddDVPortgroup_Ta
 
 			pg.PortKeys = []string{}
 
-			s.Portgroup = append(s.Portgroup, pg.Self)
-			s.Summary.PortgroupName = append(s.Summary.PortgroupName, pg.Name)
+			portgroups = append(portgroups, pg.Self)
+			portgroupNames = append(portgroupNames, pg.Name)
 
 			for _, h := range s.Summary.HostMember {
 				pg.Host = append(pg.Host, h)
 
 				host := Map.Get(h).(*HostSystem)
 				Map.AppendReference(host, &host.Network, pg.Reference())
+
+				parent := Map.Get(*host.HostSystem.Parent)
+				computeNetworks := append(hostParent(&host.HostSystem).Network, pg.Reference())
+				Map.Update(parent, []types.PropertyChange{
+					{Name: "network", Val: computeNetworks},
+				})
 			}
 		}
+
+		Map.Update(s, []types.PropertyChange{
+			{Name: "portgroup", Val: portgroups},
+			{Name: "summary.portgroupName", Val: portgroupNames},
+		})
 
 		return nil, nil
 	})
@@ -96,6 +110,8 @@ func (s *DistributedVirtualSwitch) ReconfigureDvsTask(req *types.ReconfigureDvs_
 	task := CreateTask(s, "reconfigureDvs", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		spec := req.Spec.GetDVSConfigSpec()
 
+		members := s.Summary.HostMember
+
 		for _, member := range spec.Host {
 			h := Map.Get(member.Host)
 			if h == nil {
@@ -110,13 +126,27 @@ func (s *DistributedVirtualSwitch) ReconfigureDvsTask(req *types.ReconfigureDvs_
 					return nil, &types.AlreadyExists{Name: host.Name}
 				}
 
-				Map.AppendReference(host, &host.Network, s.Portgroup...)
-				s.Summary.HostMember = append(s.Summary.HostMember, member.Host)
+				hostNetworks := append(host.Network, s.Portgroup...)
+				Map.Update(host, []types.PropertyChange{
+					{Name: "network", Val: hostNetworks},
+				})
+				members = append(members, member.Host)
+				parent := Map.Get(*host.HostSystem.Parent)
 
+				var pgs []types.ManagedObjectReference
 				for _, ref := range s.Portgroup {
 					pg := Map.Get(ref).(*DistributedVirtualPortgroup)
-					Map.AddReference(pg, &pg.Host, member.Host)
+					pgs = append(pgs, ref)
+
+					pgHosts := append(pg.Host, member.Host)
+					Map.Update(pg, []types.PropertyChange{
+						{Name: "host", Val: pgHosts},
+					})
 				}
+
+				Map.Update(parent, []types.PropertyChange{
+					{Name: "network", Val: pgs},
+				})
 			case types.ConfigSpecOperationRemove:
 				for _, ref := range host.Vm {
 					vm := Map.Get(ref).(*VirtualMachine)
@@ -128,11 +158,15 @@ func (s *DistributedVirtualSwitch) ReconfigureDvsTask(req *types.ReconfigureDvs_
 					}
 				}
 
-				RemoveReference(&s.Summary.HostMember, member.Host)
+				RemoveReference(&members, member.Host)
 			case types.ConfigSpecOperationEdit:
 				return nil, &types.NotSupported{}
 			}
 		}
+
+		Map.Update(s, []types.PropertyChange{
+			{Name: "summary.hostMember", Val: members},
+		})
 
 		return nil, nil
 	})

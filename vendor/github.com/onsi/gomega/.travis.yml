@@ -1,12 +1,17 @@
 language: go
+
 go:
-  - 1.5
-  - 1.6.2
-  - stable
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
+
+env:
+  - GO111MODULE=on
 
 install:
   - go get -v ./...
+  - go build ./...
   - go get github.com/onsi/ginkgo
   - go install github.com/onsi/ginkgo/ginkgo
 
-script: $HOME/gopath/bin/ginkgo -r --randomizeAllSpecs --failOnPending --randomizeSuites --race
+script: make test

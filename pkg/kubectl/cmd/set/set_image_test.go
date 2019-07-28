@@ -34,13 +34,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubectl/pkg/scheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestImageLocal(t *testing.T) {
@@ -49,7 +48,7 @@ func TestImageLocal(t *testing.T) {
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -161,7 +160,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -221,6 +220,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -240,6 +245,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -263,6 +274,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -282,6 +299,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -305,6 +328,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -324,6 +353,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -347,6 +382,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -366,6 +407,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -389,6 +436,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -408,6 +461,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -431,6 +490,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -450,6 +515,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -473,6 +544,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -492,6 +569,12 @@ func TestSetImageRemote(t *testing.T) {
 								{
 									Name:  "nginx",
 									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
 								},
 							},
 						},
@@ -515,6 +598,12 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
 						},
 					},
 				},
@@ -531,7 +620,7 @@ func TestSetImageRemote(t *testing.T) {
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         input.groupVersion,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == input.path && m == http.MethodGet:
@@ -546,6 +635,119 @@ func TestSetImageRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), `"image":`+`"`+"thingy"+`"`, fmt.Sprintf("image not updated for %#v", input.object))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
+						return nil, fmt.Errorf("unexpected request")
+					}
+				}),
+			}
+
+			outputFormat := "yaml"
+
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdImage(tf, streams)
+			cmd.Flags().Set("output", outputFormat)
+			opts := SetImageOptions{
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+
+				Local:     false,
+				IOStreams: streams,
+			}
+			err := opts.Complete(tf, cmd, input.args)
+			assert.NoError(t, err)
+			err = opts.Run()
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSetImageRemoteWithSpecificContainers(t *testing.T) {
+	inputs := []struct {
+		name         string
+		object       runtime.Object
+		groupVersion schema.GroupVersion
+		path         string
+		args         []string
+	}{
+		{
+			name: "set container image only",
+			object: &extensionsv1beta1.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
+				Spec: extensionsv1beta1.ReplicaSetSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
+						},
+					},
+				},
+			},
+			groupVersion: extensionsv1beta1.SchemeGroupVersion,
+			path:         "/namespaces/test/replicasets/nginx",
+			args:         []string{"replicaset", "nginx", "nginx=thingy"},
+		},
+		{
+			name: "set initContainer image only",
+			object: &appsv1beta2.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
+				Spec: appsv1beta2.ReplicaSetSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "busybox",
+									Image: "busybox",
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx",
+								},
+							},
+						},
+					},
+				},
+			},
+			groupVersion: appsv1beta2.SchemeGroupVersion,
+			path:         "/namespaces/test/replicasets/nginx",
+			args:         []string{"replicaset", "nginx", "nginx=thingy"},
+		},
+	}
+	for _, input := range inputs {
+		t.Run(input.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         input.groupVersion,
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == input.path && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
+					case p == input.path && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := ioutil.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						assert.Contains(t, string(bytes), `"image":"`+"thingy"+`","name":`+`"nginx"`, fmt.Sprintf("image not updated for %#v", input.object))
+						assert.NotContains(t, string(bytes), `"image":"`+"thingy"+`","name":`+`"busybox"`, fmt.Sprintf("image updated for %#v", input.object))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)

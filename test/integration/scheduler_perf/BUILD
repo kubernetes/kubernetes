@@ -14,7 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     deps = [
-        "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
@@ -34,15 +33,20 @@ go_test(
     embed = [":go_default_library"],
     tags = ["integration"],
     deps = [
-        "//pkg/kubelet/apis:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

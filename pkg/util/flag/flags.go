@@ -21,8 +21,8 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
@@ -30,7 +30,7 @@ import (
 // PrintFlags logs the flags in the flagset
 func PrintFlags(flags *pflag.FlagSet) {
 	flags.VisitAll(func(flag *pflag.Flag) {
-		glog.V(1).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+		klog.V(1).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
 	})
 }
 

@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"strconv"
 
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -35,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -47,10 +51,20 @@ type jobStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = jobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that was the default
-// behavior before the server-side garbage collection was implemented.
+// DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1 for backwards compatibility,
+// and DeleteDependents for all other versions.
 func (jobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
-	return rest.OrphanDependents
+	var groupVersion schema.GroupVersion
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	switch groupVersion {
+	case batchv1.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all jobs need to be within a namespace.
@@ -67,7 +81,7 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
 
-	pod.DropDisabledAlphaFields(&job.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -76,13 +90,11 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
 		newJob.Spec.TTLSecondsAfterFinished = nil
-		oldJob.Spec.TTLSecondsAfterFinished = nil
 	}
 
-	pod.DropDisabledAlphaFields(&newJob.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldJob.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 }
 
 // Validate validates a new job.
@@ -92,7 +104,9 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	return validation.ValidateJob(job)
+	allErrs := validation.ValidateJob(job)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&job.Spec.Template, nil, field.NewPath("spec.template"))...)
+	return allErrs
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -160,8 +174,11 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
-	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job))
+	job := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
+	validationErrorList := validation.ValidateJob(job)
+	updateErrorList := validation.ValidateJobUpdate(job, oldJob)
+	updateErrorList = append(updateErrorList, corevalidation.ValidateConditionalPodTemplate(&job.Spec.Template, &oldJob.Spec.Template, field.NewPath("spec.template"))...)
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -191,12 +208,12 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	job, ok := obj.(*batch.Job)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a job.")
+		return nil, nil, fmt.Errorf("given object is not a job.")
 	}
-	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), job.Initializers != nil, nil
+	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
 }
 
 // MatchJob is the filter used by the generic etcd backend to route

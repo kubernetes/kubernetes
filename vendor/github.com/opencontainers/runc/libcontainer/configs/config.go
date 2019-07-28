@@ -141,9 +141,10 @@ type Config struct {
 
 	// OomScoreAdj specifies the adjustment to be made by the kernel when calculating oom scores
 	// for a process. Valid values are between the range [-1000, '1000'], where processes with
-	// higher scores are preferred for being killed.
+	// higher scores are preferred for being killed. If it is unset then we don't touch the current
+	// value.
 	// More information about kernel oom score calculation here: https://lwn.net/Articles/317814/
-	OomScoreAdj int `json:"oom_score_adj"`
+	OomScoreAdj *int `json:"oom_score_adj,omitempty"`
 
 	// UidMappings is an array of User ID mappings for User Namespaces
 	UidMappings []IDMap `json:"uid_mappings"`
@@ -185,12 +186,19 @@ type Config struct {
 	// callers keyring in this case.
 	NoNewKeyring bool `json:"no_new_keyring"`
 
-	// Rootless specifies whether the container is a rootless container.
-	Rootless bool `json:"rootless"`
-
-	// IntelRdt specifies settings for Intel RDT/CAT group that the container is placed into
-	// to limit the resources (e.g., L3 cache) the container has available
+	// IntelRdt specifies settings for Intel RDT group that the container is placed into
+	// to limit the resources (e.g., L3 cache, memory bandwidth) the container has available
 	IntelRdt *IntelRdt `json:"intel_rdt,omitempty"`
+
+	// RootlessEUID is set when the runc was launched with non-zero EUID.
+	// Note that RootlessEUID is set to false when launched with EUID=0 in userns.
+	// When RootlessEUID is set, runc creates a new userns for the container.
+	// (config.json needs to contain userns settings)
+	RootlessEUID bool `json:"rootless_euid,omitempty"`
+
+	// RootlessCgroups is set when unlikely to have the full access to cgroups.
+	// When RootlessCgroups is set, cgroups errors are ignored.
+	RootlessCgroups bool `json:"rootless_cgroups,omitempty"`
 }
 
 type Hooks struct {
@@ -264,26 +272,23 @@ func (hooks Hooks) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// HookState is the payload provided to a hook on execution.
-type HookState specs.State
-
 type Hook interface {
 	// Run executes the hook with the provided state.
-	Run(HookState) error
+	Run(*specs.State) error
 }
 
 // NewFunctionHook will call the provided function when the hook is run.
-func NewFunctionHook(f func(HookState) error) FuncHook {
+func NewFunctionHook(f func(*specs.State) error) FuncHook {
 	return FuncHook{
 		run: f,
 	}
 }
 
 type FuncHook struct {
-	run func(HookState) error
+	run func(*specs.State) error
 }
 
-func (f FuncHook) Run(s HookState) error {
+func (f FuncHook) Run(s *specs.State) error {
 	return f.run(s)
 }
 
@@ -306,7 +311,7 @@ type CommandHook struct {
 	Command
 }
 
-func (c Command) Run(s HookState) error {
+func (c Command) Run(s *specs.State) error {
 	b, err := json.Marshal(s)
 	if err != nil {
 		return err

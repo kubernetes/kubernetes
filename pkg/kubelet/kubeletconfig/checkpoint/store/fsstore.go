@@ -95,7 +95,7 @@ func (s *fsStore) Exists(source checkpoint.RemoteConfigSource) (bool, error) {
 func (s *fsStore) Save(payload checkpoint.Payload) error {
 	// Note: Payload interface guarantees UID() and ResourceVersion() to be non-empty
 	path := s.checkpointPath(payload.UID(), payload.ResourceVersion())
-	// ensure the parent dir (checkpoints/uid) exists, since ReplaceDir requires the parent of the replacee
+	// ensure the parent dir (checkpoints/uid) exists, since ReplaceDir requires the parent of the replace
 	// to exist, and we checkpoint as checkpoints/uid/resourceVersion/files-from-configmap
 	if err := utilfiles.EnsureDir(s.fs, filepath.Dir(path)); err != nil {
 		return err

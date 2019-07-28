@@ -16,7 +16,7 @@ func SplitDomainName(s string) (labels []string) {
 	fqdnEnd := 0 // offset of the final '.' or the length of the name
 	idx := Split(s)
 	begin := 0
-	if s[len(s)-1] == '.' {
+	if IsFqdn(s) {
 		fqdnEnd = len(s) - 1
 	} else {
 		fqdnEnd = len(s)
@@ -36,13 +36,12 @@ func SplitDomainName(s string) (labels []string) {
 		}
 	}
 
-	labels = append(labels, s[begin:fqdnEnd])
-	return labels
+	return append(labels, s[begin:fqdnEnd])
 }
 
 // CompareDomainName compares the names s1 and s2 and
 // returns how many labels they have in common starting from the *right*.
-// The comparison stops at the first inequality. The names are not downcased
+// The comparison stops at the first inequality. The names are downcased
 // before the comparison.
 //
 // www.miek.nl. and miek.nl. have two labels in common: miek and nl
@@ -50,15 +49,13 @@ func SplitDomainName(s string) (labels []string) {
 //
 // s1 and s2 must be syntactically valid domain names.
 func CompareDomainName(s1, s2 string) (n int) {
-	s1 = Fqdn(s1)
-	s2 = Fqdn(s2)
+	// the first check: root label
+	if s1 == "." || s2 == "." {
+		return 0
+	}
+
 	l1 := Split(s1)
 	l2 := Split(s2)
-
-	// the first check: root label
-	if l1 == nil || l2 == nil {
-		return
-	}
 
 	j1 := len(l1) - 1 // end
 	i1 := len(l1) - 2 // start
@@ -66,7 +63,7 @@ func CompareDomainName(s1, s2 string) (n int) {
 	i2 := len(l2) - 2
 	// the second check can be done here: last/only label
 	// before we fall through into the for-loop below
-	if s1[l1[j1]:] == s2[l2[j2]:] {
+	if equal(s1[l1[j1]:], s2[l2[j2]:]) {
 		n++
 	} else {
 		return
@@ -75,7 +72,7 @@ func CompareDomainName(s1, s2 string) (n int) {
 		if i1 < 0 || i2 < 0 {
 			break
 		}
-		if s1[l1[i1]:l1[j1]] == s2[l2[i2]:l2[j2]] {
+		if equal(s1[l1[i1]:l1[j1]], s2[l2[i2]:l2[j2]]) {
 			n++
 		} else {
 			break
@@ -165,4 +162,29 @@ func PrevLabel(s string, n int) (i int, start bool) {
 		return 0, true
 	}
 	return lab[len(lab)-n], false
+}
+
+// equal compares a and b while ignoring case. It returns true when equal otherwise false.
+func equal(a, b string) bool {
+	// might be lifted into API function.
+	la := len(a)
+	lb := len(b)
+	if la != lb {
+		return false
+	}
+
+	for i := la - 1; i >= 0; i-- {
+		ai := a[i]
+		bi := b[i]
+		if ai >= 'A' && ai <= 'Z' {
+			ai |= 'a' - 'A'
+		}
+		if bi >= 'A' && bi <= 'Z' {
+			bi |= 'a' - 'A'
+		}
+		if ai != bi {
+			return false
+		}
+	}
+	return true
 }

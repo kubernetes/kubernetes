@@ -638,7 +638,7 @@ func TestPatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch, metav1.UpdateOptions{}, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch, metav1.PatchOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when patching %q: %v", tc.name, err)
 			continue

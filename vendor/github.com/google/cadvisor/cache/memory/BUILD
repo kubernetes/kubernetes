@@ -7,10 +7,10 @@ go_library(
     importpath = "github.com/google/cadvisor/cache/memory",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/storage:go_default_library",
         "//vendor/github.com/google/cadvisor/utils:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

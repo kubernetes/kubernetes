@@ -16,7 +16,7 @@
 
 # Script that destroys Kubemark cluster and deletes all master resources.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
@@ -41,7 +41,6 @@ detect-project &> /dev/null
 
 rm -rf "${RESOURCE_DIRECTORY}/addons" \
 	"${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
-	"${RESOURCE_DIRECTORY}/hollow-node.yaml" \
-	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
+	"${RESOURCE_DIRECTORY}/hollow-node.yaml"  &> /dev/null || true
 
-delete-master-instance-and-resources
+delete-kubemark-master

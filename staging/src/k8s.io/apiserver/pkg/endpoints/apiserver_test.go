@@ -37,7 +37,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -64,19 +65,19 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/server/filters"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type alwaysMutatingDeny struct{}
 
-func (alwaysMutatingDeny) Admit(a admission.Attributes) (err error) {
+func (alwaysMutatingDeny) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Mutating admission control is denying all modifications"))
 }
 
@@ -86,7 +87,7 @@ func (alwaysMutatingDeny) Handles(operation admission.Operation) bool {
 
 type alwaysValidatingDeny struct{}
 
-func (alwaysValidatingDeny) Validate(a admission.Attributes) (err error) {
+func (alwaysValidatingDeny) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Validating admission control is denying all modifications"))
 }
 
@@ -227,6 +228,8 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Linker:          selfLinker,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
+
 		ParameterCodec: parameterCodec,
 
 		Admit: admissionControl,
@@ -335,7 +338,6 @@ type SimpleRESTStorage struct {
 	fakeWatch                  *watch.FakeWatcher
 	requestedLabelSelector     labels.Selector
 	requestedFieldSelector     fields.Selector
-	requestedUninitialized     bool
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
@@ -390,7 +392,6 @@ func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainterna
 	if options != nil && options.FieldSelector != nil {
 		storage.requestedFieldSelector = options.FieldSelector
 	}
-	storage.requestedUninitialized = options.IncludeUninitialized
 	return result, storage.errors["list"]
 }
 
@@ -440,11 +441,14 @@ func (storage *SimpleRESTStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
 	if err := storage.errors["delete"]; err != nil {
+		return nil, false, err
+	}
+	if err := deleteValidation(&storage.item); err != nil {
 		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
@@ -1214,7 +1218,12 @@ func TestListCompression(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		storage := map[string]rest.Storage{}
-		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
+		simpleStorage := SimpleRESTStorage{
+			expectedResourceNamespace: testCase.namespace,
+			list: []genericapitesting.Simple{
+				{Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1)},
+			},
+		}
 		storage["simple"] = &simpleStorage
 		selfLinker := &setTestSelfLinker{
 			t:           t,
@@ -1223,7 +1232,6 @@ func TestListCompression(t *testing.T) {
 		}
 		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
 
-		handler = filters.WithCompression(handler)
 		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 
 		server := httptest.NewServer(handler)
@@ -1616,11 +1624,86 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestGetCompression(t *testing.T) {
+func BenchmarkGet(b *testing.B) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
 			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	u := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := http.Get(u)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			b.Fatalf("unexpected response: %#v", resp)
+		}
+		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+			b.Fatalf("unable to read body")
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkGetNoCompression(b *testing.B) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			DisableCompression: true,
+		},
+	}
+
+	u := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := client.Get(u)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			b.Fatalf("unexpected response: %#v", resp)
+		}
+		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+			b.Fatalf("unable to read body")
+		}
+	}
+	b.StopTimer()
+}
+func TestGetCompression(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1),
 		},
 	}
 	selfLinker := &setTestSelfLinker{
@@ -1632,7 +1715,6 @@ func TestGetCompression(t *testing.T) {
 
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
-	handler = filters.WithCompression(handler)
 	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -1647,7 +1729,7 @@ func TestGetCompression(t *testing.T) {
 	for _, test := range tests {
 		req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
 		if err != nil {
-			t.Fatalf("unexpected error cretaing request: %v", err)
+			t.Fatalf("unexpected error creating request: %v", err)
 		}
 		// It's necessary to manually set Accept-Encoding here
 		// to prevent http.DefaultClient from automatically
@@ -1689,52 +1771,6 @@ func TestGetCompression(t *testing.T) {
 	}
 }
 
-func TestGetUninitialized(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		list: []genericapitesting.Simple{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Initializers: &metav1.Initializers{
-						Pending: []metav1.Initializer{{Name: "test"}},
-					},
-				},
-				Other: "foo",
-			},
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:              t,
-		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
-		name:           "id",
-		namespace:      "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple?includeUninitialized=true")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	var itemOut genericapitesting.SimpleList
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if len(itemOut.Items) != 1 || itemOut.Items[0].Other != "foo" {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if !simpleStorage.requestedUninitialized {
-		t.Errorf("Didn't set correct flag")
-	}
-}
-
 func TestGetPretty(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1760,14 +1796,14 @@ func TestGetPretty(t *testing.T) {
 		pretty    bool
 	}{
 		{accept: runtime.ContentTypeJSON},
-		{accept: runtime.ContentTypeJSON + ";pretty=0"},
+		{accept: "application/json;pretty=0"},
 		{accept: runtime.ContentTypeJSON, userAgent: "kubectl"},
 		{accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"0"}}},
 
 		{pretty: true, accept: runtime.ContentTypeJSON, userAgent: "curl"},
 		{pretty: true, accept: runtime.ContentTypeJSON, userAgent: "Mozilla/5.0"},
 		{pretty: true, accept: runtime.ContentTypeJSON, userAgent: "Wget"},
-		{pretty: true, accept: runtime.ContentTypeJSON + ";pretty=1"},
+		{pretty: true, accept: "application/json;pretty=1"},
 		{pretty: true, accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"1"}}},
 		{pretty: true, accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"true"}}},
 	}
@@ -1829,14 +1865,28 @@ func TestGetTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	partial := meta.AsPartialObjectMetadata(m)
-	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
-	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
-	if err != nil {
-		t.Fatal(err)
+	var encodedV1Beta1Body []byte
+	{
+		partial := meta.AsPartialObjectMetadata(m)
+		partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+		encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// the codec includes a trailing newline that is not present during decode
+		encodedV1Beta1Body = bytes.TrimSpace(encodedBody)
 	}
-	// the codec includes a trailing newline that is not present during decode
-	encodedBody = bytes.TrimSpace(encodedBody)
+	var encodedV1Body []byte
+	{
+		partial := meta.AsPartialObjectMetadata(m)
+		partial.GetObjectKind().SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+		encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// the codec includes a trailing newline that is not present during decode
+		encodedV1Body = bytes.TrimSpace(encodedBody)
+	}
 
 	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
 
@@ -1849,12 +1899,36 @@ func TestGetTable(t *testing.T) {
 		item       bool
 	}{
 		{
-			accept:     runtime.ContentTypeJSON + ";as=Table;v=v1;g=meta.k8s.io",
+			accept:     "application/json;as=Table;v=v1alpha1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
+			accept:     runtime.ContentTypeProtobuf + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept:     runtime.ContentTypeProtobuf + ";as=Table;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+
+		{
 			item:   true,
-			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			accept: "application/json;as=Table;v=v1;g=meta.k8s.io",
+			expected: &metav1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ColumnDefinitions: []metav1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Body}},
+				},
+			},
+		},
+		{
+			item:   true,
+			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			expected: &metav1beta1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
@@ -1863,13 +1937,31 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
+				},
+			},
+		},
+		{
+			item: true,
+			accept: strings.Join([]string{
+				runtime.ContentTypeProtobuf + ";as=Table;v=v1beta1;g=meta.k8s.io",
+				"application/json;as=Table;v=v1beta1;g=meta.k8s.io",
+			}, ","),
+			expected: &metav1beta1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1beta1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
 		},
 		{
 			item:   true,
-			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
 			expected: &metav1beta1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
@@ -1879,12 +1971,12 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
 		},
 		{
-			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
 			expected: &metav1beta1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
@@ -1894,7 +1986,7 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
 		},
@@ -1966,6 +2058,261 @@ func TestGetTable(t *testing.T) {
 	}
 }
 
+func TestWatchTable(t *testing.T) {
+	obj := genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", SelfLink: "/blah", CreationTimestamp: metav1.NewTime(time.Unix(1, 0)), UID: types.UID("abcdef0123")},
+		Other:      "foo",
+	}
+
+	m, err := meta.Accessor(&obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partial := meta.AsPartialObjectMetadata(m)
+	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the codec includes a trailing newline that is not present during decode
+	encodedBody = bytes.TrimSpace(encodedBody)
+
+	encodedBodyV1, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the codec includes a trailing newline that is not present during decode
+	encodedBodyV1 = bytes.TrimSpace(encodedBodyV1)
+
+	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
+
+	s := metainternalversion.Codecs.SupportedMediaTypes()[0].Serializer
+
+	tests := []struct {
+		accept string
+		params url.Values
+		send   func(w *watch.FakeWatcher)
+
+		expected    []*metav1.WatchEvent
+		contentType string
+		statusCode  int
+		item        bool
+	}{
+		{
+			accept:     "application/json;as=Table;v=v1alpha1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
+			send: func(w *watch.FakeWatcher) {
+				w.Add(&obj)
+			},
+			expected: []*metav1.WatchEvent{
+				{
+					Type: "ADDED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+							},
+							Rows: []metav1beta1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+							},
+						}))),
+					},
+				},
+			},
+		},
+		{
+			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
+			send: func(w *watch.FakeWatcher) {
+				w.Add(&obj)
+				w.Modify(&obj)
+			},
+			expected: []*metav1.WatchEvent{
+				{
+					Type: "ADDED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+							},
+							Rows: []metav1beta1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+							},
+						}))),
+					},
+				},
+				{
+					Type: "MODIFIED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							Rows: []metav1beta1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+							},
+						}))),
+					},
+				},
+			},
+		},
+		{
+			accept: "application/json;as=Table;v=v1;g=meta.k8s.io",
+			send: func(w *watch.FakeWatcher) {
+				w.Add(&obj)
+				w.Modify(&obj)
+			},
+			expected: []*metav1.WatchEvent{
+				{
+					Type: "ADDED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+							},
+							Rows: []metav1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBodyV1}},
+							},
+						}))),
+					},
+				},
+				{
+					Type: "MODIFIED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							Rows: []metav1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBodyV1}},
+							},
+						}))),
+					},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{
+				item: obj,
+				list: []genericapitesting.Simple{obj},
+			}
+
+			selfLinker := &setTestSelfLinker{
+				t:           t,
+				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
+				namespace:   "default",
+			}
+			if test.item {
+				selfLinker.expectedSet += "/id"
+				selfLinker.name = "id"
+			}
+			storage["simple"] = &simpleStorage
+			handler := handleLinker(storage, selfLinker)
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			var id string
+			if test.item {
+				id = "/id"
+			}
+			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.params == nil {
+				test.params = url.Values{}
+			}
+			if test.item {
+				test.params["fieldSelector"] = []string{fmt.Sprintf("metadata.name=%s", id)}
+			}
+			test.params["watch"] = []string{"1"}
+
+			u.RawQuery = test.params.Encode()
+			req := &http.Request{Method: "GET", URL: u}
+			req.Header = http.Header{}
+			req.Header.Set("Accept", test.accept)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if test.statusCode != 0 {
+				if resp.StatusCode != test.statusCode {
+					t.Fatalf("%d: unexpected response: %#v", i, resp)
+				}
+				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+				if err != nil {
+					t.Fatalf("%d: unexpected body read error: %v", i, err)
+				}
+				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				if obj.GetObjectKind().GroupVersionKind() != gvk {
+					t.Fatalf("%d: unexpected error body: %#v", i, obj)
+				}
+				return
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("%d: unexpected response: %#v", i, resp)
+			}
+
+			go func() {
+				defer simpleStorage.fakeWatch.Stop()
+				test.send(simpleStorage.fakeWatch)
+			}()
+
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("Body:\n%s", string(body))
+			d := watcher(resp.Header.Get("Content-Type"), ioutil.NopCloser(bytes.NewReader(body)))
+			var actual []*metav1.WatchEvent
+			for {
+				var event metav1.WatchEvent
+				_, _, err := d.Decode(nil, &event)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual = append(actual, &event)
+			}
+			if !reflect.DeepEqual(test.expected, actual) {
+				for i := range test.expected {
+					if i >= len(actual) {
+						break
+					}
+					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
+				}
+				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+			}
+		})
+	}
+}
+
+func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
+	info, ok := runtime.SerializerInfoForMediaType(metainternalversion.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok || info.StreamSerializer == nil {
+		panic(info)
+	}
+	streamSerializer := info.StreamSerializer
+	fr := streamSerializer.Framer.NewFrameReader(r)
+	d := streaming.NewDecoder(fr, streamSerializer.Serializer)
+	return d
+}
+
 func TestGetPartialObjectMetadata(t *testing.T) {
 	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
 	storage := map[string]rest.Storage{}
@@ -2007,48 +2354,78 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 		statusCode int
 	}{
 		{
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io",
+			accept:     "application/json;as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json",
+			accept:     "application/json;as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io, application/json",
 			expectKind: schema.GroupVersionKind{Kind: "Simple", Group: testGroupVersion.Group, Version: testGroupVersion.Version},
 		},
 		{
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io, application/json",
+			accept:     "application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io, application/json",
 			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 		{
 			list:       true,
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
+			accept:     "application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
+
+		// verify preferred version overrides supported version
+		{
+			accept:     "application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io, application/json;as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1beta1"},
+		},
+		{
+			accept:     "application/json;as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1"},
+		},
+		{
+			accept:     "application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io, application/json;as=PartialObjectMetadata;v=v1;g=meta.k8s.io",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1beta1"},
+		},
+		{
+			accept:     "application/json;as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1"},
+		},
+
 		{
 			list:       true,
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json",
+			accept:     "application/json;as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io, application/json",
 			expectKind: schema.GroupVersionKind{Kind: "SimpleList", Group: testGroupVersion.Group, Version: testGroupVersion.Version},
 		},
 		{
 			list:       true,
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io, application/json",
+			accept:     "application/json;as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io, application/json",
 			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 		{
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
+			accept:     "application/json;as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
-			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
+			accept: "application/json;as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
 			expected: &metav1beta1.PartialObjectMetadata{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
 			},
 			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 		{
+			accept: "application/json;as=PartialObjectMetadata;v=v1;g=meta.k8s.io",
+			expected: &metav1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+			},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1"},
+		},
+		{
 			list:   true,
-			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
+			accept: "application/json;as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
 			expected: &metav1beta1.PartialObjectMetadataList{
-				Items: []*metav1beta1.PartialObjectMetadata{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "10",
+					SelfLink:        "/test/link",
+				},
+				Items: []metav1beta1.PartialObjectMetadata{
 					{
 						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "PartialObjectMetadata"},
 						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
@@ -3221,6 +3598,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Linker:          selfLinker,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
+
 		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
@@ -3250,6 +3629,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Linker:          selfLinker,
+
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
 		Admit: admissionControl,
 
@@ -3608,7 +3989,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 	}
 }
 
-func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
+func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
 	t.Helper()
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
@@ -3643,7 +4024,7 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
+	status := expectAPIStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != metav1.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != metav1.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -3666,7 +4047,7 @@ func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, negotiation.DefaultEndpointRestrictions, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// Decode error response behavior is dictated by
@@ -3674,7 +4055,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
 	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
 	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
+	status := expectAPIStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
@@ -3728,7 +4109,7 @@ func TestCreateTimeout(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
+	itemOut := expectAPIStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
@@ -3862,13 +4243,13 @@ type SimpleRESTStorageWithDeleteCollection struct {
 }
 
 // Delete collection doesn't do much, but let us test this path.
-func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return nil, nil
 }
 
 func TestDryRunDisabled(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
 
 	tests := []struct {
 		path        string
@@ -3906,12 +4287,12 @@ func TestDryRunDisabled(t *testing.T) {
 	}))
 	defer server.Close()
 	for _, test := range tests {
-		baseUrl := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseUrl+test.path, test.verb, test.data, test.contentType)
+		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
 		if response.StatusCode == http.StatusBadRequest {
 			t.Fatalf("unexpected BadRequest: %#v", response)
 		}
-		response = runRequest(t, baseUrl+test.path+"?dryRun", test.verb, test.data, test.contentType)
+		response = runRequest(t, baseURL+test.path+"?dryRun", test.verb, test.data, test.contentType)
 		if response.StatusCode != http.StatusBadRequest {
 			t.Fatalf("unexpected non BadRequest: %#v", response)
 		}
@@ -3933,7 +4314,7 @@ func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id strin
 	return storage.item.DeepCopyObject(), nil
 }
 
-func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	return nil, true, nil
 }
 
@@ -3967,6 +4348,8 @@ func TestXGSubresource(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Linker:          selfLinker,
+
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
 		ParameterCodec: parameterCodec,
 

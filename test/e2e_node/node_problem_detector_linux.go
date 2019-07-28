@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"syscall"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -33,8 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,13 +47,14 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "k8s.gcr.io/node-problem-detector:v0.4.1"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string
 	var bootTime, nodeTime time.Time
+	var image string
+
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -60,6 +63,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		configName = "node-problem-detector-config-" + uid
 		// There is no namespace for Node, event recorder will set default namespace for node events.
 		eventNamespace = metav1.NamespaceDefault
+		image = getNodeProblemDetectorImage()
+		By(fmt.Sprintf("Using node-problem-detector image: %s", image))
 	})
 
 	// Test system log monitor. We may add other tests if we have more problem daemons in the future.
@@ -97,8 +102,11 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		BeforeEach(func() {
 			By("Calculate Lookback duration")
 			var err error
-			nodeTime, bootTime, err = getNodeTime()
+
+			nodeTime = time.Now()
+			bootTime, err = util.GetBootTime()
 			Expect(err).To(BeNil())
+
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
 			lookback = nodeTime.Sub(bootTime) + time.Hour
@@ -153,13 +161,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
 			By("Create the test log file")
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			By("Create config map for the node problem detector")
 			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
@@ -230,7 +238,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				},
 			})
 			pod, err := f.PodClient().Get(name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
@@ -242,7 +250,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				timestamp        time.Time
 				message          string
 				messageNum       int
-				events           int
+				tempEvents       int // Events for temp errors
+				totalEvents      int // Events for both temp errors and condition changes
 				conditionReason  string
 				conditionMessage string
 				conditionType    v1.ConditionStatus
@@ -276,7 +285,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					timestamp:        nodeTime,
 					message:          tempMessage,
 					messageNum:       3,
-					events:           3,
+					tempEvents:       3,
+					totalEvents:      3,
 					conditionReason:  defaultReason,
 					conditionMessage: defaultMessage,
 					conditionType:    v1.ConditionFalse,
@@ -286,7 +296,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					timestamp:        nodeTime,
 					message:          permMessage1,
 					messageNum:       1,
-					events:           3, // event number should not change
+					tempEvents:       3, // event number for temp errors should not change
+					totalEvents:      4, // add 1 event for condition change
 					conditionReason:  permReason1,
 					conditionMessage: permMessage1,
 					conditionType:    v1.ConditionTrue,
@@ -296,7 +307,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					timestamp:        nodeTime.Add(5 * time.Minute),
 					message:          tempMessage,
 					messageNum:       3,
-					events:           6,
+					tempEvents:       6, // add 3 events for temp errors
+					totalEvents:      7, // add 3 events for temp errors
 					conditionReason:  permReason1,
 					conditionMessage: permMessage1,
 					conditionType:    v1.ConditionTrue,
@@ -306,7 +318,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					timestamp:        nodeTime.Add(5 * time.Minute),
 					message:          permMessage1 + "different message",
 					messageNum:       1,
-					events:           6, // event number should not change
+					tempEvents:       6, // event number should not change
+					totalEvents:      7, // event number should not change
 					conditionReason:  permReason1,
 					conditionMessage: permMessage1,
 					conditionType:    v1.ConditionTrue,
@@ -316,7 +329,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					timestamp:        nodeTime.Add(5 * time.Minute),
 					message:          permMessage2,
 					messageNum:       1,
-					events:           6, // event number should not change
+					tempEvents:       6, // event number for temp errors should not change
+					totalEvents:      8, // add 1 event for condition change
 					conditionReason:  permReason2,
 					conditionMessage: permMessage2,
 					conditionType:    v1.ConditionTrue,
@@ -326,16 +340,20 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				if test.messageNum > 0 {
 					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
 					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 				}
 
-				By(fmt.Sprintf("Wait for %d events generated", test.events))
+				By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
 				Eventually(func() error {
-					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.tempEvents, tempReason, tempMessage)
 				}, pollTimeout, pollInterval).Should(Succeed())
-				By(fmt.Sprintf("Make sure only %d events generated", test.events))
+				By(fmt.Sprintf("Wait for %d total events generated", test.totalEvents))
+				Eventually(func() error {
+					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
+				}, pollTimeout, pollInterval).Should(Succeed())
+				By(fmt.Sprintf("Make sure only %d total events generated", test.totalEvents))
 				Consistently(func() error {
-					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
 				}, pollConsistent, pollInterval).Should(Succeed())
 
 				By(fmt.Sprintf("Make sure node condition %q is set", condition))
@@ -352,14 +370,14 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
 				By("Get node problem detector log")
-				log, err := framework.GetPodLogs(c, ns, name, name)
+				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				Expect(err).ShouldNot(HaveOccurred())
-				framework.Logf("Node Problem Detector logs:\n %s", log)
+				e2elog.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			By("Delete the node problem detector")
 			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))
 			By("Wait for the node problem detector to disappear")
-			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
+			Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
 			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
 			By("Clean up the events")
@@ -387,25 +405,7 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 	return nil
 }
 
-// getNodeTime gets node boot time and current time.
-func getNodeTime() (time.Time, time.Time, error) {
-	// Get node current time.
-	nodeTime := time.Now()
-
-	// Get system uptime.
-	var info syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&info); err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	// Get node boot time. NOTE that because we get node current time before uptime, the boot time
-	// calculated will be a little earlier than the real boot time. This won't affect the correctness
-	// of the test result.
-	bootTime := nodeTime.Add(-time.Duration(info.Uptime) * time.Second)
-
-	return nodeTime, bootTime, nil
-}
-
-// verifyEvents verifies there are num specific events generated
+// verifyEvents verifies there are num specific events generated with given reason and message.
 func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
 	events, err := e.List(options)
 	if err != nil {
@@ -414,7 +414,7 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 	count := 0
 	for _, event := range events.Items {
 		if event.Reason != reason || event.Message != message {
-			return fmt.Errorf("unexpected event: %v", event)
+			continue
 		}
 		count += int(event.Count)
 	}
@@ -424,14 +424,18 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 	return nil
 }
 
-// verifyNoEvents verifies there is no event generated
-func verifyNoEvents(e coreclientset.EventInterface, options metav1.ListOptions) error {
+// verifyTotalEvents verifies there are num events in total.
+func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int) error {
 	events, err := e.List(options)
 	if err != nil {
 		return err
 	}
-	if len(events.Items) != 0 {
-		return fmt.Errorf("unexpected events: %v", events.Items)
+	count := 0
+	for _, event := range events.Items {
+		count += int(event.Count)
+	}
+	if count != num {
+		return fmt.Errorf("expect event number %d, got %d: %v", num, count, events.Items)
 	}
 	return nil
 }
@@ -442,7 +446,7 @@ func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditi
 	if err != nil {
 		return err
 	}
-	_, c := nodeutil.GetNodeCondition(&node.Status, condition)
+	_, c := testutils.GetNodeCondition(&node.Status, condition)
 	if c == nil {
 		return fmt.Errorf("node condition %q not found", condition)
 	}

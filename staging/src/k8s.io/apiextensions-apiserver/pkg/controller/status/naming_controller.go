@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +66,7 @@ func NewNamingConditionController(
 		crdClient: crdClient,
 		crdLister: crdInformer.Lister(),
 		crdSynced: crdInformer.Informer().HasSynced,
-		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-NamingConditionController"),
+		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_naming_condition_controller"),
 	}
 
 	informerIndexer := crdInformer.Informer().GetIndexer()
@@ -261,6 +261,10 @@ func (c *NamingConditionController) sync(key string) error {
 	apiextensions.SetCRDCondition(crd, establishedCondition)
 
 	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -281,8 +285,8 @@ func (c *NamingConditionController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting NamingConditionController")
-	defer glog.Infof("Shutting down NamingConditionController")
+	klog.Infof("Starting NamingConditionController")
+	defer klog.Infof("Shutting down NamingConditionController")
 
 	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
 		return
@@ -322,7 +326,7 @@ func (c *NamingConditionController) processNextWorkItem() bool {
 func (c *NamingConditionController) enqueue(obj *apiextensions.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 
@@ -331,13 +335,13 @@ func (c *NamingConditionController) enqueue(obj *apiextensions.CustomResourceDef
 
 func (c *NamingConditionController) addCustomResourceDefinition(obj interface{}) {
 	castObj := obj.(*apiextensions.CustomResourceDefinition)
-	glog.V(4).Infof("Adding %s", castObj.Name)
+	klog.V(4).Infof("Adding %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *NamingConditionController) updateCustomResourceDefinition(obj, _ interface{}) {
 	castObj := obj.(*apiextensions.CustomResourceDefinition)
-	glog.V(4).Infof("Updating %s", castObj.Name)
+	klog.V(4).Infof("Updating %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
@@ -346,16 +350,16 @@ func (c *NamingConditionController) deleteCustomResourceDefinition(obj interface
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
 		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not expected %#v", obj)
+			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
 		}
 	}
-	glog.V(4).Infof("Deleting %q", castObj.Name)
+	klog.V(4).Infof("Deleting %q", castObj.Name)
 	c.enqueue(castObj)
 }
 

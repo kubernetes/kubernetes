@@ -60,6 +60,12 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return nil, apierrors.NewBadRequest("no user present on request")
 	}
 
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	var authorizationAttributes authorizer.AttributesRecord
 	if selfSAR.Spec.ResourceAttributes != nil {
 		authorizationAttributes = authorizationutil.ResourceAttributesFrom(userToCheck, *selfSAR.Spec.ResourceAttributes)

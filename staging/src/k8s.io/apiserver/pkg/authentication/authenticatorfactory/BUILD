@@ -23,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/websocket:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/x509:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/cache:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -40,7 +40,7 @@ func newTestHost(t *testing.T) (string, volume.VolumeHost) {
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, nil, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -393,7 +393,7 @@ func doTestSetUp(scenario struct {
 		if expected.cmd[1] == "clone" {
 			fakeOutputs = append(fakeOutputs, func() ([]byte, error) {
 				// git clone, it creates new dir/files
-				os.MkdirAll(path.Join(fcmd.Dirs[0], expected.dir), 0750)
+				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir), 0750)
 				return []byte{}, nil
 			})
 		} else {
@@ -422,7 +422,7 @@ func doTestSetUp(scenario struct {
 	g := mounter.(*gitRepoVolumeMounter)
 	g.exec = &fake
 
-	g.SetUp(nil)
+	g.SetUp(volume.MounterArgs{})
 
 	if fake.CommandCalls != len(expecteds) {
 		allErrs = append(allErrs,

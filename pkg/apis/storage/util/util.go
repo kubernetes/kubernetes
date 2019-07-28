@@ -22,10 +22,19 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// DropDisabledAlphaFields removes disabled fields from the StorageClass object.
-func DropDisabledAlphaFields(class *storage.StorageClass) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		class.VolumeBindingMode = nil
-		class.AllowedTopologies = nil
+// DropDisabledFields removes disabled fields from the StorageClass object.
+func DropDisabledFields(class, oldClass *storage.StorageClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && !allowVolumeExpansionInUse(oldClass) {
+		class.AllowVolumeExpansion = nil
 	}
+}
+
+func allowVolumeExpansionInUse(oldClass *storage.StorageClass) bool {
+	if oldClass == nil {
+		return false
+	}
+	if oldClass.AllowVolumeExpansion != nil {
+		return true
+	}
+	return false
 }

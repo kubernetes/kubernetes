@@ -1,92 +1,83 @@
 package hcsshim
 
 import (
-	"errors"
 	"fmt"
 	"syscall"
+
+	"github.com/Microsoft/hcsshim/internal/hns"
+
+	"github.com/Microsoft/hcsshim/internal/hcs"
+	"github.com/Microsoft/hcsshim/internal/hcserror"
 )
 
 var (
-	// ErrComputeSystemDoesNotExist is an error encountered when the container being operated on no longer exists
-	ErrComputeSystemDoesNotExist = syscall.Errno(0xc037010e)
+	// ErrComputeSystemDoesNotExist is an error encountered when the container being operated on no longer exists = hcs.exist
+	ErrComputeSystemDoesNotExist = hcs.ErrComputeSystemDoesNotExist
 
 	// ErrElementNotFound is an error encountered when the object being referenced does not exist
-	ErrElementNotFound = syscall.Errno(0x490)
+	ErrElementNotFound = hcs.ErrElementNotFound
 
 	// ErrElementNotFound is an error encountered when the object being referenced does not exist
-	ErrNotSupported = syscall.Errno(0x32)
+	ErrNotSupported = hcs.ErrNotSupported
 
 	// ErrInvalidData is an error encountered when the request being sent to hcs is invalid/unsupported
 	// decimal -2147024883 / hex 0x8007000d
-	ErrInvalidData = syscall.Errno(0xd)
+	ErrInvalidData = hcs.ErrInvalidData
 
 	// ErrHandleClose is an error encountered when the handle generating the notification being waited on has been closed
-	ErrHandleClose = errors.New("hcsshim: the handle generating this notification has been closed")
+	ErrHandleClose = hcs.ErrHandleClose
 
 	// ErrAlreadyClosed is an error encountered when using a handle that has been closed by the Close method
-	ErrAlreadyClosed = errors.New("hcsshim: the handle has already been closed")
+	ErrAlreadyClosed = hcs.ErrAlreadyClosed
 
 	// ErrInvalidNotificationType is an error encountered when an invalid notification type is used
-	ErrInvalidNotificationType = errors.New("hcsshim: invalid notification type")
+	ErrInvalidNotificationType = hcs.ErrInvalidNotificationType
 
 	// ErrInvalidProcessState is an error encountered when the process is not in a valid state for the requested operation
-	ErrInvalidProcessState = errors.New("the process is in an invalid state for the attempted operation")
+	ErrInvalidProcessState = hcs.ErrInvalidProcessState
 
 	// ErrTimeout is an error encountered when waiting on a notification times out
-	ErrTimeout = errors.New("hcsshim: timeout waiting for notification")
+	ErrTimeout = hcs.ErrTimeout
 
 	// ErrUnexpectedContainerExit is the error encountered when a container exits while waiting for
 	// a different expected notification
-	ErrUnexpectedContainerExit = errors.New("unexpected container exit")
+	ErrUnexpectedContainerExit = hcs.ErrUnexpectedContainerExit
 
 	// ErrUnexpectedProcessAbort is the error encountered when communication with the compute service
 	// is lost while waiting for a notification
-	ErrUnexpectedProcessAbort = errors.New("lost communication with compute service")
+	ErrUnexpectedProcessAbort = hcs.ErrUnexpectedProcessAbort
 
 	// ErrUnexpectedValue is an error encountered when hcs returns an invalid value
-	ErrUnexpectedValue = errors.New("unexpected value returned from hcs")
+	ErrUnexpectedValue = hcs.ErrUnexpectedValue
 
 	// ErrVmcomputeAlreadyStopped is an error encountered when a shutdown or terminate request is made on a stopped container
-	ErrVmcomputeAlreadyStopped = syscall.Errno(0xc0370110)
+	ErrVmcomputeAlreadyStopped = hcs.ErrVmcomputeAlreadyStopped
 
 	// ErrVmcomputeOperationPending is an error encountered when the operation is being completed asynchronously
-	ErrVmcomputeOperationPending = syscall.Errno(0xC0370103)
+	ErrVmcomputeOperationPending = hcs.ErrVmcomputeOperationPending
 
 	// ErrVmcomputeOperationInvalidState is an error encountered when the compute system is not in a valid state for the requested operation
-	ErrVmcomputeOperationInvalidState = syscall.Errno(0xc0370105)
+	ErrVmcomputeOperationInvalidState = hcs.ErrVmcomputeOperationInvalidState
 
 	// ErrProcNotFound is an error encountered when the the process cannot be found
-	ErrProcNotFound = syscall.Errno(0x7f)
+	ErrProcNotFound = hcs.ErrProcNotFound
 
 	// ErrVmcomputeOperationAccessIsDenied is an error which can be encountered when enumerating compute systems in RS1/RS2
 	// builds when the underlying silo might be in the process of terminating. HCS was fixed in RS3.
-	ErrVmcomputeOperationAccessIsDenied = syscall.Errno(0x5)
+	ErrVmcomputeOperationAccessIsDenied = hcs.ErrVmcomputeOperationAccessIsDenied
 
 	// ErrVmcomputeInvalidJSON is an error encountered when the compute system does not support/understand the messages sent by management
-	ErrVmcomputeInvalidJSON = syscall.Errno(0xc037010d)
+	ErrVmcomputeInvalidJSON = hcs.ErrVmcomputeInvalidJSON
 
 	// ErrVmcomputeUnknownMessage is an error encountered guest compute system doesn't support the message
-	ErrVmcomputeUnknownMessage = syscall.Errno(0xc037010b)
+	ErrVmcomputeUnknownMessage = hcs.ErrVmcomputeUnknownMessage
 
 	// ErrNotSupported is an error encountered when hcs doesn't support the request
-	ErrPlatformNotSupported = errors.New("unsupported platform request")
+	ErrPlatformNotSupported = hcs.ErrPlatformNotSupported
 )
 
-type EndpointNotFoundError struct {
-	EndpointName string
-}
-
-func (e EndpointNotFoundError) Error() string {
-	return fmt.Sprintf("Endpoint %s not found", e.EndpointName)
-}
-
-type NetworkNotFoundError struct {
-	NetworkName string
-}
-
-func (e NetworkNotFoundError) Error() string {
-	return fmt.Sprintf("Network %s not found", e.NetworkName)
-}
+type EndpointNotFoundError = hns.EndpointNotFoundError
+type NetworkNotFoundError = hns.NetworkNotFoundError
 
 // ProcessError is an error encountered in HCS during an operation on a Process object
 type ProcessError struct {
@@ -94,6 +85,7 @@ type ProcessError struct {
 	Operation string
 	ExtraInfo string
 	Err       error
+	Events    []hcs.ErrorEvent
 }
 
 // ContainerError is an error encountered in HCS during an operation on a Container object
@@ -102,6 +94,7 @@ type ContainerError struct {
 	Operation string
 	ExtraInfo string
 	Err       error
+	Events    []hcs.ErrorEvent
 }
 
 func (e *ContainerError) Error() string {
@@ -113,7 +106,7 @@ func (e *ContainerError) Error() string {
 		return "unexpected nil container for error: " + e.Err.Error()
 	}
 
-	s := "container " + e.Container.id
+	s := "container " + e.Container.system.ID()
 
 	if e.Operation != "" {
 		s += " encountered an error during " + e.Operation
@@ -123,9 +116,13 @@ func (e *ContainerError) Error() string {
 	case nil:
 		break
 	case syscall.Errno:
-		s += fmt.Sprintf(": failure in a Windows system call: %s (0x%x)", e.Err, win32FromError(e.Err))
+		s += fmt.Sprintf(": failure in a Windows system call: %s (0x%x)", e.Err, hcserror.Win32FromError(e.Err))
 	default:
 		s += fmt.Sprintf(": %s", e.Err.Error())
+	}
+
+	for _, ev := range e.Events {
+		s += "\n" + ev.String()
 	}
 
 	if e.ExtraInfo != "" {
@@ -153,12 +150,7 @@ func (e *ProcessError) Error() string {
 		return "Unexpected nil process for error: " + e.Err.Error()
 	}
 
-	s := fmt.Sprintf("process %d", e.Process.processID)
-
-	if e.Process.container != nil {
-		s += " in container " + e.Process.container.id
-	}
-
+	s := fmt.Sprintf("process %d in container %s", e.Process.p.Pid(), e.Process.p.SystemID())
 	if e.Operation != "" {
 		s += " encountered an error during " + e.Operation
 	}
@@ -167,9 +159,13 @@ func (e *ProcessError) Error() string {
 	case nil:
 		break
 	case syscall.Errno:
-		s += fmt.Sprintf(": failure in a Windows system call: %s (0x%x)", e.Err, win32FromError(e.Err))
+		s += fmt.Sprintf(": failure in a Windows system call: %s (0x%x)", e.Err, hcserror.Win32FromError(e.Err))
 	default:
 		s += fmt.Sprintf(": %s", e.Err.Error())
+	}
+
+	for _, ev := range e.Events {
+		s += "\n" + ev.String()
 	}
 
 	return s
@@ -189,37 +185,31 @@ func makeProcessError(process *process, operation string, extraInfo string, err 
 // already exited, or does not exist. Both IsAlreadyStopped and IsNotExist
 // will currently return true when the error is ErrElementNotFound or ErrProcNotFound.
 func IsNotExist(err error) bool {
-	err = getInnerError(err)
 	if _, ok := err.(EndpointNotFoundError); ok {
 		return true
 	}
 	if _, ok := err.(NetworkNotFoundError); ok {
 		return true
 	}
-	return err == ErrComputeSystemDoesNotExist ||
-		err == ErrElementNotFound ||
-		err == ErrProcNotFound
+	return hcs.IsNotExist(getInnerError(err))
 }
 
 // IsAlreadyClosed checks if an error is caused by the Container or Process having been
 // already closed by a call to the Close() method.
 func IsAlreadyClosed(err error) bool {
-	err = getInnerError(err)
-	return err == ErrAlreadyClosed
+	return hcs.IsAlreadyClosed(getInnerError(err))
 }
 
 // IsPending returns a boolean indicating whether the error is that
 // the requested operation is being completed in the background.
 func IsPending(err error) bool {
-	err = getInnerError(err)
-	return err == ErrVmcomputeOperationPending
+	return hcs.IsPending(getInnerError(err))
 }
 
 // IsTimeout returns a boolean indicating whether the error is caused by
 // a timeout waiting for the operation to complete.
 func IsTimeout(err error) bool {
-	err = getInnerError(err)
-	return err == ErrTimeout
+	return hcs.IsTimeout(getInnerError(err))
 }
 
 // IsAlreadyStopped returns a boolean indicating whether the error is caused by
@@ -228,10 +218,7 @@ func IsTimeout(err error) bool {
 // already exited, or does not exist. Both IsAlreadyStopped and IsNotExist
 // will currently return true when the error is ErrElementNotFound or ErrProcNotFound.
 func IsAlreadyStopped(err error) bool {
-	err = getInnerError(err)
-	return err == ErrVmcomputeAlreadyStopped ||
-		err == ErrElementNotFound ||
-		err == ErrProcNotFound
+	return hcs.IsAlreadyStopped(getInnerError(err))
 }
 
 // IsNotSupported returns a boolean indicating whether the error is caused by
@@ -240,12 +227,7 @@ func IsAlreadyStopped(err error) bool {
 // ErrVmcomputeInvalidJSON, ErrInvalidData, ErrNotSupported or ErrVmcomputeUnknownMessage
 // is thrown from the Platform
 func IsNotSupported(err error) bool {
-	err = getInnerError(err)
-	// If Platform doesn't recognize or support the request sent, below errors are seen
-	return err == ErrVmcomputeInvalidJSON ||
-		err == ErrInvalidData ||
-		err == ErrNotSupported ||
-		err == ErrVmcomputeUnknownMessage
+	return hcs.IsNotSupported(getInnerError(err))
 }
 
 func getInnerError(err error) error {
@@ -256,6 +238,20 @@ func getInnerError(err error) error {
 		err = pe.Err
 	case *ProcessError:
 		err = pe.Err
+	}
+	return err
+}
+
+func convertSystemError(err error, c *container) error {
+	if serr, ok := err.(*hcs.SystemError); ok {
+		return &ContainerError{Container: c, Operation: serr.Op, ExtraInfo: serr.Extra, Err: serr.Err, Events: serr.Events}
+	}
+	return err
+}
+
+func convertProcessError(err error, p *process) error {
+	if perr, ok := err.(*hcs.ProcessError); ok {
+		return &ProcessError{Process: p, Operation: perr.Op, Err: perr.Err, Events: perr.Events}
 	}
 	return err
 }

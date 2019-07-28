@@ -21,18 +21,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -50,6 +51,7 @@ var (
 		kubectl create job test-job --from=cronjob/a-cronjob`))
 )
 
+// CreateJobOptions is the command line options for 'create job'
 type CreateJobOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
@@ -69,6 +71,7 @@ type CreateJobOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateJobOptions initializes and returns new CreateJobOptions instance
 func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
 	return &CreateJobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -80,7 +83,7 @@ func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOption
 func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateJobOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:     "job NAME [--image=image --from=cronjob/name] -- [COMMAND] [args...]",
+		Use:     "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
 		Short:   jobLong,
 		Long:    jobLong,
 		Example: jobExample,
@@ -102,6 +105,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -143,6 +147,7 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	return nil
 }
 
+// Validate makes sure provided values and valid Job options
 func (o *CreateJobOptions) Validate() error {
 	if (len(o.Image) == 0 && len(o.From) == 0) || (len(o.Image) != 0 && len(o.From) != 0) {
 		return fmt.Errorf("either --image or --from must be specified")
@@ -153,6 +158,7 @@ func (o *CreateJobOptions) Validate() error {
 	return nil
 }
 
+// Run performs the execution of 'create job' sub command
 func (o *CreateJobOptions) Run() error {
 	var job *batchv1.Job
 	if len(o.Image) > 0 {
@@ -225,6 +231,7 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 	for k, v := range cronJob.Spec.JobTemplate.Annotations {
 		annotations[k] = v
 	}
+
 	return &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
@@ -232,6 +239,9 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 			Name:        o.Name,
 			Annotations: annotations,
 			Labels:      cronJob.Spec.JobTemplate.Labels,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(cronJob, appsv1.SchemeGroupVersion.WithKind("CronJob")),
+			},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}

@@ -20,6 +20,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/crypto/ed25519:go_default_library",
+        "//vendor/golang.org/x/crypto/pbkdf2:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/cipher:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/json:go_default_library",
     ],

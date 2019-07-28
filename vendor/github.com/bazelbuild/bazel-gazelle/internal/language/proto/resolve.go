@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/internal/config"
@@ -44,7 +45,6 @@ func (_ *protoLang) Embeds(r *rule.Rule, from label.Label) []label.Label {
 }
 
 func (_ *protoLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repos.RemoteCache, r *rule.Rule, from label.Label) {
-	pc := GetProtoConfig(c)
 	importsRaw := r.PrivateAttr(config.GazelleImportsKey)
 	if importsRaw == nil {
 		// may not be set in tests.
@@ -52,19 +52,24 @@ func (_ *protoLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repos.R
 	}
 	imports := importsRaw.([]string)
 	r.DelAttr("deps")
-	deps := make([]string, 0, len(imports))
+	depSet := make(map[string]bool)
 	for _, imp := range imports {
-		l, err := resolveProto(pc, ix, r, imp, from)
+		l, err := resolveProto(c, ix, r, imp, from)
 		if err == skipImportError {
 			continue
 		} else if err != nil {
 			log.Print(err)
 		} else {
 			l = l.Rel(from.Repo, from.Pkg)
-			deps = append(deps, l.String())
+			depSet[l.String()] = true
 		}
 	}
-	if len(deps) > 0 {
+	if len(depSet) > 0 {
+		deps := make([]string, 0, len(depSet))
+		for dep := range depSet {
+			deps = append(deps, dep)
+		}
+		sort.Strings(deps)
 		r.SetAttr("deps", deps)
 	}
 }
@@ -74,9 +79,14 @@ var (
 	notFoundError   = errors.New("not found")
 )
 
-func resolveProto(pc *ProtoConfig, ix *resolve.RuleIndex, r *rule.Rule, imp string, from label.Label) (label.Label, error) {
+func resolveProto(c *config.Config, ix *resolve.RuleIndex, r *rule.Rule, imp string, from label.Label) (label.Label, error) {
+	pc := GetProtoConfig(c)
 	if !strings.HasSuffix(imp, ".proto") {
 		return label.NoLabel, fmt.Errorf("can't import non-proto: %q", imp)
+	}
+
+	if l, ok := resolve.FindRuleWithOverride(c, resolve.ImportSpec{Imp: imp, Lang: "proto"}, "proto"); ok {
+		return l, nil
 	}
 
 	if l, ok := knownImports[imp]; ok && pc.Mode.ShouldUseKnownImports() {

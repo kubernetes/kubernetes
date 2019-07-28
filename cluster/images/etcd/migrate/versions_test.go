@@ -29,12 +29,8 @@ func TestSerializeEtcdVersionPair(t *testing.T) {
 		match      bool
 	}{
 		{"3.1.2/etcd3", &EtcdVersionPair{&EtcdVersion{semver.MustParse("3.1.2")}, storageEtcd3}, true},
-		{"2.2.1/etcd2", &EtcdVersionPair{&EtcdVersion{semver.MustParse("2.2.1")}, storageEtcd2}, true},
 		{"1.1.1-rc.0/etcd3", &EtcdVersionPair{&EtcdVersion{semver.MustParse("1.1.1-rc.0")}, storageEtcd3}, true},
 		{"10.100.1000/etcd3", &EtcdVersionPair{&EtcdVersion{semver.MustParse("10.100.1000")}, storageEtcd3}, true},
-
-		{"2.2.2/etcd2", &EtcdVersionPair{&EtcdVersion{semver.MustParse("2.2.1")}, storageEtcd2}, false},
-		{"2.2.1/etcd3", &EtcdVersionPair{&EtcdVersion{semver.MustParse("2.2.1")}, storageEtcd2}, false},
 	}
 
 	for _, c := range cases {

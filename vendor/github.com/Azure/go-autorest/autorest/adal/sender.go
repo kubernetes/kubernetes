@@ -38,7 +38,7 @@ func (sf SenderFunc) Do(r *http.Request) (*http.Response, error) {
 	return sf(r)
 }
 
-// SendDecorator takes and possibily decorates, by wrapping, a Sender. Decorators may affect the
+// SendDecorator takes and possibly decorates, by wrapping, a Sender. Decorators may affect the
 // http.Request and pass it along or, first, pass the http.Request along then react to the
 // http.Response result.
 type SendDecorator func(Sender) Sender

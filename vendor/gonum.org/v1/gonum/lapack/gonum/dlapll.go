@@ -14,10 +14,29 @@ import "gonum.org/v1/gonum/blas/blas64"
 //
 // Dlapll is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlapll(n int, x []float64, incX int, y []float64, incY int) float64 {
-	checkVector(n, x, incX)
-	checkVector(n, y, incY)
+	switch {
+	case n < 0:
+		panic(nLT0)
+	case incX <= 0:
+		panic(badIncX)
+	case incY <= 0:
+		panic(badIncY)
+	}
 
-	if n <= 1 {
+	// Quick return if possible.
+	if n == 0 {
+		return 0
+	}
+
+	switch {
+	case len(x) < 1+(n-1)*incX:
+		panic(shortX)
+	case len(y) < 1+(n-1)*incY:
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if n == 1 {
 		return 0
 	}
 

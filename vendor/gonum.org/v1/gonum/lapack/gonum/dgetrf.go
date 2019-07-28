@@ -28,23 +28,38 @@ import (
 // system of equations.
 func (impl Implementation) Dgetrf(m, n int, a []float64, lda int, ipiv []int) (ok bool) {
 	mn := min(m, n)
-	checkMatrix(m, n, a, lda)
-	if len(ipiv) < mn {
-		panic(badIpiv)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if m == 0 || n == 0 {
-		return false
+
+	// Quick return if possible.
+	if mn == 0 {
+		return true
 	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(ipiv) != mn:
+		panic(badLenIpiv)
+	}
+
 	bi := blas64.Implementation()
+
 	nb := impl.Ilaenv(1, "DGETRF", " ", m, n, -1, -1)
-	if nb <= 1 || nb >= min(m, n) {
+	if nb <= 1 || mn <= nb {
 		// Use the unblocked algorithm.
 		return impl.Dgetf2(m, n, a, lda, ipiv)
 	}
 	ok = true
 	for j := 0; j < mn; j += nb {
 		jb := min(mn-j, nb)
-		blockOk := impl.Dgetf2(m-j, jb, a[j*lda+j:], lda, ipiv[j:])
+		blockOk := impl.Dgetf2(m-j, jb, a[j*lda+j:], lda, ipiv[j:j+jb])
 		if !blockOk {
 			ok = false
 		}

@@ -18,10 +18,12 @@ package filters
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -50,6 +52,18 @@ func (r *recorder) Count() int {
 	return r.count
 }
 
+func newHandler(responseCh <-chan string, panicCh <-chan struct{}, writeErrCh chan<- error) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case resp := <-responseCh:
+			_, err := w.Write([]byte(resp))
+			writeErrCh <- err
+		case <-panicCh:
+			panic("inner handler panics")
+		}
+	})
+}
+
 func TestTimeout(t *testing.T) {
 	origReallyCrash := runtime.ReallyCrash
 	runtime.ReallyCrash = false
@@ -57,31 +71,28 @@ func TestTimeout(t *testing.T) {
 		runtime.ReallyCrash = origReallyCrash
 	}()
 
-	sendResponse := make(chan struct{}, 1)
+	sendResponse := make(chan string, 1)
 	doPanic := make(chan struct{}, 1)
 	writeErrors := make(chan error, 1)
+	gotPanic := make(chan interface{}, 1)
 	timeout := make(chan time.Time, 1)
 	resp := "test response"
 	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 	record := &recorder{}
 
-	ts := httptest.NewServer(WithPanicRecovery(WithTimeout(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			select {
-			case <-sendResponse:
-				_, err := w.Write([]byte(resp))
-				writeErrors <- err
-			case <-doPanic:
-				panic("inner handler panics")
-			}
-		}),
-		func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+	handler := newHandler(sendResponse, doPanic, writeErrors)
+	ts := httptest.NewServer(withPanicRecovery(
+		WithTimeout(handler, func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
 			return req, timeout, record.Record, timeoutErr
-		})))
+		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
+			gotPanic <- err
+			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
+		}),
+	)
 	defer ts.Close()
 
 	// No timeouts
-	sendResponse <- struct{}{}
+	sendResponse <- resp
 	res, err := http.Get(ts.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +133,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Now try to send a response
-	sendResponse <- struct{}{}
+	sendResponse <- resp
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
 	}
@@ -135,5 +146,14 @@ func TestTimeout(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusInternalServerError {
 		t.Errorf("got res.StatusCode %d; expected %d due to panic", res.StatusCode, http.StatusInternalServerError)
+	}
+	select {
+	case err := <-gotPanic:
+		msg := fmt.Sprintf("%v", err)
+		if !strings.Contains(msg, "newHandler") {
+			t.Errorf("expected line with root cause panic in the stack trace, but didn't: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatalf("expected to see a handler panic, but didn't")
 	}
 }

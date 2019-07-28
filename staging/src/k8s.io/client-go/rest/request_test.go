@@ -35,15 +35,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -283,7 +282,7 @@ func defaultContentConfig() ContentConfig {
 	return ContentConfig{
 		ContentType:          "application/json",
 		GroupVersion:         &gvCopy,
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 	}
 }
 
@@ -879,9 +878,17 @@ func TestTransformUnstructuredError(t *testing.T) {
 	}
 }
 
+type errorReader struct {
+	err error
+}
+
+func (r errorReader) Read(data []byte) (int, error) { return 0, r.err }
+func (r errorReader) Close() error                  { return nil }
+
 func TestRequestWatch(t *testing.T) {
 	testCases := []struct {
 		Request *Request
+		Expect  []watch.Event
 		Err     bool
 		ErrFn   func(error) bool
 		Empty   bool
@@ -902,6 +909,40 @@ func TestRequestWatch(t *testing.T) {
 				baseURL: &url.URL{},
 			},
 			Err: true,
+		},
+		{
+			Request: &Request{
+				content:     defaultContentConfig(),
+				serializers: defaultSerializers(t),
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					resp := &http.Response{StatusCode: http.StatusOK, Body: errorReader{err: errors.New("test error")}}
+					return resp, nil
+				}),
+				baseURL: &url.URL{},
+			},
+			Expect: []watch.Event{
+				{
+					Type: watch.Error,
+					Object: &metav1.Status{
+						Status:  "Failure",
+						Code:    500,
+						Reason:  "InternalError",
+						Message: `an error on the server ("unable to decode an event from the watch stream: test error") has prevented the request from succeeding`,
+						Details: &metav1.StatusDetails{
+							Causes: []metav1.StatusCause{
+								{
+									Type:    "UnexpectedServerResponse",
+									Message: "unable to decode an event from the watch stream: test error",
+								},
+								{
+									Type:    "ClientWatchDecoding",
+									Message: "unable to decode an event from the watch stream: test error",
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Request: &Request{
@@ -999,27 +1040,37 @@ func TestRequestWatch(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		t.Logf("testcase %v", testCase.Request)
-		testCase.Request.backoffMgr = &NoBackoff{}
-		watch, err := testCase.Request.Watch()
-		hasErr := err != nil
-		if hasErr != testCase.Err {
-			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
-			continue
-		}
-		if testCase.ErrFn != nil && !testCase.ErrFn(err) {
-			t.Errorf("%d: error not valid: %v", i, err)
-		}
-		if hasErr && watch != nil {
-			t.Errorf("%d: watch should be nil when error is returned", i)
-			continue
-		}
-		if testCase.Empty {
-			_, ok := <-watch.ResultChan()
-			if ok {
-				t.Errorf("%d: expected the watch to be empty: %#v", i, watch)
+		t.Run("", func(t *testing.T) {
+			testCase.Request.backoffMgr = &NoBackoff{}
+			watch, err := testCase.Request.Watch()
+			hasErr := err != nil
+			if hasErr != testCase.Err {
+				t.Fatalf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
 			}
-		}
+			if testCase.ErrFn != nil && !testCase.ErrFn(err) {
+				t.Errorf("%d: error not valid: %v", i, err)
+			}
+			if hasErr && watch != nil {
+				t.Fatalf("%d: watch should be nil when error is returned", i)
+			}
+			if testCase.Empty {
+				_, ok := <-watch.ResultChan()
+				if ok {
+					t.Errorf("%d: expected the watch to be empty: %#v", i, watch)
+				}
+			}
+			if testCase.Expect != nil {
+				for i, evt := range testCase.Expect {
+					out, ok := <-watch.ResultChan()
+					if !ok {
+						t.Fatalf("Watch closed early, %d/%d read", i, len(testCase.Expect))
+					}
+					if !reflect.DeepEqual(evt, out) {
+						t.Fatalf("Event %d does not match: %s", i, diff.ObjectReflectDiff(evt, out))
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -1218,10 +1269,9 @@ func TestBackoffLifecycle(t *testing.T) {
 		if count == 5 || count == 9 {
 			w.WriteHeader(http.StatusOK)
 			return
-		} else {
-			w.WriteHeader(http.StatusGatewayTimeout)
-			return
 		}
+		w.WriteHeader(http.StatusGatewayTimeout)
+		return
 	}))
 	defer testServer.Close()
 	c := testRESTClient(t, testServer)
@@ -1390,15 +1440,20 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 	defer testServer.Close()
 
 	c := testRESTClient(b, testServer)
-	r := c.Verb("POST").
-		Prefix("foo", "bar").
-		Suffix("baz").
-		Timeout(time.Second).
-		Body([]byte(strings.Repeat("abcd", 1000)))
 
+	requests := make([]*Request, 0, b.N)
 	for i := 0; i < b.N; i++ {
-		if _, err := r.DoRaw(); err != nil {
-			b.Fatalf("Unexpected error: %v %#v", err, err)
+		requests = append(requests, c.Verb("POST").
+			Prefix("foo", "bar").
+			Suffix("baz").
+			Timeout(time.Second).
+			Body([]byte(strings.Repeat("abcd", 1000))))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := requests[i].DoRaw(); err != nil {
+			b.Fatalf("Unexpected error (%d/%d): %v", i, b.N, err)
 		}
 	}
 }
@@ -1855,6 +1910,10 @@ func buildString(length int) string {
 	return string(s)
 }
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 func TestTruncateBody(t *testing.T) {
 	tests := []struct {
 		body  string
@@ -1904,7 +1963,7 @@ func TestTruncateBody(t *testing.T) {
 		},
 	}
 
-	l := flag.Lookup("v").Value.(flag.Getter).Get().(glog.Level)
+	l := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
 	for _, test := range tests {
 		flag.Set("v", test.level)
 		got := truncateBody(test.body)

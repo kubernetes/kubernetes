@@ -27,7 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/utils/exec"
 )
@@ -121,7 +121,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	}
 	defer os.Remove(mntdir)
 
-	glog.V(4).Infof("Attempting to mount configdrive %s on %s", dev, mntdir)
+	klog.V(4).Infof("Attempting to mount configdrive %s on %s", dev, mntdir)
 
 	mounter := mount.New("" /* default mount path */)
 	err = mounter.Mount(dev, mntdir, "iso9660", []string{"ro"})
@@ -133,7 +133,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	}
 	defer mounter.Unmount(mntdir)
 
-	glog.V(4).Infof("Configdrive mounted on %s", mntdir)
+	klog.V(4).Infof("Configdrive mounted on %s", mntdir)
 
 	configDrivePath := getConfigDrivePath(metadataVersion)
 	f, err := os.Open(
@@ -149,7 +149,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 func getMetadataFromMetadataService(metadataVersion string) (*Metadata, error) {
 	// Try to get JSON from metadata server.
 	metadataURL := getMetadataURL(metadataVersion)
-	glog.V(4).Infof("Attempting to fetch metadata from %s", metadataURL)
+	klog.V(4).Infof("Attempting to fetch metadata from %s", metadataURL)
 	resp, err := http.Get(metadataURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching %s: %v", metadataURL, err)

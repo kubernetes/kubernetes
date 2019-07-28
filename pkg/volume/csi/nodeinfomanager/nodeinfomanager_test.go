@@ -18,397 +18,648 @@ package nodeinfomanager
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
+	"reflect"
 	"testing"
 
-	"github.com/container-storage-interface/spec/lib/go/csi/v0"
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
-	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type testcase struct {
-	name                string
-	driverName          string
-	existingNode        *v1.Node
-	existingNodeInfo    *csiv1alpha1.CSINodeInfo
-	inputNodeID         string
-	inputTopology       *csi.Topology
-	inputVolumeLimit    int64
-	expectedNodeIDMap   map[string]string
-	expectedTopologyMap map[string]sets.String
-	expectedLabels      map[string]string
-	expectNoNodeInfo    bool
-	expectedVolumeLimit int64
-	expectFail          bool
+	name             string
+	driverName       string
+	existingNode     *v1.Node
+	existingCSINode  *storage.CSINode
+	inputNodeID      string
+	inputTopology    map[string]string
+	inputVolumeLimit int64
+	expectedNode     *v1.Node
+	expectedCSINode  *storage.CSINode
+	expectFail       bool
+	hasModified      bool
 }
 
 type nodeIDMap map[string]string
 type topologyKeyMap map[string][]string
 type labelMap map[string]string
 
-// TestAddNodeInfo tests AddNodeInfo with various existing Node and/or CSINodeInfo objects.
-// The node IDs in all test cases below are the same between the Node annotation and CSINodeInfo.
-func TestAddNodeInfo(t *testing.T) {
+// TestInstallCSIDriver tests InstallCSIDriver with various existing Node and/or CSINode objects.
+// The node IDs in all test cases below are the same between the Node annotation and CSINode.
+func TestInstallCSIDriver(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:         "empty node",
-			driverName:   "com.example.csi/driver1",
+			driverName:   "com.example.csi.driver1",
 			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
 			inputNodeID:  "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+					Labels:      labelMap{"com.example.csi/zone": "zoneA"},
 				},
 			},
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+						},
+					},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": sets.NewString("com.example.csi/zone"),
-			},
-			expectedLabels: map[string]string{"com.example.csi/zone": "zoneA"},
 		},
 		{
 			name:       "pre-existing node info from the same driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				labelMap{
 					"com.example.csi/zone": "zoneA",
 				},
 				nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"com.example.csi/driver1": {"com.example.csi/zone"},
+					"com.example.csi.driver1": {"com.example.csi/zone"},
 				},
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+					Labels:      labelMap{"com.example.csi/zone": "zoneA"},
 				},
 			},
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
-			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": sets.NewString("com.example.csi/zone"),
-			},
-			expectedLabels: map[string]string{
-				"com.example.csi/zone": "zoneA",
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
 		},
 		{
 			name:       "pre-existing node info from the same driver, but without topology info",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
+				nil, /* volumeLimits */
 				nil, /* topologyKeys */
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+					Labels:      labelMap{"com.example.csi/zone": "zoneA"},
 				},
 			},
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
-			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": sets.NewString("com.example.csi/zone"),
-			},
-			expectedLabels: map[string]string{
-				"com.example.csi/zone": "zoneA",
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
 		},
 		{
 			name:       "pre-existing node info from different driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/test-node",
+					"net.example.storage.other-driver": "net.example.storage/test-node",
 				},
 				labelMap{
 					"net.example.storage/rack": "rack1",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/test-node",
+					"net.example.storage.other-driver": "net.example.storage/test-node",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"net.example.storage/other-driver": {"net.example.storage/rack"},
+					"net.example.storage.other-driver": {"net.example.storage/rack"},
 				},
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{
+						"com.example.csi.driver1":          "com.example.csi/csi-node1",
+						"net.example.storage.other-driver": "net.example.storage/test-node",
+					})},
+					Labels: labelMap{
+						"com.example.csi/zone":     "zoneA",
+						"net.example.storage/rack": "rack1",
+					},
 				},
 			},
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1":          "com.example.csi/csi-node1",
-				"net.example.storage/other-driver": "net.example.storage/test-node",
-			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1":          sets.NewString("com.example.csi/zone"),
-				"net.example.storage/other-driver": sets.NewString("net.example.storage/rack"),
-			},
-			expectedLabels: map[string]string{
-				"com.example.csi/zone":     "zoneA",
-				"net.example.storage/rack": "rack1",
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "net.example.storage.other-driver",
+							NodeID:       "net.example.storage/test-node",
+							TopologyKeys: []string{"net.example.storage/rack"},
+							Allocatable:  nil,
+						},
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
 		},
 		{
 			name:       "pre-existing node info from the same driver, but different node ID and topology values; labels should conflict",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				labelMap{
 					"com.example.csi/zone": "zoneA",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"com.example.csi/driver1": {"com.example.csi/zone"},
+					"com.example.csi.driver1": {"com.example.csi/zone"},
 				},
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "other-zone",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "other-zone",
 			},
 			expectFail: true,
 		},
 		{
 			name:       "pre-existing node info from the same driver, but different node ID and topology keys; new labels should be added",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				labelMap{
 					"com.example.csi/zone": "zoneA",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"com.example.csi/driver1": {"com.example.csi/zone"},
+					"com.example.csi.driver1": {"com.example.csi/zone"},
 				},
 			),
 			inputNodeID: "com.example.csi/other-node",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/rack": "rack1",
+			inputTopology: map[string]string{
+				"com.example.csi/rack": "rack1",
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/other-node"})},
+					Labels: labelMap{
+						"com.example.csi/zone": "zoneA",
+						"com.example.csi/rack": "rack1",
+					},
 				},
 			},
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/other-node",
-			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": sets.NewString("com.example.csi/rack"),
-			},
-			expectedLabels: map[string]string{
-				"com.example.csi/zone": "zoneA",
-				"com.example.csi/rack": "rack1",
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/other-node",
+							TopologyKeys: []string{"com.example.csi/rack"},
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
 		},
 		{
 			name:          "nil topology, empty node",
-			driverName:    "com.example.csi/driver1",
+			driverName:    "com.example.csi.driver1",
 			existingNode:  generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
 			inputNodeID:   "com.example.csi/csi-node1",
 			inputTopology: nil,
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": nil,
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
-			expectedLabels: nil,
 		},
 		{
 			name:       "nil topology, pre-existing node info from the same driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				labelMap{
 					"com.example.csi/zone": "zoneA",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"com.example.csi/driver1": {"com.example.csi/zone"},
+					"com.example.csi.driver1": {"com.example.csi/zone"},
 				},
 			),
 			inputNodeID:   "com.example.csi/csi-node1",
 			inputTopology: nil,
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+					Labels: labelMap{
+						"com.example.csi/zone": "zoneA",
+					},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": nil,
-			},
-			expectedLabels: map[string]string{
-				"com.example.csi/zone": "zoneA", // old labels are not removed
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
 		},
 		{
 			name:       "nil topology, pre-existing node info from different driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/test-node",
+					"net.example.storage.other-driver": "net.example.storage/test-node",
 				},
 				labelMap{
 					"net.example.storage/rack": "rack1",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/test-node",
+					"net.example.storage.other-driver": "net.example.storage/test-node",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"net.example.storage/other-driver": {"net.example.storage/rack"},
+					"net.example.storage.other-driver": {"net.example.storage/rack"},
 				},
 			),
 			inputNodeID:   "com.example.csi/csi-node1",
 			inputTopology: nil,
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1":          "com.example.csi/csi-node1",
-				"net.example.storage/other-driver": "net.example.storage/test-node",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{
+						"com.example.csi.driver1":          "com.example.csi/csi-node1",
+						"net.example.storage.other-driver": "net.example.storage/test-node",
+					})},
+					Labels: labelMap{
+						"net.example.storage/rack": "rack1",
+					},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"net.example.storage/other-driver": sets.NewString("net.example.storage/rack"),
-				"com.example.csi/driver1":          nil,
-			},
-			expectedLabels: map[string]string{
-				"net.example.storage/rack": "rack1",
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "net.example.storage.other-driver",
+							NodeID:       "net.example.storage/test-node",
+							TopologyKeys: []string{"net.example.storage/rack"},
+							Allocatable:  nil,
+						},
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable:  nil,
+						},
+					},
+				},
 			},
 		},
 		{
 			name:         "empty node ID",
-			driverName:   "com.example.csi/driver1",
+			driverName:   "com.example.csi.driver1",
 			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
 			inputNodeID:  "",
 			expectFail:   true,
 		},
 		{
-			name:                "new node with valid max limit",
-			driverName:          "com.example.csi/driver1",
-			existingNode:        generateNode(nil /*nodeIDs*/, nil /*labels*/, nil /*capacity*/),
-			inputVolumeLimit:    10,
-			inputTopology:       nil,
-			inputNodeID:         "com.example.csi/csi-node1",
-			expectedVolumeLimit: 10,
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			name:             "new node with valid max limit of volumes",
+			driverName:       "com.example.csi.driver1",
+			existingNode:     generateNode(nil /*nodeIDs*/, nil /*labels*/, nil /*capacity*/),
+			inputVolumeLimit: 10,
+			inputTopology:    nil,
+			inputNodeID:      "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": nil,
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable: &storage.VolumeNodeResources{
+								Count: utilpointer.Int32Ptr(10),
+							},
+						},
+					},
+				},
 			},
-			expectedLabels: nil,
 		},
 		{
-			name:       "node with existing valid max limit",
-			driverName: "com.example.csi/driver1",
+			name:             "new node with max limit of volumes",
+			driverName:       "com.example.csi.driver1",
+			existingNode:     generateNode(nil /*nodeIDs*/, nil /*labels*/, nil /*capacity*/),
+			inputVolumeLimit: math.MaxInt32,
+			inputTopology:    nil,
+			inputNodeID:      "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable: &storage.VolumeNodeResources{
+								Count: utilpointer.Int32Ptr(math.MaxInt32),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:             "new node with overflown max limit of volumes",
+			driverName:       "com.example.csi.driver1",
+			existingNode:     generateNode(nil /*nodeIDs*/, nil /*labels*/, nil /*capacity*/),
+			inputVolumeLimit: math.MaxInt32 + 1,
+			inputTopology:    nil,
+			inputNodeID:      "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable: &storage.VolumeNodeResources{
+								Count: utilpointer.Int32Ptr(math.MaxInt32),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:             "new node without max limit of volumes",
+			driverName:       "com.example.csi.driver1",
+			existingNode:     generateNode(nil /*nodeIDs*/, nil /*labels*/, nil /*capacity*/),
+			inputVolumeLimit: 0,
+			inputTopology:    nil,
+			inputNodeID:      "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "node with existing valid max limit of volumes",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nil, /*nodeIDs*/
 				nil, /*labels*/
 				map[v1.ResourceName]resource.Quantity{
 					v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
-					v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
 				}),
-			inputVolumeLimit:    20,
-			inputTopology:       nil,
-			inputNodeID:         "com.example.csi/csi-node1",
-			expectedVolumeLimit: 20,
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+
+			existingCSINode: generateCSINode(
+				nodeIDMap{
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
+				},
+				generateVolumeLimits(10),
+				nil, /* topologyKeys */
+			),
+
+			inputVolumeLimit: 20,
+			inputTopology:    nil,
+			inputNodeID:      "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
+					},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"com.example.csi/driver1": nil,
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/csi-node1",
+							TopologyKeys: nil,
+							Allocatable:  generateVolumeLimits(10),
+						},
+					},
+				},
 			},
-			expectedLabels: nil,
 		},
 	}
 
 	test(t, true /* addNodeInfo */, true /* csiNodeInfoEnabled */, testcases)
 }
 
-// TestAddNodeInfo_CSINodeInfoDisabled tests AddNodeInfo with various existing Node annotations
+func generateVolumeLimits(i int32) *storage.VolumeNodeResources {
+	return &storage.VolumeNodeResources{
+		Count: utilpointer.Int32Ptr(i),
+	}
+}
+
+// TestInstallCSIDriver_CSINodeInfoDisabled tests InstallCSIDriver with various existing Node annotations
 // and CSINodeInfo feature gate disabled.
-func TestAddNodeInfo_CSINodeInfoDisabled(t *testing.T) {
+func TestInstallCSIDriverCSINodeInfoDisabled(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:         "empty node",
-			driverName:   "com.example.csi/driver1",
+			driverName:   "com.example.csi.driver1",
 			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
 			inputNodeID:  "com.example.csi/csi-node1",
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
 			},
 		},
 		{
 			name:       "pre-existing node info from the same driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
 			inputNodeID: "com.example.csi/csi-node1",
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
+				},
 			},
 		},
 		{
 			name:       "pre-existing node info from different driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/test-node",
+					"net.example.storage.other-driver": "net.example.storage/test-node",
 				},
 				nil /* labels */, nil /*capacity*/),
 			inputNodeID: "com.example.csi/csi-node1",
-			expectedNodeIDMap: map[string]string{
-				"com.example.csi/driver1":          "com.example.csi/csi-node1",
-				"net.example.storage/other-driver": "net.example.storage/test-node",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{
+						"com.example.csi.driver1":          "com.example.csi/csi-node1",
+						"net.example.storage.other-driver": "net.example.storage/test-node",
+					})},
+				},
 			},
 		},
 	}
@@ -416,93 +667,133 @@ func TestAddNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 	test(t, true /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
 }
 
-// TestRemoveNodeInfo tests RemoveNodeInfo with various existing Node and/or CSINodeInfo objects.
-func TestRemoveNodeInfo(t *testing.T) {
+// TestUninstallCSIDriver tests UninstallCSIDriver with various existing Node and/or CSINode objects.
+func TestUninstallCSIDriver(t *testing.T) {
 	testcases := []testcase{
 		{
-			name:              "empty node and no CSINodeInfo",
-			driverName:        "com.example.csi/driver1",
-			existingNode:      generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
-			expectedNodeIDMap: nil,
-			expectedLabels:    nil,
-			expectNoNodeInfo:  true,
+			name:         "empty node and empty CSINode",
+			driverName:   "com.example.csi.driver1",
+			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{},
+			},
 		},
 		{
 			name:       "pre-existing node info from the same driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				labelMap{
 					"com.example.csi/zone": "zoneA",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"com.example.csi/driver1": {"com.example.csi/zone"},
+					"com.example.csi.driver1": {"com.example.csi/zone"},
 				},
 			),
-			expectedNodeIDMap: nil,
-			expectedLabels:    map[string]string{"com.example.csi/zone": "zoneA"},
-			expectNoNodeInfo:  true,
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node1",
+					Labels: labelMap{"com.example.csi/zone": "zoneA"},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{},
+			},
+			hasModified: true,
 		},
 		{
 			name:       "pre-existing node info from different driver",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/csi-node1",
+					"net.example.storage.other-driver": "net.example.storage/csi-node1",
 				},
 				labelMap{
 					"net.example.storage/zone": "zoneA",
 				}, nil /*capacity*/),
-			existingNodeInfo: generateNodeInfo(
+			existingCSINode: generateCSINode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/csi-node1",
+					"net.example.storage.other-driver": "net.example.storage/csi-node1",
 				},
+				nil, /* volumeLimits */
 				topologyKeyMap{
-					"net.example.storage/other-driver": {"net.example.storage/zone"},
+					"net.example.storage.other-driver": {"net.example.storage/zone"},
 				},
 			),
-			expectedNodeIDMap: map[string]string{
-				"net.example.storage/other-driver": "net.example.storage/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"net.example.storage.other-driver": "net.example.storage/csi-node1"})},
+					Labels:      labelMap{"net.example.storage/zone": "zoneA"},
+				},
 			},
-			expectedTopologyMap: map[string]sets.String{
-				"net.example.storage/other-driver": sets.NewString("net.example.storage/zone"),
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "net.example.storage.other-driver",
+							NodeID:       "net.example.storage/csi-node1",
+							TopologyKeys: []string{"net.example.storage/zone"},
+						},
+					},
+				},
 			},
-			expectedLabels: map[string]string{"net.example.storage/zone": "zoneA"},
+			hasModified: false,
 		},
 		{
-			name:       "pre-existing info about the same driver in node, but no CSINodeInfo",
-			driverName: "com.example.csi/driver1",
+			name:       "pre-existing info about the same driver in node, but empty CSINode",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
+					"com.example.csi.driver1": "com.example.csi/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
-			expectedNodeIDMap: nil,
-			expectedLabels:    nil,
-			expectNoNodeInfo:  true,
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{},
+			},
 		},
 		{
-			name: "pre-existing info about a different driver in node, but no CSINodeInfo",
+			name: "pre-existing info about a different driver in node, but empty CSINode",
 			existingNode: generateNode(
 				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/csi-node1",
+					"net.example.storage.other-driver": "net.example.storage/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
-			expectedNodeIDMap: map[string]string{
-				"net.example.storage/other-driver": "net.example.storage/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"net.example.storage.other-driver": "net.example.storage/csi-node1"})},
+				},
 			},
-			expectedLabels:   nil,
-			expectNoNodeInfo: true,
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{},
+			},
 		},
 		{
 			name:       "new node with valid max limit",
-			driverName: "com.example.csi/driver1",
+			driverName: "com.example.csi.driver1",
 			existingNode: generateNode(
 				nil, /*nodeIDs*/
 				nil, /*labels*/
@@ -511,25 +802,46 @@ func TestRemoveNodeInfo(t *testing.T) {
 					v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
 				},
 			),
-			inputTopology:       nil,
-			inputNodeID:         "com.example.csi/csi-node1",
-			expectNoNodeInfo:    true,
-			expectedVolumeLimit: 0,
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
+						v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewScaledQuantity(4, -3),
+						v1.ResourceName(util.GetCSIAttachLimitKey("com.example.csi/driver1")): *resource.NewQuantity(10, resource.DecimalSI),
+					},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{},
+			},
+			inputTopology: nil,
+			inputNodeID:   "com.example.csi/csi-node1",
 		},
 	}
 
 	test(t, false /* addNodeInfo */, true /* csiNodeInfoEnabled */, testcases)
 }
 
-// TestRemoveNodeInfo tests RemoveNodeInfo with various existing Node objects and CSINodeInfo
+// TestUninstallCSIDriver tests UninstallCSIDriver with various existing Node objects and CSINode
 // feature disabled.
-func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
+func TestUninstallCSIDriverCSINodeInfoDisabled(t *testing.T) {
 	testcases := []testcase{
 		{
-			name:              "empty node",
-			driverName:        "com.example.csi/driver1",
-			existingNode:      generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
-			expectedNodeIDMap: nil,
+			name:         "empty node",
+			driverName:   "com.example.csi/driver1",
+			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
 		},
 		{
 			name:       "pre-existing node info from the same driver",
@@ -539,7 +851,11 @@ func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 					"com.example.csi/driver1": "com.example.csi/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
-			expectedNodeIDMap: nil,
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
 		},
 		{
 			name:       "pre-existing node info from different driver",
@@ -549,8 +865,11 @@ func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 					"net.example.storage/other-driver": "net.example.storage/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
-			expectedNodeIDMap: map[string]string{
-				"net.example.storage/other-driver": "net.example.storage/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"net.example.storage/other-driver": "net.example.storage/csi-node1"})},
+				},
 			},
 		},
 	}
@@ -558,8 +877,158 @@ func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 	test(t, false /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
 }
 
-func TestAddNodeInfoExistingAnnotation(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
+func TestSetMigrationAnnotation(t *testing.T) {
+	testcases := []struct {
+		name            string
+		migratedPlugins map[string](func() bool)
+		existingNode    *storage.CSINode
+		expectedNode    *storage.CSINode
+		expectModified  bool
+	}{
+		{
+			name: "nil migrated plugins",
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+		},
+		{
+			name: "one modified plugin",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "existing plugin",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectModified: false,
+		},
+		{
+			name:            "remove plugin",
+			migratedPlugins: map[string](func() bool){},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "one modified plugin, other annotations stable",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{"other": "annotation"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "multiple plugins modified, other annotations stable",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+				"foo":  func() bool { return false },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{"other": "annotation", v1.MigratedPluginsAnnotationKey: "foo"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "multiple plugins added, other annotations stable",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+				"foo":  func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{"other": "annotation"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "foo,test", "other": "annotation"},
+				},
+			},
+			expectModified: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Logf("test case: %s", tc.name)
+
+		modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
+		if modified != tc.expectModified {
+			t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
+		}
+
+		if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
+			t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
+		}
+	}
+}
+
+func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
 
 	driverName := "com.example.csi/driver1"
 	nodeID := "com.example.csi/some-node"
@@ -569,7 +1038,7 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 		existingNode *v1.Node
 	}{
 		{
-			name: "pre-existing info about the same driver in node, but no CSINodeInfo",
+			name: "pre-existing info about the same driver in node, but empty CSINode",
 			existingNode: generateNode(
 				nodeIDMap{
 					"com.example.csi/driver1": "com.example.csi/csi-node1",
@@ -577,7 +1046,7 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 				nil /* labels */, nil /*capacity*/),
 		},
 		{
-			name: "pre-existing info about a different driver in node, but no CSINodeInfo",
+			name: "pre-existing info about a different driver in node, but empty CSINode",
 			existingNode: generateNode(
 				nodeIDMap{
 					"net.example.storage/other-driver": "net.example.storage/test-node",
@@ -592,7 +1061,6 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 		// Arrange
 		nodeName := tc.existingNode.Name
 		client := fake.NewSimpleClientset(tc.existingNode)
-		csiClient := csifake.NewSimpleClientset()
 
 		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
 		if err != nil {
@@ -601,55 +1069,60 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(
 			tmpDir,
 			client,
-			csiClient,
 			nil,
 			nodeName,
+			nil,
 		)
 
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
-		err = nim.AddNodeInfo(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		_, err = nim.CreateCSINode()
 		if err != nil {
-			t.Errorf("expected no error from AddNodeInfo call but got: %v", err)
+			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
+			continue
+		}
+		err = nim.InstallCSIDriver(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		if err != nil {
+			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
 			continue
 		}
 
 		// Assert
-		nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
+		nodeInfo, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
-			t.Errorf("error getting CSINodeInfo: %v", err)
+			t.Errorf("error getting CSINode: %v", err)
 			continue
 		}
 
-		if len(nodeInfo.CSIDrivers) != 1 {
-			t.Errorf("expected 1 CSIDriverInfo entry but got: %d", len(nodeInfo.CSIDrivers))
-			continue
-		}
-
-		driver := nodeInfo.CSIDrivers[0]
-		if driver.Driver != driverName || driver.NodeID != nodeID {
-			t.Errorf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Driver, driver.NodeID)
+		driver := nodeInfo.Spec.Drivers[0]
+		if driver.Name != driverName || driver.NodeID != nodeID {
+			t.Errorf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Name, driver.NodeID)
 		}
 	}
 }
 
+func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake.Clientset {
+	objects := []runtime.Object{}
+	if existingNode != nil {
+		objects = append(objects, existingNode)
+	}
+	if existingCSINode != nil {
+		objects = append(objects, existingCSINode)
+	}
+	return fake.NewSimpleClientset(objects...)
+}
+
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
 
 		//// Arrange
 		nodeName := tc.existingNode.Name
-		client := fake.NewSimpleClientset(tc.existingNode)
-		var csiClient *csifake.Clientset
-		if tc.existingNodeInfo == nil {
-			csiClient = csifake.NewSimpleClientset()
-		} else {
-			csiClient = csifake.NewSimpleClientset(tc.existingNodeInfo)
-		}
+		client := getClientSet(tc.existingNode, tc.existingCSINode)
 
 		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
 		if err != nil {
@@ -658,113 +1131,74 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(
 			tmpDir,
 			client,
-			csiClient,
 			nil,
 			nodeName,
+			nil,
 		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		//// Act
+		nim.CreateCSINode()
 		if addNodeInfo {
-			err = nim.AddNodeInfo(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
+			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
 		} else {
-			err = nim.RemoveNodeInfo(tc.driverName)
+			err = nim.UninstallCSIDriver(tc.driverName)
 		}
 
 		//// Assert
 		if tc.expectFail {
 			if err == nil {
-				t.Errorf("expected an error from AddNodeInfo call but got none")
+				t.Errorf("expected an error from InstallCSIDriver call but got none")
 			}
 			continue
 		} else if err != nil {
-			t.Errorf("expected no error from AddNodeInfo call but got: %v", err)
+			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
 			continue
 		}
 
-		/* Node Validation */
-		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
+		actions := client.Actions()
+
+		var node *v1.Node
+		if action := hasPatchAction(actions); action != nil {
+			node, err = applyNodeStatusPatch(tc.existingNode, action.(clienttesting.PatchActionImpl).GetPatch())
+			assert.NoError(t, err)
+		} else {
+			node, err = client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			assert.NoError(t, err)
+		}
+
+		if node == nil {
 			t.Errorf("error getting node: %v", err)
 			continue
 		}
 
-		// We are testing max volume limits
-		attachLimit := getVolumeLimit(node, tc.driverName)
-		if attachLimit != tc.expectedVolumeLimit {
-			t.Errorf("expected volume limit to be %d got %d", tc.expectedVolumeLimit, attachLimit)
-			continue
-		}
-
-		// Node ID annotation
-		annNodeID, ok := node.Annotations[annotationKeyNodeID]
-		if ok {
-			if tc.expectedNodeIDMap == nil {
-				t.Errorf("expected annotation %q to not exist, but got: %q", annotationKeyNodeID, annNodeID)
-			} else {
-				var actualNodeIDs map[string]string
-				err = json.Unmarshal([]byte(annNodeID), &actualNodeIDs)
-				if err != nil {
-					t.Errorf("expected no error when parsing annotation %q, but got error: %v", annotationKeyNodeID, err)
-				}
-
-				if !helper.Semantic.DeepEqual(actualNodeIDs, tc.expectedNodeIDMap) {
-					t.Errorf("expected annotation %v; got: %v", tc.expectedNodeIDMap, actualNodeIDs)
-				}
-			}
-		} else {
-			if tc.expectedNodeIDMap != nil {
-				t.Errorf("expected annotation %q, but got none", annotationKeyNodeID)
-			}
+		if !helper.Semantic.DeepEqual(node, tc.expectedNode) {
+			t.Errorf("expected Node %v; got: %v", tc.expectedNode, node)
 		}
 
 		if csiNodeInfoEnabled {
-			// Topology labels
-			if !helper.Semantic.DeepEqual(node.Labels, tc.expectedLabels) {
-				t.Errorf("expected topology labels to be %v; got: %v", tc.expectedLabels, node.Labels)
-			}
-
-			/* CSINodeInfo validation */
-			nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
-			if tc.expectNoNodeInfo && errors.IsNotFound(err) {
-				continue
-			} else if err != nil {
-				t.Errorf("error getting CSINodeInfo: %v", err)
+			// CSINode validation
+			nodeInfo, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					t.Errorf("error getting CSINode: %v", err)
+				}
 				continue
 			}
-
-			// Extract node IDs and topology keys
-			actualNodeIDs := make(map[string]string)
-			actualTopologyKeys := make(map[string]sets.String)
-			for _, driver := range nodeInfo.CSIDrivers {
-				actualNodeIDs[driver.Driver] = driver.NodeID
-				actualTopologyKeys[driver.Driver] = sets.NewString(driver.TopologyKeys...)
+			if !helper.Semantic.DeepEqual(nodeInfo, tc.expectedCSINode) {
+				t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfo)
 			}
 
-			// Node IDs
-			if !helper.Semantic.DeepEqual(actualNodeIDs, tc.expectedNodeIDMap) {
-				t.Errorf("expected node IDs %v from CSINodeInfo; got: %v", tc.expectedNodeIDMap, actualNodeIDs)
-			}
-
-			// Topology keys
-			if !helper.Semantic.DeepEqual(actualTopologyKeys, tc.expectedTopologyMap) {
-				t.Errorf("expected topology keys %v from CSINodeInfo; got: %v", tc.expectedTopologyMap, actualTopologyKeys)
+			if !addNodeInfo && tc.existingCSINode != nil && tc.existingNode != nil {
+				if tc.hasModified && helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
+					t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+				}
+				if !tc.hasModified && !helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
+					t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+				}
 			}
 		}
 	}
-}
-
-func getVolumeLimit(node *v1.Node, driverName string) int64 {
-	volumeLimits := map[v1.ResourceName]int64{}
-	nodeAllocatables := node.Status.Allocatable
-	for k, v := range nodeAllocatables {
-		if v1helper.IsAttachableVolumeResourceName(k) {
-			volumeLimits[k] = v.Value()
-		}
-	}
-	attachKey := v1.ResourceName(util.GetCSIAttachLimitKey(driverName))
-	attachLimit := volumeLimits[attachKey]
-	return attachLimit
 }
 
 func generateNode(nodeIDs, labels map[string]string, capacity map[v1.ResourceName]resource.Quantity) *v1.Node {
@@ -788,22 +1222,68 @@ func generateNode(nodeIDs, labels map[string]string, capacity map[v1.ResourceNam
 	return node
 }
 
-func generateNodeInfo(nodeIDs map[string]string, topologyKeys map[string][]string) *csiv1alpha1.CSINodeInfo {
-	var drivers []csiv1alpha1.CSIDriverInfo
+func marshall(nodeIDs nodeIDMap) string {
+	b, _ := json.Marshal(nodeIDs)
+	return string(b)
+}
+
+func generateCSINode(nodeIDs nodeIDMap, volumeLimits *storage.VolumeNodeResources, topologyKeys topologyKeyMap) *storage.CSINode {
+	nodeDrivers := []storage.CSINodeDriver{}
 	for k, nodeID := range nodeIDs {
-		d := csiv1alpha1.CSIDriverInfo{
-			Driver: k,
-			NodeID: nodeID,
+		dspec := storage.CSINodeDriver{
+			Name:        k,
+			NodeID:      nodeID,
+			Allocatable: volumeLimits,
 		}
 		if top, exists := topologyKeys[k]; exists {
-			d.TopologyKeys = top
+			dspec.TopologyKeys = top
 		}
-		drivers = append(drivers, d)
+		nodeDrivers = append(nodeDrivers, dspec)
 	}
-	return &csiv1alpha1.CSINodeInfo{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node1",
+
+	return &storage.CSINode{
+		ObjectMeta: getCSINodeObjectMeta(),
+		Spec: storage.CSINodeSpec{
+			Drivers: nodeDrivers,
 		},
-		CSIDrivers: drivers,
 	}
+}
+
+func getCSINodeObjectMeta() metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name: "node1",
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: nodeKind.Version,
+				Kind:       nodeKind.Kind,
+				Name:       "node1",
+			},
+		},
+	}
+}
+
+func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error) {
+	original, err := json.Marshal(originalNode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal original node %#v: %v", originalNode, err)
+	}
+	updated, err := strategicpatch.StrategicMergePatch(original, patch, v1.Node{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply strategic merge patch %q on node %#v: %v",
+			patch, originalNode, err)
+	}
+	updatedNode := &v1.Node{}
+	if err := json.Unmarshal(updated, updatedNode); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal updated node %q: %v", updated, err)
+	}
+	return updatedNode, nil
+}
+
+func hasPatchAction(actions []clienttesting.Action) clienttesting.Action {
+	for _, action := range actions {
+		if action.GetVerb() == "patch" {
+			return action
+		}
+	}
+	return nil
 }

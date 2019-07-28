@@ -116,14 +116,22 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
-				Status: api.PodStatus{PodIP: "1.2.3.4"},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "1.2.3.4"},
+					},
+				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=1.2.3.4"),
 			expectMatch:   true,
 		},
 		{
 			in: &api.Pod{
-				Status: api.PodStatus{PodIP: "1.2.3.4"},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "1.2.3.4"},
+					},
+				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
 			expectMatch:   false,
@@ -141,7 +149,30 @@ func TestMatchPod(t *testing.T) {
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node2"),
 			expectMatch:   false,
-		}}
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "2001:db8::"},
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db8::"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "2001:db8::"},
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db7::"),
+			expectMatch:   false,
+		},
+	}
 	for _, testCase := range testCases {
 		m := MatchPod(labels.Everything(), testCase.fieldSelector)
 		result, err := m.Matches(testCase.in)
@@ -454,5 +485,82 @@ func TestPortForwardLocation(t *testing.T) {
 		if !reflect.DeepEqual(loc, tc.expectedURL) {
 			t.Errorf("expected %v, got %v", tc.expectedURL, loc)
 		}
+	}
+}
+
+func TestGetPodIP(t *testing.T) {
+	testCases := []struct {
+		name       string
+		pod        *api.Pod
+		expectedIP string
+	}{
+		{
+			name:       "nil pod",
+			pod:        nil,
+			expectedIP: "",
+		},
+		{
+			name: "no status object",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec:       api.PodSpec{},
+			},
+			expectedIP: "",
+		},
+		{
+			name: "no pod ips",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec:       api.PodSpec{},
+				Status:     api.PodStatus{},
+			},
+			expectedIP: "",
+		},
+		{
+			name: "empty list",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec:       api.PodSpec{},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{},
+				},
+			},
+			expectedIP: "",
+		},
+		{
+			name: "1 ip",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec:       api.PodSpec{},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "10.0.0.10"},
+					},
+				},
+			},
+			expectedIP: "10.0.0.10",
+		},
+		{
+			name: "multiple ips",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec:       api.PodSpec{},
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "10.0.0.10"},
+						{IP: "10.0.0.20"},
+					},
+				},
+			},
+			expectedIP: "10.0.0.10",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podIP := getPodIP(tc.pod)
+			if podIP != tc.expectedIP {
+				t.Errorf("expected pod ip:%v does not match actual %v", tc.expectedIP, podIP)
+			}
+		})
 	}
 }

@@ -7,7 +7,7 @@
 //go:generate go test -tags test
 
 // Package norm contains types and functions for normalizing Unicode strings.
-package norm
+package norm // import "golang.org/x/text/unicode/norm"
 
 import (
 	"unicode/utf8"
@@ -29,8 +29,8 @@ import (
 // proceed independently on both sides:
 //   f(x) == append(f(x[0:n]), f(x[n:])...)
 //
-// References: http://unicode.org/reports/tr15/ and
-// http://unicode.org/notes/tn5/.
+// References: https://unicode.org/reports/tr15/ and
+// https://unicode.org/notes/tn5/.
 type Form int
 
 const (

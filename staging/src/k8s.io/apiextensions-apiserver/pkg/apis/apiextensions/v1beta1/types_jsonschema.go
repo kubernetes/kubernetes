@@ -18,13 +18,16 @@ package v1beta1
 
 // JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
 type JSONSchemaProps struct {
-	ID                   string                     `json:"id,omitempty" protobuf:"bytes,1,opt,name=id"`
-	Schema               JSONSchemaURL              `json:"$schema,omitempty" protobuf:"bytes,2,opt,name=schema"`
-	Ref                  *string                    `json:"$ref,omitempty" protobuf:"bytes,3,opt,name=ref"`
-	Description          string                     `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
-	Type                 string                     `json:"type,omitempty" protobuf:"bytes,5,opt,name=type"`
-	Format               string                     `json:"format,omitempty" protobuf:"bytes,6,opt,name=format"`
-	Title                string                     `json:"title,omitempty" protobuf:"bytes,7,opt,name=title"`
+	ID          string        `json:"id,omitempty" protobuf:"bytes,1,opt,name=id"`
+	Schema      JSONSchemaURL `json:"$schema,omitempty" protobuf:"bytes,2,opt,name=schema"`
+	Ref         *string       `json:"$ref,omitempty" protobuf:"bytes,3,opt,name=ref"`
+	Description string        `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
+	Type        string        `json:"type,omitempty" protobuf:"bytes,5,opt,name=type"`
+	Format      string        `json:"format,omitempty" protobuf:"bytes,6,opt,name=format"`
+	Title       string        `json:"title,omitempty" protobuf:"bytes,7,opt,name=title"`
+	// default is a default value for undefined object fields.
+	// Defaulting is an alpha feature under the CustomResourceDefaulting feature gate.
+	// Defaulting requires spec.preserveUnknownFields to be false.
 	Default              *JSON                      `json:"default,omitempty" protobuf:"bytes,8,opt,name=default"`
 	Maximum              *float64                   `json:"maximum,omitempty" protobuf:"bytes,9,opt,name=maximum"`
 	ExclusiveMaximum     bool                       `json:"exclusiveMaximum,omitempty" protobuf:"bytes,10,opt,name=exclusiveMaximum"`
@@ -54,6 +57,39 @@ type JSONSchemaProps struct {
 	Definitions          JSONSchemaDefinitions      `json:"definitions,omitempty" protobuf:"bytes,34,opt,name=definitions"`
 	ExternalDocs         *ExternalDocumentation     `json:"externalDocs,omitempty" protobuf:"bytes,35,opt,name=externalDocs"`
 	Example              *JSON                      `json:"example,omitempty" protobuf:"bytes,36,opt,name=example"`
+	Nullable             bool                       `json:"nullable,omitempty" protobuf:"bytes,37,opt,name=nullable"`
+
+	// x-kubernetes-preserve-unknown-fields stops the API server
+	// decoding step from pruning fields which are not specified
+	// in the validation schema. This affects fields recursively,
+	// but switches back to normal pruning behaviour if nested
+	// properties or additionalProperties are specified in the schema.
+	// This can either be true or undefined. False is forbidden.
+	XPreserveUnknownFields *bool `json:"x-kubernetes-preserve-unknown-fields,omitempty" protobuf:"bytes,38,opt,name=xKubernetesPreserveUnknownFields"`
+
+	// x-kubernetes-embedded-resource defines that the value is an
+	// embedded Kubernetes runtime.Object, with TypeMeta and
+	// ObjectMeta. The type must be object. It is allowed to further
+	// restrict the embedded object. kind, apiVersion and metadata
+	// are validated automatically. x-kubernetes-preserve-unknown-fields
+	// is allowed to be true, but does not have to be if the object
+	// is fully specified (up to kind, apiVersion, metadata).
+	XEmbeddedResource bool `json:"x-kubernetes-embedded-resource,omitempty" protobuf:"bytes,39,opt,name=xKubernetesEmbeddedResource"`
+
+	// x-kubernetes-int-or-string specifies that this value is
+	// either an integer or a string. If this is true, an empty
+	// type is allowed and type as child of anyOf is permitted
+	// if following one of the following patterns:
+	//
+	// 1) anyOf:
+	//    - type: integer
+	//    - type: string
+	// 2) allOf:
+	//    - anyOf:
+	//      - type: integer
+	//      - type: string
+	//    - ... zero or more
+	XIntOrString bool `json:"x-kubernetes-int-or-string,omitempty" protobuf:"bytes,40,opt,name=xKubernetesIntOrString"`
 }
 
 // JSON represents any valid JSON value.
@@ -68,7 +104,7 @@ type JSON struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSON) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
@@ -91,7 +127,7 @@ type JSONSchemaPropsOrArray struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSONSchemaPropsOrArray) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
@@ -111,7 +147,7 @@ type JSONSchemaPropsOrBool struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSONSchemaPropsOrBool) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
@@ -133,7 +169,7 @@ type JSONSchemaPropsOrStringArray struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSONSchemaPropsOrStringArray) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing

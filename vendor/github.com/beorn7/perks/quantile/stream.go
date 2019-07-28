@@ -77,15 +77,20 @@ func NewHighBiased(epsilon float64) *Stream {
 // is guaranteed to be within (Quantile±Epsilon).
 //
 // See http://www.cs.rutgers.edu/~muthu/bquant.pdf for time, space, and error properties.
-func NewTargeted(targets map[float64]float64) *Stream {
+func NewTargeted(targetMap map[float64]float64) *Stream {
+	// Convert map to slice to avoid slow iterations on a map.
+	// ƒ is called on the hot path, so converting the map to a slice
+	// beforehand results in significant CPU savings.
+	targets := targetMapToSlice(targetMap)
+
 	ƒ := func(s *stream, r float64) float64 {
 		var m = math.MaxFloat64
 		var f float64
-		for quantile, epsilon := range targets {
-			if quantile*s.n <= r {
-				f = (2 * epsilon * r) / quantile
+		for _, t := range targets {
+			if t.quantile*s.n <= r {
+				f = (2 * t.epsilon * r) / t.quantile
 			} else {
-				f = (2 * epsilon * (s.n - r)) / (1 - quantile)
+				f = (2 * t.epsilon * (s.n - r)) / (1 - t.quantile)
 			}
 			if f < m {
 				m = f
@@ -94,6 +99,25 @@ func NewTargeted(targets map[float64]float64) *Stream {
 		return m
 	}
 	return newStream(ƒ)
+}
+
+type target struct {
+	quantile float64
+	epsilon  float64
+}
+
+func targetMapToSlice(targetMap map[float64]float64) []target {
+	targets := make([]target, 0, len(targetMap))
+
+	for quantile, epsilon := range targetMap {
+		t := target{
+			quantile: quantile,
+			epsilon:  epsilon,
+		}
+		targets = append(targets, t)
+	}
+
+	return targets
 }
 
 // Stream computes quantiles for a stream of float64s. It is not thread-safe by
@@ -133,7 +157,7 @@ func (s *Stream) Query(q float64) float64 {
 		if l == 0 {
 			return 0
 		}
-		i := int(float64(l) * q)
+		i := int(math.Ceil(float64(l) * q))
 		if i > 0 {
 			i -= 1
 		}

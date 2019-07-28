@@ -34,6 +34,11 @@ type ServiceReference struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 	// Name is the name of the service
 	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,3,opt,name=port"`
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.
@@ -53,6 +58,7 @@ type APIServiceSpec struct {
 	// This is strongly discouraged.  You should use the CABundle instead.
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty" protobuf:"varint,4,opt,name=insecureSkipTLSVerify"`
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
+	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,5,opt,name=caBundle"`
 
@@ -80,6 +86,7 @@ type APIServiceSpec struct {
 	// Priority int64 `json:"priority" protobuf:"varint,6,opt,name=priority"`
 }
 
+// ConditionStatus indicates the status of a condition (true, false, or unknown).
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
@@ -92,7 +99,7 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// APIConditionConditionType is a valid value for APIServiceCondition.Type
+// APIServiceConditionType is a valid value for APIServiceCondition.Type
 type APIServiceConditionType string
 
 const (
@@ -100,6 +107,7 @@ const (
 	Available APIServiceConditionType = "Available"
 )
 
+// APIServiceCondition describes the state of an APIService at a particular point
 type APIServiceCondition struct {
 	// Type is the type of the condition.
 	Type APIServiceConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=APIServiceConditionType"`

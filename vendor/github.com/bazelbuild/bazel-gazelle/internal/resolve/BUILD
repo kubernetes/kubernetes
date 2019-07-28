@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["index.go"],
+    srcs = [
+        "config.go",
+        "index.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/resolve",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/resolve",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],

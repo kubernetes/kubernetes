@@ -5,6 +5,8 @@
 // Package context defines the Context type, which carries deadlines,
 // cancelation signals, and other request-scoped values across API boundaries
 // and between processes.
+// As of Go 1.7 this package is available in the standard library under the
+// name context.  https://golang.org/pkg/context.
 //
 // Incoming requests to a server should create a Context, and outgoing calls to
 // servers should accept a Context. The chain of function calls between must
@@ -34,7 +36,7 @@
 //
 // See http://blog.golang.org/context for example code for a server that uses
 // Contexts.
-package context
+package context // import "golang.org/x/net/context"
 
 // Background returns a non-nil, empty Context. It is never canceled, has no
 // values, and has no deadline. It is typically used by the main function,

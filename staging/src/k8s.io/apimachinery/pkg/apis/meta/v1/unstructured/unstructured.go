@@ -47,6 +47,7 @@ type Unstructured struct {
 
 var _ metav1.Object = &Unstructured{}
 var _ runtime.Unstructured = &Unstructured{}
+var _ metav1.ListInterface = &Unstructured{}
 
 func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
 
@@ -126,6 +127,16 @@ func (u *Unstructured) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
+// This should be called instead of reflect.New() for unstructured types because the go type alone does not preserve kind/apiVersion info.
+func (in *Unstructured) NewEmptyInstance() runtime.Unstructured {
+	out := new(Unstructured)
+	if in != nil {
+		out.GetObjectKind().SetGroupVersionKind(in.GetObjectKind().GroupVersionKind())
+	}
+	return out
+}
+
 func (in *Unstructured) DeepCopy() *Unstructured {
 	if in == nil {
 		return nil
@@ -143,11 +154,18 @@ func (u *Unstructured) setNestedField(value interface{}, fields ...string) {
 	SetNestedField(u.Object, value, fields...)
 }
 
-func (u *Unstructured) setNestedSlice(value []string, fields ...string) {
+func (u *Unstructured) setNestedStringSlice(value []string, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
 	SetNestedStringSlice(u.Object, value, fields...)
+}
+
+func (u *Unstructured) setNestedSlice(value []interface{}, fields ...string) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
+	SetNestedSlice(u.Object, value, fields...)
 }
 
 func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
@@ -312,6 +330,18 @@ func (u *Unstructured) SetContinue(c string) {
 	u.setNestedField(c, "metadata", "continue")
 }
 
+func (u *Unstructured) GetRemainingItemCount() *int64 {
+	return getNestedInt64Pointer(u.Object, "metadata", "remainingItemCount")
+}
+
+func (u *Unstructured) SetRemainingItemCount(c *int64) {
+	if c == nil {
+		RemoveNestedField(u.Object, "metadata", "remainingItemCount")
+	} else {
+		u.setNestedField(*c, "metadata", "remainingItemCount")
+	}
+}
+
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {
 	var timestamp metav1.Time
 	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
@@ -401,31 +431,6 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 	return gvk
 }
 
-func (u *Unstructured) GetInitializers() *metav1.Initializers {
-	m, found, err := nestedMapNoCopy(u.Object, "metadata", "initializers")
-	if !found || err != nil {
-		return nil
-	}
-	out := &metav1.Initializers{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, out); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
-		return nil
-	}
-	return out
-}
-
-func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
-	if initializers == nil {
-		RemoveNestedField(u.Object, "metadata", "initializers")
-		return
-	}
-	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(initializers)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
-	}
-	u.setNestedField(out, "metadata", "initializers")
-}
-
 func (u *Unstructured) GetFinalizers() []string {
 	val, _, _ := NestedStringSlice(u.Object, "metadata", "finalizers")
 	return val
@@ -436,7 +441,7 @@ func (u *Unstructured) SetFinalizers(finalizers []string) {
 		RemoveNestedField(u.Object, "metadata", "finalizers")
 		return
 	}
-	u.setNestedSlice(finalizers, "metadata", "finalizers")
+	u.setNestedStringSlice(finalizers, "metadata", "finalizers")
 }
 
 func (u *Unstructured) GetClusterName() string {
@@ -449,4 +454,43 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 		return
 	}
 	u.setNestedField(clusterName, "metadata", "clusterName")
+}
+
+func (u *Unstructured) GetManagedFields() []metav1.ManagedFieldsEntry {
+	items, found, err := NestedSlice(u.Object, "metadata", "managedFields")
+	if !found || err != nil {
+		return nil
+	}
+	managedFields := []metav1.ManagedFieldsEntry{}
+	for _, item := range items {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unable to retrieve managedFields for object, item %v is not a map", item))
+			return nil
+		}
+		out := metav1.ManagedFieldsEntry{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, &out); err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to retrieve managedFields for object: %v", err))
+			return nil
+		}
+		managedFields = append(managedFields, out)
+	}
+	return managedFields
+}
+
+func (u *Unstructured) SetManagedFields(managedFields []metav1.ManagedFieldsEntry) {
+	if managedFields == nil {
+		RemoveNestedField(u.Object, "metadata", "managedFields")
+		return
+	}
+	items := []interface{}{}
+	for _, managedFieldsEntry := range managedFields {
+		out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&managedFieldsEntry)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to set managedFields for object: %v", err))
+			return
+		}
+		items = append(items, out)
+	}
+	u.setNestedSlice(items, "metadata", "managedFields")
 }

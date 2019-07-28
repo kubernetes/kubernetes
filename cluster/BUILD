@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 
 filegroup(
     name = "package-srcs",

@@ -13,7 +13,7 @@ Resource Consumer starts an HTTP server and handle sent requests.
 It listens on port given as a flag (default 8080).
 Action of consuming resources is send to the container by a POST http request.
 Each http request creates new process.
-Http request handler is in file resource_consumer_handler.go 
+Http request handler is in file resource_consumer_handler.go
 
 The container consumes specified amount of resources:
 
@@ -48,21 +48,21 @@ Custom metrics in Prometheus format are exposed on "/metrics" endpoint.
 
 ### CURL example
 ```console
-$ kubectl run resource-consumer --image=gcr.io/kubernetes-e2e-test-images/resource-consumer:1.3 --expose --service-overrides='{ "spec": { "type": "LoadBalancer" } }' --port 8080 --requests='cpu=500m,memory=256Mi'
-$ kubectl get services resource-consumer
+kubectl run resource-consumer --image=gcr.io/kubernetes-e2e-test-images/resource-consumer:1.4 --expose --service-overrides='{ "spec": { "type": "LoadBalancer" } }' --port 8080 --requests='cpu=500m,memory=256Mi'
+kubectl get services resource-consumer
 ```
 
 There are two IPs.  The first one is internal, while the second one is the external load-balanced IP.  Both serve port 8080. (Use second one)
 
 ```console
-$ curl --data "millicores=300&durationSec=600" http://<EXTERNAL-IP>:8080/ConsumeCPU
+curl --data "millicores=300&durationSec=600" http://<EXTERNAL-IP>:8080/ConsumeCPU
 ```
 
 300 millicores will be consumed for 600 seconds.
 
 ## Image
 
-Docker image of Resource Consumer can be found in Google Container Registry as gcr.io/kubernetes-e2e-test-images/resource-consumer:1.3
+Docker image of Resource Consumer can be found in Google Container Registry as gcr.io/kubernetes-e2e-test-images/resource-consumer:1.4
 
 ## Use cases
 

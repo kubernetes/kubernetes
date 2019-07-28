@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -510,7 +510,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			interPodAffinity := InterPodAffinity{
 				info:                  FakeNodeListInfo(test.nodes),
 				nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
@@ -600,7 +600,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			ipa := InterPodAffinity{
 				info:                  FakeNodeListInfo(test.nodes),
 				nodeLister:            schedulertesting.FakeNodeLister(test.nodes),

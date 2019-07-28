@@ -46,8 +46,8 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:  &apiserveroptions.DeprecatedInsecureServingOptions{},
-					Metrics:  &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
+					Metrics:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindPort: 0,
 				},
 			},
@@ -61,7 +61,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:  &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindPort: 0,
 				},
 			},
@@ -79,7 +79,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Metrics:  &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Metrics:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindPort: 0,
 				},
 			},
@@ -97,8 +97,8 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:  &apiserveroptions.DeprecatedInsecureServingOptions{},
-					Metrics:  &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
+					Metrics:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindPort: 0,
 				},
 			},
@@ -118,8 +118,8 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1235",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:  &apiserveroptions.DeprecatedInsecureServingOptions{},
-					Metrics:  &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
+					Metrics:  (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindPort: 0,
 				},
 			},
@@ -141,8 +141,8 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:     &apiserveroptions.DeprecatedInsecureServingOptions{},
-					Metrics:     &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:     (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
+					Metrics:     (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindPort:    1236,
 					BindAddress: "1.2.3.4",
 				},
@@ -163,8 +163,8 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:     &apiserveroptions.DeprecatedInsecureServingOptions{},
-					Metrics:     &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:     (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
+					Metrics:     (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindAddress: "2.3.4.5",
 					BindPort:    1234,
 				},
@@ -185,8 +185,8 @@ func TestOptions_ApplyTo(t *testing.T) {
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
 				CombinedInsecureServing: &CombinedInsecureServingOptions{
-					Healthz:     &apiserveroptions.DeprecatedInsecureServingOptions{},
-					Metrics:     &apiserveroptions.DeprecatedInsecureServingOptions{},
+					Healthz:     (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
+					Metrics:     (&apiserveroptions.DeprecatedInsecureServingOptions{}).WithLoopback(),
 					BindAddress: "2.3.4.5",
 					BindPort:    0,
 				},

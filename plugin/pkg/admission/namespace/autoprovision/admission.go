@@ -55,7 +55,7 @@ var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Provision{
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Provision{})
 
 // Admit makes an admission decision based on the request attributes
-func (p *Provision) Admit(a admission.Attributes) error {
+func (p *Provision) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Don't create a namespace if the request is for a dry-run.
 	if a.IsDryRun() {
 		return nil
@@ -89,7 +89,7 @@ func (p *Provision) Admit(a admission.Attributes) error {
 		Status: corev1.NamespaceStatus{},
 	}
 
-	_, err = p.client.Core().Namespaces().Create(namespace)
+	_, err = p.client.CoreV1().Namespaces().Create(namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}

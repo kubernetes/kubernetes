@@ -32,7 +32,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/registry/apiservice"
 )
 
-// rest implements a RESTStorage for API services against etcd
+// REST implements a RESTStorage for API services against etcd
 type REST struct {
 	*genericregistry.Store
 }
@@ -59,6 +59,7 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
+// ConvertToTable implements the TableConvertor interface for REST.
 func (c *REST) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	table := &metav1beta1.Table{
 		ColumnDefinitions: []metav1beta1.TableColumnDefinition{
@@ -72,6 +73,7 @@ func (c *REST) ConvertToTable(ctx context.Context, obj runtime.Object, tableOpti
 		table.ResourceVersion = m.GetResourceVersion()
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
+		table.RemainingItemCount = m.GetRemainingItemCount()
 	} else {
 		if m, err := meta.CommonAccessor(obj); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()
@@ -121,12 +123,14 @@ func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
 	return &StatusREST{store: &statusStore}
 }
 
+// StatusREST implements the REST endpoint for changing the status of an APIService.
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
 var _ = rest.Patcher(&StatusREST{})
 
+// New creates a new APIService object.
 func (r *StatusREST) New() runtime.Object {
 	return &apiregistration.APIService{}
 }

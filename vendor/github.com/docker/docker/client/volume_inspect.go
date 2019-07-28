@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
@@ -23,10 +23,10 @@ func (cli *Client) VolumeInspectWithRaw(ctx context.Context, volumeID string) (t
 
 	var volume types.Volume
 	resp, err := cli.get(ctx, "/volumes/"+volumeID, nil, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return volume, nil, wrapResponseError(err, resp, "volume", volumeID)
 	}
-	defer ensureReaderClosed(resp)
 
 	body, err := ioutil.ReadAll(resp.body)
 	if err != nil {

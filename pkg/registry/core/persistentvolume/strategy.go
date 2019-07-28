@@ -53,7 +53,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 
-	pvutil.DropDisabledAlphaFields(&pv.Spec)
+	pvutil.DropDisabledFields(&pv.Spec, nil)
 }
 
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -76,8 +76,7 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
 
-	pvutil.DropDisabledAlphaFields(&newPv.Spec)
-	pvutil.DropDisabledAlphaFields(&oldPv.Spec)
+	pvutil.DropDisabledFields(&newPv.Spec, &oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -109,12 +108,12 @@ func (persistentvolumeStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	persistentvolumeObj, ok := obj.(*api.PersistentVolume)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a persistentvolume")
+		return nil, nil, fmt.Errorf("not a persistentvolume")
 	}
-	return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), persistentvolumeObj.Initializers != nil, nil
+	return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), nil
 }
 
 // MatchPersistentVolume returns a generic matcher for a given label and field selector.

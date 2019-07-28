@@ -31,6 +31,6 @@ gcloudpush: build
 	docker push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
 push: build
-	docker -- push $(REGISTRY)/kubemark:$(IMAGE_TAG)
+	docker push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
 .PHONY: all build gcloudpush push

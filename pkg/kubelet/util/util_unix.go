@@ -20,12 +20,15 @@ package util
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 )
 
 const (
@@ -33,6 +36,7 @@ const (
 	unixProtocol = "unix"
 )
 
+// CreateListener creates a listener on the specified endpoint.
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -48,9 +52,33 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}
 
-	return net.Listen(protocol, addr)
+	if err := os.MkdirAll(filepath.Dir(addr), 0750); err != nil {
+		return nil, fmt.Errorf("error creating socket directory %q: %v", filepath.Dir(addr), err)
+	}
+
+	// Create the socket on a tempfile and move it to the destination socket to handle improprer cleanup
+	file, err := ioutil.TempFile(filepath.Dir(addr), "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file: %v", err)
+	}
+
+	if err := os.Remove(file.Name()); err != nil {
+		return nil, fmt.Errorf("failed to remove temporary file: %v", err)
+	}
+
+	l, err := net.Listen(protocol, file.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if err = os.Rename(file.Name(), addr); err != nil {
+		return nil, fmt.Errorf("failed to move temporary file to addr %q: %v", addr, err)
+	}
+
+	return l, nil
 }
 
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -72,8 +100,38 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			glog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
 		}
 	}
 	return
+}
+
+func parseEndpoint(endpoint string) (string, string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", "", err
+	}
+
+	switch u.Scheme {
+	case "tcp":
+		return "tcp", u.Host, nil
+
+	case "unix":
+		return "unix", u.Path, nil
+
+	case "":
+		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+
+	default:
+		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
+	}
+}
+
+// LocalEndpoint returns the full path to a unix socket at the given endpoint
+func LocalEndpoint(path, file string) (string, error) {
+	u := url.URL{
+		Scheme: unixProtocol,
+		Path:   path,
+	}
+	return filepath.Join(u.String(), file+".sock"), nil
 }

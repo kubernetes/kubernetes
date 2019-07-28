@@ -21,7 +21,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -30,39 +29,78 @@ func GetGenericImage(prefix, image, tag string) string {
 	return fmt.Sprintf("%s/%s:%s", prefix, image, tag)
 }
 
-// GetKubeControlPlaneImage generates and returns the image for the core Kubernetes components or returns the unified control plane image if specified
-func GetKubeControlPlaneImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
-	if cfg.UnifiedControlPlaneImage != "" {
-		return cfg.UnifiedControlPlaneImage
+// GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
+// including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
+func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
+	if cfg.UseHyperKubeImage {
+		image = constants.HyperKube
 	}
 	repoPrefix := cfg.GetControlPlaneImageRepository()
 	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)
 	return GetGenericImage(repoPrefix, image, kubernetesImageTag)
 }
 
-// GetEtcdImage generates and returns the image for etcd or returns cfg.Etcd.Local.Image if specified
-func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
-	if cfg.Etcd.Local != nil && cfg.Etcd.Local.Image != "" {
-		return cfg.Etcd.Local.Image
+// GetDNSImage generates and returns the image for the DNS, that can be CoreDNS or kube-dns.
+// Given that kube-dns uses 3 containers, an additional imageName parameter was added
+func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration, imageName string) string {
+	// DNS uses default image repository by default
+	dnsImageRepository := cfg.ImageRepository
+	// unless an override is specified
+	if cfg.DNS.ImageRepository != "" {
+		dnsImageRepository = cfg.DNS.ImageRepository
 	}
-	etcdImageTag := constants.DefaultEtcdVersion
-	etcdImageVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
-	if err == nil {
-		etcdImageTag = etcdImageVersion.String()
+	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
+	dnsImageTag := constants.GetDNSVersion(cfg.DNS.Type)
+
+	// unless an override is specified
+	if cfg.DNS.ImageTag != "" {
+		dnsImageTag = cfg.DNS.ImageTag
 	}
-	return GetGenericImage(cfg.ImageRepository, constants.Etcd, etcdImageTag)
+	return GetGenericImage(dnsImageRepository, imageName, dnsImageTag)
 }
 
-// GetAllImages returns a list of container images kubeadm expects to use on a control plane node
-func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
-	imgs := []string{}
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeAPIServer, cfg))
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeControllerManager, cfg))
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeScheduler, cfg))
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeProxy, cfg))
+// GetEtcdImage generates and returns the image for etcd
+func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
+	// Etcd uses default image repository by default
+	etcdImageRepository := cfg.ImageRepository
+	// unless an override is specified
+	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageRepository != "" {
+		etcdImageRepository = cfg.Etcd.Local.ImageRepository
+	}
+	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
+	etcdImageTag := constants.DefaultEtcdVersion
+	etcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
+	if err == nil {
+		etcdImageTag = etcdVersion.String()
+	}
+	// unless an override is specified
+	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
+		etcdImageTag = cfg.Etcd.Local.ImageTag
+	}
+	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
+}
 
-	// pause, etcd and kube-dns are not available on the ci image repository so use the default image repository.
-	imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion))
+// GetPauseImage returns the image for the "pause" container
+func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
+	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
+}
+
+// GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node
+func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
+	imgs := []string{}
+
+	// start with core kubernetes images
+	if cfg.UseHyperKubeImage {
+		imgs = append(imgs, GetKubernetesImage(constants.HyperKube, cfg))
+	} else {
+		imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))
+		imgs = append(imgs, GetKubernetesImage(constants.KubeControllerManager, cfg))
+		imgs = append(imgs, GetKubernetesImage(constants.KubeScheduler, cfg))
+		imgs = append(imgs, GetKubernetesImage(constants.KubeProxy, cfg))
+	}
+
+	// pause is not available on the ci image repository so use the default image repository.
+	imgs = append(imgs, GetPauseImage(cfg))
 
 	// if etcd is not external then add the image as it will be required
 	if cfg.Etcd.Local != nil {
@@ -70,12 +108,12 @@ func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	}
 
 	// Append the appropriate DNS images
-	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, constants.CoreDNS, constants.CoreDNSVersion))
+	if cfg.DNS.Type == kubeadmapi.CoreDNS {
+		imgs = append(imgs, GetDNSImage(cfg, constants.CoreDNSImageName))
 	} else {
-		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "k8s-dns-kube-dns", constants.KubeDNSVersion))
-		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "k8s-dns-sidecar", constants.KubeDNSVersion))
-		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "k8s-dns-dnsmasq-nanny", constants.KubeDNSVersion))
+		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSKubeDNSImageName))
+		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSSidecarImageName))
+		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSDnsMasqNannyImageName))
 	}
 
 	return imgs

@@ -19,16 +19,16 @@ package remote
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
-// maxMsgSize use 8MB as the default message size limit.
+// maxMsgSize use 16MB as the default message size limit.
 // grpc library default is 4MB
-const maxMsgSize = 1024 * 1024 * 8
+const maxMsgSize = 1024 * 1024 * 16
 
 // DockerServer is the grpc server of dockershim.
 type DockerServer struct {
@@ -52,11 +52,11 @@ func NewDockerServer(endpoint string, s dockershim.CRIService) *DockerServer {
 func (s *DockerServer) Start() error {
 	// Start the internal service.
 	if err := s.service.Start(); err != nil {
-		glog.Errorf("Unable to start docker service")
+		klog.Errorf("Unable to start docker service")
 		return err
 	}
 
-	glog.V(2).Infof("Start dockershim grpc server")
+	klog.V(2).Infof("Start dockershim grpc server")
 	l, err := util.CreateListener(s.endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %q: %v", s.endpoint, err)
@@ -70,7 +70,7 @@ func (s *DockerServer) Start() error {
 	runtimeapi.RegisterImageServiceServer(s.server, s.service)
 	go func() {
 		if err := s.server.Serve(l); err != nil {
-			glog.Fatalf("Failed to serve connections: %v", err)
+			klog.Fatalf("Failed to serve connections: %v", err)
 		}
 	}()
 	return nil

@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 source "${KUBE_ROOT}/hack/lib/version.sh"
 kube::version::get_version_vars
@@ -30,7 +30,7 @@ kube::version::get_version_vars
 # Stamped rules will be retriggered by changes to stable-status.txt, but not by
 # changes to volatile-status.txt.
 # IMPORTANT: the camelCase vars should match the lists in hack/lib/version.sh
-# and pkg/version/def.bzl.
+# and staging/src/k8s.io/kubectl/pkg/version/def.bzl.
 cat <<EOF
 STABLE_BUILD_GIT_COMMIT ${KUBE_GIT_COMMIT-}
 STABLE_BUILD_SCM_STATUS ${KUBE_GIT_TREE_STATE-}
@@ -38,6 +38,8 @@ STABLE_BUILD_SCM_REVISION ${KUBE_GIT_VERSION-}
 STABLE_BUILD_MAJOR_VERSION ${KUBE_GIT_MAJOR-}
 STABLE_BUILD_MINOR_VERSION ${KUBE_GIT_MINOR-}
 STABLE_DOCKER_TAG ${KUBE_GIT_VERSION/+/_}
+STABLE_DOCKER_REGISTRY ${KUBE_DOCKER_REGISTRY:-k8s.gcr.io}
+STABLE_DOCKER_PUSH_REGISTRY ${KUBE_DOCKER_PUSH_REGISTRY:-${KUBE_DOCKER_REGISTRY:-staging-k8s.gcr.io}}
 gitCommit ${KUBE_GIT_COMMIT-}
 gitTreeState ${KUBE_GIT_TREE_STATE-}
 gitVersion ${KUBE_GIT_VERSION-}

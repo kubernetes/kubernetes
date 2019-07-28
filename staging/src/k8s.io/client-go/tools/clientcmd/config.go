@@ -24,7 +24,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -483,7 +483,7 @@ func getConfigFromFile(filename string) (*clientcmdapi.Config, error) {
 func GetConfigFromFileOrDie(filename string) *clientcmdapi.Config {
 	config, err := getConfigFromFile(filename)
 	if err != nil {
-		glog.FatalDepth(1, err)
+		klog.FatalDepth(1, err)
 	}
 
 	return config

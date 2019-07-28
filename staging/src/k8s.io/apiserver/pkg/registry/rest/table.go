@@ -67,15 +67,18 @@ func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtim
 		table.ResourceVersion = m.GetResourceVersion()
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
+		table.RemainingItemCount = m.GetRemainingItemCount()
 	} else {
 		if m, err := meta.CommonAccessor(object); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()
 			table.SelfLink = m.GetSelfLink()
 		}
 	}
-	table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
-		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
+	if opt, ok := tableOptions.(*metav1beta1.TableOptions); !ok || !opt.NoHeaders {
+		table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
+			{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
+		}
 	}
 	return &table, nil
 }

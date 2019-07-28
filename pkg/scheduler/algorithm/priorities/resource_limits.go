@@ -21,9 +21,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ResourceLimitsPriorityMap is a priority function that increases score of input node by 1 if the node satisfies
@@ -33,7 +33,7 @@ import (
 // of the pod are satisfied, the node is assigned a score of 1.
 // Rationale of choosing the lowest score of 1 is that this is mainly selected to break ties between nodes that have
 // same scores assigned by one of least and most requested priority functions.
-func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
@@ -42,7 +42,14 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	allocatableResources := nodeInfo.AllocatableResource()
 
 	// compute pod limits
-	podLimits := getResourceLimits(pod)
+	var podLimits *schedulernodeinfo.Resource
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use podLimits from there.
+		podLimits = priorityMeta.podLimits
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podLimits = getResourceLimits(pod)
+	}
 
 	cpuScore := computeScore(podLimits.MilliCPU, allocatableResources.MilliCPU)
 	memScore := computeScore(podLimits.Memory, allocatableResources.Memory)
@@ -52,10 +59,10 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 		score = 1
 	}
 
-	if glog.V(10) {
-		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+	if klog.V(10) {
+		// We explicitly don't do klog.V(10).Infof() to avoid computing all the parameters if this is
 		// not logged. There is visible performance gain from it.
-		glog.Infof(
+		klog.Infof(
 			"%v -> %v: Resource Limits Priority, allocatable %d millicores %d memory bytes, pod limits %d millicores %d memory bytes, score %d",
 			pod.Name, node.Name,
 			allocatableResources.MilliCPU, allocatableResources.Memory,
@@ -82,10 +89,9 @@ func computeScore(limit, allocatable int64) int64 {
 // getResourceLimits computes resource limits for input pod.
 // The reason to create this new function is to be consistent with other
 // priority functions because most or perhaps all priority functions work
-// with schedulercache.Resource.
-// TODO: cache it as part of metadata passed to priority functions.
-func getResourceLimits(pod *v1.Pod) *schedulercache.Resource {
-	result := &schedulercache.Resource{}
+// with schedulernodeinfo.Resource.
+func getResourceLimits(pod *v1.Pod) *schedulernodeinfo.Resource {
+	result := &schedulernodeinfo.Resource{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Limits)
 	}

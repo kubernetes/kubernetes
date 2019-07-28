@@ -23,8 +23,8 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -38,7 +38,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/extensions/install:go_default_library",
+        "//pkg/apis/apps/install:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",

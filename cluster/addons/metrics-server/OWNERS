@@ -1,8 +1,8 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- DirectXMan12
 - kawych
 - piosz
 reviewers:
-- DirectXMan12
 - kawych
 - piosz

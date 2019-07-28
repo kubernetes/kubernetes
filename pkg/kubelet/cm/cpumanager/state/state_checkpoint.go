@@ -21,7 +21,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -97,8 +97,8 @@ func (sc *stateCheckpoint) restoreState() error {
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
 
-	glog.V(2).Info("[cpumanager] state checkpoint: restored state from checkpoint")
-	glog.V(2).Infof("[cpumanager] state checkpoint: defaultCPUSet: %s", tmpDefaultCPUSet.String())
+	klog.V(2).Info("[cpumanager] state checkpoint: restored state from checkpoint")
+	klog.V(2).Infof("[cpumanager] state checkpoint: defaultCPUSet: %s", tmpDefaultCPUSet.String())
 
 	return nil
 }

@@ -1,0 +1,156 @@
+{
+  "kind": "NetworkPolicy",
+  "apiVersion": "networking.k8s.io/v1",
+  "metadata": {
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
+    "resourceVersion": "16964250748386560239",
+    "generation": 8071137005907523419,
+    "creationTimestamp": null,
+    "deletionGracePeriodSeconds": -4955867275792137171,
+    "labels": {
+      "7": "8"
+    },
+    "annotations": {
+      "9": "10"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "14"
+    ],
+    "clusterName": "15",
+    "managedFields": [
+      {
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fields": {"18":{"19":null}}
+      }
+    ]
+  },
+  "spec": {
+    "podSelector": {
+      "matchLabels": {
+        "9n7yd745q0------2-2413-4lu-8-6r4404d5---g8c2-k9/Nx.G": "0M.y.g"
+      },
+      "matchExpressions": [
+        {
+          "key": "68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-B",
+          "operator": "In",
+          "values": [
+            "Trcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ2"
+          ]
+        }
+      ]
+    },
+    "ingress": [
+      {
+        "ports": [
+          {
+            "protocol": "ÐƣKʘńw:5塋訩塶\"=y钡n"
+          }
+        ],
+        "from": [
+          {
+            "podSelector": {
+              "matchLabels": {
+                "y-y-o0-5q-2-zdv--6--0-a629b-jd-8c45-0-8--6n--w0--w---196g8d--i1.0t9/2fNc5-_.-RX-82_g50_u__..cu87__-7p_w.e6._.pj5tk": "h-JM"
+              },
+              "matchExpressions": [
+                {
+                  "key": "44-j8553sog-4v.w5-3z-4831i48x-e4203f-vx010-90q-6-i2d020hj--a-8g--z-nt-b6/7",
+                  "operator": "In",
+                  "values": [
+                    "17_.8CnT"
+                  ]
+                }
+              ]
+            },
+            "namespaceSelector": {
+              "matchLabels": {
+                "rSf5_Or.i1_7z.WH-..T": "2-N_Y.t--_0..--_6yV07-_.___gO-d.iUaC_wYSJfB._.zS-._0"
+              },
+              "matchExpressions": [
+                {
+                  "key": "83.SD..P.---5.-3",
+                  "operator": "NotIn",
+                  "values": [
+                    "hyz-0-_p4mz--.I_f6kjsz-7lwY-Y93-x6bigm_-._q"
+                  ]
+                }
+              ]
+            },
+            "ipBlock": {
+              "cidr": "42",
+              "except": [
+                "43"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "egress": [
+      {
+        "ports": [
+          {
+            "protocol": "ƯĖ漘Z剚敍0)鈼¬麄p呝T"
+          }
+        ],
+        "to": [
+          {
+            "podSelector": {
+              "matchLabels": {
+                "9-295at-o7qff7-x--r7v66bm71u-n4f9wk-3--652x01--p--n4-4-t--2g6/hm": "2.9__Y-H-Mqpt._.-_..05c.---qy-_5_S.d5a3J.--.6g_4....1..jtFe8b_P"
+              },
+              "matchExpressions": [
+                {
+                  "key": "Guo3Pa__n-Dd-.9.-_Z.0_1._hg._o_p665O_4Gj._BXt.O-7___-Y_um-8",
+                  "operator": "NotIn",
+                  "values": [
+                    "q.0-_1-F.h-__k_K5._3"
+                  ]
+                }
+              ]
+            },
+            "namespaceSelector": {
+              "matchLabels": {
+                "G_--V-42E_--o90G_A4..-L..-__0N_N.O30-u": "O-2hT.-z-._7-5lL..-_--.VEa-_gn.8-c.C3_F._oXF"
+              },
+              "matchExpressions": [
+                {
+                  "key": "5-28x-8-p-lvvm-2qz7-3042017h/vN5.25aWx.2M",
+                  "operator": "NotIn",
+                  "values": [
+                    "D.GgT7_7P"
+                  ]
+                }
+              ]
+            },
+            "ipBlock": {
+              "cidr": "56",
+              "except": [
+                "57"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "policyTypes": [
+      "h4ɊHȖ|ʐ"
+    ]
+  }
+}

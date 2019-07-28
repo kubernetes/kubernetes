@@ -77,6 +77,8 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_Slice_string_To_Slice_int32,
 
 		Convert_Slice_string_To_v1_DeletionPropagation,
+
+		Convert_Slice_string_To_v1_IncludeObjectPolicy,
 	)
 }
 
@@ -314,6 +316,14 @@ func Convert_Slice_string_To_v1_DeletionPropagation(input *[]string, out *Deleti
 		*out = DeletionPropagation((*input)[0])
 	} else {
 		*out = ""
+	}
+	return nil
+}
+
+// Convert_Slice_string_To_v1_IncludeObjectPolicy allows converting a URL query parameter value
+func Convert_Slice_string_To_v1_IncludeObjectPolicy(input *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
+	if len(*input) > 0 {
+		*out = IncludeObjectPolicy((*input)[0])
 	}
 	return nil
 }

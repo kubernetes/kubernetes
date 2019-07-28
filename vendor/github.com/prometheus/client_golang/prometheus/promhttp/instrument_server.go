@@ -14,9 +14,7 @@
 package promhttp
 
 import (
-	"bufio"
-	"io"
-	"net"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,10 +43,10 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 
 // InstrumentHandlerDuration is a middleware that wraps the provided
 // http.Handler to observe the request duration with the provided ObserverVec.
-// The ObserverVec must have zero, one, or two labels. The only allowed label
-// names are "code" and "method". The function panics if any other instance
-// labels are provided. The Observe method of the Observer in the ObserverVec
-// is called with the request duration in seconds. Partitioning happens by HTTP
+// The ObserverVec must have zero, one, or two non-const non-curried labels. For
+// those, the only allowed label names are "code" and "method". The function
+// panics otherwise. The Observe method of the Observer in the ObserverVec is
+// called with the request duration in seconds. Partitioning happens by HTTP
 // status code and/or HTTP method if the respective instance label names are
 // present in the ObserverVec. For unpartitioned observations, use an
 // ObserverVec with zero labels. Note that partitioning of Histograms is
@@ -57,6 +55,9 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
 // If the wrapped Handler panics, no values are reported.
+//
+// Note that this method is only guaranteed to never observe negative durations
+// if used with Go1.9+.
 func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler) http.HandlerFunc {
 	code, method := checkLabels(obs)
 
@@ -77,14 +78,13 @@ func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler) ht
 	})
 }
 
-// InstrumentHandlerCounter is a middleware that wraps the provided
-// http.Handler to observe the request result with the provided CounterVec.
-// The CounterVec must have zero, one, or two labels. The only allowed label
-// names are "code" and "method". The function panics if any other instance
-// labels are provided. Partitioning of the CounterVec happens by HTTP status
-// code and/or HTTP method if the respective instance label names are present
-// in the CounterVec. For unpartitioned counting, use a CounterVec with
-// zero labels.
+// InstrumentHandlerCounter is a middleware that wraps the provided http.Handler
+// to observe the request result with the provided CounterVec.  The CounterVec
+// must have zero, one, or two non-const non-curried labels. For those, the only
+// allowed label names are "code" and "method". The function panics
+// otherwise. Partitioning of the CounterVec happens by HTTP status code and/or
+// HTTP method if the respective instance label names are present in the
+// CounterVec. For unpartitioned counting, use a CounterVec with zero labels.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
@@ -111,17 +111,19 @@ func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler)
 // InstrumentHandlerTimeToWriteHeader is a middleware that wraps the provided
 // http.Handler to observe with the provided ObserverVec the request duration
 // until the response headers are written. The ObserverVec must have zero, one,
-// or two labels. The only allowed label names are "code" and "method". The
-// function panics if any other instance labels are provided. The Observe
-// method of the Observer in the ObserverVec is called with the request
-// duration in seconds. Partitioning happens by HTTP status code and/or HTTP
-// method if the respective instance label names are present in the
-// ObserverVec. For unpartitioned observations, use an ObserverVec with zero
-// labels. Note that partitioning of Histograms is expensive and should be used
-// judiciously.
+// or two non-const non-curried labels. For those, the only allowed label names
+// are "code" and "method". The function panics otherwise. The Observe method of
+// the Observer in the ObserverVec is called with the request duration in
+// seconds. Partitioning happens by HTTP status code and/or HTTP method if the
+// respective instance label names are present in the ObserverVec. For
+// unpartitioned observations, use an ObserverVec with zero labels. Note that
+// partitioning of Histograms is expensive and should be used judiciously.
 //
 // If the wrapped Handler panics before calling WriteHeader, no value is
 // reported.
+//
+// Note that this method is only guaranteed to never observe negative durations
+// if used with Go1.9+.
 //
 // See the example for InstrumentHandlerDuration for example usage.
 func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Handler) http.HandlerFunc {
@@ -137,15 +139,15 @@ func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Ha
 }
 
 // InstrumentHandlerRequestSize is a middleware that wraps the provided
-// http.Handler to observe the request size with the provided ObserverVec.
-// The ObserverVec must have zero, one, or two labels. The only allowed label
-// names are "code" and "method". The function panics if any other instance
-// labels are provided. The Observe method of the Observer in the ObserverVec
-// is called with the request size in bytes. Partitioning happens by HTTP
-// status code and/or HTTP method if the respective instance label names are
-// present in the ObserverVec. For unpartitioned observations, use an
-// ObserverVec with zero labels. Note that partitioning of Histograms is
-// expensive and should be used judiciously.
+// http.Handler to observe the request size with the provided ObserverVec.  The
+// ObserverVec must have zero, one, or two non-const non-curried labels. For
+// those, the only allowed label names are "code" and "method". The function
+// panics otherwise. The Observe method of the Observer in the ObserverVec is
+// called with the request size in bytes. Partitioning happens by HTTP status
+// code and/or HTTP method if the respective instance label names are present in
+// the ObserverVec. For unpartitioned observations, use an ObserverVec with zero
+// labels. Note that partitioning of Histograms is expensive and should be used
+// judiciously.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
@@ -172,15 +174,15 @@ func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler)
 }
 
 // InstrumentHandlerResponseSize is a middleware that wraps the provided
-// http.Handler to observe the response size with the provided ObserverVec.
-// The ObserverVec must have zero, one, or two labels. The only allowed label
-// names are "code" and "method". The function panics if any other instance
-// labels are provided. The Observe method of the Observer in the ObserverVec
-// is called with the response size in bytes. Partitioning happens by HTTP
-// status code and/or HTTP method if the respective instance label names are
-// present in the ObserverVec. For unpartitioned observations, use an
-// ObserverVec with zero labels. Note that partitioning of Histograms is
-// expensive and should be used judiciously.
+// http.Handler to observe the response size with the provided ObserverVec.  The
+// ObserverVec must have zero, one, or two non-const non-curried labels. For
+// those, the only allowed label names are "code" and "method". The function
+// panics otherwise. The Observe method of the Observer in the ObserverVec is
+// called with the response size in bytes. Partitioning happens by HTTP status
+// code and/or HTTP method if the respective instance label names are present in
+// the ObserverVec. For unpartitioned observations, use an ObserverVec with zero
+// labels. Note that partitioning of Histograms is expensive and should be used
+// judiciously.
 //
 // If the wrapped Handler does not set a status code, a status code of 200 is assumed.
 //
@@ -201,9 +203,12 @@ func checkLabels(c prometheus.Collector) (code bool, method bool) {
 	// once Descriptors can have their dimensionality queried.
 	var (
 		desc *prometheus.Desc
+		m    prometheus.Metric
 		pm   dto.Metric
+		lvs  []string
 	)
 
+	// Get the Desc from the Collector.
 	descc := make(chan *prometheus.Desc, 1)
 	c.Describe(descc)
 
@@ -220,49 +225,54 @@ func checkLabels(c prometheus.Collector) (code bool, method bool) {
 
 	close(descc)
 
-	if _, err := prometheus.NewConstMetric(desc, prometheus.UntypedValue, 0); err == nil {
-		return
+	// Create a ConstMetric with the Desc. Since we don't know how many
+	// variable labels there are, try for as long as it needs.
+	for err := errors.New("dummy"); err != nil; lvs = append(lvs, magicString) {
+		m, err = prometheus.NewConstMetric(desc, prometheus.UntypedValue, 0, lvs...)
 	}
-	if m, err := prometheus.NewConstMetric(desc, prometheus.UntypedValue, 0, magicString); err == nil {
-		if err := m.Write(&pm); err != nil {
-			panic("error checking metric for labels")
-		}
-		for _, label := range pm.Label {
-			name, value := label.GetName(), label.GetValue()
-			if value != magicString {
-				continue
-			}
-			switch name {
-			case "code":
-				code = true
-			case "method":
-				method = true
-			default:
-				panic("metric partitioned with non-supported labels")
-			}
-			return
-		}
-		panic("previously set label not found – this must never happen")
+
+	// Write out the metric into a proto message and look at the labels.
+	// If the value is not the magicString, it is a constLabel, which doesn't interest us.
+	// If the label is curried, it doesn't interest us.
+	// In all other cases, only "code" or "method" is allowed.
+	if err := m.Write(&pm); err != nil {
+		panic("error checking metric for labels")
 	}
-	if m, err := prometheus.NewConstMetric(desc, prometheus.UntypedValue, 0, magicString, magicString); err == nil {
-		if err := m.Write(&pm); err != nil {
-			panic("error checking metric for labels")
+	for _, label := range pm.Label {
+		name, value := label.GetName(), label.GetValue()
+		if value != magicString || isLabelCurried(c, name) {
+			continue
 		}
-		for _, label := range pm.Label {
-			name, value := label.GetName(), label.GetValue()
-			if value != magicString {
-				continue
-			}
-			if name == "code" || name == "method" {
-				continue
-			}
+		switch name {
+		case "code":
+			code = true
+		case "method":
+			method = true
+		default:
 			panic("metric partitioned with non-supported labels")
 		}
-		code = true
-		method = true
-		return
 	}
-	panic("metric partitioned with non-supported labels")
+	return
+}
+
+func isLabelCurried(c prometheus.Collector, label string) bool {
+	// This is even hackier than the label test above.
+	// We essentially try to curry again and see if it works.
+	// But for that, we need to type-convert to the two
+	// types we use here, ObserverVec or *CounterVec.
+	switch v := c.(type) {
+	case *prometheus.CounterVec:
+		if _, err := v.CurryWith(prometheus.Labels{label: "dummy"}); err == nil {
+			return false
+		}
+	case prometheus.ObserverVec:
+		if _, err := v.CurryWith(prometheus.Labels{label: "dummy"}); err == nil {
+			return false
+		}
+	default:
+		panic("unsupported metric vec type")
+	}
+	return true
 }
 
 // emptyLabels is a one-time allocation for non-partitioned metrics to avoid
@@ -434,72 +444,4 @@ func sanitizeCode(s int) string {
 	default:
 		return strconv.Itoa(s)
 	}
-}
-
-type delegator interface {
-	Status() int
-	Written() int64
-
-	http.ResponseWriter
-}
-
-type responseWriterDelegator struct {
-	http.ResponseWriter
-
-	handler, method    string
-	status             int
-	written            int64
-	wroteHeader        bool
-	observeWriteHeader func(int)
-}
-
-func (r *responseWriterDelegator) Status() int {
-	return r.status
-}
-
-func (r *responseWriterDelegator) Written() int64 {
-	return r.written
-}
-
-func (r *responseWriterDelegator) WriteHeader(code int) {
-	r.status = code
-	r.wroteHeader = true
-	r.ResponseWriter.WriteHeader(code)
-	if r.observeWriteHeader != nil {
-		r.observeWriteHeader(code)
-	}
-}
-
-func (r *responseWriterDelegator) Write(b []byte) (int, error) {
-	if !r.wroteHeader {
-		r.WriteHeader(http.StatusOK)
-	}
-	n, err := r.ResponseWriter.Write(b)
-	r.written += int64(n)
-	return n, err
-}
-
-type fancyDelegator struct {
-	*responseWriterDelegator
-}
-
-func (r *fancyDelegator) CloseNotify() <-chan bool {
-	return r.ResponseWriter.(http.CloseNotifier).CloseNotify()
-}
-
-func (r *fancyDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return r.ResponseWriter.(http.Hijacker).Hijack()
-}
-
-func (r *fancyDelegator) Flush() {
-	r.ResponseWriter.(http.Flusher).Flush()
-}
-
-func (r *fancyDelegator) ReadFrom(re io.Reader) (int64, error) {
-	if !r.wroteHeader {
-		r.WriteHeader(http.StatusOK)
-	}
-	n, err := r.ResponseWriter.(io.ReaderFrom).ReadFrom(re)
-	r.written += n
-	return n, err
 }

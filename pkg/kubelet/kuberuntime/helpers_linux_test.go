@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -89,8 +89,7 @@ func TestMilliCPUToQuota(t *testing.T) {
 }
 
 func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
-	utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUCFSQuotaPeriod, true)
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUCFSQuotaPeriod, false)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUCFSQuotaPeriod, true)()
 
 	for _, testCase := range []struct {
 		msg      string

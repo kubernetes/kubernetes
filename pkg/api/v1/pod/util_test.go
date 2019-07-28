@@ -28,6 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestFindPort(t *testing.T) {
@@ -198,7 +201,137 @@ func TestFindPort(t *testing.T) {
 	}
 }
 
+func TestVisitContainers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
+	testCases := []struct {
+		description string
+		haveSpec    *v1.PodSpec
+		wantNames   []string
+	}{
+		{
+			"empty podspec",
+			&v1.PodSpec{},
+			[]string{},
+		},
+		{
+			"regular containers",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+			},
+			[]string{"c1", "c2"},
+		},
+		{
+			"init containers",
+			&v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2"},
+		},
+		{
+			"regular and init containers",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+		{
+			"ephemeral containers",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+				},
+			},
+			[]string{"c1", "c2", "e1"},
+		},
+		{
+			"all container types",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+		},
+		{
+			"dropping fields",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &v1.SecurityContext{}},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &v1.SecurityContext{}},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2", SecurityContext: &v1.SecurityContext{}}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+		},
+	}
+
+	for _, tc := range testCases {
+		gotNames := []string{}
+		VisitContainers(tc.haveSpec, func(c *v1.Container) bool {
+			gotNames = append(gotNames, c.Name)
+			if c.SecurityContext != nil {
+				c.SecurityContext = nil
+			}
+			return true
+		})
+		if !reflect.DeepEqual(gotNames, tc.wantNames) {
+			t.Errorf("VisitContainers() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
+		}
+		for _, c := range tc.haveSpec.Containers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+		for _, c := range tc.haveSpec.InitContainers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for init container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+		for _, c := range tc.haveSpec.EphemeralContainers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for ephemeral container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+	}
+}
+
 func TestPodSecrets(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
 	pod := &v1.Pod{
@@ -268,7 +401,22 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: v1.VolumeSource{
 					StorageOS: &v1.StorageOSVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					CSI: &v1.CSIVolumeSource{
+						NodePublishSecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
+			EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					EnvFrom: []v1.EnvFromSource{{
+						SecretRef: &v1.SecretEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef"}}}},
+					Env: []v1.EnvVar{{
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef"}}}}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -286,6 +434,8 @@ func TestPodSecrets(t *testing.T) {
 	expectedSecretPaths := sets.NewString(
 		"Spec.Containers[*].EnvFrom[*].SecretRef",
 		"Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef",
 		"Spec.ImagePullSecrets",
 		"Spec.InitContainers[*].EnvFrom[*].SecretRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
@@ -300,6 +450,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
 		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 		"Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
+		"Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef",
 	)
 	secretPaths := collectResourcePaths(t, "secret", nil, "", reflect.TypeOf(&v1.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -340,6 +491,11 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	case reflect.Ptr:
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
+		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
+		// it contains cycles so it's easiest to just skip it.
+		if name == "ObjectMeta" {
+			break
+		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
 			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).List()...)
@@ -358,6 +514,8 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 }
 
 func TestPodConfigmaps(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	// Stub containing all possible ConfigMap references in a pod.
 	// The names of the referenced ConfigMaps match struct paths detected by reflection.
 	pod := &v1.Pod{
@@ -372,6 +530,17 @@ func TestPodConfigmaps(t *testing.T) {
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
 								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+			EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					EnvFrom: []v1.EnvFromSource{{
+						ConfigMapRef: &v1.ConfigMapEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef"}}}},
+					Env: []v1.EnvVar{{
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
 			InitContainers: []v1.Container{{
 				EnvFrom: []v1.EnvFromSource{{
 					ConfigMapRef: &v1.ConfigMapEnvSource{
@@ -406,6 +575,8 @@ func TestPodConfigmaps(t *testing.T) {
 	expectedPaths := sets.NewString(
 		"Spec.Containers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.InitContainers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap",
@@ -594,8 +765,7 @@ func TestUpdatePodCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var resultStatus bool
-		resultStatus = UpdatePodCondition(test.status, &test.conditions)
+		resultStatus := UpdatePodCondition(test.status, &test.conditions)
 
 		assert.Equal(t, test.expected, resultStatus, test.desc)
 	}

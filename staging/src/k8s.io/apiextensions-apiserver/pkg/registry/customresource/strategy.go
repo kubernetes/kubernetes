@@ -35,6 +35,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
@@ -45,11 +47,12 @@ type customResourceStrategy struct {
 
 	namespaceScoped bool
 	validator       customResourceValidator
+	schemas         map[string]*structuralschema.Structural
 	status          *apiextensions.CustomResourceSubresourceStatus
 	scale           *apiextensions.CustomResourceSubresourceScale
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, schemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
 	return customResourceStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
@@ -62,6 +65,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			schemaValidator:       schemaValidator,
 			statusSchemaValidator: statusSchemaValidator,
 		},
+		schemas: schemas,
 	}
 }
 
@@ -87,48 +91,58 @@ func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
-		return
-	}
-
 	newCustomResourceObject := obj.(*unstructured.Unstructured)
 	oldCustomResourceObject := old.(*unstructured.Unstructured)
 
 	newCustomResource := newCustomResourceObject.UnstructuredContent()
 	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
 
-	// update is not allowed to set status
-	_, ok1 := newCustomResource["status"]
-	_, ok2 := oldCustomResource["status"]
-	switch {
-	case ok2:
-		newCustomResource["status"] = oldCustomResource["status"]
-	case ok1:
-		delete(newCustomResource, "status")
+	// If the /status subresource endpoint is installed, update is not allowed to set status.
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
+		_, ok1 := newCustomResource["status"]
+		_, ok2 := oldCustomResource["status"]
+		switch {
+		case ok2:
+			newCustomResource["status"] = oldCustomResource["status"]
+		case ok1:
+			delete(newCustomResource, "status")
+		}
 	}
 
-	// Any changes to the spec increment the generation number, any changes to the
-	// status should reflect the generation number of the corresponding object. We push
-	// the burden of managing the status onto the clients because we can't (in general)
-	// know here what version of spec the writer of the status has seen. It may seem like
-	// we can at first -- since obj contains spec -- but in the future we will probably make
-	// status its own object, and even if we don't, writes may be the result of a
-	// read-update-write loop, so the contents of spec may not actually be the spec that
-	// the CustomResource has *seen*.
-	newSpec, ok1 := newCustomResource["spec"]
-	oldSpec, ok2 := oldCustomResource["spec"]
-
-	// spec is changed, created or deleted
-	if (ok1 && ok2 && !apiequality.Semantic.DeepEqual(oldSpec, newSpec)) || (ok1 && !ok2) || (!ok1 && ok2) {
+	// except for the changes to `metadata`, any other changes
+	// cause the generation to increment.
+	newCopyContent := copyNonMetadata(newCustomResource)
+	oldCopyContent := copyNonMetadata(oldCustomResource)
+	if !apiequality.Semantic.DeepEqual(newCopyContent, oldCopyContent) {
 		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
 		newAccessor, _ := meta.Accessor(newCustomResourceObject)
 		newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
 	}
 }
 
+func copyNonMetadata(original map[string]interface{}) map[string]interface{} {
+	ret := make(map[string]interface{})
+	for key, val := range original {
+		if key == "metadata" {
+			continue
+		}
+		ret[key] = val
+	}
+	return ret
+}
+
 // Validate validates a new CustomResource.
 func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return a.validator.Validate(ctx, obj, a.scale)
+	var errs field.ErrorList
+	errs = append(errs, a.validator.Validate(ctx, obj, a.scale)...)
+
+	// validate embedded resources
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		v := obj.GetObjectKind().GroupVersionKind().Version
+		errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.schemas[v], false)...)
+	}
+
+	return errs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -148,16 +162,25 @@ func (customResourceStrategy) AllowUnconditionalUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return a.validator.ValidateUpdate(ctx, obj, old, a.scale)
+	var errs field.ErrorList
+	errs = append(errs, a.validator.ValidateUpdate(ctx, obj, old, a.scale)...)
+
+	// Checks the embedded objects. We don't make a difference between update and create for those.
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		v := obj.GetObjectKind().GroupVersionKind().Version
+		errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.schemas[v], false)...)
+	}
+
+	return errs
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
-	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), accessor.GetInitializers() != nil, nil
+	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), nil
 }
 
 // objectMetaFieldsSet returns a fields that represent the ObjectMeta.

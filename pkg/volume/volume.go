@@ -101,6 +101,12 @@ type Attributes struct {
 	SupportsSELinux bool
 }
 
+// MounterArgs provides more easily extensible arguments to Mounter
+type MounterArgs struct {
+	FsGroup     *int64
+	DesiredSize *resource.Quantity
+}
+
 // Mounter interface provides methods to set up/mount the volume.
 type Mounter interface {
 	// Uses Interface to provide the path for Docker binds.
@@ -122,14 +128,14 @@ type Mounter interface {
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp(fsGroup *int64) error
+	SetUp(mounterArgs MounterArgs) error
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, fsGroup *int64) error
+	SetUpAt(dir string, mounterArgs MounterArgs) error
 	// GetAttributes returns the attributes of the mounter.
 	// This function is called after SetUp()/SetUpAt().
 	GetAttributes() Attributes
@@ -259,29 +265,4 @@ type DeviceUnmounter interface {
 	// should only be called once all bind mounts have been
 	// unmounted.
 	UnmountDevice(deviceMountPath string) error
-}
-
-// NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError
-// error.
-func NewDeletedVolumeInUseError(message string) error {
-	return deletedVolumeInUseError(message)
-}
-
-type deletedVolumeInUseError string
-
-var _ error = deletedVolumeInUseError("")
-
-// IsDeletedVolumeInUse returns true if an error returned from Delete() is
-// deletedVolumeInUseError
-func IsDeletedVolumeInUse(err error) bool {
-	switch err.(type) {
-	case deletedVolumeInUseError:
-		return true
-	default:
-		return false
-	}
-}
-
-func (err deletedVolumeInUseError) Error() string {
-	return string(err)
 }

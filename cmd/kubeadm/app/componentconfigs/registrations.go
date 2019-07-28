@@ -74,10 +74,7 @@ func (r Registration) Unmarshal(fileContent []byte) (runtime.Object, error) {
 
 func unmarshalObject(obj runtime.Object, fileContent []byte) error {
 	// Decode the file content  using the componentconfig Codecs that knows about all APIs
-	if err := runtime.DecodeInto(Codecs.UniversalDecoder(), fileContent, obj); err != nil {
-		return err
-	}
-	return nil
+	return runtime.DecodeInto(Codecs.UniversalDecoder(), fileContent, obj)
 }
 
 const (

@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -73,10 +75,15 @@ func (c *nodes) Get(name string, options metav1.GetOptions) (result *v1.Node, er
 
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
 func (c *nodes) List(opts metav1.ListOptions) (result *v1.NodeList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -84,10 +91,15 @@ func (c *nodes) List(opts metav1.ListOptions) (result *v1.NodeList, err error) {
 
 // Watch returns a watch.Interface that watches the requested nodes.
 func (c *nodes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -141,9 +153,14 @@ func (c *nodes) Delete(name string, options *metav1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *nodes) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Resource("nodes").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

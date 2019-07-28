@@ -19,7 +19,7 @@ limitations under the License.
 package statusupdater
 
 import (
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -65,7 +65,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		if errors.IsNotFound(err) {
 			// If node does not exist, its status cannot be updated.
 			// Do nothing so that there is no retry until node is created.
-			glog.V(2).Infof(
+			klog.V(2).Infof(
 				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
 				nodeName,
 				err)
@@ -73,7 +73,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		} else if err != nil {
 			// For all other errors, log error and reset flag statusUpdateNeeded
 			// back to true to indicate this node status needs to be updated again.
-			glog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
+			klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 			continue
 		}
@@ -83,7 +83,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 			// to indicate this node status needs to be updated again
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 
-			glog.V(2).Infof(
+			klog.V(2).Infof(
 				"Could not update node status for %q; re-marking for update. %v",
 				nodeName,
 				err)
@@ -103,6 +103,6 @@ func (nsu *nodeStatusUpdater) updateNodeStatus(nodeName types.NodeName, nodeObj 
 		return err
 	}
 
-	glog.V(4).Infof("Updating status %q for node %q succeeded. VolumesAttached: %v", patchBytes, nodeName, attachedVolumes)
+	klog.V(4).Infof("Updating status %q for node %q succeeded. VolumesAttached: %v", patchBytes, nodeName, attachedVolumes)
 	return nil
 }

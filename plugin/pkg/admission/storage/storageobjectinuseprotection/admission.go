@@ -19,7 +19,7 @@ package storageobjectinuseprotection
 import (
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -65,7 +65,7 @@ var (
 //
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
-func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
+func (c *storageProtectionPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		return nil
 	}
@@ -97,7 +97,7 @@ func (c *storageProtectionPlugin) admitPV(a admission.Attributes) error {
 			return nil
 		}
 	}
-	glog.V(4).Infof("adding PV protection finalizer to %s", pv.Name)
+	klog.V(4).Infof("adding PV protection finalizer to %s", pv.Name)
 	pv.Finalizers = append(pv.Finalizers, volumeutil.PVProtectionFinalizer)
 
 	return nil
@@ -121,7 +121,7 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 		}
 	}
 
-	glog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
 	return nil
 }

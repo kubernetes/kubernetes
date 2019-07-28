@@ -19,9 +19,9 @@ package master
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
@@ -49,9 +50,10 @@ const kubernetesServiceName = "kubernetes"
 // "default", "kube-system" and "kube-public" namespaces, and provide the IP
 // repair check on service IPs
 type Controller struct {
-	ServiceClient   coreclient.ServicesGetter
-	NamespaceClient coreclient.NamespacesGetter
-	EventClient     coreclient.EventsGetter
+	ServiceClient   corev1client.ServicesGetter
+	NamespaceClient corev1client.NamespacesGetter
+	EventClient     corev1client.EventsGetter
+	healthClient    rest.Interface
 
 	ServiceClusterIPRegistry rangeallocation.RangeRegistry
 	ServiceClusterIPInterval time.Duration
@@ -72,8 +74,8 @@ type Controller struct {
 	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
 	ServiceIP                 net.IP
 	ServicePort               int
-	ExtraServicePorts         []api.ServicePort
-	ExtraEndpointPorts        []api.EndpointPort
+	ExtraServicePorts         []corev1.ServicePort
+	ExtraEndpointPorts        []corev1.EndpointPort
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
@@ -81,10 +83,10 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter, eventClient coreclient.EventsGetter) *Controller {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, healthClient rest.Interface) *Controller {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
-		glog.Fatalf("failed to get listener address: %v", err)
+		klog.Fatalf("failed to get listener address: %v", err)
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic}
@@ -96,6 +98,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		ServiceClient:   serviceClient,
 		NamespaceClient: nsClient,
 		EventClient:     eventClient,
+		healthClient:    healthClient,
 
 		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
@@ -139,21 +142,23 @@ func (c *Controller) Start() {
 		return
 	}
 
+	// Reconcile during first run removing itself until server is ready.
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
+		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
+	}
+
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.EventClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
 		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
-		glog.Fatalf("Unable to perform initial IP allocation check: %v", err)
+		klog.Fatalf("Unable to perform initial IP allocation check: %v", err)
 	}
 	if err := repairNodePorts.RunOnce(); err != nil {
 		// If we fail to repair node ports apiserver is useless. We should restart and retry.
-		glog.Fatalf("Unable to perform initial service nodePort check: %v", err)
-	}
-	// Service definition is reconciled during first run to correct port and type per expectations.
-	if err := c.UpdateKubernetesService(true); err != nil {
-		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
+		klog.Fatalf("Unable to perform initial service nodePort check: %v", err)
 	}
 
 	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
@@ -168,9 +173,10 @@ func (c *Controller) Stop() {
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
-		glog.Infof("Shutting down kubernetes service endpoint reconciler")
-		if err := c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts); err != nil {
-			glog.Error(err)
+		klog.Infof("Shutting down kubernetes service endpoint reconciler")
+		c.EndpointReconciler.StopReconciling()
+		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
+			klog.Error(err)
 		}
 	}()
 
@@ -179,7 +185,7 @@ func (c *Controller) Stop() {
 		// done
 	case <-time.After(2 * c.EndpointInterval):
 		// don't block server shutdown forever if we can't reach etcd to remove ourselves
-		glog.Warning("StopReconciling() timed out")
+		klog.Warning("RemoveEndpoints() timed out")
 	}
 }
 
@@ -197,7 +203,14 @@ func (c *Controller) RunKubernetesNamespaces(ch chan struct{}) {
 
 // RunKubernetesService periodically updates the kubernetes service
 func (c *Controller) RunKubernetesService(ch chan struct{}) {
-	wait.Until(func() {
+	// wait until process is ready
+	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+		var code int
+		c.healthClient.Get().AbsPath("/healthz").Do().StatusCode(&code)
+		return code == http.StatusOK, nil
+	}, ch)
+
+	wait.NonSlidingUntil(func() {
 		// Service definition is not reconciled after first
 		// run, ports and type will be corrected only during
 		// start.
@@ -230,17 +243,17 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
-func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string, extraServicePorts []api.ServicePort) ([]api.ServicePort, api.ServiceType) {
+func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string, extraServicePorts []corev1.ServicePort) ([]corev1.ServicePort, corev1.ServiceType) {
 	//Use the Cluster IP type for the service port if NodePort isn't provided.
 	//Otherwise, we will be binding the master service to a NodePort.
-	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
+	servicePorts := []corev1.ServicePort{{Protocol: corev1.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
 		TargetPort: intstr.FromInt(targetServicePort)}}
-	serviceType := api.ServiceTypeClusterIP
+	serviceType := corev1.ServiceTypeClusterIP
 	if nodePort > 0 {
 		servicePorts[0].NodePort = int32(nodePort)
-		serviceType = api.ServiceTypeNodePort
+		serviceType = corev1.ServiceTypeNodePort
 	}
 	if extraServicePorts != nil {
 		servicePorts = append(servicePorts, extraServicePorts...)
@@ -249,8 +262,8 @@ func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort i
 }
 
 // createEndpointPortSpec creates an array of endpoint ports
-func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndpointPorts []api.EndpointPort) []api.EndpointPort {
-	endpointPorts := []api.EndpointPort{{Protocol: api.ProtocolTCP,
+func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndpointPorts []corev1.EndpointPort) []corev1.EndpointPort {
+	endpointPorts := []corev1.EndpointPort{{Protocol: corev1.ProtocolTCP,
 		Port: int32(endpointPort),
 		Name: endpointPortName,
 	}}
@@ -262,30 +275,30 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
+func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
 	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
 			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
-				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
+				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
 				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(svc)
 				return err
 			}
 		}
 		return nil
 	}
-	svc := &api.Service{
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: metav1.NamespaceDefault,
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
-		Spec: api.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Ports: servicePorts,
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
-			SessionAffinity: api.ServiceAffinityNone,
+			SessionAffinity: corev1.ServiceAffinityNone,
 			Type:            serviceType,
 		},
 	}

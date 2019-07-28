@@ -16,7 +16,46 @@ import (
 
 type Handle uintptr
 
-const InvalidHandle = ^Handle(0)
+const (
+	InvalidHandle = ^Handle(0)
+
+	// Flags for DefineDosDevice.
+	DDD_EXACT_MATCH_ON_REMOVE = 0x00000004
+	DDD_NO_BROADCAST_SYSTEM   = 0x00000008
+	DDD_RAW_TARGET_PATH       = 0x00000001
+	DDD_REMOVE_DEFINITION     = 0x00000002
+
+	// Return values for GetDriveType.
+	DRIVE_UNKNOWN     = 0
+	DRIVE_NO_ROOT_DIR = 1
+	DRIVE_REMOVABLE   = 2
+	DRIVE_FIXED       = 3
+	DRIVE_REMOTE      = 4
+	DRIVE_CDROM       = 5
+	DRIVE_RAMDISK     = 6
+
+	// File system flags from GetVolumeInformation and GetVolumeInformationByHandle.
+	FILE_CASE_SENSITIVE_SEARCH        = 0x00000001
+	FILE_CASE_PRESERVED_NAMES         = 0x00000002
+	FILE_FILE_COMPRESSION             = 0x00000010
+	FILE_DAX_VOLUME                   = 0x20000000
+	FILE_NAMED_STREAMS                = 0x00040000
+	FILE_PERSISTENT_ACLS              = 0x00000008
+	FILE_READ_ONLY_VOLUME             = 0x00080000
+	FILE_SEQUENTIAL_WRITE_ONCE        = 0x00100000
+	FILE_SUPPORTS_ENCRYPTION          = 0x00020000
+	FILE_SUPPORTS_EXTENDED_ATTRIBUTES = 0x00800000
+	FILE_SUPPORTS_HARD_LINKS          = 0x00400000
+	FILE_SUPPORTS_OBJECT_IDS          = 0x00010000
+	FILE_SUPPORTS_OPEN_BY_FILE_ID     = 0x01000000
+	FILE_SUPPORTS_REPARSE_POINTS      = 0x00000080
+	FILE_SUPPORTS_SPARSE_FILES        = 0x00000040
+	FILE_SUPPORTS_TRANSACTIONS        = 0x00200000
+	FILE_SUPPORTS_USN_JOURNAL         = 0x02000000
+	FILE_UNICODE_ON_DISK              = 0x00000004
+	FILE_VOLUME_IS_COMPRESSED         = 0x00008000
+	FILE_VOLUME_QUOTAS                = 0x00000020
+)
 
 // StringToUTF16 is deprecated. Use UTF16FromString instead.
 // If s contains a NUL byte this function panics instead of
@@ -73,12 +112,14 @@ func Getpagesize() int { return 4096 }
 
 // NewCallback converts a Go function to a function pointer conforming to the stdcall calling convention.
 // This is useful when interoperating with Windows code requiring callbacks.
+// The argument is expected to be a function with with one uintptr-sized result. The function must not have arguments with size larger than the size of uintptr.
 func NewCallback(fn interface{}) uintptr {
 	return syscall.NewCallback(fn)
 }
 
 // NewCallbackCDecl converts a Go function to a function pointer conforming to the cdecl calling convention.
 // This is useful when interoperating with Windows code requiring callbacks.
+// The argument is expected to be a function with with one uintptr-sized result. The function must not have arguments with size larger than the size of uintptr.
 func NewCallbackCDecl(fn interface{}) uintptr {
 	return syscall.NewCallbackCDecl(fn)
 }
@@ -131,6 +172,7 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	GetProcessTimes(handle Handle, creationTime *Filetime, exitTime *Filetime, kernelTime *Filetime, userTime *Filetime) (err error)
 //sys	DuplicateHandle(hSourceProcessHandle Handle, hSourceHandle Handle, hTargetProcessHandle Handle, lpTargetHandle *Handle, dwDesiredAccess uint32, bInheritHandle bool, dwOptions uint32) (err error)
 //sys	WaitForSingleObject(handle Handle, waitMilliseconds uint32) (event uint32, err error) [failretval==0xffffffff]
+//sys	waitForMultipleObjects(count uint32, handles uintptr, waitAll bool, waitMilliseconds uint32) (event uint32, err error) [failretval==0xffffffff] = WaitForMultipleObjects
 //sys	GetTempPath(buflen uint32, buf *uint16) (n uint32, err error) = GetTempPathW
 //sys	CreatePipe(readhandle *Handle, writehandle *Handle, sa *SecurityAttributes, size uint32) (err error)
 //sys	GetFileType(filehandle Handle) (n uint32, err error)
@@ -199,6 +241,27 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	SetEvent(event Handle) (err error) = kernel32.SetEvent
 //sys	ResetEvent(event Handle) (err error) = kernel32.ResetEvent
 //sys	PulseEvent(event Handle) (err error) = kernel32.PulseEvent
+
+// Volume Management Functions
+//sys	DefineDosDevice(flags uint32, deviceName *uint16, targetPath *uint16) (err error) = DefineDosDeviceW
+//sys	DeleteVolumeMountPoint(volumeMountPoint *uint16) (err error) = DeleteVolumeMountPointW
+//sys	FindFirstVolume(volumeName *uint16, bufferLength uint32) (handle Handle, err error) [failretval==InvalidHandle] = FindFirstVolumeW
+//sys	FindFirstVolumeMountPoint(rootPathName *uint16, volumeMountPoint *uint16, bufferLength uint32) (handle Handle, err error) [failretval==InvalidHandle] = FindFirstVolumeMountPointW
+//sys	FindNextVolume(findVolume Handle, volumeName *uint16, bufferLength uint32) (err error) = FindNextVolumeW
+//sys	FindNextVolumeMountPoint(findVolumeMountPoint Handle, volumeMountPoint *uint16, bufferLength uint32) (err error) = FindNextVolumeMountPointW
+//sys	FindVolumeClose(findVolume Handle) (err error)
+//sys	FindVolumeMountPointClose(findVolumeMountPoint Handle) (err error)
+//sys	GetDriveType(rootPathName *uint16) (driveType uint32) = GetDriveTypeW
+//sys	GetLogicalDrives() (drivesBitMask uint32, err error) [failretval==0]
+//sys	GetLogicalDriveStrings(bufferLength uint32, buffer *uint16) (n uint32, err error) [failretval==0] = GetLogicalDriveStringsW
+//sys	GetVolumeInformation(rootPathName *uint16, volumeNameBuffer *uint16, volumeNameSize uint32, volumeNameSerialNumber *uint32, maximumComponentLength *uint32, fileSystemFlags *uint32, fileSystemNameBuffer *uint16, fileSystemNameSize uint32) (err error) = GetVolumeInformationW
+//sys	GetVolumeInformationByHandle(file Handle, volumeNameBuffer *uint16, volumeNameSize uint32, volumeNameSerialNumber *uint32, maximumComponentLength *uint32, fileSystemFlags *uint32, fileSystemNameBuffer *uint16, fileSystemNameSize uint32) (err error) = GetVolumeInformationByHandleW
+//sys	GetVolumeNameForVolumeMountPoint(volumeMountPoint *uint16, volumeName *uint16, bufferlength uint32) (err error) = GetVolumeNameForVolumeMountPointW
+//sys	GetVolumePathName(fileName *uint16, volumePathName *uint16, bufferLength uint32) (err error) = GetVolumePathNameW
+//sys	GetVolumePathNamesForVolumeName(volumeName *uint16, volumePathNames *uint16, bufferLength uint32, returnLength *uint32) (err error) = GetVolumePathNamesForVolumeNameW
+//sys	QueryDosDevice(deviceName *uint16, targetPath *uint16, max uint32) (n uint32, err error) [failretval==0] = QueryDosDeviceW
+//sys	SetVolumeLabel(rootPathName *uint16, volumeName *uint16) (err error) = SetVolumeLabelW
+//sys	SetVolumeMountPoint(volumeMountPoint *uint16, volumeName *uint16) (err error) = SetVolumeMountPointW
 
 // syscall interface implementation for other packages
 
@@ -527,6 +590,18 @@ func LoadSetFileCompletionNotificationModes() error {
 	return procSetFileCompletionNotificationModes.Find()
 }
 
+func WaitForMultipleObjects(handles []Handle, waitAll bool, waitMilliseconds uint32) (event uint32, err error) {
+	// Every other win32 array API takes arguments as "pointer, count", except for this function. So we
+	// can't declare it as a usual [] type, because mksyscall will use the opposite order. We therefore
+	// trivially stub this ourselves.
+
+	var handlePtr *Handle
+	if len(handles) > 0 {
+		handlePtr = &handles[0]
+	}
+	return waitForMultipleObjects(uint32(len(handles)), uintptr(unsafe.Pointer(handlePtr)), waitAll, waitMilliseconds)
+}
+
 // net api calls
 
 const socket_error = uintptr(^uint32(0))
@@ -593,7 +668,7 @@ type RawSockaddr struct {
 
 type RawSockaddrAny struct {
 	Addr RawSockaddr
-	Pad  [96]int8
+	Pad  [100]int8
 }
 
 type Sockaddr interface {
@@ -642,19 +717,69 @@ func (sa *SockaddrInet6) sockaddr() (unsafe.Pointer, int32, error) {
 	return unsafe.Pointer(&sa.raw), int32(unsafe.Sizeof(sa.raw)), nil
 }
 
+type RawSockaddrUnix struct {
+	Family uint16
+	Path   [UNIX_PATH_MAX]int8
+}
+
 type SockaddrUnix struct {
 	Name string
+	raw  RawSockaddrUnix
 }
 
 func (sa *SockaddrUnix) sockaddr() (unsafe.Pointer, int32, error) {
-	// TODO(brainman): implement SockaddrUnix.sockaddr()
-	return nil, 0, syscall.EWINDOWS
+	name := sa.Name
+	n := len(name)
+	if n > len(sa.raw.Path) {
+		return nil, 0, syscall.EINVAL
+	}
+	if n == len(sa.raw.Path) && name[0] != '@' {
+		return nil, 0, syscall.EINVAL
+	}
+	sa.raw.Family = AF_UNIX
+	for i := 0; i < n; i++ {
+		sa.raw.Path[i] = int8(name[i])
+	}
+	// length is family (uint16), name, NUL.
+	sl := int32(2)
+	if n > 0 {
+		sl += int32(n) + 1
+	}
+	if sa.raw.Path[0] == '@' {
+		sa.raw.Path[0] = 0
+		// Don't count trailing NUL for abstract address.
+		sl--
+	}
+
+	return unsafe.Pointer(&sa.raw), sl, nil
 }
 
 func (rsa *RawSockaddrAny) Sockaddr() (Sockaddr, error) {
 	switch rsa.Addr.Family {
 	case AF_UNIX:
-		return nil, syscall.EWINDOWS
+		pp := (*RawSockaddrUnix)(unsafe.Pointer(rsa))
+		sa := new(SockaddrUnix)
+		if pp.Path[0] == 0 {
+			// "Abstract" Unix domain socket.
+			// Rewrite leading NUL as @ for textual display.
+			// (This is the standard convention.)
+			// Not friendly to overwrite in place,
+			// but the callers below don't care.
+			pp.Path[0] = '@'
+		}
+
+		// Assume path ends at NUL.
+		// This is not technically the Linux semantics for
+		// abstract Unix domain sockets--they are supposed
+		// to be uninterpreted fixed-size binary blobs--but
+		// everyone uses this convention.
+		n := 0
+		for n < len(pp.Path) && pp.Path[n] != 0 {
+			n++
+		}
+		bytes := (*[10000]byte)(unsafe.Pointer(&pp.Path[0]))[0:n]
+		sa.Name = string(bytes)
+		return sa, nil
 
 	case AF_INET:
 		pp := (*RawSockaddrInet4)(unsafe.Pointer(rsa))
@@ -794,6 +919,75 @@ func ConnectEx(fd Handle, sa Sockaddr, sendBuf *byte, sendDataLen uint32, bytesS
 		return err
 	}
 	return connectEx(fd, ptr, n, sendBuf, sendDataLen, bytesSent, overlapped)
+}
+
+var sendRecvMsgFunc struct {
+	once     sync.Once
+	sendAddr uintptr
+	recvAddr uintptr
+	err      error
+}
+
+func loadWSASendRecvMsg() error {
+	sendRecvMsgFunc.once.Do(func() {
+		var s Handle
+		s, sendRecvMsgFunc.err = Socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+		if sendRecvMsgFunc.err != nil {
+			return
+		}
+		defer CloseHandle(s)
+		var n uint32
+		sendRecvMsgFunc.err = WSAIoctl(s,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			(*byte)(unsafe.Pointer(&WSAID_WSARECVMSG)),
+			uint32(unsafe.Sizeof(WSAID_WSARECVMSG)),
+			(*byte)(unsafe.Pointer(&sendRecvMsgFunc.recvAddr)),
+			uint32(unsafe.Sizeof(sendRecvMsgFunc.recvAddr)),
+			&n, nil, 0)
+		if sendRecvMsgFunc.err != nil {
+			return
+		}
+		sendRecvMsgFunc.err = WSAIoctl(s,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			(*byte)(unsafe.Pointer(&WSAID_WSASENDMSG)),
+			uint32(unsafe.Sizeof(WSAID_WSASENDMSG)),
+			(*byte)(unsafe.Pointer(&sendRecvMsgFunc.sendAddr)),
+			uint32(unsafe.Sizeof(sendRecvMsgFunc.sendAddr)),
+			&n, nil, 0)
+	})
+	return sendRecvMsgFunc.err
+}
+
+func WSASendMsg(fd Handle, msg *WSAMsg, flags uint32, bytesSent *uint32, overlapped *Overlapped, croutine *byte) error {
+	err := loadWSASendRecvMsg()
+	if err != nil {
+		return err
+	}
+	r1, _, e1 := syscall.Syscall6(sendRecvMsgFunc.sendAddr, 6, uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(flags), uintptr(unsafe.Pointer(bytesSent)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)))
+	if r1 == socket_error {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return err
+}
+
+func WSARecvMsg(fd Handle, msg *WSAMsg, bytesReceived *uint32, overlapped *Overlapped, croutine *byte) error {
+	err := loadWSASendRecvMsg()
+	if err != nil {
+		return err
+	}
+	r1, _, e1 := syscall.Syscall6(sendRecvMsgFunc.recvAddr, 5, uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(unsafe.Pointer(bytesReceived)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)), 0)
+	if r1 == socket_error {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return err
 }
 
 // Invented structures to support what package os expects.

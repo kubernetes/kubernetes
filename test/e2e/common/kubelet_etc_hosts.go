@@ -20,11 +20,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -36,7 +37,7 @@ const (
 	etcHostsOriginalPath       = "/etc/hosts-original"
 )
 
-var etcHostsImageName = imageutils.GetE2EImage(imageutils.Netexec)
+var etcHostsImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
 type KubeletManagedHostConfig struct {
 	hostNetworkPod *v1.Pod
@@ -57,34 +58,35 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 			1. The Pod with hostNetwork=false MUST have /etc/hosts of containers managed by the Kubelet.
 			2. The Pod with hostNetwork=false but the container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be managed by the Kubelet.
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
+		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
-		By("Setting up the test")
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.By("Setting up the test")
 		config.setup()
 
-		By("Running the test")
+		ginkgo.By("Running the test")
 		config.verifyEtcHosts()
 	})
 })
 
 func (config *KubeletManagedHostConfig) verifyEtcHosts() {
-	By("Verifying /etc/hosts of container is kubelet-managed for pod with hostNetwork=false")
+	ginkgo.By("Verifying /etc/hosts of container is kubelet-managed for pod with hostNetwork=false")
 	assertManagedStatus(config, etcHostsPodName, true, "busybox-1")
 	assertManagedStatus(config, etcHostsPodName, true, "busybox-2")
 
-	By("Verifying /etc/hosts of container is not kubelet-managed since container specifies /etc/hosts mount")
+	ginkgo.By("Verifying /etc/hosts of container is not kubelet-managed since container specifies /etc/hosts mount")
 	assertManagedStatus(config, etcHostsPodName, false, "busybox-3")
 
-	By("Verifying /etc/hosts content of container is not kubelet-managed for pod with hostNetwork=true")
+	ginkgo.By("Verifying /etc/hosts content of container is not kubelet-managed for pod with hostNetwork=true")
 	assertManagedStatus(config, etcHostsHostNetworkPodName, false, "busybox-1")
 	assertManagedStatus(config, etcHostsHostNetworkPodName, false, "busybox-2")
 }
 
 func (config *KubeletManagedHostConfig) setup() {
-	By("Creating hostNetwork=false pod")
+	ginkgo.By("Creating hostNetwork=false pod")
 	config.createPodWithoutHostNetwork()
 
-	By("Creating hostNetwork=true pod")
+	ginkgo.By("Creating hostNetwork=true pod")
 	config.createPodWithHostNetwork()
 }
 
@@ -126,7 +128,7 @@ func assertManagedStatus(
 			}
 		}
 
-		glog.Warningf(
+		klog.Warningf(
 			"For pod: %s, name: %s, expected %t, (/etc/hosts was %q), (/etc/hosts-original was %q), retryCount: %d",
 			podName, name, expectedIsManaged, etcHostsContent, etcHostsOriginalContent, retryCount)
 
@@ -135,11 +137,11 @@ func assertManagedStatus(
 	}
 
 	if expectedIsManaged {
-		framework.Failf(
+		e2elog.Failf(
 			"/etc/hosts file should be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
 			name, retryCount, etcHostsContent)
 	} else {
-		framework.Failf(
+		e2elog.Failf(
 			"/etc/hosts file should no be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
 			name, retryCount, etcHostsContent)
 	}

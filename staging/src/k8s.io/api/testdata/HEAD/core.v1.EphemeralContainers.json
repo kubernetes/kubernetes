@@ -1,0 +1,267 @@
+{
+  "kind": "EphemeralContainers",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
+    "resourceVersion": "16964250748386560239",
+    "generation": 8071137005907523419,
+    "creationTimestamp": null,
+    "deletionGracePeriodSeconds": -4955867275792137171,
+    "labels": {
+      "7": "8"
+    },
+    "annotations": {
+      "9": "10"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "14"
+    ],
+    "clusterName": "15",
+    "managedFields": [
+      {
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fields": {"18":{"19":null}}
+      }
+    ]
+  },
+  "ephemeralContainers": [
+    {
+      "name": "24",
+      "image": "25",
+      "command": [
+        "26"
+      ],
+      "args": [
+        "27"
+      ],
+      "workingDir": "28",
+      "ports": [
+        {
+          "name": "29",
+          "hostPort": -1821918122,
+          "containerPort": -439697596,
+          "protocol": "/ʕVŚ(ĿȊ甞谐颋ǅSǡ",
+          "hostIP": "30"
+        }
+      ],
+      "envFrom": [
+        {
+          "prefix": "31",
+          "configMapRef": {
+            "name": "32",
+            "optional": true
+          },
+          "secretRef": {
+            "name": "33",
+            "optional": true
+          }
+        }
+      ],
+      "env": [
+        {
+          "name": "34",
+          "value": "35",
+          "valueFrom": {
+            "fieldRef": {
+              "apiVersion": "36",
+              "fieldPath": "37"
+            },
+            "resourceFieldRef": {
+              "containerName": "38",
+              "resource": "39",
+              "divisor": "590"
+            },
+            "configMapKeyRef": {
+              "name": "40",
+              "key": "41",
+              "optional": false
+            },
+            "secretKeyRef": {
+              "name": "42",
+              "key": "43",
+              "optional": false
+            }
+          }
+        }
+      ],
+      "resources": {
+        "limits": {
+          "亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h": "494"
+        },
+        "requests": {
+          "ņɖ橙9ȫŚʒUɦOŖ樅尷": "239"
+        }
+      },
+      "volumeMounts": [
+        {
+          "name": "44",
+          "readOnly": true,
+          "mountPath": "45",
+          "subPath": "46",
+          "mountPropagation": "ĴC浔Ű壝ž",
+          "subPathExpr": "47"
+        }
+      ],
+      "volumeDevices": [
+        {
+          "name": "48",
+          "devicePath": "49"
+        }
+      ],
+      "livenessProbe": {
+        "exec": {
+          "command": [
+            "50"
+          ]
+        },
+        "httpGet": {
+          "path": "51",
+          "port": 1747809671,
+          "host": "52",
+          "scheme": "潁谯耨V6\u0026]鴍Ɋ恧ȭ%ƎÜ掸8½£.",
+          "httpHeaders": [
+            {
+              "name": "53",
+              "value": "54"
+            }
+          ]
+        },
+        "tcpSocket": {
+          "port": "55",
+          "host": "56"
+        },
+        "initialDelaySeconds": 1167335696,
+        "timeoutSeconds": -532496585,
+        "periodSeconds": 153426386,
+        "successThreshold": 1006284894,
+        "failureThreshold": -1623705764
+      },
+      "readinessProbe": {
+        "exec": {
+          "command": [
+            "57"
+          ]
+        },
+        "httpGet": {
+          "path": "58",
+          "port": "59",
+          "host": "60",
+          "scheme": "9Ȏ瀮",
+          "httpHeaders": [
+            {
+              "name": "61",
+              "value": "62"
+            }
+          ]
+        },
+        "tcpSocket": {
+          "port": -1081142510,
+          "host": "63"
+        },
+        "initialDelaySeconds": 1721139423,
+        "timeoutSeconds": 252483228,
+        "periodSeconds": -1077199580,
+        "successThreshold": 1633185252,
+        "failureThreshold": 1380868499
+      },
+      "lifecycle": {
+        "postStart": {
+          "exec": {
+            "command": [
+              "64"
+            ]
+          },
+          "httpGet": {
+            "path": "65",
+            "port": "66",
+            "host": "67",
+            "scheme": "譋娲瘹ɭȊɚɎ(",
+            "httpHeaders": [
+              {
+                "name": "68",
+                "value": "69"
+              }
+            ]
+          },
+          "tcpSocket": {
+            "port": "70",
+            "host": "71"
+          }
+        },
+        "preStop": {
+          "exec": {
+            "command": [
+              "72"
+            ]
+          },
+          "httpGet": {
+            "path": "73",
+            "port": 75785535,
+            "host": "74",
+            "scheme": "圬剴扲ȿQZ{ʁgɸ=ǤÆ碛,1ZƜ/",
+            "httpHeaders": [
+              {
+                "name": "75",
+                "value": "76"
+              }
+            ]
+          },
+          "tcpSocket": {
+            "port": "77",
+            "host": "78"
+          }
+        }
+      },
+      "terminationMessagePath": "79",
+      "terminationMessagePolicy": "ȪÆ",
+      "imagePullPolicy": "4懙鏮嵒ƫS捕ɷD¡轫n(鲼ƳÐƣKʘ",
+      "securityContext": {
+        "capabilities": {
+          "add": [
+            ":5塋訩塶\"=y钡n)İ笓"
+          ],
+          "drop": [
+            "筩ƐP_"
+          ]
+        },
+        "privileged": false,
+        "seLinuxOptions": {
+          "user": "80",
+          "role": "81",
+          "type": "82",
+          "level": "83"
+        },
+        "windowsOptions": {
+          "gmsaCredentialSpecName": "84",
+          "gmsaCredentialSpec": "85",
+          "runAsUserName": "86"
+        },
+        "runAsUser": -2890225091301830311,
+        "runAsGroup": 2270010876567964647,
+        "runAsNonRoot": false,
+        "readOnlyRootFilesystem": false,
+        "allowPrivilegeEscalation": true,
+        "procMount": "舁吉蓨O澘銈e棈_Ĭ"
+      },
+      "stdinOnce": true,
+      "tty": true,
+      "targetContainerName": "87"
+    }
+  ]
+}

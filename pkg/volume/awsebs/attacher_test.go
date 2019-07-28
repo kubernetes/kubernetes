@@ -20,14 +20,14 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/volume"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/klog"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/aws"
 )
 
 func TestGetVolumeName_Volume(t *testing.T) {
@@ -205,13 +205,6 @@ type detachCall struct {
 	ret           error
 }
 
-type diskIsAttachedCall struct {
-	diskName   aws.KubernetesVolumeID
-	nodeName   types.NodeName
-	isAttached bool
-	ret        error
-}
-
 func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
 	expected := &testcase.attach
 
@@ -232,7 +225,7 @@ func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName t
 		return "", errors.New("Unexpected AttachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
 
 	return expected.retDeviceName, expected.ret
 }
@@ -257,7 +250,7 @@ func (testcase *testcase) DetachDisk(diskName aws.KubernetesVolumeID, nodeName t
 		return "", errors.New("Unexpected DetachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
 
 	return expected.retDeviceName, expected.ret
 }

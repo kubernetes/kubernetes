@@ -89,18 +89,18 @@ func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 			},
 			VendorExtensible: openapi.VendorExtensible{
 				Extensions: openapi.Extensions{
-					"x-kubernetes-group-version-kind": []map[string]string{
-						{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
 							"group":   "",
 							"version": "v1",
 							"kind":    "Getter",
 						},
-						{
+						map[string]interface{}{
 							"group":   "batch",
 							"version": "v1",
 							"kind":    "Getter",
 						},
-						{
+						map[string]interface{}{
 							"group":   "extensions",
 							"version": "v1",
 							"kind":    "Getter",
@@ -137,7 +137,6 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 
 	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
 	config.OpenAPIConfig.Info.Version = "unversioned"
-	config.SwaggerConfig = DefaultSwaggerConfig()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
 
@@ -162,11 +161,6 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
-
-	// these values get defaulted
-	assert.Equal(net.JoinHostPort(config.PublicAddress.String(), "443"), s.ExternalAddress)
-	assert.NotNil(s.swaggerConfig)
-	assert.Equal("http://"+s.ExternalAddress, s.swaggerConfig.WebServicesUrl)
 }
 
 // Verifies that AddGroupVersions works as expected.
@@ -321,7 +315,7 @@ func TestInstallAPIGroups(t *testing.T) {
 func TestPrepareRun(t *testing.T) {
 	s, config, assert := newMaster(t)
 
-	assert.NotNil(config.SwaggerConfig)
+	assert.NotNil(config.OpenAPIConfig)
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
@@ -330,8 +324,8 @@ func TestPrepareRun(t *testing.T) {
 	s.PrepareRun()
 	s.RunPostStartHooks(done)
 
-	// swagger is installed in PrepareRun
-	resp, err := http.Get(server.URL + "/swaggerapi/")
+	// openapi is installed in PrepareRun
+	resp, err := http.Get(server.URL + "/openapi/v2")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
@@ -342,6 +336,46 @@ func TestPrepareRun(t *testing.T) {
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
+func TestUpdateOpenAPISpec(t *testing.T) {
+	s, _, assert := newMaster(t)
+	s.PrepareRun()
+	s.RunPostStartHooks(make(chan struct{}))
+
+	server := httptest.NewServer(s.Handler.Director)
+	defer server.Close()
+
+	// verify the static spec in record is what we currently serve
+	oldSpec, err := json.Marshal(s.StaticOpenAPISpec)
+	assert.NoError(err)
+
+	resp, err := http.Get(server.URL + "/openapi/v2")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	assert.Equal(oldSpec, body)
+	resp.Body.Close()
+
+	// verify we are able to update the served spec using the exposed service
+	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
+	swagger := new(openapi.Swagger)
+	err = json.Unmarshal(newSpec, swagger)
+	assert.NoError(err)
+
+	err = s.OpenAPIVersionedService.UpdateSpec(swagger)
+	assert.NoError(err)
+
+	resp, err = http.Get(server.URL + "/openapi/v2")
+	assert.NoError(err)
+	defer resp.Body.Close()
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	body, err = ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	assert.Equal(newSpec, body)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
@@ -406,10 +440,8 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.Authorization.Authorizer = &authz
 
-	config.EnableSwaggerUI = true
 	config.EnableIndex = true
 	config.EnableProfiling = true
-	config.SwaggerConfig = DefaultSwaggerConfig()
 
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
@@ -423,7 +455,6 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		route string
 	}{
 		{"/"},
-		{"/swagger-ui/"},
 		{"/debug/pprof/"},
 		{"/debug/flags/"},
 		{"/version"},
@@ -517,19 +548,23 @@ func TestGracefulShutdown(t *testing.T) {
 		return handler
 	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		wg.Done()
-		time.Sleep(2 * time.Second)
-		w.WriteHeader(http.StatusOK)
-		graceShutdown = true
-	})
-
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.Handler.NonGoRestfulMux.Handle("/test", handler)
+	twoSecondHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		wg.Done()
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+		graceShutdown = true
+	})
+	okHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Handler.NonGoRestfulMux.Handle("/test", twoSecondHandler)
+	s.Handler.NonGoRestfulMux.Handle("/200", okHandler)
 
 	insecureServer := &http.Server{
 		Addr:    "0.0.0.0:0",
@@ -544,9 +579,9 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// get port
 	serverPort := ln.Addr().(*net.TCPAddr).Port
-	err = RunServer(insecureServer, ln, 10*time.Second, stopCh)
+	stoppedCh, err := RunServer(insecureServer, ln, 10*time.Second, stopCh)
 	if err != nil {
-		t.Errorf("RunServer err: %v", err)
+		t.Fatalf("RunServer err: %v", err)
 	}
 
 	graceCh := make(chan struct{})
@@ -565,8 +600,15 @@ func TestGracefulShutdown(t *testing.T) {
 	// close stopCh after request sent to server to guarantee request handler is running.
 	wg.Wait()
 	close(stopCh)
+
+	time.Sleep(500 * time.Millisecond)
+	if _, err := http.Get("http://127.0.0.1:" + strconv.Itoa(serverPort) + "/200"); err == nil {
+		t.Errorf("Unexpected http success after stopCh was closed")
+	}
+
 	// wait for wait group handler finish
 	s.HandlerChainWaitGroup.Wait()
+	<-stoppedCh
 
 	// check server all handlers finished.
 	if !graceShutdown {

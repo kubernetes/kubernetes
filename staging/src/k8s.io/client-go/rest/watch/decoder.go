@@ -54,7 +54,7 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 		return "", nil, fmt.Errorf("unable to decode to metav1.Event")
 	}
 	switch got.Type {
-	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error):
+	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error), string(watch.Bookmark):
 	default:
 		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 	}

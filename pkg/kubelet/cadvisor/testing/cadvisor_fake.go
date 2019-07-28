@@ -33,7 +33,7 @@ const (
 	FakeMemoryCapacity     = 4026531840
 	FakeKernelVersion      = "3.16.0-0.bpo.4-amd64"
 	FakeContainerOsVersion = "Debian GNU/Linux 7 (wheezy)"
-	FakeDockerVersion      = "1.5.0"
+	FakeDockerVersion      = "1.13.1"
 )
 
 var _ cadvisor.Interface = new(Fake)

@@ -18,6 +18,7 @@ package features
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 )
 
 const (
@@ -32,24 +33,45 @@ const (
 	// beta: v1.9
 	//
 	// CustomResourceValidation is a list of validation methods for CustomResources
-	CustomResourceValidation utilfeature.Feature = "CustomResourceValidation"
+	CustomResourceValidation featuregate.Feature = "CustomResourceValidation"
+
+	// owner: @roycaihw, @sttts
+	// alpha: v1.14
+	//
+	// CustomResourcePublishOpenAPI enables publishing of CRD OpenAPI specs.
+	CustomResourcePublishOpenAPI featuregate.Feature = "CustomResourcePublishOpenAPI"
 
 	// owner: @sttts, @nikhita
 	// alpha: v1.10
 	// beta: v1.11
 	//
 	// CustomResourceSubresources defines the subresources for CustomResources
-	CustomResourceSubresources utilfeature.Feature = "CustomResourceSubresources"
+	CustomResourceSubresources featuregate.Feature = "CustomResourceSubresources"
+
+	// owner: @mbohlool, @roycaihw
+	// alpha: v1.13
+	//
+	// CustomResourceWebhookConversion defines the webhook conversion for Custom Resources.
+	CustomResourceWebhookConversion featuregate.Feature = "CustomResourceWebhookConversion"
+
+	// owner: @sttts
+	// alpha: v1.15
+	//
+	// CustomResourceDefaulting enables OpenAPI defaulting in CustomResources.
+	CustomResourceDefaulting featuregate.Feature = "CustomResourceDefaulting"
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
-	CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
+	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
 }

@@ -29,7 +29,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // CustomArgs is used tby the go2idl framework to pass args specific to this
@@ -117,11 +117,11 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 
 	for _, f := range pkg.Functions {
 		if f.Underlying == nil || f.Underlying.Kind != types.Func {
-			glog.Errorf("Malformed function: %#v", f)
+			klog.Errorf("Malformed function: %#v", f)
 			continue
 		}
 		if f.Underlying.Signature == nil {
-			glog.Errorf("Function without signature: %#v", f)
+			klog.Errorf("Function without signature: %#v", f)
 			continue
 		}
 		signature := f.Underlying.Signature
@@ -156,7 +156,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 			}
 			v.base = f
 			manualMap[key] = v
-			glog.V(6).Infof("found base defaulter function for %s from %s", key.Name, f.Name)
+			klog.V(6).Infof("found base defaulter function for %s from %s", key.Name, f.Name)
 		// Is one of the additional defaulters - a top level defaulter on a type that is
 		// also invoked.
 		case strings.HasPrefix(f.Name.Name, buffer.String()+"_"):
@@ -176,7 +176,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 			}
 			v.additional = append(v.additional, f)
 			manualMap[key] = v
-			glog.V(6).Infof("found additional defaulter function for %s from %s", key.Name, f.Name)
+			klog.V(6).Infof("found additional defaulter function for %s from %s", key.Name, f.Name)
 		}
 		buffer.Reset()
 		sw.Do("$.inType|objectdefaultfn$", args)
@@ -189,7 +189,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 			}
 			v.object = f
 			manualMap[key] = v
-			glog.V(6).Infof("found object defaulter function for %s from %s", key.Name, f.Name)
+			klog.V(6).Infof("found object defaulter function for %s from %s", key.Name, f.Name)
 		}
 		buffer.Reset()
 	}
@@ -198,7 +198,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	packages := generator.Packages{}
@@ -214,7 +214,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	// We are generating defaults only for packages that are explicitly
 	// passed as InputDir.
 	for _, i := range context.Inputs {
-		glog.V(5).Infof("considering pkg %q", i)
+		klog.V(5).Infof("considering pkg %q", i)
 		pkg := context.Universe[i]
 		if pkg == nil {
 			// If the input had no Go files, for example.
@@ -248,7 +248,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		shouldCreateObjectDefaulterFn := func(t *types.Type) bool {
 			if defaults, ok := existingDefaulters[t]; ok && defaults.object != nil {
 				// A default generator is defined
-				glog.V(5).Infof("  an object defaulter already exists as %s", defaults.base.Name)
+				klog.V(5).Infof("  an object defaulter already exists as %s", defaults.base.Name)
 				return false
 			}
 			// opt-out
@@ -285,7 +285,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			var err error
 			typesPkg, err = context.AddDirectory(filepath.Join(pkg.Path, inputTags[0]))
 			if err != nil {
-				glog.Fatalf("cannot import package %s", inputTags[0])
+				klog.Fatalf("cannot import package %s", inputTags[0])
 			}
 			// update context.Order to the latest context.Universe
 			orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
@@ -299,7 +299,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 			if namer.IsPrivateGoName(t.Name.Name) {
 				// We won't be able to convert to a private type.
-				glog.V(5).Infof("  found a type %v, but it is a private name", t)
+				klog.V(5).Infof("  found a type %v, but it is a private name", t)
 				continue
 			}
 
@@ -338,7 +338,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// prune any types that were not used
 			for t, d := range newDefaulters {
 				if d.object == nil {
-					glog.V(6).Infof("did not generate defaulter for %s because no child defaulters were registered", t.Name)
+					klog.V(6).Infof("did not generate defaulter for %s because no child defaulters were registered", t.Name)
 					delete(newDefaulters, t)
 				}
 			}
@@ -346,7 +346,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		if len(newDefaulters) == 0 {
-			glog.V(5).Infof("no defaulters in package %s", pkg.Name)
+			klog.V(5).Infof("no defaulters in package %s", pkg.Name)
 		}
 
 		path := pkg.Path
@@ -421,7 +421,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		parent.call = append(parent.call, newDefaults.object)
 		// if we will be generating the defaulter, it by definition is a covering
 		// defaulter, so we halt recursion
-		glog.V(6).Infof("the defaulter %s will be generated as an object defaulter", t.Name)
+		klog.V(6).Infof("the defaulter %s will be generated as an object defaulter", t.Name)
 		return parent
 
 	case defaults.object != nil:
@@ -434,7 +434,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		// if the base function indicates it "covers" (it already includes defaulters)
 		// we can halt recursion
 		if checkTag(defaults.base.CommentLines, "covers") {
-			glog.V(6).Infof("the defaulter %s indicates it covers all sub generators", t.Name)
+			klog.V(6).Infof("the defaulter %s indicates it covers all sub generators", t.Name)
 			return parent
 		}
 	}
@@ -496,7 +496,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		}
 	}
 	if len(parent.children) == 0 && len(parent.call) == 0 {
-		//glog.V(6).Infof("decided type %s needs no generation", t.Name)
+		//klog.V(6).Infof("decided type %s needs no generation", t.Name)
 		return nil
 	}
 	return parent
@@ -596,11 +596,11 @@ func (g *genDefaulter) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		return nil
 	}
 
-	glog.V(5).Infof("generating for type %v", t)
+	klog.V(5).Infof("generating for type %v", t)
 
 	callTree := newCallTreeForType(g.existingDefaulters, g.newDefaulters).build(t, true)
 	if callTree == nil {
-		glog.V(5).Infof("  no defaulters defined")
+		klog.V(5).Infof("  no defaulters defined")
 		return nil
 	}
 	i := 0
@@ -609,7 +609,7 @@ func (g *genDefaulter) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 			return
 		}
 		path := callPath(append(ancestors, current))
-		glog.V(5).Infof("  %d: %s", i, path)
+		klog.V(5).Infof("  %d: %s", i, path)
 		i++
 	})
 

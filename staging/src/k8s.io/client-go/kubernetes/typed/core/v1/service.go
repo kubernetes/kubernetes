@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -75,11 +77,16 @@ func (c *services) Get(name string, options metav1.GetOptions) (result *v1.Servi
 
 // List takes label and field selectors, and returns the list of Services that match those selectors.
 func (c *services) List(opts metav1.ListOptions) (result *v1.ServiceList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.ServiceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -87,11 +94,16 @@ func (c *services) List(opts metav1.ListOptions) (result *v1.ServiceList, err er
 
 // Watch returns a watch.Interface that watches the requested services.
 func (c *services) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 

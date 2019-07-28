@@ -101,7 +101,7 @@ func getKernelVersion() (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%d.%d.%s.%d\n", majorVersionNumber[0], minorVersionNumber[0], buildNumber, revision), nil
+	return fmt.Sprintf("%d.%d.%s.%d", majorVersionNumber[0], minorVersionNumber[0], buildNumber, revision), nil
 }
 
 // getOSImageVersion gets the osImage name and version.

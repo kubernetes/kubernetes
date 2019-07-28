@@ -23,14 +23,14 @@ set -o pipefail
 # echo "NOTE:"
 # echo "kubectl.sh is deprecated and will be removed soon."
 # echo "please replace all usage with calls to the kubectl"
-# echo "binary and ensure that it is in your PATH." 
+# echo "binary and ensure that it is in your PATH."
 # echo ""
 # echo "Please see 'kubectl help config' for more details"
 # echo "about configuring kubectl for your cluster."
 # echo "-=-=-=-=-=-=-=-=-=-="
 
 
-KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 source "${KUBE_ROOT}/cluster/clientbin.sh"
 

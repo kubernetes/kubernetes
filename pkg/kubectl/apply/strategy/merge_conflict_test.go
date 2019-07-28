@@ -26,19 +26,19 @@ var _ = Describe("Comparing fields of remote and recorded ", func() {
 	Context("Test conflict in map fields of remote and recorded", func() {
 		It("If conflicts found, expected return error", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1: "key1"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo2: "baz2-1"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1: "baz1-0"
@@ -53,7 +53,7 @@ spec:
 	Context("Test conflict in list fields of remote and recorded ", func() {
 		It("If conflicts found, expected return false", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -62,7 +62,7 @@ metadata:
   - "d"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -70,7 +70,7 @@ metadata:
   - "b"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -87,7 +87,7 @@ metadata:
 	Context("Test conflict in Map-List fields of remote and recorded ", func() {
 		It("should leave the item", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -97,7 +97,7 @@ spec:
         image: image1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -107,7 +107,7 @@ spec:
         image: image2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -125,21 +125,21 @@ spec:
 	Context("Test conflicts in nested map field", func() {
 		It("If conflicts found, expected return error", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1:
     name: "key1"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1:
     name: "baz1-0"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo1:
@@ -154,7 +154,7 @@ spec:
 	Context("Test conflicts in complicated map, list", func() {
 		It("Should catch conflict in key-value in map element", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -170,7 +170,7 @@ spec:
           hostPort: 2022
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -183,7 +183,7 @@ spec:
           hostPort: 2020
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:

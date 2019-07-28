@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
+load("@io_k8s_repo_infra//defs:go.bzl", "go_genrule")
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,6 +14,7 @@ go_library(
         "doc.go",
         "empty.go",
         "int.go",
+        "int32.go",
         "int64.go",
         "string.go",
     ],

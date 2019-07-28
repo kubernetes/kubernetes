@@ -210,10 +210,10 @@ function setup-base-image() {
     if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
         NODE_OS_DISTRIBUTION="gci"
     fi
-    
+
     source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
-    set-node-image
+    set-linux-node-image
   fi
 }
 
@@ -263,12 +263,12 @@ function prepare-node-upgrade() {
 
   # TODO(zmerlynn): How do we ensure kube-env is written in a ${version}-
   #                 compatible way?
-  write-node-env
+  write-linux-node-env
 
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
-  #                 through all create-node-instance-template implementations).
-  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
-  create-node-instance-template "${template_name}"
+  #                 through all create-linux-node-instance-template implementations).
+  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION} ${NODE_INSTANCE_PREFIX})
+  create-linux-node-instance-template "${template_name}"
   # The following is echo'd so that callers can get the template name.
   echo "Instance template name: ${template_name}"
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
@@ -373,7 +373,7 @@ function do-node-upgrade() {
   # Do the actual upgrade.
   # NOTE(zmerlynn): If you are changing this gcloud command, update
   #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
-  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
+  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION} ${NODE_INSTANCE_PREFIX})
   local old_templates=()
   local updates=()
   for group in ${INSTANCE_GROUPS[@]}; do

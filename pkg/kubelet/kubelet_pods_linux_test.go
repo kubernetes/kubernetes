@@ -23,13 +23,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/mount"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 func TestMakeMounts(t *testing.T) {
@@ -241,20 +241,15 @@ func TestMakeMounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			fm := &mount.FakeMounter{}
+			fhu := &mount.FakeHostUtil{}
+			fsp := &subpath.FakeSubpath{}
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
 					HostNetwork: true,
 				},
 			}
-			// test makeMounts with enabled mount propagation
-			err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-			if err != nil {
-				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-				return
-			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fhu, fsp, nil)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {
@@ -270,24 +265,6 @@ func TestMakeMounts(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
-
-			// test makeMounts with disabled mount propagation
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
-			if err != nil {
-				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-				return
-			}
-			mounts, _, err = makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
-			if !tc.expectErr {
-				expectedPrivateMounts := []kubecontainer.Mount{}
-				for _, mount := range tc.expectedMounts {
-					// all mounts are expected to be private when mount
-					// propagation is disabled
-					mount.Propagation = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
-					expectedPrivateMounts = append(expectedPrivateMounts, mount)
-				}
-				assert.Equal(t, expectedPrivateMounts, mounts, "mounts of container %+v", tc.container)
-			}
 		})
 	}
 }

@@ -13,6 +13,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/networking/v1:go_default_library",
+        "//pkg/apis/networking/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],

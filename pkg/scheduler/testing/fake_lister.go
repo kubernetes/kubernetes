@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 var _ algorithm.NodeLister = &FakeNodeLister{}
@@ -34,9 +33,9 @@ var _ algorithm.NodeLister = &FakeNodeLister{}
 // FakeNodeLister implements NodeLister on a []string for test purposes.
 type FakeNodeLister []*v1.Node
 
-// List returns nodes as a []string.
-func (f FakeNodeLister) List() ([]*v1.Node, error) {
-	return f, nil
+// ListNodes returns nodes as a []*v1.Node.
+func (f FakeNodeLister) ListNodes() []*v1.Node {
+	return f
 }
 
 var _ algorithm.PodLister = &FakePodLister{}
@@ -55,7 +54,7 @@ func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 }
 
 // FilteredList returns pods matching a pod filter and a label selector.
-func (f FakePodLister) FilteredList(podFilter schedulerinternalcache.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
+func (f FakePodLister) FilteredList(podFilter algorithm.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)

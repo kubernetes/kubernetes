@@ -21,14 +21,15 @@ import (
 	"sort"
 	"strings"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
 type mustRunAs struct {
-	opts *policy.SELinuxStrategyOptions
+	opts *api.SELinuxOptions
 }
 
 var _ SELinuxStrategy = &mustRunAs{}
@@ -40,14 +41,19 @@ func NewMustRunAs(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, erro
 	if options.SELinuxOptions == nil {
 		return nil, fmt.Errorf("MustRunAs requires SELinuxOptions")
 	}
+
+	internalSELinuxOptions := &api.SELinuxOptions{}
+	if err := v1.Convert_v1_SELinuxOptions_To_core_SELinuxOptions(options.SELinuxOptions, internalSELinuxOptions, nil); err != nil {
+		return nil, err
+	}
 	return &mustRunAs{
-		opts: options,
+		opts: internalSELinuxOptions,
 	}, nil
 }
 
 // Generate creates the SELinuxOptions based on constraint rules.
 func (s *mustRunAs) Generate(_ *api.Pod, _ *api.Container) (*api.SELinuxOptions, error) {
-	return s.opts.SELinuxOptions, nil
+	return s.opts, nil
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
@@ -58,20 +64,20 @@ func (s *mustRunAs) Validate(fldPath *field.Path, _ *api.Pod, _ *api.Container, 
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 		return allErrs
 	}
-	if !equalLevels(s.opts.SELinuxOptions.Level, seLinux.Level) {
-		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.Level)
+	if !equalLevels(s.opts.Level, seLinux.Level) {
+		detail := fmt.Sprintf("must be %s", s.opts.Level)
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("level"), seLinux.Level, detail))
 	}
-	if seLinux.Role != s.opts.SELinuxOptions.Role {
-		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.Role)
+	if seLinux.Role != s.opts.Role {
+		detail := fmt.Sprintf("must be %s", s.opts.Role)
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("role"), seLinux.Role, detail))
 	}
-	if seLinux.Type != s.opts.SELinuxOptions.Type {
-		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.Type)
+	if seLinux.Type != s.opts.Type {
+		detail := fmt.Sprintf("must be %s", s.opts.Type)
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), seLinux.Type, detail))
 	}
-	if seLinux.User != s.opts.SELinuxOptions.User {
-		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.User)
+	if seLinux.User != s.opts.User {
+		detail := fmt.Sprintf("must be %s", s.opts.User)
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), seLinux.User, detail))
 	}
 

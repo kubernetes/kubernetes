@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,13 +33,45 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
+	// All of these should do nothing (not panic, no side-effects)
+	cfgGens := []func() *rest.Config{
+		func() *rest.Config { return nil },
+		func() *rest.Config { return &rest.Config{} },
+		func() *rest.Config { return &rest.Config{BearerToken: "mu"} },
+	}
+	authcGens := []func() *AuthenticationInfo{
+		func() *AuthenticationInfo { return nil },
+		func() *AuthenticationInfo { return &AuthenticationInfo{} },
+	}
+	authzGens := []func() *AuthorizationInfo{
+		func() *AuthorizationInfo { return nil },
+		func() *AuthorizationInfo { return &AuthorizationInfo{} },
+	}
+	for _, cfgGen := range cfgGens {
+		for _, authcGen := range authcGens {
+			for _, authzGen := range authzGens {
+				pConfig := cfgGen()
+				pAuthc := authcGen()
+				pAuthz := authzGen()
+				AuthorizeClientBearerToken(pConfig, pAuthc, pAuthz)
+				if before, after := authcGen(), pAuthc; !reflect.DeepEqual(before, after) {
+					t.Errorf("AuthorizeClientBearerToken(%v, %#+v, %v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
+				}
+				if before, after := authzGen(), pAuthz; !reflect.DeepEqual(before, after) {
+					t.Errorf("AuthorizeClientBearerToken(%v, %v, %#+v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
+				}
+			}
+		}
+	}
+}
+
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
-	delegateConfig.SwaggerConfig = DefaultSwaggerConfig()
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
@@ -57,7 +90,9 @@ func TestNewWithDelegate(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	})
 
-	delegateServer.AddPostStartHook("delegate-post-start-hook", func(context PostStartHookContext) error {
+	delegatePostStartHookChan := make(chan struct{})
+	delegateServer.AddPostStartHookOrDie("delegate-post-start-hook", func(context PostStartHookContext) error {
+		defer close(delegatePostStartHookChan)
 		return nil
 	})
 
@@ -69,7 +104,6 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
-	wrappingConfig.SwaggerConfig = DefaultSwaggerConfig()
 
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
 		return fmt.Errorf("wrapping failed healthcheck")
@@ -84,7 +118,9 @@ func TestNewWithDelegate(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
-	wrappingServer.AddPostStartHook("wrapping-post-start-hook", func(context PostStartHookContext) error {
+	wrappingPostStartHookChan := make(chan struct{})
+	wrappingServer.AddPostStartHookOrDie("wrapping-post-start-hook", func(context PostStartHookContext) error {
+		defer close(wrappingPostStartHookChan)
 		return nil
 	})
 
@@ -95,6 +131,10 @@ func TestNewWithDelegate(t *testing.T) {
 
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()
+
+	// Wait for the hooks to finish before checking the response
+	<-delegatePostStartHookChan
+	<-wrappingPostStartHookChan
 
 	checkPath(server.URL, http.StatusOK, `{
   "paths": [
@@ -110,7 +150,14 @@ func TestNewWithDelegate(t *testing.T) {
     "/healthz/poststarthook/wrapping-post-start-hook",
     "/healthz/wrapping-health",
     "/metrics",
-    "/swaggerapi"
+    "/readyz",
+    "/readyz/delegate-health",
+    "/readyz/log",
+    "/readyz/ping",
+    "/readyz/poststarthook/delegate-post-start-hook",
+    "/readyz/poststarthook/generic-apiserver-start-informers",
+    "/readyz/poststarthook/wrapping-post-start-hook",
+    "/readyz/shutdown"
   ]
 }`, t)
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok

@@ -31,8 +31,8 @@ import (
 // CombinedInsecureServingOptions sets up to two insecure listeners for healthz and metrics. The flags
 // override the ComponentConfig and DeprecatedInsecureServingOptions values for both.
 type CombinedInsecureServingOptions struct {
-	Healthz *apiserveroptions.DeprecatedInsecureServingOptions
-	Metrics *apiserveroptions.DeprecatedInsecureServingOptions
+	Healthz *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
+	Metrics *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
 
 	BindPort    int    // overrides the structs above on ApplyTo, ignored on ApplyToFromLoadedConfig
 	BindAddress string // overrides the structs above on ApplyTo, ignored on ApplyToFromLoadedConfig
@@ -47,7 +47,7 @@ func (o *CombinedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.BindAddress, "address", o.BindAddress, "DEPRECATED: the IP address on which to listen for the --port port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces). See --bind-address instead.")
 	// MarkDeprecated hides the flag from the help. We don't want that:
 	// fs.MarkDeprecated("address", "see --bind-address instead.")
-	fs.IntVar(&o.BindPort, "port", o.BindPort, "DEPRECATED: the port on which to serve HTTP insecurely without authentication and authorization. If 0, don't serve HTTPS at all. See --secure-port instead.")
+	fs.IntVar(&o.BindPort, "port", o.BindPort, "DEPRECATED: the port on which to serve HTTP insecurely without authentication and authorization. If 0, don't serve plain HTTP at all. See --secure-port instead.")
 	// MarkDeprecated hides the flag from the help. We don't want that:
 	// fs.MarkDeprecated("port", "see --secure-port instead.")
 }
@@ -60,11 +60,11 @@ func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, c
 		return err
 	}
 
-	if err := o.Healthz.ApplyTo(&c.InsecureServing); err != nil {
+	if err := o.Healthz.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.Metrics != nil && (c.ComponentConfig.MetricsBindAddress != c.ComponentConfig.HealthzBindAddress || o.Healthz == nil) {
-		if err := o.Metrics.ApplyTo(&c.InsecureMetricsServing); err != nil {
+		if err := o.Metrics.ApplyTo(&c.InsecureMetricsServing, &c.LoopbackClientConfig); err != nil {
 			return err
 		}
 	}
@@ -108,7 +108,7 @@ func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerapp
 	return o.applyTo(c, componentConfig)
 }
 
-func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptions) error {
+func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback) error {
 	if is == nil {
 		*addr = ""
 	} else {
@@ -124,7 +124,7 @@ func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserv
 	return nil
 }
 
-func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptions, addr string) error {
+func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback, addr string) error {
 	if is == nil {
 		return nil
 	}
@@ -152,12 +152,12 @@ func (o *CombinedInsecureServingOptions) Validate() []error {
 
 	errors := []error{}
 
-	if o.BindPort < 0 || o.BindPort > 65335 {
-		errors = append(errors, fmt.Errorf("--port %v must be between 0 and 65335, inclusive. 0 for turning off insecure (HTTP) port", o.BindPort))
+	if o.BindPort < 0 || o.BindPort > 65535 {
+		errors = append(errors, fmt.Errorf("--port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port", o.BindPort))
 	}
 
 	if len(o.BindAddress) > 0 && net.ParseIP(o.BindAddress) == nil {
-		errors = append(errors, fmt.Errorf("--address has no valid IP address"))
+		errors = append(errors, fmt.Errorf("--address %v is an invalid IP address", o.BindAddress))
 	}
 
 	return errors

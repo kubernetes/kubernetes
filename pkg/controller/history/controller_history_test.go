@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	core "k8s.io/client-go/testing"
+	"time"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {
@@ -1545,12 +1546,14 @@ func TestSortControllerRevisions(t *testing.T) {
 		want      []string
 	}
 	testFn := func(test *testcase, t *testing.T) {
-		SortControllerRevisions(test.revisions)
-		for i := range test.revisions {
-			if test.revisions[i].Name != test.want[i] {
-				t.Errorf("%s: want %s at %d got %s", test.name, test.want[i], i, test.revisions[i].Name)
+		t.Run(test.name, func(t *testing.T) {
+			SortControllerRevisions(test.revisions)
+			for i := range test.revisions {
+				if test.revisions[i].Name != test.want[i] {
+					t.Errorf("%s: want %s at %d got %s", test.name, test.want[i], i, test.revisions[i].Name)
+				}
 			}
-		}
+		})
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
@@ -1559,17 +1562,32 @@ func TestSortControllerRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ss1Rev1.Namespace = ss1.Namespace
 	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev3, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ss1Rev3.Namespace = ss1.Namespace
+
+	ss1Rev3Time2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev3Time2.Namespace = ss1.Namespace
+	ss1Rev3Time2.CreationTimestamp = metav1.Time{Time: ss1Rev3.CreationTimestamp.Add(time.Second)}
+
+	ss1Rev3Time2Name2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev3Time2Name2.Namespace = ss1.Namespace
+	ss1Rev3Time2Name2.CreationTimestamp = metav1.Time{Time: ss1Rev3.CreationTimestamp.Add(time.Second)}
 
 	tests := []testcase{
 		{
@@ -1586,6 +1604,11 @@ func TestSortControllerRevisions(t *testing.T) {
 			name:      "reversed",
 			revisions: []*apps.ControllerRevision{ss1Rev3, ss1Rev2, ss1Rev1},
 			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name},
+		},
+		{
+			name:      "with ties",
+			revisions: []*apps.ControllerRevision{ss1Rev3, ss1Rev3Time2, ss1Rev2, ss1Rev1},
+			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name, ss1Rev3Time2.Name, ss1Rev3Time2Name2.Name},
 		},
 		{
 			name:      "empty",

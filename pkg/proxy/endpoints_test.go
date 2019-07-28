@@ -18,7 +18,9 @@ package proxy
 
 import (
 	"reflect"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -110,7 +112,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 
 	for tci, tc := range testCases {
 		// outputs
-		localIPs := GetLocalEndpointIPs(tc.endpointsMap)
+		localIPs := tc.endpointsMap.getLocalEndpointIPs()
 
 		if !reflect.DeepEqual(localIPs, tc.expected) {
 			t.Errorf("[%d] expected %#v, got %#v", tci, tc.expected, localIPs)
@@ -121,8 +123,9 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 func makeTestEndpoints(namespace, name string, eptFunc func(*v1.Endpoints)) *v1.Endpoints {
 	ept := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: make(map[string]string),
 		},
 	}
 	eptFunc(ept)
@@ -1210,7 +1213,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				fp.addEndpoints(tc.previousEndpoints[i])
 			}
 		}
-		UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		fp.endpointsMap.Update(fp.endpointsChanges)
 		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 		// Now let's call appropriate handlers to get to state we want to be.
@@ -1230,7 +1233,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				fp.updateEndpoints(prev, curr)
 			}
 		}
-		result := UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		result := fp.endpointsMap.Update(fp.endpointsChanges)
 		newMap := fp.endpointsMap
 		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
 		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
@@ -1264,6 +1267,120 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}
 		if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
 			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+		}
+	}
+}
+
+func TestLastChangeTriggerTime(t *testing.T) {
+	t0 := time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
+	t1 := t0.Add(time.Second)
+	t2 := t1.Add(time.Second)
+	t3 := t2.Add(time.Second)
+
+	createEndpoints := func(namespace, name string, triggerTime time.Time) *v1.Endpoints {
+		e := makeTestEndpoints(namespace, name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "1.1.1.1"}},
+				Ports:     []v1.EndpointPort{{Port: 11}},
+			}}
+		})
+		e.Annotations[v1.EndpointsLastChangeTriggerTime] = triggerTime.Format(time.RFC3339Nano)
+		return e
+	}
+
+	modifyEndpoints := func(endpoints *v1.Endpoints, triggerTime time.Time) *v1.Endpoints {
+		e := endpoints.DeepCopy()
+		e.Subsets[0].Ports[0].Port++
+		e.Annotations[v1.EndpointsLastChangeTriggerTime] = triggerTime.Format(time.RFC3339Nano)
+		return e
+	}
+
+	sortTimeSlice := func(data []time.Time) {
+		sort.Slice(data, func(i, j int) bool { return data[i].Before(data[j]) })
+	}
+
+	testCases := []struct {
+		name     string
+		scenario func(fp *FakeProxier)
+		expected []time.Time
+	}{
+		{
+			name: "Single addEndpoints",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t0)
+				fp.addEndpoints(e)
+			},
+			expected: []time.Time{t0},
+		},
+		{
+			name: "addEndpoints then updatedEndpoints",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t0)
+				fp.addEndpoints(e)
+
+				e1 := modifyEndpoints(e, t1)
+				fp.updateEndpoints(e, e1)
+			},
+			expected: []time.Time{t0, t1},
+		},
+		{
+			name: "Add two endpoints then modify one",
+			scenario: func(fp *FakeProxier) {
+				e1 := createEndpoints("ns", "ep1", t1)
+				fp.addEndpoints(e1)
+
+				e2 := createEndpoints("ns", "ep2", t2)
+				fp.addEndpoints(e2)
+
+				e11 := modifyEndpoints(e1, t3)
+				fp.updateEndpoints(e1, e11)
+			},
+			expected: []time.Time{t1, t2, t3},
+		},
+		{
+			name: "Endpoints without annotation set",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t1)
+				delete(e.Annotations, v1.EndpointsLastChangeTriggerTime)
+				fp.addEndpoints(e)
+			},
+			expected: []time.Time{},
+		},
+		{
+			name: "addEndpoints then deleteEndpoints",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t1)
+				fp.addEndpoints(e)
+				fp.deleteEndpoints(e)
+			},
+			expected: []time.Time{},
+		},
+		{
+			name: "add then delete then add again",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t1)
+				fp.addEndpoints(e)
+				fp.deleteEndpoints(e)
+				e = modifyEndpoints(e, t2)
+				fp.addEndpoints(e)
+			},
+			expected: []time.Time{t2},
+		},
+	}
+
+	for _, tc := range testCases {
+		fp := newFakeProxier()
+
+		tc.scenario(fp)
+
+		result := fp.endpointsMap.Update(fp.endpointsChanges)
+		got := result.LastChangeTriggerTimes
+		sortTimeSlice(got)
+		sortTimeSlice(tc.expected)
+
+		if !reflect.DeepEqual(got, tc.expected) {
+			t.Errorf("%s: Invalid LastChangeTriggerTimes, expected: %v, got: %v",
+				tc.name, tc.expected, result.LastChangeTriggerTimes)
 		}
 	}
 }

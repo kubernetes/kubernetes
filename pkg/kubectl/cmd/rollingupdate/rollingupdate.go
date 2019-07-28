@@ -21,27 +21,26 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/validation"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var (
@@ -292,16 +291,16 @@ func (o *RollingUpdateOptions) Run() error {
 
 		uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(infos[0].Object, corev1.SchemeGroupVersion)
 		if err != nil {
-			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
+			klog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
 			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 		switch t := uncastVersionedObj.(type) {
-		case *v1.ReplicationController:
+		case *corev1.ReplicationController:
 			replicasDefaulted = t.Spec.Replicas == nil
 			newRc = t
 		}
 		if newRc == nil {
-			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
+			klog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
 			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 	}
@@ -310,7 +309,7 @@ func (o *RollingUpdateOptions) Run() error {
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
 	if len(o.Image) != 0 {
-		codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+		codec := scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
 		newName := o.FindNewName(oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err
@@ -403,10 +402,10 @@ func (o *RollingUpdateOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(oldRc, nil), oldRcData); err != nil {
+			if err := printer.PrintObj(oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), newRcData); err != nil {
+			if err := printer.PrintObj(newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -455,7 +454,7 @@ func (o *RollingUpdateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), o.Out)
+	return printer.PrintObj(newRc, o.Out)
 }
 
 func findNewName(args []string, oldRc *corev1.ReplicationController) string {

@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -41,54 +41,10 @@ fi
 
 gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 
-PACKAGES=(
-  k8s.io/apiserver/pkg/apis/example/v1
-  k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
-  k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
-  k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-  k8s.io/api/core/v1
-  k8s.io/api/policy/v1beta1
-  k8s.io/api/extensions/v1beta1
-  k8s.io/api/autoscaling/v1
-  k8s.io/api/authorization/v1
-  k8s.io/api/autoscaling/v2beta1
-  k8s.io/api/autoscaling/v2beta2
-  k8s.io/api/authorization/v1beta1
-  k8s.io/api/batch/v1
-  k8s.io/api/batch/v1beta1
-  k8s.io/api/batch/v2alpha1
-  k8s.io/api/apps/v1beta1
-  k8s.io/api/apps/v1beta2
-  k8s.io/api/apps/v1
-  k8s.io/api/authentication/v1
-  k8s.io/api/authentication/v1beta1
-  k8s.io/api/events/v1beta1
-  k8s.io/api/rbac/v1alpha1
-  k8s.io/api/rbac/v1beta1
-  k8s.io/api/rbac/v1
-  k8s.io/api/certificates/v1beta1
-  k8s.io/api/coordination/v1beta1
-  k8s.io/api/imagepolicy/v1alpha1
-  k8s.io/api/scheduling/v1alpha1
-  k8s.io/api/scheduling/v1beta1
-  k8s.io/api/settings/v1alpha1
-  k8s.io/api/storage/v1alpha1
-  k8s.io/api/storage/v1beta1
-  k8s.io/api/storage/v1
-  k8s.io/api/admissionregistration/v1alpha1
-  k8s.io/api/admissionregistration/v1beta1
-  k8s.io/api/admission/v1beta1
-  k8s.io/api/networking/v1
-  k8s.io/metrics/pkg/apis/metrics/v1alpha1
-  k8s.io/metrics/pkg/apis/metrics/v1beta1
-  k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
-  k8s.io/metrics/pkg/apis/custom_metrics/v1beta2
-  k8s.io/metrics/pkg/apis/external_metrics/v1beta1
-  k8s.io/apiserver/pkg/apis/audit/v1alpha1
-  k8s.io/apiserver/pkg/apis/audit/v1beta1
-  k8s.io/apiserver/pkg/apis/audit/v1
-  k8s.io/apiserver/pkg/apis/example2/v1
-)
+while IFS=$'\n' read -r line; do
+  APIROOTS+=( "$line" );
+done <<< "${1}"
+shift
 
 # requires the 'proto' tag to build (will remove when ready)
 # searches for the protoc-gen-gogo extension in the output directory
@@ -98,6 +54,6 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
-  --packages=$(IFS=, ; echo "${PACKAGES[*]}") \
-  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
+  --packages="$(IFS=, ; echo "${APIROOTS[*]}")" \
+  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   "$@"

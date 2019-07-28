@@ -17,20 +17,21 @@ limitations under the License.
 package test
 
 import (
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // SetupTempDir is a utility function for kubeadm testing, that creates a temporary directory
@@ -44,9 +45,9 @@ func SetupTempDir(t *testing.T) string {
 	return tmpdir
 }
 
-// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
+// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a InitConfiguration file
 // into /config subfolder of a given temporary directory.
-// The function returns the path of the created master configuration file.
+// The function returns the path of the created InitConfiguration file.
 func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.InitConfiguration) string {
 
 	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
@@ -54,20 +55,20 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		t.Fatalf("Couldn't create cfgDir")
 	}
 
-	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(`
-		apiVersion: kubeadm.k8s.io/v1beta1
+	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(fmt.Sprintf(`
+		apiVersion: kubeadm.k8s.io/v1beta2
 		kind: InitConfiguration
 		apiEndpoint:
-		  advertiseAddress: {{.APIEndpoint.AdvertiseAddress}}
-		  bindPort: {{.APIEndpoint.BindPort}}
+		  advertiseAddress: {{.LocalAPIEndpoint.AdvertiseAddress}}
+		  bindPort: {{.LocalAPIEndpoint.BindPort}}
 		nodeRegistration:
 		  name: {{.NodeRegistration.Name}}
 		---
-		apiVersion: kubeadm.k8s.io/v1beta1
+		apiVersion: kubeadm.k8s.io/v1beta2
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: v1.11.0
-		`)))
+		kubernetesVersion: %s
+		`, kubeadmconstants.MinimumControlPlaneVersion))))
 
 	f, err := os.Create(cfgPath)
 	if err != nil {
@@ -156,7 +157,7 @@ func AssertError(t *testing.T, err error, expected string) {
 
 // GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
 func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
-	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{})
+	internalcfg, err := configutil.DefaultedInitConfiguration(&kubeadmapiv1beta2.InitConfiguration{}, &kubeadmapiv1beta2.ClusterConfiguration{})
 	if err != nil {
 		t.Fatalf("unexpected error getting default config: %v", err)
 	}

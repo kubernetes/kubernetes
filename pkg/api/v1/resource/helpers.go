@@ -86,8 +86,10 @@ func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
-			if resource == v1.ResourceCPU && rQuantity.MilliValue() > totalResources {
-				totalResources = rQuantity.MilliValue()
+			if resource == v1.ResourceCPU {
+				if rQuantity.MilliValue() > totalResources {
+					totalResources = rQuantity.MilliValue()
+				}
 			} else if rQuantity.Value() > totalResources {
 				totalResources = rQuantity.Value()
 			}
@@ -146,7 +148,7 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
 	}
 
-	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)
 }
 
 // convertResourceCPUToString converts cpu value to the format of divisor and returns
@@ -173,6 +175,11 @@ func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity
 // findContainerInPod finds a container by its name in the provided pod
 func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error) {
 	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			return &container, nil
+		}
+	}
+	for _, container := range pod.Spec.InitContainers {
 		if container.Name == containerName {
 			return &container, nil
 		}

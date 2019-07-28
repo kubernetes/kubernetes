@@ -17,19 +17,12 @@ limitations under the License.
 package leaderelectionconfig
 
 import (
-	"time"
-
 	"github.com/spf13/pflag"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
-)
-
-const (
-	// DefaultLeaseDuration defines a default duration of lease.
-	DefaultLeaseDuration = 15 * time.Second
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // BindFlags binds the LeaderElectionConfiguration struct fields to a flagset
-func BindFlags(l *apiserverconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
+func BindFlags(l *componentbaseconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
 	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+

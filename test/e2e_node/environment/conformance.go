@@ -81,7 +81,7 @@ func check(options ...string) []error {
 		case "kernel":
 			errs = appendNotNil(errs, kernel())
 		default:
-			fmt.Printf("Unrecognized option %s", c)
+			fmt.Printf("Unrecognized option %s\n", c)
 			errs = append(errs, fmt.Errorf("Unrecognized option %s", c))
 		}
 	}
@@ -99,7 +99,7 @@ func containerRuntime() error {
 	}
 
 	// Setup cadvisor to check the container environment
-	c, err := cadvisor.New(cadvisor.NewImageFsInfoProvider("docker", ""), "/var/lib/kubelet", false)
+	c, err := cadvisor.New(cadvisor.NewImageFsInfoProvider("docker", ""), "/var/lib/kubelet", []string{"/"}, false)
 	if err != nil {
 		return printError("Container Runtime Check: %s Could not start cadvisor %v", failed, err)
 	}
@@ -119,12 +119,12 @@ func containerRuntime() error {
 	return printSuccess("Container Runtime Check: %s", success)
 }
 
-const kubeletClusterDnsRegexStr = `\/kubelet.*--cluster-dns=(\S+) `
+const kubeletClusterDNSRegexStr = `\/kubelet.*--cluster-dns=(\S+) `
 const kubeletClusterDomainRegexStr = `\/kubelet.*--cluster-domain=(\S+)`
 
 // dns checks that cluster dns has been properly configured and can resolve the kubernetes.default service
 func dns() error {
-	dnsRegex, err := regexp.Compile(kubeletClusterDnsRegexStr)
+	dnsRegex, err := regexp.Compile(kubeletClusterDNSRegexStr)
 	if err != nil {
 		// This should never happen and can only be fixed by changing the code
 		panic(err)

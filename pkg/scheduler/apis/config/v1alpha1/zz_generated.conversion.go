@@ -23,10 +23,9 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	configv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	apisconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -55,6 +54,46 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.KubeSchedulerLeaderElectionConfiguration)(nil), (*v1alpha1.KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(a.(*config.KubeSchedulerLeaderElectionConfiguration), b.(*v1alpha1.KubeSchedulerLeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.Plugin)(nil), (*config.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Plugin_To_config_Plugin(a.(*v1alpha1.Plugin), b.(*config.Plugin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.Plugin)(nil), (*v1alpha1.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Plugin_To_v1alpha1_Plugin(a.(*config.Plugin), b.(*v1alpha1.Plugin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.PluginConfig)(nil), (*config.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PluginConfig_To_config_PluginConfig(a.(*v1alpha1.PluginConfig), b.(*config.PluginConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.PluginConfig)(nil), (*v1alpha1.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_PluginConfig_To_v1alpha1_PluginConfig(a.(*config.PluginConfig), b.(*v1alpha1.PluginConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.PluginSet)(nil), (*config.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PluginSet_To_config_PluginSet(a.(*v1alpha1.PluginSet), b.(*config.PluginSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.PluginSet)(nil), (*v1alpha1.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_PluginSet_To_v1alpha1_PluginSet(a.(*config.PluginSet), b.(*v1alpha1.PluginSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Plugins_To_config_Plugins(a.(*v1alpha1.Plugins), b.(*config.Plugins), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.Plugins)(nil), (*v1alpha1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Plugins_To_v1alpha1_Plugins(a.(*config.Plugins), b.(*v1alpha1.Plugins), scope)
 	}); err != nil {
 		return err
 	}
@@ -115,13 +154,14 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	if err := apisconfigv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
 	out.DisablePreemption = in.DisablePreemption
 	out.PercentageOfNodesToScore = in.PercentageOfNodesToScore
-	out.FailureDomains = in.FailureDomains
 	out.BindTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindTimeoutSeconds))
+	out.Plugins = (*config.Plugins)(unsafe.Pointer(in.Plugins))
+	out.PluginConfig = *(*[]config.PluginConfig)(unsafe.Pointer(&in.PluginConfig))
 	return nil
 }
 
@@ -144,13 +184,14 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	if err := apisconfigv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
 	out.DisablePreemption = in.DisablePreemption
 	out.PercentageOfNodesToScore = in.PercentageOfNodesToScore
-	out.FailureDomains = in.FailureDomains
 	out.BindTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindTimeoutSeconds))
+	out.Plugins = (*v1alpha1.Plugins)(unsafe.Pointer(in.Plugins))
+	out.PluginConfig = *(*[]v1alpha1.PluginConfig)(unsafe.Pointer(&in.PluginConfig))
 	return nil
 }
 
@@ -160,7 +201,7 @@ func Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfigur
 }
 
 func autoConvert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in *v1alpha1.KubeSchedulerLeaderElectionConfiguration, out *config.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := apisconfigv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
 		return err
 	}
 	out.LockObjectNamespace = in.LockObjectNamespace
@@ -174,7 +215,7 @@ func Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSch
 }
 
 func autoConvert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in *config.KubeSchedulerLeaderElectionConfiguration, out *v1alpha1.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := apisconfigv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
 		return err
 	}
 	out.LockObjectNamespace = in.LockObjectNamespace
@@ -185,6 +226,114 @@ func autoConvert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_Kub
 // Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration is an autogenerated conversion function.
 func Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in *config.KubeSchedulerLeaderElectionConfiguration, out *v1alpha1.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
 	return autoConvert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_Plugin_To_config_Plugin(in *v1alpha1.Plugin, out *config.Plugin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Weight = in.Weight
+	return nil
+}
+
+// Convert_v1alpha1_Plugin_To_config_Plugin is an autogenerated conversion function.
+func Convert_v1alpha1_Plugin_To_config_Plugin(in *v1alpha1.Plugin, out *config.Plugin, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Plugin_To_config_Plugin(in, out, s)
+}
+
+func autoConvert_config_Plugin_To_v1alpha1_Plugin(in *config.Plugin, out *v1alpha1.Plugin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Weight = in.Weight
+	return nil
+}
+
+// Convert_config_Plugin_To_v1alpha1_Plugin is an autogenerated conversion function.
+func Convert_config_Plugin_To_v1alpha1_Plugin(in *config.Plugin, out *v1alpha1.Plugin, s conversion.Scope) error {
+	return autoConvert_config_Plugin_To_v1alpha1_Plugin(in, out, s)
+}
+
+func autoConvert_v1alpha1_PluginConfig_To_config_PluginConfig(in *v1alpha1.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Args = in.Args
+	return nil
+}
+
+// Convert_v1alpha1_PluginConfig_To_config_PluginConfig is an autogenerated conversion function.
+func Convert_v1alpha1_PluginConfig_To_config_PluginConfig(in *v1alpha1.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PluginConfig_To_config_PluginConfig(in, out, s)
+}
+
+func autoConvert_config_PluginConfig_To_v1alpha1_PluginConfig(in *config.PluginConfig, out *v1alpha1.PluginConfig, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Args = in.Args
+	return nil
+}
+
+// Convert_config_PluginConfig_To_v1alpha1_PluginConfig is an autogenerated conversion function.
+func Convert_config_PluginConfig_To_v1alpha1_PluginConfig(in *config.PluginConfig, out *v1alpha1.PluginConfig, s conversion.Scope) error {
+	return autoConvert_config_PluginConfig_To_v1alpha1_PluginConfig(in, out, s)
+}
+
+func autoConvert_v1alpha1_PluginSet_To_config_PluginSet(in *v1alpha1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+	out.Enabled = *(*[]config.Plugin)(unsafe.Pointer(&in.Enabled))
+	out.Disabled = *(*[]config.Plugin)(unsafe.Pointer(&in.Disabled))
+	return nil
+}
+
+// Convert_v1alpha1_PluginSet_To_config_PluginSet is an autogenerated conversion function.
+func Convert_v1alpha1_PluginSet_To_config_PluginSet(in *v1alpha1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PluginSet_To_config_PluginSet(in, out, s)
+}
+
+func autoConvert_config_PluginSet_To_v1alpha1_PluginSet(in *config.PluginSet, out *v1alpha1.PluginSet, s conversion.Scope) error {
+	out.Enabled = *(*[]v1alpha1.Plugin)(unsafe.Pointer(&in.Enabled))
+	out.Disabled = *(*[]v1alpha1.Plugin)(unsafe.Pointer(&in.Disabled))
+	return nil
+}
+
+// Convert_config_PluginSet_To_v1alpha1_PluginSet is an autogenerated conversion function.
+func Convert_config_PluginSet_To_v1alpha1_PluginSet(in *config.PluginSet, out *v1alpha1.PluginSet, s conversion.Scope) error {
+	return autoConvert_config_PluginSet_To_v1alpha1_PluginSet(in, out, s)
+}
+
+func autoConvert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *config.Plugins, s conversion.Scope) error {
+	out.QueueSort = (*config.PluginSet)(unsafe.Pointer(in.QueueSort))
+	out.PreFilter = (*config.PluginSet)(unsafe.Pointer(in.PreFilter))
+	out.Filter = (*config.PluginSet)(unsafe.Pointer(in.Filter))
+	out.PostFilter = (*config.PluginSet)(unsafe.Pointer(in.PostFilter))
+	out.Score = (*config.PluginSet)(unsafe.Pointer(in.Score))
+	out.NormalizeScore = (*config.PluginSet)(unsafe.Pointer(in.NormalizeScore))
+	out.Reserve = (*config.PluginSet)(unsafe.Pointer(in.Reserve))
+	out.Permit = (*config.PluginSet)(unsafe.Pointer(in.Permit))
+	out.PreBind = (*config.PluginSet)(unsafe.Pointer(in.PreBind))
+	out.Bind = (*config.PluginSet)(unsafe.Pointer(in.Bind))
+	out.PostBind = (*config.PluginSet)(unsafe.Pointer(in.PostBind))
+	out.Unreserve = (*config.PluginSet)(unsafe.Pointer(in.Unreserve))
+	return nil
+}
+
+// Convert_v1alpha1_Plugins_To_config_Plugins is an autogenerated conversion function.
+func Convert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *config.Plugins, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Plugins_To_config_Plugins(in, out, s)
+}
+
+func autoConvert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1alpha1.Plugins, s conversion.Scope) error {
+	out.QueueSort = (*v1alpha1.PluginSet)(unsafe.Pointer(in.QueueSort))
+	out.PreFilter = (*v1alpha1.PluginSet)(unsafe.Pointer(in.PreFilter))
+	out.Filter = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Filter))
+	out.PostFilter = (*v1alpha1.PluginSet)(unsafe.Pointer(in.PostFilter))
+	out.Score = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Score))
+	out.NormalizeScore = (*v1alpha1.PluginSet)(unsafe.Pointer(in.NormalizeScore))
+	out.Reserve = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Reserve))
+	out.Permit = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Permit))
+	out.PreBind = (*v1alpha1.PluginSet)(unsafe.Pointer(in.PreBind))
+	out.Bind = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Bind))
+	out.PostBind = (*v1alpha1.PluginSet)(unsafe.Pointer(in.PostBind))
+	out.Unreserve = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Unreserve))
+	return nil
+}
+
+// Convert_config_Plugins_To_v1alpha1_Plugins is an autogenerated conversion function.
+func Convert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1alpha1.Plugins, s conversion.Scope) error {
+	return autoConvert_config_Plugins_To_v1alpha1_Plugins(in, out, s)
 }
 
 func autoConvert_v1alpha1_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(in *v1alpha1.SchedulerAlgorithmSource, out *config.SchedulerAlgorithmSource, s conversion.Scope) error {

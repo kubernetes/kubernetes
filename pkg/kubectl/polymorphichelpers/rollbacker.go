@@ -20,11 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
-func rollbacker(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
+func rollbacker(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (Rollbacker, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -34,5 +33,5 @@ func rollbacker(restClientGetter genericclioptions.RESTClientGetter, mapping *me
 		return nil, err
 	}
 
-	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
+	return RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
 }

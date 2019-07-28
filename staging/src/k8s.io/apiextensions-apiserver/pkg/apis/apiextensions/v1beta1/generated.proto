@@ -28,6 +28,52 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// ConversionRequest describes the conversion request parameters.
+message ConversionRequest {
+  // `uid` is an identifier for the individual request/response. It allows us to distinguish instances of requests which are
+  // otherwise identical (parallel requests, requests when earlier requests did not modify etc)
+  // The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request.
+  // It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.
+  optional string uid = 1;
+
+  // `desiredAPIVersion` is the version to convert given objects to. e.g. "myapi.example.com/v1"
+  optional string desiredAPIVersion = 2;
+
+  // `objects` is the list of CR objects to be converted.
+  repeated k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
+}
+
+// ConversionResponse describes a conversion response.
+message ConversionResponse {
+  // `uid` is an identifier for the individual request/response.
+  // This should be copied over from the corresponding ConversionRequest.
+  optional string uid = 1;
+
+  // `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
+  // The webhook is expected to set apiVersion of these objects to the ConversionRequest.desiredAPIVersion. The list
+  // must also have the same size as the input list with the same objects in the same order (equal kind, UID, name and namespace).
+  // The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
+  repeated k8s.io.apimachinery.pkg.runtime.RawExtension convertedObjects = 2;
+
+  // `result` contains the result of conversion with extra details if the conversion failed. `result.status` determines if
+  // the conversion failed or succeeded. The `result.status` field is required and represent the success or failure of the
+  // conversion. A successful conversion must set `result.status` to `Success`. A failed conversion must set
+  // `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message`
+  // will be used to construct an error message for the end user.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Status result = 3;
+}
+
+// ConversionReview describes a conversion request/response.
+message ConversionReview {
+  // `request` describes the attributes for the conversion request.
+  // +optional
+  optional ConversionRequest request = 1;
+
+  // `response` describes the attributes for the conversion response.
+  // +optional
+  optional ConversionResponse response = 2;
+}
+
 // CustomResourceColumnDefinition specifies a column for server side printing.
 message CustomResourceColumnDefinition {
   // name is a human readable name for the column.
@@ -57,6 +103,30 @@ message CustomResourceColumnDefinition {
   optional string JSONPath = 6;
 }
 
+// CustomResourceConversion describes how to convert different versions of a CR.
+message CustomResourceConversion {
+  // `strategy` specifies the conversion strategy. Allowed values are:
+  // - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
+  // - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
+  //   is needed for this option. This requires spec.preserveUnknownFields to be false.
+  optional string strategy = 1;
+
+  // `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`. This field is
+  // alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+  // +optional
+  optional WebhookClientConfig webhookClientConfig = 2;
+
+  // ConversionReviewVersions is an ordered list of preferred `ConversionReview`
+  // versions the Webhook expects. API server will try to use first version in
+  // the list which it supports. If none of the versions specified in this list
+  // supported by API server, conversion will fail for this object.
+  // If a persisted Webhook configuration specifies allowed versions and does not
+  // include any versions known to the API Server, calls to the webhook will fail.
+  // Default to `['v1beta1']`.
+  // +optional
+  repeated string conversionReviewVersions = 3;
+}
+
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
 message CustomResourceDefinition {
@@ -72,7 +142,7 @@ message CustomResourceDefinition {
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 message CustomResourceDefinitionCondition {
-  // Type is the type of the condition.
+  // Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
   optional string type = 1;
 
   // Status is the status of the condition.
@@ -145,10 +215,14 @@ message CustomResourceDefinitionSpec {
   optional string scope = 4;
 
   // Validation describes the validation methods for CustomResources
+  // Optional, the global validation schema for all versions.
+  // Top-level and per-version schemas are mutually exclusive.
   // +optional
   optional CustomResourceValidation validation = 5;
 
-  // Subresources describes the subresources for CustomResources
+  // Subresources describes the subresources for CustomResource
+  // Optional, the global subresources for all versions.
+  // Top-level and per-version subresources are mutually exclusive.
   // +optional
   optional CustomResourceSubresources subresources = 6;
 
@@ -167,8 +241,20 @@ message CustomResourceDefinitionSpec {
   repeated CustomResourceDefinitionVersion versions = 7;
 
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+  // Optional, the global columns for all versions.
+  // Top-level and per-version columns are mutually exclusive.
   // +optional
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
+
+  // `conversion` defines conversion settings for the CRD.
+  // +optional
+  optional CustomResourceConversion conversion = 9;
+
+  // preserveUnknownFields disables pruning of object fields which are not
+  // specified in the OpenAPI schema. apiVersion, kind, metadata and known
+  // fields inside metadata are always preserved.
+  // Defaults to true in v1beta and will default to false in v1.
+  optional bool preserveUnknownFields = 10;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
@@ -189,6 +275,7 @@ message CustomResourceDefinitionStatus {
   repeated string storedVersions = 3;
 }
 
+// CustomResourceDefinitionVersion describes a version for CRD.
 message CustomResourceDefinitionVersion {
   // Name is the version name, e.g. “v1”, “v2beta1”, etc.
   optional string name = 1;
@@ -199,6 +286,30 @@ message CustomResourceDefinitionVersion {
   // Storage flags the version as storage version. There must be exactly one
   // flagged as storage version.
   optional bool storage = 3;
+
+  // Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+  // Top-level and per-version schemas are mutually exclusive.
+  // Per-version schemas must not all be set to identical values (top-level validation schema should be used instead)
+  // This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+  // +optional
+  optional CustomResourceValidation schema = 4;
+
+  // Subresources describes the subresources for CustomResource
+  // Top-level and per-version subresources are mutually exclusive.
+  // Per-version subresources must not all be set to identical values (top-level subresources should be used instead)
+  // This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+  // +optional
+  optional CustomResourceSubresources subresources = 5;
+
+  // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+  // Top-level and per-version columns are mutually exclusive.
+  // Per-version columns must not all be set to identical values (top-level columns should be used instead)
+  // This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+  // NOTE: CRDs created prior to 1.13 populated the top-level additionalPrinterColumns field by default. To apply an
+  // update that changes to per-version additionalPrinterColumns, the top-level additionalPrinterColumns field must
+  // be explicitly set to null
+  // +optional
+  repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
@@ -218,8 +329,11 @@ message CustomResourceSubresourceScale {
 
   // LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
   // Only JSON paths without the array notation are allowed.
-  // Must be a JSON Path under .status.
+  // Must be a JSON Path under .status or .spec.
   // Must be set to work with HPA.
+  // The field pointed by this JSON path must be a string field (not a complex selector struct)
+  // which contains a serialized label selector in string form.
+  // More info: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions#scale-subresource
   // If there is no value under the given path in the CustomResource, the status label selector value in the /scale
   // subresource will default to the empty string.
   // +optional
@@ -281,6 +395,9 @@ message JSONSchemaProps {
 
   optional string title = 7;
 
+  // default is a default value for undefined object fields.
+  // Defaulting is an alpha feature under the CustomResourceDefaulting feature gate.
+  // Defaulting requires spec.preserveUnknownFields to be false.
   optional JSON default = 8;
 
   optional double maximum = 9;
@@ -338,6 +455,40 @@ message JSONSchemaProps {
   optional ExternalDocumentation externalDocs = 35;
 
   optional JSON example = 36;
+
+  optional bool nullable = 37;
+
+  // x-kubernetes-preserve-unknown-fields stops the API server
+  // decoding step from pruning fields which are not specified
+  // in the validation schema. This affects fields recursively,
+  // but switches back to normal pruning behaviour if nested
+  // properties or additionalProperties are specified in the schema.
+  // This can either be true or undefined. False is forbidden.
+  optional bool xKubernetesPreserveUnknownFields = 38;
+
+  // x-kubernetes-embedded-resource defines that the value is an
+  // embedded Kubernetes runtime.Object, with TypeMeta and
+  // ObjectMeta. The type must be object. It is allowed to further
+  // restrict the embedded object. kind, apiVersion and metadata
+  // are validated automatically. x-kubernetes-preserve-unknown-fields
+  // is allowed to be true, but does not have to be if the object
+  // is fully specified (up to kind, apiVersion, metadata).
+  optional bool xKubernetesEmbeddedResource = 39;
+
+  // x-kubernetes-int-or-string specifies that this value is
+  // either an integer or a string. If this is true, an empty
+  // type is allowed and type as child of anyOf is permitted
+  // if following one of the following patterns:
+  //
+  // 1) anyOf:
+  //    - type: integer
+  //    - type: string
+  // 2) allOf:
+  //    - anyOf:
+  //      - type: integer
+  //      - type: string
+  //    - ... zero or more
+  optional bool xKubernetesIntOrString = 40;
 }
 
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
@@ -361,5 +512,73 @@ message JSONSchemaPropsOrStringArray {
   optional JSONSchemaProps schema = 1;
 
   repeated string property = 2;
+}
+
+// ServiceReference holds a reference to Service.legacy.k8s.io
+message ServiceReference {
+  // `namespace` is the namespace of the service.
+  // Required
+  optional string namespace = 1;
+
+  // `name` is the name of the service.
+  // Required
+  optional string name = 2;
+
+  // `path` is an optional URL path which will be sent in any request to
+  // this service.
+  // +optional
+  optional string path = 3;
+
+  // If specified, the port on the service that hosting webhook.
+  // Default to 443 for backward compatibility.
+  // `port` should be a valid port number (1-65535, inclusive).
+  // +optional
+  optional int32 port = 4;
+}
+
+// WebhookClientConfig contains the information to make a TLS
+// connection with the webhook. It has the same field as admissionregistration.v1beta1.WebhookClientConfig.
+message WebhookClientConfig {
+  // `url` gives the location of the webhook, in standard URL form
+  // (`scheme://host:port/path`). Exactly one of `url` or `service`
+  // must be specified.
+  //
+  // The `host` should not refer to a service running in the cluster; use
+  // the `service` field instead. The host might be resolved via external
+  // DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
+  // in-cluster DNS as that would be a layering violation). `host` may
+  // also be an IP address.
+  //
+  // Please note that using `localhost` or `127.0.0.1` as a `host` is
+  // risky unless you take great care to run this webhook on all hosts
+  // which run an apiserver which might need to make calls to this
+  // webhook. Such installs are likely to be non-portable, i.e., not easy
+  // to turn up in a new cluster.
+  //
+  // The scheme must be "https"; the URL must begin with "https://".
+  //
+  // A path is optional, and if present may be any string permissible in
+  // a URL. You may use the path to pass an arbitrary string to the
+  // webhook, for example, a cluster identifier.
+  //
+  // Attempting to use a user or basic auth e.g. "user:password@" is not
+  // allowed. Fragments ("#...") and query parameters ("?...") are not
+  // allowed, either.
+  //
+  // +optional
+  optional string url = 3;
+
+  // `service` is a reference to the service for this webhook. Either
+  // `service` or `url` must be specified.
+  //
+  // If the webhook is running within the cluster, then you should use `service`.
+  //
+  // +optional
+  optional ServiceReference service = 1;
+
+  // `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+  // If unspecified, system trust roots on the apiserver are used.
+  // +optional
+  optional bytes caBundle = 2;
 }
 

@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,6 +54,15 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
+	// StrictTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with NUMA alignment of CPU and device resources.
+	StrictTopologyManagerPolicy = "strict"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	BestEffortTopologyManagerPolicy = "best-effort"
+	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
+	// of NUMA alignment of a pod's CPU and device resources.
+	NoneTopologyManagerPolicy = "none"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -151,10 +160,16 @@ type KubeletConfiguration struct {
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
-	// status to master. Note: be cautious when changing the constant, it
-	// must work with nodeMonitorGracePeriod in nodecontroller.
+	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
+	// status. If node lease feature is not enabled, it is also the frequency that
+	// kubelet posts node status to master. In that case, be cautious when
+	// changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency metav1.Duration
+	// nodeStatusReportFrequency is the frequency that kubelet posts node
+	// status to master if node status does not change. Kubelet will ignore this
+	// frequency and post node status immediately if any change is detected. It is
+	// only used when node lease feature is enabled.
+	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
 	// imageMinimumGCAge is the minimum age for an unused image before it is
@@ -191,6 +206,9 @@ type KubeletConfiguration struct {
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
+	// TopologyManagerPolicy is the name of the policy to use.
+	// Policies other than "none" require the TopologyManager feature gate to be enabled.
+	TopologyManagerPolicy string
 	// Map of QoS resource reservation percentages (memory only for now).
 	// Requires the QOSReserved feature gate to be enabled.
 	QOSReserved map[string]string
@@ -212,7 +230,7 @@ type KubeletConfiguration struct {
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
-	// PodPidsLimit is the maximum number of pids in any pod.
+	// The maximum number of processes per pod.  If -1, the kubelet defaults to the node allocatable pid capacity.
 	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
@@ -282,15 +300,20 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
+	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
+	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
+	// +optional
+	AllowedUnsafeSysctls []string
 
 	/* the following fields are meant for Node Allocatable */
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.

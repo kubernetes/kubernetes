@@ -20,11 +20,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/pointer"
 )
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
@@ -60,6 +61,17 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.AdditionalPrinterColumns = []apiextensions.CustomResourceColumnDefinition{
 					{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
 				}
+			}
+			if obj.Conversion == nil {
+				obj.Conversion = &apiextensions.CustomResourceConversion{
+					Strategy: apiextensions.NoneConverter,
+				}
+			}
+			if obj.Conversion.Strategy == apiextensions.WebhookConverter && len(obj.Conversion.ConversionReviewVersions) == 0 {
+				obj.Conversion.ConversionReviewVersions = []string{"v1beta1"}
+			}
+			if obj.PreserveUnknownFields == nil {
+				obj.PreserveUnknownFields = pointer.BoolPtr(true)
 			}
 		},
 		func(obj *apiextensions.CustomResourceDefinition, c fuzz.Continue) {
@@ -108,6 +120,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				validRef := "validRef"
 				obj.Ref = &validRef
 			}
+			if len(obj.Type) == 0 {
+				obj.Nullable = false // because this does not roundtrip through go-openapi
+			}
+			if obj.XIntOrString {
+				obj.Type = ""
+			}
 		},
 		func(obj *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {
 			if c.RandBool() {
@@ -137,6 +155,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				c.Fuzz(&obj.Property)
 			}
+		},
+		func(obj *int64, c fuzz.Continue) {
+			// JSON only supports 53 bits because everything is a float
+			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
 		},
 	}
 }

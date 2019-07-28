@@ -18,8 +18,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	zfs "github.com/mistifyio/go-zfs"
+	"k8s.io/klog"
 )
 
 // zfsWatcher maintains a cache of filesystem -> usage stats for a
@@ -49,7 +49,7 @@ func NewZfsWatcher(filesystem string) (*ZfsWatcher, error) {
 func (w *ZfsWatcher) Start() {
 	err := w.Refresh()
 	if err != nil {
-		glog.Errorf("encountered error refreshing zfs watcher: %v", err)
+		klog.Errorf("encountered error refreshing zfs watcher: %v", err)
 	}
 
 	for {
@@ -60,12 +60,12 @@ func (w *ZfsWatcher) Start() {
 			start := time.Now()
 			err = w.Refresh()
 			if err != nil {
-				glog.Errorf("encountered error refreshing zfs watcher: %v", err)
+				klog.Errorf("encountered error refreshing zfs watcher: %v", err)
 			}
 
 			// print latency for refresh
 			duration := time.Since(start)
-			glog.V(5).Infof("zfs(%d) took %s", start.Unix(), duration)
+			klog.V(5).Infof("zfs(%d) took %s", start.Unix(), duration)
 		}
 	}
 }
@@ -95,12 +95,12 @@ func (w *ZfsWatcher) Refresh() error {
 	newCache := make(map[string]uint64)
 	parent, err := zfs.GetDataset(w.filesystem)
 	if err != nil {
-		glog.Errorf("encountered error getting zfs filesystem: %s: %v", w.filesystem, err)
+		klog.Errorf("encountered error getting zfs filesystem: %s: %v", w.filesystem, err)
 		return err
 	}
 	children, err := parent.Children(0)
 	if err != nil {
-		glog.Errorf("encountered error getting children of zfs filesystem: %s: %v", w.filesystem, err)
+		klog.Errorf("encountered error getting children of zfs filesystem: %s: %v", w.filesystem, err)
 		return err
 	}
 

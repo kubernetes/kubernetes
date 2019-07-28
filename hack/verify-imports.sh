@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -38,4 +38,4 @@ if [[ ! -x "$importverifier" ]]; then
   exit 1
 fi
 
-"${importverifier}" "k8s.io/" "${KUBE_ROOT}/hack/import-restrictions.yaml"
+"${importverifier}" "k8s.io/" "${KUBE_ROOT}/staging/publishing/import-restrictions.yaml"

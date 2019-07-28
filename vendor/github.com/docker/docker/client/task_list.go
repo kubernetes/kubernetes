@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -24,12 +24,12 @@ func (cli *Client) TaskList(ctx context.Context, options types.TaskListOptions) 
 	}
 
 	resp, err := cli.get(ctx, "/tasks", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var tasks []swarm.Task
 	err = json.NewDecoder(resp.body).Decode(&tasks)
-	ensureReaderClosed(resp)
 	return tasks, err
 }

@@ -18,19 +18,19 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
+	"errors"
 	"time"
-
-	"github.com/golang/glog"
 
 	authentication "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	"k8s.io/klog"
 )
 
 var (
@@ -44,56 +44,88 @@ var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
 type WebhookTokenAuthenticator struct {
 	tokenReview    authenticationclient.TokenReviewInterface
-	responseCache  *cache.LRUExpireCache
-	ttl            time.Duration
 	initialBackoff time.Duration
+	implicitAuds   authenticator.Audiences
 }
 
-// NewFromInterface creates a webhook authenticator using the given tokenReview client
-func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(tokenReview, ttl, retryBackoff)
+// NewFromInterface creates a webhook authenticator using the given tokenReview
+// client. It is recommend to wrap this authenticator with the token cache
+// authenticator implemented in
+// k8s.io/apiserver/pkg/authentication/token/cache.
+func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
-// New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
-func New(kubeConfigFile string, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
+// New creates a new WebhookTokenAuthenticator from the provided kubeconfig
+// file. It is recommend to wrap this authenticator with the token cache
+// authenticator implemented in
+// k8s.io/apiserver/pkg/authentication/token/cache.
+func New(kubeConfigFile string, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
 	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, ttl, retryBackoff)
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, cache.NewLRUExpireCache(1024), ttl, initialBackoff}, nil
+func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, initialBackoff time.Duration, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, initialBackoff, implicitAuds}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	// We take implicit audiences of the API server at WebhookTokenAuthenticator
+	// construction time. The outline of how we validate audience here is:
+	//
+	// * if the ctx is not audience limited, don't do any audience validation.
+	// * if ctx is audience-limited, add the audiences to the tokenreview spec
+	//   * if the tokenreview returns with audiences in the status that intersect
+	//     with the audiences in the ctx, copy into the response and return success
+	//   * if the tokenreview returns without an audience in the status, ensure
+	//     the ctx audiences intersect with the implicit audiences, and set the
+	//     intersection in the response.
+	//   * otherwise return unauthenticated.
+	wantAuds, checkAuds := authenticator.AudiencesFrom(ctx)
 	r := &authentication.TokenReview{
-		Spec: authentication.TokenReviewSpec{Token: token},
+		Spec: authentication.TokenReviewSpec{
+			Token:     token,
+			Audiences: wantAuds,
+		},
 	}
-	if entry, ok := w.responseCache.Get(r.Spec); ok {
-		r.Status = entry.(authentication.TokenReviewStatus)
-	} else {
-		var (
-			result *authentication.TokenReview
-			err    error
-		)
-		webhook.WithExponentialBackoff(w.initialBackoff, func() error {
-			result, err = w.tokenReview.Create(r)
-			return err
-		})
-		if err != nil {
-			// An error here indicates bad configuration or an outage. Log for debugging.
-			glog.Errorf("Failed to make webhook authenticator request: %v", err)
-			return nil, false, err
+	var (
+		result *authentication.TokenReview
+		err    error
+		auds   authenticator.Audiences
+	)
+	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
+		result, err = w.tokenReview.Create(r)
+		return err
+	})
+	if err != nil {
+		// An error here indicates bad configuration or an outage. Log for debugging.
+		klog.Errorf("Failed to make webhook authenticator request: %v", err)
+		return nil, false, err
+	}
+
+	if checkAuds {
+		gotAuds := w.implicitAuds
+		if len(result.Status.Audiences) > 0 {
+			gotAuds = result.Status.Audiences
 		}
-		r.Status = result.Status
-		w.responseCache.Add(r.Spec, result.Status, w.ttl)
+		auds = wantAuds.Intersect(gotAuds)
+		if len(auds) == 0 {
+			return nil, false, nil
+		}
 	}
+
+	r.Status = result.Status
 	if !r.Status.Authenticated {
-		return nil, false, nil
+		var err error
+		if len(r.Status.Error) != 0 {
+			err = errors.New(r.Status.Error)
+		}
+		return nil, false, err
 	}
 
 	var extra map[string][]string
@@ -104,11 +136,14 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 		}
 	}
 
-	return &user.DefaultInfo{
-		Name:   r.Status.User.Username,
-		UID:    r.Status.User.UID,
-		Groups: r.Status.User.Groups,
-		Extra:  extra,
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   r.Status.User.Username,
+			UID:    r.Status.User.UID,
+			Groups: r.Status.User.Groups,
+			Extra:  extra,
+		},
+		Audiences: auds,
 	}, true, nil
 }
 

@@ -9,6 +9,7 @@
 package jwt
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/internal"
 	"golang.org/x/oauth2/jws"
@@ -61,6 +61,11 @@ type Config struct {
 
 	// Expires optionally specifies how long the token is valid for.
 	Expires time.Duration
+
+	// Audience optionally specifies the intended audience of the
+	// request.  If empty, the value of TokenURL is used as the
+	// intended audience.
+	Audience string
 }
 
 // TokenSource returns a JWT TokenSource using the configuration
@@ -105,6 +110,9 @@ func (js jwtSource) Token() (*oauth2.Token, error) {
 	if t := js.conf.Expires; t > 0 {
 		claimSet.Exp = time.Now().Add(t).Unix()
 	}
+	if aud := js.conf.Audience; aud != "" {
+		claimSet.Aud = aud
+	}
 	h := *defaultHeader
 	h.KeyID = js.conf.PrivateKeyID
 	payload, err := jws.Encode(&h, claimSet, pk)
@@ -124,7 +132,10 @@ func (js jwtSource) Token() (*oauth2.Token, error) {
 		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
 	if c := resp.StatusCode; c < 200 || c > 299 {
-		return nil, fmt.Errorf("oauth2: cannot fetch token: %v\nResponse: %s", resp.Status, body)
+		return nil, &oauth2.RetrieveError{
+			Response: resp,
+			Body:     body,
+		}
 	}
 	// tokenRes is the JSON response body.
 	var tokenRes struct {

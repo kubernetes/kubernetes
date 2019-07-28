@@ -18,10 +18,9 @@ package polymorphichelpers
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // statusViewer returns a StatusViewer for printing rollout status.
-func statusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind())
+func statusViewer(mapping *meta.RESTMapping) (StatusViewer, error) {
+	return StatusViewerFor(mapping.GroupVersionKind.GroupKind())
 }

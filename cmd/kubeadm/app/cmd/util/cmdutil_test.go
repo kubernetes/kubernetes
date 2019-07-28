@@ -22,43 +22,51 @@ import (
 
 func TestValidateExactArgNumber(t *testing.T) {
 	var tests = []struct {
+		name                string
 		args, supportedArgs []string
 		expectedErr         bool
 	}{
-		{ // one arg given and one arg expected
+		{
+			name:          "one arg given and one arg expected",
 			args:          []string{"my-node-1234"},
 			supportedArgs: []string{"node-name"},
 			expectedErr:   false,
 		},
-		{ // two args given and two args expected
+		{
+			name:          "two args given and two args expected",
 			args:          []string{"my-node-1234", "foo"},
 			supportedArgs: []string{"node-name", "second-toplevel-arg"},
 			expectedErr:   false,
 		},
-		{ // too few supplied args
+		{
+			name:          "too few supplied args",
 			args:          []string{},
 			supportedArgs: []string{"node-name"},
 			expectedErr:   true,
 		},
-		{ // too few non-empty args
+		{
+			name:          "too few non-empty args",
 			args:          []string{""},
 			supportedArgs: []string{"node-name"},
 			expectedErr:   true,
 		},
-		{ // too many args
+		{
+			name:          "too many args",
 			args:          []string{"my-node-1234", "foo"},
 			supportedArgs: []string{"node-name"},
 			expectedErr:   true,
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateExactArgNumber(rt.args, rt.supportedArgs)
-		if (actual != nil) != rt.expectedErr {
-			t.Errorf(
-				"failed ValidateExactArgNumber:\n\texpected error: %t\n\t  actual error: %t",
-				rt.expectedErr,
-				(actual != nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := ValidateExactArgNumber(rt.args, rt.supportedArgs)
+			if (actual != nil) != rt.expectedErr {
+				t.Errorf(
+					"failed ValidateExactArgNumber:\n\texpected error: %t\n\t  actual error: %t",
+					rt.expectedErr,
+					(actual != nil),
+				)
+			}
+		})
 	}
 }

@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 )
 
 // JobControllerOptions holds the JobController options.
 type JobControllerOptions struct {
-	ConcurrentJobSyncs int32
+	*jobconfig.JobControllerConfiguration
 }
 
 // AddFlags adds flags related to JobController for controller manager to the specified FlagSet.
@@ -35,7 +35,7 @@ func (o *JobControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up JobController config with options.
-func (o *JobControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.JobControllerConfiguration) error {
+func (o *JobControllerOptions) ApplyTo(cfg *jobconfig.JobControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

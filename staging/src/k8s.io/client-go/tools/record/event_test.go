@@ -19,7 +19,6 @@ package record
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"testing"
@@ -417,7 +416,6 @@ func TestWriteEventError(t *testing.T) {
 
 	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
 	eventCorrelator := NewEventCorrelator(&clock)
-	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for caseName, ent := range table {
 		attempts := 0
@@ -431,7 +429,7 @@ func TestWriteEventError(t *testing.T) {
 			},
 		}
 		ev := &v1.Event{}
-		recordToSink(sink, ev, eventCorrelator, randGen, 0)
+		recordToSink(sink, ev, eventCorrelator, 0)
 		if attempts != ent.attemptsWanted {
 			t.Errorf("case %v: wanted %d, got %d attempts", caseName, ent.attemptsWanted, attempts)
 		}
@@ -441,7 +439,6 @@ func TestWriteEventError(t *testing.T) {
 func TestUpdateExpiredEvent(t *testing.T) {
 	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
 	eventCorrelator := NewEventCorrelator(&clock)
-	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var createdEvent *v1.Event
 
@@ -462,7 +459,7 @@ func TestUpdateExpiredEvent(t *testing.T) {
 	ev := &v1.Event{}
 	ev.ResourceVersion = "updated-resource-version"
 	ev.Count = 2
-	recordToSink(sink, ev, eventCorrelator, randGen, 0)
+	recordToSink(sink, ev, eventCorrelator, 0)
 
 	if createdEvent == nil {
 		t.Error("Event did not get created after patch failed")

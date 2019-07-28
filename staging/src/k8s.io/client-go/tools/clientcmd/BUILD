@@ -22,9 +22,9 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/imdario/mergo:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -54,10 +54,10 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
         "//staging/src/k8s.io/client-go/util/homedir:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/imdario/mergo:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/golang.org/x/crypto/ssh/terminal:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

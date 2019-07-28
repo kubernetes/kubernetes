@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // PriorityMetadataFactory is a factory to produce PriorityMetadata.
@@ -33,7 +33,7 @@ type PriorityMetadataFactory struct {
 }
 
 // NewPriorityMetadataFactory creates a PriorityMetadataFactory.
-func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister) algorithm.PriorityMetadataProducer {
+func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister) PriorityMetadataProducer {
 	factory := &PriorityMetadataFactory{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
@@ -45,7 +45,8 @@ func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controlle
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
-	nonZeroRequest          *schedulercache.Resource
+	nonZeroRequest          *schedulernodeinfo.Resource
+	podLimits               *schedulernodeinfo.Resource
 	podTolerations          []v1.Toleration
 	affinity                *v1.Affinity
 	podSelectors            []labels.Selector
@@ -55,13 +56,14 @@ type priorityMetadata struct {
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
 	}
 	return &priorityMetadata{
 		nonZeroRequest:          getNonZeroRequests(pod),
+		podLimits:               getResourceLimits(pod),
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
 		affinity:                pod.Spec.Affinity,
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),

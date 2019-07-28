@@ -22,7 +22,10 @@ func insertMime(l []mime, e mime) []mime {
 	return append(l, e)
 }
 
+const qFactorWeightingKey = "q"
+
 // sortedMimes returns a list of mime sorted (desc) by its specified quality.
+// e.g. text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3
 func sortedMimes(accept string) (sorted []mime) {
 	for _, each := range strings.Split(accept, ",") {
 		typeAndQuality := strings.Split(strings.Trim(each, " "), ";")
@@ -30,14 +33,16 @@ func sortedMimes(accept string) (sorted []mime) {
 			sorted = insertMime(sorted, mime{typeAndQuality[0], 1.0})
 		} else {
 			// take factor
-			parts := strings.Split(typeAndQuality[1], "=")
-			if len(parts) == 2 {
-				f, err := strconv.ParseFloat(parts[1], 64)
+			qAndWeight := strings.Split(typeAndQuality[1], "=")
+			if len(qAndWeight) == 2 && strings.Trim(qAndWeight[0], " ") == qFactorWeightingKey {
+				f, err := strconv.ParseFloat(qAndWeight[1], 64)
 				if err != nil {
 					traceLogger.Printf("unable to parse quality in %s, %v", each, err)
 				} else {
 					sorted = insertMime(sorted, mime{typeAndQuality[0], f})
 				}
+			} else {
+				sorted = insertMime(sorted, mime{typeAndQuality[0], 1.0})
 			}
 		}
 	}

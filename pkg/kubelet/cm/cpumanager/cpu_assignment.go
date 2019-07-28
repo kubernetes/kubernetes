@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -69,7 +69,7 @@ func (a *cpuAccumulator) freeSockets() []int {
 // - socket ID, ascending
 // - core ID, ascending
 func (a *cpuAccumulator) freeCores() []int {
-	socketIDs := a.details.Sockets().ToSlice()
+	socketIDs := a.details.Sockets().ToSliceNoSort()
 	sort.Slice(socketIDs,
 		func(i, j int) bool {
 			iCores := a.details.CoresInSocket(socketIDs[i]).Filter(a.isCoreFree)
@@ -158,24 +158,30 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	// Algorithm: topology-aware best-fit
 	// 1. Acquire whole sockets, if available and the container requires at
 	//    least a socket's-worth of CPUs.
-	for _, s := range acc.freeSockets() {
-		if acc.needs(acc.topo.CPUsPerSocket()) {
-			glog.V(4).Infof("[cpumanager] takeByTopology: claiming socket [%d]", s)
+	if acc.needs(acc.topo.CPUsPerSocket()) {
+		for _, s := range acc.freeSockets() {
+			klog.V(4).Infof("[cpumanager] takeByTopology: claiming socket [%d]", s)
 			acc.take(acc.details.CPUsInSocket(s))
 			if acc.isSatisfied() {
 				return acc.result, nil
+			}
+			if !acc.needs(acc.topo.CPUsPerSocket()) {
+				break
 			}
 		}
 	}
 
 	// 2. Acquire whole cores, if available and the container requires at least
 	//    a core's-worth of CPUs.
-	for _, c := range acc.freeCores() {
-		if acc.needs(acc.topo.CPUsPerCore()) {
-			glog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", c)
+	if acc.needs(acc.topo.CPUsPerCore()) {
+		for _, c := range acc.freeCores() {
+			klog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", c)
 			acc.take(acc.details.CPUsInCore(c))
 			if acc.isSatisfied() {
 				return acc.result, nil
+			}
+			if !acc.needs(acc.topo.CPUsPerCore()) {
+				break
 			}
 		}
 	}
@@ -184,7 +190,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
 	for _, c := range acc.freeCPUs() {
-		glog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", c)
+		klog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", c)
 		if acc.needs(1) {
 			acc.take(cpuset.NewCPUSet(c))
 		}

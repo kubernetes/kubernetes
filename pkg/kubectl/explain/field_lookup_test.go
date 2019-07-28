@@ -87,3 +87,48 @@ func TestFindField(t *testing.T) {
 		})
 	}
 }
+func TestCrdFindField(t *testing.T) {
+	schema := resources.LookupResource(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "CrdKind",
+	})
+	if schema == nil {
+		t.Fatal("Counldn't find schema v1.CrdKind")
+	}
+
+	tests := []struct {
+		name string
+		path []string
+
+		err          string
+		expectedPath string
+	}{
+		{
+			name:         "test1",
+			path:         []string{},
+			expectedPath: "CrdKind",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, err := LookupSchemaForField(schema, tt.path)
+
+			gotErr := ""
+			if err != nil {
+				gotErr = err.Error()
+			}
+
+			gotPath := ""
+			if path != nil {
+				gotPath = path.GetPath().String()
+			}
+
+			if gotErr != tt.err || gotPath != tt.expectedPath {
+				t.Errorf("LookupSchemaForField(schema, %v) = (path: %q, err: %q), expected (path: %q, err: %q)",
+					tt.path, gotPath, gotErr, tt.expectedPath, tt.err)
+			}
+		})
+	}
+}

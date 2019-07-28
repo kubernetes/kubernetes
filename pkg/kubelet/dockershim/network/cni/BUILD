@@ -19,9 +19,11 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/network:go_default_library",
         "//pkg/util/bandwidth:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [

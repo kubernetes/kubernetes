@@ -19,7 +19,7 @@
 #
 
 # monitor setup
-monmaptool --create --clobber --fsid `uuidgen` --add a $1:6789 /etc/ceph/monmap
+monmaptool --create --clobber --fsid "$(uuidgen)" --add a "${1}":6789 /etc/ceph/monmap
 mkdir /var/lib/ceph/mon/ceph-a
 ceph-mon -i a --mkfs --monmap /etc/ceph/monmap -k /var/lib/ceph/mon/keyring
 cp /var/lib/ceph/mon/keyring /var/lib/ceph/mon/ceph-a

@@ -49,12 +49,15 @@ readonly APISERVER_SERVER_KEY_PATH=/foo/bar
 readonly APISERVER_CLIENT_CERT_PATH=/foo/bar
 readonly CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
 readonly CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
+readonly INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
 readonly DOCKER_REGISTRY="k8s.gcr.io"
 readonly ENABLE_LEGACY_ABAC=false
 readonly ETC_MANIFESTS=${KUBE_HOME}/etc/kubernetes/manifests
 readonly KUBE_API_SERVER_DOCKER_TAG=v1.11.0-alpha.0.1808_3c7452dc11645d-dirty
 readonly LOG_OWNER_USER=$(id -un)
 readonly LOG_OWNER_GROUP=$(id -gn)
+readonly SERVICEACCOUNT_ISSUER=https://foo.bar.baz
+readonly SERVICEACCOUNT_KEY_PATH=/foo/bar/baz.key
 {{if .EncryptionProviderConfig}}
 ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
 {{end}}
@@ -96,7 +99,7 @@ func TestEncryptionProviderFlag(t *testing.T) {
 		//   "-c",      - Index 1
 		//   "exec /usr/local/bin/kube-apiserver " - Index 2
 		execArgsIndex        = 2
-		encryptionConfigFlag = "--experimental-encryption-provider-config"
+		encryptionConfigFlag = "--encryption-provider-config"
 	)
 
 	testCases := []struct {

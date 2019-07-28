@@ -19,10 +19,10 @@ package storage
 import (
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -47,7 +48,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	)
 
 	f := framework.NewDefaultFramework("pv-protection")
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
@@ -72,60 +73,60 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 			StorageClassName: &emptyStorageClass,
 		}
 
-		By("Creating a PV")
+		ginkgo.By("Creating a PV")
 		// make the pv definitions
 		pv = framework.MakePersistentVolume(pvConfig)
 		// create the PV
 		pv, err = client.CoreV1().PersistentVolumes().Create(pv)
-		Expect(err).NotTo(HaveOccurred(), "Error creating PV")
+		framework.ExpectNoError(err, "Error creating PV")
 
-		By("Waiting for PV to enter phase Available")
+		ginkgo.By("Waiting for PV to enter phase Available")
 		framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeAvailable, client, pv.Name, 1*time.Second, 30*time.Second))
 
-		By("Checking that PV Protection finalizer is set")
+		ginkgo.By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "While getting PV status")
-		Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(BeTrue())
+		framework.ExpectNoError(err, "While getting PV status")
+		gomega.Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(gomega.BeTrue(), "PV Protection finalizer(%v) is not set in %v", volumeutil.PVProtectionFinalizer, pv.ObjectMeta.Finalizers)
 	})
 
-	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources.")
+	ginkgo.AfterEach(func() {
+		e2elog.Logf("AfterEach: Cleaning up test resources.")
 		if errs := framework.PVPVCCleanup(client, nameSpace, pv, pvc); len(errs) > 0 {
-			framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 		}
 	})
 
-	It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func() {
-		By("Deleting the PV")
+	ginkgo.It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func() {
+		ginkgo.By("Deleting the PV")
 		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
+		framework.ExpectNoError(err, "Error deleting PV")
 		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
 	})
 
-	It("Verify that PV bound to a PVC is not removed immediately", func() {
-		By("Creating a PVC")
+	ginkgo.It("Verify that PV bound to a PVC is not removed immediately", func() {
+		ginkgo.By("Creating a PVC")
 		pvc = framework.MakePersistentVolumeClaim(pvcConfig, nameSpace)
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
+		framework.ExpectNoError(err, "Error creating PVC")
 
-		By("Waiting for PVC to become Bound")
+		ginkgo.By("Waiting for PVC to become Bound")
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
-		By("Deleting the PV, however, the PV must not be removed from the system as it's bound to a PVC")
+		ginkgo.By("Deleting the PV, however, the PV must not be removed from the system as it's bound to a PVC")
 		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
+		framework.ExpectNoError(err, "Error deleting PV")
 
-		By("Checking that the PV status is Terminating")
+		ginkgo.By("Checking that the PV status is Terminating")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "While checking PV status")
-		Expect(pv.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
+		framework.ExpectNoError(err, "While checking PV status")
+		framework.ExpectNotEqual(pv.ObjectMeta.DeletionTimestamp, nil)
 
-		By("Deleting the PVC that is bound to the PV")
+		ginkgo.By("Deleting the PVC that is bound to the PV")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
+		framework.ExpectNoError(err, "Error deleting PVC")
 
-		By("Checking that the PV is automatically removed from the system because it's no longer bound to a PVC")
+		ginkgo.By("Checking that the PV is automatically removed from the system because it's no longer bound to a PVC")
 		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
 	})
 })

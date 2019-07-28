@@ -22,7 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {
@@ -157,5 +160,37 @@ func TestLabelSelectorAsMap(t *testing.T) {
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
 		}
+	}
+}
+
+func TestResetObjectMetaForStatus(t *testing.T) {
+	meta := &ObjectMeta{}
+	existingMeta := &ObjectMeta{}
+
+	// fuzz the existingMeta to set every field, no nils
+	f := fuzz.New().NilChance(0).NumElements(1, 1).MaxDepth(10)
+	f.Fuzz(existingMeta)
+	ResetObjectMetaForStatus(meta, existingMeta)
+
+	// not all fields are stomped during the reset.  These fields should not have been set. False
+	// set them all to their zero values.  Before you add anything to this list, consider whether or not
+	// you're enforcing immutability (those are fine) and whether /status should be able to update
+	// these values (these are usually not fine).
+
+	// generateName doesn't do anything after create
+	existingMeta.SetGenerateName("")
+	// resourceVersion is enforced in validation and used during the storage update
+	existingMeta.SetResourceVersion("")
+	// fields made immutable in validation
+	existingMeta.SetUID(types.UID(""))
+	existingMeta.SetName("")
+	existingMeta.SetNamespace("")
+	existingMeta.SetClusterName("")
+	existingMeta.SetCreationTimestamp(Time{})
+	existingMeta.SetDeletionTimestamp(nil)
+	existingMeta.SetDeletionGracePeriodSeconds(nil)
+
+	if !reflect.DeepEqual(meta, existingMeta) {
+		t.Error(diff.ObjectDiff(meta, existingMeta))
 	}
 }

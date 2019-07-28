@@ -1,4 +1,4 @@
-package sysinfo
+package sysinfo // import "github.com/docker/docker/pkg/sysinfo"
 
 import (
 	"runtime"

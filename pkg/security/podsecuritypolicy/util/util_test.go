@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	policy "k8s.io/api/policy/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // TestVolumeSourceFSTypeDrift ensures that for every known type of volume source (by the fields on

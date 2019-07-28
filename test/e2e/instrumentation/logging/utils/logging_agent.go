@@ -19,12 +19,13 @@ package utils
 import (
 	"fmt"
 
-	api_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/util/integer"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/utils/integer"
 )
 
 // EnsureLoggingAgentDeployment checks that logging agent is present on each
@@ -67,13 +68,13 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 	for _, pod := range agentPods.Items {
 		contStatuses := pod.Status.ContainerStatuses
 		if len(contStatuses) == 0 {
-			framework.Logf("There are no container statuses for pod %s", pod.Name)
+			e2elog.Logf("There are no container statuses for pod %s", pod.Name)
 			continue
 		}
 		restartCount := int(contStatuses[0].RestartCount)
 		maxRestartCount = integer.IntMax(maxRestartCount, restartCount)
 
-		framework.Logf("Logging agent %s on node %s was restarted %d times",
+		e2elog.Logf("Logging agent %s on node %s was restarted %d times",
 			pod.Name, pod.Spec.NodeName, restartCount)
 	}
 
@@ -84,7 +85,7 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 	return nil
 }
 
-func getLoggingAgentPods(f *framework.Framework, appName string) (*api_v1.PodList, error) {
+func getLoggingAgentPods(f *framework.Framework, appName string) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": appName}))
 	options := meta_v1.ListOptions{LabelSelector: label.String()}
 	return f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)

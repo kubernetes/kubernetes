@@ -21,10 +21,7 @@ go_library(
     srcs = ["bearertoken.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/bearertoken",
     importpath = "k8s.io/apiserver/pkg/authentication/request/bearertoken",
-    deps = [
-        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-    ],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library"],
 )
 
 filegroup(

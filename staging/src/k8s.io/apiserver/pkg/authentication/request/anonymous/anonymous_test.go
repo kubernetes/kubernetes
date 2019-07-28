@@ -17,6 +17,7 @@ limitations under the License.
 package anonymous
 
 import (
+	"net/http"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -26,17 +27,17 @@ import (
 
 func TestAnonymous(t *testing.T) {
 	var a authenticator.Request = NewAuthenticator()
-	u, ok, err := a.AuthenticateRequest(nil)
+	r, ok, err := a.AuthenticateRequest(&http.Request{})
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	if !ok {
 		t.Fatalf("Unexpectedly unauthenticated")
 	}
-	if u.GetName() != user.Anonymous {
-		t.Fatalf("Expected username %s, got %s", user.Anonymous, u.GetName())
+	if r.User.GetName() != user.Anonymous {
+		t.Fatalf("Expected username %s, got %s", user.Anonymous, r.User.GetName())
 	}
-	if !sets.NewString(u.GetGroups()...).Equal(sets.NewString(user.AllUnauthenticated)) {
-		t.Fatalf("Expected group %s, got %v", user.AllUnauthenticated, u.GetGroups())
+	if !sets.NewString(r.User.GetGroups()...).Equal(sets.NewString(user.AllUnauthenticated)) {
+		t.Fatalf("Expected group %s, got %v", user.AllUnauthenticated, r.User.GetGroups())
 	}
 }

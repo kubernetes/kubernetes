@@ -31,8 +31,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubectl/pkg/scheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
@@ -46,7 +46,7 @@ const (
 func TestTopNodeAllMetrics(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
-	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
+	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsAPIVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -102,7 +102,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 
 	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
-	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsApiVersion)
+	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsAPIVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -165,7 +165,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		ListMeta: metrics.ListMeta,
 		Items:    metrics.Items[1:],
 	}
-	expectedPath := fmt.Sprintf("%s/%s/nodes/%s", baseMetricsAddress, metricsApiVersion, expectedMetrics.Name)
+	expectedPath := fmt.Sprintf("%s/%s/nodes/%s", baseMetricsAddress, metricsAPIVersion, expectedMetrics.Name)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -230,7 +230,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		Items:    metrics.Items[1:],
 	}
 	label := "key=value"
-	expectedPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
+	expectedPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsAPIVersion)
 	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 

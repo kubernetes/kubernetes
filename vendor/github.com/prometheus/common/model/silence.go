@@ -59,8 +59,8 @@ func (m *Matcher) Validate() error {
 	return nil
 }
 
-// Silence defines the representation of a silence definiton
-// in the Prometheus eco-system.
+// Silence defines the representation of a silence definition in the Prometheus
+// eco-system.
 type Silence struct {
 	ID uint64 `json:"id,omitempty"`
 

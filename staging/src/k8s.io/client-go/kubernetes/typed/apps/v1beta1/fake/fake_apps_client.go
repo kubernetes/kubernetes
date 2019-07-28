@@ -36,10 +36,6 @@ func (c *FakeAppsV1beta1) Deployments(namespace string) v1beta1.DeploymentInterf
 	return &FakeDeployments{c, namespace}
 }
 
-func (c *FakeAppsV1beta1) Scales(namespace string) v1beta1.ScaleInterface {
-	return &FakeScales{c, namespace}
-}
-
 func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
 }

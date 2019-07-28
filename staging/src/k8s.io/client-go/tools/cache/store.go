@@ -210,7 +210,7 @@ func (c *cache) GetByKey(key string) (item interface{}, exists bool, err error) 
 // 'c' takes ownership of the list, you should not reference the list again
 // after calling this function.
 func (c *cache) Replace(list []interface{}, resourceVersion string) error {
-	items := map[string]interface{}{}
+	items := make(map[string]interface{}, len(list))
 	for _, item := range list {
 		key, err := c.keyFunc(item)
 		if err != nil {

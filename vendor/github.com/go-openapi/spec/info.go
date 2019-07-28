@@ -52,14 +52,14 @@ func (e Extensions) GetBool(key string) (bool, bool) {
 // GetStringSlice gets a string value from the extensions
 func (e Extensions) GetStringSlice(key string) ([]string, bool) {
 	if v, ok := e[strings.ToLower(key)]; ok {
-		arr, ok := v.([]interface{})
-		if !ok {
+		arr, isSlice := v.([]interface{})
+		if !isSlice {
 			return nil, false
 		}
 		var strs []string
 		for _, iface := range arr {
-			str, ok := iface.(string)
-			if !ok {
+			str, isString := iface.(string)
+			if !isString {
 				return nil, false
 			}
 			strs = append(strs, str)
@@ -161,8 +161,5 @@ func (i *Info) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &i.InfoProps); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &i.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, &i.VendorExtensible)
 }

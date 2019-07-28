@@ -26,8 +26,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubectl/pkg/scheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreatePriorityClass(t *testing.T) {
@@ -58,6 +58,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("description", "my priority")
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", outputFormat)
+	cmd.Flags().Set("preemption-policy", "Never")
 
 	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 	printFlags.OutputFormat = &outputFormat

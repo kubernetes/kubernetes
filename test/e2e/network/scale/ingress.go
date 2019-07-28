@@ -22,13 +22,17 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/ingress"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
 
 const (
@@ -59,19 +63,19 @@ var (
 // IngressScaleFramework defines the framework for ingress scale testing.
 type IngressScaleFramework struct {
 	Clientset     clientset.Interface
-	Jig           *framework.IngressTestJig
-	GCEController *framework.GCEIngressController
+	Jig           *ingress.TestJig
+	GCEController *gce.IngressController
 	CloudConfig   framework.CloudConfig
-	Logger        framework.TestLogger
+	Logger        ingress.TestLogger
 
 	Namespace        string
 	EnableTLS        bool
 	NumIngressesTest []int
 	OutputFile       string
 
-	ScaleTestDeploy *extensions.Deployment
+	ScaleTestDeploy *appsv1.Deployment
 	ScaleTestSvcs   []*v1.Service
-	ScaleTestIngs   []*extensions.Ingress
+	ScaleTestIngs   []*networkingv1beta1.Ingress
 
 	// BatchCreateLatencies stores all ingress creation latencies, in different
 	// batches.
@@ -92,7 +96,7 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 		Namespace:   ns,
 		Clientset:   cs,
 		CloudConfig: cloudConfig,
-		Logger:      &framework.E2ELogger{},
+		Logger:      &ingress.E2ELogger{},
 		EnableTLS:   true,
 		NumIngressesTest: []int{
 			numIngressesSmall,
@@ -106,10 +110,10 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 // PrepareScaleTest prepares framework for ingress scale testing.
 func (f *IngressScaleFramework) PrepareScaleTest() error {
 	f.Logger.Infof("Initializing ingress test suite and gce controller...")
-	f.Jig = framework.NewIngressTestJig(f.Clientset)
+	f.Jig = ingress.NewIngressTestJig(f.Clientset)
 	f.Jig.Logger = f.Logger
 	f.Jig.PollInterval = scaleTestPollInterval
-	f.GCEController = &framework.GCEIngressController{
+	f.GCEController = &gce.IngressController{
 		Client: f.Clientset,
 		Cloud:  f.CloudConfig,
 	}
@@ -118,7 +122,7 @@ func (f *IngressScaleFramework) PrepareScaleTest() error {
 	}
 
 	f.ScaleTestSvcs = []*v1.Service{}
-	f.ScaleTestIngs = []*extensions.Ingress{}
+	f.ScaleTestIngs = []*networkingv1beta1.Ingress{}
 
 	return nil
 }
@@ -130,7 +134,7 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	f.Logger.Infof("Cleaning up ingresses...")
 	for _, ing := range f.ScaleTestIngs {
 		if ing != nil {
-			if err := f.Clientset.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil); err != nil {
+			if err := f.Clientset.NetworkingV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil); err != nil {
 				errs = append(errs, fmt.Errorf("Error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
 			}
 		}
@@ -145,13 +149,13 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	}
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
-		if err := f.Clientset.ExtensionsV1beta1().Deployments(f.ScaleTestDeploy.Namespace).Delete(f.ScaleTestDeploy.Name, nil); err != nil {
+		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(f.ScaleTestDeploy.Name, nil); err != nil {
 			errs = append(errs, fmt.Errorf("Error while delting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
 
 	f.Logger.Infof("Cleaning up cloud resources...")
-	if err := f.GCEController.CleanupGCEIngressControllerWithTimeout(ingressesCleanupTimeout); err != nil {
+	if err := f.GCEController.CleanupIngressControllerWithTimeout(ingressesCleanupTimeout); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -164,7 +168,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 
 	testDeploy := generateScaleTestBackendDeploymentSpec(scaleTestNumBackends)
 	f.Logger.Infof("Creating deployment %s...", testDeploy.Name)
-	testDeploy, err := f.Jig.Client.ExtensionsV1beta1().Deployments(f.Namespace).Create(testDeploy)
+	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(testDeploy)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("Failed to create deployment %s: %v", testDeploy.Name, err))
 		return errs
@@ -187,7 +191,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		numIngsToCreate := numIngsNeeded - numIngsCreated
 		ingWg.Add(numIngsToCreate)
 		svcQueue := make(chan *v1.Service, numIngsToCreate)
-		ingQueue := make(chan *extensions.Ingress, numIngsToCreate)
+		ingQueue := make(chan *networkingv1beta1.Ingress, numIngsToCreate)
 		errQueue := make(chan error, numIngsToCreate)
 		latencyQueue := make(chan time.Duration, numIngsToCreate)
 		start := time.Now()
@@ -267,14 +271,14 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		f.StepCreateLatencies = append(f.StepCreateLatencies, elapsed)
 
 		f.Logger.Infof("Updating ingress and wait for change to take effect")
-		ingToUpdate, err := f.Clientset.ExtensionsV1beta1().Ingresses(f.Namespace).Get(ingCreated.Name, metav1.GetOptions{})
+		ingToUpdate, err := f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Get(ingCreated.Name, metav1.GetOptions{})
 		if err != nil {
 			errs = append(errs, err)
 			return
 		}
 		addTestPathToIngress(ingToUpdate)
 		start = time.Now()
-		ingToUpdate, err = f.Clientset.ExtensionsV1beta1().Ingresses(f.Namespace).Update(ingToUpdate)
+		ingToUpdate, err = f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Update(ingToUpdate)
 		if err != nil {
 			errs = append(errs, err)
 			return
@@ -354,45 +358,45 @@ func (f *IngressScaleFramework) GetFormattedLatencies() string {
 	return res
 }
 
-func addTestPathToIngress(ing *extensions.Ingress) {
+func addTestPathToIngress(ing *networkingv1beta1.Ingress) {
 	ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths = append(
 		ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths,
-		extensions.HTTPIngressPath{
+		networkingv1beta1.HTTPIngressPath{
 			Path:    "/test",
 			Backend: ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend,
 		})
 }
 
-func (f *IngressScaleFramework) createScaleTestServiceIngress(suffix string, enableTLS bool) (*v1.Service, *extensions.Ingress, error) {
+func (f *IngressScaleFramework) createScaleTestServiceIngress(suffix string, enableTLS bool) (*v1.Service, *networkingv1beta1.Ingress, error) {
 	svcCreated, err := f.Clientset.CoreV1().Services(f.Namespace).Create(generateScaleTestServiceSpec(suffix))
 	if err != nil {
 		return nil, nil, err
 	}
-	ingCreated, err := f.Clientset.ExtensionsV1beta1().Ingresses(f.Namespace).Create(generateScaleTestIngressSpec(suffix, enableTLS))
+	ingCreated, err := f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Create(generateScaleTestIngressSpec(suffix, enableTLS))
 	if err != nil {
 		return nil, nil, err
 	}
 	return svcCreated, ingCreated, nil
 }
 
-func generateScaleTestIngressSpec(suffix string, enableTLS bool) *extensions.Ingress {
-	ing := &extensions.Ingress{
+func generateScaleTestIngressSpec(suffix string, enableTLS bool) *networkingv1beta1.Ingress {
+	ing := &networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", scaleTestIngressNamePrefix, suffix),
 		},
-		Spec: extensions.IngressSpec{
-			TLS: []extensions.IngressTLS{
+		Spec: networkingv1beta1.IngressSpec{
+			TLS: []networkingv1beta1.IngressTLS{
 				{SecretName: scaleTestSecretName},
 			},
-			Rules: []extensions.IngressRule{
+			Rules: []networkingv1beta1.IngressRule{
 				{
 					Host: scaleTestHostname,
-					IngressRuleValue: extensions.IngressRuleValue{
-						HTTP: &extensions.HTTPIngressRuleValue{
-							Paths: []extensions.HTTPIngressPath{
+					IngressRuleValue: networkingv1beta1.IngressRuleValue{
+						HTTP: &networkingv1beta1.HTTPIngressRuleValue{
+							Paths: []networkingv1beta1.HTTPIngressPath{
 								{
 									Path: "/scale",
-									Backend: extensions.IngressBackend{
+									Backend: networkingv1beta1.IngressBackend{
 										ServiceName: fmt.Sprintf("%s-%s", scaleTestBackendName, suffix),
 										ServicePort: intstr.IntOrString{
 											Type:   intstr.Int,
@@ -408,7 +412,7 @@ func generateScaleTestIngressSpec(suffix string, enableTLS bool) *extensions.Ing
 		},
 	}
 	if enableTLS {
-		ing.Spec.TLS = []extensions.IngressTLS{
+		ing.Spec.TLS = []networkingv1beta1.IngressTLS{
 			{SecretName: scaleTestSecretName},
 		}
 	}
@@ -434,12 +438,12 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 	}
 }
 
-func generateScaleTestBackendDeploymentSpec(numReplicas int32) *extensions.Deployment {
-	return &extensions.Deployment{
+func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: scaleTestBackendName,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &numReplicas,
 			Selector: &metav1.LabelSelector{MatchLabels: scaleTestLabels},
 			Template: v1.PodTemplateSpec{
@@ -450,7 +454,7 @@ func generateScaleTestBackendDeploymentSpec(numReplicas int32) *extensions.Deplo
 					Containers: []v1.Container{
 						{
 							Name:  scaleTestBackendName,
-							Image: "k8s.gcr.io/echoserver:1.10",
+							Image: imageutils.GetE2EImage(imageutils.EchoServer),
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 							ReadinessProbe: &v1.Probe{
 								Handler: v1.Handler{

@@ -77,18 +77,14 @@ func (s *CpusetGroup) ApplyDir(dir string, cgroup *configs.Cgroup, pid int) erro
 	// The logic is, if user specified cpuset configs, use these
 	// specified configs, otherwise, inherit from parent. This makes
 	// cpuset configs work correctly with 'cpuset.cpu_exclusive', and
-	// keep backward compatbility.
+	// keep backward compatibility.
 	if err := s.ensureCpusAndMems(dir, cgroup); err != nil {
 		return err
 	}
 
 	// because we are not using d.join we need to place the pid into the procs file
 	// unlike the other subsystems
-	if err := cgroups.WriteCgroupProc(dir, pid); err != nil {
-		return err
-	}
-
-	return nil
+	return cgroups.WriteCgroupProc(dir, pid)
 }
 
 func (s *CpusetGroup) getSubsystemSettings(parent string) (cpus []byte, mems []byte, err error) {

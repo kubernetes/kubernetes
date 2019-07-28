@@ -33,17 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/kubectl/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
+	"k8s.io/kubectl/pkg/util"
+	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
+	"k8s.io/kubectl/pkg/util/podutils"
+	"k8s.io/utils/integer"
+	utilpointer "k8s.io/utils/pointer"
 )
-
-func newInt32Ptr(val int) *int32 {
-	ret := int32(val)
-	return &ret
-}
 
 func valOrZero(val *int32) int32 {
 	if val == nil {
@@ -54,7 +50,7 @@ func valOrZero(val *int32) int32 {
 
 const (
 	kubectlAnnotationPrefix    = "kubectl.kubernetes.io/"
-	sourceIdAnnotation         = kubectlAnnotationPrefix + "update-source-id"
+	sourceIDAnnotation         = kubectlAnnotationPrefix + "update-source-id"
 	desiredReplicasAnnotation  = kubectlAnnotationPrefix + "desired-replicas"
 	originalReplicasAnnotation = kubectlAnnotationPrefix + "original-replicas"
 	nextControllerAnnotation   = kubectlAnnotationPrefix + "next-controller-id"
@@ -101,7 +97,7 @@ type RollingUpdaterConfig struct {
 	// when the rolling update starts, such that the total number of old and new pods do not exceed
 	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
-	// the update is atmost 130% of desired pods.
+	// the update is at most 130% of desired pods.
 	MaxSurge intstr.IntOrString
 	// OnProgress is invoked if set during each scale cycle, to allow the caller to perform additional logic or
 	// abort the scale. If an error is returned the cleanup method will not be invoked. The percentage value
@@ -135,7 +131,7 @@ type RollingUpdater struct {
 	scaleAndWait func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error)
 	//getOrCreateTargetController gets and validates an existing controller or
 	//makes a new one.
-	getOrCreateTargetController func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error)
+	getOrCreateTargetController func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error)
 	// cleanup performs post deployment cleanup tasks for newRc and oldRc.
 	cleanup func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error
 	// getReadyPods returns the amount of old and new ready pods.
@@ -188,8 +184,8 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 
 	// Find an existing controller (for continuing an interrupted update) or
 	// create a new one if necessary.
-	sourceId := fmt.Sprintf("%s:%s", oldRc.Name, oldRc.UID)
-	newRc, existed, err := r.getOrCreateTargetController(config.NewRc, sourceId)
+	sourceID := fmt.Sprintf("%s:%s", oldRc.Name, oldRc.UID)
+	newRc, existed, err := r.getOrCreateTargetController(config.NewRc, sourceID)
 	if err != nil {
 		return err
 	}
@@ -393,12 +389,12 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *corev1.ReplicationController, d
 	nextOldVal := valOrZero(oldRc.Spec.Replicas) - decrement
 	oldRc.Spec.Replicas = &nextOldVal
 	if valOrZero(oldRc.Spec.Replicas) < 0 {
-		oldRc.Spec.Replicas = newInt32Ptr(0)
+		oldRc.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 	// If the new is already fully scaled and available up to the desired size, go
 	// ahead and scale old all the way down.
 	if valOrZero(newRc.Spec.Replicas) == desired && newAvailable == desired {
-		oldRc.Spec.Replicas = newInt32Ptr(0)
+		oldRc.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 	// Perform the scale-down.
 	fmt.Fprintf(config.Out, "Scaling %s down to %d\n", oldRc.Name, valOrZero(oldRc.Spec.Replicas))
@@ -458,14 +454,14 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *corev1.ReplicationController, m
 }
 
 // getOrCreateTargetControllerWithClient looks for an existing controller with
-// sourceId. If found, the existing controller is returned with true
+// sourceID. If found, the existing controller is returned with true
 // indicating that the controller already exists. If the controller isn't
 // found, a new one is created and returned along with false indicating the
 // controller was created.
 //
-// Existing controllers are validated to ensure their sourceIdAnnotation
-// matches sourceId; if there's a mismatch, an error is returned.
-func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+// Existing controllers are validated to ensure their sourceIDAnnotation
+// matches sourceID; if there's a mismatch, an error is returned.
+func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 	existingRc, err := r.existingController(controller)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -474,24 +470,24 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev
 			return nil, false, err
 		}
 		if valOrZero(controller.Spec.Replicas) <= 0 {
-			return nil, false, fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d\n", controller.Name, valOrZero(controller.Spec.Replicas))
+			return nil, false, fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d", controller.Name, valOrZero(controller.Spec.Replicas))
 		}
 		// The controller wasn't found, so create it.
 		if controller.Annotations == nil {
 			controller.Annotations = map[string]string{}
 		}
 		controller.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", valOrZero(controller.Spec.Replicas))
-		controller.Annotations[sourceIdAnnotation] = sourceId
-		controller.Spec.Replicas = newInt32Ptr(0)
+		controller.Annotations[sourceIDAnnotation] = sourceID
+		controller.Spec.Replicas = utilpointer.Int32Ptr(0)
 		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(controller)
 		return newRc, false, err
 	}
 	// Validate and use the existing controller.
 	annotations := existingRc.Annotations
-	source := annotations[sourceIdAnnotation]
+	source := annotations[sourceIDAnnotation]
 	_, ok := annotations[desiredReplicasAnnotation]
-	if source != sourceId || !ok {
-		return nil, false, fmt.Errorf("Missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceId, annotations)
+	if source != sourceID || !ok {
+		return nil, false, fmt.Errorf("Missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceID, annotations)
 	}
 	return existingRc, true, nil
 }
@@ -517,7 +513,7 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *corev1.ReplicationCont
 		return err
 	}
 	applyUpdate := func(rc *corev1.ReplicationController) {
-		delete(rc.Annotations, sourceIdAnnotation)
+		delete(rc.Annotations, sourceIDAnnotation)
 		delete(rc.Annotations, desiredReplicasAnnotation)
 	}
 	if newRc, err = updateRcWithRetries(r.rcClient, r.ns, newRc, applyUpdate); err != nil {
@@ -662,7 +658,7 @@ func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	if c.NewRc.Annotations == nil {
 		c.NewRc.Annotations = map[string]string{}
 	}
-	c.NewRc.Annotations[sourceIdAnnotation] = fmt.Sprintf("%s:%s", c.OldRc.Name, c.OldRc.UID)
+	c.NewRc.Annotations[sourceIDAnnotation] = fmt.Sprintf("%s:%s", c.OldRc.Name, c.OldRc.UID)
 
 	// Use the original value since the replica count change from old to new
 	// could be asymmetric. If we don't know the original count, we can't safely
@@ -743,11 +739,6 @@ func AddDeploymentKeyToReplicationController(oldRc *corev1.ReplicationController
 	if oldRc.Spec.Selector == nil {
 		oldRc.Spec.Selector = map[string]string{}
 	}
-	// Copy the old selector, so that we can scrub out any orphaned pods
-	selectorCopy := map[string]string{}
-	for k, v := range oldRc.Spec.Selector {
-		selectorCopy[k] = v
-	}
 	applyUpdate = func(rc *corev1.ReplicationController) {
 		rc.Spec.Selector[deploymentKey] = deploymentValue
 	}
@@ -759,7 +750,7 @@ func AddDeploymentKeyToReplicationController(oldRc *corev1.ReplicationController
 	// Clean up any orphaned pods that don't have the new label, this can happen if the rc manager
 	// doesn't see the update to its pod template and creates a new pod with the old labels after
 	// we've finished re-adopting existing pods to the rc.
-	selector = labels.SelectorFromSet(selectorCopy)
+	selector = labels.SelectorFromSet(oldRc.Spec.Selector)
 	options = metav1.ListOptions{LabelSelector: selector.String()}
 	if podList, err = podClient.Pods(namespace).List(options); err != nil {
 		return nil, err
@@ -841,7 +832,7 @@ func FindSourceController(r corev1client.ReplicationControllersGetter, namespace
 	}
 	for ix := range list.Items {
 		rc := &list.Items[ix]
-		if rc.Annotations != nil && strings.HasPrefix(rc.Annotations[sourceIdAnnotation], name) {
+		if rc.Annotations != nil && strings.HasPrefix(rc.Annotations[sourceIDAnnotation], name) {
 			return rc, nil
 		}
 	}

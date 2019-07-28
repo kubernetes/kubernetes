@@ -9,7 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "compression_test.go",
+        "content_type_test.go",
         "cors_test.go",
         "maxinflight_test.go",
         "timeout_test.go",
@@ -31,7 +31,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "compression.go",
+        "content_type.go",
         "cors.go",
         "doc.go",
         "longrunning.go",
@@ -53,8 +53,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/httplog:go_default_library",
-        "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

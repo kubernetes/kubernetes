@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -369,7 +369,7 @@ func TestYAMLSubresource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.ClusterScoped)[0]
 	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)

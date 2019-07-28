@@ -133,3 +133,40 @@ DESCRIPTION:
 		}
 	}
 }
+func TestCRDModel(t *testing.T) {
+	gvk := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "CrdKind",
+	}
+	schema := resources.LookupResource(gvk)
+	if schema == nil {
+		t.Fatal("Couldn't find schema v1.CrdKind")
+	}
+
+	tests := []struct {
+		path []string
+		want string
+	}{
+		{
+			path: []string{},
+			want: `KIND:     CrdKind
+VERSION:  v1
+
+DESCRIPTION:
+     <empty>
+`,
+		},
+	}
+
+	for _, test := range tests {
+		buf := bytes.Buffer{}
+		if err := PrintModelDescription(test.path, &buf, schema, gvk, false); err != nil {
+			t.Fatalf("Failed to PrintModelDescription for path %v: %v", test.path, err)
+		}
+		got := buf.String()
+		if got != test.want {
+			t.Errorf("Got:\n%v\nWant:\n%v\n", buf.String(), test.want)
+		}
+	}
+}

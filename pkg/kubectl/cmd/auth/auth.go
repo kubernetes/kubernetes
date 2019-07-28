@@ -23,6 +23,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+// NewCmdAuth returns an initialized Command instance for 'auth' sub command
 func NewCmdAuth(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{

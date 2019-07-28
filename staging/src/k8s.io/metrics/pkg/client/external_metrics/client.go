@@ -17,9 +17,10 @@ limitations under the License.
 package external_metrics
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -39,6 +40,9 @@ func New(client rest.Interface) ExternalMetricsClient {
 func NewForConfig(c *rest.Config) (ExternalMetricsClient, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	configShallowCopy.APIPath = "/apis"
@@ -46,7 +50,7 @@ func NewForConfig(c *rest.Config) (ExternalMetricsClient, error) {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &v1beta1.SchemeGroupVersion
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {

@@ -22,14 +22,15 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // FakeMounter implements mount.Interface for tests.
 type FakeMounter struct {
 	MountPoints []MountPoint
 	Log         []FakeAction
-	Filesystem  map[string]FileType
+	// Error to return for a path when calling IsLikelyNotMountPoint
+	MountCheckErrors map[string]error
 	// Some tests run things in parallel, make sure the mounter does not produce
 	// any golang's DATA RACE warnings.
 	mutex sync.Mutex
@@ -93,7 +94,7 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 		absTarget = target
 	}
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: opts})
-	glog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
+	klog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
 	return nil
 }
@@ -111,7 +112,7 @@ func (f *FakeMounter) Unmount(target string) error {
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
 		if mp.Path == absTarget {
-			glog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, absTarget)
+			klog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, absTarget)
 			// Don't copy it to newMountpoints
 			continue
 		}
@@ -119,6 +120,7 @@ func (f *FakeMounter) Unmount(target string) error {
 	}
 	f.MountPoints = newMountpoints
 	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: absTarget})
+	delete(f.MountCheckErrors, target)
 	return nil
 }
 
@@ -133,15 +135,16 @@ func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	return mp.Path == dir
 }
 
-func (f *FakeMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(f, dir)
-}
-
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	_, err := os.Stat(file)
+	err := f.MountCheckErrors[file]
+	if err != nil {
+		return false, err
+	}
+
+	_, err = os.Stat(file)
 	if err != nil {
 		return true, err
 	}
@@ -154,73 +157,12 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 
 	for _, mp := range f.MountPoints {
 		if mp.Path == absFile {
-			glog.V(5).Infof("isLikelyNotMountPoint for %s: mounted %s, false", file, mp.Path)
+			klog.V(5).Infof("isLikelyNotMountPoint for %s: mounted %s, false", file, mp.Path)
 			return false, nil
 		}
 	}
-	glog.V(5).Infof("isLikelyNotMountPoint for %s: true", file)
+	klog.V(5).Infof("isLikelyNotMountPoint for %s: true", file)
 	return true, nil
-}
-
-func (f *FakeMounter) DeviceOpened(pathname string) (bool, error) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	for _, mp := range f.MountPoints {
-		if mp.Device == pathname {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
-}
-
-func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return getDeviceNameFromMount(f, mountPath, pluginDir)
-}
-
-func (f *FakeMounter) MakeRShared(path string) error {
-	return nil
-}
-
-func (f *FakeMounter) GetFileType(pathname string) (FileType, error) {
-	if t, ok := f.Filesystem[pathname]; ok {
-		return t, nil
-	}
-	return FileType("Directory"), nil
-}
-
-func (f *FakeMounter) MakeDir(pathname string) error {
-	return nil
-}
-
-func (f *FakeMounter) MakeFile(pathname string) error {
-	return nil
-}
-
-func (f *FakeMounter) ExistsPath(pathname string) (bool, error) {
-	if _, ok := f.Filesystem[pathname]; ok {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (f *FakeMounter) EvalHostSymlinks(pathname string) (string, error) {
-	return pathname, nil
-}
-
-func (f *FakeMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, nil
-}
-
-func (f *FakeMounter) CleanSubPaths(podDir string, volumeName string) error {
-	return nil
-}
-func (mounter *FakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return nil
 }
 
 func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
@@ -232,14 +174,73 @@ func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	return getMountRefsByDev(f, realpath)
 }
 
-func (f *FakeMounter) GetFSGroup(pathname string) (int64, error) {
+type FakeHostUtil struct {
+	MountPoints []MountPoint
+	Filesystem  map[string]FileType
+
+	mutex sync.Mutex
+}
+
+var _ HostUtils = &FakeHostUtil{}
+
+func (hu *FakeHostUtil) DeviceOpened(pathname string) (bool, error) {
+	hu.mutex.Lock()
+	defer hu.mutex.Unlock()
+
+	for _, mp := range hu.MountPoints {
+		if mp.Device == pathname {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (hu *FakeHostUtil) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+func (hu *FakeHostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
+}
+
+func (hu *FakeHostUtil) MakeRShared(path string) error {
+	return nil
+}
+
+func (hu *FakeHostUtil) GetFileType(pathname string) (FileType, error) {
+	if t, ok := hu.Filesystem[pathname]; ok {
+		return t, nil
+	}
+	return FileType("Directory"), nil
+}
+
+func (hu *FakeHostUtil) MakeDir(pathname string) error {
+	return nil
+}
+
+func (hu *FakeHostUtil) MakeFile(pathname string) error {
+	return nil
+}
+
+func (hu *FakeHostUtil) ExistsPath(pathname string) (bool, error) {
+	if _, ok := hu.Filesystem[pathname]; ok {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (hu *FakeHostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return pathname, nil
+}
+
+func (hu *FakeHostUtil) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("GetFSGroup not implemented")
 }
 
-func (f *FakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
+func (hu *FakeHostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("GetSELinuxSupport not implemented")
 }
 
-func (f *FakeMounter) GetMode(pathname string) (os.FileMode, error) {
+func (hu *FakeHostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return 0, errors.New("not implemented")
 }

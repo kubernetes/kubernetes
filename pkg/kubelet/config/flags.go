@@ -73,6 +73,9 @@ type ContainerRuntimeOptions struct {
 	// CNIBinDir is the full path of the directory in which to search for
 	// CNI plugin binaries
 	CNIBinDir string
+	// CNICacheDir is the full path of the directory in which CNI should store
+	// cache files
+	CNICacheDir string
 }
 
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
@@ -96,5 +99,6 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, fmt.Sprintf("<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle. %s", dockerOnlyWarning))
 	fs.StringVar(&s.CNIConfDir, "cni-conf-dir", s.CNIConfDir, fmt.Sprintf("<Warning: Alpha feature> The full path of the directory in which to search for CNI config files. %s", dockerOnlyWarning))
 	fs.StringVar(&s.CNIBinDir, "cni-bin-dir", s.CNIBinDir, fmt.Sprintf("<Warning: Alpha feature> A comma-separated list of full paths of directories in which to search for CNI plugin binaries. %s", dockerOnlyWarning))
+	fs.StringVar(&s.CNICacheDir, "cni-cache-dir", s.CNICacheDir, fmt.Sprintf("<Warning: Alpha feature> The full path of the directory in which CNI should store cache files. %s", dockerOnlyWarning))
 	fs.Int32Var(&s.NetworkPluginMTU, "network-plugin-mtu", s.NetworkPluginMTU, fmt.Sprintf("<Warning: Alpha feature> The MTU to be passed to the network plugin, to override the default. Set to 0 to use the default 1460 MTU. %s", dockerOnlyWarning))
 }

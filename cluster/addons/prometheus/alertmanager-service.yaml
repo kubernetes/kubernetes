@@ -14,5 +14,5 @@ spec:
       protocol: TCP
       targetPort: 9093
   selector:
-    k8s-app: alertmanager 
+    k8s-app: alertmanager
   type: "ClusterIP"

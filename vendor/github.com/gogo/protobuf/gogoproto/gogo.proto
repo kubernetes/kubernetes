@@ -33,6 +33,7 @@ import "google/protobuf/descriptor.proto";
 
 option java_package = "com.google.protobuf";
 option java_outer_classname = "GoGoProtos";
+option go_package = "github.com/gogo/protobuf/gogoproto";
 
 extend google.protobuf.EnumOptions {
 	optional bool goproto_enum_prefix = 62001;
@@ -82,6 +83,10 @@ extend google.protobuf.FileOptions {
     optional bool enumdecl_all = 63031;
 
 	optional bool goproto_registration = 63032;
+	optional bool messagename_all = 63033;
+
+	optional bool goproto_sizecache_all = 63034;
+	optional bool goproto_unkeyed_all = 63035;
 }
 
 extend google.protobuf.MessageOptions {
@@ -114,6 +119,11 @@ extend google.protobuf.MessageOptions {
 	optional bool compare = 64029;
 
 	optional bool typedecl = 64030;
+
+	optional bool messagename = 64033;
+
+	optional bool goproto_sizecache = 64034;
+	optional bool goproto_unkeyed = 64035;
 }
 
 extend google.protobuf.FieldOptions {
@@ -129,4 +139,6 @@ extend google.protobuf.FieldOptions {
 
 	optional bool stdtime = 65010;
 	optional bool stdduration = 65011;
+	optional bool wktpointer = 65012;
+
 }

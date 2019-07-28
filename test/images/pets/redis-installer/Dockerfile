@@ -19,7 +19,7 @@ FROM BASEIMAGE
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 # TODO: just use standard redis when there is one for 3.2.0.
-RUN clean-install wget make gcc libc-dev
+RUN clean-install wget make gcc libc-dev bash
 
 # See README.md
 RUN wget -qO /redis-3.2.0.tar.gz http://download.redis.io/releases/redis-3.2.0.tar.gz && \
@@ -37,4 +37,4 @@ ADD on-start.sh /
 COPY peer-finder /
 ADD install.sh /
 RUN chmod -c 755 /install.sh /on-start.sh /peer-finder
-Entrypoint ["/install.sh"]
+ENTRYPOINT ["/install.sh"]

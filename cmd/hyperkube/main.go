@@ -20,21 +20,17 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	goflag "flag"
-	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiserver/pkg/server"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	cloudcontrollermanager "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 	kubeapiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	kubecontrollermanager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -49,20 +45,19 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	hyperkubeCommand, allCommandFns := NewHyperKubeCommand(server.SetupSignalHandler())
+	hyperkubeCommand, allCommandFns := NewHyperKubeCommand()
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
-	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	// utilflag.InitFlags()
+	// cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
 	basename := filepath.Base(os.Args[0])
 	if err := commandFor(basename, hyperkubeCommand, allCommandFns).Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
@@ -84,35 +79,15 @@ func commandFor(basename string, defaultCommand *cobra.Command, commands []func(
 }
 
 // NewHyperKubeCommand is the entry point for hyperkube
-func NewHyperKubeCommand(stopCh <-chan struct{}) (*cobra.Command, []func() *cobra.Command) {
-	// these have to be functions since the command is polymorphic.  Cobra wants you to be  top level
+func NewHyperKubeCommand() (*cobra.Command, []func() *cobra.Command) {
+	// these have to be functions since the command is polymorphic. Cobra wants you to be top level
 	// command to get executed
-	apiserver := func() *cobra.Command {
-		ret := kubeapiserver.NewAPIServerCommand(stopCh)
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"apiserver"}
-		return ret
-	}
-	controller := func() *cobra.Command {
-		ret := kubecontrollermanager.NewControllerManagerCommand()
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"controller-manager"}
-		return ret
-	}
-	proxy := func() *cobra.Command {
-		ret := kubeproxy.NewProxyCommand()
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"proxy"}
-		return ret
-	}
-	scheduler := func() *cobra.Command {
-		ret := kubescheduler.NewSchedulerCommand()
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"scheduler"}
-		return ret
-	}
+	apiserver := func() *cobra.Command { return kubeapiserver.NewAPIServerCommand() }
+	controller := func() *cobra.Command { return kubecontrollermanager.NewControllerManagerCommand() }
+	proxy := func() *cobra.Command { return kubeproxy.NewProxyCommand() }
+	scheduler := func() *cobra.Command { return kubescheduler.NewSchedulerCommand() }
 	kubectlCmd := func() *cobra.Command { return kubectl.NewDefaultKubectlCommand() }
-	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand(stopCh) }
+	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand() }
 	cloudController := func() *cobra.Command { return cloudcontrollermanager.NewCloudControllerManagerCommand() }
 
 	commandFns := []func() *cobra.Command{
@@ -125,52 +100,21 @@ func NewHyperKubeCommand(stopCh <-chan struct{}) (*cobra.Command, []func() *cobr
 		cloudController,
 	}
 
-	makeSymlinksFlag := false
 	cmd := &cobra.Command{
 		Use:   "hyperkube",
 		Short: "Request a new project",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 0 || !makeSymlinksFlag {
+			if len(args) != 0 {
 				cmd.Help()
 				os.Exit(1)
 			}
 
-			if err := makeSymlinks(os.Args[0], commandFns); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err.Error())
-			}
 		},
 	}
-	cmd.Flags().BoolVar(&makeSymlinksFlag, "make-symlinks", makeSymlinksFlag, "create a symlink for each server in current directory")
-	cmd.Flags().MarkHidden("make-symlinks") // hide this flag from appearing in servers' usage output
 
 	for i := range commandFns {
 		cmd.AddCommand(commandFns[i]())
 	}
 
 	return cmd, commandFns
-}
-
-// makeSymlinks will create a symlink for each command in the local directory.
-func makeSymlinks(targetName string, commandFns []func() *cobra.Command) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	var errs bool
-	for _, commandFn := range commandFns {
-		command := commandFn()
-		link := path.Join(wd, command.Name())
-
-		err := os.Symlink(targetName, link)
-		if err != nil {
-			errs = true
-			fmt.Println(err)
-		}
-	}
-
-	if errs {
-		return errors.New("Error creating one or more symlinks.")
-	}
-	return nil
 }

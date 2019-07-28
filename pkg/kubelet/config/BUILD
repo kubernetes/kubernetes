@@ -43,12 +43,13 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/io:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-            "//vendor/golang.org/x/exp/inotify:go_default_library",
+            "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         ],
         "//conditions:default": [],
     }),

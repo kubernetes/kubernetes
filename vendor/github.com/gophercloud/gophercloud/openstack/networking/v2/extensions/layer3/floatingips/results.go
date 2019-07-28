@@ -15,6 +15,9 @@ type FloatingIP struct {
 	// ID is the unique identifier for the floating IP instance.
 	ID string `json:"id"`
 
+	// Description for the floating IP instance.
+	Description string `json:"description"`
+
 	// FloatingNetworkID is the UUID of the external network where the floating
 	// IP is to be created.
 	FloatingNetworkID string `json:"floating_network_id"`
@@ -42,6 +45,9 @@ type FloatingIP struct {
 
 	// RouterID is the ID of the router used for this floating IP.
 	RouterID string `json:"router_id"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 type commonResult struct {
@@ -50,11 +56,13 @@ type commonResult struct {
 
 // Extract will extract a FloatingIP resource from a result.
 func (r commonResult) Extract() (*FloatingIP, error) {
-	var s struct {
-		FloatingIP *FloatingIP `json:"floatingip"`
-	}
+	var s FloatingIP
 	err := r.ExtractInto(&s)
-	return s.FloatingIP, err
+	return &s, err
+}
+
+func (r commonResult) ExtractInto(v interface{}) error {
+	return r.Result.ExtractIntoStructPtr(v, "floatingip")
 }
 
 // CreateResult represents the result of a create operation. Call its Extract
@@ -116,4 +124,8 @@ func ExtractFloatingIPs(r pagination.Page) ([]FloatingIP, error) {
 	}
 	err := (r.(FloatingIPPage)).ExtractInto(&s)
 	return s.FloatingIPs, err
+}
+
+func ExtractFloatingIPsInto(r pagination.Page, v interface{}) error {
+	return r.(FloatingIPPage).Result.ExtractIntoSlicePtr(v, "floatingips")
 }

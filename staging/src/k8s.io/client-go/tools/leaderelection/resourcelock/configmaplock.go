@@ -93,6 +93,9 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 
 // RecordEvent in leader election while adding meta-data
 func (cml *ConfigMapLock) RecordEvent(s string) {
+	if cml.LockConfig.EventRecorder == nil {
+		return
+	}
 	events := fmt.Sprintf("%v %v", cml.LockConfig.Identity, s)
 	cml.LockConfig.EventRecorder.Eventf(&v1.ConfigMap{ObjectMeta: cml.cm.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
 }

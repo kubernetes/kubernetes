@@ -26,7 +26,7 @@ var _ = Describe("Merging fields of type map with openapi", func() {
 	Context("where a field has been deleted", func() {
 		It("should delete the field when it is the only field in the map", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - recorded/remote match
@@ -35,14 +35,14 @@ spec:
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - not present in recorded
   replicas: null
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -51,7 +51,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
@@ -60,7 +60,7 @@ spec:
 
 		It("should delete the field when there are other fields in the map", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - recorded/remote match
@@ -69,7 +69,7 @@ spec:
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - not present in recorded
@@ -78,7 +78,7 @@ spec:
   revisionHistoryLimit: 1
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -88,7 +88,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   revisionHistoryLimit: 1
@@ -100,14 +100,14 @@ spec:
 	Context("where a field is has been added", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   paused: true
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # Add this - it is missing from recorded and remote
@@ -118,12 +118,12 @@ spec:
   progressDeadlineSeconds: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -137,14 +137,14 @@ spec:
 	Context("where a field is has been updated", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   paused: true
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # Missing from recorded
@@ -155,7 +155,7 @@ spec:
   progressDeadlineSeconds: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 2
@@ -163,7 +163,7 @@ spec:
   progressDeadlineSeconds: 3
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -175,26 +175,26 @@ spec:
 
 		It("should update the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 2
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 2
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   replicas: 3
@@ -208,7 +208,7 @@ var _ = Describe("Merging fields of type map without openapi", func() {
 	Context("where a field has been deleted", func() {
 		It("should delete the field when it is the only field in the map", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   # delete - recorded/remote match
@@ -217,14 +217,14 @@ spec:
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   # delete - not present in recorded
   replicas: null
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 3
@@ -233,7 +233,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
 `)
@@ -242,7 +242,7 @@ spec:
 
 		It("should delete the field when there are other fields in the map", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   # delete - recorded/remote match
@@ -251,7 +251,7 @@ spec:
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   # delete - not present in recorded
@@ -260,7 +260,7 @@ spec:
   revisionHistoryLimit: 1
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 3
@@ -270,7 +270,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   revisionHistoryLimit: 1
@@ -282,14 +282,14 @@ spec:
 	Context("where a field is has been added", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   paused: true
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   # Add this - it is missing from recorded and remote
@@ -300,12 +300,12 @@ spec:
   progressDeadlineSeconds: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 3
@@ -319,14 +319,14 @@ spec:
 	Context("where a field is has been updated", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   paused: true
   progressDeadlineSeconds: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   # Matches recorded
@@ -337,7 +337,7 @@ spec:
   progressDeadlineSeconds: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 2
@@ -345,7 +345,7 @@ spec:
   progressDeadlineSeconds: 3
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 3
@@ -357,26 +357,26 @@ spec:
 
 		It("should update the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 2
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 3
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 2
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   replicas: 3
@@ -390,7 +390,7 @@ var _ = Describe("Merging fields of type map with openapi", func() {
 	Context("where a field has been deleted", func() {
 		It("should delete the field when it is the only field in the map", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - recorded/remote match
@@ -399,14 +399,14 @@ spec:
   bar: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - not present in recorded
   baz: null
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   baz: 3
@@ -415,7 +415,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
@@ -424,7 +424,7 @@ spec:
 
 		It("should delete the field when there are other fields in the map", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - recorded/remote match
@@ -433,7 +433,7 @@ spec:
   bar: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # delete - not present in recorded
@@ -442,7 +442,7 @@ spec:
   biz: 1
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   bar: 3
@@ -452,7 +452,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   biz: 1
@@ -464,14 +464,14 @@ spec:
 	Context("where a field is has been added", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo: true
   biz: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # Add this - it is missing from recorded and remote
@@ -482,12 +482,12 @@ spec:
   biz: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   baz: 3
@@ -501,14 +501,14 @@ spec:
 	Context("where a field is has been updated", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   foo: true
   baz: 1
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   # Missing from recorded
@@ -519,7 +519,7 @@ spec:
   baz: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   bar: 2
@@ -527,7 +527,7 @@ spec:
   baz: 3
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   bar: 3

@@ -21,18 +21,20 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/version"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/version"
 )
 
+// Version is a struct for version information
 type Version struct {
 	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
 	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
@@ -44,7 +46,8 @@ var (
 		kubectl version`))
 )
 
-type VersionOptions struct {
+// Options is a struct to support version command
+type Options struct {
 	ClientOnly bool
 	Short      bool
 	Output     string
@@ -54,15 +57,17 @@ type VersionOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewVersionOptions(ioStreams genericclioptions.IOStreams) *VersionOptions {
-	return &VersionOptions{
+// NewOptions returns initialized Options
+func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
+	return &Options{
 		IOStreams: ioStreams,
 	}
 
 }
 
+// NewCmdVersion returns a cobra command for fetching versions
 func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewVersionOptions(ioStreams)
+	o := NewOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "version",
 		Short:   i18n.T("Print the client and server version information"),
@@ -80,16 +85,23 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+// Complete completes all the required options
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
+	if o.ClientOnly {
+		return nil
+	}
 	o.discoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
+	// if we had an empty rest.Config, continue and just print out client information.
+	// if we had an error other than being unable to build a rest.Config, fail.
+	if err != nil && !clientcmd.IsEmptyConfig(err) {
 		return err
 	}
 	return nil
 }
 
-func (o *VersionOptions) Validate() error {
+// Validate validates the provided options
+func (o *Options) Validate() error {
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
 		return errors.New(`--output must be 'yaml' or 'json'`)
 	}
@@ -97,7 +109,8 @@ func (o *VersionOptions) Validate() error {
 	return nil
 }
 
-func (o *VersionOptions) Run() error {
+// Run executes version command
+func (o *Options) Run() error {
 	var (
 		serverVersion *apimachineryversion.Info
 		serverErr     error
@@ -107,7 +120,7 @@ func (o *VersionOptions) Run() error {
 	clientVersion := version.Get()
 	versionInfo.ClientVersion = &clientVersion
 
-	if !o.ClientOnly {
+	if !o.ClientOnly && o.discoveryClient != nil {
 		// Always request fresh data from the server
 		o.discoveryClient.Invalidate()
 		serverVersion, serverErr = o.discoveryClient.ServerVersion()

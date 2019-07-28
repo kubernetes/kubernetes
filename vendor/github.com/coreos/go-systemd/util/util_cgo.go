@@ -122,11 +122,12 @@ func runningFromSystemService() (ret bool, err error) {
 	errno := C.my_sd_pid_get_owner_uid(sd_pid_get_owner_uid, 0, &uid)
 	serrno := syscall.Errno(-errno)
 	// when we're running from a unit file, sd_pid_get_owner_uid returns
-	// ENOENT (systemd <220) or ENXIO (systemd >=220)
+	// ENOENT (systemd <220), ENXIO (systemd 220-223), or ENODATA
+	// (systemd >=234)
 	switch {
 	case errno >= 0:
 		ret = false
-	case serrno == syscall.ENOENT, serrno == syscall.ENXIO:
+	case serrno == syscall.ENOENT, serrno == syscall.ENXIO, serrno == syscall.ENODATA:
 		// Since the implementation of sessions in systemd relies on
 		// the `pam_systemd` module, using the sd_pid_get_owner_uid
 		// heuristic alone can result in false positives if that module

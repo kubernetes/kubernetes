@@ -19,12 +19,15 @@ package csi
 import (
 	"context"
 	"errors"
+	"io"
+	"reflect"
 	"testing"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
-	"reflect"
 )
 
 type fakeCsiDriverClient struct {
@@ -39,13 +42,82 @@ func newFakeCsiDriverClient(t *testing.T, stagingCapable bool) *fakeCsiDriverCli
 	}
 }
 
+func newFakeCsiDriverClientWithExpansion(t *testing.T, stagingCapable bool, expansionSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithExpansion(stagingCapable, expansionSet),
+	}
+}
+
+func newFakeCsiDriverClientWithVolumeStats(t *testing.T, volumeStatsSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithVolumeStats(volumeStatsSet),
+	}
+}
+
 func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
-	accessibleTopology *csipb.Topology,
+	accessibleTopology map[string]string,
 	err error) {
-	resp, err := c.nodeClient.NodeGetInfo(ctx, &csipb.NodeGetInfoRequest{})
-	return resp.GetNodeId(), resp.GetMaxVolumesPerNode(), resp.GetAccessibleTopology(), err
+	resp, err := c.nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{})
+	topology := resp.GetAccessibleTopology()
+	if topology != nil {
+		accessibleTopology = topology.Segments
+	}
+	return resp.GetNodeId(), resp.GetMaxVolumesPerNode(), accessibleTopology, err
+}
+
+func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (
+	usageCountMap *volume.Metrics, err error) {
+	c.t.Log("calling fake.NodeGetVolumeStats...")
+	req := &csipbv1.NodeGetVolumeStatsRequest{
+		VolumeId:   volID,
+		VolumePath: targetPath,
+	}
+	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
+	usages := resp.GetUsage()
+	metrics := &volume.Metrics{}
+	if usages == nil {
+		return nil, nil
+	}
+	for _, usage := range usages {
+		if usage == nil {
+			continue
+		}
+		unit := usage.GetUnit()
+		switch unit {
+		case csipbv1.VolumeUsage_BYTES:
+			metrics.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			metrics.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			metrics.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+		case csipbv1.VolumeUsage_INODES:
+			metrics.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			metrics.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			metrics.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+		}
+	}
+	return metrics, nil
+}
+
+func (c *fakeCsiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsVolumeStats...")
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	capabilities := resp.GetCapabilities()
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *fakeCsiDriverClient) NodePublishVolume(
@@ -55,26 +127,29 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 	stagingTargetPath string,
 	targetPath string,
 	accessMode api.PersistentVolumeAccessMode,
-	volumeInfo map[string]string,
-	volumeAttribs map[string]string,
-	nodePublishSecrets map[string]string,
+	publishContext map[string]string,
+	volumeContext map[string]string,
+	secrets map[string]string,
 	fsType string,
+	mountOptions []string,
 ) error {
 	c.t.Log("calling fake.NodePublishVolume...")
-	req := &csipb.NodePublishVolumeRequest{
-		VolumeId:           volID,
-		TargetPath:         targetPath,
-		Readonly:           readOnly,
-		PublishInfo:        volumeInfo,
-		VolumeAttributes:   volumeAttribs,
-		NodePublishSecrets: nodePublishSecrets,
-		VolumeCapability: &csipb.VolumeCapability{
-			AccessMode: &csipb.VolumeCapability_AccessMode{
-				Mode: asCSIAccessMode(accessMode),
+	req := &csipbv1.NodePublishVolumeRequest{
+		VolumeId:          volID,
+		TargetPath:        targetPath,
+		StagingTargetPath: stagingTargetPath,
+		Readonly:          readOnly,
+		PublishContext:    publishContext,
+		VolumeContext:     volumeContext,
+		Secrets:           secrets,
+		VolumeCapability: &csipbv1.VolumeCapability{
+			AccessMode: &csipbv1.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV1(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
+			AccessType: &csipbv1.VolumeCapability_Mount{
+				Mount: &csipbv1.VolumeCapability_MountVolume{
+					FsType:     fsType,
+					MountFlags: mountOptions,
 				},
 			},
 		},
@@ -86,7 +161,7 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 
 func (c *fakeCsiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string, targetPath string) error {
 	c.t.Log("calling fake.NodeUnpublishVolume...")
-	req := &csipb.NodeUnpublishVolumeRequest{
+	req := &csipbv1.NodeUnpublishVolumeRequest{
 		VolumeId:   volID,
 		TargetPath: targetPath,
 	}
@@ -97,30 +172,32 @@ func (c *fakeCsiDriverClient) NodeUnpublishVolume(ctx context.Context, volID str
 
 func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 	volID string,
-	publishInfo map[string]string,
+	publishContext map[string]string,
 	stagingTargetPath string,
 	fsType string,
 	accessMode api.PersistentVolumeAccessMode,
-	nodeStageSecrets map[string]string,
-	volumeAttribs map[string]string,
+	secrets map[string]string,
+	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	c.t.Log("calling fake.NodeStageVolume...")
-	req := &csipb.NodeStageVolumeRequest{
+	req := &csipbv1.NodeStageVolumeRequest{
 		VolumeId:          volID,
-		PublishInfo:       publishInfo,
+		PublishContext:    publishContext,
 		StagingTargetPath: stagingTargetPath,
-		VolumeCapability: &csipb.VolumeCapability{
-			AccessMode: &csipb.VolumeCapability_AccessMode{
-				Mode: asCSIAccessMode(accessMode),
+		VolumeCapability: &csipbv1.VolumeCapability{
+			AccessMode: &csipbv1.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV1(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
+			AccessType: &csipbv1.VolumeCapability_Mount{
+				Mount: &csipbv1.VolumeCapability_MountVolume{
+					FsType:     fsType,
+					MountFlags: mountOptions,
 				},
 			},
 		},
-		NodeStageSecrets: nodeStageSecrets,
-		VolumeAttributes: volumeAttribs,
+		Secrets:       secrets,
+		VolumeContext: volumeContext,
 	}
 
 	_, err := c.nodeClient.NodeStageVolume(ctx, req)
@@ -129,7 +206,7 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 
 func (c *fakeCsiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error {
 	c.t.Log("calling fake.NodeUnstageVolume...")
-	req := &csipb.NodeUnstageVolumeRequest{
+	req := &csipbv1.NodeUnstageVolumeRequest{
 		VolumeId:          volID,
 		StagingTargetPath: stagingTargetPath,
 	}
@@ -137,18 +214,89 @@ func (c *fakeCsiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stag
 	return err
 }
 
-func (c *fakeCsiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
-	c.t.Log("calling fake.NodeGetCapabilities...")
-	req := &csipb.NodeGetCapabilitiesRequest{}
+func (c *fakeCsiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsNodeExpand...")
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+
 	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	return resp.GetCapabilities(), nil
+
+	capabilities := resp.GetCapabilities()
+
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeGetCapabilities for NodeSupportsStageUnstage...")
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	stageUnstageSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
+			stageUnstageSet = true
+		}
+	}
+	return stageUnstageSet, nil
+}
+
+func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, volumeid, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {
+	c.t.Log("calling fake.NodeExpandVolume")
+	req := &csipbv1.NodeExpandVolumeRequest{
+		VolumeId:      volumeid,
+		VolumePath:    volumePath,
+		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: newSize.Value()},
+	}
+	resp, err := c.nodeClient.NodeExpandVolume(ctx, req)
+	if err != nil {
+		return newSize, err
+	}
+	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
+	return *updatedQuantity, nil
 }
 
 func setupClient(t *testing.T, stageUnstageSet bool) csiClient {
 	return newFakeCsiDriverClient(t, stageUnstageSet)
+}
+
+func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet bool) csiClient {
+	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
+}
+
+func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
+	return newFakeCsiDriverClientWithVolumeStats(t, volumeStatsSet)
+}
+
+func checkErr(t *testing.T, expectedAnError bool, actualError error) {
+	t.Helper()
+
+	errOccurred := actualError != nil
+
+	if expectedAnError && !errOccurred {
+		t.Error("expected an error")
+	}
+
+	if !expectedAnError && errOccurred {
+		t.Errorf("expected no error, got: %v", actualError)
+	}
 }
 
 func TestClientNodeGetInfo(t *testing.T) {
@@ -156,40 +304,45 @@ func TestClientNodeGetInfo(t *testing.T) {
 		name                       string
 		expectedNodeID             string
 		expectedMaxVolumePerNode   int64
-		expectedAccessibleTopology *csipb.Topology
+		expectedAccessibleTopology map[string]string
 		mustFail                   bool
 		err                        error
 	}{
 		{
-			name:                     "test ok",
-			expectedNodeID:           "node1",
-			expectedMaxVolumePerNode: 16,
-			expectedAccessibleTopology: &csipb.Topology{
-				Segments: map[string]string{"com.example.csi-topology/zone": "zone1"},
-			},
+			name:                       "test ok",
+			expectedNodeID:             "node1",
+			expectedMaxVolumePerNode:   16,
+			expectedAccessibleTopology: map[string]string{"com.example.csi-topology/zone": "zone1"},
 		},
-		{name: "grpc error", mustFail: true, err: errors.New("grpc error")},
+		{
+			name:     "grpc error",
+			mustFail: true,
+			err:      errors.New("grpc error"),
+		},
 	}
-
-	client := setupClient(t, false /* stageUnstageSet */)
 
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		client.(*fakeCsiDriverClient).nodeClient.SetNextError(tc.err)
-		client.(*fakeCsiDriverClient).nodeClient.SetNodeGetInfoResp(&csipb.NodeGetInfoResponse{
-			NodeId:             tc.expectedNodeID,
-			MaxVolumesPerNode:  tc.expectedMaxVolumePerNode,
-			AccessibleTopology: tc.expectedAccessibleTopology,
-		})
+
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
+					NodeId:            tc.expectedNodeID,
+					MaxVolumesPerNode: tc.expectedMaxVolumePerNode,
+					AccessibleTopology: &csipbv1.Topology{
+						Segments: tc.expectedAccessibleTopology,
+					},
+				})
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
 		nodeID, maxVolumePerNode, accessibleTopology, err := client.NodeGetInfo(context.Background())
-
-		if tc.mustFail && err == nil {
-			t.Error("expected an error but got none")
-		}
-
-		if !tc.mustFail && err != nil {
-			t.Errorf("expected no errors but got: %v", err)
-		}
+		checkErr(t, tc.mustFail, err)
 
 		if nodeID != tc.expectedNodeID {
 			t.Errorf("expected nodeID: %v; got: %v", tc.expectedNodeID, nodeID)
@@ -200,7 +353,11 @@ func TestClientNodeGetInfo(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(accessibleTopology, tc.expectedAccessibleTopology) {
-			t.Errorf("expected accessibleTopology: %v; got: %v", *tc.expectedAccessibleTopology, *accessibleTopology)
+			t.Errorf("expected accessibleTopology: %v; got: %v", tc.expectedAccessibleTopology, accessibleTopology)
+		}
+
+		if !tc.mustFail {
+			fakeCloser.Check()
 		}
 	}
 }
@@ -221,11 +378,18 @@ func TestClientNodePublishVolume(t *testing.T) {
 		{name: "grpc error", volID: "vol-test", targetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
 	}
 
-	client := setupClient(t, false)
-
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		client.(*fakeCsiDriverClient).nodeClient.SetNextError(tc.err)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
 		err := client.NodePublishVolume(
 			context.Background(),
 			tc.volID,
@@ -237,10 +401,12 @@ func TestClientNodePublishVolume(t *testing.T) {
 			map[string]string{"attr0": "val0"},
 			map[string]string{},
 			tc.fsType,
+			[]string{},
 		)
+		checkErr(t, tc.mustFail, err)
 
-		if tc.mustFail && err == nil {
-			t.Error("test must fail, but err is nil")
+		if !tc.mustFail {
+			fakeCloser.Check()
 		}
 	}
 }
@@ -259,14 +425,23 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 		{name: "grpc error", volID: "vol-test", targetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
 	}
 
-	client := setupClient(t, false)
-
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		client.(*fakeCsiDriverClient).nodeClient.SetNextError(tc.err)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
 		err := client.NodeUnpublishVolume(context.Background(), tc.volID, tc.targetPath)
-		if tc.mustFail && err == nil {
-			t.Error("test must fail, but err is nil")
+		checkErr(t, tc.mustFail, err)
+
+		if !tc.mustFail {
+			fakeCloser.Check()
 		}
 	}
 }
@@ -277,22 +452,30 @@ func TestClientNodeStageVolume(t *testing.T) {
 		volID             string
 		stagingTargetPath string
 		fsType            string
-		secret            map[string]string
+		secrets           map[string]string
+		mountOptions      []string
 		mustFail          bool
 		err               error
 	}{
-		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4"},
+		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4", mountOptions: []string{"unvalidated"}},
 		{name: "missing volID", stagingTargetPath: "/test/path", mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
 		{name: "bad fs", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "badfs", mustFail: true},
 		{name: "grpc error", volID: "vol-test", stagingTargetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
 	}
 
-	client := setupClient(t, false)
-
 	for _, tc := range testCases {
 		t.Logf("Running test case: %s", tc.name)
-		client.(*fakeCsiDriverClient).nodeClient.SetNextError(tc.err)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
 		err := client.NodeStageVolume(
 			context.Background(),
 			tc.volID,
@@ -300,12 +483,14 @@ func TestClientNodeStageVolume(t *testing.T) {
 			tc.stagingTargetPath,
 			tc.fsType,
 			api.ReadWriteOnce,
-			tc.secret,
+			tc.secrets,
 			map[string]string{"attr0": "val0"},
+			tc.mountOptions,
 		)
+		checkErr(t, tc.mustFail, err)
 
-		if tc.mustFail && err == nil {
-			t.Error("test must fail, but err is nil")
+		if !tc.mustFail {
+			fakeCloser.Check()
 		}
 	}
 }
@@ -324,17 +509,171 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		{name: "grpc error", volID: "vol-test", stagingTargetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
 	}
 
-	client := setupClient(t, false)
-
 	for _, tc := range testCases {
 		t.Logf("Running test case: %s", tc.name)
-		client.(*fakeCsiDriverClient).nodeClient.SetNextError(tc.err)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
 		err := client.NodeUnstageVolume(
 			context.Background(),
 			tc.volID, tc.stagingTargetPath,
 		)
-		if tc.mustFail && err == nil {
-			t.Error("test must fail, but err is nil")
+		checkErr(t, tc.mustFail, err)
+
+		if !tc.mustFail {
+			fakeCloser.Check()
 		}
 	}
+}
+
+func TestNodeExpandVolume(t *testing.T) {
+	testCases := []struct {
+		name       string
+		volID      string
+		volumePath string
+		newSize    resource.Quantity
+		mustFail   bool
+		err        error
+	}{
+		{
+			name:       "with all correct values",
+			volID:      "vol-abcde",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("10Gi"),
+			mustFail:   false,
+		},
+		{
+			name:       "with missing volume-id",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("10Gi"),
+			mustFail:   true,
+		},
+		{
+			name:     "with missing volume path",
+			volID:    "vol-1234",
+			newSize:  resource.MustParse("10Gi"),
+			mustFail: true,
+		},
+		{
+			name:       "with invalid quantity",
+			volID:      "vol-1234",
+			volumePath: "/foo/bar",
+			newSize:    *resource.NewQuantity(-10, resource.DecimalSI),
+			mustFail:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test cases : %s", tc.name)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+		_, err := client.NodeExpandVolume(context.Background(), tc.volID, tc.volumePath, tc.newSize)
+		checkErr(t, tc.mustFail, err)
+		if !tc.mustFail {
+			fakeCloser.Check()
+		}
+	}
+}
+
+type VolumeStatsOptions struct {
+	VolumeSpec *volume.Spec
+
+	// this just could be volumeID
+	VolumeID string
+
+	// DeviceMountPath location where device is mounted on the node. If volume type
+	// is attachable - this would be global mount path otherwise
+	// it would be location where volume was mounted for the pod
+	DeviceMountPath string
+}
+
+func TestVolumeStats(t *testing.T) {
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
+	tests := []struct {
+		name           string
+		volumeStatsSet bool
+		volumeData     VolumeStatsOptions
+		success        bool
+	}{
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+
+		{
+			name:           "when nodeVolumeStats=off, VolumeID=on, DeviceMountPath=on",
+			volumeStatsSet: false,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: false,
+		},
+
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=off, DeviceMountPath=on",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: false,
+		},
+
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=off",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "",
+			},
+			success: false,
+		},
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=off",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "",
+				DeviceMountPath: "",
+			},
+			success: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if err != nil && tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
+			}
+		})
+	}
+
 }

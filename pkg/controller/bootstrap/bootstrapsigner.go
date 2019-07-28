@@ -20,10 +20,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"fmt"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,13 +35,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	jws "k8s.io/cluster-bootstrap/token/jws"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-// BootstrapSignerOptions contains options for the BootstrapSigner
-type BootstrapSignerOptions struct {
+// SignerOptions contains options for the Signer
+type SignerOptions struct {
 	// ConfigMapNamespace is the namespace of the ConfigMap
 	ConfigMapNamespace string
 
@@ -59,18 +61,17 @@ type BootstrapSignerOptions struct {
 	SecretResync time.Duration
 }
 
-// DefaultBootstrapSignerOptions returns a set of default options for creating a
-// BootstrapSigner
-func DefaultBootstrapSignerOptions() BootstrapSignerOptions {
-	return BootstrapSignerOptions{
+// DefaultSignerOptions returns a set of default options for creating a Signer.
+func DefaultSignerOptions() SignerOptions {
+	return SignerOptions{
 		ConfigMapNamespace:   api.NamespacePublic,
 		ConfigMapName:        bootstrapapi.ConfigMapClusterInfo,
 		TokenSecretNamespace: api.NamespaceSystem,
 	}
 }
 
-// BootstrapSigner is a controller that signs a ConfigMap with a set of tokens.
-type BootstrapSigner struct {
+// Signer is a controller that signs a ConfigMap with a set of tokens.
+type Signer struct {
 	client             clientset.Interface
 	configMapKey       string
 	configMapName      string
@@ -90,9 +91,9 @@ type BootstrapSigner struct {
 	configMapSynced cache.InformerSynced
 }
 
-// NewBootstrapSigner returns a new *BootstrapSigner.
-func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options BootstrapSignerOptions) (*BootstrapSigner, error) {
-	e := &BootstrapSigner{
+// NewSigner returns a new *Signer.
+func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+	e := &Signer{
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
 		configMapName:      options.ConfigMapName,
@@ -153,7 +154,7 @@ func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer
 }
 
 // Run runs controller loops and returns when they are done
-func (e *BootstrapSigner) Run(stopCh <-chan struct{}) {
+func (e *Signer) Run(stopCh <-chan struct{}) {
 	// Shut down queues
 	defer utilruntime.HandleCrash()
 	defer e.syncQueue.ShutDown()
@@ -162,17 +163,17 @@ func (e *BootstrapSigner) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	glog.V(5).Infof("Starting workers")
+	klog.V(5).Infof("Starting workers")
 	go wait.Until(e.serviceConfigMapQueue, 0, stopCh)
 	<-stopCh
-	glog.V(1).Infof("Shutting down")
+	klog.V(1).Infof("Shutting down")
 }
 
-func (e *BootstrapSigner) pokeConfigMapSync() {
+func (e *Signer) pokeConfigMapSync() {
 	e.syncQueue.Add(e.configMapKey)
 }
 
-func (e *BootstrapSigner) serviceConfigMapQueue() {
+func (e *Signer) serviceConfigMapQueue() {
 	key, quit := e.syncQueue.Get()
 	if quit {
 		return
@@ -184,7 +185,7 @@ func (e *BootstrapSigner) serviceConfigMapQueue() {
 
 // signConfigMap computes the signatures on our latest cached objects and writes
 // back if necessary.
-func (e *BootstrapSigner) signConfigMap() {
+func (e *Signer) signConfigMap() {
 	origCM := e.getConfigMap()
 
 	if origCM == nil {
@@ -198,7 +199,7 @@ func (e *BootstrapSigner) signConfigMap() {
 	// First capture the config we are signing
 	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
 	if !ok {
-		glog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
+		klog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
 		return
 	}
 
@@ -215,7 +216,7 @@ func (e *BootstrapSigner) signConfigMap() {
 	// Now recompute signatures and store them on the new map
 	tokens := e.getTokens()
 	for tokenID, tokenValue := range tokens {
-		sig, err := computeDetachedSig(content, tokenID, tokenValue)
+		sig, err := jws.ComputeDetachedSignature(content, tokenID, tokenValue)
 		if err != nil {
 			utilruntime.HandleError(err)
 		}
@@ -241,15 +242,15 @@ func (e *BootstrapSigner) signConfigMap() {
 	}
 }
 
-func (e *BootstrapSigner) updateConfigMap(cm *v1.ConfigMap) {
+func (e *Signer) updateConfigMap(cm *v1.ConfigMap) {
 	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-		glog.V(3).Infof("Error updating ConfigMap: %v", err)
+		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}
 }
 
 // getConfigMap gets the ConfigMap we are interested in
-func (e *BootstrapSigner) getConfigMap() *v1.ConfigMap {
+func (e *Signer) getConfigMap() *v1.ConfigMap {
 	configMap, err := e.configMapLister.ConfigMaps(e.configMapNamespace).Get(e.configMapName)
 
 	// If we can't get the configmap just return nil. The resync will eventually
@@ -264,7 +265,7 @@ func (e *BootstrapSigner) getConfigMap() *v1.ConfigMap {
 	return configMap
 }
 
-func (e *BootstrapSigner) listSecrets() []*v1.Secret {
+func (e *Signer) listSecrets() []*v1.Secret {
 	secrets, err := e.secretLister.Secrets(e.secretNamespace).List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -282,7 +283,7 @@ func (e *BootstrapSigner) listSecrets() []*v1.Secret {
 
 // getTokens returns a map of tokenID->tokenSecret. It ensures the token is
 // valid for signing.
-func (e *BootstrapSigner) getTokens() map[string]string {
+func (e *Signer) getTokens() map[string]string {
 	ret := map[string]string{}
 	secretObjs := e.listSecrets()
 	for _, secret := range secretObjs {
@@ -295,7 +296,7 @@ func (e *BootstrapSigner) getTokens() map[string]string {
 		if _, ok := ret[tokenID]; ok {
 			// This should never happen as we ensure a consistent secret name.
 			// But leave this in here just in case.
-			glog.V(1).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
+			klog.V(1).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
 			continue
 		}
 

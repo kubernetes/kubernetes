@@ -28,7 +28,7 @@ type emptyHandle struct {
 }
 
 // NewNetLinkHandle will create an EmptyHandle
-func NewNetLinkHandle() NetLinkHandle {
+func NewNetLinkHandle(ipv6 bool) NetLinkHandle {
 	return &emptyHandle{}
 }
 

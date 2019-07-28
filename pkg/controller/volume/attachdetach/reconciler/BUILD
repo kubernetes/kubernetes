@@ -22,7 +22,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -35,7 +35,6 @@ go_test(
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
         "//pkg/controller/volume/attachdetach/testing:go_default_library",
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
@@ -44,6 +43,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 

@@ -59,6 +59,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/coreos/pkg/capnslog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -435,6 +436,7 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 		reqIDGen:      idutil.NewGenerator(uint16(id), time.Now()),
 		forceVersionC: make(chan struct{}),
 	}
+	serverID.With(prometheus.Labels{"server_id": id.String()}).Set(1)
 
 	srv.applyV2 = &applierV2store{store: srv.store, cluster: srv.cluster}
 

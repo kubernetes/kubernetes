@@ -4,7 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "appengine.go",
+        "appengine_gen2_flex.go",
         "default.go",
+        "doc.go",
         "google.go",
         "jwt.go",
         "sdk.go",
@@ -14,7 +16,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/internal:go_default_library",
         "//vendor/golang.org/x/oauth2/jws:go_default_library",

@@ -305,7 +305,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 		t.Errorf("Unexpected path, expected %q, got: %q", c.expectedPodMountPath, path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -680,5 +680,61 @@ func TestRequiresRemount(t *testing.T) {
 	has := plug.RequiresRemount()
 	if has {
 		t.Errorf("Exepcted RequiresRemount to be false, got %t", has)
+	}
+}
+
+func TestGetRbdImageSize(t *testing.T) {
+	for i, c := range []struct {
+		Output     string
+		TargetSize int
+	}{
+		{
+			Output:     `{"name":"kubernetes-dynamic-pvc-18e7a4d9-050d-11e9-b905-548998f3478f","size":10737418240,"objects":2560,"order":22,"object_size":4194304,"block_name_prefix":"rbd_data.9f4ff7238e1f29","format":2}`,
+			TargetSize: 10240,
+		},
+		{
+			Output:     `{"name":"kubernetes-dynamic-pvc-070635bf-e33f-11e8-aab7-548998f3478f","size":1073741824,"objects":256,"order":22,"object_size":4194304,"block_name_prefix":"rbd_data.670ac4238e1f29","format":2}`,
+			TargetSize: 1024,
+		},
+	} {
+		size, err := getRbdImageSize([]byte(c.Output))
+		if err != nil {
+			t.Errorf("Case %d: getRbdImageSize failed: %v", i, err)
+			continue
+		}
+		if size != c.TargetSize {
+			t.Errorf("Case %d: unexpected size, wanted %d, got %d", i, c.TargetSize, size)
+		}
+	}
+}
+
+func TestGetRbdImageInfo(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	for i, c := range []struct {
+		DeviceMountPath    string
+		TargetRbdImageInfo *rbdImageInfo
+	}{
+		{
+			DeviceMountPath:    fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/pool1-image-image1", tmpDir),
+			TargetRbdImageInfo: &rbdImageInfo{pool: "pool1", name: "image1"},
+		},
+		{
+			DeviceMountPath:    fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool2-image-image2", tmpDir),
+			TargetRbdImageInfo: &rbdImageInfo{pool: "pool2", name: "image2"},
+		},
+	} {
+		rbdImageInfo, err := getRbdImageInfo(c.DeviceMountPath)
+		if err != nil {
+			t.Errorf("Case %d: getRbdImageInfo failed: %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(rbdImageInfo, c.TargetRbdImageInfo) {
+			t.Errorf("Case %d: unexpected RbdImageInfo, wanted %v, got %v", i, c.TargetRbdImageInfo, rbdImageInfo)
+		}
 	}
 }

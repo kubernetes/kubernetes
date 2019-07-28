@@ -355,7 +355,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 
 // DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
 		return err
 	}
 	for _, version := range servedVersions(crd) {
@@ -370,13 +370,13 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 	return nil
 }
 
-// CreateNewScaleClient returns a scale client.
-func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config) (scale.ScalesGetter, error) {
+// CreateNewVersionedScaleClient returns a scale client.
+func CreateNewVersionedScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config, version string) (scale.ScalesGetter, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	groupResource, err := discoveryClient.ServerResourcesForGroupVersion(crd.Spec.Group + "/" + crd.Spec.Version)
+	groupResource, err := discoveryClient.ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
 		return nil, err
 	}
@@ -386,12 +386,12 @@ func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, co
 			Group: metav1.APIGroup{
 				Name: crd.Spec.Group,
 				Versions: []metav1.GroupVersionForDiscovery{
-					{Version: crd.Spec.Version},
+					{Version: version},
 				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: crd.Spec.Version},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: version},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
-				crd.Spec.Version: groupResource.APIResources,
+				version: groupResource.APIResources,
 			},
 		},
 	}

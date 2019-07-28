@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
+        "//pkg/apis/scheduling/v1:go_default_library",
         "//pkg/apis/scheduling/v1alpha1:go_default_library",
         "//pkg/apis/scheduling/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

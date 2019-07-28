@@ -145,13 +145,14 @@ func TestParallelPuller(t *testing.T) {
 
 	cases := pullerTestCases()
 
+	useSerializedEnv := false
 	for i, c := range cases {
-		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, false)
+		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
 
 		for tick, expected := range c.expected {
 			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
-			_, _, err := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}
@@ -170,13 +171,14 @@ func TestSerializedPuller(t *testing.T) {
 
 	cases := pullerTestCases()
 
+	useSerializedEnv := true
 	for i, c := range cases {
-		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, true)
+		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
 
 		for tick, expected := range c.expected {
 			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
-			_, _, err := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}

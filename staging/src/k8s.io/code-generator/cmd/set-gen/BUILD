@@ -22,9 +22,9 @@ go_library(
     importpath = "k8s.io/code-generator/cmd/set-gen",
     deps = [
         "//staging/src/k8s.io/code-generator/pkg/util:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/examples/set-gen/generators:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

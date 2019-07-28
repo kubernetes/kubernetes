@@ -1,11 +1,10 @@
 {
   "swagger": "2.0",
   "info": {
-   "title": "Kubernetes",
-   "version": "v1.9.0"
+    "title": "Kubernetes",
+    "version": "v1.9.0"
   },
-  "paths": {
-  },
+  "paths": {},
   "definitions": {
     "io.k8s.api.core.v1.Container": {
       "description": "A single application container that you want to run within a pod.",
@@ -63,8 +62,8 @@
         }
       }
     },
-    "io.k8s.api.apps.v1beta1.Deployment": {
-      "description": "DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for more information. Deployment enables declarative updates for Pods and ReplicaSets.",
+    "io.k8s.api.apps.v1.Deployment": {
+      "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -80,20 +79,21 @@
         },
         "spec": {
           "description": "Specification of the desired behavior of the Deployment.",
-          "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentSpec"
+          "$ref": "#/definitions/io.k8s.api.apps.v1.DeploymentSpec"
         }
       },
       "x-kubernetes-group-version-kind": [
         {
           "group": "apps",
           "kind": "Deployment",
-          "version": "v1beta1"
+          "version": "v1"
         }
       ]
     },
-    "io.k8s.api.apps.v1beta1.DeploymentSpec": {
+    "io.k8s.api.apps.v1.DeploymentSpec": {
       "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
       "required": [
+        "selector",
         "template"
       ],
       "properties": {
@@ -107,7 +107,7 @@
           "type": "boolean"
         },
         "progressDeadlineSeconds": {
-          "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
+          "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
           "type": "integer",
           "format": "int32"
         },
@@ -117,15 +117,55 @@
           "format": "int32"
         },
         "revisionHistoryLimit": {
-          "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 2.",
+          "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
           "type": "integer",
           "format": "int32"
+        },
+        "selector": {
+          "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment. It must match the pod template's labels.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
+        "strategy": {
+          "description": "The deployment strategy to use to replace existing pods with new ones.",
+          "x-kubernetes-patch-strategy": "retainKeys",
+          "$ref": "#/definitions/io.k8s.api.apps.v1.DeploymentStrategy"
         },
         "template": {
           "description": "Template describes the pods that will be created.",
           "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplateSpec"
         }
       }
+    },
+    "io.k8s.api.apps.v1.DeploymentStrategy": {
+      "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+      "properties": {
+        "rollingUpdate": {
+          "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
+          "$ref": "#/definitions/io.k8s.api.apps.v1.RollingUpdateDeployment"
+        },
+        "type": {
+          "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
+          "type": "string"
+        }
+      }
+    },
+    "io.k8s.api.apps.v1.RollingUpdateDeployment": {
+      "description": "Spec to control the desired behavior of rolling update.",
+      "properties": {
+        "maxSurge": {
+          "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new ReplicaSet can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new ReplicaSet can be scaled up further, ensuring that total number of pods running at any time during the update is at most 130% of desired pods.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        },
+        "maxUnavailable": {
+          "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old ReplicaSet can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old ReplicaSet can be scaled down further, followed by scaling up the new ReplicaSet, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        }
+      }
+    },
+    "io.k8s.apimachinery.pkg.util.intstr.IntOrString": {
+      "description": "IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number.",
+      "type": "string",
+      "format": "int-or-string"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta": {
       "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
@@ -184,8 +224,8 @@
         }
       }
     },
-    "io.k8s.api.extensions.v1beta1.ReplicaSet": {
-      "description": "DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for more information. ReplicaSet represents the configuration of a ReplicaSet.",
+    "io.k8s.api.apps.v1.ReplicaSet": {
+      "description": "ReplicaSet ensures that a specified number of pod replicas are running at any given time.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -201,21 +241,22 @@
         },
         "spec": {
           "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-          "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSetSpec",
-          "x-kubernetes-patch-strategy": "replace"
-
+          "$ref": "#/definitions/io.k8s.api.apps.v1.ReplicaSetSpec"
         }
       },
       "x-kubernetes-group-version-kind": [
         {
-          "group": "extensions",
+          "group": "apps",
           "kind": "ReplicaSet",
-          "version": "v1beta1"
+          "version": "v1"
         }
       ]
     },
-    "io.k8s.api.extensions.v1beta1.ReplicaSetSpec": {
+    "io.k8s.api.apps.v1.ReplicaSetSpec": {
       "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+      "required": [
+        "selector"
+      ],
       "properties": {
         "minReadySeconds": {
           "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
@@ -227,24 +268,73 @@
           "type": "integer",
           "format": "int32"
         },
+        "selector": {
+          "description": "Selector is a label query over pods that should match the replica count. Label keys and values that must match in order to be controlled by this replica set. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
         "template": {
           "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
           "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplateSpec"
         }
       }
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector": {
+      "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+      "properties": {
+        "matchExpressions": {
+          "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
+          }
+        },
+        "matchLabels": {
+          "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement": {
+      "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+      "required": [
+        "key",
+        "operator"
+      ],
+      "properties": {
+        "key": {
+          "description": "key is the label key that the selector applies to.",
+          "type": "string",
+          "x-kubernetes-patch-merge-key": "key",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "operator": {
+          "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.",
+          "type": "string"
+        },
+        "values": {
+          "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "securityDefinitions": {
-   "BearerToken": {
-    "description": "Bearer Token authentication",
-    "type": "apiKey",
-    "name": "authorization",
-    "in": "header"
-   }
+    "BearerToken": {
+      "description": "Bearer Token authentication",
+      "type": "apiKey",
+      "name": "authorization",
+      "in": "header"
+    }
   },
   "security": [
-   {
-    "BearerToken": []
-   }
+    {
+      "BearerToken": []
+    }
   ]
- }
+}

@@ -2,3 +2,4 @@ secrets.yml
 coverage.out
 *.cov
 *.out
+playground

@@ -25,9 +25,9 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
 
-	"github.com/golang/glog"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"k8s.io/klog"
 )
 
 type rawContainerHandler struct {
@@ -39,8 +39,9 @@ type rawContainerHandler struct {
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
-	fsInfo         fs.FsInfo
-	externalMounts []common.Mount
+	fsInfo          fs.FsInfo
+	externalMounts  []common.Mount
+	includedMetrics container.MetricSet
 
 	libcontainerHandler *libcontainer.Handler
 }
@@ -86,6 +87,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		cgroupPaths:         cgroupPaths,
 		fsInfo:              fsInfo,
 		externalMounts:      externalMounts,
+		includedMetrics:     includedMetrics,
 		libcontainerHandler: handler,
 	}, nil
 }
@@ -134,7 +136,7 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 		// Get memory and swap limits of the running machine
 		memLimit, err := machine.GetMachineMemoryCapacity()
 		if err != nil {
-			glog.Warningf("failed to obtain memory limit for machine container")
+			klog.Warningf("failed to obtain memory limit for machine container")
 			spec.HasMemory = false
 		} else {
 			spec.Memory.Limit = uint64(memLimit)
@@ -144,7 +146,7 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 
 		swapLimit, err := machine.GetMachineSwapCapacity()
 		if err != nil {
-			glog.Warningf("failed to obtain swap limit for machine container")
+			klog.Warningf("failed to obtain swap limit for machine container")
 		} else {
 			spec.Memory.SwapLimit = uint64(swapLimit)
 		}
@@ -185,36 +187,39 @@ func fsToFsStats(fs *fs.Fs) info.FsStats {
 }
 
 func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
-	var allFs []fs.Fs
+	var filesystems []fs.Fs
+	var err error
 	// Get Filesystem information only for the root cgroup.
 	if isRootCgroup(self.name) {
-		filesystems, err := self.fsInfo.GetGlobalFsInfo()
+		filesystems, err = self.fsInfo.GetGlobalFsInfo()
 		if err != nil {
 			return err
 		}
-		for i := range filesystems {
-			fs := filesystems[i]
-			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
+	} else if self.includedMetrics.Has(container.DiskUsageMetrics) || self.includedMetrics.Has(container.DiskIOMetrics) {
+		if len(self.externalMounts) > 0 {
+			var mountSet map[string]struct{}
+			mountSet = make(map[string]struct{})
+			for _, mount := range self.externalMounts {
+				mountSet[mount.HostDir] = struct{}{}
+			}
+			filesystems, err = self.fsInfo.GetFsInfoForPath(mountSet)
+			if err != nil {
+				return err
+			}
 		}
-		allFs = filesystems
-	} else if len(self.externalMounts) > 0 {
-		var mountSet map[string]struct{}
-		mountSet = make(map[string]struct{})
-		for _, mount := range self.externalMounts {
-			mountSet[mount.HostDir] = struct{}{}
-		}
-		filesystems, err := self.fsInfo.GetFsInfoForPath(mountSet)
-		if err != nil {
-			return err
-		}
-		for i := range filesystems {
-			fs := filesystems[i]
-			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
-		}
-		allFs = filesystems
 	}
 
-	common.AssignDeviceNamesToDiskStats(&fsNamer{fs: allFs, factory: self.machineInfoFactory}, &stats.DiskIo)
+	if isRootCgroup(self.name) || self.includedMetrics.Has(container.DiskUsageMetrics) {
+		for i := range filesystems {
+			fs := filesystems[i]
+			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
+		}
+	}
+
+	if isRootCgroup(self.name) || self.includedMetrics.Has(container.DiskIOMetrics) {
+		common.AssignDeviceNamesToDiskStats(&fsNamer{fs: filesystems, factory: self.machineInfoFactory}, &stats.DiskIo)
+
+	}
 	return nil
 }
 

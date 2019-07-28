@@ -15,13 +15,13 @@ import (
 //sys connectNamedPipe(pipe syscall.Handle, o *syscall.Overlapped) (err error) = ConnectNamedPipe
 //sys createNamedPipe(name string, flags uint32, pipeMode uint32, maxInstances uint32, outSize uint32, inSize uint32, defaultTimeout uint32, sa *syscall.SecurityAttributes) (handle syscall.Handle, err error)  [failretval==syscall.InvalidHandle] = CreateNamedPipeW
 //sys createFile(name string, access uint32, mode uint32, sa *syscall.SecurityAttributes, createmode uint32, attrs uint32, templatefile syscall.Handle) (handle syscall.Handle, err error) [failretval==syscall.InvalidHandle] = CreateFileW
-//sys waitNamedPipe(name string, timeout uint32) (err error) = WaitNamedPipeW
 //sys getNamedPipeInfo(pipe syscall.Handle, flags *uint32, outSize *uint32, inSize *uint32, maxInstances *uint32) (err error) = GetNamedPipeInfo
 //sys getNamedPipeHandleState(pipe syscall.Handle, state *uint32, curInstances *uint32, maxCollectionCount *uint32, collectDataTimeout *uint32, userName *uint16, maxUserNameSize uint32) (err error) = GetNamedPipeHandleStateW
 //sys localAlloc(uFlags uint32, length uint32) (ptr uintptr) = LocalAlloc
 
 const (
 	cERROR_PIPE_BUSY      = syscall.Errno(231)
+	cERROR_NO_DATA        = syscall.Errno(232)
 	cERROR_PIPE_CONNECTED = syscall.Errno(535)
 	cERROR_SEM_TIMEOUT    = syscall.Errno(121)
 
@@ -120,6 +120,11 @@ func (f *win32MessageBytePipe) Read(b []byte) (int, error) {
 		// zero-byte message, ensure that all future Read() calls
 		// also return EOF.
 		f.readEOF = true
+	} else if err == syscall.ERROR_MORE_DATA {
+		// ERROR_MORE_DATA indicates that the pipe's read mode is message mode
+		// and the message still has more bytes. Treat this as a success, since
+		// this package presents all named pipes as byte streams.
+		err = nil
 	}
 	return n, err
 }
@@ -133,12 +138,14 @@ func (s pipeAddress) String() string {
 }
 
 // DialPipe connects to a named pipe by path, timing out if the connection
-// takes longer than the specified duration. If timeout is nil, then the timeout
-// is the default timeout established by the pipe server.
+// takes longer than the specified duration. If timeout is nil, then we use
+// a default timeout of 5 seconds.  (We do not use WaitNamedPipe.)
 func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 	var absTimeout time.Time
 	if timeout != nil {
 		absTimeout = time.Now().Add(*timeout)
+	} else {
+		absTimeout = time.Now().Add(time.Second * 2)
 	}
 	var err error
 	var h syscall.Handle
@@ -147,22 +154,13 @@ func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 		if err != cERROR_PIPE_BUSY {
 			break
 		}
-		now := time.Now()
-		var ms uint32
-		if absTimeout.IsZero() {
-			ms = cNMPWAIT_USE_DEFAULT_WAIT
-		} else if now.After(absTimeout) {
-			ms = cNMPWAIT_NOWAIT
-		} else {
-			ms = uint32(absTimeout.Sub(now).Nanoseconds() / 1000 / 1000)
+		if time.Now().After(absTimeout) {
+			return nil, ErrTimeout
 		}
-		err = waitNamedPipe(path, ms)
-		if err != nil {
-			if err == cERROR_SEM_TIMEOUT {
-				return nil, ErrTimeout
-			}
-			break
-		}
+
+		// Wait 10 msec and try again. This is a rather simplistic
+		// view, as we always try each 10 milliseconds.
+		time.Sleep(time.Millisecond * 10)
 	}
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: path, Err: err}
@@ -172,16 +170,6 @@ func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 	err = getNamedPipeInfo(h, &flags, nil, nil, nil)
 	if err != nil {
 		return nil, err
-	}
-
-	var state uint32
-	err = getNamedPipeHandleState(h, &state, nil, nil, nil, nil, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	if state&cPIPE_READMODE_MESSAGE != 0 {
-		return nil, &os.PathError{Op: "open", Path: path, Err: errors.New("message readmode pipes not supported")}
 	}
 
 	f, err := makeWin32File(h)
@@ -254,6 +242,36 @@ func (l *win32PipeListener) makeServerPipe() (*win32File, error) {
 	return f, nil
 }
 
+func (l *win32PipeListener) makeConnectedServerPipe() (*win32File, error) {
+	p, err := l.makeServerPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for the client to connect.
+	ch := make(chan error)
+	go func(p *win32File) {
+		ch <- connectPipe(p)
+	}(p)
+
+	select {
+	case err = <-ch:
+		if err != nil {
+			p.Close()
+			p = nil
+		}
+	case <-l.closeCh:
+		// Abort the connect request by closing the handle.
+		p.Close()
+		p = nil
+		err = <-ch
+		if err == nil || err == ErrFileClosed {
+			err = ErrPipeListenerClosed
+		}
+	}
+	return p, err
+}
+
 func (l *win32PipeListener) listenerRoutine() {
 	closed := false
 	for !closed {
@@ -261,31 +279,20 @@ func (l *win32PipeListener) listenerRoutine() {
 		case <-l.closeCh:
 			closed = true
 		case responseCh := <-l.acceptCh:
-			p, err := l.makeServerPipe()
-			if err == nil {
-				// Wait for the client to connect.
-				ch := make(chan error)
-				go func(p *win32File) {
-					ch <- connectPipe(p)
-				}(p)
-				select {
-				case err = <-ch:
-					if err != nil {
-						p.Close()
-						p = nil
-					}
-				case <-l.closeCh:
-					// Abort the connect request by closing the handle.
-					p.Close()
-					p = nil
-					err = <-ch
-					if err == nil || err == ErrFileClosed {
-						err = ErrPipeListenerClosed
-					}
-					closed = true
+			var (
+				p   *win32File
+				err error
+			)
+			for {
+				p, err = l.makeConnectedServerPipe()
+				// If the connection was immediately closed by the client, try
+				// again.
+				if err != cERROR_NO_DATA {
+					break
 				}
 			}
 			responseCh <- acceptResponse{p, err}
+			closed = err == ErrPipeListenerClosed
 		}
 	}
 	syscall.Close(l.firstHandle)
@@ -334,13 +341,23 @@ func ListenPipe(path string, c *PipeConfig) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Immediately open and then close a client handle so that the named pipe is
-	// created but not currently accepting connections.
+	// Create a client handle and connect it.  This results in the pipe
+	// instance always existing, so that clients see ERROR_PIPE_BUSY
+	// rather than ERROR_FILE_NOT_FOUND.  This ties the first instance
+	// up so that no other instances can be used.  This would have been
+	// cleaner if the Win32 API matched CreateFile with ConnectNamedPipe
+	// instead of CreateNamedPipe.  (Apparently created named pipes are
+	// considered to be in listening state regardless of whether any
+	// active calls to ConnectNamedPipe are outstanding.)
 	h2, err := createFile(path, 0, 0, nil, syscall.OPEN_EXISTING, cSECURITY_SQOS_PRESENT|cSECURITY_ANONYMOUS, 0)
 	if err != nil {
 		syscall.Close(h)
 		return nil, err
 	}
+	// Close the client handle. The server side of the instance will
+	// still be busy, leading to ERROR_PIPE_BUSY instead of
+	// ERROR_NOT_FOUND, as long as we don't close the server handle,
+	// or disconnect the client with DisconnectNamedPipe.
 	syscall.Close(h2)
 	l := &win32PipeListener{
 		firstHandle:        h,

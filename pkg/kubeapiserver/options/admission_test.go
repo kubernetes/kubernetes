@@ -25,7 +25,7 @@ func TestValidate(t *testing.T) {
 	// 1. Both `--admission-control` and `--enable-admission-plugins` are specified
 	options := NewAdmissionOptions()
 	options.PluginNames = []string{"ServiceAccount"}
-	options.GenericAdmission.EnablePlugins = []string{"Initializers"}
+	options.GenericAdmission.EnablePlugins = []string{"NodeRestriction"}
 	if len(options.Validate()) == 0 {
 		t.Errorf("Expect error, but got none")
 	}
@@ -33,7 +33,7 @@ func TestValidate(t *testing.T) {
 	// 2. Both `--admission-control` and `--disable-admission-plugins` are specified
 	options = NewAdmissionOptions()
 	options.PluginNames = []string{"ServiceAccount"}
-	options.GenericAdmission.DisablePlugins = []string{"Initializers"}
+	options.GenericAdmission.DisablePlugins = []string{"NodeRestriction"}
 	if len(options.Validate()) == 0 {
 		t.Errorf("Expect error, but got none")
 	}

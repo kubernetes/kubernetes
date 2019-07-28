@@ -21,24 +21,25 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	libstrings "strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
-	defaultStorageAccountType       = storage.StandardLRS
+	defaultStorageAccountType       = compute.StandardLRS
 	defaultAzureDiskKind            = v1.AzureManagedDisk
-	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingNone
+	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingReadOnly
 )
 
 type dataDisk struct {
@@ -59,10 +60,14 @@ var (
 		string(api.AzureSharedBlobDisk),
 		string(api.AzureDedicatedBlobDisk),
 		string(api.AzureManagedDisk))
+
+	// only for Windows node
+	winDiskNumRE     = regexp.MustCompile(`/dev/disk(.+)`)
+	winDiskNumFormat = "/dev/disk%d"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(azureDataDiskPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(azureDataDiskPluginName), volName)
 }
 
 // creates a unique path for disks (even if they share the same *.vhd name)
@@ -76,7 +81,7 @@ func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (s
 	}
 	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
 	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
-	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
+	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil
 }
@@ -120,13 +125,13 @@ func normalizeKind(kind string) (v1.AzureDataDiskKind, error) {
 	return v1.AzureDataDiskKind(kind), nil
 }
 
-func normalizeStorageAccountType(storageAccountType string) (storage.SkuName, error) {
+func normalizeStorageAccountType(storageAccountType string) (compute.DiskStorageAccountTypes, error) {
 	if storageAccountType == "" {
 		return defaultStorageAccountType, nil
 	}
 
-	sku := storage.SkuName(storageAccountType)
-	supportedSkuNames := storage.PossibleSkuNameValues()
+	sku := compute.DiskStorageAccountTypes(storageAccountType)
+	supportedSkuNames := compute.PossibleDiskStorageAccountTypesValues()
 	for _, s := range supportedSkuNames {
 		if sku == s {
 			return sku, nil
@@ -200,4 +205,14 @@ func strFirstLetterToUpper(str string) string {
 		return str
 	}
 	return libstrings.ToUpper(string(str[0])) + str[1:]
+}
+
+// getDiskNum : extract the disk num from a device path,
+// deviceInfo format could be like this: e.g. /dev/disk2
+func getDiskNum(deviceInfo string) (string, error) {
+	matches := winDiskNumRE.FindStringSubmatch(deviceInfo)
+	if len(matches) == 2 {
+		return matches[1], nil
+	}
+	return "", fmt.Errorf("cannot parse deviceInfo: %s, correct format: /dev/disk?", deviceInfo)
 }

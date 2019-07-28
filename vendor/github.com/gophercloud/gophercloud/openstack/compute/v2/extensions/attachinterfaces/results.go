@@ -37,8 +37,10 @@ type DeleteResult struct {
 }
 
 // FixedIP represents a Fixed IP Address.
+// This struct is also used when creating an attachment,
+// but it is not possible to specify a SubnetID.
 type FixedIP struct {
-	SubnetID  string `json:"subnet_id"`
+	SubnetID  string `json:"subnet_id,omitempty"`
 	IPAddress string `json:"ip_address"`
 }
 

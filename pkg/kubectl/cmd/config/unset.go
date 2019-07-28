@@ -23,11 +23,11 @@ import (
 	"reflect"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/util/i18n"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type unsetOptions struct {
@@ -49,6 +49,7 @@ var (
 		kubectl config unset contexts.foo.namespace`)
 )
 
+// NewCmdConfigUnset returns a Command instance for 'config unset' sub command
 func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &unsetOptions{configAccess: configAccess}
 

@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package remotecommand contains functions related to executing commands in and attaching to pods.
+// Package remotecommand contains functions related to executing commands in and attaching to pods.
 package remotecommand // import "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"

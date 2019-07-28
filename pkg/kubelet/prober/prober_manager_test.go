@@ -22,12 +22,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -37,7 +38,7 @@ func init() {
 	runtime.ReallyCrash = true
 }
 
-var defaultProbe *v1.Probe = &v1.Probe{
+var defaultProbe = &v1.Probe{
 	Handler: v1.Handler{
 		Exec: &v1.ExecAction{},
 	},
@@ -158,7 +159,9 @@ func TestCleanupPods(t *testing.T) {
 	m.AddPod(&podToCleanup)
 	m.AddPod(&podToKeep)
 
-	m.CleanupPods([]*v1.Pod{&podToKeep})
+	desiredPods := map[types.UID]sets.Empty{}
+	desiredPods[podToKeep.UID] = sets.Empty{}
+	m.CleanupPods(desiredPods)
 
 	removedProbes := []probeKey{
 		{"pod_cleanup", "prober1", readiness},
@@ -197,7 +200,7 @@ func TestCleanupRepeated(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		m.CleanupPods([]*v1.Pod{})
+		m.CleanupPods(map[types.UID]sets.Empty{})
 	}
 }
 
@@ -359,7 +362,7 @@ func waitForWorkerExit(m *manager, workerPaths []probeKey) error {
 		if exited, _ := condition(); exited {
 			continue // Already exited, no need to poll.
 		}
-		glog.Infof("Polling %v", w)
+		klog.Infof("Polling %v", w)
 		if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 			return err
 		}
@@ -384,7 +387,7 @@ func waitForReadyStatus(m *manager, ready bool) error {
 		}
 		return status.ContainerStatuses[0].Ready == ready, nil
 	}
-	glog.Infof("Polling for ready state %v", ready)
+	klog.Infof("Polling for ready state %v", ready)
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 		return err
 	}
@@ -399,7 +402,7 @@ func cleanup(t *testing.T, m *manager) {
 	condition := func() (bool, error) {
 		workerCount := m.workerCount()
 		if workerCount > 0 {
-			glog.Infof("Waiting for %d workers to exit...", workerCount)
+			klog.Infof("Waiting for %d workers to exit...", workerCount)
 		}
 		return workerCount == 0, nil
 	}

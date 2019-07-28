@@ -29,7 +29,7 @@ import (
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -80,7 +80,7 @@ type NetworkPolicySpec struct {
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// List of rule types that the NetworkPolicy relates to.
-	// Valid options are Ingress, Egress, or Ingress,Egress.
+	// Valid options are "Ingress", "Egress", or "Ingress,Egress".
 	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
 	// policies that contain an Egress section are assumed to affect Egress, and all policies
 	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
@@ -107,7 +107,7 @@ type NetworkPolicyIngressRule struct {
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation. If this field is
 	// empty or missing, this rule matches all sources (traffic not restricted by
-	// source). If this field is present and contains at least on item, this rule
+	// source). If this field is present and contains at least one item, this rule
 	// allows traffic only if the traffic matches at least one item in the from list.
 	// +optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
@@ -194,7 +194,7 @@ type NetworkPolicyPeer struct {
 type NetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

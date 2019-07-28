@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/containernetworking/cni/libcni"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
@@ -68,10 +69,18 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)
 	}
 
-	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+	ips, err := network.GetPodIPs(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	return &network.PodNetworkStatus{IP: ip}, nil
+	return &network.PodNetworkStatus{
+		IP:  ips[0],
+		IPs: ips,
+	}, nil
+}
+
+// buildDNSCapabilities builds cniDNSConfig from runtimeapi.DNSConfig.
+func buildDNSCapabilities(dnsConfig *runtimeapi.DNSConfig) *cniDNSConfig {
+	return nil
 }

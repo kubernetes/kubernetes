@@ -23,68 +23,6 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-func TestParseSELinuxOptions(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected *v1.SELinuxOptions
-	}{
-		{
-			name:  "simple",
-			input: "user_t:role_t:type_t:s0",
-			expected: &v1.SELinuxOptions{
-				User:  "user_t",
-				Role:  "role_t",
-				Type:  "type_t",
-				Level: "s0",
-			},
-		},
-		{
-			name:  "simple + categories",
-			input: "user_t:role_t:type_t:s0:c0",
-			expected: &v1.SELinuxOptions{
-				User:  "user_t",
-				Role:  "role_t",
-				Type:  "type_t",
-				Level: "s0:c0",
-			},
-		},
-		{
-			name:  "not enough fields",
-			input: "type_t:s0:c0",
-		},
-	}
-
-	for _, tc := range cases {
-		result, err := ParseSELinuxOptions(tc.input)
-
-		if err != nil {
-			if tc.expected == nil {
-				continue
-			} else {
-				t.Errorf("%v: unexpected error: %v", tc.name, err)
-			}
-		}
-
-		compareContexts(tc.name, tc.expected, result, t)
-	}
-}
-
-func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
-	if e, a := ex.User, ac.User; e != a {
-		t.Errorf("%v: expected user: %v, got: %v", name, e, a)
-	}
-	if e, a := ex.Role, ac.Role; e != a {
-		t.Errorf("%v: expected role: %v, got: %v", name, e, a)
-	}
-	if e, a := ex.Type, ac.Type; e != a {
-		t.Errorf("%v: expected type: %v, got: %v", name, e, a)
-	}
-	if e, a := ex.Level, ac.Level; e != a {
-		t.Errorf("%v: expected level: %v, got: %v", name, e, a)
-	}
-}
-
 func TestAddNoNewPrivileges(t *testing.T) {
 	pfalse := false
 	ptrue := true

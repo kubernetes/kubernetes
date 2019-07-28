@@ -17,42 +17,16 @@ limitations under the License.
 package upgrade
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
-
-func TestBackupAPIServerCertAndKey(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
-
-	certPath := filepath.Join(tmpdir, constants.APIServerCertName)
-	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	if err != nil {
-		t.Fatalf("Failed to create cert file %s: %v", certPath, err)
-	}
-	defer certFile.Close()
-
-	keyPath := filepath.Join(tmpdir, constants.APIServerKeyName)
-	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	if err != nil {
-		t.Fatalf("Failed to create key file %s: %v", keyPath, err)
-	}
-	defer keyFile.Close()
-
-	if err := backupAPIServerCertAndKey(tmpdir); err != nil {
-		t.Fatalf("Failed to backup cert and key in dir %s: %v", tmpdir, err)
-	}
-}
 
 func TestMoveFiles(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
@@ -125,59 +99,5 @@ func TestRollbackFiles(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), errString) {
 		t.Fatalf("Expected error contains %q, got %v", errString, err)
-	}
-}
-
-func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
-	cfg := &kubeadmapi.InitConfiguration{
-		APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		},
-		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "test-node"},
-	}
-
-	for desc, test := range map[string]struct {
-		adjustedExpiry time.Duration
-		expected       bool
-	}{
-		"default: cert not older than 180 days doesn't needs to backup": {
-			expected: false,
-		},
-		"cert older than 180 days need to backup": {
-			adjustedExpiry: expiry + 100*time.Hour,
-			expected:       true,
-		},
-	} {
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-		cfg.CertificatesDir = tmpdir
-
-		caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg)
-		if err != nil {
-			t.Fatalf("failed creation of ca cert and key: %v", err)
-		}
-		caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
-
-		err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, caCert, caKey)
-		if err != nil {
-			t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
-		}
-
-		certAndKey := []string{filepath.Join(tmpdir, constants.APIServerCertName), filepath.Join(tmpdir, constants.APIServerKeyName)}
-		for _, path := range certAndKey {
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				t.Fatalf("Test %s: %s not exist: %v", desc, path, err)
-			}
-		}
-
-		shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir)
-		if err != nil {
-			t.Fatalf("Test %s: failed to check shouldBackupAPIServerCertAndKey: %v", desc, err)
-		}
-
-		if shouldBackup != test.expected {
-			t.Fatalf("Test %s: shouldBackupAPIServerCertAndKey expected %v, got %v", desc, test.expected, shouldBackup)
-		}
 	}
 }

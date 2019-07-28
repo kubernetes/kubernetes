@@ -28,11 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -62,14 +63,8 @@ func newPod(nsName, name string, req, limit v1.ResourceList) *v1.Pod {
 
 // TestTaintNodeByCondition tests related cases for TaintNodeByCondition feature.
 func TestTaintNodeByCondition(t *testing.T) {
-	enabled := utilfeature.DefaultFeatureGate.Enabled("TaintNodesByCondition")
-	defer func() {
-		if !enabled {
-			utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
-		}
-	}()
 	// Enable TaintNodeByCondition
-	utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
@@ -77,22 +72,19 @@ func TestTaintNodeByCondition(t *testing.T) {
 	context := initTestMaster(t, "default", admission)
 
 	// Build clientset and informers for controllers.
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{
+	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
 		QPS:           -1,
 		Host:          context.httpServer.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, time.Second)
+	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 
-	kubeadmission.WantsInternalKubeClientSet(admission).SetInternalKubeClientSet(internalClientset)
-	kubeadmission.WantsInternalKubeInformerFactory(admission).SetInternalKubeInformerFactory(internalInformers)
-
-	controllerCh := make(chan struct{})
-	defer close(controllerCh)
+	admission.SetExternalKubeClientSet(externalClientset)
+	admission.SetExternalKubeInformerFactory(externalInformers)
 
 	// Apply feature gates to enable TaintNodesByCondition
 	algorithmprovider.ApplyFeatureGates()
 
-	context = initTestScheduler(t, context, controllerCh, false, nil)
+	context = initTestScheduler(t, context, false, nil)
 	cs := context.clientSet
 	informers := context.informerFactory
 	nsName := context.ns.Name
@@ -102,8 +94,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		informers.Coordination().V1beta1().Leases(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
-		informers.Extensions().V1beta1().DaemonSets(),
-		nil, // CloudProvider
+		informers.Apps().V1().DaemonSets(),
 		cs,
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
@@ -121,13 +112,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(controllerCh)
+	go nc.Run(context.stopCh)
 
 	// Waiting for all controller sync.
-	internalInformers.Start(controllerCh)
-	internalInformers.WaitForCacheSync(controllerCh)
-	informers.Start(controllerCh)
-	informers.WaitForCacheSync(controllerCh)
+	externalInformers.Start(context.stopCh)
+	externalInformers.WaitForCacheSync(context.stopCh)
+	informers.Start(context.stopCh)
+	informers.WaitForCacheSync(context.stopCh)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -149,20 +140,8 @@ func TestTaintNodeByCondition(t *testing.T) {
 		Effect:   v1.TaintEffectNoSchedule,
 	}
 
-	unreachableToleration := v1.Toleration{
-		Key:      schedulerapi.TaintNodeUnreachable,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	}
-
 	unschedulableToleration := v1.Toleration{
 		Key:      schedulerapi.TaintNodeUnschedulable,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	}
-
-	outOfDiskToleration := v1.Toleration{
-		Key:      schedulerapi.TaintNodeOutOfDisk,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	}
@@ -245,46 +224,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 			},
 		},
 		{
-			name: "unreachable node",
-			existingTaints: []v1.Taint{
-				{
-					Key:    schedulerapi.TaintNodeUnreachable,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			nodeConditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionUnknown, // node status is "Unknown"
-				},
-			},
-			expectedTaints: []v1.Taint{
-				{
-					Key:    schedulerapi.TaintNodeUnreachable,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			pods: []podCase{
-				{
-					pod:  bestEffortPod,
-					fits: false,
-				},
-				{
-					pod:  burstablePod,
-					fits: false,
-				},
-				{
-					pod:  guaranteePod,
-					fits: false,
-				},
-				{
-					pod:         bestEffortPod,
-					tolerations: []v1.Toleration{unreachableToleration},
-					fits:        true,
-				},
-			},
-		},
-		{
 			name:          "unschedulable node",
 			unschedulable: true, // node.spec.unschedulable = true
 			nodeConditions: []v1.NodeCondition{
@@ -316,50 +255,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 					pod:         bestEffortPod,
 					tolerations: []v1.Toleration{unschedulableToleration},
 					fits:        true,
-				},
-			},
-		},
-		{
-			name: "out of disk node",
-			nodeConditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeOutOfDisk,
-					Status: v1.ConditionTrue,
-				},
-				{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionTrue,
-				},
-			},
-			expectedTaints: []v1.Taint{
-				{
-					Key:    schedulerapi.TaintNodeOutOfDisk,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			// In OutOfDisk condition, only pods with toleration can be scheduled.
-			pods: []podCase{
-				{
-					pod:  bestEffortPod,
-					fits: false,
-				},
-				{
-					pod:  burstablePod,
-					fits: false,
-				},
-				{
-					pod:  guaranteePod,
-					fits: false,
-				},
-				{
-					pod:         bestEffortPod,
-					tolerations: []v1.Toleration{outOfDiskToleration},
-					fits:        true,
-				},
-				{
-					pod:         bestEffortPod,
-					tolerations: []v1.Toleration{diskPressureToleration},
-					fits:        false,
 				},
 			},
 		},

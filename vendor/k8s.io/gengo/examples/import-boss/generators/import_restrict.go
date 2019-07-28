@@ -19,6 +19,7 @@ package generators
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,7 +34,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -196,37 +197,54 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 		return nil
 	}
 
+	forbiddenImports := map[string]string{}
+	allowedMismatchedImports := []string{}
 	for _, r := range rules.Rules {
 		re, err := regexp.Compile(r.SelectorRegexp)
 		if err != nil {
 			return fmt.Errorf("regexp `%s` in file %q doesn't compile: %v", r.SelectorRegexp, actualPath, err)
 		}
 		for v := range f.Imports {
-			glog.V(4).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
+			klog.V(4).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
 			if !re.MatchString(v) {
 				continue
 			}
 			for _, forbidden := range r.ForbiddenPrefixes {
-				glog.V(4).Infof("Checking %v against %v\n", v, forbidden)
+				klog.V(4).Infof("Checking %v against %v\n", v, forbidden)
 				if strings.HasPrefix(v, forbidden) {
-					return fmt.Errorf("import %v has forbidden prefix %v", v, forbidden)
+					forbiddenImports[v] = forbidden
 				}
 			}
 			found := false
 			for _, allowed := range r.AllowedPrefixes {
-				glog.V(4).Infof("Checking %v against %v\n", v, allowed)
+				klog.V(4).Infof("Checking %v against %v\n", v, allowed)
 				if strings.HasPrefix(v, allowed) {
 					found = true
 					break
 				}
 			}
 			if !found {
-				return fmt.Errorf("import %v did not match any allowed prefix", v)
+				allowedMismatchedImports = append(allowedMismatchedImports, v)
 			}
 		}
 	}
+
+	if len(forbiddenImports) > 0 || len(allowedMismatchedImports) > 0 {
+		var errorBuilder strings.Builder
+		for i, f := range forbiddenImports {
+			fmt.Fprintf(&errorBuilder, "import %v has forbidden prefix %v\n", i, f)
+		}
+		if len(allowedMismatchedImports) > 0 {
+			sort.Sort(sort.StringSlice(allowedMismatchedImports))
+			fmt.Fprintf(&errorBuilder, "the following imports did not match any allowed prefix:\n")
+			for _, i := range allowedMismatchedImports {
+				fmt.Fprintf(&errorBuilder, "  %v\n", i)
+			}
+		}
+		return errors.New(errorBuilder.String())
+	}
 	if len(rules.Rules) > 0 {
-		glog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
+		klog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
 	}
 
 	return nil

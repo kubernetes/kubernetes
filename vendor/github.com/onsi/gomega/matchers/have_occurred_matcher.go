@@ -29,5 +29,5 @@ func (matcher *HaveOccurredMatcher) FailureMessage(actual interface{}) (message 
 }
 
 func (matcher *HaveOccurredMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf("Expected error:\n%s\n%s\n%s", format.Object(actual, 1), format.IndentString(actual.(error).Error(), 1), "not to have occurred")
+	return fmt.Sprintf("Unexpected error:\n%s\n%s\n%s", format.Object(actual, 1), format.IndentString(actual.(error).Error(), 1), "occurred")
 }

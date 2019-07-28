@@ -63,7 +63,7 @@ func TestHTTPStreamReceived(t *testing.T) {
 	for name, test := range tests {
 		streams := make(chan httpstream.Stream, 1)
 		f := httpStreamReceived(streams)
-		stream := newFakeHttpStream()
+		stream := newFakeHTTPStream()
 		if len(test.port) > 0 {
 			stream.headers.Set("port", test.port)
 		}
@@ -135,7 +135,7 @@ func TestGetStreamPair(t *testing.T) {
 	}
 
 	// removed via complete
-	dataStream := newFakeHttpStream()
+	dataStream := newFakeHTTPStream()
 	dataStream.headers.Set(api.StreamType, api.StreamTypeData)
 	complete, err := p.add(dataStream)
 	if err != nil {
@@ -145,7 +145,7 @@ func TestGetStreamPair(t *testing.T) {
 		t.Fatalf("unexpected complete")
 	}
 
-	errorStream := newFakeHttpStream()
+	errorStream := newFakeHTTPStream()
 	errorStream.headers.Set(api.StreamType, api.StreamTypeError)
 	complete, err = p.add(errorStream)
 	if err != nil {
@@ -188,7 +188,7 @@ func TestGetStreamPair(t *testing.T) {
 func TestRequestID(t *testing.T) {
 	h := &httpStreamHandler{}
 
-	s := newFakeHttpStream()
+	s := newFakeHTTPStream()
 	s.headers.Set(api.StreamType, api.StreamTypeError)
 	s.id = 1
 	if e, a := "1", h.requestID(s); e != a {
@@ -208,39 +208,39 @@ func TestRequestID(t *testing.T) {
 	}
 }
 
-type fakeHttpStream struct {
+type fakeHTTPStream struct {
 	headers http.Header
 	id      uint32
 }
 
-func newFakeHttpStream() *fakeHttpStream {
-	return &fakeHttpStream{
+func newFakeHTTPStream() *fakeHTTPStream {
+	return &fakeHTTPStream{
 		headers: make(http.Header),
 	}
 }
 
-var _ httpstream.Stream = &fakeHttpStream{}
+var _ httpstream.Stream = &fakeHTTPStream{}
 
-func (s *fakeHttpStream) Read(data []byte) (int, error) {
+func (s *fakeHTTPStream) Read(data []byte) (int, error) {
 	return 0, nil
 }
 
-func (s *fakeHttpStream) Write(data []byte) (int, error) {
+func (s *fakeHTTPStream) Write(data []byte) (int, error) {
 	return 0, nil
 }
 
-func (s *fakeHttpStream) Close() error {
+func (s *fakeHTTPStream) Close() error {
 	return nil
 }
 
-func (s *fakeHttpStream) Reset() error {
+func (s *fakeHTTPStream) Reset() error {
 	return nil
 }
 
-func (s *fakeHttpStream) Headers() http.Header {
+func (s *fakeHTTPStream) Headers() http.Header {
 	return s.headers
 }
 
-func (s *fakeHttpStream) Identifier() uint32 {
+func (s *fakeHTTPStream) Identifier() uint32 {
 	return s.id
 }

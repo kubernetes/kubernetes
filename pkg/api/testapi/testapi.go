@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admission"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/auditregistration"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -57,6 +59,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	_ "k8s.io/kubernetes/pkg/apis/auditregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -68,6 +71,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
+	_ "k8s.io/kubernetes/pkg/apis/node/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -255,6 +259,12 @@ func init() {
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
+	if _, ok := Groups[node.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: node.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(node.GroupName)[0].Version}
+		Groups[node.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
 	if _, ok := Groups[events.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: events.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(events.GroupName)[0].Version}
 		Groups[events.GroupName] = TestGroup{
@@ -264,6 +274,12 @@ func init() {
 	if _, ok := Groups[coordination.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: coordination.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(coordination.GroupName)[0].Version}
 		Groups[coordination.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
+	if _, ok := Groups[auditregistration.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: auditregistration.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(auditregistration.GroupName)[0].Version}
+		Groups[auditregistration.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}

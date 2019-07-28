@@ -20,16 +20,19 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/aws"
 )
 
 type awsElasticBlockStoreAttacher struct {
@@ -78,7 +81,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 	// succeeds in that case, so no need to do that separately.
 	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeID, nodeName, err)
+		klog.Errorf("Error attaching volume %q to node %q: %+v", volumeID, nodeName, err)
 		return "", err
 	}
 
@@ -87,14 +90,14 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 
 func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 
-	glog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for AWS", nodeName)
+	klog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for AWS", nodeName)
 	volumeNodeMap := map[types.NodeName][]*volume.Spec{
 		nodeName: specs,
 	}
 	nodeVolumesResult := make(map[*volume.Spec]bool)
 	nodesVerificationMap, err := attacher.BulkVerifyVolumes(volumeNodeMap)
 	if err != nil {
-		glog.Errorf("Attacher.VolumesAreAttached - error checking volumes for node %q with %v", nodeName, err)
+		klog.Errorf("Attacher.VolumesAreAttached - error checking volumes for node %q with %v", nodeName, err)
 		return nodeVolumesResult, err
 	}
 
@@ -114,7 +117,7 @@ func (attacher *awsElasticBlockStoreAttacher) BulkVerifyVolumes(volumesByNode ma
 			volumeSource, _, err := getVolumeSource(volumeSpec)
 
 			if err != nil {
-				glog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
+				klog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
 				continue
 			}
 
@@ -134,7 +137,7 @@ func (attacher *awsElasticBlockStoreAttacher) BulkVerifyVolumes(volumesByNode ma
 	attachedResult, err := attacher.awsVolumes.DisksAreAttached(diskNamesByNode)
 
 	if err != nil {
-		glog.Errorf("Error checking if volumes are attached to nodes err = %v", err)
+		klog.Errorf("Error checking if volumes are attached to nodes err = %v", err)
 		return volumesAttachedCheck, err
 	}
 
@@ -174,15 +177,14 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 	for {
 		select {
 		case <-ticker.C:
-			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
-			devicePaths := getDiskByIDPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
-			path, err := verifyDevicePath(devicePaths)
+			klog.V(5).Infof("Checking AWS Volume %q is attached at devicePath %q.", volumeID, devicePath)
+			path, err := attacher.getDevicePath(volumeSource.VolumeID, partition, devicePath)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
-				glog.Errorf("Error verifying AWS Volume (%q) is attached: %v", volumeID, err)
+				klog.Errorf("Error verifying AWS Volume (%q) is attached at devicePath %q: %v", volumeID, devicePath, err)
 			} else if path != "" {
 				// A device path has successfully been created for the PD
-				glog.Infof("Successfully found attached AWS Volume %q.", volumeID)
+				klog.Infof("Successfully found attached AWS Volume %q at path %q.", volumeID, path)
 				return path, nil
 			}
 		case <-timer.C:
@@ -207,8 +209,17 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				return err
+			dir := deviceMountPath
+			if runtime.GOOS == "windows" {
+				// On Windows, FormatAndMount will mklink (create a symbolic link) at deviceMountPath later, so don't create a
+				// directory at deviceMountPath now. Otherwise mklink will error: "Cannot create a file when that file already exists".
+				// Instead, create the parent of deviceMountPath. For example when deviceMountPath is:
+				// C:\var\lib\kubelet\plugins\kubernetes.io\aws-ebs\mounts\aws\us-west-2b\vol-xxx
+				// create us-west-2b. FormatAndMount will make vol-xxx a symlink to the drive (e.g. D:\)
+				dir = filepath.Dir(deviceMountPath)
+			}
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				return fmt.Errorf("making dir %s failed with %s", dir, err)
 			}
 			notMnt = true
 		} else {
@@ -266,14 +277,22 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName
 	volumeID := aws.KubernetesVolumeID(path.Base(volumeName))
 
 	if _, err := detacher.awsVolumes.DetachDisk(volumeID, nodeName); err != nil {
-		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
+		klog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
 		return err
 	}
 	return nil
 }
 
 func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
+}
+
+func (plugin *awsElasticBlockStorePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func setNodeDisk(

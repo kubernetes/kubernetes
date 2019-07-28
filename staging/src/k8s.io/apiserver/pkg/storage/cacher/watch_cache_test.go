@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -56,11 +56,10 @@ func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
 
 func makeTestStoreElement(pod *v1.Pod) *storeElement {
 	return &storeElement{
-		Key:           "prefix/ns/" + pod.Name,
-		Object:        pod,
-		Labels:        labels.Set(pod.Labels),
-		Fields:        fields.Set{"spec.nodeName": pod.Spec.NodeName},
-		Uninitialized: false,
+		Key:    "prefix/ns/" + pod.Name,
+		Object: pod,
+		Labels: labels.Set(pod.Labels),
+		Fields: fields.Set{"spec.nodeName": pod.Spec.NodeName},
 	}
 }
 
@@ -69,15 +68,16 @@ func newTestWatchCache(capacity int) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return storage.NamespaceKeyFunc("prefix", obj)
 	}
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
-			return nil, nil, false, fmt.Errorf("not a pod")
+			return nil, nil, fmt.Errorf("not a pod")
 		}
-		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, false, nil
+		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	versioner := etcd.APIObjectVersioner{}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, versioner)
+	versioner := etcd3.APIObjectVersioner{}
+	mockHandler := func(*watchCacheEvent) {}
+	wc := newWatchCache(capacity, keyFunc, mockHandler, getAttrsFunc, versioner)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }

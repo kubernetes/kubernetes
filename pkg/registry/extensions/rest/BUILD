@@ -16,7 +16,7 @@ go_library(
         "//pkg/registry/apps/deployment/storage:go_default_library",
         "//pkg/registry/apps/replicaset/storage:go_default_library",
         "//pkg/registry/extensions/controller/storage:go_default_library",
-        "//pkg/registry/extensions/ingress/storage:go_default_library",
+        "//pkg/registry/networking/ingress/storage:go_default_library",
         "//pkg/registry/networking/networkpolicy/storage:go_default_library",
         "//pkg/registry/policy/podsecuritypolicy/storage:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",

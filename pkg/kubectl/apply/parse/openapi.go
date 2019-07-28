@@ -147,7 +147,7 @@ type mapSchemaVisitor struct {
 	Result *proto.Map
 }
 
-// MergeMap implements openapi
+// VisitMap implements openapi
 func (v *mapSchemaVisitor) VisitMap(result *proto.Map) {
 	v.Result = result
 	v.Kind = "map"
@@ -173,7 +173,7 @@ func (v *arraySchemaVisitor) VisitArray(result *proto.Array) {
 	v.Err = copySubElementPatchStrategy(result.Path.String(), result.GetExtensions(), result.SubType.GetExtensions())
 }
 
-// copyPatchStrategy copies the strategies to subelements to the subtype
+// copySubElementPatchStrategy copies the strategies to subelements to the subtype
 // e.g. PodTemplate.Volumes is a []Volume with "x-kubernetes-patch-strategy": "merge,retainKeys"
 // the "retainKeys" strategy applies to merging Volumes, and must be copied to the sub element
 func copySubElementPatchStrategy(field string, from, to map[string]interface{}) error {
@@ -199,7 +199,7 @@ func copySubElementPatchStrategy(field string, from, to map[string]interface{}) 
 	return nil
 }
 
-// MergePrimitive implements openapi
+// VisitReference implements openapi
 func (v *arraySchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
 	if v.Err == nil {
@@ -212,7 +212,7 @@ type primitiveSchemaVisitor struct {
 	Result *proto.Primitive
 }
 
-// MergePrimitive implements openapi
+// VisitPrimitive implements openapi
 func (v *primitiveSchemaVisitor) VisitPrimitive(result *proto.Primitive) {
 	v.Result = result
 	v.Kind = "primitive"

@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -33,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -94,6 +95,8 @@ func TestNodeAddress(t *testing.T) {
 			name:   "InternalIP and ExternalIP are the same",
 			nodeIP: net.ParseIP("55.55.55.55"),
 			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "44.44.44.44"},
+				{Type: v1.NodeExternalIP, Address: "44.44.44.44"},
 				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
 				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
@@ -246,7 +249,7 @@ func TestNodeAddress(t *testing.T) {
 			}
 			hostname := testKubeletHostname
 			externalCloudProvider := false
-			cloud := &fakecloud.FakeCloud{
+			cloud := &fakecloud.Cloud{
 				Addresses: testCase.nodeAddresses,
 				Err:       nil,
 			}
@@ -890,8 +893,9 @@ func TestReadyCondition(t *testing.T) {
 	cases := []struct {
 		desc                     string
 		node                     *v1.Node
-		runtimeErrors            []string
-		networkErrors            []string
+		runtimeErrors            error
+		networkErrors            error
+		storageErrors            error
 		appArmorValidateHostFunc func() error
 		cmStatus                 cm.Status
 		expectConditions         []v1.NodeCondition
@@ -927,23 +931,17 @@ func TestReadyCondition(t *testing.T) {
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. WARNING: foo", now, now)},
 		},
 		{
-			desc:             "new, not ready: runtime errors",
+			desc:             "new, not ready: storage errors",
 			node:             withCapacity.DeepCopy(),
-			runtimeErrors:    []string{"foo", "bar"},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo,bar", now, now)},
-		},
-		{
-			desc:             "new, not ready: network errors",
-			node:             withCapacity.DeepCopy(),
-			networkErrors:    []string{"foo", "bar"},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo,bar", now, now)},
+			storageErrors:    errors.New("some storage error"),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "some storage error", now, now)},
 		},
 		{
 			desc:             "new, not ready: runtime and network errors",
 			node:             withCapacity.DeepCopy(),
-			runtimeErrors:    []string{"runtime"},
-			networkErrors:    []string{"network"},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "runtime,network", now, now)},
+			runtimeErrors:    errors.New("runtime"),
+			networkErrors:    errors.New("network"),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "[runtime, network]", now, now)},
 		},
 		{
 			desc:             "new, not ready: missing capacities",
@@ -973,7 +971,7 @@ func TestReadyCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(true, "", before, before)}
 				return node
 			}(),
-			runtimeErrors:    []string{"foo"},
+			runtimeErrors:    errors.New("foo"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", now, now)},
 			expectEvents: []testEvent{
 				{
@@ -999,18 +997,21 @@ func TestReadyCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
 				return node
 			}(),
-			runtimeErrors:    []string{"foo"},
+			runtimeErrors:    errors.New("foo"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", before, now)},
 			expectEvents:     []testEvent{},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			runtimeErrorsFunc := func() []string {
+			runtimeErrorsFunc := func() error {
 				return tc.runtimeErrors
 			}
-			networkErrorsFunc := func() []string {
+			networkErrorsFunc := func() error {
 				return tc.networkErrors
+			}
+			storageErrorsFunc := func() error {
+				return tc.storageErrors
 			}
 			cmStatusFunc := func() cm.Status {
 				return tc.cmStatus
@@ -1023,7 +1024,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

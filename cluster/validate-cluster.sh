@@ -24,7 +24,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
   source "${KUBE_ROOT}/cluster/env.sh"
@@ -50,16 +50,21 @@ function kubectl_retry() {
 ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
 CLUSTER_READY_ADDITIONAL_TIME_SECONDS="${CLUSTER_READY_ADDITIONAL_TIME_SECONDS:-30}"
 
-EXPECTED_NUM_NODES="${NUM_NODES}"
-
 if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
+  if [[ "${KUBE_CREATE_NODES}" == "true" ]]; then
+    EXPECTED_NUM_NODES="$(get-num-nodes)"
+  else
+    EXPECTED_NUM_NODES="0"
+  fi
   echo "Validating gce cluster, MULTIZONE=${MULTIZONE:-}"
   # In multizone mode we need to add instances for all nodes in the region.
   if [[ "${MULTIZONE:-}" == "true" ]]; then
     EXPECTED_NUM_NODES=$(gcloud -q compute instances list --project="${PROJECT}" --format=[no-heading] \
-      --filter="name ~ '${NODE_INSTANCE_PREFIX}.*' AND zone:($(gcloud -q compute zones list --project="${PROJECT}" --filter=region=${REGION} --format=csv[no-heading]\(name\) | tr "\n" "," | sed  "s/,$//"))" | wc -l)
+      --filter="(name ~ '${NODE_INSTANCE_PREFIX}.*' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}.*') AND zone:($(gcloud -q compute zones list --project="${PROJECT}" --filter=region=${REGION} --format=csv[no-heading]\(name\) | tr "\n" "," | sed  "s/,$//"))" | wc -l)
     echo "Computing number of nodes, NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX}, REGION=${REGION}, EXPECTED_NUM_NODES=${EXPECTED_NUM_NODES}"
   fi
+else
+  EXPECTED_NUM_NODES="${NUM_NODES}"
 fi
 
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then

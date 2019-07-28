@@ -19,15 +19,17 @@ package common
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
 )
 
-var _ = Describe("[sig-api-machinery] ConfigMap", func() {
+var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
@@ -38,10 +40,10 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
-		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
-			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			e2elog.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -86,10 +88,10 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newEnvFromConfigMap(f, name)
-		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
-			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			e2elog.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -122,6 +124,16 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
 		})
 	})
+
+	/*
+	   Release : v1.14
+	   Testname: ConfigMap, with empty-key
+	   Description: Attempt to create a ConfigMap with an empty key. The creation MUST fail.
+	*/
+	framework.ConformanceIt("should fail to create ConfigMap with empty key", func() {
+		configMap, err := newConfigMapWithEmptyKey(f)
+		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
+	})
 })
 
 func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
@@ -136,4 +148,20 @@ func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 			"data_3": "value-3",
 		},
 	}
+}
+
+func newConfigMapWithEmptyKey(f *framework.Framework) (*v1.ConfigMap, error) {
+	name := "configmap-test-emptyKey-" + string(uuid.NewUUID())
+	configMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"": "value-1",
+		},
+	}
+
+	ginkgo.By(fmt.Sprintf("Creating configMap that has name %s", configMap.Name))
+	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
 }

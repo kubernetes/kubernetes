@@ -17,13 +17,14 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
@@ -34,14 +35,15 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 
 	// Read the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(version)
-	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	kubeletCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
 	if err != nil {
 		return nil, err
 	}
 
 	kubeletConfigData, ok := kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]
 	if !ok {
-		return nil, fmt.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", configMapName, kubeadmconstants.KubeletBaseConfigurationConfigMapKey)
+		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing",
+			configMapName, kubeadmconstants.KubeletBaseConfigurationConfigMapKey)
 	}
 
 	// Decodes the kubeletConfigData into the internal component config
@@ -59,14 +61,15 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Version) (runtime.Object, error) {
 
 	// Read the ConfigMap from the cluster
-	kubeproxyCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeProxyConfigMap, metav1.GetOptions{})
+	kubeproxyCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, kubeadmconstants.KubeProxyConfigMap)
 	if err != nil {
 		return nil, err
 	}
 
 	kubeproxyConfigData, ok := kubeproxyCfg.Data[kubeadmconstants.KubeProxyConfigMapKey]
 	if !ok {
-		return nil, fmt.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey)
+		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing",
+			kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey)
 	}
 
 	// Decodes the Config map dat into the internal component config

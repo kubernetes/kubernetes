@@ -19,7 +19,7 @@ package user
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/policy"
+	policy "k8s.io/api/policy/v1beta1"
 )
 
 func TestRunAsAnyOptions(t *testing.T) {

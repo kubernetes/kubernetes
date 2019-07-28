@@ -48,14 +48,27 @@ import (
 //
 // Dpbtf2 is an internal routine, exported for testing purposes.
 func (Implementation) Dpbtf2(ul blas.Uplo, n, kd int, ab []float64, ldab int) (ok bool) {
-	if ul != blas.Upper && ul != blas.Lower {
+	switch {
+	case ul != blas.Upper && ul != blas.Lower:
 		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case kd < 0:
+		panic(kdLT0)
+	case ldab < kd+1:
+		panic(badLdA)
 	}
-	checkSymBanded(ab, n, kd, ldab)
+
 	if n == 0 {
 		return
 	}
+
+	if len(ab) < (n-1)*ldab+kd {
+		panic(shortAB)
+	}
+
 	bi := blas64.Implementation()
+
 	kld := max(1, ldab-1)
 	if ul == blas.Upper {
 		for j := 0; j < n; j++ {

@@ -898,7 +898,7 @@ func TestNodePIDPressure(t *testing.T) {
 		t.Fatalf("Cannot update node: %v", err)
 	}
 
-	// Creats test pod.
+	// Create test pod.
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pidpressure-fake-name"},
 		Spec: v1.PodSpec{

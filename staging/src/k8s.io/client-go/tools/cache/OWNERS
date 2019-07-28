@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - thockin
 - lavalamp
@@ -22,7 +24,6 @@ reviewers:
 - erictune
 - davidopp
 - pmorie
-- kargakis
 - janetkuo
 - justinsb
 - eparis

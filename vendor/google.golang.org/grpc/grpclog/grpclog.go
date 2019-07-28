@@ -24,7 +24,7 @@
 // In the default logger,
 // severity level can be set by environment variable GRPC_GO_LOG_SEVERITY_LEVEL,
 // verbosity level can be set by GRPC_GO_LOG_VERBOSITY_LEVEL.
-package grpclog
+package grpclog // import "google.golang.org/grpc/grpclog"
 
 import "os"
 
@@ -105,18 +105,21 @@ func Fatalln(args ...interface{}) {
 }
 
 // Print prints to the logger. Arguments are handled in the manner of fmt.Print.
+//
 // Deprecated: use Info.
 func Print(args ...interface{}) {
 	logger.Info(args...)
 }
 
 // Printf prints to the logger. Arguments are handled in the manner of fmt.Printf.
+//
 // Deprecated: use Infof.
 func Printf(format string, args ...interface{}) {
 	logger.Infof(format, args...)
 }
 
 // Println prints to the logger. Arguments are handled in the manner of fmt.Println.
+//
 // Deprecated: use Infoln.
 func Println(args ...interface{}) {
 	logger.Infoln(args...)

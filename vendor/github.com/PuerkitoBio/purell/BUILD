@@ -9,8 +9,8 @@ go_library(
     deps = [
         "//vendor/github.com/PuerkitoBio/urlesc:go_default_library",
         "//vendor/golang.org/x/net/idna:go_default_library",
-        "//vendor/golang.org/x/text/secure/precis:go_default_library",
         "//vendor/golang.org/x/text/unicode/norm:go_default_library",
+        "//vendor/golang.org/x/text/width:go_default_library",
     ],
 )
 

@@ -20,7 +20,6 @@ package v1
 
 import (
 	v1 "k8s.io/api/storage/v1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -28,6 +27,7 @@ import (
 type StorageV1Interface interface {
 	RESTClient() rest.Interface
 	StorageClassesGetter
+	VolumeAttachmentsGetter
 }
 
 // StorageV1Client is used to interact with features provided by the storage.k8s.io group.
@@ -37,6 +37,10 @@ type StorageV1Client struct {
 
 func (c *StorageV1Client) StorageClasses() StorageClassInterface {
 	return newStorageClasses(c)
+}
+
+func (c *StorageV1Client) VolumeAttachments() VolumeAttachmentInterface {
+	return newVolumeAttachments(c)
 }
 
 // NewForConfig creates a new StorageV1Client for the given config.
@@ -71,7 +75,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

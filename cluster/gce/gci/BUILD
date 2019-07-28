@@ -1,11 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
-load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
-load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
+load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 
 go_test(
     name = "go_default_test",
     srcs = [
         "apiserver_manifest_test.go",
+        "audit_policy_test.go",
         "configure_helper_test.go",
     ],
     data = [
@@ -14,8 +15,17 @@ go_test(
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/audit/policy:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 

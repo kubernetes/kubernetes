@@ -21,7 +21,7 @@
 // Package stats is for collecting and reporting various network and RPC stats.
 // This package is for monitoring purpose only. All fields are read-only.
 // All APIs are experimental.
-package stats
+package stats // import "google.golang.org/grpc/stats"
 
 import (
 	"net"
@@ -169,6 +169,8 @@ func (s *OutTrailer) isRPCStats() {}
 type End struct {
 	// Client is true if this End is from client side.
 	Client bool
+	// BeginTime is the time when the RPC began.
+	BeginTime time.Time
 	// EndTime is the time when the RPC ends.
 	EndTime time.Time
 	// Error is the error the RPC ended with. It is an error generated from

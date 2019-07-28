@@ -12,6 +12,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"io"
@@ -261,7 +262,7 @@ func compactCCC() {
 
 // CompositionExclusions.txt has form:
 // 0958    # ...
-// See http://unicode.org/reports/tr44/ for full explanation
+// See https://unicode.org/reports/tr44/ for full explanation
 func loadCompositionExclusions() {
 	f := gen.OpenUCDFile("CompositionExclusions.txt")
 	defer f.Close()
@@ -735,6 +736,8 @@ func makeTables() {
 			max = n
 		}
 	}
+	fmt.Fprintln(w, `import "sync"`)
+	fmt.Fprintln(w)
 
 	fmt.Fprintln(w, "const (")
 	fmt.Fprintln(w, "\t// Version is the Unicode edition from which the tables are derived.")
@@ -782,20 +785,27 @@ func makeTables() {
 		sz := nrentries * 8
 		size += sz
 		fmt.Fprintf(w, "// recompMap: %d bytes (entries only)\n", sz)
-		fmt.Fprintln(w, "var recompMap = map[uint32]rune{")
+		fmt.Fprintln(w, "var recompMap map[uint32]rune")
+		fmt.Fprintln(w, "var recompMapOnce sync.Once\n")
+		fmt.Fprintln(w, `const recompMapPacked = "" +`)
+		var buf [8]byte
 		for i, c := range chars {
 			f := c.forms[FCanonical]
 			d := f.decomp
 			if !f.isOneWay && len(d) > 0 {
 				key := uint32(uint16(d[0]))<<16 + uint32(uint16(d[1]))
-				fmt.Fprintf(w, "0x%.8X: 0x%.4X,\n", key, i)
+				binary.BigEndian.PutUint32(buf[:4], key)
+				binary.BigEndian.PutUint32(buf[4:], uint32(i))
+				fmt.Fprintf(w, "\t\t%q + // 0x%.8X: 0x%.8X\n", string(buf[:]), key, uint32(i))
 			}
 		}
-		fmt.Fprintf(w, "}\n\n")
+		// hack so we don't have to special case the trailing plus sign
+		fmt.Fprintf(w, `	""`)
+		fmt.Fprintln(w)
 	}
 
 	fmt.Fprintf(w, "// Total size of tables: %dKB (%d bytes)\n", (size+512)/1024, size)
-	gen.WriteGoFile("tables.go", "norm", w.Bytes())
+	gen.WriteVersionedGoFile("tables.go", "norm", w.Bytes())
 }
 
 func printChars() {
@@ -857,7 +867,7 @@ func verifyComputed() {
 // DerivedNormalizationProps.txt has form:
 // 00C0..00C5    ; NFD_QC; N # ...
 // 0374          ; NFD_QC; N # ...
-// See http://unicode.org/reports/tr44/ for full explanation
+// See https://unicode.org/reports/tr44/ for full explanation
 func testDerived() {
 	f := gen.OpenUCDFile("DerivedNormalizationProps.txt")
 	defer f.Close()
@@ -972,5 +982,5 @@ func printTestdata() {
 		}
 	}
 	fmt.Fprintln(w, "}")
-	gen.WriteGoFile("data_test.go", "norm", w.Bytes())
+	gen.WriteVersionedGoFile("data_test.go", "norm", w.Bytes())
 }

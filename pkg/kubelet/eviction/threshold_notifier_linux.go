@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 )
 
 const (
@@ -48,12 +48,12 @@ var _ CgroupNotifier = &linuxCgroupNotifier{}
 func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
 	var watchfd, eventfd, epfd, controlfd int
 	var err error
-	watchfd, err = unix.Open(fmt.Sprintf("%s/%s", path, attribute), unix.O_RDONLY, 0)
+	watchfd, err = unix.Open(fmt.Sprintf("%s/%s", path, attribute), unix.O_RDONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
 	defer unix.Close(watchfd)
-	controlfd, err = unix.Open(fmt.Sprintf("%s/cgroup.event_control", path), unix.O_WRONLY, 0)
+	controlfd, err = unix.Open(fmt.Sprintf("%s/cgroup.event_control", path), unix.O_WRONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier,
 			unix.Close(eventfd)
 		}
 	}()
-	epfd, err = unix.EpollCreate1(0)
+	epfd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		Events: unix.EPOLLIN,
 	})
 	if err != nil {
-		glog.Warningf("eviction manager: error adding epoll eventfd: %v", err)
+		klog.Warningf("eviction manager: error adding epoll eventfd: %v", err)
 		return
 	}
 	for {
@@ -115,7 +115,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		}
 		event, err := wait(n.epfd, n.eventfd, notifierRefreshInterval)
 		if err != nil {
-			glog.Warningf("eviction manager: error while waiting for memcg events: %v", err)
+			klog.Warningf("eviction manager: error while waiting for memcg events: %v", err)
 			return
 		} else if !event {
 			// Timeout on wait.  This is expected if the threshold was not crossed
@@ -125,7 +125,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		buf := make([]byte, eventSize)
 		_, err = unix.Read(n.eventfd, buf)
 		if err != nil {
-			glog.Warningf("eviction manager: error reading memcg events: %v", err)
+			klog.Warningf("eviction manager: error reading memcg events: %v", err)
 			return
 		}
 		eventCh <- struct{}{}

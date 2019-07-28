@@ -33,6 +33,7 @@ const (
 	currentPodInfraContainerImageVersion = "3.1"
 )
 
+// CreateTestingNamespace creates a namespace for testing.
 func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
 	// TODO: Create a namespace with a given basename.
 	// Currently we neither create the namespace nor delete all of its contents at the end.
@@ -45,6 +46,7 @@ func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *test
 	}
 }
 
+// DeleteTestingNamespace is currently a no-op function.
 func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
 	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
 }

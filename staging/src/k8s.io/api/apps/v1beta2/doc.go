@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 
 package v1beta2 // import "k8s.io/api/apps/v1beta2"

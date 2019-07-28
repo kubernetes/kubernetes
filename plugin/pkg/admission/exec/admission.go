@@ -25,25 +25,34 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
 	// DenyEscalatingExec indicates name of admission plugin.
+	// Deprecated, will be removed in v1.18.
+	// Use of PodSecurityPolicy or a custom admission plugin to limit creation of pods is recommended instead.
 	DenyEscalatingExec = "DenyEscalatingExec"
 	// DenyExecOnPrivileged indicates name of admission plugin.
-	// Deprecated, should use DenyEscalatingExec instead.
+	// Deprecated, will be removed in v1.18.
+	// Use of PodSecurityPolicy or a custom admission plugin to limit creation of pods is recommended instead.
 	DenyExecOnPrivileged = "DenyExecOnPrivileged"
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(DenyEscalatingExec, func(config io.Reader) (admission.Interface, error) {
+		klog.Warningf("the %s admission plugin is deprecated and will be removed in v1.18", DenyEscalatingExec)
+		klog.Warningf("use of PodSecurityPolicy or a custom admission plugin to limit creation of pods is recommended instead")
 		return NewDenyEscalatingExec(), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
 	plugins.Register(DenyExecOnPrivileged, func(config io.Reader) (admission.Interface, error) {
+		klog.Warningf("the %s admission plugin is deprecated and will be removed in v1.18", DenyExecOnPrivileged)
+		klog.Warningf("use of PodSecurityPolicy or a custom admission plugin to limit creation of pods is recommended instead")
 		return NewDenyExecOnPrivileged(), nil
 	})
 }
@@ -103,7 +112,7 @@ func (d *DenyExec) ValidateInitialization() error {
 }
 
 // Validate makes an admission decision based on the request attributes
-func (d *DenyExec) Validate(a admission.Attributes) (err error) {
+func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	path := a.GetResource().Resource
 	if subresource := a.GetSubresource(); subresource != "" {
 		path = path + "/" + subresource
@@ -138,21 +147,16 @@ func (d *DenyExec) Validate(a admission.Attributes) (err error) {
 
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *corev1.Pod) bool {
-	for _, c := range pod.Spec.InitContainers {
+	var privileged bool
+	podutil.VisitContainers(&pod.Spec, func(c *corev1.Container) bool {
 		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
-			continue
-		}
-		if *c.SecurityContext.Privileged {
 			return true
 		}
-	}
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
-			continue
-		}
 		if *c.SecurityContext.Privileged {
-			return true
+			privileged = true
+			return false
 		}
-	}
-	return false
+		return true
+	})
+	return privileged
 }

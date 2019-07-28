@@ -92,20 +92,12 @@ type Logger interface {
 	Log(cmd []string)
 }
 
-type defaultLogger struct{}
-
-func (*defaultLogger) Log(cmd []string) {
-	return
-}
-
-var logger Logger = &defaultLogger{}
+var logger Logger
 
 // SetLogger set a log handler to log all commands including arguments before
 // they are executed
 func SetLogger(l Logger) {
-	if l != nil {
-		logger = l
-	}
+	logger = l
 }
 
 // zfs is a helper function to wrap typical calls to zfs.

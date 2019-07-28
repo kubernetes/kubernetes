@@ -2,7 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["aggregator.go"],
+    srcs = [
+        "aggregator.go",
+        "mutating_walker.go",
+        "walker.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-openapi/pkg/aggregator",
     importpath = "k8s.io/kube-openapi/pkg/aggregator",
     visibility = ["//visibility:public"],

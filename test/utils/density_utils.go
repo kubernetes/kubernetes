@@ -21,12 +21,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 const (
@@ -79,7 +79,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 			if !apierrs.IsConflict(err) {
 				return err
 			} else {
-				glog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)
+				klog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)
 			}
 		} else {
 			break

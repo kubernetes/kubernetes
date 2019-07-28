@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -75,11 +77,16 @@ func (c *serviceAccounts) Get(name string, options metav1.GetOptions) (result *v
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
 func (c *serviceAccounts) List(opts metav1.ListOptions) (result *v1.ServiceAccountList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -87,11 +94,16 @@ func (c *serviceAccounts) List(opts metav1.ListOptions) (result *v1.ServiceAccou
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *serviceAccounts) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -133,10 +145,15 @@ func (c *serviceAccounts) Delete(name string, options *metav1.DeleteOptions) err
 
 // DeleteCollection deletes a collection of objects.
 func (c *serviceAccounts) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

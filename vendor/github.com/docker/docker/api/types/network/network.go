@@ -1,4 +1,8 @@
-package network
+package network // import "github.com/docker/docker/api/types/network"
+import (
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/errdefs"
+)
 
 // Address represents an IP address
 type Address struct {
@@ -105,4 +109,19 @@ type NetworkingConfig struct {
 // ConfigReference specifies the source which provides a network's configuration
 type ConfigReference struct {
 	Network string
+}
+
+var acceptedFilters = map[string]bool{
+	"dangling": true,
+	"driver":   true,
+	"id":       true,
+	"label":    true,
+	"name":     true,
+	"scope":    true,
+	"type":     true,
+}
+
+// ValidateFilters validates the list of filter args with the available filters.
+func ValidateFilters(filter filters.Args) error {
+	return errdefs.InvalidParameter(filter.Validate(acceptedFilters))
 }

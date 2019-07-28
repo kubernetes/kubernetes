@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
+	"k8s.io/kubectl/pkg/util/podutils"
 )
 
 func TestGetFirstPod(t *testing.T) {
@@ -174,7 +174,7 @@ func TestGetFirstPod(t *testing.T) {
 		}
 		selector := labels.Set(labelSet).AsSelector()
 
-		pod, numPods, err := GetFirstPod(fake.Core(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
+		pod, numPods, err := GetFirstPod(fake.CoreV1(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
 		pod.Spec.SecurityContext = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)

@@ -23,15 +23,17 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/aws"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -136,7 +138,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -367,12 +369,46 @@ func TestMountOptions(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	mountOptions := fakeMounter.MountPoints[0].Opts
 	expectedMountOptions := []string{"_netdev", "bind"}
 	if !reflect.DeepEqual(mountOptions, expectedMountOptions) {
 		t.Errorf("Expected mount options to be %v got %v", expectedMountOptions, mountOptions)
+	}
+}
+
+func TestGetCandidateZone(t *testing.T) {
+	const testZone = "my-zone-1a"
+
+	// TODO: add test case for immediate bind volume when we have a good way to mock Cloud outside cloudprovider
+	tests := []struct {
+		cloud         *aws.Cloud
+		node          *v1.Node
+		expectedZones sets.String
+	}{
+		{
+			cloud: nil,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: testZone,
+					},
+				},
+			},
+			expectedZones: sets.NewString(),
+		},
+		{
+			cloud:         nil,
+			node:          &v1.Node{},
+			expectedZones: sets.NewString(),
+		},
+	}
+
+	for _, test := range tests {
+		zones, err := getCandidateZones(test.cloud, test.node)
+		assert.Nil(t, err)
+		assert.Equal(t, test.expectedZones, zones)
 	}
 }

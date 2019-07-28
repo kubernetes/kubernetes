@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type ClientCARegistrationHook struct {
@@ -48,7 +49,7 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 		// retry building the config since sometimes the server can be in an in-between state which caused
 		// some kind of auto detection failure as I recall from other post start hooks.
 		// TODO see if this is still true and fix the RBAC one too if it isn't.
-		client, err := coreclient.NewForConfig(hookContext.LoopbackClientConfig)
+		client, err := corev1client.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return false, nil
@@ -67,7 +68,7 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 
 // tryToWriteClientCAs is here for unit testing with a fake client.  This is a wait.ConditionFunc so the bool
 // indicates if the condition was met.  True when its finished, false when it should retry.
-func (h ClientCARegistrationHook) tryToWriteClientCAs(client coreclient.CoreInterface) (bool, error) {
+func (h ClientCARegistrationHook) tryToWriteClientCAs(client corev1client.CoreV1Interface) (bool, error) {
 	if err := createNamespaceIfNeeded(client, metav1.NamespaceSystem); err != nil {
 		utilruntime.HandleError(err)
 		return false, nil
@@ -118,10 +119,10 @@ func jsonSerializeStringSlice(in []string) (string, error) {
 	return string(out), err
 }
 
-func writeConfigMap(client coreclient.ConfigMapsGetter, name string, data map[string]string) error {
+func writeConfigMap(client corev1client.ConfigMapsGetter, name string, data map[string]string) error {
 	existing, err := client.ConfigMaps(metav1.NamespaceSystem).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err := client.ConfigMaps(metav1.NamespaceSystem).Create(&api.ConfigMap{
+		_, err := client.ConfigMaps(metav1.NamespaceSystem).Create(&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: name},
 			Data:       data,
 		})
@@ -131,7 +132,9 @@ func writeConfigMap(client coreclient.ConfigMapsGetter, name string, data map[st
 		return err
 	}
 
-	existing.Data = data
-	_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(existing)
+	if !apiequality.Semantic.DeepEqual(existing.Data, data) {
+		existing.Data = data
+		_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(existing)
+	}
 	return err
 }

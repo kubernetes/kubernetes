@@ -23,7 +23,7 @@ if ! dpkg-query -W cuda; then
   dpkg -i ./cuda-repo-ubuntu1404_8.0.61-1_amd64.deb
   apt-get update
   apt-get install cuda -y
-  apt-get install linux-headers-$(uname -r) -y
+  apt-get install "linux-headers-$(uname -r)" -y
 fi
 ## Pre-loads kernel modules
 nvidia-smi
