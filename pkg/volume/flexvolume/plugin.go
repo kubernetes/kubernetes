@@ -35,7 +35,6 @@ import (
 
 const (
 	flexVolumePluginName       = "kubernetes.io/flexvolume"
-	flexVolumePluginNamePrefix = "flexvolume-"
 )
 
 // FlexVolumePlugin object.
@@ -114,7 +113,7 @@ func (plugin *flexVolumePlugin) getExecutable() string {
 
 // Name is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) GetPluginName() string {
-	return flexVolumePluginNamePrefix + plugin.driverName
+	return plugin.driverName
 }
 
 // GetVolumeName is part of the volume.VolumePlugin interface.
