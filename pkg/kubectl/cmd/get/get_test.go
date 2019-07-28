@@ -48,9 +48,9 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/openapi"
+	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 var (

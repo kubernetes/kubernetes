@@ -30,9 +30,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/util/openapi"
+	openapivalidation "k8s.io/kubectl/pkg/util/openapi/validation"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 )
 
 type factoryImpl struct {

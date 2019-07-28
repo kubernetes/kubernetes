@@ -13,8 +13,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
     deps = [
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -34,6 +32,8 @@ go_library(
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/openapi/validation:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/validation:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/version:go_default_library",
@@ -79,7 +79,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/cmd/util/editor:all-srcs",
-        "//pkg/kubectl/cmd/util/openapi:all-srcs",
         "//pkg/kubectl/cmd/util/sanity:all-srcs",
     ],
     tags = ["automanaged"],
