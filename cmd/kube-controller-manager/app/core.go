@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
@@ -507,8 +508,9 @@ func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool,
 		return nil, false, nil
 	}
 	go ttlafterfinished.New(
-		ctx.InformerFactory.Batch().V1().Jobs(),
-		ctx.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
+		ctx.InformerFactory,
+		schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
+		dynamic.NewForConfigOrDie(ctx.ClientBuilder.ConfigOrDie("ttl-after-finished-controller-jobs")),
 	).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
 	return nil, true, nil
 }

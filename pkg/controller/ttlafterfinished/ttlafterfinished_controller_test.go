@@ -155,7 +155,7 @@ func TestTimeLeft(t *testing.T) {
 
 	for _, tc := range testCases {
 		job := newJob(tc.completionTime, tc.failedTime, tc.ttl)
-		gotTimeLeft, gotErr := timeLeft(job, tc.since)
+		gotTimeLeft, gotErr := timeLeftForJob(job, tc.since)
 		if tc.expectErr != (gotErr != nil) {
 			t.Errorf("%s: expected error is %t, got %t, error: %v", tc.name, tc.expectErr, gotErr != nil, gotErr)
 		}
