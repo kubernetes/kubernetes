@@ -107,6 +107,9 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
 	s.SecureServing.BindPort = ports.CloudControllerManagerPort
 
+	s.Generic.LeaderElection.ResourceName = "cloud-controller-manager"
+	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+
 	return &s, nil
 }
 
