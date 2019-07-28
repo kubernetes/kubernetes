@@ -27,11 +27,11 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 )
 
 // ResumeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of

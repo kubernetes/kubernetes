@@ -1651,6 +1651,7 @@ k8s.io/kubectl/pkg/describe/versioned
 k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/metricsutil
+k8s.io/kubectl/pkg/polymorphichelpers
 k8s.io/kubectl/pkg/rawhttp
 k8s.io/kubectl/pkg/scheme
 k8s.io/kubectl/pkg/util

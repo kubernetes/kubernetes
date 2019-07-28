@@ -22,7 +22,8 @@ go_library(
         "statusviewer.go",
         "updatepodspec.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/polymorphichelpers",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/polymorphichelpers",
+    importpath = "k8s.io/kubectl/pkg/polymorphichelpers",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

@@ -16,6 +16,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/drain:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/generated:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/metricsutil:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/polymorphichelpers:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/rawhttp:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/scheme:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util:all-srcs",
