@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 
-	Context("when we need to admit a critical pod", func() {
+	ginkgo.Context("when we need to admit a critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			initialConfig.FeatureGates[string(features.ExperimentalCriticalPodAnnotation)] = true
 		})
 
-		It("should be able to create and delete a critical pod", func() {
+		ginkgo.It("should be able to create and delete a critical pod", func() {
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
 			if !configEnabled {
@@ -91,13 +91,13 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
-					Expect(p.Status.Phase).NotTo(Equal(v1.PodFailed), fmt.Sprintf("pod: %v should be preempted", p.Name))
+					gomega.Expect(p.Status.Phase).NotTo(gomega.Equal(v1.PodFailed), fmt.Sprintf("pod: %v should be preempted", p.Name))
 				} else {
-					Expect(p.Status.Phase).To(Equal(v1.PodFailed), fmt.Sprintf("pod: %v should not be preempted", p.Name))
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodFailed), fmt.Sprintf("pod: %v should not be preempted", p.Name))
 				}
 			}
 		})
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			// Delete Pods
 			f.PodClient().DeleteSync(guaranteedPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(burstablePodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
@@ -115,7 +115,7 @@ func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	Expect(len(nodeList.Items)).To(Equal(1))
+	gomega.Expect(len(nodeList.Items)).To(gomega.Equal(1))
 	capacity := nodeList.Items[0].Status.Allocatable
 	return v1.ResourceList{
 		v1.ResourceCPU:    capacity[v1.ResourceCPU],
@@ -145,9 +145,9 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 		pod.ObjectMeta.Annotations = map[string]string{
 			kubelettypes.CriticalPodAnnotationKey: "",
 		}
-		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeTrue(), "pod should be a critical pod")
+		gomega.Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(gomega.BeTrue(), "pod should be a critical pod")
 	} else {
-		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeFalse(), "pod should not be a critical pod")
+		gomega.Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(gomega.BeFalse(), "pod should not be a critical pod")
 	}
 	return pod
 }

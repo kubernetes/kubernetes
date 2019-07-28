@@ -38,8 +38,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector]", func() {
@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 	var bootTime, nodeTime time.Time
 	var image string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		uid = string(uuid.NewUUID())
@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		// There is no namespace for Node, event recorder will set default namespace for node events.
 		eventNamespace = metav1.NamespaceDefault
 		image = getNodeProblemDetectorImage()
-		By(fmt.Sprintf("Using node-problem-detector image: %s", image))
+		ginkgo.By(fmt.Sprintf("Using node-problem-detector image: %s", image))
 	})
 
 	// Test system log monitor. We may add other tests if we have more problem daemons in the future.
@@ -99,13 +99,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		var lookback time.Duration
 		var eventListOptions metav1.ListOptions
 
-		BeforeEach(func() {
-			By("Calculate Lookback duration")
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Calculate Lookback duration")
 			var err error
 
 			nodeTime = time.Now()
 			bootTime, err = util.GetBootTime()
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				}
 				]
 			}`
-			By("Generate event list options")
+			ginkgo.By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
 				"involvedObject.name":      framework.TestContext.NodeName,
@@ -160,15 +160,15 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				"source":                   source,
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
-			By("Create the test log file")
+			ginkgo.By("Create the test log file")
 			framework.ExpectNoError(err)
-			By("Create config map for the node problem detector")
+			ginkgo.By("Create config map for the node problem detector")
 			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
 			framework.ExpectNoError(err)
-			By("Create the node problem detector")
+			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
 			f.PodClient().CreateSync(&v1.Pod{
@@ -244,7 +244,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
 		})
 
-		It("should generate node condition and events for corresponding errors", func() {
+		ginkgo.It("should generate node condition and events for corresponding errors", func() {
 			for _, test := range []struct {
 				description      string
 				timestamp        time.Time
@@ -336,53 +336,53 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					conditionType:    v1.ConditionTrue,
 				},
 			} {
-				By(test.description)
+				ginkgo.By(test.description)
 				if test.messageNum > 0 {
-					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
+					ginkgo.By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
 					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
 					framework.ExpectNoError(err)
 				}
 
-				By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
-				Eventually(func() error {
+				ginkgo.By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
+				gomega.Eventually(func() error {
 					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.tempEvents, tempReason, tempMessage)
-				}, pollTimeout, pollInterval).Should(Succeed())
-				By(fmt.Sprintf("Wait for %d total events generated", test.totalEvents))
-				Eventually(func() error {
+				}, pollTimeout, pollInterval).Should(gomega.Succeed())
+				ginkgo.By(fmt.Sprintf("Wait for %d total events generated", test.totalEvents))
+				gomega.Eventually(func() error {
 					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
-				}, pollTimeout, pollInterval).Should(Succeed())
-				By(fmt.Sprintf("Make sure only %d total events generated", test.totalEvents))
-				Consistently(func() error {
+				}, pollTimeout, pollInterval).Should(gomega.Succeed())
+				ginkgo.By(fmt.Sprintf("Make sure only %d total events generated", test.totalEvents))
+				gomega.Consistently(func() error {
 					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
-				}, pollConsistent, pollInterval).Should(Succeed())
+				}, pollConsistent, pollInterval).Should(gomega.Succeed())
 
-				By(fmt.Sprintf("Make sure node condition %q is set", condition))
-				Eventually(func() error {
+				ginkgo.By(fmt.Sprintf("Make sure node condition %q is set", condition))
+				gomega.Eventually(func() error {
 					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
-				}, pollTimeout, pollInterval).Should(Succeed())
-				By(fmt.Sprintf("Make sure node condition %q is stable", condition))
-				Consistently(func() error {
+				}, pollTimeout, pollInterval).Should(gomega.Succeed())
+				ginkgo.By(fmt.Sprintf("Make sure node condition %q is stable", condition))
+				gomega.Consistently(func() error {
 					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
-				}, pollConsistent, pollInterval).Should(Succeed())
+				}, pollConsistent, pollInterval).Should(gomega.Succeed())
 			}
 		})
 
-		AfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
-				By("Get node problem detector log")
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+				ginkgo.By("Get node problem detector log")
 				log, err := e2epod.GetPodLogs(c, ns, name, name)
-				Expect(err).ShouldNot(HaveOccurred())
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 				e2elog.Logf("Node Problem Detector logs:\n %s", log)
 			}
-			By("Delete the node problem detector")
+			ginkgo.By("Delete the node problem detector")
 			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))
-			By("Wait for the node problem detector to disappear")
-			Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
-			By("Delete the config map")
+			ginkgo.By("Wait for the node problem detector to disappear")
+			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
+			ginkgo.By("Delete the config map")
 			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
-			By("Clean up the events")
-			Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
-			By("Clean up the node condition")
+			ginkgo.By("Clean up the events")
+			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
+			ginkgo.By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
 			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
 		})

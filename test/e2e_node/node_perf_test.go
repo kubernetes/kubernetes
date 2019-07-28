@@ -28,8 +28,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // makeNodePerfPod returns a pod with the information provided from the workload.
@@ -48,10 +48,10 @@ func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfigur
 	}
 
 	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
 // Serial because the test updates kubelet configuration.
@@ -64,7 +64,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow] [Flaky]", func() {
 		newCfg *kubeletconfig.KubeletConfiguration
 		pod    *v1.Pod
 	)
-	JustBeforeEach(func() {
+	ginkgo.JustBeforeEach(func() {
 		err := wl.PreTestExec()
 		framework.ExpectNoError(err)
 		oldCfg, err = getCurrentKubeletConfig()
@@ -80,14 +80,14 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow] [Flaky]", func() {
 			GracePeriodSeconds: &gp,
 		}
 		f.PodClient().DeleteSync(pod.Name, &delOpts, framework.DefaultPodDeletionTimeout)
-		By("running the post test exec from the workload")
+		ginkgo.By("running the post test exec from the workload")
 		err := wl.PostTestExec()
 		framework.ExpectNoError(err)
 		setKubeletConfig(f, oldCfg)
 	}
 
 	runWorkload := func() {
-		By("running the workload and waiting for success")
+		ginkgo.By("running the workload and waiting for success")
 		// Make the pod for the workload.
 		pod = makeNodePerfPod(wl)
 		// Create the pod.
@@ -101,29 +101,29 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow] [Flaky]", func() {
 		e2elog.Logf("Time to complete workload %s: %v", wl.Name(), perf)
 	}
 
-	Context("Run node performance testing with pre-defined workloads", func() {
-		BeforeEach(func() {
+	ginkgo.Context("Run node performance testing with pre-defined workloads", func() {
+		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[0]
 		})
-		It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func() {
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func() {
 			defer cleanup()
 			runWorkload()
 		})
 	})
-	Context("Run node performance testing with pre-defined workloads", func() {
-		BeforeEach(func() {
+	ginkgo.Context("Run node performance testing with pre-defined workloads", func() {
+		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[1]
 		})
-		It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func() {
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func() {
 			defer cleanup()
 			runWorkload()
 		})
 	})
-	Context("Run node performance testing with pre-defined workloads", func() {
-		BeforeEach(func() {
+	ginkgo.Context("Run node performance testing with pre-defined workloads", func() {
+		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[2]
 		})
-		It("TensorFlow workload", func() {
+		ginkgo.It("TensorFlow workload", func() {
 			defer cleanup()
 			runWorkload()
 		})
