@@ -17,6 +17,8 @@ limitations under the License.
 package benchmark
 
 import (
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -31,7 +33,7 @@ import (
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (*factory.ConfigFactoryArgs, util.ShutdownFunc) {
+func mustSetupScheduler() (*factory.Config, util.ShutdownFunc, clientset.Interface) {
 	apiURL, apiShutdown := util.StartApiserver()
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
@@ -39,11 +41,27 @@ func mustSetupScheduler() (*factory.ConfigFactoryArgs, util.ShutdownFunc) {
 		QPS:           5000.0,
 		Burst:         5000,
 	})
-	schedulerConfigArgs, schedulerShutdown := util.StartScheduler(clientSet)
+	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet)
 
 	shutdownFunc := func() {
 		schedulerShutdown()
 		apiShutdown()
 	}
-	return schedulerConfigArgs, shutdownFunc
+	return schedulerConfig, shutdownFunc, clientSet
+}
+
+func getScheduledPods(clientset clientset.Interface) ([]*v1.Pod, error) {
+	podList, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	allPods := podList.Items
+	scheduled := make([]*v1.Pod, 0, len(allPods))
+	for i := range allPods {
+		pod := allPods[i]
+		if len(pod.Spec.NodeName) > 0 {
+			scheduled = append(scheduled, &pod)
+		}
+	}
+	return scheduled, nil
 }

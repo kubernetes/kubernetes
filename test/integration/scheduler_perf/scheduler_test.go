@@ -23,14 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	clientset "k8s.io/client-go/kubernetes"
 	testutils "k8s.io/kubernetes/test/utils"
+
+	"k8s.io/klog"
 )
 
 const (
@@ -107,18 +106,18 @@ type testConfig struct {
 	numNodes            int
 	mutatedNodeTemplate *v1.Node
 	mutatedPodTemplate  *v1.Pod
-	schedulerSupport    *factory.ConfigFactoryArgs
+	clientset           clientset.Interface
 	destroyFunc         func()
 }
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	schedulerConfigArgs, destroyFunc := mustSetupScheduler()
+	_, destroyFunc, clientset := mustSetupScheduler()
 	return &testConfig{
-		schedulerSupport: schedulerConfigArgs,
-		destroyFunc:      destroyFunc,
-		numNodes:         nodes,
-		numPods:          pods,
+		clientset:   clientset,
+		destroyFunc: destroyFunc,
+		numNodes:    nodes,
+		numPods:     pods,
 	}
 }
 
@@ -134,11 +133,10 @@ func schedulePods(config *testConfig) int32 {
 	// We are interested in low scheduling rates (i.e. qps=2),
 	minQPS := int32(math.MaxInt32)
 	start := time.Now()
-	podLister := config.schedulerSupport.PodInformer.Lister()
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
-		scheduled, err := getScheduledPods(podLister)
+		scheduled, err := getScheduledPods(config.clientset)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -153,14 +151,11 @@ func schedulePods(config *testConfig) int32 {
 
 	// Now that scheduling has started, lets start taking the pulse on how many pods are happening per second.
 	for {
-		// This can potentially affect performance of scheduler, since List() is done under mutex.
-		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := getScheduledPods(podLister)
+		scheduled, err := getScheduledPods(config.clientset)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
-
 		// We will be completed when all pods are done being scheduled.
 		// return the worst-case-scenario interval that was seen during this time.
 		// Note this should never be low due to cold-start, so allow bake in sched time if necessary.
@@ -184,20 +179,6 @@ func schedulePods(config *testConfig) int32 {
 		prev = len(scheduled)
 		time.Sleep(1 * time.Second)
 	}
-}
-
-func getScheduledPods(lister listers.PodLister) ([]*v1.Pod, error) {
-	all, err := lister.List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-	scheduled := make([]*v1.Pod, 0, len(all))
-	for _, pod := range all {
-		if len(pod.Spec.NodeName) > 0 {
-			scheduled = append(scheduled, pod)
-		}
-	}
-	return scheduled, nil
 }
 
 // mutateNodeTemplate returns the modified node needed for creation of nodes.
@@ -237,17 +218,18 @@ func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
 // generateNodes generates nodes to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generateNodes(config *testConfig) {
 	for i := 0; i < inputConfig.NodeCount; i++ {
-		config.schedulerSupport.Client.CoreV1().Nodes().Create(config.mutatedNodeTemplate)
+		config.clientset.CoreV1().Nodes().Create(config.mutatedNodeTemplate)
+
 	}
 	for i := 0; i < config.numNodes-inputConfig.NodeCount; i++ {
-		config.schedulerSupport.Client.CoreV1().Nodes().Create(baseNodeTemplate)
+		config.clientset.CoreV1().Nodes().Create(baseNodeTemplate)
 	}
 }
 
 // generatePods generates pods to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generatePods(config *testConfig) {
-	testutils.CreatePod(config.schedulerSupport.Client, "sample", inputConfig.PodCount, config.mutatedPodTemplate)
-	testutils.CreatePod(config.schedulerSupport.Client, "sample", config.numPods-inputConfig.PodCount, basePodTemplate)
+	testutils.CreatePod(config.clientset, "sample", inputConfig.PodCount, config.mutatedPodTemplate)
+	testutils.CreatePod(config.clientset, "sample", config.numPods-inputConfig.PodCount, basePodTemplate)
 }
 
 // generatePodAndNodeTopology is the wrapper function for modifying both pods and node objects.

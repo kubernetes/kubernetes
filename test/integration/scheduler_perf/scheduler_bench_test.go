@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -358,12 +358,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	schedulerConfigArgs, finalFunc := mustSetupScheduler()
+	_, finalFunc, clientset := mustSetupScheduler()
 	defer finalFunc()
-	c := schedulerConfigArgs.Client
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
-		c,
+		clientset,
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: nodeStrategy}},
 		"scheduler-perf-",
 	)
@@ -374,12 +373,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", numExistingPods, setupPodStrategy)
-	podCreator := testutils.NewTestPodCreator(c, config)
+	podCreator := testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
 
-	podLister := schedulerConfigArgs.PodInformer.Lister()
 	for {
-		scheduled, err := getScheduledPods(podLister)
+		scheduled, err := getScheduledPods(clientset)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -392,12 +390,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	b.ResetTimer()
 	config = testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", b.N, testPodStrategy)
-	podCreator = testutils.NewTestPodCreator(c, config)
+	podCreator = testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
 	for {
-		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := getScheduledPods(podLister)
+		scheduled, err := getScheduledPods(clientset)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
