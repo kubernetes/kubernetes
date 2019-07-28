@@ -27,6 +27,10 @@ func ValidateClientConnectionConfiguration(cc *config.ClientConnectionConfigurat
 	if cc.Burst < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("burst"), cc.Burst, "must be non-negative"))
 	}
+
+	if int(cc.Burst) < int(cc.QPS) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("burst"), cc.Burst, "must be equal to or greater than QPS"))
+	}
 	return allErrs
 }
 

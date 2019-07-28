@@ -39,6 +39,10 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 	burstLessThanZero := validConfig.DeepCopy()
 	burstLessThanZero.Burst = -1
 
+	burstLessThanQPS := validConfig.DeepCopy()
+	burstLessThanQPS.Burst = 50
+	burstLessThanQPS.QPS = 100
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.ClientConnectionConfiguration
@@ -51,9 +55,13 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 			expectedToFail: false,
 			config:         qpsLessThanZero,
 		},
-		"bad-burst-less-then-zero": {
+		"bad-burst-less-than-zero": {
 			expectedToFail: true,
 			config:         burstLessThanZero,
+		},
+		"bad-burst-less-than-qps": {
+			expectedToFail: true,
+			config:         burstLessThanQPS,
 		},
 	}
 
