@@ -86,8 +86,8 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	healthzBindAddrPortInvalid.HealthzBindAddress = "0.0.0.0:909090"
 
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
-	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
-	enableContentProfilingSetWithoutEnableProfiling.EnableContentionProfiling = true
+	enableContentProfilingSetWithoutEnableProfiling.Debugging.EnableProfiling = false
+	enableContentProfilingSetWithoutEnableProfiling.Debugging.EnableContentionProfiling = true
 
 	bindTimeoutUnset := validConfig.DeepCopy()
 	bindTimeoutUnset.BindTimeoutSeconds = nil

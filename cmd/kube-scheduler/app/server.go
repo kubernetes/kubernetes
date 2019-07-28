@@ -310,9 +310,9 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
 func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	installMetricHandler(pathRecorderMux)
-	if config.EnableProfiling {
+	if config.Debugging.EnableProfiling {
 		routes.Profiling{}.Install(pathRecorderMux)
-		if config.EnableContentionProfiling {
+		if config.Debugging.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
@@ -328,9 +328,9 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 	if !separateMetrics {
 		installMetricHandler(pathRecorderMux)
 	}
-	if config.EnableProfiling {
+	if config.Debugging.EnableProfiling {
 		routes.Profiling{}.Install(pathRecorderMux)
-		if config.EnableContentionProfiling {
+		if config.Debugging.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}

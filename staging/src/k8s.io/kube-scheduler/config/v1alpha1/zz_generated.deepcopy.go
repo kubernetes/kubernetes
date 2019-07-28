@@ -31,7 +31,7 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 	in.AlgorithmSource.DeepCopyInto(&out.AlgorithmSource)
 	in.LeaderElection.DeepCopyInto(&out.LeaderElection)
 	out.ClientConnection = in.ClientConnection
-	out.DebuggingConfiguration = in.DebuggingConfiguration
+	out.Debugging = in.Debugging
 	if in.BindTimeoutSeconds != nil {
 		in, out := &in.BindTimeoutSeconds, &out.BindTimeoutSeconds
 		*out = new(int64)

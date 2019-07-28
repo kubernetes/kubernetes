@@ -154,7 +154,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	out.DisablePreemption = in.DisablePreemption
@@ -184,7 +184,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	out.DisablePreemption = in.DisablePreemption

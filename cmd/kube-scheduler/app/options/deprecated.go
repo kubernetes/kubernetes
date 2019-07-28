@@ -51,8 +51,8 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 	fs.StringVar(&o.PolicyConfigMapNamespace, "policy-configmap-namespace", o.PolicyConfigMapNamespace, "DEPRECATED: the namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty.")
 	fs.BoolVar(&o.UseLegacyPolicyConfig, "use-legacy-policy-config", o.UseLegacyPolicyConfig, "DEPRECATED: when set to true, scheduler will ignore policy ConfigMap and uses policy config file")
 
-	fs.BoolVar(&cfg.EnableProfiling, "profiling", cfg.EnableProfiling, "DEPRECATED: enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&cfg.EnableContentionProfiling, "contention-profiling", cfg.EnableContentionProfiling, "DEPRECATED: enable lock contention profiling, if profiling is enabled")
+	fs.BoolVar(&cfg.Debugging.EnableProfiling, "profiling", cfg.Debugging.EnableProfiling, "DEPRECATED: enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&cfg.Debugging.EnableContentionProfiling, "contention-profiling", cfg.Debugging.EnableContentionProfiling, "DEPRECATED: enable lock contention profiling, if profiling is enabled")
 	fs.StringVar(&cfg.ClientConnection.Kubeconfig, "kubeconfig", cfg.ClientConnection.Kubeconfig, "DEPRECATED: path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&cfg.ClientConnection.ContentType, "kube-api-content-type", cfg.ClientConnection.ContentType, "DEPRECATED: content type of requests sent to apiserver.")
 	fs.Float32Var(&cfg.ClientConnection.QPS, "kube-api-qps", cfg.ClientConnection.QPS, "DEPRECATED: QPS to use while talking with kubernetes apiserver")
