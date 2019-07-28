@@ -22,7 +22,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/generate"
+	"k8s.io/kubectl/pkg/generate"
 )
 
 // HorizontalPodAutoscalerGeneratorV1 supports stable generation of a horizontal pod autoscaler.

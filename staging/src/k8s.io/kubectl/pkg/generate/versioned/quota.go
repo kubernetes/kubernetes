@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/generate"
+	"k8s.io/kubectl/pkg/generate"
 )
 
 // ResourceQuotaGeneratorV1 supports stable generation of a resource quota

@@ -1649,6 +1649,8 @@ k8s.io/kubectl/pkg/cmd/util/sanity
 k8s.io/kubectl/pkg/describe
 k8s.io/kubectl/pkg/describe/versioned
 k8s.io/kubectl/pkg/drain
+k8s.io/kubectl/pkg/generate
+k8s.io/kubectl/pkg/generate/versioned
 k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/metricsutil
 k8s.io/kubectl/pkg/polymorphichelpers

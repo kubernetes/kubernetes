@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/util/hash"
-	"k8s.io/kubernetes/pkg/kubectl/generate"
 )
 
 // SecretForDockerRegistryGeneratorV1 supports stable generation of a docker registry secret

@@ -23,7 +23,7 @@ import (
 	scheduling "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/generate"
+	"k8s.io/kubectl/pkg/generate"
 )
 
 // PriorityClassV1Generator supports stable generation of a priorityClass.
