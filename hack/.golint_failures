@@ -276,7 +276,6 @@ pkg/util/env
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/iptables
 pkg/util/iptables/testing
-pkg/util/labels
 pkg/util/mount
 pkg/util/normalizer
 pkg/util/oom
