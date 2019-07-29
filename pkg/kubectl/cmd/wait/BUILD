@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/wait",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
@@ -21,6 +20,7 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],

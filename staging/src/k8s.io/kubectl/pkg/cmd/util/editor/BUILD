@@ -1,8 +1,4 @@
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -10,13 +6,10 @@ go_library(
         "editoptions.go",
         "editor.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/editor",
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
-    ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/util/editor",
+    importpath = "k8s.io/kubectl/pkg/cmd/util/editor",
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/kubectl/cmd/util/editor/crlf:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -31,6 +24,8 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/editor/crlf:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/term:go_default_library",
@@ -53,16 +48,15 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/cmd/util/editor/crlf:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/editor/crlf:all-srcs",
     ],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
-    ],
+    visibility = ["//visibility:public"],
 )

@@ -22,9 +22,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 const defaultBoilerPlate = `

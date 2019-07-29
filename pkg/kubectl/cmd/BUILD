@@ -54,12 +54,12 @@ go_library(
         "//pkg/kubectl/cmd/set:go_default_library",
         "//pkg/kubectl/cmd/taint:go_default_library",
         "//pkg/kubectl/cmd/top:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/version:go_default_library",
         "//pkg/kubectl/cmd/wait:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -78,8 +78,8 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
     ],
 )
 
@@ -133,7 +133,6 @@ filegroup(
         "//pkg/kubectl/cmd/taint:all-srcs",
         "//pkg/kubectl/cmd/testing:all-srcs",
         "//pkg/kubectl/cmd/top:all-srcs",
-        "//pkg/kubectl/cmd/util:all-srcs",
         "//pkg/kubectl/cmd/version:all-srcs",
         "//pkg/kubectl/cmd/wait:all-srcs",
     ],

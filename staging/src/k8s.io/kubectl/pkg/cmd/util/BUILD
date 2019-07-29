@@ -10,8 +10,9 @@ go_library(
         "kubectl_match_version.go",
         "printing.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
-    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/util",
+    importpath = "k8s.io/kubectl/pkg/cmd/util",
+    visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -78,9 +79,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/cmd/util/editor:all-srcs",
-        "//pkg/kubectl/cmd/util/sanity:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/editor:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/sanity:all-srcs",
     ],
     tags = ["automanaged"],
-    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
+    visibility = ["//visibility:public"],
 )
