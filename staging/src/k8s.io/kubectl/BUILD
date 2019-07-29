@@ -9,6 +9,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/apply:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/apps:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/describe:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/drain:all-srcs",

@@ -13,7 +13,8 @@ go_library(
         "type_element.go",
         "visitor.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/apply",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/apply",
+    importpath = "k8s.io/kubectl/pkg/apply",
     visibility = ["//visibility:public"],
 )
 
@@ -28,8 +29,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/apply/parse:all-srcs",
-        "//pkg/kubectl/apply/strategy:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/apply/parse:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/apply/strategy:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

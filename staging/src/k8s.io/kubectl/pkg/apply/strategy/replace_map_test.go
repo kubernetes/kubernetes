@@ -19,9 +19,9 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
+	"k8s.io/kubectl/pkg/apply/strategy"
 	"k8s.io/kubectl/pkg/util/openapi"
 	tst "k8s.io/kubectl/pkg/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Replacing fields of type map with openapi for some fields", func() {

@@ -18,7 +18,7 @@ package parse
 
 import (
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/kubectl/pkg/apply"
 )
 
 // mapElement builds a new mapElement from a mapItem

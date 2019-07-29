@@ -19,175 +19,169 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/kubectl/pkg/apply/strategy"
 )
 
-var _ = Describe("Merging fields with the retainkeys strategy", func() {
-	Context("where some fields are only defined remotely", func() {
-		It("should drop those fields ", func() {
+var _ = Describe("Merging fields of type list-of-primitive with openapi", func() {
+	Context("where one of the items has been deleted", func() {
+		It("should delete the deleted item", func() {
 			recorded := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
+metadata:
+  finalizers:
+  - "a"
+  - "b"
+  - "c"
 `)
 			local := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
-    type: Recreate
+metadata:
+  finalizers:
+  - "a"
+  - "c"
 `)
 			remote := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
+metadata:
+  finalizers:
+  - "a"
+  - "b"
+  - "c"
 `)
 			expected := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
-    type: Recreate
+metadata:
+  finalizers:
+  - "a"
+  - "c"
 `)
 			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
-	Context("where some fields are defined both locally and remotely", func() {
-		It("should merge those fields", func() {
+	Context("where one of the items is only on the remote", func() {
+		It("should move the remote-only item to the end but keep it", func() {
 			recorded := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
+metadata:
+  finalizers:
+  - "a"
+  - "b"
 `)
 			local := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 2
+metadata:
+  finalizers:
+  - "a"
+  - "b"
 `)
 			remote := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
+metadata:
+  finalizers:
+  - "c"
+  - "b"
+  - "a"
 `)
 			expected := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 2
-      maxSurge: 1
+metadata:
+  finalizers:
+  - "a"
+  - "b"
+  - "c"
 `)
 			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
-	Context("where the elements are in a list and some fields are only defined remotely", func() {
-		It("should drop those fields ", func() {
+	Context("where one of the items is repeated", func() {
+		It("should de-duplicate the repeated items", func() {
 			recorded := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
+metadata:
+  finalizers:
+  - "a"
+  - "b"
 `)
 			local := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
-      volumes:
-      - name: cache-volume
-        emptyDir:
+metadata:
+  finalizers:
+  - "a"
+  - "b"
+  - "a"
 `)
 			remote := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
-      volumes:
-      - name: cache-volume
-        hostPath:
-          path: /tmp/cache-volume
+metadata:
+  finalizers:
+  - "a"
+  - "b"
 `)
 			expected := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
-      volumes:
-      - name: cache-volume
-        emptyDir:
+metadata:
+  finalizers:
+  - "a"
+  - "b"
 `)
 			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
-	Context("where the elements are in a list", func() {
-		It("the fields defined both locally and remotely should be merged", func() {
+	Context("where some items are deleted and others are on remote only", func() {
+		It("should retain the correct items in the correct order", func() {
 			recorded := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
+metadata:
+  finalizers:
+  - "a"
+  - "b"
+  - "c"
 `)
 			local := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
-      volumes:
-      - name: cache-volume
-        hostPath:
-          path: /tmp/cache-volume
-        emptyDir:
+metadata:
+  finalizers:
+  - "a"
+  - "c"
+  - "a"
 `)
 			remote := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
-      volumes:
-      - name: cache-volume
-        hostPath:
-          path: /tmp/cache-volume
-          type: Directory
+metadata:
+  finalizers:
+  - "d"
+  - "b"
+  - "c"
+  - "a"
+  - "e"
 `)
 			expected := create(`
 apiVersion: apps/v1
 kind: Deployment
-spec:
-  template:
-    spec:
-      volumes:
-      - name: cache-volume
-        hostPath:
-          path: /tmp/cache-volume
-          type: Directory
-        emptyDir:
+metadata:
+  finalizers:
+  - "a"
+  - "c"
+  - "d"
+  - "e"
 `)
 			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})

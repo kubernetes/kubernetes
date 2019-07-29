@@ -26,10 +26,10 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kubectl/pkg/apply"
+	"k8s.io/kubectl/pkg/apply/parse"
 	"k8s.io/kubectl/pkg/util/openapi"
 	tst "k8s.io/kubectl/pkg/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 	noConflict  = false
 )
 
-var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
+var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "test", "data", "openapi", "swagger.json"))
 
 // run parses the openapi and runs the tests
 func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}) {
