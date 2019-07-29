@@ -53,7 +53,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 		clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 		return kubeconfigutil.CreateWithToken(
 			clusterinfo.Server,
-			kubeadmapiv1beta2.DefaultClusterName,
+			kubeadmapiv1beta1.DefaultClusterName,
 			TokenUser,
 			clusterinfo.CertificateAuthorityData,
 			cfg.Discovery.TLSBootstrapToken,
@@ -66,7 +66,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	}
 
 	// if there are no authentication credentials (nor in the config returned from discovery, nor in the TLSBootstrapToken), fail
-	return nil, errors.New("couldn't find authentication credentials for the TLS boostrap process. Please use Token discovery, a discovery file with embedded authentication credentials or a discovery file without authentication credentials and the TLSBootstrapToken flag")
+	return nil, errors.New("couldn't find authentication credentials for the TLS boostrap process. Please use Token discovery, a discovery file with embedded authentication credentials or a discovery file without authentication credentials but with the TLSBootstrapToken flag")
 }
 
 // DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust

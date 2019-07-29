@@ -171,11 +171,8 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 
 // getCurrentAuthInfo returns current authInfo, if defined
 func getCurrentAuthInfo(config *clientcmdapi.Config) *clientcmdapi.AuthInfo {
-	if config == nil || config.CurrentContext == "" {
-		return nil
-	}
-
-	if len(config.Contexts) == 0 || config.Contexts[config.CurrentContext] == nil {
+	if config == nil || config.CurrentContext == "" ||
+		len(config.Contexts) == 0 || config.Contexts[config.CurrentContext] == nil {
 		return nil
 	}
 	user := config.Contexts[config.CurrentContext].AuthInfo
