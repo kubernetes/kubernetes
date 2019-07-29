@@ -50,7 +50,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 
 	// respect gray update choice.
 	if ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
-		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil &&  *ds.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
+		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
 			// respect partitioned nodes to keep old versions.
 			nodeToDaemonPods = dsc.getNodeToDaemonPodsByPartition(ds, nodeToDaemonPods)
 		}
@@ -152,13 +152,8 @@ func (dsc *DaemonSetsController) getNodeToDaemonPodsBySelector(ds *apps.DaemonSe
 // getSurgeNumbers returns the max allowable number of surging pods and the current number of
 // surging pods. The number of surging pods is computed as the total number pods above the first
 // on each node.
-func (dsc *DaemonSetsController) getSurgeNumbers(ds *apps.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod, hash string) (int, int, error) {
+func (dsc *DaemonSetsController) getSurgeNumbers(ds *apps.DaemonSet, nodeList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod, hash string) (int, int, error) {
 	klog.V(4).Infof("Getting surge numbers")
-	// TODO: get nodeList once in syncDaemonSet and pass it to other functions
-	nodeList, err := dsc.nodeLister.List(labels.Everything())
-	if err != nil {
-		return -1, -1, fmt.Errorf("couldn't get list of nodes during surging rolling update of daemon set %#v: %v", ds, err)
-	}
 
 	generation, err := util.GetTemplateGeneration(ds)
 	if err != nil {
@@ -261,7 +256,7 @@ func (dsc *DaemonSetsController) surgingRollingUpdate(ds *apps.DaemonSet, nodeLi
 
 	// respect gray update choice.
 	if ds.Spec.UpdateStrategy.SurgingRollingUpdate.Selector == nil {
-		if ds.Spec.UpdateStrategy.SurgingRollingUpdate.Partition != nil && *ds.Spec.UpdateStrategy.SurgingRollingUpdate.Partition !=0 {
+		if ds.Spec.UpdateStrategy.SurgingRollingUpdate.Partition != nil && *ds.Spec.UpdateStrategy.SurgingRollingUpdate.Partition != 0 {
 			// respect partitioned nodes to keep old versions.
 			nodeToDaemonPods = dsc.getNodeToDaemonPodsByPartition(ds, nodeToDaemonPods)
 		}
@@ -270,7 +265,7 @@ func (dsc *DaemonSetsController) surgingRollingUpdate(ds *apps.DaemonSet, nodeLi
 		nodeToDaemonPods = dsc.getNodeToDaemonPodsBySelector(ds, nodeToDaemonPods)
 	}
 
-	maxSurge, numSurge, err := dsc.getSurgeNumbers(ds, nodeToDaemonPods, hash)
+	maxSurge, numSurge, err := dsc.getSurgeNumbers(ds, nodeList, nodeToDaemonPods, hash)
 	if err != nil {
 		return fmt.Errorf("Couldn't get surge numbers: %v", err)
 	}
