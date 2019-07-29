@@ -128,7 +128,7 @@ func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
 	templateMatches := dsTemplateGeneration != nil &&
 		pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
-	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
+	hashMatches := len(hash) > 0 && pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] == hash
 	return hashMatches || templateMatches
 }
 

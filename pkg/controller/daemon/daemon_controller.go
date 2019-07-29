@@ -867,6 +867,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	node *v1.Node,
 	nodeToDaemonPods map[string][]*v1.Pod,
 	ds *apps.DaemonSet,
+	hash string,
 ) (nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
 	wantToRun, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
@@ -882,6 +883,10 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	}
 
 	dsc.removeSuspendedDaemonPods(node.Name, dsKey)
+
+	// Ignore the pods that belong to previous generations
+	// Only applies when the update strategy is SurgingRollingUpdate
+	daemonPods = dsc.pruneSurgingDaemonPods(ds, daemonPods, hash)
 
 	switch {
 	case wantToRun && !shouldSchedule:
@@ -961,7 +966,7 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, nodeList []*v1.Node,
 	var nodesNeedingDaemonPods, podsToDelete []string
 	for _, node := range nodeList {
 		nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(
-			node, nodeToDaemonPods, ds)
+			node, nodeToDaemonPods, ds, hash)
 
 		if err != nil {
 			continue
