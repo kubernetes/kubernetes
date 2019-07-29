@@ -255,7 +255,7 @@ var _ = SIGDescribe("kubelet", func() {
 			numNodes        int
 			nodeNames       sets.String
 			nodeLabels      map[string]string
-			resourceMonitor *framework.ResourceMonitor
+			resourceMonitor *e2ekubelet.ResourceMonitor
 		)
 		type DeleteTest struct {
 			podsPerNode int
@@ -293,7 +293,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			// Start resourceMonitor only in small clusters.
 			if len(nodes.Items) <= maxNodesToCheck {
-				resourceMonitor = framework.NewResourceMonitor(f.ClientSet, framework.TargetContainers(), containerStatsPollingInterval)
+				resourceMonitor = e2ekubelet.NewResourceMonitor(f.ClientSet, e2ekubelet.TargetContainers(), containerStatsPollingInterval)
 				resourceMonitor.Start()
 			}
 		})

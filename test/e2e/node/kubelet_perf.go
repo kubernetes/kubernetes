@@ -63,7 +63,7 @@ func logPodsOnNodes(c clientset.Interface, nodeNames []string) {
 	}
 }
 
-func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames sets.String, rm *framework.ResourceMonitor,
+func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames sets.String, rm *e2ekubelet.ResourceMonitor,
 	expectedCPU map[string]map[float64]float64, expectedMemory e2ekubelet.ResourceUsagePerContainer) {
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
@@ -86,7 +86,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 
 	ginkgo.By("Start monitoring resource usage")
 	// Periodically dump the cpu summary until the deadline is met.
-	// Note that without calling framework.ResourceMonitor.Reset(), the stats
+	// Note that without calling e2ekubelet.ResourceMonitor.Reset(), the stats
 	// would occupy increasingly more memory. This should be fine
 	// for the current test duration, but we should reclaim the
 	// entries if we plan to monitor longer (e.g., 8 hours).
@@ -145,7 +145,7 @@ func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsage
 		}
 		if len(nodeErrs) > 0 {
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
-			heapStats, err := framework.GetKubeletHeapStats(c, nodeName)
+			heapStats, err := e2ekubelet.GetKubeletHeapStats(c, nodeName)
 			if err != nil {
 				e2elog.Logf("Unable to get heap stats from %q", nodeName)
 			} else {
@@ -196,8 +196,8 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
 	f := framework.NewDefaultFramework("kubelet-perf")
-	var om *framework.RuntimeOperationMonitor
-	var rm *framework.ResourceMonitor
+	var om *e2ekubelet.RuntimeOperationMonitor
+	var rm *e2ekubelet.ResourceMonitor
 
 	ginkgo.BeforeEach(func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -205,15 +205,15 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
-		rm = framework.NewResourceMonitor(f.ClientSet, framework.TargetContainers(), containerStatsPollingPeriod)
+		om = e2ekubelet.NewRuntimeOperationMonitor(f.ClientSet)
+		rm = e2ekubelet.NewResourceMonitor(f.ClientSet, e2ekubelet.TargetContainers(), containerStatsPollingPeriod)
 		rm.Start()
 	})
 
 	ginkgo.AfterEach(func() {
 		rm.Stop()
 		result := om.GetLatestRuntimeOperationErrorRate()
-		e2elog.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
+		e2elog.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
 	SIGDescribe("regular resource usage tracking", func() {
 		// We assume that the scheduler will make reasonable scheduling choices

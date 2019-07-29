@@ -454,8 +454,8 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, inter
 }
 
 // getPodStartLatency gets prometheus metric 'pod start latency' from kubelet
-func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
-	latencyMetrics := framework.KubeletLatencyMetrics{}
+func getPodStartLatency(node string) (e2emetrics.KubeletLatencyMetrics, error) {
+	latencyMetrics := e2emetrics.KubeletLatencyMetrics{}
 	ms, err := e2emetrics.GrabKubeletMetricsWithoutProxy(node, "/metrics")
 	framework.ExpectNoError(err, "Failed to get kubelet metrics without proxy in node %s", node)
 
@@ -464,7 +464,7 @@ func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 			if sample.Metric["__name__"] == kubemetrics.KubeletSubsystem+"_"+kubemetrics.PodStartDurationKey {
 				quantile, _ := strconv.ParseFloat(string(sample.Metric["quantile"]), 64)
 				latencyMetrics = append(latencyMetrics,
-					framework.KubeletLatencyMetric{
+					e2emetrics.KubeletLatencyMetric{
 						Quantile: quantile,
 						Method:   kubemetrics.PodStartDurationKey,
 						Latency:  time.Duration(int(sample.Value)) * time.Microsecond})

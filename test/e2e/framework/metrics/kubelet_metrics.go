@@ -134,9 +134,9 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (KubeletM
 	return grabber.GrabFromKubelet(nodeName)
 }
 
-// getKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
+// GetKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
 // the subsystem prefix.
-func getKubeletMetrics(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
+func GetKubeletMetrics(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
 	ms, err := getKubeletMetricsFromNode(c, nodeName)
 	if err != nil {
 		return KubeletMetrics{}, err
@@ -203,7 +203,7 @@ func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) 
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
 func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
-	ms, err := getKubeletMetrics(c, nodeName)
+	ms, err := GetKubeletMetrics(c, nodeName)
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
 	}

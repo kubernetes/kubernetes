@@ -42,13 +42,13 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 	var (
 		rc *ResourceCollector
-		om *framework.RuntimeOperationMonitor
+		om *e2ekubelet.RuntimeOperationMonitor
 	)
 
 	f := framework.NewDefaultFramework("resource-usage")
 
 	ginkgo.BeforeEach(func() {
-		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
+		om = e2ekubelet.NewRuntimeOperationMonitor(f.ClientSet)
 		// The test collects resource usage from a standalone Cadvisor pod.
 		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
 		// show the resource usage spikes. But changing its interval increases the overhead
@@ -59,7 +59,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 	ginkgo.AfterEach(func() {
 		result := om.GetLatestRuntimeOperationErrorRate()
-		e2elog.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
+		e2elog.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
 
 	// This test measures and verifies the steady resource usage of node is within limit
@@ -164,7 +164,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 
 	ginkgo.By("Start monitoring resource usage")
 	// Periodically dump the cpu summary until the deadline is met.
-	// Note that without calling framework.ResourceMonitor.Reset(), the stats
+	// Note that without calling e2ekubelet.ResourceMonitor.Reset(), the stats
 	// would occupy increasingly more memory. This should be fine
 	// for the current test duration, but we should reclaim the
 	// entries if we plan to monitor longer (e.g., 8 hours).
@@ -238,7 +238,7 @@ func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsage
 		}
 		if len(nodeErrs) > 0 {
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
-			heapStats, err := framework.GetKubeletHeapStats(c, nodeName)
+			heapStats, err := e2ekubelet.GetKubeletHeapStats(c, nodeName)
 			if err != nil {
 				e2elog.Logf("Unable to get heap stats from %q", nodeName)
 			} else {
