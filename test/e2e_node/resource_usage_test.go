@@ -287,7 +287,7 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 
 func logPods(c clientset.Interface) {
 	nodeName := framework.TestContext.NodeName
-	podList, err := framework.GetKubeletRunningPods(c, nodeName)
+	podList, err := e2ekubelet.GetKubeletRunningPods(c, nodeName)
 	if err != nil {
 		e2elog.Logf("Unable to retrieve kubelet pods for node %v", nodeName)
 	}
