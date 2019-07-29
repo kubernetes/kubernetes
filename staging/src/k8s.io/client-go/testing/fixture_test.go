@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -272,4 +271,34 @@ func TestPatchWithMissingObject(t *testing.T) {
 	assert.True(t, handled)
 	assert.Nil(t, node)
 	assert.EqualError(t, err, `nodes "node-1" not found`)
+}
+
+func TestAlignAPIServerFixtureBehavior(t *testing.T) {
+	ns := "test_namespace"
+	gv := schema.GroupVersion{Group: "core", Version: "v1"}
+	gvk := schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Unstructured"}
+	gvkList := schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "UnstructuredList"}
+	gvr := schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "unstructured"}
+
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(gvk)
+
+	objList := &unstructured.UnstructuredList{}
+	objList.SetGroupVersionKind(gvkList)
+
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(gv, obj)
+	scheme.AddKnownTypes(gv, objList)
+
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+
+	err := o.Add(obj)
+	assert.Nil(t, err)
+
+	list, err := o.List(gvr, gvk, ns)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, list)
+	assert.Equal(t, gvkList, list.GetObjectKind().GroupVersionKind())
 }

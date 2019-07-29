@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	jsonpatch "github.com/evanphx/json-patch"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -232,6 +234,20 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	}
 
 	list, err := t.scheme.New(listGVK)
+	if err != nil {
+		return nil, err
+	}
+
+	uList := unstructured.UnstructuredList{}
+	uList.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(list)
+	if err != nil {
+		return nil, err
+	}
+
+	// making sure kind and apiVersion are not lost on creating a new list from scheme
+	uList.SetGroupVersionKind(listGVK)
+
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(uList.Object, list)
 	if err != nil {
 		return nil, err
 	}
