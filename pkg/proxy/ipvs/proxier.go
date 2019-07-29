@@ -1402,7 +1402,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			}
 			args = append(args,
 				"-m", "comment", "--comment", proxier.ipsetList[set.name].getComment(),
-				"-m", "set", "--match-set", set.name,
+				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
 				set.matchType,
 			)
 			writeLine(proxier.natRules, append(args, "-j", set.to)...)
@@ -1413,7 +1413,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeClusterIPSet].getComment(),
-			"-m", "set", "--match-set", kubeClusterIPSet,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name,
 		)
 		if proxier.masqueradeAll {
 			writeLine(proxier.natRules, append(args, "dst,dst", "-j", string(KubeMarkMasqChain))...)
@@ -1441,7 +1441,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPSet].getComment(),
-			"-m", "set", "--match-set", kubeExternalIPSet,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
 			"dst,dst",
 		)
 		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
@@ -1535,7 +1535,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 			}
 			writeLine(proxier.natRules, []string{
 				"-A", string(kubeServicesChain),
-				"-m", "set", "--match-set", set, matchType,
+				"-m", "set", "--match-set", proxier.ipsetList[set].Name, matchType,
 				"-j", "ACCEPT",
 			}...)
 		}
