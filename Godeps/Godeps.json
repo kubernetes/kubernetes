@@ -2569,30 +2569,37 @@
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/spec",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/pkg/parser",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/pkg/units",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/volume",
+			"Comment": "v1.0.0",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
@@ -3176,7 +3183,7 @@
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",
-			"Comment": "v1-53-gdf38d32658d878",
+			"Comment": "v1.0.0-53-gdf38d32658d878",
 			"Rev": "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
 		},
 		{
