@@ -17,8 +17,8 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/utils/inotify"
 	"k8s.io/klog"
+	"k8s.io/utils/inotify"
 )
 
 func watchForLockfileContention(path string, done chan struct{}) error {
