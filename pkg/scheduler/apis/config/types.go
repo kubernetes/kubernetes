@@ -138,10 +138,6 @@ type SchedulerPolicyConfigMapSource struct {
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
 	componentbaseconfig.LeaderElectionConfiguration
-	// LockObjectNamespace defines the namespace of the lock object
-	LockObjectNamespace string
-	// LockObjectName defines the lock object name
-	LockObjectName string
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for

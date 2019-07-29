@@ -47,14 +47,14 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			},
 		},
 		LeaderElection: config.KubeSchedulerLeaderElectionConfiguration{
-			LockObjectNamespace: "name",
-			LockObjectName:      "name",
 			LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-				ResourceLock:  "configmap",
-				LeaderElect:   true,
-				LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
-				RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
-				RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
+				ResourceLock:      "configmap",
+				LeaderElect:       true,
+				LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
+				RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
+				RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
+				ResourceNamespace: "name",
+				ResourceName:      "name",
 			},
 		},
 		BindTimeoutSeconds:       &testTimeout,
@@ -67,11 +67,11 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	HardPodAffinitySymmetricWeightLt0 := validConfig.DeepCopy()
 	HardPodAffinitySymmetricWeightLt0.HardPodAffinitySymmetricWeight = -1
 
-	lockObjectNameNotSet := validConfig.DeepCopy()
-	lockObjectNameNotSet.LeaderElection.LockObjectName = ""
+	resourceNameNotSet := validConfig.DeepCopy()
+	resourceNameNotSet.LeaderElection.ResourceName = ""
 
-	lockObjectNamespaceNotSet := validConfig.DeepCopy()
-	lockObjectNamespaceNotSet.LeaderElection.LockObjectNamespace = ""
+	resourceNamespaceNotSet := validConfig.DeepCopy()
+	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
 
 	metricsBindAddrHostInvalid := validConfig.DeepCopy()
 	metricsBindAddrHostInvalid.MetricsBindAddress = "0.0.0.0.0:9090"
@@ -103,13 +103,13 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: false,
 			config:         validConfig,
 		},
-		"bad-lock-object-names-not-set": {
+		"bad-resource-name-not-set": {
 			expectedToFail: true,
-			config:         lockObjectNameNotSet,
+			config:         resourceNameNotSet,
 		},
-		"bad-lock-object-namespace-not-set": {
+		"bad-resource-namespace-not-set": {
 			expectedToFail: true,
-			config:         lockObjectNamespaceNotSet,
+			config:         resourceNamespaceNotSet,
 		},
 		"bad-healthz-port-invalid": {
 			expectedToFail: true,

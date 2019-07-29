@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -27,12 +28,19 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["defaults_test.go"],
+    srcs = [
+        "conversion_test.go",
+        "defaults_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:go_default_library",
     ],
 )
