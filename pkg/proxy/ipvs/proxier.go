@@ -1808,11 +1808,11 @@ func (l *listenPortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Clo
 
 func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
+	// use ipvs to redirect traffic.
 	// This ensures a) that it's safe to use that port and b) that (a) stays
 	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
 	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
+	// be bad because ipvs would silently claim the traffic but the process
 	// would never know.
 	// NOTE: We should not need to have a real listen()ing socket - bind()
 	// should be enough, but I can't figure out a way to e2e test without
