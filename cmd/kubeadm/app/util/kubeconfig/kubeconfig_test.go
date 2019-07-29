@@ -206,12 +206,12 @@ func TestGetCurrentAuthInfo(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "no CurrentContext object 1",
+			name:     "no CurrentContext object",
 			config:   &clientcmdapi.Config{CurrentContext: "kubernetes"},
 			expected: false,
 		},
 		{
-			name: "no CurrentContext object ",
+			name: "CurrentContext object with bad contents",
 			config: &clientcmdapi.Config{
 				CurrentContext: "kubernetes",
 				Contexts:       map[string]*clientcmdapi.Context{"NOTkubernetes": {}},
@@ -227,7 +227,7 @@ func TestGetCurrentAuthInfo(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "no AuthInfo object 1",
+			name: "no AuthInfo object",
 			config: &clientcmdapi.Config{
 				CurrentContext: "kubernetes",
 				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
@@ -235,7 +235,7 @@ func TestGetCurrentAuthInfo(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "no AuthInfo object 2",
+			name: "AuthInfo object with bad contents",
 			config: &clientcmdapi.Config{
 				CurrentContext: "kubernetes",
 				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
@@ -244,7 +244,7 @@ func TestGetCurrentAuthInfo(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "authInfo",
+			name: "valid AuthInfo",
 			config: &clientcmdapi.Config{
 				CurrentContext: "kubernetes",
 				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},

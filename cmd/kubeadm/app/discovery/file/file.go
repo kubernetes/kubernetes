@@ -53,14 +53,14 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 
 	var kubeconfig *clientcmdapi.Config
 
-	// If the discovery file config contains a authentication credentials
+	// If the discovery file config contains authentication credentials
 	if kubeconfigutil.HasAuthenticationCredentials(config) {
 		klog.V(1).Info("[discovery] Using authentication credentials from the discovery file for validating TLS connection")
 
 		// Use the discovery file config for starting the join process
 		kubeconfig = config
 
-		// We should ensure that all the authentication info are embedded in config file, so everything will work also when
+		// We should ensure that all the authentication info is embedded in config file, so everything will work also when
 		// the kubeconfig file will be stored in /etc/kubernetes/boostrap-kubelet.conf
 		if err := kubeconfigutil.EnsureAuthenticationInfoAreEmbedded(kubeconfig); err != nil {
 			return nil, errors.Wrap(err, "error while reading client cert file or client key file")
@@ -87,7 +87,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return nil, err
 	}
 
-	var currentCluster = kubeconfigutil.GetClusterFromKubeConfig(kubeconfig)
+	currentCluster := kubeconfigutil.GetClusterFromKubeConfig(kubeconfig)
 	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
 
 	var clusterinfoCM *v1.ConfigMap
@@ -101,7 +101,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 				klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
 			}
-			klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: [%v]\n", bootstrapapi.ConfigMapClusterInfo, err)
+			klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
 			return false, nil
 		}
 		return true, nil
@@ -119,11 +119,11 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return kubeconfig, nil
 	}
 
-	var refreshedCluster = kubeconfigutil.GetClusterFromKubeConfig(refreshedBaseKubeConfig)
+	refreshedCluster := kubeconfigutil.GetClusterFromKubeConfig(refreshedBaseKubeConfig)
 	currentCluster.Server = refreshedCluster.Server
 	currentCluster.CertificateAuthorityData = refreshedCluster.CertificateAuthorityData
 
-	klog.V(1).Infof("[discovery] Synced server and CA from the %s ConfigMap so we have got the latest information", bootstrapapi.ConfigMapClusterInfo)
+	klog.V(1).Infof("[discovery] Synced Server and CertificateAuthorityData from the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	return kubeconfig, nil
 }
 
