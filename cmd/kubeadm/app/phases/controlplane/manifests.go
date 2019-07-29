@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -184,6 +185,12 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	}
 
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
+
 	if cfg.APIServer.ExtraArgs == nil {
 		cfg.APIServer.ExtraArgs = map[string]string{}
 	}
@@ -295,6 +302,12 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 		}
 	}
 
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
+
 	command := []string{"kube-controller-manager"}
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManager.ExtraArgs)...)
 
@@ -307,6 +320,12 @@ func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 		"bind-address": "127.0.0.1",
 		"leader-elect": "true",
 		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+	}
+
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
 	}
 
 	command := []string{"kube-scheduler"}
