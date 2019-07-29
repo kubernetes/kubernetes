@@ -509,6 +509,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	// track if we write any output
 	trackingWriter := &trackingWriterWrapper{Delegate: o.Out}
+	previouslyWritten := trackingWriter.Written
 
 	w := utilprinters.GetNewTabWriter(trackingWriter)
 	for ix := range objs {
@@ -535,8 +536,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			// TODO: this doesn't belong here
 			// add linebreak between resource groups (if there is more than one)
 			// skip linebreak above first resource group
-			if lastMapping != nil && !o.NoHeaders {
-				fmt.Fprintln(o.ErrOut)
+			if trackingWriter.Written > previouslyWritten && !o.NoHeaders {
+				fmt.Fprintln(w)
+				previouslyWritten = trackingWriter.Written
 			}
 
 			printer, err = o.ToPrinter(mapping, printWithNamespace, printWithKind)
