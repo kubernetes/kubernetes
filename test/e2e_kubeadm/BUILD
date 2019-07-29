@@ -17,6 +17,7 @@ go_test(
         "kubeadm_certs_test.go",
         "kubeadm_config_test.go",
         "kubelet_config_test.go",
+        "networking_test.go",
         "nodes_test.go",
         "proxy_addon_test.go",
     ],
