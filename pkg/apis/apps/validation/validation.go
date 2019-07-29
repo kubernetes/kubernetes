@@ -391,7 +391,7 @@ func ValidateDaemonSetUpdateStrategy(strategy *apps.DaemonSetUpdateStrategy, fld
 		}
 		allErrs = append(allErrs, ValidateSurgingRollingUpdateDaemonSet(strategy.SurgingRollingUpdate, fldPath.Child("surgingRollingUpdate"))...)
 	default:
-		validValues := []string{string(apps.RollingUpdateDaemonSetStrategyType), string(apps.OnDeleteDaemonSetStrategyType)}
+		validValues := []string{string(apps.RollingUpdateDaemonSetStrategyType), string(apps.SurgingRollingUpdateDaemonSetStrategyType), string(apps.OnDeleteDaemonSetStrategyType)}
 		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
 	}
 	return allErrs
