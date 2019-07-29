@@ -107,6 +107,7 @@ func (dsc *DaemonSetsController) getNodeToDaemonPodsByPartition(ds *apps.DaemonS
 		partition = *ds.Spec.UpdateStrategy.SurgingRollingUpdate.Partition
 	}
 
+	// keep the old version pods whose count is no more than Partition value.
 	for i := int32(0); i < int32(len(nodeNames)); i++ {
 		if i == partition {
 			break
