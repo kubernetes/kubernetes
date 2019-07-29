@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestCacheCRDFinder(t *testing.T) {
