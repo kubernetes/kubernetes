@@ -25,9 +25,6 @@ spec:
       - name: kubeconfig-volume
         secret:
           secretName: kubeconfig
-      - name: kernelmonitorconfig-volume
-        configMap:
-          name: node-configmap
       - name: logs-volume
         hostPath:
           path: /var/log
@@ -93,7 +90,7 @@ spec:
             cpu: {{HOLLOW_PROXY_CPU}}m
             memory: {{HOLLOW_PROXY_MEM}}Ki
       - name: hollow-node-problem-detector
-        image: k8s.gcr.io/node-problem-detector:v0.4.1
+        image: k8s.gcr.io/node-problem-detector:v0.6.3
         env:
         - name: NODE_NAME
           valueFrom:
@@ -102,13 +99,10 @@ spec:
         command:
         - /bin/sh
         - -c
-        - /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
+        - exec /node-problem-detector --logtostderr --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json,/config/docker-monitor.json,/config/docker-monitor-filelog.json --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" >>/var/log/npd-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
-          readOnly: true
-        - name: kernelmonitorconfig-volume
-          mountPath: /config
           readOnly: true
         - name: no-serviceaccount-access-to-real-master
           mountPath: /var/run/secrets/kubernetes.io/serviceaccount
