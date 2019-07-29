@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/kubectl/pkg/apply"
 )
 
 // nilSafeLookup returns the value from the map if the map is non-nil

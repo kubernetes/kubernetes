@@ -10,9 +10,10 @@ go_library(
         "retain_keys_visitor.go",
         "strategic_visitor.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/strategy",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/apply/strategy",
+    importpath = "k8s.io/kubectl/pkg/apply/strategy",
     visibility = ["//visibility:public"],
-    deps = ["//pkg/kubectl/apply:go_default_library"],
+    deps = ["//staging/src/k8s.io/kubectl/pkg/apply:go_default_library"],
 )
 
 go_test(
@@ -31,14 +32,14 @@ go_test(
         "utils_test.go",
     ],
     data = [
-        ":openapi-spec",
-        "//api/openapi-spec",
+        "test_swagger.json",
+        "//staging/src/k8s.io/kubectl/test/data/openapi",
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/apply:go_default_library",
-        "//pkg/kubectl/apply/parse:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/apply:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/apply/parse:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi/testing:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -61,11 +62,4 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-filegroup(
-    name = "openapi-spec",
-    srcs = glob([
-        "**/*.json",
-    ]),
 )

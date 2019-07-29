@@ -18,7 +18,7 @@ package parse
 
 import (
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/kubectl/pkg/apply"
 )
 
 // Item wraps values from 3 sources (recorded, local, remote).

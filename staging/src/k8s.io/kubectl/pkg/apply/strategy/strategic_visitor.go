@@ -17,7 +17,7 @@ limitations under the License.
 package strategy
 
 import (
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/kubectl/pkg/apply"
 )
 
 // delegatingStrategy delegates merging fields to other visitor implementations

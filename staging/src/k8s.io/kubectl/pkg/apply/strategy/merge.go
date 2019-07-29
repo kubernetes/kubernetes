@@ -16,7 +16,7 @@ limitations under the License.
 
 package strategy
 
-import "k8s.io/kubernetes/pkg/kubectl/apply"
+import "k8s.io/kubectl/pkg/apply"
 
 // Options controls how a merge will be executed
 type Options struct {
