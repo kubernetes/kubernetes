@@ -170,6 +170,17 @@ type ScorePlugin interface {
 	Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status)
 }
 
+// ScoreWithNormalizePlugin is an interface that must be implemented by "score"
+// plugins that also need to normalize the node scoring results produced by the same
+// plugin's "Score" method.
+type ScoreWithNormalizePlugin interface {
+	ScorePlugin
+	// NormalizeScore is called for all node scores produced by the same plugin's "Score"
+	// method. A successful run of NormalizeScore will update the scores list and return
+	// a success status.
+	NormalizeScore(pc *PluginContext, p *v1.Pod, scores NodeScoreList) *Status
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -263,6 +274,16 @@ type Framework interface {
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
 	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status)
+
+	// RunNormalizeScorePlugins runs the normalize score plugins. It should be called after
+	// RunScorePlugins with the PluginToNodeScoreMap result. It then modifies the map with
+	// normalized scores. It returns a non-success Status if any of the normalize score plugins
+	// returns a non-success status.
+	RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status
+
+	// ApplyScoreWeights applies weights to the score results. It should be called after
+	// RunNormalizeScorePlugins.
+	ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status
 
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
