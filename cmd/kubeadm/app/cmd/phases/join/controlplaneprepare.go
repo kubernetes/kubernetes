@@ -78,6 +78,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TLSBootstrapToken,
 			options.TokenStr,
 			options.CertificateKey,
+			options.KustomizePods,
 		}
 	case "download-certs":
 		flags = []string{
@@ -122,6 +123,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.APIServerBindPort,
 			options.CfgPath,
 			options.ControlPlane,
+			options.KustomizePods,
 		}
 	default:
 		flags = []string{}
@@ -188,6 +190,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
 		err := controlplane.CreateStaticPodFiles(
 			kubeadmconstants.GetStaticPodDirectory(),
+			data.KustomizeDir(),
 			&cfg.ClusterConfiguration,
 			&cfg.LocalAPIEndpoint,
 			component,
