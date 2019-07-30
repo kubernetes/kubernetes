@@ -101,6 +101,60 @@ type AlgorithmProviderConfig struct {
 	PriorityFunctionKeys sets.String
 }
 
+// Snapshot is used to store current state of registered predicates and priorities.
+type Snapshot struct {
+	fitPredicateMap        map[string]FitPredicateFactory
+	mandatoryFitPredicates sets.String
+	priorityFunctionMap    map[string]PriorityConfigFactory
+	algorithmProviderMap   map[string]AlgorithmProviderConfig
+}
+
+// Copy returns a snapshot of current registered predicates and priorities.
+func Copy() *Snapshot {
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
+
+	copy := Snapshot{
+		fitPredicateMap:        make(map[string]FitPredicateFactory),
+		mandatoryFitPredicates: sets.NewString(),
+		priorityFunctionMap:    make(map[string]PriorityConfigFactory),
+		algorithmProviderMap:   make(map[string]AlgorithmProviderConfig),
+	}
+	for k, v := range fitPredicateMap {
+		copy.fitPredicateMap[k] = v
+	}
+	for k := range mandatoryFitPredicates {
+		copy.mandatoryFitPredicates[k] = struct{}{}
+	}
+	for k, v := range priorityFunctionMap {
+		copy.priorityFunctionMap[k] = v
+	}
+	for provider, config := range algorithmProviderMap {
+		copyPredKeys, copyPrioKeys := sets.NewString(), sets.NewString()
+		for k := range config.FitPredicateKeys {
+			copyPredKeys[k] = struct{}{}
+		}
+		for k := range config.PriorityFunctionKeys {
+			copyPrioKeys[k] = struct{}{}
+		}
+		copy.algorithmProviderMap[provider] = AlgorithmProviderConfig{
+			FitPredicateKeys:     copyPredKeys,
+			PriorityFunctionKeys: copyPrioKeys,
+		}
+	}
+	return &copy
+}
+
+// Apply sets state of predicates and priorities to `s`.
+func Apply(s *Snapshot) {
+	schedulerFactoryMutex.Lock()
+	fitPredicateMap = s.fitPredicateMap
+	mandatoryFitPredicates = s.mandatoryFitPredicates
+	priorityFunctionMap = s.priorityFunctionMap
+	algorithmProviderMap = s.algorithmProviderMap
+	schedulerFactoryMutex.Unlock()
+}
+
 // RegisterFitPredicate registers a fit predicate with the algorithm
 // registry. Returns the name with which the predicate was registered.
 func RegisterFitPredicate(name string, predicate predicates.FitPredicate) string {
