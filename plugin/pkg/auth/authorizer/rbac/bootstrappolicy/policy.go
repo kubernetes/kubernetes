@@ -45,6 +45,7 @@ const (
 	autoscalingGroup    = "autoscaling"
 	batchGroup          = "batch"
 	certificatesGroup   = "certificates.k8s.io"
+	discoveryGroup      = "discovery.k8s.io"
 	extensionsGroup     = "extensions"
 	policyGroup         = "policy"
 	rbacGroup           = "rbac.authorization.k8s.io"

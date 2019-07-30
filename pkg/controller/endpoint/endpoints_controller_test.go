@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -42,6 +41,7 @@ import (
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -1272,24 +1272,24 @@ func TestPodChanged(t *testing.T) {
 	oldPod := pods[0].(*v1.Pod)
 	newPod := oldPod.DeepCopy()
 
-	if podChanged(oldPod, newPod) {
+	if podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be unchanged for copied pod")
 	}
 
 	newPod.Spec.NodeName = "changed"
-	if !podChanged(oldPod, newPod) {
+	if !podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be changed for pod with NodeName changed")
 	}
 	newPod.Spec.NodeName = oldPod.Spec.NodeName
 
 	newPod.ObjectMeta.ResourceVersion = "changed"
-	if podChanged(oldPod, newPod) {
+	if podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be unchanged for pod with only ResourceVersion changed")
 	}
 	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
 
 	newPod.Status.PodIP = "1.2.3.1"
-	if !podChanged(oldPod, newPod) {
+	if !podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be changed with pod IP address change")
 	}
 	newPod.Status.PodIP = oldPod.Status.PodIP
@@ -1306,7 +1306,7 @@ func TestPodChanged(t *testing.T) {
 			IP: "2000::1",
 		},
 	}
-	if !podChanged(oldPod, newPod) {
+	if !podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be changed with adding secondary IP")
 	}
 	// reset
@@ -1369,88 +1369,24 @@ func TestPodChanged(t *testing.T) {
 	/* end dual stack testing */
 
 	newPod.ObjectMeta.Name = "wrong-name"
-	if !podChanged(oldPod, newPod) {
+	if !podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be changed with pod name change")
 	}
 	newPod.ObjectMeta.Name = oldPod.ObjectMeta.Name
 
 	saveConditions := oldPod.Status.Conditions
 	oldPod.Status.Conditions = nil
-	if !podChanged(oldPod, newPod) {
+	if !podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be changed with pod readiness change")
 	}
 	oldPod.Status.Conditions = saveConditions
 
 	now := metav1.NewTime(time.Now().UTC())
 	newPod.ObjectMeta.DeletionTimestamp = &now
-	if !podChanged(oldPod, newPod) {
+	if !podChangedHelper(oldPod, newPod, endpointChanged) {
 		t.Errorf("Expected pod to be changed with DeletionTimestamp change")
 	}
 	newPod.ObjectMeta.DeletionTimestamp = oldPod.ObjectMeta.DeletionTimestamp.DeepCopy()
-}
-
-func TestDetermineNeededServiceUpdates(t *testing.T) {
-	testCases := []struct {
-		name  string
-		a     sets.String
-		b     sets.String
-		union sets.String
-		xor   sets.String
-	}{
-		{
-			name:  "no services changed",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("a", "b", "c"),
-			xor:   sets.NewString(),
-			union: sets.NewString("a", "b", "c"),
-		},
-		{
-			name:  "all old services removed, new services added",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("d", "e", "f"),
-			xor:   sets.NewString("a", "b", "c", "d", "e", "f"),
-			union: sets.NewString("a", "b", "c", "d", "e", "f"),
-		},
-		{
-			name:  "all old services removed, no new services added",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString(),
-			xor:   sets.NewString("a", "b", "c"),
-			union: sets.NewString("a", "b", "c"),
-		},
-		{
-			name:  "no old services, but new services added",
-			a:     sets.NewString(),
-			b:     sets.NewString("a", "b", "c"),
-			xor:   sets.NewString("a", "b", "c"),
-			union: sets.NewString("a", "b", "c"),
-		},
-		{
-			name:  "one service removed, one service added, two unchanged",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("b", "c", "d"),
-			xor:   sets.NewString("a", "d"),
-			union: sets.NewString("a", "b", "c", "d"),
-		},
-		{
-			name:  "no services",
-			a:     sets.NewString(),
-			b:     sets.NewString(),
-			xor:   sets.NewString(),
-			union: sets.NewString(),
-		},
-	}
-	for _, testCase := range testCases {
-		retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
-		if !retval.Equal(testCase.xor) {
-			t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
-		}
-
-		retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
-		if !retval.Equal(testCase.union) {
-			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
-		}
-	}
 }
 
 func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
@@ -1998,4 +1934,9 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "DELETE", nil)
+}
+
+func podChangedHelper(oldPod, newPod *v1.Pod, endpointChanged endpointutil.EndpointsMatch) bool {
+	podChanged, _ := endpointutil.PodChanged(oldPod, newPod, endpointChanged)
+	return podChanged
 }
