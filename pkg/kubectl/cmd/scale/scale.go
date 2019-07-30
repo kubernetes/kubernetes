@@ -30,9 +30,9 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scale"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 var (
@@ -86,7 +86,7 @@ type ScaleOptions struct {
 	args                         []string
 	shortOutput                  bool
 	clientSet                    kubernetes.Interface
-	scaler                       kubectl.Scaler
+	scaler                       scale.Scaler
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	parent                       string
 
@@ -209,15 +209,15 @@ func (o *ScaleOptions) RunScale() error {
 
 	// only set a precondition if the user has requested one.  A nil precondition means we can do a blind update, so
 	// we avoid a Scale GET that may or may not succeed
-	var precondition *kubectl.ScalePrecondition
+	var precondition *scale.ScalePrecondition
 	if o.CurrentReplicas != -1 || len(o.ResourceVersion) > 0 {
-		precondition = &kubectl.ScalePrecondition{Size: o.CurrentReplicas, ResourceVersion: o.ResourceVersion}
+		precondition = &scale.ScalePrecondition{Size: o.CurrentReplicas, ResourceVersion: o.ResourceVersion}
 	}
-	retry := kubectl.NewRetryParams(1*time.Second, 5*time.Minute)
+	retry := scale.NewRetryParams(1*time.Second, 5*time.Minute)
 
-	var waitForReplicas *kubectl.RetryParams
+	var waitForReplicas *scale.RetryParams
 	if o.Timeout != 0 {
-		waitForReplicas = kubectl.NewRetryParams(1*time.Second, timeout)
+		waitForReplicas = scale.NewRetryParams(1*time.Second, timeout)
 	}
 
 	counter := 0
@@ -257,11 +257,11 @@ func (o *ScaleOptions) RunScale() error {
 	return nil
 }
 
-func scaler(f cmdutil.Factory) (kubectl.Scaler, error) {
+func scaler(f cmdutil.Factory) (scale.Scaler, error) {
 	scalesGetter, err := cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return nil, err
 	}
 
-	return kubectl.NewScaler(scalesGetter), nil
+	return scale.NewScaler(scalesGetter), nil
 }

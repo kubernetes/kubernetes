@@ -106,7 +106,6 @@ pkg/credentialprovider/gcp
 pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/options
-pkg/kubectl
 pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apply
 pkg/kubectl/cmd/attach
@@ -536,6 +535,7 @@ staging/src/k8s.io/kubectl/pkg/generate
 staging/src/k8s.io/kubectl/pkg/generate/versioned
 staging/src/k8s.io/kubectl/pkg/metricsutil
 staging/src/k8s.io/kubectl/pkg/polymorphichelpers
+staging/src/k8s.io/kubectl/pkg/scale
 staging/src/k8s.io/kubectl/pkg/util/templates
 staging/src/k8s.io/kubelet/config/v1beta1
 staging/src/k8s.io/legacy-cloud-providers/vsphere
