@@ -22,17 +22,19 @@ import (
 	"math"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/scheduler/internal/channels"
+
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // PredicateMetadata interface represents anything that can access a predicate metadata.
@@ -178,7 +180,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		pod:                                    pod,
 		podBestEffort:                          isPodBestEffort(pod),
 		podRequest:                             GetResourceRequest(pod),
-		podPorts:                               schedutil.GetContainerPorts(pod),
+		podPorts:                               podinfo.GetContainerPorts(pod),
 		topologyPairsPotentialAffinityPods:     incomingPodAffinityMap,
 		topologyPairsPotentialAntiAffinityPods: incomingPodAntiAffinityMap,
 		topologyPairsAntiAffinityPodsMap:       existingPodAntiAffinityMap,
@@ -204,7 +206,8 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		allNodeNames = append(allNodeNames, name)
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
+
 	var lock sync.Mutex
 
 	topologyPairsPodSpreadMap := &topologyPairsPodSpreadMap{
@@ -336,7 +339,7 @@ func newTopologyPairsMaps() *topologyPairsMaps {
 }
 
 func (m *topologyPairsMaps) addTopologyPair(pair topologyPair, pod *v1.Pod) {
-	podFullName := schedutil.GetPodFullName(pod)
+	podFullName := podinfo.GetPodFullName(pod)
 	m.addTopologyPairWithoutPods(pair)
 	m.topologyPairToPods[pair][pod] = struct{}{}
 	if m.podToTopologyPairs[podFullName] == nil {
@@ -353,7 +356,7 @@ func (m *topologyPairsMaps) addTopologyPairWithoutPods(pair topologyPair) {
 }
 
 func (m *topologyPairsMaps) removePod(deletedPod *v1.Pod) {
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
+	deletedPodFullName := podinfo.GetPodFullName(deletedPod)
 	for pair := range m.podToTopologyPairs[deletedPodFullName] {
 		delete(m.topologyPairToPods[pair], deletedPod)
 		if len(m.topologyPairToPods[pair]) == 0 {
@@ -447,7 +450,7 @@ func (m *topologyPairsPodSpreadMap) removePod(deletedPod *v1.Pod) {
 		return
 	}
 
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
+	deletedPodFullName := podinfo.GetPodFullName(deletedPod)
 	pairSet, ok := m.podToTopologyPairs[deletedPodFullName]
 	if !ok {
 		return
@@ -485,8 +488,8 @@ func (m *topologyPairsPodSpreadMap) clone() *topologyPairsPodSpreadMap {
 // RemovePod changes predicateMetadata assuming that the given `deletedPod` is
 // deleted from the system.
 func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
-	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
+	deletedPodFullName := podinfo.GetPodFullName(deletedPod)
+	if deletedPodFullName == podinfo.GetPodFullName(meta.pod) {
 		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
 	meta.topologyPairsAntiAffinityPodsMap.removePod(deletedPod)
@@ -502,7 +505,7 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 		len(meta.serviceAffinityMatchingPodList) > 0 &&
 		deletedPod.Namespace == meta.serviceAffinityMatchingPodList[0].Namespace {
 		for i, pod := range meta.serviceAffinityMatchingPodList {
-			if schedutil.GetPodFullName(pod) == deletedPodFullName {
+			if podinfo.GetPodFullName(pod) == deletedPodFullName {
 				meta.serviceAffinityMatchingPodList = append(
 					meta.serviceAffinityMatchingPodList[:i],
 					meta.serviceAffinityMatchingPodList[i+1:]...)
@@ -516,8 +519,8 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 // AddPod changes predicateMetadata assuming that `newPod` is added to the
 // system.
 func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) error {
-	addedPodFullName := schedutil.GetPodFullName(addedPod)
-	if addedPodFullName == schedutil.GetPodFullName(meta.pod) {
+	addedPodFullName := podinfo.GetPodFullName(addedPod)
+	if addedPodFullName == podinfo.GetPodFullName(meta.pod) {
 		return fmt.Errorf("addedPod and meta.pod must not be the same")
 	}
 	if nodeInfo.Node() == nil {
@@ -654,7 +657,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		allNodeNames = append(allNodeNames, name)
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
 	var lock sync.Mutex
 	topologyMaps := newTopologyPairsMaps()
 
@@ -706,7 +709,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		allNodeNames = append(allNodeNames, name)
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
 
 	var lock sync.Mutex
 	topologyPairsAffinityPodsMaps = newTopologyPairsMaps()

@@ -31,8 +31,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int32(-100), int32(0), int32(100), int32(1000), int32(10000)
@@ -157,8 +157,8 @@ type fakeFramework struct{}
 
 func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	return func(podInfo1, podInfo2 *framework.PodInfo) bool {
-		prio1 := util.GetPodPriority(podInfo1.Pod)
-		prio2 := util.GetPodPriority(podInfo2.Pod)
+		prio1 := podinfo.GetPodPriority(podInfo1.Pod)
+		prio2 := podinfo.GetPodPriority(podInfo2.Pod)
 		return prio1 < prio2
 	}
 }
@@ -677,35 +677,35 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: pods[0]},
-				util.GetPodFullName(pods[1]): {Pod: pods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: pods[0]},
+				podinfo.GetPodFullName(pods[1]): {Pod: pods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
 			expectedMapAfterUpdate: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: updatedPods[0]},
-				util.GetPodFullName(pods[1]): {Pod: pods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: updatedPods[0]},
+				podinfo.GetPodFullName(pods[1]): {Pod: pods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
 			expectedMapAfterDelete: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 		},
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: pods[0]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: pods[0]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
 			expectedMapAfterUpdate: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: pods[0]},
-				util.GetPodFullName(pods[3]): {Pod: updatedPods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: pods[0]},
+				podinfo.GetPodFullName(pods[3]): {Pod: updatedPods[3]},
 			},
 			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.PodInfo{},
@@ -714,17 +714,17 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
 			expectedMapAfterAdd: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[1]): {Pod: pods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[1]): {Pod: pods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
 			expectedMapAfterUpdate: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
+				podinfo.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
 			},
 		},
 	}
@@ -1055,8 +1055,8 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 
 	addOrUpdateUnschedulablePod(q, &highPod)
 	addOrUpdateUnschedulablePod(q, &midPod)
-	q.unschedulableQ.podInfoMap[util.GetPodFullName(&highPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
-	q.unschedulableQ.podInfoMap[util.GetPodFullName(&midPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
+	q.unschedulableQ.podInfoMap[podinfo.GetPodFullName(&highPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
+	q.unschedulableQ.podInfoMap[podinfo.GetPodFullName(&midPod)].Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
 
 	if p, err := q.Pop(); err != nil || p != &highPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)

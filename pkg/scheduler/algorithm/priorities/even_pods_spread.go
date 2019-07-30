@@ -18,17 +18,16 @@ package priorities
 
 import (
 	"context"
+	"k8s.io/kubernetes/pkg/scheduler/internal/channels"
 	"math"
 	"sync/atomic"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-
-	"k8s.io/klog"
 )
 
 type topologyPair struct {
@@ -98,7 +97,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 		allNodeNames = append(allNodeNames, name)
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
 	ctx, cancel := context.WithCancel(context.Background())
 	processAllNode := func(i int) {
 		nodeInfo := nodeNameToInfo[allNodeNames[i]]

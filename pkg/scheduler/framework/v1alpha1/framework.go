@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	channels "k8s.io/kubernetes/pkg/scheduler/internal/channels"
 )
 
 // framework is the component responsible for initializing and running scheduler
@@ -359,7 +359,7 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 		pluginToNodeScoreMap[pl.Name()] = make(NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
 			score, status := pl.Score(pc, pod, nodes[index].Name)
@@ -386,7 +386,7 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 // if any of the NormalizeScore functions returns a non-success status.
 func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status {
 	ctx, cancel := context.WithCancel(context.Background())
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(f.scoreWithNormalizePlugins), func(index int) {
 		pl := f.scoreWithNormalizePlugins[index]
 		nodeScoreList, ok := scores[pl.Name()]
@@ -416,7 +416,7 @@ func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, sco
 // RunNormalizeScorePlugins.
 func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status {
 	ctx, cancel := context.WithCancel(context.Background())
-	errCh := schedutil.NewErrorChannel()
+	errCh := channels.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		// Score plugins' weight has been checked when they are initialized.

@@ -39,8 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	heap "k8s.io/kubernetes/pkg/scheduler/internal/heap"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -106,7 +107,7 @@ func NominatedNodeName(pod *v1.Pod) string {
 // unschedulable queues and will be moved to active queue when backoff are completed.
 type PriorityQueue struct {
 	stop  <-chan struct{}
-	clock util.Clock
+	clock podinfo.Clock
 	// podBackoff tracks backoff for pods attempting to be rescheduled
 	podBackoff *PodBackoffMap
 
@@ -115,10 +116,10 @@ type PriorityQueue struct {
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
-	activeQ *util.Heap
+	activeQ *heap.Heap
 	// podBackoffQ is a heap ordered by backoff expiry. Pods which have completed backoff
 	// are popped from this heap before the scheduler looks at activeQ
-	podBackoffQ *util.Heap
+	podBackoffQ *heap.Heap
 	// unschedulableQ holds pods that have been tried and determined unschedulable.
 	unschedulableQ *UnschedulablePodsMap
 	// nominatedPods is a structures that stores pods which are nominated to run
@@ -154,18 +155,18 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 func activeQComp(podInfo1, podInfo2 interface{}) bool {
 	pInfo1 := podInfo1.(*framework.PodInfo)
 	pInfo2 := podInfo2.(*framework.PodInfo)
-	prio1 := util.GetPodPriority(pInfo1.Pod)
-	prio2 := util.GetPodPriority(pInfo2.Pod)
+	prio1 := podinfo.GetPodPriority(pInfo1.Pod)
+	prio2 := podinfo.GetPodPriority(pInfo2.Pod)
 	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
-	return NewPriorityQueueWithClock(stop, util.RealClock{}, fwk)
+	return NewPriorityQueueWithClock(stop, podinfo.RealClock{}, fwk)
 }
 
 // NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
-func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
+func NewPriorityQueueWithClock(stop <-chan struct{}, clock podinfo.Clock, fwk framework.Framework) *PriorityQueue {
 	comp := activeQComp
 	if fwk != nil {
 		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
@@ -182,13 +183,13 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk frame
 		clock:            clock,
 		stop:             stop,
 		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
-		activeQ:          util.NewHeapWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
+		activeQ:          heap.NewHeapWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),
 		moveRequestCycle: -1,
 	}
 	pq.cond.L = &pq.lock
-	pq.podBackoffQ = util.NewHeapWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
+	pq.podBackoffQ = heap.NewHeapWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
 
 	pq.run()
 
@@ -728,7 +729,7 @@ func (u *UnschedulablePodsMap) clear() {
 func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
 		podInfoMap:     make(map[string]*framework.PodInfo),
-		keyFunc:        util.GetPodFullName,
+		keyFunc:        podinfo.GetPodFullName,
 		metricRecorder: metricRecorder,
 	}
 }
