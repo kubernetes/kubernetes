@@ -55,7 +55,7 @@ type ExpirationPolicy interface {
 type TTLPolicy struct {
 	//	 >0: Expire entries with an age > ttl
 	//	<=0: Don't expire any entry
-	Ttl time.Duration
+	TTL time.Duration
 
 	// Clock used to calculate ttl expiration
 	Clock clock.Clock
@@ -64,7 +64,7 @@ type TTLPolicy struct {
 // IsExpired returns true if the given object is older than the ttl, or it can't
 // determine its age.
 func (p *TTLPolicy) IsExpired(obj *TimestampedEntry) bool {
-	return p.Ttl > 0 && p.Clock.Since(obj.Timestamp) > p.Ttl
+	return p.TTL > 0 && p.Clock.Since(obj.Timestamp) > p.TTL
 }
 
 // TimestampedEntry is the only type allowed in a ExpirationCache.

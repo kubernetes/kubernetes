@@ -501,7 +501,6 @@ staging/src/k8s.io/client-go/scale/scheme/autoscalingv1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/testing
-staging/src/k8s.io/client-go/tools/cache
 staging/src/k8s.io/client-go/tools/cache/testing
 staging/src/k8s.io/client-go/tools/clientcmd
 staging/src/k8s.io/client-go/tools/clientcmd/api
