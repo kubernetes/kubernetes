@@ -75,7 +75,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 

@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"

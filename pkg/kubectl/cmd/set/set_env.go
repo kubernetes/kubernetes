@@ -35,10 +35,10 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/templates"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/set/env"
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 )
 
 var (

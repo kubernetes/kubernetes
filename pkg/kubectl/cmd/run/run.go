@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/logs"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	uexec "k8s.io/utils/exec"
 )
 
