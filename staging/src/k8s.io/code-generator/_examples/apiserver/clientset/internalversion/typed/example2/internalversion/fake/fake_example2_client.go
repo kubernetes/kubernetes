@@ -28,8 +28,8 @@ type FakeSecondExample struct {
 	*testing.Fake
 }
 
-func (c *FakeSecondExample) TestTypes(namespace string) internalversion.TestTypeInterface {
-	return &FakeTestTypes{c, namespace}
+func (c *FakeSecondExample) TestTypes() internalversion.TestTypeInterface {
+	return &FakeTestTypes{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
