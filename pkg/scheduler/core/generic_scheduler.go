@@ -734,7 +734,10 @@ func PrioritizeNodes(
 			results[i] = make(schedulerapi.HostPriorityList, len(nodes))
 		}
 	}
-
+	
+	// Wait for results array initialization
+	wg.Wait()
+	
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		for i := range priorityConfigs {
