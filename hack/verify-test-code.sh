@@ -27,7 +27,7 @@ kube::util::read-array all_e2e_files < <(find test/e2e{,_node,_kubeadm} -name '*
 errors_expect_no_error=()
 for file in "${all_e2e_files[@]}"
 do
-    if grep "Expect(.*)\.NotTo(.*HaveOccurred()" "${file}" > /dev/null
+    if grep -E "Expect\(.*\)\.(NotTo|ToNot)\(.*HaveOccurred\(\)" "${file}" > /dev/null
     then
         errors_expect_no_error+=( "${file}" )
     fi
