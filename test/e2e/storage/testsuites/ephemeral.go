@@ -17,7 +17,9 @@ limitations under the License.
 package testsuites
 
 import (
+	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -116,6 +118,35 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 
 		l.testCase.TestEphemeral()
 	})
+
+	ginkgo.It("should support two pods which share the same data", func() {
+		init()
+		defer cleanup()
+
+		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+			// Create another pod with the same inline volume attributes.
+			pod2 := StartInPodWithInlineVolume(f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "true",
+				[]v1.CSIVolumeSource{*pod.Spec.Volumes[0].CSI},
+				l.testCase.Node)
+			defer StopPod(f.ClientSet, pod2)
+			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(f.ClientSet, pod2.Name, pod2.Namespace), "waiting for second pod with inline volume")
+			return nil
+		}
+
+		l.testCase.TestEphemeral()
+	})
+
+	var numInlineVolumes = flag.Int("storage.ephemeral."+strings.Replace(driver.GetDriverInfo().Name, ".", "-", -1)+".numInlineVolumes",
+		2, "number of ephemeral inline volumes per pod")
+
+	ginkgo.It("should support multiple inline ephemeral volumes", func() {
+		init()
+		defer cleanup()
+
+		l.testCase.NumInlineVolumes = *numInlineVolumes
+		gomega.Expect(*numInlineVolumes).To(gomega.BeNumerically(">", 0), "positive number of inline volumes")
+		l.testCase.TestEphemeral()
+	})
 }
 
 // EphemeralTest represents parameters to be used by tests for inline volumes.
@@ -145,6 +176,10 @@ type EphemeralTest struct {
 	// removed. How to do such a check is driver-specific and not
 	// covered by the generic storage test suite.
 	StoppedPodCheck func(nodeName string, runningPodData interface{})
+
+	// NumInlineVolumes sets the number of ephemeral inline volumes per pod.
+	// Unset (= zero) is the same as one.
+	NumInlineVolumes int
 }
 
 // TestEphemeral tests pod creation with one ephemeral volume.
@@ -156,12 +191,18 @@ func (t EphemeralTest) TestEphemeral() {
 
 	ginkgo.By(fmt.Sprintf("checking the requested inline volume exists in the pod running on node %+v", t.Node))
 	command := "mount | grep /mnt/test"
-	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command,
-		v1.CSIVolumeSource{
+	var csiVolumes []v1.CSIVolumeSource
+	numVolumes := t.NumInlineVolumes
+	if numVolumes == 0 {
+		numVolumes = 1
+	}
+	for i := 0; i < numVolumes; i++ {
+		csiVolumes = append(csiVolumes, v1.CSIVolumeSource{
 			Driver:           t.DriverName,
-			VolumeAttributes: t.GetVolumeAttributes(0),
-		},
-		t.Node)
+			VolumeAttributes: t.GetVolumeAttributes(i),
+		})
+	}
+	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, csiVolumes, t.Node)
 	defer func() {
 		// pod might be nil now.
 		StopPod(client, pod)
@@ -185,9 +226,9 @@ func (t EphemeralTest) TestEphemeral() {
 	}
 }
 
-// StartInPodWithInlineVolume starts a command in a pod with given volume mounted to /mnt/test directory.
+// StartInPodWithInlineVolume starts a command in a pod with given volume(s) mounted to /mnt/test-<number> directory.
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolume v1.CSIVolumeSource, node e2epod.NodeSelection) *v1.Pod {
+func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolumes []v1.CSIVolumeSource, node e2epod.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -208,24 +249,26 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 					Name:    "csi-volume-tester",
 					Image:   volume.GetTestImage(framework.BusyBoxImage),
 					Command: volume.GenerateScriptCmd(command),
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "my-volume",
-							MountPath: "/mnt/test",
-						},
-					},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name: "my-volume",
-					VolumeSource: v1.VolumeSource{
-						CSI: &csiVolume,
-					},
-				},
-			},
 		},
+	}
+
+	for i, csiVolume := range csiVolumes {
+		name := fmt.Sprintf("my-volume-%d", i)
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts,
+			v1.VolumeMount{
+				Name:      name,
+				MountPath: fmt.Sprintf("/mnt/test-%d", i),
+			})
+		pod.Spec.Volumes = append(pod.Spec.Volumes,
+			v1.Volume{
+				Name: name,
+				VolumeSource: v1.VolumeSource{
+					CSI: &csiVolume,
+				},
+			})
 	}
 
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
