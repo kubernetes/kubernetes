@@ -308,7 +308,7 @@ func VerifySchedulerLatency(c clientset.Interface, provider, cloudMasterName, ma
 func ResetSchedulerMetrics(c clientset.Interface, provider, cloudMasterName, masterHostname string) error {
 	responseText, err := sendRestRequestToScheduler(c, "DELETE", provider, cloudMasterName, masterHostname)
 	if err != nil {
-		return fmt.Errorf("Unexpected response: %q", responseText)
+		return fmt.Errorf("Unexpected response: %q, %v", responseText, err)
 	}
 	return nil
 }
