@@ -80,7 +80,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
-							Partition: utilpointer.Int32Ptr(0),
+							Partition:      utilpointer.Int32Ptr(0),
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -111,7 +111,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
-							Partition: utilpointer.Int32Ptr(0),
+							Partition:      utilpointer.Int32Ptr(0),
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
@@ -148,7 +148,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
-							Partition: utilpointer.Int32Ptr(0),
+							Partition:      utilpointer.Int32Ptr(0),
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),

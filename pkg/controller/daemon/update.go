@@ -316,7 +316,7 @@ func (dsc *DaemonSetsController) surgingRollingUpdate(ds *apps.DaemonSet, nodeLi
 
 		if newPod == nil && numSurge < maxSurge && wantToRun {
 			if !foundAvailable && len(pods) >= 2 {
-				klog.Warningf("Node %s already has %d unavailble pods, need clean first, skip surge new pod", node, len(pods))
+				klog.Warningf("Node %s already has %d unavailable pods, need clean first, skip surge new pod", node, len(pods))
 			} else {
 				klog.V(4).Infof("Surging new pod on node %s", node)
 				numSurge++

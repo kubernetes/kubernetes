@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "daemon_controller.go",
         "doc.go",
+        "sync.go",
         "update.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/daemon",
