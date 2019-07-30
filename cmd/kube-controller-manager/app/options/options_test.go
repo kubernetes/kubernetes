@@ -72,7 +72,7 @@ func TestAddFlags(t *testing.T) {
 		"--cluster-signing-cert-file=/cluster-signing-cert",
 		"--cluster-signing-key-file=/cluster-signing-key",
 		"--concurrent-deployment-syncs=10",
-		"--concurrent-statefulset-syncs=5",
+		"--concurrent-statefulset-syncs=15",
 		"--concurrent-endpoint-syncs=10",
 		"--concurrent-gc-syncs=30",
 		"--concurrent-namespace-syncs=20",
@@ -220,7 +220,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
 			&statefulsetconfig.StatefulSetControllerConfiguration{
-				ConcurrentStatefulSetSyncs: 5,
+				ConcurrentStatefulSetSyncs: 15,
 			},
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
