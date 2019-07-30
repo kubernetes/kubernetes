@@ -40,27 +40,30 @@ import (
 type Factory interface {
 	genericclioptions.RESTClientGetter
 
-	// DynamicClient returns a dynamic client ready for use
+	// DynamicClient returns a dynamic client ready for use.
 	DynamicClient() (dynamic.Interface, error)
 
-	// KubernetesClientSet gives you back an external clientset
+	// KubernetesClientSet gives you back an external clientset.
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
-	// Returns a RESTClient for accessing Kubernetes resources or an error.
+	// RESTClient returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
 
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
 
-	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
-	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
+	// ClientForMapping returns a RESTClient for working with the specified RESTMapping or an error.
+	// This is intended for working with arbitrary resources and is not guaranteed to point to a
+	// Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	// Returns a RESTClient for working with Unstructured objects.
+
+	// UnstructuredClientForMapping returns a RESTClient for working with Unstructured objects.
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
-	// Returns a schema that can validate objects stored on disk.
+	// Validator returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)
-	// OpenAPISchema returns the schema openapi schema definition
+
+	// OpenAPISchema returns the schema openapi schema definition.
 	OpenAPISchema() (openapi.Resources, error)
 }
