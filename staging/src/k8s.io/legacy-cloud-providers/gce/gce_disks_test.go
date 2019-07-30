@@ -109,6 +109,71 @@ func TestAttachDetach_Basic(t *testing.T) {
 	}
 }
 
+func TestVerifyDisksAttached_UnattachedDisk(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName := "test-node-1"
+	diskName := "disk-1"
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := gceServiceManager{
+		gce: gce,
+	}
+	gce.manager = &manager
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	_, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	if err != nil {
+		t.Errorf("failed to create instance %s in zone %s: %v", nodeName, vals.ZoneName, err)
+	}
+
+	results, err := gce.DisksAreAttached([]string{diskName}, types.NodeName(nodeName))
+	if err != nil {
+		t.Errorf("failed to verify disks are attached: %v", err)
+	}
+
+	// Check that disk that wasn't attached returns false
+	attached, ok := results[diskName]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for disk %s: %v", diskName, err)
+	}
+	if attached {
+		t.Errorf("disk %s expected to be detached, but got: %v", diskName, attached)
+	}
+}
+
+func TestVerifyDisksAttached_MissingInstance(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName := "test-node-1"
+	diskName := "disk-1"
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := gceServiceManager{
+		gce: gce,
+	}
+	gce.manager = &manager
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	results, err := gce.DisksAreAttached([]string{diskName}, types.NodeName(nodeName))
+	if err != nil {
+		t.Errorf("failed to verify disks are attached: %v", err)
+	}
+
+	// Check missing instance defaults disk to not attached
+	attached, ok := results[diskName]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for disk %s: %v", diskName, err)
+	}
+	if attached {
+		t.Errorf("disk %s expected to be detached, but got: %v", diskName, attached)
+	}
+}
+
 func TestCreateDisk_Basic(t *testing.T) {
 	/* Arrange */
 	gceProjectID := "test-project"
