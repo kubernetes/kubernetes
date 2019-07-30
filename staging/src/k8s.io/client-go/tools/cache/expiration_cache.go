@@ -74,6 +74,7 @@ func (p *TTLPolicy) IsExpired(obj *TimestampedEntry) bool {
 type TimestampedEntry struct {
 	Obj       interface{}
 	Timestamp time.Time
+	key       string
 }
 
 // getTimestampedEntry returns the TimestampedEntry stored under the given key.
@@ -129,10 +130,8 @@ func (c *ExpirationCache) List() []interface{} {
 
 	list := make([]interface{}, 0, len(items))
 	for _, item := range items {
-		obj := item.(*TimestampedEntry).Obj
-		if key, err := c.keyFunc(obj); err != nil {
-			list = append(list, obj)
-		} else if obj, exists := c.getOrExpire(key); exists {
+		key := item.(*TimestampedEntry).key
+		if obj, exists := c.getOrExpire(key); exists {
 			list = append(list, obj)
 		}
 	}
@@ -154,7 +153,7 @@ func (c *ExpirationCache) Add(obj interface{}) error {
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
 
-	c.cacheStorage.Add(key, &TimestampedEntry{obj, c.clock.Now()})
+	c.cacheStorage.Add(key, &TimestampedEntry{obj, c.clock.Now(), key})
 	return nil
 }
 
@@ -187,7 +186,7 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 		if err != nil {
 			return KeyError{item, err}
 		}
-		items[key] = &TimestampedEntry{item, ts}
+		items[key] = &TimestampedEntry{item, ts, key}
 	}
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
