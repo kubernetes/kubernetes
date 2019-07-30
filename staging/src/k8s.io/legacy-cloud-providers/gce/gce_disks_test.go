@@ -26,12 +26,88 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
 // TODO TODO write a test for GetDiskByNameUnknownZone and make sure casting logic works
 // TODO TODO verify that RegionDisks.Get does not return non-replica disks
+
+func createAndAttachDiskToNode(t *testing.T, gce *Cloud, diskName, nodeName, zoneName string) {
+	err := gce.CreateDisk(diskName, diskTypeDefault, zoneName, 8, nil)
+	if err != nil {
+		t.Errorf("failed to create disk %s: %v", diskName, err)
+	}
+	err = gce.AttachDisk(diskName, types.NodeName(nodeName), false, false)
+	if err != nil {
+		t.Errorf("failed to create attach disk %s to node %s: %v", diskName, nodeName, err)
+	}
+}
+
+func TestAttachDetach_Basic(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName := "test-node-1"
+	diskName1 := "disk-1"
+	diskName2 := "disk-2"
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := gceServiceManager{
+		gce: gce,
+	}
+	gce.manager = &manager
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	_, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	if err != nil {
+		t.Errorf("failed to create instance %s in zone %s: %v", nodeName, vals.ZoneName, err)
+	}
+	createAndAttachDiskToNode(t, gce, diskName1, nodeName, vals.ZoneName)
+	createAndAttachDiskToNode(t, gce, diskName2, nodeName, vals.ZoneName)
+
+	results, err := gce.DisksAreAttached([]string{diskName1, diskName2}, types.NodeName(nodeName))
+	if err != nil {
+		t.Errorf("failed to verify disks are attached: %v", err)
+	}
+
+	// Check that disk that was attached returns true
+	attached, ok := results[diskName1]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for disk %s: %v", diskName1, err)
+	}
+	if !attached {
+		t.Errorf("disk %s expected to be attached, but got: %v", diskName1, attached)
+	}
+	attached, ok = results[diskName2]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for disk %s: %v", diskName2, err)
+	}
+	if !attached {
+		t.Errorf("disk %s expected to be attached, but got: %v", diskName2, attached)
+	}
+
+	err = gce.DetachDisk(diskName2, types.NodeName(nodeName))
+	if err != nil {
+		t.Errorf("failed to detach disk %s from node %s: %v", diskName2, nodeName, err)
+	}
+
+	results, err = gce.DisksAreAttached([]string{diskName1, diskName2}, types.NodeName(nodeName))
+	if err != nil {
+		t.Errorf("failed to verify disks are attached: %v", err)
+	}
+
+	// Check that disk2 is now reflected as detached
+	attached, ok = results[diskName2]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for disk %s: %v", diskName2, err)
+	}
+	if attached {
+		t.Errorf("disk %s expected to be detached, but got: %v", diskName2, attached)
+	}
+}
 
 func TestCreateDisk_Basic(t *testing.T) {
 	/* Arrange */
