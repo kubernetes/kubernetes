@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "container_map.go",
         "cpu_assignment.go",
         "cpu_manager.go",
         "fake_cpu_manager.go",
@@ -30,6 +31,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "container_map_test.go",
         "cpu_assignment_test.go",
         "cpu_manager_test.go",
         "policy_none_test.go",
