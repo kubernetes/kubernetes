@@ -565,7 +565,9 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		cache.moveNodeInfoToHead(node.Name)
 	}
 
-	cache.nodeTree.RemoveNode(node)
+	if err := cache.nodeTree.RemoveNode(node); err != nil {
+		return err
+	}
 	cache.removeNodeImageStates(node)
 	return nil
 }
