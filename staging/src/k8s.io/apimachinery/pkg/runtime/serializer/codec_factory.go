@@ -108,8 +108,6 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 // CodecFactory provides methods for retrieving codecs and serializers for specific
 // versions and content types.
 type CodecFactory struct {
-	options CodecFactoryOptions
-
 	scheme      *runtime.Scheme
 	serializers []serializerType
 	universal   runtime.Decoder
@@ -120,9 +118,9 @@ type CodecFactory struct {
 
 // CodecFactoryOptions holds the options for configuring CodecFactory behavior
 type CodecFactoryOptions struct {
-	// Strict: configures all serializers in strict mode
+	// Strict configures all serializers in strict mode
 	Strict bool
-	// Pretty: includes a pretty serializer along with the non-pretty one
+	// Pretty includes a pretty serializer along with the non-pretty one
 	Pretty bool
 }
 
