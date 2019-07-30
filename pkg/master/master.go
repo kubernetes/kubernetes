@@ -44,6 +44,7 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingapiv1 "k8s.io/api/networking/v1"
@@ -94,6 +95,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	coordinationrest "k8s.io/kubernetes/pkg/registry/coordination/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
@@ -349,6 +351,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
 		coordinationrest.RESTStorageProvider{},
+		discoveryrest.StorageProvider{},
 		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
@@ -540,6 +543,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
+		discoveryv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,
