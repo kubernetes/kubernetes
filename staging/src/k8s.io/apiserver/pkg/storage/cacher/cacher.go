@@ -165,6 +165,7 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
 // This is NOT thread-safe.
 type watcherBookmarkTimeBuckets struct {
+	lock            sync.Mutex
 	watchersBuckets map[int64][]*cacheWatcher
 	startBucketID   int64
 	clock           clock.Clock
@@ -186,6 +187,8 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 		return false
 	}
 	bucketID := nextTime.Unix()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	if bucketID < t.startBucketID {
 		bucketID = t.startBucketID
 	}
@@ -198,6 +201,8 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchers() [][]*cacheWatcher {
 	currentBucketID := t.clock.Now().Unix()
 	// There should be one or two elements in almost all cases
 	expiredWatchers := make([][]*cacheWatcher, 0, 2)
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	for ; t.startBucketID <= currentBucketID; t.startBucketID++ {
 		if watchers, ok := t.watchersBuckets[t.startBucketID]; ok {
 			delete(t.watchersBuckets, t.startBucketID)
@@ -784,6 +789,8 @@ func (c *Cacher) dispatchEvents() {
 			// Never send a bookmark event if we did not see an event here, this is fine
 			// because we don't provide any guarantees on sending bookmarks.
 			if lastProcessedResourceVersion == 0 {
+				// pop expired watchers in case there has been no update
+				c.bookmarkWatchers.popExpiredWatchers()
 				continue
 			}
 			bookmarkEvent := &watchCacheEvent{

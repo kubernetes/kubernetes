@@ -587,6 +587,70 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	}
 }
 
+func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+
+	// run the collision test for 3 seconds to let ~2 buckets expire
+	stopCh := make(chan struct{})
+	time.AfterFunc(3*time.Second, func() { close(stopCh) })
+
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+				w, err := cacher.Watch(ctx, "pods/ns", "0", pred)
+				if err != nil {
+					t.Fatalf("Failed to create watch: %v", err)
+				}
+				w.Stop()
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				cacher.bookmarkWatchers.popExpiredWatchers()
+			}
+		}
+	}()
+
+	// wait for adding/removing watchers to end
+	wg.Wait()
+
+	// wait out the expiration period and pop expired watchers
+	time.Sleep(2 * time.Second)
+	cacher.bookmarkWatchers.popExpiredWatchers()
+	cacher.bookmarkWatchers.lock.Lock()
+	defer cacher.bookmarkWatchers.lock.Unlock()
+	if len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
+		t.Errorf("unexpected bookmark watchers %v", len(cacher.bookmarkWatchers.watchersBuckets))
+	}
+}
+
 func testCacherSendBookmarkEvents(t *testing.T, watchCacheEnabled, allowWatchBookmarks, expectedBookmarks bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, watchCacheEnabled)()
 	backingStorage := &dummyStorage{}
