@@ -174,6 +174,163 @@ func TestVerifyDisksAttached_MissingInstance(t *testing.T) {
 	}
 }
 
+func TestBulkVerifyDisksAttached_Basic(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName1 := "test-node-1"
+	nodeName2 := "test-node-2"
+	diskName1 := "disk-1"
+	diskName2 := "disk-2"
+	diskName3 := "disk-3"
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := gceServiceManager{
+		gce: gce,
+	}
+	gce.manager = &manager
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	_, err = createAndInsertNodes(gce, []string{nodeName1}, vals.ZoneName)
+	if err != nil {
+		t.Errorf("failed to create instance %s in zone %s: %v", nodeName1, vals.ZoneName, err)
+	}
+	_, err = createAndInsertNodes(gce, []string{nodeName2}, vals.ZoneName)
+	if err != nil {
+		t.Errorf("failed to create instance %s in zone %s: %v", nodeName1, vals.ZoneName, err)
+	}
+	createAndAttachDiskToNode(t, gce, diskName1, nodeName1, vals.ZoneName)
+	createAndAttachDiskToNode(t, gce, diskName2, nodeName1, vals.ZoneName)
+	createAndAttachDiskToNode(t, gce, diskName3, nodeName2, vals.ZoneName)
+
+	nodeToDisksToVerify := map[types.NodeName][]string{
+		types.NodeName(nodeName1): {diskName1, diskName2},
+		types.NodeName(nodeName2): {diskName3},
+	}
+
+	results, err := gce.BulkDisksAreAttached(nodeToDisksToVerify)
+	if err != nil {
+		t.Errorf("failed to bulk verify disks are attached: %v", err)
+	}
+	resultsForNode1, ok := results[types.NodeName(nodeName1)]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for node %s: %v", nodeName1, err)
+	}
+	resultsForNode2, ok := results[types.NodeName(nodeName2)]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for node %s: %v", nodeName2, err)
+	}
+
+	// Check that disk that was attached returns true
+	attached, ok := resultsForNode1[diskName1]
+	if !ok {
+		t.Errorf("bulk disks are attached failed to return result for disk %s, node %s : %v", diskName1, nodeName1, err)
+	}
+	if !attached {
+		t.Errorf("disk %s on node %s expected to be attached, but got: %v", diskName1, nodeName1, attached)
+	}
+	attached, ok = resultsForNode1[diskName2]
+	if !ok {
+		t.Errorf("bulk disks are attached failed to return result for disk %s, node %s : %v", diskName2, nodeName1, err)
+	}
+	if !attached {
+		t.Errorf("disk %s on node %s expected to be attached, but got: %v", diskName2, nodeName1, attached)
+	}
+	attached, ok = resultsForNode2[diskName3]
+	if !ok {
+		t.Errorf("bulk disks are attached failed to return result for disk %s, node %s : %v", diskName3, nodeName2, err)
+	}
+	if !attached {
+		t.Errorf("disk %s on node %s expected to be attached, but got: %v", diskName3, nodeName2, attached)
+	}
+}
+
+func TestBulkVerifyDisksAttached_UnattachedDisk(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName := "test-node-1"
+	diskName := "disk-1"
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := gceServiceManager{
+		gce: gce,
+	}
+	gce.manager = &manager
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	_, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	if err != nil {
+		t.Errorf("failed to create instance %s in zone %s: %v", nodeName, vals.ZoneName, err)
+	}
+
+	nodeToDisksToVerify := map[types.NodeName][]string{
+		types.NodeName(nodeName): {diskName},
+	}
+
+	results, err := gce.BulkDisksAreAttached(nodeToDisksToVerify)
+	if err != nil {
+		t.Errorf("failed to bulk verify disks are attached: %v", err)
+	}
+	resultsForNode, ok := results[types.NodeName(nodeName)]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for node %s: %v", nodeName, err)
+	}
+
+	// Check that disk that wasn't attached returns false
+	attached, ok := resultsForNode[diskName]
+	if !ok {
+		t.Errorf("bulk disks are attached failed to return result for disk %s, node %s : %v", diskName, nodeName, err)
+	}
+	if attached {
+		t.Errorf("disk %s on node %s expected to be detached, but got: %v", diskName, nodeName, attached)
+	}
+}
+
+func TestBulkVerifyDisksAttached_MissingInstance(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName := "test-node-1"
+	diskName := "disk-1"
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := gceServiceManager{
+		gce: gce,
+	}
+	gce.manager = &manager
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	_, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	if err != nil {
+		t.Errorf("failed to create instance %s in zone %s: %v", nodeName, vals.ZoneName, err)
+	}
+	nodeToDisksToVerify := map[types.NodeName][]string{
+		types.NodeName(nodeName): {diskName},
+	}
+
+	results, err := gce.BulkDisksAreAttached(nodeToDisksToVerify)
+	if err != nil {
+		t.Errorf("failed to bulk verify disks are attached: %v", err)
+	}
+	resultsForNode, ok := results[types.NodeName(nodeName)]
+	if !ok {
+		t.Errorf("disks are attached failed to return result for node %s: %v", nodeName, err)
+	}
+
+	// Check that disks for node that couldn't be found returns false
+	attached, ok := resultsForNode[diskName]
+	if !ok {
+		t.Errorf("bulk disks are attached failed to return result for disk %s, node %s : %v", diskName, nodeName, err)
+	}
+	if attached {
+		t.Errorf("disk %s on not found instance %s should default to false, but got %v", diskName, nodeName, attached)
+	}
+}
+
 func TestCreateDisk_Basic(t *testing.T) {
 	/* Arrange */
 	gceProjectID := "test-project"
