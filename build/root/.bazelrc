@@ -7,6 +7,7 @@ build --host_force_python=PY2
 
 # https://github.com/kubernetes/kubernetes/issues/80763
 build --incompatible_depset_is_not_iterable=false
+build --incompatible_new_actions_api=false
 
 # Show us information about failures.
 build --verbose_failures
