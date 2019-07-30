@@ -10,7 +10,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/top",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/metricsutil:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -18,6 +17,7 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/metricsutil:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:go_default_library",
