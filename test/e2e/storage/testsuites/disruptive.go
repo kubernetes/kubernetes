@@ -18,7 +18,7 @@ package testsuites
 
 import (
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -120,14 +120,11 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			runTestFile:  utils.TestKubeletRestartsAndRestoresMount,
 			runTestBlock: utils.TestKubeletRestartsAndRestoresMap,
 		},
-		// TODO (#79980): This test fails until #79980 is fixed.
-		/*
-			{
-				testItStmt:   "Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.",
-				runTestFile:  utils.TestVolumeUnmountsFromDeletedPod,
-				runTestBlock: utils.TestVolumeUnmapsFromDeletedPod,
-			},
-		*/
+		{
+			testItStmt:   "Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.",
+			runTestFile:  utils.TestVolumeUnmountsFromDeletedPod,
+			runTestBlock: utils.TestVolumeUnmapsFromDeletedPod,
+		},
 		{
 			testItStmt:   "Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.",
 			runTestFile:  utils.TestVolumeUnmountsFromForceDeletedPod,

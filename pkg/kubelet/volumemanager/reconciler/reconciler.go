@@ -26,7 +26,7 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -495,6 +495,8 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 
 	var volumeMapper volumepkg.BlockVolumeMapper
 	var volumeMounter volumepkg.Mounter
+	// Path to the mount or block device to check
+	var checkPath string
 
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && volume.volumeMode == v1.PersistentVolumeBlock {
@@ -513,6 +515,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 					pod.UID,
 					newMapperErr)
 			}
+			checkPath, _ = volumeMapper.GetPodDeviceMapPath()
 		}
 	} else {
 		var err error
@@ -529,10 +532,11 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 				pod.UID,
 				err)
 		}
+		checkPath = volumeMounter.GetPath()
 	}
 
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.volumePath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, checkPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
 	if checkErr != nil {
 		return nil, checkErr
 	}
