@@ -108,7 +108,7 @@ func TestLog(t *testing.T) {
 			},
 		},
 		{
-			name: "fail to follow logs from multiple requests when there are more logs sources then MaxFollowConcurency allows",
+			name: "fail to follow logs from multiple requests when there are more logs sources then MaxFollowConcurrency allows",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
@@ -124,11 +124,11 @@ func TestLog(t *testing.T) {
 				o := NewLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
-				o.MaxFollowConcurency = 2
+				o.MaxFollowConcurrency = 2
 				o.Follow = true
 				return o
 			},
-			expectedErr: "you are attempting to follow 3 log streams, but maximum allowed concurency is 2, use --max-log-requests to increase the limit",
+			expectedErr: "you are attempting to follow 3 log streams, but maximum allowed concurrency is 2, use --max-log-requests to increase the limit",
 		},
 		{
 			name: "fail if LogsForObject fails",

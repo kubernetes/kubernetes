@@ -107,7 +107,7 @@ type LogsOptions struct {
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
 	Selector               string
-	MaxFollowConcurency    int
+	MaxFollowConcurrency   int
 
 	Object           runtime.Object
 	GetPodTimeout    time.Duration
@@ -121,10 +121,10 @@ type LogsOptions struct {
 
 func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
 	return &LogsOptions{
-		IOStreams:           streams,
-		AllContainers:       allContainers,
-		Tail:                -1,
-		MaxFollowConcurency: 5,
+		IOStreams:            streams,
+		AllContainers:        allContainers,
+		Tail:                 -1,
+		MaxFollowConcurrency: 5,
 	}
 }
 
@@ -162,7 +162,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Print the logs of this container")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
-	cmd.Flags().IntVar(&o.MaxFollowConcurency, "max-log-requests", o.MaxFollowConcurency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
+	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	return cmd
 }
 
@@ -308,10 +308,10 @@ func (o LogsOptions) RunLogs() error {
 	}
 
 	if o.Follow && len(requests) > 1 {
-		if len(requests) > o.MaxFollowConcurency {
+		if len(requests) > o.MaxFollowConcurrency {
 			return fmt.Errorf(
-				"you are attempting to follow %d log streams, but maximum allowed concurency is %d, use --max-log-requests to increase the limit",
-				len(requests), o.MaxFollowConcurency,
+				"you are attempting to follow %d log streams, but maximum allowed concurrency is %d, use --max-log-requests to increase the limit",
+				len(requests), o.MaxFollowConcurrency,
 			)
 		}
 
