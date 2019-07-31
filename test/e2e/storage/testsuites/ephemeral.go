@@ -32,6 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type ephemeralTestSuite struct {
@@ -99,8 +100,8 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 			Namespace:  f.Namespace.Name,
 			DriverName: eDriver.GetCSIDriverName(l.config),
 			Node:       e2epod.NodeSelection{Name: l.config.ClientNodeName},
-			GetVolumeAttributes: func(volumeNumber int) map[string]string {
-				return eDriver.GetVolumeAttributes(l.config, volumeNumber)
+			GetVolume: func(volumeNumber int) (map[string]string, bool, bool) {
+				return eDriver.GetVolume(l.config, volumeNumber)
 			},
 		}
 	}
@@ -112,24 +113,58 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 		}
 	}
 
-	ginkgo.It("should create inline ephemeral volume", func() {
+	ginkgo.It("should create read-only inline ephemeral volume", func() {
 		init()
 		defer cleanup()
 
+		l.testCase.ReadOnly = true
+		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+			storageutils.VerifyExecInPodSucceed(pod, "mount | grep /mnt/test | grep ro,")
+			return nil
+		}
 		l.testCase.TestEphemeral()
 	})
 
-	ginkgo.It("should support two pods which share the same data", func() {
+	ginkgo.It("should create read/write inline ephemeral volume", func() {
 		init()
 		defer cleanup()
 
+		l.testCase.ReadOnly = false
+		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+			storageutils.VerifyExecInPodSucceed(pod, "mount | grep /mnt/test | grep rw,")
+			return nil
+		}
+		l.testCase.TestEphemeral()
+	})
+
+	ginkgo.It("should support two pods which share the same volume", func() {
+		init()
+		defer cleanup()
+
+		// We test in read-only mode if that is all that the driver supports,
+		// otherwise read/write.
+		_, shared, readOnly := eDriver.GetVolume(l.config, 0)
+
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
 			// Create another pod with the same inline volume attributes.
-			pod2 := StartInPodWithInlineVolume(f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "true",
+			pod2 := StartInPodWithInlineVolume(f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "sleep 100000",
 				[]v1.CSIVolumeSource{*pod.Spec.Volumes[0].CSI},
+				readOnly,
 				l.testCase.Node)
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod2.Name, pod2.Namespace), "waiting for second pod with inline volume")
+
+			// If (and only if) we were able to mount
+			// read/write and volume data is not shared
+			// between pods, then we can check whether
+			// data written in one pod is really not
+			// visible in the other.
+			if !readOnly && !shared {
+				ginkgo.By("writing data in one pod and checking for it in the second")
+				storageutils.VerifyExecInPodSucceed(pod, "touch /mnt/test-0/hello-world")
+				storageutils.VerifyExecInPodSucceed(pod2, "[ ! -f /mnt/test-0/hello-world ]")
+			}
+
 			defer StopPod(f.ClientSet, pod2)
-			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(f.ClientSet, pod2.Name, pod2.Namespace), "waiting for second pod with inline volume")
 			return nil
 		}
 
@@ -157,12 +192,18 @@ type EphemeralTest struct {
 	DriverName string
 	Node       e2epod.NodeSelection
 
-	// GetVolumeAttributes returns the volume attributes for a
+	// GetVolume returns the volume attributes for a
 	// certain inline ephemeral volume, enumerated starting with
 	// #0. Some tests might require more than one volume. They can
 	// all be the same or different, depending what the driver supports
 	// and/or wants to test.
-	GetVolumeAttributes func(volumeNumber int) map[string]string
+	//
+	// For each volume, the test driver can specify the
+	// attributes, whether two pods using those attributes will
+	// end up sharing the same backend storage (i.e. changes made
+	// in one pod will be visible in the other), and whether
+	// the volume can be mounted read/write or only read-only.
+	GetVolume func(volumeNumber int) (attributes map[string]string, shared bool, readOnly bool)
 
 	// RunningPodCheck is invoked while a pod using an inline volume is running.
 	// It can execute additional checks on the pod and its volume(s). Any data
@@ -180,34 +221,42 @@ type EphemeralTest struct {
 	// NumInlineVolumes sets the number of ephemeral inline volumes per pod.
 	// Unset (= zero) is the same as one.
 	NumInlineVolumes int
+
+	// ReadOnly limits mounting to read-only.
+	ReadOnly bool
 }
 
 // TestEphemeral tests pod creation with one ephemeral volume.
 func (t EphemeralTest) TestEphemeral() {
 	client := t.Client
 	gomega.Expect(client).NotTo(gomega.BeNil(), "EphemeralTest.Client is required")
-	gomega.Expect(t.GetVolumeAttributes).NotTo(gomega.BeNil(), "EphemeralTest.GetVolumeAttributes is required")
+	gomega.Expect(t.GetVolume).NotTo(gomega.BeNil(), "EphemeralTest.GetVolume is required")
 	gomega.Expect(t.DriverName).NotTo(gomega.BeEmpty(), "EphemeralTest.DriverName is required")
 
 	ginkgo.By(fmt.Sprintf("checking the requested inline volume exists in the pod running on node %+v", t.Node))
-	command := "mount | grep /mnt/test"
+	command := "mount | grep /mnt/test && sleep 10000"
 	var csiVolumes []v1.CSIVolumeSource
 	numVolumes := t.NumInlineVolumes
 	if numVolumes == 0 {
 		numVolumes = 1
 	}
 	for i := 0; i < numVolumes; i++ {
-		csiVolumes = append(csiVolumes, v1.CSIVolumeSource{
+		attributes, _, readOnly := t.GetVolume(i)
+		csi := v1.CSIVolumeSource{
 			Driver:           t.DriverName,
-			VolumeAttributes: t.GetVolumeAttributes(i),
-		})
+			VolumeAttributes: attributes,
+		}
+		if readOnly && !t.ReadOnly {
+			framework.Skipf("inline ephemeral volume #%d is read-only, but the test needs a read/write volume", i)
+		}
+		csiVolumes = append(csiVolumes, csi)
 	}
-	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, csiVolumes, t.Node)
+	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, csiVolumes, t.ReadOnly, t.Node)
 	defer func() {
 		// pod might be nil now.
 		StopPod(client, pod)
 	}()
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace), "waiting for pod with inline volume")
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(client, pod.Name, pod.Namespace), "waiting for pod with inline volume")
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
@@ -228,7 +277,7 @@ func (t EphemeralTest) TestEphemeral() {
 
 // StartInPodWithInlineVolume starts a command in a pod with given volume(s) mounted to /mnt/test-<number> directory.
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolumes []v1.CSIVolumeSource, node e2epod.NodeSelection) *v1.Pod {
+func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolumes []v1.CSIVolumeSource, readOnly bool, node e2epod.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -261,6 +310,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			v1.VolumeMount{
 				Name:      name,
 				MountPath: fmt.Sprintf("/mnt/test-%d", i),
+				ReadOnly:  readOnly,
 			})
 		pod.Spec.Volumes = append(pod.Spec.Volumes,
 			v1.Volume{

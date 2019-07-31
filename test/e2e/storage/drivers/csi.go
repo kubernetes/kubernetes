@@ -137,8 +137,8 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.P
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (h *hostpathCSIDriver) GetVolumeAttributes(config *testsuites.PerTestConfig, volumeNumber int) map[string]string {
-	return h.volumeAttributes[volumeNumber%len(h.volumeAttributes)]
+func (h *hostpathCSIDriver) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+	return h.volumeAttributes[volumeNumber%len(h.volumeAttributes)], false /* not shared */, false /* read-write */
 }
 
 func (h *hostpathCSIDriver) GetCSIDriverName(config *testsuites.PerTestConfig) string {

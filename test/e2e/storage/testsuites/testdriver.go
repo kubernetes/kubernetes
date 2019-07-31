@@ -105,12 +105,17 @@ type DynamicPVTestDriver interface {
 type EphemeralTestDriver interface {
 	TestDriver
 
-	// GetVolumeAttributes returns the volume attributes for a
-	// certain inline ephemeral volume, enumerated starting with
-	// #0. Some tests might require more than one volume. They can
-	// all be the same or different, depending what the driver supports
+	// GetVolume returns the volume attributes for a certain
+	// inline ephemeral volume, enumerated starting with #0. Some
+	// tests might require more than one volume. They can all be
+	// the same or different, depending what the driver supports
 	// and/or wants to test.
-	GetVolumeAttributes(config *PerTestConfig, volumeNumber int) map[string]string
+	//
+	// For each volume, the test driver can return volume attributes,
+	// whether the resulting volume is shared between different pods (i.e.
+	// changes made in one pod are visible in another), and whether the
+	// volume can be mounted read/write or only read-only.
+	GetVolume(config *PerTestConfig, volumeNumber int) (attributes map[string]string, shared bool, readOnly bool)
 
 	// GetCSIDriverName returns the name that was used when registering with
 	// kubelet. Depending on how the driver was deployed, this can be different
