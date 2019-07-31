@@ -104,6 +104,12 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 }
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
+// PR https://github.com/kubernetes/kubernetes/pull/80660 added support for cloud providers to return an error
+// ImplementedElsewhere. This error is used to indicate that the loadbalancer implementation is handled outside of
+// cloud provider, maybe in a different controller.
+// In order to use this correctly, the cloud-provider implementation needs to return "NotFound"
+// for GetLoadBalancer and empty string for GetLoadBalancerName. EnsureLoadBalancer and UpdateLoadBalancer need to
+// return ImplementedElsewhere error. EnsureLoadBalancerDeleted can return ImplementedElsewhere as well.
 type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
