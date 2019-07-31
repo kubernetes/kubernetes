@@ -647,7 +647,12 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	cacher.bookmarkWatchers.lock.Lock()
 	defer cacher.bookmarkWatchers.lock.Unlock()
 	if len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
-		t.Errorf("unexpected bookmark watchers %v", len(cacher.bookmarkWatchers.watchersBuckets))
+		numWatchers := 0
+		for bucketID, v := range cacher.bookmarkWatchers.watchersBuckets {
+			numWatchers += len(v)
+			t.Errorf("there are %v watchers at bucket Id %v with start Id %v", len(v), bucketID, cacher.bookmarkWatchers.startBucketID)
+		}
+		t.Errorf("unexpected bookmark watchers %v", numWatchers)
 	}
 }
 
