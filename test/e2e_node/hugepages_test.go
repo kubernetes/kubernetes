@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -178,12 +179,57 @@ func runHugePagesTests(f *framework.Framework) {
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 	})
+
+	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func() {
+		ginkgo.By("Stopping kubelet")
+		startKubelet := stopKubelet()
+		ginkgo.By(`Patching away support for hugepage resource "hugepages-2Mi"`)
+		patch := []byte(`[{"op": "remove", "path": "/status/capacity/hugepages-2Mi"}, {"op": "remove", "path": "/status/allocatable/hugepages-2Mi"}]`)
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+		framework.ExpectNoError(result.Error(), "while patching")
+
+		ginkgo.By("Starting kubelet again")
+		startKubelet()
+
+		ginkgo.By("verifying that the hugepages-2Mi resource is present")
+		gomega.Eventually(func() bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "while getting node status")
+			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
+			return isPresent
+		}, 30*time.Second, framework.Poll).Should(gomega.Equal(true))
+	})
 }
 
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 
+	ginkgo.It("should remove resources for huge page sizes no longer supported", func() {
+		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
+		patch := []byte(`[{"op": "add", "path": "/status/capacity/hugepages-3Mi", "value": "9Mi"}, {"op": "add", "path": "/status/allocatable/hugepages-3Mi", "value": "9Mi"}]`)
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+		framework.ExpectNoError(result.Error(), "while patching")
+
+		node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "while getting node status")
+
+		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
+		value, ok := node.Status.Capacity["hugepages-3Mi"]
+		framework.ExpectEqual(ok, true, "capacity should contain resouce hugepages-3Mi")
+		framework.ExpectEqual(value.String(), "9Mi", "huge pages with size 3Mi should be supported")
+
+		ginkgo.By("restarting the node and verifying that huge pages with size 3Mi are not supported")
+		restartKubelet()
+
+		ginkgo.By("verifying that the hugepages-3Mi resource no longer is present")
+		gomega.Eventually(func() bool {
+			node, err = f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "while getting node status")
+			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
+			return isPresent
+		}, 30*time.Second, framework.Poll).Should(gomega.Equal(false))
+	})
 	ginkgo.Context("With config updated with hugepages feature enabled", func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("verifying hugepages are supported")
