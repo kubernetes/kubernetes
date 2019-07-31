@@ -163,7 +163,6 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 // As we don't need a high precision here, we keep all watchers timeout within a
 // second in a bucket, and pop up them once at the timeout. To be more specific,
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
-// This is NOT thread-safe.
 type watcherBookmarkTimeBuckets struct {
 	lock            sync.Mutex
 	watchersBuckets map[int64][]*cacheWatcher
