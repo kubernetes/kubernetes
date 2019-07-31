@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 			}
 			pod = f.PodClient().CreateSync(pod)
 			ginkgo.By("get container log path")
-			gomega.Expect(len(pod.Status.ContainerStatuses)).To(gomega.Equal(1))
+			framework.ExpectEqual(len(pod.Status.ContainerStatuses), 1)
 			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
 			framework.ExpectNoError(err)

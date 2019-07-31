@@ -199,10 +199,10 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 
 func expectSoftRejection(status v1.PodStatus) {
 	args := []interface{}{"PodStatus: %+v", status}
-	gomega.Expect(status.Phase).To(gomega.Equal(v1.PodPending), args...)
-	gomega.Expect(status.Reason).To(gomega.Equal("AppArmor"), args...)
+	framework.ExpectEqual(status.Phase, v1.PodPending, args...)
+	framework.ExpectEqual(status.Reason, "AppArmor", args...)
 	gomega.Expect(status.Message).To(gomega.ContainSubstring("AppArmor"), args...)
-	gomega.Expect(status.ContainerStatuses[0].State.Waiting.Reason).To(gomega.Equal("Blocked"), args...)
+	framework.ExpectEqual(status.ContainerStatuses[0].State.Waiting.Reason, "Blocked", args...)
 }
 
 func isAppArmorEnabled() bool {
