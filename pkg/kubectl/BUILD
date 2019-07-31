@@ -81,7 +81,6 @@ filegroup(
         ":package-srcs",
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/explain:all-srcs",
-        "//pkg/kubectl/proxy:all-srcs",
     ],
     tags = ["automanaged"],
 )
