@@ -36,3 +36,12 @@ spec:
     podFixed:
       ǸƢ6/: "569"
   runtimeHandler: "24"
+  scheduling:
+    nodeSelector:
+      "25": "26"
+    tolerations:
+    - effect: H牗洝尿彀亞螩B
+      key: "27"
+      operator: ĉy緅縕>Ž燹憍峕?狱³-Ǐ
+      tolerationSeconds: -90233536926144532
+      value: "28"
