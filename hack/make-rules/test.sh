@@ -149,7 +149,7 @@ eval "testargs=(${KUBE_TEST_ARGS:-})"
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
-# The go-junit-report tool needs full test case information to produce a
+# The junit report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   goflags+=(-v)
@@ -241,19 +241,19 @@ produceJUnitXMLReport() {
     return
   fi
 
-  local test_stdout_filenames
   local junit_xml_filename
-  test_stdout_filenames=$(ls "${junit_filename_prefix}"*.stdout)
   junit_xml_filename="${junit_filename_prefix}.xml"
-  if ! command -v go-junit-report >/dev/null 2>&1; then
-    kube::log::error "go-junit-report not found; please install with " \
-      "go get -u github.com/jstemmer/go-junit-report"
+
+  if ! command -v gotestsum >/dev/null 2>&1; then
+    kube::log::error "gotestsum not found; please install with " \
+      "go get -u gotest.tools/gotestsum"
     return
   fi
-  go-junit-report < "${test_stdout_filenames}" > "${junit_xml_filename}"
+  gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-    rm "${test_stdout_filenames}"
+    rm "${junit_filename_prefix}"*.stdout
   fi
+
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
@@ -267,7 +267,7 @@ runTests() {
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
-    go test "${goflags[@]:+${goflags[@]}}" \
+    go test -json "${goflags[@]:+${goflags[@]}}" \
      "${KUBE_TIMEOUT}" "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
@@ -307,7 +307,7 @@ runTests() {
     | grep -Ev ${cover_ignore_dirs} \
     | xargs -I{} -n 1 -P "${KUBE_COVERPROCS}" \
     bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
-      go test ${goflags[*]:+${goflags[*]}} \
+      go test -json ${goflags[*]:+${goflags[*]}} \
         ${KUBE_TIMEOUT} \
         -cover -covermode=\"${KUBE_COVERMODE}\" \
         -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
