@@ -143,7 +143,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		}
 
 		klog.V(3).Infof("Orphaned pod %q found, removing", uid)
-		if err := removeall.RemoveAllOneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
+		if err := removeall.OneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
 			klog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
 			orphanRemovalErrors = append(orphanRemovalErrors, err)
 		}

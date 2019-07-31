@@ -43,7 +43,7 @@ func (f *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func TestRemoveAllOneFilesystem(t *testing.T) {
+func TestOneFilesystem(t *testing.T) {
 	tests := []struct {
 		name string
 		// Items of the test directory. Directories end with "/".
@@ -129,7 +129,7 @@ func TestRemoveAllOneFilesystem(t *testing.T) {
 		}
 
 		mounter := &fakeMounter{}
-		err = RemoveAllOneFilesystem(mounter, tmpDir)
+		err = OneFilesystem(mounter, tmpDir)
 		if err == nil && test.expectError {
 			t.Errorf("test %q failed: expected error and got none", test.name)
 		}
