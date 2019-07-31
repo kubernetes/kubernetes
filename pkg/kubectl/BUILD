@@ -31,7 +31,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/cmd:all-srcs",
-        "//pkg/kubectl/explain:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
