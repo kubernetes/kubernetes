@@ -125,25 +125,15 @@ var _ = SIGDescribe("Services", func() {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, serviceName)
-		labels := map[string]string{
-			"foo": "bar",
-			"baz": "blah",
-		}
 
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
 		defer func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
-		ports := []v1.ServicePort{{
-			Port:       80,
-			TargetPort: intstr.FromInt(80),
-		}}
-		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
+		_ = jig.CreateTCPServiceWithPort(ns, nil, 80)
 
-		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
-
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		err := e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		names := map[string]bool{}
@@ -157,12 +147,12 @@ var _ = SIGDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		e2epod.CreatePodOrFail(cs, ns, name1, labels, []v1.ContainerPort{{ContainerPort: 80}})
+		e2epod.CreatePodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		e2epod.CreatePodOrFail(cs, ns, name2, labels, []v1.ContainerPort{{ContainerPort: 80}})
+		e2epod.CreatePodOrFail(cs, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}, name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -194,29 +184,28 @@ var _ = SIGDescribe("Services", func() {
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 
-		labels := map[string]string{"foo": "bar"}
-
 		svc1port := "svc1"
 		svc2port := "svc2"
 
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
-		ports := []v1.ServicePort{
-			{
-				Name:       "portname1",
-				Port:       80,
-				TargetPort: intstr.FromString(svc1port),
-			},
-			{
-				Name:       "portname2",
-				Port:       81,
-				TargetPort: intstr.FromString(svc2port),
-			},
-		}
-		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
-		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
+		_ = jig.CreateTCPServiceOrFail(ns, func(service *v1.Service) {
+			service.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+				{
+					Name:       "portname2",
+					Port:       81,
+					TargetPort: intstr.FromString(svc2port),
+				},
+			}
+		})
+
 		port1 := 100
 		port2 := 101
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		err := e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		names := map[string]bool{}
@@ -243,12 +232,12 @@ var _ = SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		e2epod.CreatePodOrFail(cs, ns, podname1, labels, containerPorts1)
+		e2epod.CreatePodOrFail(cs, ns, podname1, jig.Labels, containerPorts1)
 		names[podname1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		e2epod.CreatePodOrFail(cs, ns, podname2, labels, containerPorts2)
+		e2epod.CreatePodOrFail(cs, ns, podname2, jig.Labels, containerPorts2)
 		names[podname2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}, podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -1960,20 +1949,10 @@ var _ = SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, serviceName)
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
-		labels := map[string]string{
-			"nopods": "nopods",
-		}
 		port := 80
-		ports := []v1.ServicePort{{
-			Port:       int32(port),
-			TargetPort: intstr.FromInt(80),
-		}}
 
 		ginkgo.By("creating a service with no endpoints")
-		_, err = jig.CreateServiceWithServicePort(labels, namespace, ports)
-		if err != nil {
-			framework.Failf("ginkgo.Failed to create service: %v", err)
-		}
+		_ = jig.CreateTCPServiceWithPort(namespace, nil, int32(port))
 
 		nodeName := nodes.Items[0].Name
 		podName := "execpod-noendpoints"

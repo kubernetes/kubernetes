@@ -164,20 +164,6 @@ func (j *TestJig) CreateExternalNameServiceOrFail(namespace string, tweak func(s
 	return result
 }
 
-// CreateServiceWithServicePort creates a new Service with ServicePort.
-func (j *TestJig) CreateServiceWithServicePort(labels map[string]string, namespace string, ports []v1.ServicePort) (*v1.Service, error) {
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: j.Name,
-		},
-		Spec: v1.ServiceSpec{
-			Selector: labels,
-			Ports:    ports,
-		},
-	}
-	return j.Client.CoreV1().Services(namespace).Create(service)
-}
-
 // ChangeServiceType updates the given service's ServiceType to the given newType.
 func (j *TestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
 	ingressIP := ""
