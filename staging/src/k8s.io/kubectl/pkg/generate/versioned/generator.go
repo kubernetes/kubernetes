@@ -29,7 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-	"k8s.io/kubernetes/pkg/kubectl/generate"
+	"k8s.io/kubectl/pkg/generate"
 )
 
 // GeneratorFn gives a way to easily override the function for unit testing if needed

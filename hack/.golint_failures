@@ -138,8 +138,6 @@ pkg/kubectl/cmd/taint
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/wait
-pkg/kubectl/generate
-pkg/kubectl/generate/versioned
 pkg/kubelet
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
@@ -534,6 +532,8 @@ staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubectl/pkg/cmd/util
 staging/src/k8s.io/kubectl/pkg/describe/versioned
+staging/src/k8s.io/kubectl/pkg/generate
+staging/src/k8s.io/kubectl/pkg/generate/versioned
 staging/src/k8s.io/kubectl/pkg/metricsutil
 staging/src/k8s.io/kubectl/pkg/polymorphichelpers
 staging/src/k8s.io/kubectl/pkg/util/templates
