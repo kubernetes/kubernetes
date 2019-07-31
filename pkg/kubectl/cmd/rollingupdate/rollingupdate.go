@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 var (
@@ -255,11 +254,11 @@ func (o *RollingUpdateOptions) Run() error {
 			return err
 		}
 		// We're in the middle of a rename, look for an RC with a source annotation of oldName
-		newRc, err := kubectl.FindSourceController(coreClient, o.Namespace, o.OldName)
+		newRc, err := FindSourceController(coreClient, o.Namespace, o.OldName)
 		if err != nil {
 			return err
 		}
-		return kubectl.Rename(coreClient, newRc, o.OldName)
+		return Rename(coreClient, newRc, o.OldName)
 	}
 
 	var replicasDefaulted bool
@@ -311,7 +310,7 @@ func (o *RollingUpdateOptions) Run() error {
 	if len(o.Image) != 0 {
 		codec := scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
 		newName := o.FindNewName(oldRc)
-		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
+		if newRc, err = LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err
 		}
 		if newRc != nil {
@@ -320,7 +319,7 @@ func (o *RollingUpdateOptions) Run() error {
 			}
 			fmt.Fprintf(o.Out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
-			config := &kubectl.NewControllerConfig{
+			config := &NewControllerConfig{
 				Namespace:     o.Namespace,
 				OldName:       o.OldName,
 				NewName:       newName,
@@ -334,7 +333,7 @@ func (o *RollingUpdateOptions) Run() error {
 				}
 				config.PullPolicy = corev1.PullPolicy(o.PullPolicy)
 			}
-			newRc, err = kubectl.CreateNewControllerFromCurrentController(coreClient, codec, config)
+			newRc, err = CreateNewControllerFromCurrentController(coreClient, codec, config)
 			if err != nil {
 				return err
 			}
@@ -347,7 +346,7 @@ func (o *RollingUpdateOptions) Run() error {
 		}
 		// If new image is same as old, the hash may not be distinct, so add a suffix.
 		oldHash += "-orig"
-		oldRc, err = kubectl.UpdateExistingReplicationController(coreClient, coreClient, oldRc, o.Namespace, newRc.Name, o.DeploymentKey, oldHash, o.Out)
+		oldRc, err = UpdateExistingReplicationController(coreClient, coreClient, oldRc, o.Namespace, newRc.Name, o.DeploymentKey, oldHash, o.Out)
 		if err != nil {
 			return err
 		}
@@ -355,7 +354,7 @@ func (o *RollingUpdateOptions) Run() error {
 
 	if o.Rollback {
 		newName := o.FindNewName(oldRc)
-		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
+		if newRc, err = LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err
 		}
 
@@ -369,7 +368,7 @@ func (o *RollingUpdateOptions) Run() error {
 			filename, o.OldName)
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, coreClient, coreClient, o.ScaleClient)
+	updater := NewRollingUpdater(newRc.Namespace, coreClient, coreClient, o.ScaleClient)
 
 	// To successfully pull off a rolling update the new and old rc have to differ
 	// by at least one selector. Every new pod should have the selector and every
@@ -412,11 +411,11 @@ func (o *RollingUpdateOptions) Run() error {
 		fmt.Fprintf(o.Out, "Rolling from:\n%s\nTo:\n%s\n", string(oldRcData.Bytes()), string(newRcData.Bytes()))
 		return nil
 	}
-	updateCleanupPolicy := kubectl.DeleteRollingUpdateCleanupPolicy
+	updateCleanupPolicy := DeleteRollingUpdateCleanupPolicy
 	if o.KeepOldName {
-		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
+		updateCleanupPolicy = RenameRollingUpdateCleanupPolicy
 	}
-	config := &kubectl.RollingUpdaterConfig{
+	config := &RollingUpdaterConfig{
 		Out:            o.Out,
 		OldRc:          oldRc,
 		NewRc:          newRc,
@@ -428,7 +427,7 @@ func (o *RollingUpdateOptions) Run() error {
 		MaxSurge:       intstr.FromInt(1),
 	}
 	if o.Rollback {
-		err = kubectl.AbortRollingUpdate(config)
+		err = AbortRollingUpdate(config)
 		if err != nil {
 			return err
 		}
@@ -462,7 +461,7 @@ func findNewName(args []string, oldRc *corev1.ReplicationController) string {
 		return args[1]
 	}
 	if oldRc != nil {
-		newName, _ := kubectl.GetNextControllerAnnotation(oldRc)
+		newName, _ := GetNextControllerAnnotation(oldRc)
 		return newName
 	}
 	return ""
