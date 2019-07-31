@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -200,7 +200,7 @@ type Routes interface {
 
 var (
 	DiskNotFound         = errors.New("disk is not found")
-	ImplementedElsewhere = errors.New("Implemented by a different controller")
+	ImplementedElsewhere = errors.New("implemented by a different controller")
 	InstanceNotFound     = errors.New("instance not found")
 	NotImplemented       = errors.New("unimplemented")
 )
