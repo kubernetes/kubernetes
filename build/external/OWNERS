@@ -1,13 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - yastij
-  - dims
   - sig-release-approvers
   - release-engineering-approvers
 reviewers:
-  - neolit123
-  - justaugustus
   - release-engineering-reviewers
 
 labels:

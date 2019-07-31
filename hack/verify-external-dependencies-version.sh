@@ -21,8 +21,10 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+DEPENDENCIES="build/external/dependencies.yaml"
+
 kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
 
-go run cmd/verifydependencies/verifydependencies.go "${KUBE_ROOT}"/build/dependencies.yaml
+go run cmd/verifydependencies/verifydependencies.go "${KUBE_ROOT}/${DEPENDENCIES}"
