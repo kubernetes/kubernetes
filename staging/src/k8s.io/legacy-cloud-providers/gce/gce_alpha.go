@@ -26,7 +26,9 @@ const (
 	//
 	// alpha: v1.8 (for Services)
 	AlphaFeatureNetworkTiers = "NetworkTiers"
-	AlphaFeatureILBSubsets   = "ILBSubsets"
+	// AlphaFeatureILBSubsets allows InternalLoadBalancer services to include a subset
+	// of cluster nodes as backends instead of all nodes.
+	AlphaFeatureILBSubsets = "ILBSubsets"
 )
 
 // AlphaFeatureGate contains a mapping of alpha features to whether they are enabled

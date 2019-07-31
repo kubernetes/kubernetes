@@ -311,6 +311,11 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
+				if err == cloudprovider.ImplementedElsewhere {
+					klog.V(3).Infof("LoadBalancer for service %s implemented by a different controller %s," +
+						"Ignoring error upon deletion", key, s.cloud.ProviderName())
+					return op, nil
+				}
 				return op, fmt.Errorf("failed to delete load balancer: %v", err)
 			}
 		}
@@ -340,7 +345,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		newStatus, err = s.ensureLoadBalancer(service)
 		if err != nil {
 			if err == cloudprovider.ImplementedElsewhere {
-				klog.Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error",
+				klog.V(3).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error",
 					key, s.cloud.ProviderName())
 				return op, nil
 			}

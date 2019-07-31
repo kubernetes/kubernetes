@@ -37,8 +37,8 @@ const (
 )
 
 func (g *Cloud) usesSubsets() bool {
-       return g.AlphaFeatureGate != nil && g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets)
- }
+	return g.AlphaFeatureGate != nil && g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets)
+}
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	if g.usesSubsets() {
