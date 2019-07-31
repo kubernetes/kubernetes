@@ -729,9 +729,17 @@ func testWebhook(f *framework.Framework) {
 	pod = hangingPod(f)
 	_, err = client.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectError(err, "create pod %s in namespace %s should have caused webhook to hang", pod.Name, f.Namespace.Name)
-	expectedTimeoutErr := "request did not complete within"
-	if !strings.Contains(err.Error(), expectedTimeoutErr) {
-		e2elog.Failf("expect timeout error %q, got %q", expectedTimeoutErr, err.Error())
+	// ensure the error is webhook-related, not client-side
+	if !strings.Contains(err.Error(), "webhook") {
+		e2elog.Failf("expect error %q, got %q", "webhook", err.Error())
+	}
+	// ensure the error is a timeout
+	if !strings.Contains(err.Error(), "deadline") {
+		e2elog.Failf("expect error %q, got %q", "deadline", err.Error())
+	}
+	// ensure the pod was not actually created
+	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !errors.IsNotFound(err) {
+		e2elog.Failf("expect notfound error looking for rejected pod, got %v", err)
 	}
 
 	ginkgo.By("create a configmap that should be denied by the webhook")
