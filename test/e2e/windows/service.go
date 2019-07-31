@@ -42,12 +42,12 @@ var _ = SIGDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		nodeIP, err := e2enode.PickIP(jig.Client)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		svc, err := jig.CreateTCPService(ns, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
 		framework.ExpectNoError(err)
@@ -55,7 +55,7 @@ var _ = SIGDescribe("Services", func() {
 		nodePort := int(svc.Spec.Ports[0].NodePort)
 
 		ginkgo.By("creating Pod to be part of service " + serviceName)
-		_, err = jig.Run(ns, nil)
+		_, err = jig.Run(nil)
 		framework.ExpectNoError(err)
 
 		//using hybrid_network methods

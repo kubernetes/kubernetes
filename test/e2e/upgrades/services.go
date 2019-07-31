@@ -43,16 +43,16 @@ func shouldTestPDBs() bool { return framework.ProviderIs("gce", "gke") }
 // Setup creates a service with a load balancer and makes sure it's reachable.
 func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	serviceName := "service-test"
-	jig := e2eservice.NewTestJig(f.ClientSet, serviceName)
+	jig := e2eservice.NewTestJig(f.ClientSet, f.Namespace.Name, serviceName)
 
 	ns := f.Namespace
 
 	ginkgo.By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + ns.Name)
-	tcpService, err := jig.CreateTCPService(ns.Name, func(s *v1.Service) {
+	tcpService, err := jig.CreateTCPService(func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
 	framework.ExpectNoError(err)
-	tcpService, err = jig.WaitForLoadBalancer(ns.Name, tcpService.Name, e2eservice.LoadBalancerCreateTimeoutDefault)
+	tcpService, err = jig.WaitForLoadBalancer(e2eservice.LoadBalancerCreateTimeoutDefault)
 	framework.ExpectNoError(err)
 
 	// Get info to hit it with
@@ -60,12 +60,12 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
-	rc, err := jig.Run(ns.Name, jig.AddRCAntiAffinity)
+	rc, err := jig.Run(jig.AddRCAntiAffinity)
 	framework.ExpectNoError(err)
 
 	if shouldTestPDBs() {
 		ginkgo.By("creating a PodDisruptionBudget to cover the ReplicationController")
-		_, err = jig.CreatePDB(ns.Name, rc)
+		_, err = jig.CreatePDB(rc)
 		framework.ExpectNoError(err)
 	}
 

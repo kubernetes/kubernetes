@@ -899,9 +899,9 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	framework.ExpectNoError(err)
 
 	framework.Logf("Creating a service %s with type=LoadBalancer and externalTrafficPolicy=Local in namespace %s", name, ns)
-	jig := e2eservice.NewTestJig(c, name)
+	jig := e2eservice.NewTestJig(c, ns, name)
 	jig.Labels = podLabels
-	service, err := jig.CreateLoadBalancerService(ns, name, e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
+	service, err := jig.CreateLoadBalancerService(e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	})
 	framework.ExpectNoError(err)
@@ -922,14 +922,14 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	defer close(done)
 	go func() {
 		defer ginkgo.GinkgoRecover()
-		expectedNodes, err := jig.GetEndpointNodeNames(service)
+		expectedNodes, err := jig.GetEndpointNodeNames()
 		framework.ExpectNoError(err)
 		// The affinity policy should ensure that before an old pod is
 		// deleted, a new pod will have been created on the same node.
 		// Thus the set of nodes with local endpoints for the service
 		// should remain unchanged.
 		wait.Until(func() {
-			actualNodes, err := jig.GetEndpointNodeNames(service)
+			actualNodes, err := jig.GetEndpointNodeNames()
 			framework.ExpectNoError(err)
 			if !actualNodes.Equal(expectedNodes) {
 				framework.Logf("The set of nodes with local endpoints changed; started with %v, now have %v", expectedNodes.List(), actualNodes.List())
