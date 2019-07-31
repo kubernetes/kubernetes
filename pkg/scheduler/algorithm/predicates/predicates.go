@@ -422,9 +422,9 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil || pvc == nil {
-				// if the PVC is not found, log the error and count the PV towards the PV limit
-				klog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err)
-				filteredVolumes[pvID] = true
+				// If the PVC is invalid, we don't count the volume because
+				// there's no guarantee that it belongs to the running predicate.
+				klog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC doesn't match predicate when counting limits: %v", namespace, pvcName, err)
 				continue
 			}
 
