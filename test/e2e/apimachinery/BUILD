@@ -32,7 +32,7 @@ go_library(
         "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/quota/v1/evaluator/core:go_default_library",
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/authorization/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
