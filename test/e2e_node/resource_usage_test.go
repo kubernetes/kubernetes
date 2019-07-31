@@ -31,7 +31,7 @@ import (
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
@@ -47,7 +47,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("resource-usage")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
 		// The test collects resource usage from a standalone Cadvisor pod.
 		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
@@ -57,7 +57,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		result := om.GetLatestRuntimeOperationErrorRate()
 		e2elog.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
 	})
@@ -65,7 +65,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 	// This test measures and verifies the steady resource usage of node is within limit
 	// It collects data from a standalone Cadvisor with housekeeping interval 1s.
 	// It verifies CPU percentiles and the lastest memory usage.
-	Context("regular resource usage tracking", func() {
+	ginkgo.Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
 				podsNr: 10,
@@ -83,7 +83,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
@@ -94,7 +94,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		}
 	})
 
-	Context("regular resource usage tracking", func() {
+	ginkgo.Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
 				podsNr: 0,
@@ -113,7 +113,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
@@ -152,7 +152,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
-	By("Creating a batch of Pods")
+	ginkgo.By("Creating a batch of Pods")
 	f.PodClient().CreateBatch(pods)
 
 	// wait for a while to let the node be steady
@@ -162,7 +162,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	rc.LogLatest()
 	rc.Reset()
 
-	By("Start monitoring resource usage")
+	ginkgo.By("Start monitoring resource usage")
 	// Periodically dump the cpu summary until the deadline is met.
 	// Note that without calling framework.ResourceMonitor.Reset(), the stats
 	// would occupy increasingly more memory. This should be fine
@@ -180,7 +180,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		logPods(f.ClientSet)
 	}
 
-	By("Reporting overall resource usage")
+	ginkgo.By("Reporting overall resource usage")
 	logPods(f.ClientSet)
 }
 

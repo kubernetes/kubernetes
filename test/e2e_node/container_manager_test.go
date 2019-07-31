@@ -35,8 +35,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -76,32 +76,32 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 
 var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
-	Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
-		Context("once the node is setup", func() {
-			It("container runtime's oom-score-adj should be -999", func() {
+	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
+		ginkgo.Context("once the node is setup", func() {
+			ginkgo.It("container runtime's oom-score-adj should be -999", func() {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-				Expect(err).To(BeNil(), "failed to get list of container runtime pids")
+				gomega.Expect(err).To(gomega.BeNil(), "failed to get list of container runtime pids")
 				for _, pid := range runtimePids {
-					Eventually(func() error {
+					gomega.Eventually(func() error {
 						return validateOOMScoreAdjSetting(pid, -999)
-					}, 5*time.Minute, 30*time.Second).Should(BeNil())
+					}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
 				}
 			})
-			It("Kubelet's oom-score-adj should be -999", func() {
+			ginkgo.It("Kubelet's oom-score-adj should be -999", func() {
 				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
-				Expect(err).To(BeNil(), "failed to get list of kubelet pids")
-				Expect(len(kubeletPids)).To(Equal(1), "expected only one kubelet process; found %d", len(kubeletPids))
-				Eventually(func() error {
+				gomega.Expect(err).To(gomega.BeNil(), "failed to get list of kubelet pids")
+				gomega.Expect(len(kubeletPids)).To(gomega.Equal(1), "expected only one kubelet process; found %d", len(kubeletPids))
+				gomega.Eventually(func() error {
 					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
-				}, 5*time.Minute, 30*time.Second).Should(BeNil())
+				}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
 			})
-			Context("", func() {
-				It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
+			ginkgo.Context("", func() {
+				ginkgo.It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
 					// Take a snapshot of existing pause processes. These were
 					// created before this test, and may not be infra
 					// containers. They should be excluded from the test.
 					existingPausePIDs, err := getPidsForProcess("pause", "")
-					Expect(err).To(BeNil(), "failed to list all pause processes on the node")
+					gomega.Expect(err).To(gomega.BeNil(), "failed to list all pause processes on the node")
 					existingPausePIDSet := sets.NewInt(existingPausePIDs...)
 
 					podClient := f.PodClient()
@@ -120,8 +120,8 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 						},
 					})
 					var pausePids []int
-					By("checking infra container's oom-score-adj")
-					Eventually(func() error {
+					ginkgo.By("checking infra container's oom-score-adj")
+					gomega.Eventually(func() error {
 						pausePids, err = getPidsForProcess("pause", "")
 						if err != nil {
 							return fmt.Errorf("failed to get list of pause pids: %v", err)
@@ -136,10 +136,10 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							}
 						}
 						return nil
-					}, 2*time.Minute, time.Second*4).Should(BeNil())
+					}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 					var shPids []int
-					By("checking besteffort container's oom-score-adj")
-					Eventually(func() error {
+					ginkgo.By("checking besteffort container's oom-score-adj")
+					gomega.Eventually(func() error {
 						shPids, err = getPidsForProcess("serve_hostname", "")
 						if err != nil {
 							return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
@@ -148,12 +148,12 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							return fmt.Errorf("expected only one serve_hostname process; found %d", len(shPids))
 						}
 						return validateOOMScoreAdjSetting(shPids[0], 1000)
-					}, 2*time.Minute, time.Second*4).Should(BeNil())
+					}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 				})
 				// Log the running containers here to help debugging.
-				AfterEach(func() {
-					if CurrentGinkgoTestDescription().Failed {
-						By("Dump all running containers")
+				ginkgo.AfterEach(func() {
+					if ginkgo.CurrentGinkgoTestDescription().Failed {
+						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						framework.ExpectNoError(err)
 						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
@@ -169,7 +169,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					}
 				})
 			})
-			It("guaranteed container's oom-score-adj should be -998", func() {
+			ginkgo.It("guaranteed container's oom-score-adj should be -998", func() {
 				podClient := f.PodClient()
 				podName := "guaranteed" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
@@ -195,7 +195,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					ngPids []int
 					err    error
 				)
-				Eventually(func() error {
+				gomega.Eventually(func() error {
 					ngPids, err = getPidsForProcess("nginx", "")
 					if err != nil {
 						return fmt.Errorf("failed to get list of nginx process pids: %v", err)
@@ -207,10 +207,10 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					}
 
 					return nil
-				}, 2*time.Minute, time.Second*4).Should(BeNil())
+				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			})
-			It("burstable container's oom-score-adj should be between [2, 1000)", func() {
+			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func() {
 				podClient := f.PodClient()
 				podName := "burstable" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
@@ -236,7 +236,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					wsPids []int
 					err    error
 				)
-				Eventually(func() error {
+				gomega.Eventually(func() error {
 					wsPids, err = getPidsForProcess("test-webserver", "")
 					if err != nil {
 						return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
@@ -247,7 +247,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 						}
 					}
 					return nil
-				}, 2*time.Minute, time.Second*4).Should(BeNil())
+				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 				// TODO: Test the oom-score-adj logic for burstable more accurately.
 			})

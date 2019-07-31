@@ -32,8 +32,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // makePodToVerifyPids returns a pod that verifies specified cgroup with pids
@@ -96,17 +96,17 @@ func enablePodPidsLimitInKubelet(f *framework.Framework) *kubeletconfig.KubeletC
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 
 	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
 }
 
 func runPodPidsLimitTests(f *framework.Framework) {
-	It("should set pids.max for Pod", func() {
-		By("by creating a G pod")
+	ginkgo.It("should set pids.max for Pod", func() {
+		ginkgo.By("by creating a G pod")
 		pod := f.PodClient().Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
@@ -128,7 +128,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 			},
 		})
 		podUID := string(pod.UID)
-		By("checking if the expected pids settings were applied")
+		ginkgo.By("checking if the expected pids settings were applied")
 		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("1024"))
 		f.PodClient().Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
@@ -139,7 +139,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("PodPidsLimit [Serial] [Feature:SupportPodPidsLimit][NodeFeature:SupportPodPidsLimit]", func() {
 	f := framework.NewDefaultFramework("pids-limit-test")
-	Context("With config updated with pids feature enabled", func() {
+	ginkgo.Context("With config updated with pids feature enabled", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
