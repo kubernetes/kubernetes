@@ -92,7 +92,7 @@ var _ = KubeadmDescribe("DNS addon", func() {
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, kubeDNSDeploymentName)
 
-				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(kubeDNSServiceAccountName))
+				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, kubeDNSServiceAccountName)
 			})
 		})
 	})
@@ -137,7 +137,7 @@ var _ = KubeadmDescribe("DNS addon", func() {
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, coreDNSDeploymentName)
 
-				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(coreDNSServiceAccountName))
+				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, coreDNSServiceAccountName)
 			})
 		})
 	})
