@@ -109,7 +109,7 @@ __kubectl_override_flags()
     done
     for var in "${__kubectl_override_flag_list[@]##*-}"; do
         if eval "test -n \"\$${var}\""; then
-            eval "echo \${${var}}"
+            eval "echo -n \${${var}}' '"
         fi
     done
 }
