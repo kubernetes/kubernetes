@@ -78,7 +78,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -135,7 +135,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
 		resourceQuota.Spec.Hard[v1.ResourceSecrets] = resource.MustParse(hardSecrets)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -176,7 +176,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -282,7 +282,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -325,7 +325,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -364,7 +364,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -403,7 +403,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -445,7 +445,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -499,7 +499,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		// in order to make sure the resourcequota controller knows this resource, we create one test
 		// resourcequota object, and triggering updates on it until the status is updated.
 		quotaName := "quota-for-" + testcrd.Crd.Spec.Names.Plural
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, &v1.ResourceQuota{
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, &v1.ResourceQuota{
 			ObjectMeta: metav1.ObjectMeta{Name: quotaName},
 			Spec: v1.ResourceQuotaSpec{
 				Hard: v1.ResourceList{
@@ -507,6 +507,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 				},
 			},
 		})
+		framework.ExpectNoError(err)
 		err = updateResourceQuotaUntilUsageAppears(f.ClientSet, f.Namespace.Name, quotaName, v1.ResourceName(countResourceName))
 		framework.ExpectNoError(err)
 		err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Delete(quotaName, nil)
@@ -518,9 +519,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName = "test-quota"
-		resourceQuota = newTestResourceQuota(quotaName)
+		resourceQuota := newTestResourceQuota(quotaName)
 		resourceQuota.Spec.Hard[v1.ResourceName(countResourceName)] = resource.MustParse("1")
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
