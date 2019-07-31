@@ -1,40 +1,54 @@
 apiVersion: v1
 ephemeralContainers:
 - args:
-  - "27"
+  - "21"
   command:
-  - "26"
+  - "20"
   env:
-  - name: "34"
-    value: "35"
+  - name: "28"
+    value: "29"
     valueFrom:
       configMapKeyRef:
-        key: "41"
-        name: "40"
+        key: "35"
+        name: "34"
         optional: false
       fieldRef:
-        apiVersion: "36"
-        fieldPath: "37"
+        apiVersion: "30"
+        fieldPath: "31"
       resourceFieldRef:
-        containerName: "38"
-        divisor: "590"
-        resource: "39"
+        containerName: "32"
+        divisor: "12"
+        resource: "33"
       secretKeyRef:
-        key: "43"
-        name: "42"
+        key: "37"
+        name: "36"
         optional: false
   envFrom:
   - configMapRef:
-      name: "32"
-      optional: true
-    prefix: "31"
+      name: "26"
+      optional: false
+    prefix: "25"
     secretRef:
-      name: "33"
-      optional: true
-  image: "25"
-  imagePullPolicy: 4懙鏮嵒ƫS捕ɷD¡轫n(鲼ƳÐƣKʘ
+      name: "27"
+      optional: false
+  image: "19"
+  imagePullPolicy: /
   lifecycle:
     postStart:
+      exec:
+        command:
+        - "58"
+      httpGet:
+        host: "60"
+        httpHeaders:
+        - name: "61"
+          value: "62"
+        path: "59"
+        port: 1114837452
+      tcpSocket:
+        host: "63"
+        port: 672648281
+    preStop:
       exec:
         command:
         - "64"
@@ -45,115 +59,97 @@ ephemeralContainers:
           value: "69"
         path: "65"
         port: "66"
-        scheme: 譋娲瘹ɭȊɚɎ(
+        scheme: 魋Ď儇击3ƆìQ喞艋涽
       tcpSocket:
         host: "71"
         port: "70"
-    preStop:
-      exec:
-        command:
-        - "72"
-      httpGet:
-        host: "74"
-        httpHeaders:
-        - name: "75"
-          value: "76"
-        path: "73"
-        port: 75785535
-        scheme: 圬剴扲ȿQZ{ʁgɸ=ǤÆ碛,1ZƜ/
-      tcpSocket:
-        host: "78"
-        port: "77"
   livenessProbe:
     exec:
       command:
-      - "50"
-    failureThreshold: -1623705764
+      - "44"
+    failureThreshold: -54954325
     httpGet:
-      host: "52"
+      host: "47"
       httpHeaders:
-      - name: "53"
-        value: "54"
-      path: "51"
-      port: 1747809671
-      scheme: 潁谯耨V6&]鴍Ɋ恧ȭ%ƎÜ掸8½£.
-    initialDelaySeconds: 1167335696
-    periodSeconds: 153426386
-    successThreshold: 1006284894
+      - name: "48"
+        value: "49"
+      path: "45"
+      port: "46"
+      scheme: 亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h
+    initialDelaySeconds: 1392988974
+    periodSeconds: -1771047449
+    successThreshold: -1280107919
     tcpSocket:
-      host: "56"
-      port: "55"
-    timeoutSeconds: -532496585
-  name: "24"
+      host: "50"
+      port: 1366345526
+    timeoutSeconds: 1563658126
+  name: "18"
   ports:
-  - containerPort: -439697596
-    hostIP: "30"
-    hostPort: -1821918122
-    name: "29"
-    protocol: /ʕVŚ(ĿȊ甞谐颋ǅSǡ
+  - containerPort: -1300313567
+    hostIP: "24"
+    hostPort: 1305381319
+    name: "23"
   readinessProbe:
     exec:
       command:
-      - "57"
-    failureThreshold: 1380868499
+      - "51"
+    failureThreshold: -833209928
     httpGet:
-      host: "60"
+      host: "54"
       httpHeaders:
-      - name: "61"
-        value: "62"
-      path: "58"
-      port: "59"
-      scheme: 9Ȏ瀮
-    initialDelaySeconds: 1721139423
-    periodSeconds: -1077199580
-    successThreshold: 1633185252
+      - name: "55"
+        value: "56"
+      path: "52"
+      port: "53"
+      scheme: OŖ樅尷
+    initialDelaySeconds: 819364842
+    periodSeconds: -983896210
+    successThreshold: 552512122
     tcpSocket:
-      host: "63"
-      port: -1081142510
-    timeoutSeconds: 252483228
+      host: "57"
+      port: 2136826132
+    timeoutSeconds: 933484239
   resources:
     limits:
-      亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h: "494"
+      V夸eɑeʤ: "420"
     requests:
-      ņɖ橙9ȫŚʒUɦOŖ樅尷: "239"
+      Ƣ6/ʕVŚ(ĿȊ甞: "776"
   securityContext:
     allowPrivilegeEscalation: true
     capabilities:
       add:
-      - :5塋訩塶"=y钡n)İ笓
+      - -议}ȧ外ĺ稥氹Ç|¶
       drop:
-      - 筩ƐP_
-    privileged: false
-    procMount: 舁吉蓨O澘銈e棈_Ĭ
-    readOnlyRootFilesystem: false
-    runAsGroup: 2270010876567964647
-    runAsNonRoot: false
-    runAsUser: -2890225091301830311
+      - ¡ Ɠ(嘒ėf倐ȓ圬剴扲ȿQZ
+    privileged: true
+    procMount: 1ZƜ/C龷
+    readOnlyRootFilesystem: true
+    runAsGroup: -3031446704001093654
+    runAsNonRoot: true
+    runAsUser: -2195720433245498980
     seLinuxOptions:
-      level: "83"
-      role: "81"
-      type: "82"
-      user: "80"
+      level: "76"
+      role: "74"
+      type: "75"
+      user: "73"
     windowsOptions:
-      gmsaCredentialSpec: "85"
-      gmsaCredentialSpecName: "84"
-      runAsUserName: "86"
+      gmsaCredentialSpec: "78"
+      gmsaCredentialSpecName: "77"
+      runAsUserName: "79"
   stdinOnce: true
-  targetContainerName: "87"
-  terminationMessagePath: "79"
-  terminationMessagePolicy: ȪÆ
-  tty: true
+  targetContainerName: "80"
+  terminationMessagePath: "72"
+  terminationMessagePolicy: w-檮Ǣ冖ž琔n宂¬轚9Ȏ瀮
   volumeDevices:
-  - devicePath: "49"
-    name: "48"
+  - devicePath: "43"
+    name: "42"
   volumeMounts:
-  - mountPath: "45"
-    mountPropagation: ĴC浔Ű壝ž
-    name: "44"
-    readOnly: true
-    subPath: "46"
-    subPathExpr: "47"
-  workingDir: "28"
+  - mountPath: "39"
+    mountPropagation: 憍峕?狱³-Ǐ忄*
+    name: "38"
+    subPath: "40"
+    subPathExpr: "41"
+  workingDir: "22"
 kind: EphemeralContainers
 metadata:
   annotations:
@@ -169,9 +165,6 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -183,6 +176,6 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"

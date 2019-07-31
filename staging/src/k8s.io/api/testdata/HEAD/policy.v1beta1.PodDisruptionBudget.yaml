@@ -14,9 +14,6 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -28,23 +25,23 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 spec:
   selector:
     matchExpressions:
-    - key: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-B
+    - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
       operator: In
       values:
-      - Trcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ2
+      - D07.a_.y_y_o0_5qN2_---_M.N_._a6.9bHjdH.-.5_.I8__n
     matchLabels:
-      9n7yd745q0------2-2413-4lu-8-6r4404d5---g8c2-k9/Nx.G: 0M.y.g
+      8---jop9641lg.p-g8c2-k-912e5-c-e63-n-3n/E9.8ThjT9s-j41-0-6p-JFHn7y-74.-0MUORQQ.N2.3: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-_Bq.m_4
 status:
-  currentHealthy: -1628457490
-  desiredHealthy: 1184528004
+  currentHealthy: -2037845840
+  desiredHealthy: -1965578645
   disruptedPods:
-    "30": "2331-08-21T12:12:02Z"
-  disruptionsAllowed: 925313537
-  expectedPods: -144625578
-  observedGeneration: -4178463431261421654
+    "24": "2250-04-18T21:52:38Z"
+  disruptionsAllowed: -1942073618
+  expectedPods: -347579237
+  observedGeneration: -6582200896939805980

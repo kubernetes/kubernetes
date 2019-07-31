@@ -14,9 +14,6 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -28,19 +25,19 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 spec:
-  maxReplicas: 2114329341
-  minReplicas: -1978186127
+  maxReplicas: -1971381490
+  minReplicas: 896585016
   scaleTargetRef:
-    apiVersion: "26"
-    kind: "24"
-    name: "25"
-  targetCPUUtilizationPercentage: -439697596
+    apiVersion: "20"
+    kind: "18"
+    name: "19"
+  targetCPUUtilizationPercentage: -1300313567
 status:
-  currentCPUUtilizationPercentage: 1804227960
-  currentReplicas: 73350537
-  desiredReplicas: -799278564
-  observedGeneration: -918288109031280833
+  currentCPUUtilizationPercentage: 757808475
+  currentReplicas: -738053939
+  desiredReplicas: -1258077201
+  observedGeneration: -5238012362384355226
