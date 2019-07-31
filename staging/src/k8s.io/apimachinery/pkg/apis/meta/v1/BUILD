@@ -41,6 +41,7 @@ go_library(
         "deepcopy.go",
         "doc.go",
         "duration.go",
+        "fields_proto.go",
         "generated.pb.go",
         "group_version.go",
         "helpers.go",
