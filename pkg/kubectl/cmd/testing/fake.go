@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // InternalType is the schema for internal type
@@ -284,9 +283,9 @@ type TestFactory struct {
 
 	kubeConfigFlags *genericclioptions.TestConfigFlags
 
-	Client             kubectl.RESTClient
+	Client             RESTClient
 	ScaleGetter        scaleclient.ScalesGetter
-	UnstructuredClient kubectl.RESTClient
+	UnstructuredClient RESTClient
 	ClientConfigVal    *restclient.Config
 	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
