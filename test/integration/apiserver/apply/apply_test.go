@@ -789,40 +789,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
 		Fields: &metav1.Fields{
-			Map: map[string]metav1.Fields{
-				"f:metadata": {
-					Map: map[string]metav1.Fields{
-						"f:labels": {
-							Map: map[string]metav1.Fields{
-								"f:sidecar_version": {Map: map[string]metav1.Fields{}},
-							},
-						},
-					},
-				},
-				"f:spec": {
-					Map: map[string]metav1.Fields{
-						"f:template": {
-							Map: map[string]metav1.Fields{
-								"f:spec": {
-									Map: map[string]metav1.Fields{
-										"f:containers": {
-											Map: map[string]metav1.Fields{
-												"k:{\"name\":\"sidecar\"}": {
-													Map: map[string]metav1.Fields{
-														".":       {Map: map[string]metav1.Fields{}},
-														"f:image": {Map: map[string]metav1.Fields{}},
-														"f:name":  {Map: map[string]metav1.Fields{}},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`),
 		},
 	}
 

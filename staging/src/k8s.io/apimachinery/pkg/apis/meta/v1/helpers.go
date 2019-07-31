@@ -17,7 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -254,13 +256,24 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 }
 
 // MarshalJSON implements json.Marshaler
+// MarshalJSON may get called on pointers or values, so implement MarshalJSON on value.
+// http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
 func (f Fields) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&f.Map)
+	if f.Raw == nil {
+		return []byte("null"), nil
+	}
+	return f.Raw, nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler
 func (f *Fields) UnmarshalJSON(b []byte) error {
-	return json.Unmarshal(b, &f.Map)
+	if f == nil {
+		return errors.New("metav1.Fields: UnmarshalJSON on nil pointer")
+	}
+	if !bytes.Equal(b, []byte("null")) {
+		f.Raw = append(f.Raw[0:0], b...)
+	}
+	return nil
 }
 
 var _ json.Marshaler = Fields{}
