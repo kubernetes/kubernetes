@@ -19,8 +19,10 @@ package ipvs
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,13 +30,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -473,6 +475,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 // KernelHandler can handle the current installed kernel modules.
 type KernelHandler interface {
 	GetModules() ([]string, error)
+	GetKernelVersion() (string, error)
 }
 
 // LinuxKernelHandler implements KernelHandler interface.
@@ -490,11 +493,17 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 // GetModules returns all installed kernel modules.
 func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	// Check whether IPVS required kernel modules are built-in
-	kernelVersion, ipvsModules, err := utilipvs.GetKernelVersionAndIPVSMods(handle.executor)
+	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
 		return nil, err
 	}
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
+	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
+	if err != nil {
+		return nil, fmt.Errorf("error parseing kernel version %q: %v", kernelVersionStr, err)
+	}
+	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
+
+	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
 	b, err := ioutil.ReadFile(builtinModsFilePath)
 	if err != nil {
 		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
@@ -516,13 +525,47 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 
 	// Find out loaded kernel modules
-	out, err := handle.executor.Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
+	modulesFile, err := os.Open("/proc/modules")
 	if err != nil {
 		return nil, err
 	}
 
-	mods := strings.Split(string(out), "\n")
+	mods, err := getFirstColumn(modulesFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
+	}
+
 	return append(mods, bmods...), nil
+}
+
+// getFirstColumn reads all the content from r into memory and return a
+// slice which consists of the first word from each line.
+func getFirstColumn(r io.Reader) ([]string, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(b), "\n")
+	words := make([]string, 0, len(lines))
+	for i := range lines {
+		fields := strings.Fields(lines[i])
+		if len(fields) > 0 {
+			words = append(words, fields[0])
+		}
+	}
+	return words, nil
+}
+
+// GetKernelVersion returns currently running kernel version.
+func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
+	kernelVersionFile := "/proc/sys/kernel/osrelease"
+	fileContent, err := ioutil.ReadFile(kernelVersionFile)
+	if err != nil {
+		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
+	}
+
+	return strings.TrimSpace(string(fileContent)), nil
 }
 
 // CanUseIPVSProxier returns true if we can use the ipvs Proxier.
@@ -534,12 +577,21 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
 	}
-	wantModules := sets.NewString()
 	loadModules := sets.NewString()
-	linuxKernelHandler := NewLinuxKernelHandler()
-	_, ipvsModules, _ := utilipvs.GetKernelVersionAndIPVSMods(linuxKernelHandler.executor)
-	wantModules.Insert(ipvsModules...)
 	loadModules.Insert(mods...)
+
+	kernelVersionStr, err := handle.GetKernelVersion()
+	if err != nil {
+		return false, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+	}
+	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
+	if err != nil {
+		return false, fmt.Errorf("error parseing kernel version %q: %v", kernelVersionStr, err)
+	}
+	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
+	wantModules := sets.NewString()
+	wantModules.Insert(mods...)
+
 	modules := wantModules.Difference(loadModules).UnsortedList()
 	var missingMods []string
 	ConntrackiMissingCounter := 0
