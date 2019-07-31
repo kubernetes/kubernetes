@@ -582,7 +582,7 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 			}
 		}
 		gomega.Expect(priorityPod).NotTo(gomega.BeNil())
-		gomega.Expect(priorityPod.Status.Phase).NotTo(gomega.Equal(v1.PodSucceeded),
+		framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodSucceeded,
 			fmt.Sprintf("pod: %s succeeded unexpectedly", priorityPod.Name))
 
 		// Check eviction ordering.
@@ -597,20 +597,20 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 			}
 			gomega.Expect(lowPriorityPod).NotTo(gomega.BeNil())
 			if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
-				gomega.Expect(priorityPod.Status.Phase).NotTo(gomega.Equal(v1.PodFailed),
+				framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
 					fmt.Sprintf("priority %d pod: %s failed before priority %d pod: %s",
 						priorityPodSpec.evictionPriority, priorityPodSpec.pod.Name, lowPriorityPodSpec.evictionPriority, lowPriorityPodSpec.pod.Name))
 			}
 		}
 
 		if priorityPod.Status.Phase == v1.PodFailed {
-			gomega.Expect(priorityPod.Status.Reason, eviction.Reason, "pod %s failed; expected Status.Reason to be %s, but got %s",
+			framework.ExpectEqual(priorityPod.Status.Reason, eviction.Reason, "pod %s failed; expected Status.Reason to be %s, but got %s",
 				priorityPod.Name, eviction.Reason, priorityPod.Status.Reason)
 		}
 
 		// EvictionPriority 0 pods should not fail
 		if priorityPodSpec.evictionPriority == 0 {
-			gomega.Expect(priorityPod.Status.Phase).NotTo(gomega.Equal(v1.PodFailed),
+			framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
 				fmt.Sprintf("priority 0 pod: %s failed", priorityPod.Name))
 		}
 
@@ -637,7 +637,7 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 			}.AsSelector().String()
 			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{FieldSelector: selector})
 			gomega.Expect(err).To(gomega.BeNil(), "Unexpected error getting events during eviction test: %v", err)
-			gomega.Expect(len(podEvictEvents.Items)).To(gomega.Equal(1), "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
+			framework.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]
 
 			if expectedStarvedResource != noStarvedResource {
@@ -646,7 +646,7 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 				gomega.Expect(found).To(gomega.BeTrue(), "Expected to find an annotation on the eviction event for pod %s containing the starved resource %s, but it was not found",
 					pod.Name, expectedStarvedResource)
 				starvedResource := v1.ResourceName(starved)
-				gomega.Expect(starvedResource).To(gomega.Equal(expectedStarvedResource), "Expected to the starved_resource annotation on pod %s to contain %s, but got %s instead",
+				framework.ExpectEqual(starvedResource, expectedStarvedResource, "Expected to the starved_resource annotation on pod %s to contain %s, but got %s instead",
 					pod.Name, expectedStarvedResource, starvedResource)
 
 				// We only check these keys for memory, because ephemeral storage evictions may be due to volume usage, in which case these values are not present
@@ -656,22 +656,22 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 					gomega.Expect(found).To(gomega.BeTrue(), "Expected to find an annotation on the eviction event for pod %s containing the offending containers, but it was not found",
 						pod.Name)
 					offendingContainers := strings.Split(offendersString, ",")
-					gomega.Expect(len(offendingContainers)).To(gomega.Equal(1), "Expected to find the offending container's usage in the %s annotation, but no container was found",
+					framework.ExpectEqual(len(offendingContainers), 1, "Expected to find the offending container's usage in the %s annotation, but no container was found",
 						eviction.OffendingContainersKey)
-					gomega.Expect(offendingContainers[0]).To(gomega.Equal(pod.Spec.Containers[0].Name), "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
+					framework.ExpectEqual(offendingContainers[0], pod.Spec.Containers[0].Name, "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
 						pod.Spec.Containers[0].Name, eviction.OffendingContainersKey, offendingContainers[0])
 
 					// Check the eviction.OffendingContainersUsageKey
 					offendingUsageString, found := event.Annotations[eviction.OffendingContainersUsageKey]
-					gomega.Expect(found).To(gomega.BeTrue(), "Expected to find an annotation on the eviction event for pod %s containing the offending containers' usage, but it was not found",
+					framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers' usage, but it was not found",
 						pod.Name)
 					offendingContainersUsage := strings.Split(offendingUsageString, ",")
-					gomega.Expect(len(offendingContainersUsage)).To(gomega.Equal(1), "Expected to find the offending container's usage in the %s annotation, but found %+v",
+					framework.ExpectEqual(len(offendingContainersUsage), 1, "Expected to find the offending container's usage in the %s annotation, but found %+v",
 						eviction.OffendingContainersUsageKey, offendingContainersUsage)
 					usageQuantity, err := resource.ParseQuantity(offendingContainersUsage[0])
 					gomega.Expect(err).To(gomega.BeNil(), "Expected to be able to parse pod %s's %s annotation as a quantity, but got err: %v", pod.Name, eviction.OffendingContainersUsageKey, err)
 					request := pod.Spec.Containers[0].Resources.Requests[starvedResource]
-					gomega.Expect(usageQuantity.Cmp(request)).To(gomega.Equal(1), "Expected usage of offending container: %s in pod %s to exceed its request %s",
+					framework.ExpectEqual(usageQuantity.Cmp(request), 1, "Expected usage of offending container: %s in pod %s to exceed its request %s",
 						usageQuantity.String(), pod.Name, request.String())
 				}
 			}

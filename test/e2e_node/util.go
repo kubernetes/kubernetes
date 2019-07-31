@@ -140,7 +140,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 	ginkgo.BeforeEach(func() {
 		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
-		gomega.Expect(configEnabled).To(gomega.BeTrue(), "The Dynamic Kubelet Configuration feature is not enabled.\n"+
+		framework.ExpectEqual(configEnabled, true, "The Dynamic Kubelet Configuration feature is not enabled.\n"+
 			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n"+
 			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
 		oldCfg, err = getCurrentKubeletConfig()
@@ -347,7 +347,7 @@ func logNodeEvents(f *framework.Framework) {
 
 func getLocalNode(f *framework.Framework) *v1.Node {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	gomega.Expect(len(nodeList.Items)).To(gomega.Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
+	framework.ExpectEqual(len(nodeList.Items), 1, "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
 }
 
@@ -423,7 +423,7 @@ func restartKubelet() {
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	gomega.Expect(len(matches)).NotTo(gomega.BeZero())
+	framework.ExpectNotEqual(len(matches), 0)
 	kube := matches[0]
 	e2elog.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
@@ -433,9 +433,8 @@ func restartKubelet() {
 func toCgroupFsName(cgroupName cm.CgroupName) string {
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
-	} else {
-		return cgroupName.ToCgroupfs()
 	}
+	return cgroupName.ToCgroupfs()
 }
 
 // reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
