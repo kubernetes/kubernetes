@@ -312,13 +312,12 @@ func (f *framework) RunPrefilterPlugins(
 // Meanwhile, the failure message and status are set for the given node.
 func (f *framework) RunFilterPlugins(pc *PluginContext,
 	pod *v1.Pod, nodeName string) *Status {
-
-	for _, p := range f.filterPlugins {
-		status := p.Filter(pc, pod, nodeName)
+	for _, pl := range f.filterPlugins {
+		status := pl.Filter(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() != Unschedulable {
-				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %s filter plugin for pod %s: %s",
-					p.Name(), pod.Name, status.Message())
+				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %v filter plugin for pod %v: %v",
+					pl.Name(), pod.Name, status.Message())
 				klog.Error(errMsg)
 				return NewStatus(Error, errMsg)
 			}
