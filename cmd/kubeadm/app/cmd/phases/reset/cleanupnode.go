@@ -48,6 +48,7 @@ func NewCleanupNodePhase() workflow.Phase {
 }
 
 func runCleanupNode(c workflow.RunData) error {
+	var e error
 	r, ok := c.(resetData)
 	if !ok {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
@@ -75,10 +76,13 @@ func runCleanupNode(c workflow.RunData) error {
 	if err == nil {
 		// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
 		r.AddDirsToClean(kubeletRunDir)
+	} else {
+		e = err
 	}
 
 	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
+		e = err
 		klog.Errorf("[reset] Failed to remove containers: %v", err)
 	}
 
@@ -89,12 +93,16 @@ func runCleanupNode(c workflow.RunData) error {
 	if certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
-	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)
+	if err := resetConfigDir(kubeadmconstants.KubernetesDir, certsDir); err != nil {
+		e = err
+	}
 
-	return nil
+	return e
 }
 
 func absoluteKubeletRunDirectory() (string, error) {
+	var e error
+
 	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
 		klog.Errorf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v", kubeadmconstants.KubeletRunDirectory, err)
@@ -107,8 +115,9 @@ func absoluteKubeletRunDirectory() (string, error) {
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
 		klog.Errorf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		e = err
 	}
-	return absoluteKubeletRunDirectory, nil
+	return absoluteKubeletRunDirectory, e
 }
 
 func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
@@ -124,7 +133,8 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 }
 
 // resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
-func resetConfigDir(configPathDir, pkiPathDir string) {
+func resetConfigDir(configPathDir, pkiPathDir string) error {
+	var e error
 	dirsToClean := []string{
 		filepath.Join(configPathDir, kubeadmconstants.ManifestsSubDirName),
 		pkiPathDir,
@@ -133,6 +143,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	for _, dir := range dirsToClean {
 		if err := CleanDir(dir); err != nil {
 			klog.Errorf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			e = err
 		}
 	}
 
@@ -146,9 +157,11 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
 		if err := os.RemoveAll(path); err != nil {
+			e = err
 			klog.Errorf("[reset] Failed to remove file: %q [%v]\n", path, err)
 		}
 	}
+	return e
 }
 
 // CleanDir removes everything in a directory, but not the directory itself
@@ -173,5 +186,5 @@ func CleanDir(filePath string) error {
 			return err
 		}
 	}
-	return nil
+	return err
 }
