@@ -44,5 +44,18 @@
     "podFixed": {
       "qJ枊a8衍`Ĩ": "652"
     }
+  },
+  "scheduling": {
+    "nodeSelector": {
+      "19": "20"
+    },
+    "tolerations": [
+      {
+        "key": "21",
+        "value": "22",
+        "effect": "6ċ",
+        "tolerationSeconds": -5658031457286093454
+      }
+    ]
   }
 }
