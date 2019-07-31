@@ -84,7 +84,6 @@ require (
 	github.com/heketi/utils v0.0.0-20170317161834-435bc5bdfa64 // indirect
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.6
-	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/karrick/godirwalk v1.7.5 // indirect
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -148,6 +147,8 @@ require (
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.2
+	gotest.tools v2.2.0+incompatible
+	gotest.tools/gotestsum v0.3.5
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -251,6 +252,7 @@ replace (
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase => github.com/fatih/camelcase v1.0.0
+	github.com/fatih/color => github.com/fatih/color v1.6.0
 	github.com/flynn/go-shlex => github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.7
 	github.com/ghodss/yaml => github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4
@@ -307,7 +309,6 @@ replace (
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.6
-	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
@@ -330,6 +331,8 @@ replace (
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63
 	github.com/marstr/guid => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
 	github.com/marten-seemann/qtls => github.com/marten-seemann/qtls v0.2.3
+	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
+	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.3
 	github.com/mattn/go-shellwords => github.com/mattn/go-shellwords v1.0.5
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.9
@@ -420,9 +423,11 @@ replace (
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
 	google.golang.org/grpc => google.golang.org/grpc v1.13.0
+	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/gcfg.v1 => gopkg.in/gcfg.v1 v1.2.0
+	gopkg.in/gemnasium/logrus-airbrake-hook.v2 => gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
 	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0
 	gopkg.in/mcuadros/go-syslog.v2 => gopkg.in/mcuadros/go-syslog.v2 v2.2.1
 	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -431,6 +436,7 @@ replace (
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.2
 	gotest.tools => gotest.tools v2.2.0+incompatible
+	gotest.tools/gotestsum => gotest.tools/gotestsum v0.3.5
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

@@ -339,6 +339,8 @@ github.com/evanphx/json-patch
 github.com/exponent-io/jsonpath
 # github.com/fatih/camelcase v1.0.0 => github.com/fatih/camelcase v1.0.0
 github.com/fatih/camelcase
+# github.com/fatih/color v1.6.0 => github.com/fatih/color v1.6.0
+github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.4.7 => github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
 # github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 => github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4
@@ -562,10 +564,6 @@ github.com/jmespath/go-jmespath
 github.com/jonboulle/clockwork
 # github.com/json-iterator/go v1.1.6 => github.com/json-iterator/go v1.1.6
 github.com/json-iterator/go
-# github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024 => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
-github.com/jstemmer/go-junit-report
-github.com/jstemmer/go-junit-report/formatter
-github.com/jstemmer/go-junit-report/parser
 # github.com/karrick/godirwalk v1.7.5 => github.com/karrick/godirwalk v1.7.5
 github.com/karrick/godirwalk
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1 => github.com/konsorten/go-windows-terminal-sequences v1.0.1
@@ -590,6 +588,10 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
 github.com/marstr/guid
+# github.com/mattn/go-colorable v0.0.9 => github.com/mattn/go-colorable v0.0.9
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.3 => github.com/mattn/go-isatty v0.0.3
+github.com/mattn/go-isatty
 # github.com/mattn/go-shellwords v1.0.5 => github.com/mattn/go-shellwords v1.0.5
 github.com/mattn/go-shellwords
 # github.com/matttproud/golang_protobuf_extensions v1.0.1 => github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -864,6 +866,8 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
+# golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
+golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -1018,6 +1022,12 @@ gopkg.in/tomb.v1
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.2 => gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
+# gotest.tools v2.2.0+incompatible => gotest.tools v2.2.0+incompatible
+gotest.tools
+# gotest.tools/gotestsum v0.3.5 => gotest.tools/gotestsum v0.3.5
+gotest.tools/gotestsum
+gotest.tools/gotestsum/internal/junitxml
+gotest.tools/gotestsum/testjson
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1
