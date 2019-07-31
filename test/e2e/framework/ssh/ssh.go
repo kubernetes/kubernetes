@@ -258,14 +258,13 @@ func LogResult(result Result) {
 	e2elog.Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
-// IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
-func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, error) {
-	e2elog.Logf("Getting external IP address for %s", node.Name)
+// GetSSHAddress returns external or internal IP address of the node. The internal
+// address is used hoping that SSH bastion is set up.
+func GetSSHAddress(node *v1.Node) (string, error) {
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
+			return net.JoinHostPort(a.Address, sshPort), nil
 		}
 	}
 
@@ -273,14 +272,20 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 		// No external IPs were found, let's try to use internal as plan B
 		for _, a := range node.Status.Addresses {
 			if a.Type == v1.NodeInternalIP && a.Address != "" {
-				host = net.JoinHostPort(a.Address, sshPort)
-				break
+				return net.JoinHostPort(a.Address, sshPort), nil
 			}
 		}
 	}
 
-	if host == "" {
-		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
+	return "", fmt.Errorf("couldn't find any IP address for node %s", node.Name)
+}
+
+// IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
+func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, error) {
+	e2elog.Logf("Getting external IP address for %s", node.Name)
+	host, err := GetSSHAddress(node)
+	if err != nil {
+		return nil, err
 	}
 
 	e2elog.Logf("SSH %q on %s(%s)", cmd, node.Name, host)

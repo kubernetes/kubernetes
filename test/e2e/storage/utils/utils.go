@@ -114,9 +114,10 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	systemctlPresent := false
 	kubeletPid := ""
 
-	nodeIP, err := framework.GetHostExternalAddress(c, pod)
+	node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	nodeIP = nodeIP + ":22"
+	nodeIP, err := e2essh.GetSSHAddress(node)
+	framework.ExpectNoError(err)
 
 	e2elog.Logf("Checking if sudo command is present")
 	sshResult, err := e2essh.SSH("sudo --version", nodeIP, framework.TestContext.Provider)
@@ -216,9 +217,10 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 // TestVolumeUnmountsFromDeletedPodWithForceOption tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 // forceDelete is true indicating whether the pod is forcefully deleted.
 func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
-	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
+	node, err := c.CoreV1().Nodes().Get(clientPod.Spec.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	nodeIP = nodeIP + ":22"
+	nodeIP, err := e2essh.GetSSHAddress(node)
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Expecting the volume mount to be found.")
 	result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
