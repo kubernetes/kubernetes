@@ -30,6 +30,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -181,17 +182,23 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".")
+	// Use os.Create to get default file permissions honoring umask
+	f, err := os.Create(filename + "." + string(uuid.NewUUID()))
 	if err != nil {
 		return err
 	}
 	defer os.Remove(f.Name())
-	_, err = f.Write(bytes)
+
+	// remove world-wide permissions before writing data to the file
+	info, err := os.Stat(f.Name())
 	if err != nil {
 		return err
 	}
-
-	err = os.Chmod(f.Name(), 0660)
+	err = os.Chmod(f.Name(), info.Mode().Perm()&0660)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(bytes)
 	if err != nil {
 		return err
 	}

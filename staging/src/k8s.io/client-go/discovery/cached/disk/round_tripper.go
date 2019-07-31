@@ -25,6 +25,8 @@ import (
 	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
 	"k8s.io/klog"
+
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 type cacheRoundTripper struct {
@@ -35,9 +37,23 @@ type cacheRoundTripper struct {
 // response headers and send the If-None-Match header on subsequent
 // corresponding requests.
 func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
+	perms := os.FileMode(0660)
+	// if the directory exists or can be created...
+	if err := os.MkdirAll(cacheDir, 0750); err == nil {
+		// and we can create a tmp file to check default permissions...
+		if f, err := os.Create(filepath.Join(cacheDir, "umask.tmp."+string(uuid.NewUUID()))); err == nil {
+			// clean up the tmp file when we're done
+			defer os.Remove(f.Name())
+			// determine default file permission (honoring umask), dropping world-readable permissions
+			if info, err := os.Stat(f.Name()); err == nil {
+				perms = info.Mode().Perm() & os.FileMode(0660)
+			}
+		}
+	}
+
 	d := diskv.New(diskv.Options{
 		PathPerm: os.FileMode(0750),
-		FilePerm: os.FileMode(0660),
+		FilePerm: perms,
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})

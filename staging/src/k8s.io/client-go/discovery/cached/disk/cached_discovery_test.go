@@ -102,7 +102,17 @@ func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 
 	d, err := ioutil.TempDir("", "")
 	assert.NoError(err)
-	os.RemoveAll(d)
+
+	// expect default read/write permissions with world-permissions removed
+	assert.NoError(os.MkdirAll(d, os.FileMode(0750)))
+	umask, err := os.Create(filepath.Join(d, "umask.tmp"))
+	assert.NoError(err)
+	umaskInfo, err := os.Stat(umask.Name())
+	assert.NoError(err)
+	expectedFilePermission := umaskInfo.Mode().Perm() & 0660
+
+	// remove directory to allow cacher to create it
+	assert.NoError(os.RemoveAll(d))
 	defer os.RemoveAll(d)
 
 	c := fakeDiscoveryClient{}
@@ -116,7 +126,7 @@ func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 		if info.IsDir() {
 			assert.Equal(os.FileMode(0750), info.Mode().Perm())
 		} else {
-			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+			assert.Equal(expectedFilePermission, info.Mode().Perm())
 		}
 		return nil
 	})

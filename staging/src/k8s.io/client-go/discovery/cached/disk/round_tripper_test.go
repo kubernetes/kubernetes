@@ -102,6 +102,16 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 
 	rt := &testRoundTripper{}
 	cacheDir, err := ioutil.TempDir("", "cache-rt")
+
+	// expect default read/write permissions with world-permissions removed
+	assert.NoError(os.MkdirAll(cacheDir, os.FileMode(0750)))
+	umask, err := os.Create(filepath.Join(cacheDir, "umask.tmp"))
+	assert.NoError(err)
+	umaskInfo, err := os.Stat(umask.Name())
+	assert.NoError(err)
+	expectedFilePermission := umaskInfo.Mode().Perm() & 0660
+
+	// remove directory to allow cacher to create it
 	os.RemoveAll(cacheDir)
 	defer os.RemoveAll(cacheDir)
 
@@ -139,7 +149,7 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 		if info.IsDir() {
 			assert.Equal(os.FileMode(0750), info.Mode().Perm())
 		} else {
-			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+			assert.Equal(expectedFilePermission, info.Mode().Perm())
 		}
 		return nil
 	})
