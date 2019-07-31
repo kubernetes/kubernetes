@@ -22,7 +22,7 @@ import (
 	"errors"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -35,6 +35,9 @@ type NodeScoreList []int
 
 // PluginToNodeScoreMap declares a map from plugin name to its NodeScoreList.
 type PluginToNodeScoreMap map[string]NodeScoreList
+
+// NodeToStatusMap declares map from node name to its status.
+type NodeToStatusMap map[string]*Status
 
 // These are predefined codes used in a Status.
 const (
@@ -160,6 +163,19 @@ type FilterPlugin interface {
 	Filter(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 }
 
+// PostFilterPlugin is an interface for Post-filter plugin. Post-filter is an
+// informational extension point. Plugins will be called with a list of nodes
+// that passed the filtering phase. A plugin may use this data to update internal
+// state or to generate logs/metrics.
+type PostFilterPlugin interface {
+	Plugin
+	// PostFilter is called by the scheduling framework after a list of nodes
+	// passed the filtering phase. All postfilter plugins must return success or
+	// the pod will be rejected. The filteredNodesStatuses is the set of filtered nodes
+	// and their filter status.
+	PostFilter(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+}
+
 // ScorePlugin is an interface that must be implemented by "score" plugins to rank
 // nodes that passed the filtering phase.
 type ScorePlugin interface {
@@ -268,6 +284,11 @@ type Framework interface {
 	// given host. If any of these plugins returns any status other than "Success",
 	// the given node is not suitable for running the pod.
 	RunFilterPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
+	// of these plugins returns any status other than "Success", the given node is
+	// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
+	RunPostFilterPlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
 
 	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).

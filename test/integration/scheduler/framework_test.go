@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,6 +56,11 @@ type FilterPlugin struct {
 type ReservePlugin struct {
 	numReserveCalled int
 	failReserve      bool
+}
+
+type PostFilterPlugin struct {
+	numPostFilterCalled int
+	failPostFilter      bool
 }
 
 type PrebindPlugin struct {
@@ -100,6 +105,7 @@ const (
 	scorePluginName              = "score-plugin"
 	scoreWithNormalizePluginName = "score-with-normalize-plugin"
 	filterPluginName             = "filter-plugin"
+	postFilterPluginName         = "postfilter-plugin"
 	reservePluginName            = "reserve-plugin"
 	prebindPluginName            = "prebind-plugin"
 	unreservePluginName          = "unreserve-plugin"
@@ -113,6 +119,7 @@ var _ = framework.FilterPlugin(&FilterPlugin{})
 var _ = framework.ScorePlugin(&ScorePlugin{})
 var _ = framework.ScoreWithNormalizePlugin(&ScoreWithNormalizePlugin{})
 var _ = framework.ReservePlugin(&ReservePlugin{})
+var _ = framework.PostFilterPlugin(&PostFilterPlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
 var _ = framework.BindPlugin(&BindPlugin{})
 var _ = framework.PostbindPlugin(&PostbindPlugin{})
@@ -239,6 +246,34 @@ func (rp *ReservePlugin) reset() {
 // NewReservePlugin is the factory for reserve plugin.
 func NewReservePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return resPlugin, nil
+}
+
+// Name returns name of the plugin.
+func (*PostFilterPlugin) Name() string {
+	return postFilterPluginName
+}
+
+var postFilterPlugin = &PostFilterPlugin{}
+
+// PostFilter is a test function.
+func (pfp *PostFilterPlugin) PostFilter(_ *framework.PluginContext, pod *v1.Pod, _ []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
+	pfp.numPostFilterCalled++
+	if pfp.failPostFilter {
+		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+
+	return nil
+}
+
+// reset used to reset postfilter plugin.
+func (pfp *PostFilterPlugin) reset() {
+	pfp.numPostFilterCalled = 0
+	pfp.failPostFilter = false
+}
+
+// NewPostFilterPlugin is the factory for post-filter plugin.
+func NewPostFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return postFilterPlugin, nil
 }
 
 var pbdPlugin = &PrebindPlugin{}
@@ -1443,6 +1478,65 @@ func TestFilterPlugin(t *testing.T) {
 		}
 
 		filterPlugin.reset()
+		cleanupPods(cs, t, []*v1.Pod{pod})
+	}
+}
+
+// TestPostFilterPlugin tests invocation of post-filter plugins.
+func TestPostFilterPlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a post-filter plugin.
+	registry := framework.Registry{postFilterPluginName: NewPostFilterPlugin}
+
+	// Setup initial post-filter plugin for testing.
+	pluginsConfig := &schedulerconfig.Plugins{
+		PostFilter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: postFilterPluginName,
+				},
+			},
+		},
+	}
+	// Set empty plugin config for testing
+	emptyPluginConfig := []schedulerconfig.PluginConfig{}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "post-filter-plugin", nil),
+		false, nil, registry, pluginsConfig, emptyPluginConfig, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add a few nodes.
+	_, err := createNodes(cs, "test-node", nil, 2)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	for _, fail := range []bool{false, true} {
+		postFilterPlugin.failPostFilter = fail
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Errorf("Error while creating a test pod: %v", err)
+		}
+
+		if fail {
+			if err = waitForPodUnschedulable(cs, pod); err != nil {
+				t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+			}
+		} else {
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("Expected the pod to be scheduled. error: %v", err)
+			}
+		}
+
+		if postFilterPlugin.numPostFilterCalled == 0 {
+			t.Errorf("Expected the post-filter plugin to be called.")
+		}
+
+		postFilterPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
