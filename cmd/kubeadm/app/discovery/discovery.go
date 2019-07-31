@@ -75,9 +75,9 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	case cfg.Discovery.File != nil:
 		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
 		if isHTTPSURL(kubeConfigPath) {
-			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName)
+			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName, cfg.Discovery.Timeout.Duration)
 		}
-		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName)
+		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName, cfg.Discovery.Timeout.Duration)
 	case cfg.Discovery.BootstrapToken != nil:
 		return token.RetrieveValidatedConfigInfo(cfg)
 	default:
