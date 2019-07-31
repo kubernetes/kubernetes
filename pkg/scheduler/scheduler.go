@@ -272,12 +272,14 @@ func (sched *Scheduler) Config() *factory.Config {
 func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason string, message string) {
 	sched.config.Error(pod, err)
 	sched.config.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", message)
-	sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+	if err := sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  reason,
 		Message: err.Error(),
-	})
+	}); err != nil {
+		klog.Errorf("Error updating the condition of the pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
 }
 
 // schedule implements the scheduling algorithm and returns the suggested result(host,
