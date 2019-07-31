@@ -94,7 +94,7 @@ var _ = KubeadmDescribe("proxy addon", func() {
 		ginkgo.It("should exist and be properly configured", func() {
 			ds := GetDaemonSet(f.ClientSet, kubeSystemNamespace, kubeProxyDaemonSetName)
 
-			gomega.Expect(ds.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(kubeProxyServiceAccountName))
+			framework.ExpectEqual(ds.Spec.Template.Spec.ServiceAccountName, kubeProxyServiceAccountName)
 		})
 	})
 })
