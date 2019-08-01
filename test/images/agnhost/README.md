@@ -496,20 +496,18 @@ Usage:
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md
-?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md?pixel)]()
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel
-)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel)]()
 
 
 ### webhook (Kubernetes External Admission Webhook)
 
 The subcommand tests MutatingAdmissionWebhook and ValidatingAdmissionWebhook. After deploying
-it to kubernetes cluster, administrator needs to create a ValidatingWebhookConfiguration
-in kubernetes cluster to register remote webhook admission controllers.
+it to kubernetes cluster, administrator needs to create a MutatingWebhookConfiguration or
+ValidatingWebhookConfiguration in kubernetes cluster to register remote webhook admission controllers.
 
-TODO: add the reference when the document for admission webhook v1beta1 API is done.
+More details on the configuration can be found from here [Dynamic Admission Control](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/).
 
 Check the [MutatingAdmissionWebhook](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.14/#mutatingwebhookconfiguration-v1beta1-admissionregistration-k8s-io) and [ValidatingAdmissionWebhook](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.14/#validatingwebhookconfiguration-v1beta1-admissionregistration-k8s-io) documentations for more information about them.
 
