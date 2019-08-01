@@ -328,7 +328,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	result, err := e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
-	gomega.Expect(result.Code).To(gomega.BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	// TODO: Needs to check GetGlobalMapPath and descriptor lock, as well.
 
@@ -350,9 +350,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
 	err = f.WaitForPodNotFound(clientPod.Name, framework.PodDeleteTimeout)
-	if err != nil {
-		framework.ExpectNoError(err, "Expected pod to be not found.")
-	}
+	framework.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {
 		// With forceDelete, since pods are immediately deleted from API server, there is no way to be sure when volumes are torn down
