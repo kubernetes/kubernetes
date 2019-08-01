@@ -95,6 +95,51 @@ func TestDescribePod(t *testing.T) {
 	}
 }
 
+func TestDescribePodEphemeralContainers(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name:  "debugger",
+						Image: "busybox",
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			EphemeralContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "debugger",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+					Ready:        false,
+					RestartCount: 0,
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "debugger:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "busybox") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribePodNode(t *testing.T) {
 	fake := fake.NewSimpleClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

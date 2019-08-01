@@ -710,6 +710,13 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
+		if len(pod.Spec.EphemeralContainers) > 0 {
+			var ec []corev1.Container
+			for i := range pod.Spec.EphemeralContainers {
+				ec = append(ec, corev1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+			}
+			describeContainers("Ephemeral Containers", ec, pod.Status.EphemeralContainerStatuses, EnvValueRetriever(pod), w, "")
+		}
 		if len(pod.Spec.ReadinessGates) > 0 {
 			w.Write(LEVEL_0, "Readiness Gates:\n  Type\tStatus\n")
 			for _, g := range pod.Spec.ReadinessGates {
