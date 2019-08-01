@@ -91,5 +91,5 @@ func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 
 // AddKustomizePodsFlag adds the --kustomize flag to the given flagset
 func AddKustomizePodsFlag(fs *pflag.FlagSet, kustomizeDir *string) {
-	fs.StringVarP(kustomizeDir, KustomizePods, "k", *kustomizeDir, "The path where to save the kubeconfig file.")
+	fs.StringVarP(kustomizeDir, Kustomize, "k", *kustomizeDir, "The path where your static pod kustomizations are stored.")
 }

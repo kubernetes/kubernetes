@@ -28,7 +28,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -181,7 +181,7 @@ func KustomizeStaticPod(pod v1.Pod, kustomizeDir string) (v1.Pod, error) {
 
 	kustomized, err := km.Kustomize(serialized)
 	if err != nil {
-		return pod, errors.Wrap(err, "failed to kustomize static pod manifest")
+		return pod, errors.Wrap(err, "failed to kustomize static Pod manifest")
 	}
 
 	// unmarshal kustomized yaml back into a pod manifest
@@ -192,7 +192,7 @@ func KustomizeStaticPod(pod v1.Pod, kustomizeDir string) (v1.Pod, error) {
 
 	pod2, ok := obj.(*v1.Pod)
 	if !ok {
-		return pod, errors.Wrap(err, "kustomized manifest is not a valid pod object")
+		return pod, errors.Wrap(err, "kustomized manifest is not a valid Pod object")
 	}
 
 	return *pod2, nil

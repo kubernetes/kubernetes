@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,17 +38,16 @@ type UnstructuredSlice []*unstructured.Unstructured
 // NewUnstructuredSliceFromFiles returns a ResMap given a resource path slice.
 // This func use a Loader to mimic the behavior of kubectl kustomize, and most specifically support for reading from
 // a local git repository like git@github.com:someOrg/someRepo.git or https://github.com/someOrg/someRepo?ref=someHash
-func NewUnstructuredSliceFromFiles(
-	loader ifc.Loader, paths []string) (UnstructuredSlice, error) {
+func NewUnstructuredSliceFromFiles(loader ifc.Loader, paths []string) (UnstructuredSlice, error) {
 	var result UnstructuredSlice
 	for _, path := range paths {
 		content, err := loader.Load(path)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Load from path %s failed", path)
+			return nil, errors.Wrapf(err, "load from path %q failed", path)
 		}
 		res, err := NewUnstructuredSliceFromBytes(content)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Convert %s to Unstructured failed", path)
+			return nil, errors.Wrapf(err, "convert %q to Unstructured failed", path)
 		}
 
 		result = append(result, res...)
@@ -59,8 +58,7 @@ func NewUnstructuredSliceFromFiles(
 // NewUnstructuredSliceFromBytes returns a slice of Unstructured.
 // This functions handles all the nuances of Kubernetes yaml (e.g. many yaml
 // documents in one file, List of objects)
-func NewUnstructuredSliceFromBytes(
-	in []byte) (UnstructuredSlice, error) {
+func NewUnstructuredSliceFromBytes(in []byte) (UnstructuredSlice, error) {
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(in), 1024)
 	var result UnstructuredSlice
 	var err error
@@ -76,8 +74,7 @@ func NewUnstructuredSliceFromBytes(
 			}
 
 			// validate the object has kind, metadata.name as required by Kustomize
-			err := validate(u)
-			if err != nil {
+			if err := validate(u); err != nil {
 				return nil, err
 			}
 
@@ -110,9 +107,7 @@ func NewUnstructuredSliceFromBytes(
 
 			// append the object to the UnstructuredSlice
 			result = append(result, &u)
-
 		}
-
 	}
 	if err != io.EOF {
 		return nil, err
@@ -120,7 +115,7 @@ func NewUnstructuredSliceFromBytes(
 	return result, nil
 }
 
-// FilterResource returns all the Unstructured corresponding to a given resource
+// FilterResource returns all the Unstructured items in the UnstructuredSlice corresponding to a given resource
 func (rs *UnstructuredSlice) FilterResource(gvk schema.GroupVersionKind, namespace, name string) UnstructuredSlice {
 	var result UnstructuredSlice
 	for _, r := range *rs {

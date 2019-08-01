@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ func GetManager(kustomizeDir string) (*Manager, error) {
 
 		// loads the UnstructuredSlice with all the patches into the Manager
 		// NB. this is done at singleton instance level because kubeadm has a unique pool
-		// of pathches that are applied to different content/at different time
+		// of patches that are applied to different content, at different time
 		if err := km.getUnstructuredSlice(); err != nil {
 			return nil, err
 		}
@@ -65,11 +65,11 @@ func GetManager(kustomizeDir string) (*Manager, error) {
 	return instances[kustomizeDir], nil
 }
 
-// getUnstructuredSlice returns an UnstructuredSlice with all the patches.
+// getUnstructuredSlice returns a UnstructuredSlice with all the patches.
 func (km *Manager) getUnstructuredSlice() error {
-	// kubeadm does not requires a kustomization.yaml file listing all the resources/patches, so it is necessary
+	// kubeadm does not require a kustomization.yaml file listing all the resources/patches, so it is necessary
 	// to rebuild the list of patches manually
-	// TODO: make this git friendly
+	// TODO: make this git friendly - currently this works only for patches in local folders -
 	files, err := ioutil.ReadDir(km.kustomizeDir)
 	if err != nil {
 		return err
@@ -102,7 +102,8 @@ func (km *Manager) getUnstructuredSlice() error {
 	return nil
 }
 
-// Kustomize apply a set of patches to a resource
+// Kustomize apply a set of patches to a resource.
+// Portions of the kustomize logic in this function are taken from the kubernetes-sigs/kind project
 func (km *Manager) Kustomize(res []byte) ([]byte, error) {
 	// create a loader that mimics the behavior of kubectl kustomize
 	// and converts the resource into a UnstructuredSlice
@@ -123,7 +124,7 @@ func (km *Manager) Kustomize(res []byte) ([]byte, error) {
 		patches = append(patches, resourcePatches...)
 	}
 
-	fmt.Println("kustomize ", len(patches), " patches")
+	fmt.Printf("[kustomize] Applying %s patches\n", len(patches))
 
 	// if there are no patches, for the target resources, exit
 	if len(patches) == 0 {
@@ -146,7 +147,10 @@ func (km *Manager) Kustomize(res []byte) ([]byte, error) {
 	// that ties everything together
 	kustomization.WriteString("resources:\n")
 	for i, r := range resources {
-		b, _ := r.MarshalJSON()
+		b, err := r.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
 
 		name := fmt.Sprintf("resource-%d.json", i)
 		_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
@@ -155,7 +159,10 @@ func (km *Manager) Kustomize(res []byte) ([]byte, error) {
 
 	kustomization.WriteString("patches:\n")
 	for i, p := range patches {
-		b, _ := p.MarshalJSON()
+		b, err := p.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
 
 		name := fmt.Sprintf("patch-%d.json", i)
 		_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
