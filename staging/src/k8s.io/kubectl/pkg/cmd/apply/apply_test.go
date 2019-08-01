@@ -54,7 +54,7 @@ import (
 )
 
 var (
-	fakeSchema                 = sptest.Fake{Path: filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+	fakeSchema                 = sptest.Fake{Path: filepath.Join("..", "..", "..", "test", "data", "openapi", "swagger.json")}
 	testingOpenAPISchemaFns    = []func() (openapi.Resources, error){nil, AlwaysErrorOpenAPISchemaFn, openAPISchemaFn}
 	AlwaysErrorOpenAPISchemaFn = func() (openapi.Resources, error) {
 		return nil, errors.New("cannot get openapi spec")
@@ -87,23 +87,23 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameCM                = "../../../../test/fixtures/pkg/kubectl/cmd/apply/cm.yaml"
-	filenameRC                = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameRCArgs            = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc-args.yaml"
-	filenameRCLastAppliedArgs = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied-args.yaml"
-	filenameRCNoAnnotation    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
-	filenameRCLASTAPPLIED     = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
-	filenameSVC               = "../../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC             = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
-	filenameNoExistRC         = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
-	filenameRCPatchTest       = "../../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
-	dirName                   = "../../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
-	filenameRCJSON            = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
+	filenameCM                = "../../../test/data/apply/cm.yaml"
+	filenameRC                = "../../../test/data/apply/rc.yaml"
+	filenameRCArgs            = "../../../test/data/apply/rc-args.yaml"
+	filenameRCLastAppliedArgs = "../../../test/data/apply/rc-lastapplied-args.yaml"
+	filenameRCNoAnnotation    = "../../../test/data/apply/rc-no-annotation.yaml"
+	filenameRCLASTAPPLIED     = "../../../test/data/apply/rc-lastapplied.yaml"
+	filenameSVC               = "../../../test/data/apply/service.yaml"
+	filenameRCSVC             = "../../../test/data/apply/rc-service.yaml"
+	filenameNoExistRC         = "../../../test/data/apply/rc-noexist.yaml"
+	filenameRCPatchTest       = "../../../test/data/apply/patch.json"
+	dirName                   = "../../../test/data/apply/testdir"
+	filenameRCJSON            = "../../../test/data/apply/rc.json"
 
-	filenameWidgetClientside    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
-	filenameWidgetServerside    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
-	filenameDeployObjServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
-	filenameDeployObjClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
+	filenameWidgetClientside    = "../../../test/data/apply/widget-clientside.yaml"
+	filenameWidgetServerside    = "../../../test/data/apply/widget-serverside.yaml"
+	filenameDeployObjServerside = "../../../test/data/apply/deploy-serverside.yaml"
+	filenameDeployObjClientside = "../../../test/data/apply/deploy-clientside.yaml"
 )
 
 func readConfigMapList(t *testing.T, filename string) [][]byte {

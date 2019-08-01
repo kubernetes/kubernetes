@@ -60,6 +60,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["cmd_test.go"],
+    data = ["//pkg/kubectl/cmd/plugin/testdata"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",

@@ -30,9 +30,7 @@ go_test(
         "openapi_suite_test.go",
         "openapi_test.go",
     ],
-    data = [
-        "//staging/src/k8s.io/kubectl/test/data/openapi",
-    ],
+    data = ["//staging/src/k8s.io/kubectl/test/data"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

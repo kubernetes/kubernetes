@@ -28,9 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["replace_test.go"],
-    data = [
-        "//test/e2e/testing-manifests:all-srcs",
-    ],
+    data = ["//staging/src/k8s.io/kubectl/test/data"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

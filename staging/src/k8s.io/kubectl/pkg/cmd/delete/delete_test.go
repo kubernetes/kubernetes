@@ -38,9 +38,9 @@ import (
 
 func fakecmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
-		Run:                   func(cmd *cobra.Command, args []string) {},
+		Run: func(cmd *cobra.Command, args []string) {},
 	}
 	return cmd
 }
@@ -237,7 +237,7 @@ func TestDeleteObject(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -317,7 +317,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 	options := &DeleteOptions{
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml"},
+			Filenames: []string{"../../../test/data/redis-master-controller.yaml"},
 		},
 		GracePeriod: -1,
 		Cascade:     false,
@@ -354,7 +354,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "name")
@@ -482,8 +482,8 @@ func TestDeleteMultipleObject(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -520,7 +520,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 	options := &DeleteOptions{
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml", "../../../../test/e2e/testing-manifests/guestbook/frontend-service.yaml"},
+			Filenames: []string{"../../../test/data/redis-master-controller.yaml", "../../../test/data/frontend-service.yaml"},
 		},
 		GracePeriod: -1,
 		Cascade:     false,
@@ -604,7 +604,7 @@ func TestDeleteDirectory(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy")
+	cmd.Flags().Set("filename", "../../../test/data/replace/legacy")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})

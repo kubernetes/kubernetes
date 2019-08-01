@@ -57,10 +57,7 @@ go_test(
         "set_subject_test.go",
         "set_test.go",
     ],
-    data = [
-        "//test/e2e/testing-manifests:all-srcs",
-        "//test/fixtures",
-    ],
+    data = ["//staging/src/k8s.io/kubectl/test/data"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

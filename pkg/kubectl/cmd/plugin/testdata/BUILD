@@ -1,9 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "openapi",
+    name = "testdata",
     srcs = glob([
-        "**/*.json",
+        "**/*",
     ]),
 )
 

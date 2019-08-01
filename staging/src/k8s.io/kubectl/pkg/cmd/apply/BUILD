@@ -50,10 +50,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["apply_test.go"],
-    data = [
-        "//api/openapi-spec",
-        "//test/fixtures",
-    ],
+    data = ["//staging/src/k8s.io/kubectl/test/data"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
