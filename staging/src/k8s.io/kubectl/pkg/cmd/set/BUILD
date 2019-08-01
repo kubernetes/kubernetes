@@ -16,10 +16,10 @@ go_library(
         "set_serviceaccount.go",
         "set_subject.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/set",
+    importpath = "k8s.io/kubectl/pkg/cmd/set",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [
-        "//pkg/kubectl/cmd/set/env:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -34,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/set/env:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/generate/versioned:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/polymorphichelpers:go_default_library",
@@ -62,7 +63,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
@@ -78,6 +78,7 @@ go_test(
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -95,7 +96,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/cmd/set/env:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/set/env:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = [

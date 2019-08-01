@@ -6,7 +6,8 @@ go_library(
         "apiresources.go",
         "apiversions.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/apiresources",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/apiresources",
+    importpath = "k8s.io/kubectl/pkg/cmd/apiresources",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

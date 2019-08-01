@@ -3,7 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["kustomize.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/kustomize",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/kustomize",
+    importpath = "k8s.io/kubectl/pkg/cmd/kustomize",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",

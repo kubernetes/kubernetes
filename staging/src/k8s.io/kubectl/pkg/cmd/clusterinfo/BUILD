@@ -6,7 +6,8 @@ go_library(
         "clusterinfo.go",
         "clusterinfo_dump.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/clusterinfo",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/clusterinfo",
+    importpath = "k8s.io/kubectl/pkg/cmd/clusterinfo",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -33,8 +34,8 @@ go_test(
     srcs = ["clusterinfo_dump_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
     ],
 )
 

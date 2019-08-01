@@ -3,15 +3,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["replace.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/replace",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/replace",
+    importpath = "k8s.io/kubectl/pkg/cmd/replace",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/cmd/delete:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/delete:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/rawhttp:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
@@ -32,11 +33,11 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
     ],
 )

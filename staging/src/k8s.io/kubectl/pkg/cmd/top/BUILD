@@ -7,7 +7,8 @@ go_library(
         "top_node.go",
         "top_pod.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/top",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/top",
+    importpath = "k8s.io/kubectl/pkg/cmd/top",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -38,7 +39,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -48,6 +48,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",

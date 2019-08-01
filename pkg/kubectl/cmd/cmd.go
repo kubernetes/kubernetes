@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
+	cmdpkg "k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubectl/pkg/cmd/annotate"
 	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -445,10 +446,10 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			return initProfiling()
+			return cmdpkg.InitProfiling()
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
-			return flushProfiling()
+			return cmdpkg.FlushProfiling()
 		},
 		BashCompletionFunction: bashCompletionFunc,
 	}
@@ -460,7 +461,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
-	addProfilingFlags(flags)
+	cmdpkg.AddProfilingFlags(flags)
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
@@ -562,7 +563,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(f, ioStreams)
+	alpha := cmdpkg.NewCmdAlpha(f, ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
