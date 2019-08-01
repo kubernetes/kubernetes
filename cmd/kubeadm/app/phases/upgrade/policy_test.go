@@ -93,13 +93,12 @@ func TestEnforceVersionPolicies(t *testing.T) {
 		{
 			name: "downgrading two minor versions in one go is not supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.15.3",
-				kubeletVersion: "v1.15.3",
-				kubeadmVersion: "v1.15.0",
+				clusterVersion: constants.CurrentKubernetesVersion.WithMinor(constants.CurrentKubernetesVersion.Minor() + 2).String(),
+				kubeletVersion: constants.CurrentKubernetesVersion.WithMinor(constants.CurrentKubernetesVersion.Minor() + 2).String(),
+				kubeadmVersion: constants.CurrentKubernetesVersion.String(),
 			},
-			newK8sVersion:         constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+			newK8sVersion:         constants.CurrentKubernetesVersion.String(),
 			expectedMandatoryErrs: 1, // can't downgrade two minor versions
-			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 		{
 			name: "kubeadm version must be higher than the new kube version. However, patch version skews may be forced",
@@ -213,10 +212,10 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			}
 
 			if len(actualSkewErrs.Skippable) != rt.expectedSkippableErrs {
-				t.Errorf("failed TestEnforceVersionPolicies\n\texpected skippable errors: %d\n\tgot skippable errors: %d %v", rt.expectedSkippableErrs, len(actualSkewErrs.Skippable), *rt.vg)
+				t.Errorf("failed TestEnforceVersionPolicies\n\texpected skippable errors: %d\n\tgot skippable errors: %d\n%#v\n%#v", rt.expectedSkippableErrs, len(actualSkewErrs.Skippable), *rt.vg, actualSkewErrs)
 			}
 			if len(actualSkewErrs.Mandatory) != rt.expectedMandatoryErrs {
-				t.Errorf("failed TestEnforceVersionPolicies\n\texpected mandatory errors: %d\n\tgot mandatory errors: %d %v", rt.expectedMandatoryErrs, len(actualSkewErrs.Mandatory), *rt.vg)
+				t.Errorf("failed TestEnforceVersionPolicies\n\texpected mandatory errors: %d\n\tgot mandatory errors: %d\n%#v\n%#v", rt.expectedMandatoryErrs, len(actualSkewErrs.Mandatory), *rt.vg, actualSkewErrs)
 			}
 		})
 	}
