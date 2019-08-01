@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/nodelifecycle",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/nodelifecycle/scheduler:go_default_library",
         "//pkg/controller/util/node:go_default_library",
@@ -23,7 +22,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
