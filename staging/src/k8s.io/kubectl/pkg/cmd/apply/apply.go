@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
+	"k8s.io/kubectl/pkg/cmd/delete"
 )
 
 // ApplyOptions defines flags and other configuration parameters for the `apply` command

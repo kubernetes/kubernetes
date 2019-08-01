@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func generateNodeAndTaintedNode(oldTaints []corev1.Taint, newTaints []corev1.Taint) (*corev1.Node, *corev1.Node) {

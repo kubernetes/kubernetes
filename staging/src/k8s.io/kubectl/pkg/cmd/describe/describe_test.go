@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	versioneddescribe "k8s.io/kubectl/pkg/describe/versioned"
 	"k8s.io/kubectl/pkg/scheme"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.

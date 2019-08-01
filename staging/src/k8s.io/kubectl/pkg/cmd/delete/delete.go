@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	cmdwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
+	cmdwait "k8s.io/kubectl/pkg/cmd/wait"
 )
 
 var (

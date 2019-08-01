@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/utils/exec"
 	"sigs.k8s.io/yaml"
 )

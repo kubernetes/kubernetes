@@ -50,10 +50,10 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/attach"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/logs"
+	"k8s.io/kubectl/pkg/cmd/attach"
+	"k8s.io/kubectl/pkg/cmd/delete"
+	"k8s.io/kubectl/pkg/cmd/exec"
+	"k8s.io/kubectl/pkg/cmd/logs"
 	uexec "k8s.io/utils/exec"
 )
 

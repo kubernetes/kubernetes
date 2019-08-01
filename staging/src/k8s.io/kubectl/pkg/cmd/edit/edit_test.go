@@ -39,9 +39,9 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubectl/pkg/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/create"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type EditTestCase struct {

@@ -50,7 +50,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubectl/pkg/scheme"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 

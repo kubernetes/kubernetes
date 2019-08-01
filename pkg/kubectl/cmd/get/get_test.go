@@ -50,7 +50,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var (

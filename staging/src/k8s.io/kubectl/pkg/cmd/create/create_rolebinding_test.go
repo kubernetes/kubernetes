@@ -32,7 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubectl/pkg/scheme"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1"}

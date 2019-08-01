@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"

@@ -33,7 +33,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
+	"k8s.io/kubectl/pkg/cmd/exec"
 
 	"bytes"
 

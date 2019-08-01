@@ -37,7 +37,7 @@ import (
 
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type fakeRemoteExecutor struct {

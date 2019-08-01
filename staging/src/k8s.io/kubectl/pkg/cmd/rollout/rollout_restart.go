@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
+	"k8s.io/kubectl/pkg/cmd/set"
 )
 
 // RestartOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
