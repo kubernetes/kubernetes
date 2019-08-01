@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
-	"k8s.io/kubectl/pkg/cmd/delete"
 )
 
 // ApplyOptions defines flags and other configuration parameters for the `apply` command

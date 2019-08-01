@@ -36,11 +36,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubectl/pkg/cmd/delete"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/cmd/delete"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestGetRestartPolicy(t *testing.T) {

@@ -27,9 +27,9 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func Test_generatorFromName(t *testing.T) {

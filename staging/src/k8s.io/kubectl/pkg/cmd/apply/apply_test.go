@@ -46,10 +46,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 

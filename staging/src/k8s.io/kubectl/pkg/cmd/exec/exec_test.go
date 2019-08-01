@@ -35,9 +35,9 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
 
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type fakeRemoteExecutor struct {
