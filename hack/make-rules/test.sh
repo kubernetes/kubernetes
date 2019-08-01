@@ -153,6 +153,7 @@ go_test_grep_pattern=".*"
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   goflags+=(-v)
+  goflags+=(-json)
   # Show only summary lines by matching lines like "status package/test"
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
@@ -246,7 +247,7 @@ produceJUnitXMLReport() {
 
   if ! command -v gotestsum >/dev/null 2>&1; then
     kube::log::error "gotestsum not found; please install with " \
-      "go get -u gotest.tools/gotestsum"
+      "go install k8s.io/kubernetes/vendor/gotest.tools/gotestsum"
     return
   fi
   gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
@@ -267,7 +268,7 @@ runTests() {
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
-    go test -json "${goflags[@]:+${goflags[@]}}" \
+    go test "${goflags[@]:+${goflags[@]}}" \
      "${KUBE_TIMEOUT}" "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
@@ -307,7 +308,7 @@ runTests() {
     | grep -Ev ${cover_ignore_dirs} \
     | xargs -I{} -n 1 -P "${KUBE_COVERPROCS}" \
     bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
-      go test -json ${goflags[*]:+${goflags[*]}} \
+      go test ${goflags[*]:+${goflags[*]}} \
         ${KUBE_TIMEOUT} \
         -cover -covermode=\"${KUBE_COVERMODE}\" \
         -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
