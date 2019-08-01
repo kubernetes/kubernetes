@@ -27,6 +27,7 @@ go_library(
         "//pkg/controller/resourcequota/config:go_default_library",
         "//pkg/controller/service/config:go_default_library",
         "//pkg/controller/serviceaccount/config:go_default_library",
+        "//pkg/controller/statefulset/config:go_default_library",
         "//pkg/controller/ttlafterfinished/config:go_default_library",
         "//pkg/controller/volume/attachdetach/config:go_default_library",
         "//pkg/controller/volume/persistentvolume/config:go_default_library",

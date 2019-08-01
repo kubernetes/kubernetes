@@ -102,6 +102,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController DeploymentControllerConfiguration
+	// StatefulSetControllerConfiguration holds configuration for
+	// StatefulSetController related features.
+	StatefulSetController StatefulSetControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
@@ -258,6 +261,14 @@ type DeploymentControllerConfiguration struct {
 	ConcurrentDeploymentSyncs int32
 	// deploymentControllerSyncPeriod is the period for syncing the deployments.
 	DeploymentControllerSyncPeriod metav1.Duration
+}
+
+// StatefulSetControllerConfiguration contains elements describing StatefulSetController.
+type StatefulSetControllerConfiguration struct {
+	// concurrentStatefulSetSyncs is the number of statefulset objects that are
+	// allowed to sync concurrently. Larger number = more responsive statefulsets,
+	// but more CPU (and network) load.
+	ConcurrentStatefulSetSyncs int32
 }
 
 // DeprecatedControllerConfiguration contains elements be deprecated.
