@@ -43,6 +43,7 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog"
 )
@@ -92,7 +93,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
-		operationTimestamps:           metrics.NewOperationStartTimeCache(),
+		operationTimestamps:           util.NewOperationStartTimeCache(),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -213,7 +214,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume
 	// record deletion metric if a deletion start timestamp is in the cache
 	// the following calls will be a no-op if there is nothing for this volume in the cache
 	// end of timestamp cache entry lifecycle, "RecordMetric" will do the clean
-	metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, nil)
+	util.RecordMetric(volume.Name, ctrl.operationTimestamps, nil)
 
 	if volume.Spec.ClaimRef == nil {
 		return

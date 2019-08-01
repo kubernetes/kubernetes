@@ -63,6 +63,13 @@ var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
 	[]string{"plugin_name", "operation_name"},
 )
 
+var volumeOperationErrorsMetric = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "volume_operation_total_errors",
+		Help: "Total volume operation erros",
+	},
+	[]string{"plugin_name", "operation_name"})
+
 func init() {
 	registerMetrics()
 }
@@ -72,6 +79,7 @@ func registerMetrics() {
 	prometheus.MustRegister(storageOperationErrorMetric)
 	prometheus.MustRegister(storageOperationStatusMetric)
 	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
+	prometheus.MustRegister(volumeOperationErrorsMetric)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
@@ -106,8 +114,35 @@ func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) s
 	return pluginName
 }
 
-// RecordOperationLatencyMetric records the end to end latency for certain operation
+// recordOperationLatencyMetric records the end to end latency for certain operation
 // into metric volume_operation_total_seconds
-func RecordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
+func recordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
 	storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
+}
+
+// recordVolumeOperationErrorMetric records error count into metric
+// volume_operation_total_errors for provisioning/deletion operations
+func recordVolumeOperationErrorMetric(pluginName, opName string) {
+	if pluginName == "" {
+		pluginName = "N/A"
+	}
+	volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+}
+
+// RecordMetric records either an error count metric or a latency metric if there
+// exists a start timestamp entry in the cache. For a successful operation, i.e.,
+// err == nil, the corresponding timestamp entry will be removed from cache
+func RecordMetric(key string, c OperationStartTimeCache, err error) {
+	pluginName, operation, startTime, ok := c.Load(key)
+	if !ok {
+		return
+	}
+	if err != nil {
+		recordVolumeOperationErrorMetric(pluginName, operation)
+	} else {
+		timeTaken := time.Since(startTime).Seconds()
+		recordOperationLatencyMetric(pluginName, operation, timeTaken)
+		// end of this operation, remove the timestamp entry from cache
+		c.Delete(key)
+	}
 }

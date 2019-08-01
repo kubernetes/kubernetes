@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -47,7 +47,8 @@ const (
 func Test_Run_Positive_DoNothing(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -62,7 +63,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	nsu := statusupdater.NewNodeStatusUpdater(
 		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 
 	// Act
 	ch := make(chan struct{})
@@ -83,7 +84,8 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -96,7 +98,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -124,6 +126,12 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	verifyNoOperationTimestamp(t, fCache, key, "volume_detach")
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -135,7 +143,8 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -148,7 +157,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -198,6 +207,13 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
+
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one attach entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one detach entry in cache, with AddIfNotExist potentially called multiple times
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -208,7 +224,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -221,7 +238,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -269,6 +286,13 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
+
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one attach entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one detach entry in cache, with AddIfNotExist potentially called multiple times
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -281,7 +305,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdateStatusFail(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -294,7 +319,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -344,6 +369,13 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one attach entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one detach entry in cache
+	verifyNoOperationTimestamp(t, fCache, key, "volume_detach")
 }
 
 // Creates a volume with accessMode ReadWriteMany
@@ -357,7 +389,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -370,7 +403,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -439,6 +472,18 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	waitForTotalAttachCallCount(t, 2 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForTotalDetachCallCount(t, 2 /* expectedDetachCallCount */, fakePlugin)
+
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one attach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one detach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+	// expect one attach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one detach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -450,7 +495,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -463,7 +509,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -489,6 +535,10 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	go reconciler.Run(ch)
 	defer close(ch)
 
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
@@ -502,6 +552,15 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	// check if multiattach is marked
 	// at least one volume+node should be marked with multiattach error
 	nodeAttachedTo := nodesForVolume[0]
+
+	// expect one attach entry in cache with one of the node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	firstAttachedToNode1 := nodeAttachedTo == nodeName1
+	if firstAttachedToNode1 {
+		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	} else {
+		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	}
+
 	waitForMultiAttachErrorOnNode(t, nodeAttachedTo, dsw)
 
 	// Act
@@ -531,6 +590,16 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	waitForNewAttacherCallCount(t, 2 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForTotalAttachCallCount(t, 2 /* expectedAttachCallCount */, fakePlugin)
+
+	// expect one detach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	if firstAttachedToNode1 {
+		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	} else {
+		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	}
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -540,8 +609,9 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
 func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -554,7 +624,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -582,6 +652,12 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
 	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
 
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one attach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
 	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName1, false /* mounted */)
@@ -589,6 +665,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
 	waitForVolumeRemovedFromNode(t, generatedVolumeName, nodeName1, asw)
+	// expect one detach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
 
 	// Add a second pod which tries to attach the volume to a different node.
 	generatedVolumeName, podAddErr = dsw.AddPod(types.UniquePodName(podName2), controllervolumetesting.NewPod(podName2, podName2), volumeSpec, nodeName2)
@@ -598,6 +676,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
 
+	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -607,8 +687,9 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
 func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -621,7 +702,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -648,6 +729,13 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
 	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
 
+	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
+	// expect one attach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 0, UpdatePluginName = 1
+	// the volume will NOT be successfully attached to the TimeoutAttachNode
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 0, 1)
+
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
 	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName1, false /* mounted */)
@@ -664,6 +752,8 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
 
+	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
 }
 
 func Test_ReportMultiAttachError(t *testing.T) {
@@ -714,7 +804,8 @@ func Test_ReportMultiAttachError(t *testing.T) {
 		// Arrange
 		t.Logf("Test %q starting", test.name)
 		volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-		dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+		fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+		dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 		asw := cache.NewActualStateOfWorld(volumePluginMgr)
 		fakeKubeClient := controllervolumetesting.CreateTestClient()
 		fakeRecorder := record.NewFakeRecorder(100)
@@ -727,7 +818,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			fakeHandler))
 		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 		rc := NewReconciler(
-			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder, fakeOpCache)
 
 		nodes := []k8stypes.NodeName{}
 		for _, n := range test.nodes {
@@ -1202,4 +1293,23 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 		Steps:    6,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func verifyOperationTimestampCache(
+	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, plugin, operation string, countAdd, countDelete, countUpdate int) {
+	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
+	if p != plugin || op != operation || countAdd > cAdd || countDelete != cDelete || countUpdate != cUpdate {
+		t.Errorf("OperationStartTimeCache for key <%s>, Expected, plugin = %s, operation = %s, countAdd >= %v, countDelete = %v, countUpdate = %v, Actual: %s, %s, %v, %v, %v",
+			key, plugin, operation, countAdd, countDelete, countUpdate,
+			p, op, cAdd, cDelete, cUpdate)
+	}
+}
+
+func verifyNoOperationTimestamp(
+	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, operation string) {
+	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
+	if p != "" || op != "" || cAdd != 0 || cDelete != 0 || cUpdate != 0 {
+		t.Errorf("OperationStartTimeCache should be empty: volume<%s>, operation<%s>, Got: %s %s %v %v %v",
+			key, operation, p, op, cAdd, cDelete, cUpdate)
+	}
 }

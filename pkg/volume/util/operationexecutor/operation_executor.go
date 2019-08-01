@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -62,7 +62,14 @@ import (
 type OperationExecutor interface {
 	// AttachVolume attaches the volume to the node specified in volumeToAttach.
 	// It then updates the actual state of the world to reflect that.
-	AttachVolume(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	// Upon a volume has been successfully detached from a node, an
+	// end to end latency metric will be reported and corresponding entry in the
+	// passed in cache of the volume will be cleaned. In case of error, an error
+	// count metric will be reported, while the cached item remains in the cache
+	// until a following successful try to attach succeeded.
+	AttachVolume(volumeToAttach VolumeToAttach,
+		actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+		operationStartTimeCache util.OperationStartTimeCache) error
 
 	// VerifyVolumesAreAttachedPerNode verifies the given list of volumes to see whether they are still attached to the node.
 	// If any volume is not attached right now, it will update the actual state of the world to reflect that.
@@ -80,7 +87,15 @@ type OperationExecutor interface {
 	// that. If verifySafeToDetach is set, a call is made to the fetch the node
 	// object and it is used to verify that the volume does not exist in Node's
 	// Status.VolumesInUse list (operation fails with error if it is).
-	DetachVolume(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	// Upon a volume has been successfully detached from a node, an
+	// end to end latency metric will be reported and corresponding entry in the
+	// passed in cache of the volume will be cleaned. In case of error, an error
+	// count metric will be reported, while the cached item remains in the cache
+	// until a following successful try to detach succeeded.
+	DetachVolume(volumeToDetach AttachedVolume,
+		verifySafeToDetach bool,
+		actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+		operationStartTimeCache util.OperationStartTimeCache) error
 
 	// If a volume has 'Filesystem' volumeMode, MountVolume mounts the
 	// volume to the pod specified in volumeToMount.
@@ -600,9 +615,10 @@ func (oe *operationExecutor) IsOperationPending(volumeName v1.UniqueVolumeName, 
 
 func (oe *operationExecutor) AttachVolume(
 	volumeToAttach VolumeToAttach,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+	operationStartTimeCache util.OperationStartTimeCache) error {
 	generatedOperations :=
-		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
+		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld, operationStartTimeCache)
 
 	return oe.pendingOperations.Run(
 		volumeToAttach.VolumeName, "" /* podName */, generatedOperations)
@@ -611,9 +627,11 @@ func (oe *operationExecutor) AttachVolume(
 func (oe *operationExecutor) DetachVolume(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+	operationStartTimeCache util.OperationStartTimeCache) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
+		oe.operationGenerator.GenerateDetachVolumeFunc(
+			volumeToDetach, verifySafeToDetach, actualStateOfWorld, operationStartTimeCache)
 	if err != nil {
 		return err
 	}

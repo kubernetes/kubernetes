@@ -42,7 +42,6 @@ import (
 	csitranslation "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
-	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
@@ -224,7 +223,7 @@ type PersistentVolumeController struct {
 	//     end time:   after a volume deleted event has been received from API server
 	//                 the corresponding timestamp entry will be deleted from cache
 	//     abort:      N.A.
-	operationTimestamps metrics.OperationStartTimeCache
+	operationTimestamps util.OperationStartTimeCache
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -331,14 +330,14 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// syncClaim will finish the binding.
 				// record count error for provision if exists
 				// timestamp entry will remain in cache until a success binding has happened
-				metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, err)
+				util.RecordMetric(claimKey, ctrl.operationTimestamps, err)
 				return err
 			}
 			// OBSERVATION: claim is "Bound", pv is "Bound"
 			// if exists a timestamp entry in cache, record end to end provision latency and clean up cache
 			// End of the provision + binding operation lifecycle, cache will be cleaned by "RecordMetric"
 			// [Unit test 12-1, 12-2, 12-4]
-			metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, nil)
+			util.RecordMetric(claimKey, ctrl.operationTimestamps, nil)
 			return nil
 		}
 	} else /* pvc.Spec.VolumeName != nil */ {
@@ -1030,7 +1029,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 				// only report error count to "volume_operation_total_errors"
 				// latency reporting will happen when the volume get finally
 				// deleted and a volume deleted event is captured
-				metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, err)
+				util.RecordMetric(volume.Name, ctrl.operationTimestamps, err)
 			}
 			return err
 		})
@@ -1348,7 +1347,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		// if error happened, record an error count metric
 		// timestamp entry will remain in cache until a success binding has happened
 		if err != nil {
-			metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, err)
+			util.RecordMetric(claimKey, ctrl.operationTimestamps, err)
 		}
 		return err
 	})

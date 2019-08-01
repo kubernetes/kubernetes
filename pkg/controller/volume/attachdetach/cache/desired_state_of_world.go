@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -130,10 +130,11 @@ type PodToAdd struct {
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
-func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
+func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr, operationTimestamps util.OperationStartTimeCache) DesiredStateOfWorld {
 	return &desiredStateOfWorld{
-		nodesManaged:    make(map[k8stypes.NodeName]nodeManaged),
-		volumePluginMgr: volumePluginMgr,
+		nodesManaged:        make(map[k8stypes.NodeName]nodeManaged),
+		volumePluginMgr:     volumePluginMgr,
+		operationTimestamps: operationTimestamps,
 	}
 }
 
@@ -145,6 +146,20 @@ type desiredStateOfWorld struct {
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
+	// operationTimestamps caches start timestamps for attach/detach operations
+	// for metric reporting, and it is created in attachDetachController.
+	// desiredStateOfWorld holds a pointer to it to delete no longer needed but cached
+	// operation start timestamps when the operation has been aborted by pod updates
+	// the following cases will trigger removal of a cached item:
+	// 1. there exists a cached start timestamp of "volume_attach" operation for a given volume + node pair,
+	//    and "DeletePod" has been called for the same volume + node pair
+	//    (i.e., the pod gets deleted or there is update on of that pod to remove the given volume
+	//     before a pre-existed volume attach operation succeeded)
+	// 2. there exists a cached start timestamp of "volume_detach" operation for a given volume + node pair,
+	//    and "AddPod" has been called for the same volume + node pair
+	//    (i.e., the pod gets added or the volume has been added to the pod before a pre-existed "volume_detach"
+	//     operation succeeded)
+	operationTimestamps util.OperationStartTimeCache
 	sync.RWMutex
 }
 
@@ -193,6 +208,15 @@ type pod struct {
 
 	// pod object contains the api object of pod
 	podObj *v1.Pod
+}
+
+// cleanCacheOnOperationAbort deletes cached operation timestamp of a specific
+// volume-node pair from cache in the case when the operation should be aborted
+func cleanCacheOnOperationAbort(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName, toBeCleanedOperationName string, operationTimestamps util.OperationStartTimeCache) {
+	key := string(nodeName) + "/" + string(volumeName)
+	if _, cachedOpName, _, ok := operationTimestamps.Load(key); ok && cachedOpName == toBeCleanedOperationName {
+		operationTimestamps.Delete(key)
+	}
 }
 
 func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool) {
@@ -262,6 +286,12 @@ func (dsw *desiredStateOfWorld) AddPod(
 			}
 	}
 
+	// remove any existing cached "volume_detach" operation w.r.t the volume and node pair
+	// as the detach could be aborted.
+	// NOTE: removing of the cached "volume_detach" entry might cause on-going detach operation
+	//       to not record end to end latency which is desired behavior
+	cleanCacheOnOperationAbort(volumeName, nodeName, "volume_detach", dsw.operationTimestamps)
+
 	return volumeName, nil
 }
 
@@ -315,7 +345,12 @@ func (dsw *desiredStateOfWorld) DeletePod(
 		delete(
 			dsw.nodesManaged[nodeName].volumesToAttach,
 			volumeName)
+
+		// remove any existing cached "volume_attach" operation w.r.t the volume and node pair
+		// as the detach could be aborted (no pod needs to have the volume attached to the node)
+		cleanCacheOnOperationAbort(volumeName, nodeName, "volume_attach", dsw.operationTimestamps)
 	}
+
 }
 
 func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {

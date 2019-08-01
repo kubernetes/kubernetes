@@ -371,6 +371,47 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 	})
 
+	ginkgo.It("should have metrics for end to end latency for provision/deletion/detach/attach in controller manager", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(pvc, nil)
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		framework.ExpectNoError(err)
+
+		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+
+		metricKey := "volume_operation_total_seconds_count"
+		gomega.Expect(err == nil).To(gomega.BeTrue(), "failed to retrieve metrics from controller manager for metric: %q", metricKey)
+
+		dimensions := []string{"operation_name", "plugin_name"}
+		expectedOperations := []string{"delete", "provision", "volume_detach", "volume_attach"}
+		valid := hasValidMetrics(metrics.Metrics(controllerMetrics), metricKey, dimensions...)
+		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in Controller manager metrics: %q", metricKey)
+
+		values := extractDimensionValues(metrics.Metrics(controllerMetrics), metricKey, "operation_name")
+
+		for _, v := range expectedOperations {
+			if values[v] == 0 {
+				valid = false
+				break
+			}
+		}
+		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in Controller manager metrics: %q", metricKey)
+
+		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	})
+
 	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.
 	ginkgo.Describe("PVController", func() {
 		const (
@@ -734,6 +775,25 @@ func hasValidMetrics(metrics metrics.Metrics, metricKey string, dimensions ...st
 		}
 	}
 	return errCount == 0
+}
+
+func extractDimensionValues(m metrics.Metrics, metricKey, targetDimension string) map[string]int {
+	values := make(map[string]int)
+	samples, ok := m[metricKey]
+	if !ok {
+		e2elog.Logf("Metric with key %q not found in metrics", metricKey)
+		return values
+	}
+
+	for _, sample := range samples {
+		val, ok := sample.Metric[model.LabelName(targetDimension)]
+		if !ok {
+			e2elog.Logf("Error getting dimension %q for metric %q, sample %q", targetDimension, metricKey, sample.String())
+		} else {
+			values[string(val)] = values[string(val)] + 1
+		}
+	}
+	return values
 }
 
 func getStatesMetrics(metricKey string, givenMetrics metrics.Metrics) map[string]map[string]int64 {

@@ -55,6 +55,7 @@ go_test(
         "//pkg/volume/csi/testing:go_default_library",
         "//pkg/volume/gcepd:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

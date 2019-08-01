@@ -24,7 +24,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -128,18 +128,19 @@ func NewAttachDetachController(
 	// dropped pods so they are continuously processed until it is accepted or
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		podIndexer:  podInformer.Informer().GetIndexer(),
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		kubeClient:          kubeClient,
+		pvcLister:           pvcInformer.Lister(),
+		pvcsSynced:          pvcInformer.Informer().HasSynced,
+		pvLister:            pvInformer.Lister(),
+		pvsSynced:           pvInformer.Informer().HasSynced,
+		podLister:           podInformer.Lister(),
+		podsSynced:          podInformer.Informer().HasSynced,
+		podIndexer:          podInformer.Informer().GetIndexer(),
+		nodeLister:          nodeInformer.Lister(),
+		nodesSynced:         nodeInformer.Informer().HasSynced,
+		cloud:               cloud,
+		pvcQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		operationTimestamps: volumeutil.NewOperationStartTimeCache(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
@@ -163,7 +164,7 @@ func NewAttachDetachController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
-	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
+	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr, adc.operationTimestamps)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
 	adc.attacherDetacher =
 		operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -185,7 +186,8 @@ func NewAttachDetachController(
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
-		recorder)
+		recorder,
+		adc.operationTimestamps)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -326,6 +328,30 @@ type attachDetachController struct {
 
 	// pvcQueue is used to queue pvc objects
 	pvcQueue workqueue.RateLimitingInterface
+
+	// operationTimestamps caches start timestamp of attach/detach for metric recording.
+	// Detailed lifecyle/key for each operation
+	// 1. attach
+	//     key:        string of VolumeToAttach.NodeName + "/" + VolumeToAttach.VolumeName
+	//     start time: the first time "AttachVolume" is called in reconciler in "attachDesiredVolumes"
+	//                 for the VolumeToAttach object
+	//     end time:   after the "VolumeToAttach" has been successfully attached to the desired node
+	//     abort:      a. The "VolumeToAttach" has been marked "attached", i.e., actualStateOfWorld
+	//                 returns true on "IsVolumeAttachedToNode", before a successful "AttachVolume" call
+	//                 has been invoked by the reconciler
+	//                 b. A pod is deleted or updated to remove a volume from the desiredOfStateOfWorld before
+	//                    an attach operation has been successfully completed AND there is no other scheduled
+	//                    pod on that specific node which needs the volume
+	// 2. detach
+	//     key:        string of AttachedVolume.NodeName + "/" + AttachedVolume.VolumeName
+	//     start time: the first time "DetachVolume" is called in reconciler in "reconcile"
+	//                 for the "AttachedVolume" object
+	//     end time:   after the volume "AttachedVolume" object refers to being successfully
+	//                 detached from the node
+	//     abort:      when a volume is firstly requested to be detached from a node, and before the detach operation has been
+	//                 successfully processed, another request has been made to the volume to stay in desiredStateOfWorld
+	//                 via pod updating/adding/pvc bounding
+	operationTimestamps volumeutil.OperationStartTimeCache
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {

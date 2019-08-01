@@ -19,7 +19,7 @@ package cache
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -31,7 +31,8 @@ import (
 func Test_AddNode_Positive_NewNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 
 	// Act
@@ -56,7 +57,8 @@ func Test_AddNode_Positive_NewNode(t *testing.T) {
 func Test_AddNode_Positive_ExistingNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 
 	// Act
@@ -90,7 +92,8 @@ func Test_AddPod_Positive_NewPodNodeExistsVolumeDoesntExist(t *testing.T) {
 	// Arrange
 	podName := "pod-uid"
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
@@ -136,7 +139,8 @@ func Test_AddPod_Positive_NewPodNodeExistsVolumeDoesntExist(t *testing.T) {
 func Test_AddPod_Positive_NewPodNodeExistsVolumeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	pod1Name := "pod1-uid"
 	pod2Name := "pod2-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -210,7 +214,8 @@ func Test_AddPod_Positive_NewPodNodeExistsVolumeExists(t *testing.T) {
 func Test_AddPod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -276,7 +281,8 @@ func Test_AddPod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 func Test_AddPod_Negative_NewPodNodeDoesntExistVolumeDoesntExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -317,7 +323,8 @@ func Test_AddPod_Negative_NewPodNodeDoesntExistVolumeDoesntExist(t *testing.T) {
 func Test_DeleteNode_Positive_NodeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
 
@@ -345,7 +352,8 @@ func Test_DeleteNode_Positive_NodeExists(t *testing.T) {
 func Test_DeleteNode_Positive_NodeDoesntExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	notAddedNodeName := k8stypes.NodeName("node-not-added-name")
 
 	// Act
@@ -373,7 +381,8 @@ func Test_DeleteNode_Positive_NodeDoesntExist(t *testing.T) {
 func Test_DeleteNode_Negative_NodeExistsHasChildVolumes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
 	podName := "pod-uid"
@@ -414,7 +423,8 @@ func Test_DeleteNode_Negative_NodeExistsHasChildVolumes(t *testing.T) {
 func Test_DeletePod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -461,7 +471,8 @@ func Test_DeletePod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 func Test_DeletePod_Positive_2PodsExistNodeExistsVolumesExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	pod1Name := "pod1-uid"
 	pod2Name := "pod2-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -522,7 +533,8 @@ func Test_DeletePod_Positive_2PodsExistNodeExistsVolumesExist(t *testing.T) {
 func Test_DeletePod_Positive_PodDoesNotExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	pod1Name := "pod1-uid"
 	pod2Name := "pod2-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -571,7 +583,8 @@ func Test_DeletePod_Positive_PodDoesNotExist(t *testing.T) {
 func Test_DeletePod_Positive_NodeDoesNotExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -626,7 +639,8 @@ func Test_DeletePod_Positive_NodeDoesNotExist(t *testing.T) {
 func Test_DeletePod_Positive_VolumeDoesNotExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	podName := "pod-uid"
 	volume1Name := v1.UniqueVolumeName("volume1-name")
 	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
@@ -680,7 +694,8 @@ func Test_DeletePod_Positive_VolumeDoesNotExist(t *testing.T) {
 func Test_NodeExists_Positive_NodeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	notAddedNodeName := k8stypes.NodeName("node-not-added-name")
 
 	// Act
@@ -703,7 +718,8 @@ func Test_NodeExists_Positive_NodeExists(t *testing.T) {
 func Test_NodeExists_Positive_NodeDoesntExist(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
 
@@ -727,7 +743,8 @@ func Test_NodeExists_Positive_NodeDoesntExist(t *testing.T) {
 func Test_VolumeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
 	podName := "pod-uid"
@@ -757,7 +774,8 @@ func Test_VolumeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 func Test_VolumeExists_Positive_VolumeDoesntExistNodeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
 	podName := "pod-uid"
@@ -793,7 +811,8 @@ func Test_VolumeExists_Positive_VolumeDoesntExistNodeExists(t *testing.T) {
 func Test_VolumeExists_Positive_VolumeDoesntExistNodeDoesntExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	nodeName := k8stypes.NodeName("node-name")
 	volumeName := v1.UniqueVolumeName("volume-name")
 
@@ -816,7 +835,8 @@ func Test_VolumeExists_Positive_VolumeDoesntExistNodeDoesntExists(t *testing.T) 
 func Test_GetVolumesToAttach_Positive_NoNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 
 	// Act
 	volumesToAttach := dsw.GetVolumesToAttach()
@@ -833,7 +853,8 @@ func Test_GetVolumesToAttach_Positive_NoNodes(t *testing.T) {
 func Test_GetVolumesToAttach_Positive_TwoNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	node1Name := k8stypes.NodeName("node1-name")
 	node2Name := k8stypes.NodeName("node2-name")
 	dsw.AddNode(node1Name, false /*keepTerminatedPodVolumes*/)
@@ -854,7 +875,8 @@ func Test_GetVolumesToAttach_Positive_TwoNodes(t *testing.T) {
 func Test_GetVolumesToAttach_Positive_TwoNodesOneVolumeEach(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	node1Name := k8stypes.NodeName("node1-name")
 	pod1Name := "pod1-uid"
 	volume1Name := v1.UniqueVolumeName("volume1-name")
@@ -899,7 +921,8 @@ func Test_GetVolumesToAttach_Positive_TwoNodesOneVolumeEach(t *testing.T) {
 func Test_GetVolumesToAttach_Positive_TwoNodesOneVolumeEachExtraPod(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	node1Name := k8stypes.NodeName("node1-name")
 	pod1Name := "pod1-uid"
 	volume1Name := v1.UniqueVolumeName("volume1-name")
@@ -953,7 +976,8 @@ func Test_GetVolumesToAttach_Positive_TwoNodesOneVolumeEachExtraPod(t *testing.T
 func Test_GetVolumesToAttach_Positive_TwoNodesThreeVolumes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 	node1Name := k8stypes.NodeName("node1-name")
 	pod1Name := "pod1-uid"
 	volume1Name := v1.UniqueVolumeName("volume1-name")
@@ -1016,6 +1040,287 @@ func Test_GetVolumesToAttach_Positive_TwoNodesThreeVolumes(t *testing.T) {
 	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume3Name, string(volume3Name))
 }
 
+// Test AddPod which causes abort of a volume detach operation triggers cleaning up of a cached detach operation
+// timestamp for the corresponding node/volume pair that related to the added pod
+// 1. insert a detach operation timestamp entry into cache
+// 2. AddPod: add a pod with volume into dsw
+// 3. verify the cached detach operation timestamp should have been deleted from cache
+func Test_AddPod_TriggersCleaningDetachOperationStartTimeEntryForTheSpecificVolumeNodePair(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	plugin := "fake-plugin"
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
+	nodeName := k8stypes.NodeName("node-name")
+	podName := "pod-uid"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	nodeVolKey := string(nodeName) + "/" + plugin + "/" + string(volumeName)
+	fakeOpCache.AddIfNotExist(nodeVolKey, plugin, "volume_detach")
+	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_detach", 1, 0, 0)
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			podName,
+			podAddErr)
+	}
+	// Act
+	volumesToAttach := dsw.GetVolumesToAttach()
+	// Assert
+	if len(volumesToAttach) != 1 {
+		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+	}
+	verifyVolumeToAttach(t, volumesToAttach, nodeName, generatedVolumeName, string(volumeName))
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_detach", 1, 1, 0)
+}
+
+// Test AddPod which causes abort of a volume detach operation triggers cleaning up of a cached detach operation
+// timestamp for the corresponding node/volume pair that related to the added pod
+// 1. insert a detach operation timestamp entry into cache
+// 2. AddPod: add a pod with volume into dsw
+// 3. verify the cached detach operation timestamp should have been deleted from cache
+func Test_AddPod_ShouldNotCleanAttachOperationStartTimeEntryForTheSpecificVolumeNodePair(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	plugin := "fake-plugin"
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
+	nodeName := k8stypes.NodeName("node-name")
+	podName := "pod-uid"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	nodeVolKey := string(nodeName) + "/" + plugin + "/" + string(volumeName)
+	fakeOpCache.AddIfNotExist(nodeVolKey, plugin, "volume_attach")
+	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_attach", 1, 0, 0)
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			podName,
+			podAddErr)
+	}
+	// Act
+	volumesToAttach := dsw.GetVolumesToAttach()
+	// Assert
+	if len(volumesToAttach) != 1 {
+		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+	}
+	verifyVolumeToAttach(t, volumesToAttach, nodeName, generatedVolumeName, string(volumeName))
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_attach", 1, 0, 0)
+}
+
+// Test DeletePod which causes abort of an attach operation will NOT clean up of a cached detach operation
+// timestamp for the corresponding node/volume pair that related to the deleted pod
+// 1. AddPod: add a node/volume pair into dsw and corresponding node/volume detach entry into operation cache
+// 2. DeletePod: delete the pod from dsw should NOT touch existing detach operation timestamp
+// 3. verify there is detach operation timestamp entry for the removed volume/node pair
+func Test_DeletePod_DoesNotCleanDetachOperationStartTimeCacheForTheSpecificVolumeNodePair(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	plugin := "fake-plugin"
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
+	node1Name := k8stypes.NodeName("node1-name")
+	pod1Name := "pod1-uid"
+	volume1Name := v1.UniqueVolumeName("volume1-name")
+	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
+	dsw.AddNode(node1Name, false /*keepTerminatedPodVolumes*/)
+	generatedVolume1Name, podAddErr := dsw.AddPod(types.UniquePodName(pod1Name), controllervolumetesting.NewPod(pod1Name, pod1Name), volume1Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod1Name,
+			podAddErr)
+	}
+	node1Vol1Key := string(node1Name) + "/" + string(generatedVolume1Name)
+	fakeOpCache.AddIfNotExist(node1Vol1Key, plugin, "volume_detach")
+	// Act
+	volumesToAttach := dsw.GetVolumesToAttach()
+	// Assert
+	if len(volumesToAttach) != 1 {
+		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+	}
+	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
+	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_detach", 1, 0, 0)
+	// delete a pod should NOT remove detach operation entry in cache
+	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_detach", 1, 0, 0)
+}
+
+// Test DeletePod which causes abort of an attach operation will clean up of a cached attach operation
+// timestamp for the corresponding node/volume pair that related to the deleted pod AND there is no other
+// pod scheduled to the node needs the volume
+// 1. AddPod: add a node/volume pair into dsw and corresponding node/volume attach entry into operation cache
+// 2. DeletePod: delete the pod from dsw should delete existing cached attach operation timestamp
+// 3. verify there is no attach operation timestamp entry for the removed volume/node pair
+func Test_DeletePod_TriggersCleaningAttachOperationStartTimeCacheForTheSpecificVolumeNodePair(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	plugin := "fake-plugin"
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
+	node1Name := k8stypes.NodeName("node1-name")
+	pod1Name := "pod1-uid"
+	volume1Name := v1.UniqueVolumeName("volume1-name")
+	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
+	dsw.AddNode(node1Name, false /*keepTerminatedPodVolumes*/)
+	generatedVolume1Name, podAddErr := dsw.AddPod(types.UniquePodName(pod1Name), controllervolumetesting.NewPod(pod1Name, pod1Name), volume1Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod1Name,
+			podAddErr)
+	}
+	node1Vol1Key := string(node1Name) + "/" + string(generatedVolume1Name)
+	fakeOpCache.AddIfNotExist(node1Vol1Key, plugin, "volume_attach")
+	// Act
+	volumesToAttach := dsw.GetVolumesToAttach()
+	// Assert
+	if len(volumesToAttach) != 1 {
+		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+	}
+	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
+	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+	// delete a pod should NOT remove detach operation entry in cache
+	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 1, 0)
+}
+
+// Test DeletePod should NOT clean up the cached attach operation
+// timestamp when there is other pod scheduled to the node which also need the volume
+// 1. AddPod: add two pods which use the same volume into dsw on the same node
+// 2. insert corresponding node/volume attach entry into operation cache
+// 3. DeletePod: remove one of the node/volume pairs from dsw should not trigger operation cache cleaning
+// 4. verify the attach operation timestamp of the other node/volume pair is not cleaned from cache
+func Test_DeletePod_ShouldNotCleanAttachOperationStartTimeCacheWhenOtherPodStillNeedsItOnThatNode(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	plugin := "fake-plugin"
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
+	node1Name := k8stypes.NodeName("node1-name")
+	pod1Name := "pod1-uid"
+	volume1Name := v1.UniqueVolumeName("volume1-name")
+	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
+	dsw.AddNode(node1Name, false /*keepTerminatedPodVolumes*/)
+	generatedVolume1Name, podAddErr := dsw.AddPod(types.UniquePodName(pod1Name), controllervolumetesting.NewPod(pod1Name, pod1Name), volume1Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod1Name,
+			podAddErr)
+	}
+	node1Vol1Key := string(node1Name) + "/" + string(generatedVolume1Name)
+	fakeOpCache.AddIfNotExist(node1Vol1Key, plugin, "volume_attach")
+
+	pod2Name := "pod2-uid"
+	generatedVolume2Name, podAddErr := dsw.AddPod(types.UniquePodName(pod2Name), controllervolumetesting.NewPod(pod2Name, pod2Name), volume1Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod2Name,
+			podAddErr)
+	}
+	node1Vol2Key := string(node1Name) + "/" + string(generatedVolume2Name)
+	// check operation key should be the same
+	if node1Vol2Key != node1Vol1Key {
+		t.Fatalf("returned generated operation timestamp key should be the same, however get %q, %q", node1Vol1Key, node1Vol2Key)
+	}
+	// Act
+	volumesToAttach := dsw.GetVolumesToAttach()
+	// Assert
+	if len(volumesToAttach) != 1 {
+		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+	}
+	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
+	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+	// delete a pod should NOT clean the cached to attach operation timestamp
+	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+}
+
+// Test DeletePod only cleans cached volume_attach operation timestamp for the specific node/volume pair
+// 1. AddPod: add two pods onto the same node, each has a different volume into dsw
+// 2. insert two volume_attach operation timestamps into cache corresponding two the previous two pods
+// 3. DeletePod: delete pod1 which should trigger cached "attach_operation" timestamp being cleaned for the specific pair
+// 4. verify operation timestamps cache status
+func Test_DeletePod_ShouldOnlyCleanAttachOperationStartTimeCacheForTheSpecificNodeVolumePair(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	plugin := "fake-plugin"
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
+	node1Name := k8stypes.NodeName("node1-name")
+	pod1Name := "pod1-uid"
+	volume1Name := v1.UniqueVolumeName("volume1-name")
+	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
+	dsw.AddNode(node1Name, false /*keepTerminatedPodVolumes*/)
+	generatedVolume1Name, podAddErr := dsw.AddPod(types.UniquePodName(pod1Name), controllervolumetesting.NewPod(pod1Name, pod1Name), volume1Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod1Name,
+			podAddErr)
+	}
+	node1Vol1Key := string(node1Name) + "/" + string(generatedVolume1Name)
+	fakeOpCache.AddIfNotExist(node1Vol1Key, plugin, "volume_attach")
+
+	pod2Name := "pod2-uid"
+	volume2Name := v1.UniqueVolumeName("volume2-name")
+	volume2Spec := controllervolumetesting.GetTestVolumeSpec(string(volume2Name), volume2Name)
+	generatedVolume2Name, podAddErr := dsw.AddPod(types.UniquePodName(pod2Name), controllervolumetesting.NewPod(pod2Name, pod2Name), volume2Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod2Name,
+			podAddErr)
+	}
+	node1Vol2Key := string(node1Name) + "/" + string(generatedVolume2Name)
+	fakeOpCache.AddIfNotExist(node1Vol2Key, plugin, "volume_attach")
+	// Act
+	volumesToAttach := dsw.GetVolumesToAttach()
+	// Assert
+	if len(volumesToAttach) != 2 {
+		t.Fatalf("len(volumesToAttach) Expected: <2> Actual: <%v>", len(volumesToAttach))
+	}
+	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
+	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume2Name, string(volume2Name))
+	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol2Key, plugin, "volume_attach", 1, 0, 0)
+	// delete a pod should NOT clean the cached to attach operation timestamp
+	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 1, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol2Key, plugin, "volume_attach", 1, 0, 0)
+}
+
+func verifyOperationTimestampCache(
+	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, plugin, operation string, countAdd, countDelete, countUpdate int) {
+	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
+	if p != plugin || op != operation || countAdd > cAdd || countDelete != cDelete || countUpdate != cUpdate {
+		t.Errorf("OperationStartTimeCache for key <%s>, Expected, plugin = %s, operation = %s, countAdd >= %v, countDelete = %v, countUpdate = %v, Actual: %s, %s, %v, %v, %v",
+			key, plugin, operation, countAdd, countDelete, countUpdate,
+			p, op, cAdd, cDelete, cUpdate)
+	}
+}
+
+func verifyNoOperationTimestamp(
+	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, operation string) {
+	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
+	if p != "" || op != "" || cAdd != 0 || cDelete != 0 || cUpdate != 0 {
+		t.Errorf("OperationStartTimeCache should be empty: volume<%s>, operation<%s>, Got: %s %s %v %v %v",
+			key, operation, p, op, cAdd, cDelete, cUpdate)
+	}
+}
+
 func verifyVolumeToAttach(
 	t *testing.T,
 	volumesToAttach []VolumeToAttach,
@@ -1035,7 +1340,8 @@ func verifyVolumeToAttach(
 
 func Test_GetPodsOnNodes(t *testing.T) {
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, fakeOpCache)
 
 	// 2 nodes, each with one pod with a different volume
 	node1Name := k8stypes.NodeName("node1-name")

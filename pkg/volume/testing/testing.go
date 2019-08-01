@@ -28,7 +28,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -981,6 +981,9 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
+	if nodeName == MultiAttachNode {
+		return nil
+	}
 	if _, exist := fv.VolumesAttached[volumeName]; !exist {
 		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, nodeName)
 	}
@@ -1529,4 +1532,124 @@ func (f *fakeVolumeHost) SetKubeletError(err error) {
 
 func (f *fakeVolumeHost) WaitForCacheSync() error {
 	return nil
+}
+
+type fakeOperationTimestamp struct {
+	plugin             string
+	operation          string
+	countAddIfNotExist int
+	countDelete        int
+	countUpdatePlugin  int
+}
+
+type FakeOperationStartTimeCache struct {
+	cache   map[string](*fakeOperationTimestamp)
+	deleted map[string](*fakeOperationTimestamp)
+	rwLock  sync.RWMutex
+}
+
+func newFackOperationTimestamp(plugin, op string) *fakeOperationTimestamp {
+	return &fakeOperationTimestamp{
+		plugin:    plugin,
+		operation: op,
+	}
+}
+
+func NewFakeOperationStartTimeCache() util.OperationStartTimeCache {
+	return &FakeOperationStartTimeCache{
+		cache:   make(map[string]*fakeOperationTimestamp),
+		deleted: make(map[string]*fakeOperationTimestamp),
+	}
+}
+
+func (c *FakeOperationStartTimeCache) AddIfNotExist(key, pluginName, operationName string) {
+	c.rwLock.Lock()
+	defer c.rwLock.Unlock()
+	existed, found := c.cache[key]
+	if found {
+		existed.countAddIfNotExist += 1
+	} else {
+		ts := newFackOperationTimestamp(pluginName, operationName)
+		ts.countAddIfNotExist = 1
+		c.cache[key] = ts
+	}
+}
+
+func (c *FakeOperationStartTimeCache) Delete(key string) {
+	c.rwLock.Lock()
+	defer c.rwLock.Unlock()
+	existed, found := c.cache[key]
+	if found {
+		dKey := key + "-" + existed.operation
+		deleteExisted, found := c.deleted[dKey]
+		if found {
+			deleteExisted.countDelete += existed.countDelete
+			deleteExisted.countUpdatePlugin += existed.countUpdatePlugin
+			deleteExisted.countAddIfNotExist += existed.countAddIfNotExist
+		} else {
+			newlyDeleted := newFackOperationTimestamp(existed.plugin, existed.operation)
+			newlyDeleted.countAddIfNotExist = existed.countAddIfNotExist
+			newlyDeleted.countDelete = 1
+			newlyDeleted.countUpdatePlugin = existed.countUpdatePlugin
+			c.deleted[dKey] = newlyDeleted
+		}
+		delete(c.cache, key)
+	}
+}
+
+func (c *FakeOperationStartTimeCache) Has(key string) bool {
+	c.rwLock.RLock()
+	defer c.rwLock.RUnlock()
+	_, exists := c.cache[key]
+	return exists
+}
+
+func (c *FakeOperationStartTimeCache) Load(key string) (pluginName, operationName string, startTime time.Time, ok bool) {
+	c.rwLock.RLock()
+	defer c.rwLock.RUnlock()
+	ts, found := c.cache[key]
+	if !found {
+		return "", "", time.Time{}, found
+	}
+	return ts.plugin, ts.operation, time.Time{}, found
+}
+
+func (c *FakeOperationStartTimeCache) UpdatePluginName(key, newPluginName string) bool {
+	c.rwLock.Lock()
+	defer c.rwLock.Unlock()
+	ts, found := c.cache[key]
+	if !found || ts.plugin == newPluginName {
+		return false
+	}
+	ts.plugin = newPluginName
+	ts.countUpdatePlugin += 1
+	return true
+}
+
+func (c *FakeOperationStartTimeCache) LoadAll(key, op string) (plugin, operation string, countAdd, countDelete, countUpdate int) {
+	c.rwLock.RLock()
+	defer c.rwLock.RUnlock()
+	ts, found := c.cache[key]
+	deleted, deletedFound := c.deleted[key+"-"+op]
+	if !found && !deletedFound {
+		return "", "", 0, 0, 0
+	}
+
+	if found && !deletedFound {
+		if ts.operation == op {
+			return ts.plugin, ts.operation, ts.countAddIfNotExist, ts.countDelete, ts.countUpdatePlugin
+		}
+		return "", "", 0, 0, 0
+	}
+
+	if !found || ts.operation != op {
+		return deleted.plugin, deleted.operation, deleted.countAddIfNotExist, deleted.countDelete, deleted.countUpdatePlugin
+	}
+
+	// combine deleted and on-going
+	return deleted.plugin,
+		deleted.operation,
+		deleted.countAddIfNotExist + ts.countAddIfNotExist,
+		deleted.countDelete + ts.countDelete,
+		deleted.countUpdatePlugin + ts.countUpdatePlugin
 }

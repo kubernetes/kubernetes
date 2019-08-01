@@ -90,7 +90,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	}
 
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
-	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
+	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr, adc.operationTimestamps)
 
 	err := adc.populateActualStateOfWorld()
 	if err != nil {

@@ -26,7 +26,7 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -118,6 +118,7 @@ func NewReconciler(
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
 		timeOfLastSync:                time.Time{},
+		operationStartTimeCache:       util.NewOperationStartTimeCache(),
 	}
 }
 
@@ -137,6 +138,13 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	kubeletPodsDir                string
 	timeOfLastSync                time.Time
+	// TODO(xiangqian): An architecture change has been made in #26351 to move
+	// attach/detach from kubelet into controller manager since v.1.3. sig-storage
+	// is looking to completely disable kubelet volume attach/detach however the code
+	// still exists in kubelet. The following cache is needed to make sure the new
+	// changes do not break build, though needs to be cleaned up when attach/detach
+	// are completely removed from kubelet
+	operationStartTimeCache util.OperationStartTimeCache
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -215,7 +223,7 @@ func (rc *reconciler) reconcile() {
 					NodeName:   rc.nodeName,
 				}
 				klog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""))
-				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
+				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld, rc.operationStartTimeCache)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
@@ -303,7 +311,7 @@ func (rc *reconciler) reconcile() {
 					// Only detach if kubelet detach is enabled
 					klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
 					err := rc.operationExecutor.DetachVolume(
-						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
+						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld, rc.operationStartTimeCache)
 					if err != nil &&
 						!nestedpendingoperations.IsAlreadyExists(err) &&
 						!exponentialbackoff.IsExponentialBackoff(err) {

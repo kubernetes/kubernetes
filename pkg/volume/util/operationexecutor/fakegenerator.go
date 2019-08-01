@@ -19,10 +19,11 @@ package operationexecutor
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -52,11 +53,18 @@ func (f *fakeOGCounter) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume,
 	return f.recordFuncCall("GenerateUnmountVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+func (f *fakeOGCounter) GenerateAttachVolumeFunc(
+	volumeToAttach VolumeToAttach,
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+	operationStartTimeCache util.OperationStartTimeCache) volumetypes.GeneratedOperations {
 	return f.recordFuncCall("GenerateAttachVolumeFunc")
 }
 
-func (f *fakeOGCounter) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateDetachVolumeFunc(
+	volumeToDetach AttachedVolume,
+	verifySafeToDetach bool,
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+	operationStartTimeCache util.OperationStartTimeCache) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateDetachVolumeFunc"), nil
 }
 
@@ -104,6 +112,17 @@ func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMoun
 }
 
 func (f *fakeOGCounter) recordFuncCall(name string) volumetypes.GeneratedOperations {
+	if _, ok := f.calledFuncs[name]; ok {
+		f.calledFuncs[name]++
+	}
+	ops := volumetypes.GeneratedOperations{
+		OperationName: name,
+		OperationFunc: f.opFunc,
+	}
+	return ops
+}
+
+func (f *fakeOGCounter) recordFuncCallWithMetric(name string, opStartTimeCache *util.OperationStartTimeCache) volumetypes.GeneratedOperations {
 	if _, ok := f.calledFuncs[name]; ok {
 		f.calledFuncs[name]++
 	}

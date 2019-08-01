@@ -21,12 +21,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -191,7 +192,7 @@ func TestOperationExecutor_AttachVolumeConcurrently(t *testing.T) {
 			VolumeName: v1.UniqueVolumeName(pdName),
 			NodeName:   "node",
 		}
-		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */)
+		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */, nil /* operationStartTimeCache */)
 	}
 
 	// Assert
@@ -212,7 +213,7 @@ func TestOperationExecutor_DetachVolumeConcurrently(t *testing.T) {
 			VolumeName: v1.UniqueVolumeName(pdName),
 			NodeName:   "node",
 		}
-		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */)
+		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */, nil /* operationStartTimeCache */)
 	}
 
 	// Assert
@@ -406,7 +407,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount Mo
 		OperationFunc: opFunc,
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater, operationStartTimeCache util.OperationStartTimeCache) volumetypes.GeneratedOperations {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
@@ -415,7 +416,7 @@ func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach Volu
 		OperationFunc: opFunc,
 	}
 }
-func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater, operationStartTimeCache util.OperationStartTimeCache) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil

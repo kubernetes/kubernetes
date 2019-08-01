@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -97,10 +97,10 @@ type OperationGenerator interface {
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
-	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations
+	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater, operationStartTimeCache util.OperationStartTimeCache) volumetypes.GeneratedOperations
 
 	// Generates the DetachVolume function needed to perform the detach of a volume plugin
-	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater, operationStartTimeCache util.OperationStartTimeCache) (volumetypes.GeneratedOperations, error)
 
 	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
 	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
@@ -325,7 +325,8 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(
 	volumeToAttach VolumeToAttach,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+	operationStartTimeCache util.OperationStartTimeCache) volumetypes.GeneratedOperations {
 	originalSpec := volumeToAttach.VolumeSpec
 	attachVolumeFunc := func() (error, error) {
 		var attachableVolumePlugin volume.AttachableVolumePlugin
@@ -397,6 +398,10 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			return volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 		}
 
+		// the volume has been attached, and actualStateOfWorld has been updated,
+		// record end of end latency and clean up cache
+		util.RecordMetric(createOperationUniqueKey(volumeToAttach.VolumeName, volumeToAttach.NodeName), operationStartTimeCache, nil)
+
 		return nil, nil
 	}
 
@@ -444,11 +449,15 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		attachableVolumePluginName = attachableVolumePlugin.GetPluginName()
 	}
 
+	// update operation start time cache with fully qualified plugin name for the corresponding volumeToAttach
+	fullPluginName := util.GetFullQualifiedPluginNameForVolume(attachableVolumePluginName, volumeToAttach.VolumeSpec)
+	operationStartTimeCache.UpdatePluginName(createOperationUniqueKey(volumeToAttach.VolumeName, volumeToAttach.NodeName), fullPluginName)
+
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_attach",
 		OperationFunc:     attachVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(attachableVolumePluginName, volumeToAttach.VolumeSpec), "volume_attach"),
+		CompleteFunc:      util.OperationCompleteHook(fullPluginName, "volume_attach"),
 	}
 }
 
@@ -459,7 +468,8 @@ func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 func (og *operationGenerator) GenerateDetachVolumeFunc(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+	operationStartTimeCache util.OperationStartTimeCache) (volumetypes.GeneratedOperations, error) {
 	var volumeName string
 	var attachableVolumePlugin volume.AttachableVolumePlugin
 	var pluginName string
@@ -561,13 +571,21 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		actualStateOfWorld.MarkVolumeAsDetached(
 			volumeToDetach.VolumeName, volumeToDetach.NodeName)
 
+		// the volume has been detached, and actualStateOfWorld has been updated,
+		// record end of end latency and clean up cache
+		util.RecordMetric(createOperationUniqueKey(volumeToDetach.VolumeName, volumeToDetach.NodeName), operationStartTimeCache, nil)
+
 		return nil, nil
 	}
+
+	// update operation start time cache with fully qualified plugin name for the corresponding volumeToDetach
+	fullPluginName := util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec)
+	operationStartTimeCache.UpdatePluginName(createOperationUniqueKey(volumeToDetach.VolumeName, volumeToDetach.NodeName), fullPluginName)
 
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_detach",
 		OperationFunc:     getVolumePluginMgrFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec), "volume_detach"),
+		CompleteFunc:      util.OperationCompleteHook(fullPluginName, "volume_detach"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -1920,4 +1938,8 @@ func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
 		ReadOnly:                        spec.ReadOnly,
 		InlineVolumeSpecForCSIMigration: inlineVolume,
 	}, nil
+}
+
+func createOperationUniqueKey(volumeName v1.UniqueVolumeName, nodeName types.NodeName) string {
+	return string(nodeName) + "/" + string(volumeName)
 }

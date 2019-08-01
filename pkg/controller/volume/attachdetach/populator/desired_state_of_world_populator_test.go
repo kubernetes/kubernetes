@@ -38,7 +38,8 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 	fakePodInformer := fakeInformerFactory.Core().V1().Pods()
 
-	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, fakeOpCache)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

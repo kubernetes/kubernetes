@@ -131,7 +131,8 @@ func TestVolumesInUseMetricCollection(t *testing.T) {
 
 func TestTotalVolumesMetricCollection(t *testing.T) {
 	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+	fakeOpCache := volumetesting.NewFakeOperationStartTimeCache()
+	dsw := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, fakeOpCache)
 	asw := cache.NewActualStateOfWorld(fakeVolumePluginMgr)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
