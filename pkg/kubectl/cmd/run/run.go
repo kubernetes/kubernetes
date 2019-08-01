@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/attach"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
@@ -423,7 +423,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		leaveStdinOpen := o.LeaveStdinOpen
 		waitForExitCode := !leaveStdinOpen && restartPolicy == corev1.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, podCompleted)
 			if err != nil {
 				return err
 			}
@@ -540,8 +540,8 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitConditio
 }
 
 func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *attach.AttachOptions) error {
-	pod, err := waitForPod(podClient, ns, name, kubectl.PodRunningAndReady)
-	if err != nil && err != kubectl.ErrPodCompleted {
+	pod, err := waitForPod(podClient, ns, name, podRunningAndReady)
+	if err != nil && err != ErrPodCompleted {
 		return err
 	}
 
@@ -717,4 +717,54 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		Object:  actualObj,
 		Mapping: mapping,
 	}, nil
+}
+
+// ErrPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
+// the pod has already reached completed state.
+var ErrPodCompleted = fmt.Errorf("pod ran to completion")
+
+// podCompleted returns true if the pod has run to completion, false if the pod has not yet
+// reached running state, or an error in any other case.
+func podCompleted(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		switch t.Status.Phase {
+		case corev1.PodFailed, corev1.PodSucceeded:
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// podRunningAndReady returns true if the pod is running and ready, false if the pod has not
+// yet reached those states, returns ErrPodCompleted if the pod has run to completion, or
+// an error in any other case.
+func podRunningAndReady(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		switch t.Status.Phase {
+		case corev1.PodFailed, corev1.PodSucceeded:
+			return false, ErrPodCompleted
+		case corev1.PodRunning:
+			conditions := t.Status.Conditions
+			if conditions == nil {
+				return false, nil
+			}
+			for i := range conditions {
+				if conditions[i].Type == corev1.PodReady &&
+					conditions[i].Status == corev1.ConditionTrue {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }

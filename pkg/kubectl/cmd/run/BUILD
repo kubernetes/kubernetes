@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/run",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/attach:go_default_library",
         "//pkg/kubectl/cmd/delete:go_default_library",
         "//pkg/kubectl/cmd/exec:go_default_library",
@@ -17,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
