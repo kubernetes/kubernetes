@@ -2439,7 +2439,7 @@ func TestDescribeEvents(t *testing.T) {
 			fake.NewSimpleClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:     "bar",
-					SelfLink: "url/url/url/url",
+					SelfLink: "/api/v1/nodes/bar",
 				},
 			}, events),
 		},
@@ -2447,7 +2447,7 @@ func TestDescribeEvents(t *testing.T) {
 			fake.NewSimpleClientset(&corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:     "bar",
-					SelfLink: "url/url/url/url",
+					SelfLink: "/api/v1/persistentvolumes/bar",
 				},
 			}, events),
 		},
@@ -2456,7 +2456,7 @@ func TestDescribeEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
-					SelfLink:  "url/url/url/url",
+					SelfLink:  "/api/v1/namespaces/foo/pods/bar",
 				},
 			}, events),
 		},
