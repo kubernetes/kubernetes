@@ -55,7 +55,7 @@ func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretRef
 // saveVolumeData persists parameter data as json file at the provided location
 func saveVolumeData(dir string, fileName string, data map[string]string) error {
 	dataFilePath := filepath.Join(dir, fileName)
-	klog.V(4).Info(log("saving volume data file [%s]", dataFilePath))
+	klog.V(5).Info(log("saving volume data file [%s]", dataFilePath))
 	file, err := os.Create(dataFilePath)
 	if err != nil {
 		klog.Error(log("failed to save volume data file %s: %v", dataFilePath, err))
@@ -74,7 +74,7 @@ func saveVolumeData(dir string, fileName string, data map[string]string) error {
 func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 	// remove /mount at the end
 	dataFileName := filepath.Join(dir, fileName)
-	klog.V(4).Info(log("loading volume data file [%s]", dataFileName))
+	klog.V(5).Info(log("loading volume data file [%s]", dataFileName))
 
 	file, err := os.Open(dataFileName)
 	if err != nil {
