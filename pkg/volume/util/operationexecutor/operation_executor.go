@@ -899,13 +899,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	// Block Volume case
 	// Create volumeSpec from mount path
 	klog.V(5).Infof("Starting operationExecutor.ReconstructVolume")
-	if mapperPlugin == nil {
-		return nil, fmt.Errorf("Could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)",
-			pluginName,
-			volumeSpecName,
-			podName,
-			uid)
-	}
+
 	// volumePath contains volumeName on the path. In the case of block volume, {volumeName} is symbolic link
 	// corresponding to raw block device.
 	// ex. volumePath: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}

@@ -470,6 +470,11 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
+	// TODO: remove feature gate check after no longer needed
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && volume.volumeMode == v1.PersistentVolumeBlock && mapperPlugin == nil {
+		return nil, fmt.Errorf("Could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)", volume.pluginName, volume.volumeSpecName, volume.podName, pod.UID)
+	}
+
 	volumeSpec, err := rc.operationExecutor.ReconstructVolumeOperation(
 		volume.volumeMode,
 		plugin,
@@ -501,22 +506,20 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && volume.volumeMode == v1.PersistentVolumeBlock {
 		var newMapperErr error
-		if mapperPlugin != nil {
-			volumeMapper, newMapperErr = mapperPlugin.NewBlockVolumeMapper(
-				volumeSpec,
-				pod,
-				volumepkg.VolumeOptions{})
-			if newMapperErr != nil {
-				return nil, fmt.Errorf(
-					"reconstructVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-					uniqueVolumeName,
-					volumeSpec.Name(),
-					volume.podName,
-					pod.UID,
-					newMapperErr)
-			}
-			checkPath, _ = volumeMapper.GetPodDeviceMapPath()
+		volumeMapper, newMapperErr = mapperPlugin.NewBlockVolumeMapper(
+			volumeSpec,
+			pod,
+			volumepkg.VolumeOptions{})
+		if newMapperErr != nil {
+			return nil, fmt.Errorf(
+				"reconstructVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				newMapperErr)
 		}
+		checkPath, _ = volumeMapper.GetPodDeviceMapPath()
 	} else {
 		var err error
 		volumeMounter, err = plugin.NewMounter(
