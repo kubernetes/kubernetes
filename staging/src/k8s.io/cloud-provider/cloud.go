@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -104,12 +104,21 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 }
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
-// PR https://github.com/kubernetes/kubernetes/pull/80660 added support for cloud providers to return an error
-// ImplementedElsewhere. This error is used to indicate that the loadbalancer implementation is handled outside of
-// cloud provider, maybe in a different controller.
-// In order to use this correctly, the cloud-provider implementation needs to return "NotFound"
-// for GetLoadBalancer and empty string for GetLoadBalancerName. EnsureLoadBalancer and UpdateLoadBalancer need to
-// return ImplementedElsewhere error. EnsureLoadBalancerDeleted can return ImplementedElsewhere as well.
+//
+// Cloud provider may chose to implement the logic for
+// constructing/destroying specific kinds of load balancers in a
+// controller separate from the ServiceController.  If this is the case,
+// then {Ensure,Update}LoadBalancer must return the ImplementedElsewhere error.
+// For the given LB service, the GetLoadBalancer must return "exists=True" if
+// there exists a LoadBalancer instance created by ServiceController.
+// In all other cases, GetLoadBalancer must return a NotFound error.
+// EnsureLoadBalancerDeleted must not return ImplementedElsewhere to ensure
+// proper teardown of resources that were allocated by the ServiceController.
+// This can happen if a user changes the type of LB via an update to the resource
+// or when migrating from ServiceController to alternate implementation.
+// The finalizer on the service will be added and removed by ServiceController
+// irrespective of the ImplementedElsewhere error. Additional finalizers for
+// LB services must be managed in the alternate implementation.
 type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
