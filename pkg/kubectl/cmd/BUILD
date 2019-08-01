@@ -82,6 +82,7 @@ filegroup(
         "//pkg/kubectl/cmd/auth:all-srcs",
         "//pkg/kubectl/cmd/convert:all-srcs",
         "//pkg/kubectl/cmd/get:all-srcs",
+        "//pkg/kubectl/cmd/plugin/testdata:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
