@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
 	"strings"
 	"sync"
@@ -160,7 +161,6 @@ type genericScheduler struct {
 	prioritizers             []priorities.PriorityConfig
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
-	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
 	nodeInfoSnapshot         *internalcache.NodeInfoSnapshot
 	volumeBinder             *volumebinder.VolumeBinder
@@ -271,34 +271,29 @@ func (g *genericScheduler) Predicates() map[string]predicates.FitPredicate {
 	return g.predicates
 }
 
-// findMaxScores returns the indexes of nodes in the "priorityList" that has the highest "Score".
-func findMaxScores(priorityList schedulerapi.HostPriorityList) []int {
-	maxScoreIndexes := make([]int, 0, len(priorityList)/2)
-	maxScore := priorityList[0].Score
-	for i, hp := range priorityList {
-		if hp.Score > maxScore {
-			maxScore = hp.Score
-			maxScoreIndexes = maxScoreIndexes[:0]
-			maxScoreIndexes = append(maxScoreIndexes, i)
-		} else if hp.Score == maxScore {
-			maxScoreIndexes = append(maxScoreIndexes, i)
-		}
-	}
-	return maxScoreIndexes
-}
-
 // selectHost takes a prioritized list of nodes and then picks one
-// in a round-robin manner from the nodes that had the highest score.
+// in a reservoir sampling manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
-
-	maxScores := findMaxScores(priorityList)
-	ix := int(g.lastNodeIndex % uint64(len(maxScores)))
-	g.lastNodeIndex++
-
-	return priorityList[maxScores[ix]].Host, nil
+	maxScore := priorityList[0].Score
+	selected := priorityList[0].Host
+	cntOfMaxScore := 1
+	for _, hp := range priorityList[1:] {
+		if hp.Score > maxScore {
+			maxScore = hp.Score
+			selected = hp.Host
+			cntOfMaxScore = 1
+		} else if hp.Score == maxScore {
+			cntOfMaxScore++
+			if rand.Intn(cntOfMaxScore) == 0 {
+				// Replace the candidate with probability of 1/cntOfMaxScore
+				selected = hp.Host
+			}
+		}
+	}
+	return selected, nil
 }
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
