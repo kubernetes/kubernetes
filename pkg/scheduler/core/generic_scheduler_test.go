@@ -613,7 +613,7 @@ func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
-	_, predicateMap, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, nodes)
+	_, predicateMap, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, schedulertesting.FakeNodeLister(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -643,7 +643,7 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(predicates, nodes)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, predicateMap, err := scheduler.findNodesThatFit(nil, pod, nodes)
+	_, predicateMap, err := scheduler.findNodesThatFit(nil, pod, schedulertesting.FakeNodeLister(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
