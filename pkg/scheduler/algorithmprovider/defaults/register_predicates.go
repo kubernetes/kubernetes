@@ -61,21 +61,21 @@ func init() {
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxEBSVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 	// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxGCEPDVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 	// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxAzureDiskVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 	factory.RegisterFitPredicateFactory(
@@ -87,7 +87,7 @@ func init() {
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxCinderVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 

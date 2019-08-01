@@ -23,12 +23,13 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -97,6 +98,32 @@ func TestVolumeCountConflicts(t *testing.T) {
 				{
 					VolumeSource: v1.VolumeSource{
 						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
+					},
+				},
+			},
+		},
+	}
+	unboundPVCwithInvalidSCPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "unboundPVCwithInvalidSCPod",
+						},
+					},
+				},
+			},
+		},
+	}
+	unboundPVCwithDefaultSCPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "unboundPVCwithDefaultSCPod",
+						},
 					},
 				},
 			},
@@ -361,26 +388,43 @@ func TestVolumeCountConflicts(t *testing.T) {
 			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
 			filterName:   EBSVolumeFilterType,
-			maxVols:      2,
+			maxVols:      1,
 			fits:         false,
-			test:         "pod with missing PVC is counted towards the PV limit",
+			test:         "missing PVC is not counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
 			filterName:   EBSVolumeFilterType,
-			maxVols:      3,
+			maxVols:      2,
 			fits:         true,
-			test:         "pod with missing PVC is counted towards the PV limit",
+			test:         "missing PVC is not counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
 			filterName:   EBSVolumeFilterType,
-			maxVols:      3,
-			fits:         false,
-			test:         "pod with missing two PVCs is counted towards the PV limit twice",
+			maxVols:      2,
+			fits:         true,
+			test:         "two missing PVCs are not counted towards the PV limit twice",
 		},
+		{
+			newPod:       unboundPVCwithInvalidSCPod,
+			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   EBSVolumeFilterType,
+			maxVols:      1,
+			fits:         true,
+			test:         "unbound PVC with invalid SC is not counted towards the PV limit",
+		},
+		{
+			newPod:       unboundPVCwithDefaultSCPod,
+			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   EBSVolumeFilterType,
+			maxVols:      1,
+			fits:         true,
+			test:         "unbound PVC from different provisioner is not counted towards the PV limit",
+		},
+
 		{
 			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
@@ -791,7 +835,11 @@ func TestVolumeCountConflicts(t *testing.T) {
 	// running attachable predicate tests without feature gate and no limit present on nodes
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
+		pred := NewMaxPDVolumeCountPredicate(test.filterName,
+			getFakeStorageClassInfo(test.filterName),
+			getFakePVInfo(test.filterName),
+			getFakePVCInfo(test.filterName))
+
 		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), schedulernodeinfo.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
@@ -809,7 +857,10 @@ func TestVolumeCountConflicts(t *testing.T) {
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		node := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
+		pred := NewMaxPDVolumeCountPredicate(test.filterName,
+			getFakeStorageClassInfo(test.filterName),
+			getFakePVInfo(test.filterName),
+			getFakePVCInfo(test.filterName))
 		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
@@ -820,6 +871,32 @@ func TestVolumeCountConflicts(t *testing.T) {
 		if fits != test.fits {
 			t.Errorf("Using allocatable [%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
 		}
+	}
+}
+
+func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
+	var provisioner string
+	switch sc {
+	case EBSVolumeFilterType:
+		provisioner = csilibplugins.AWSEBSInTreePluginName
+	case GCEPDVolumeFilterType:
+		provisioner = csilibplugins.GCEPDInTreePluginName
+	case AzureDiskVolumeFilterType:
+		provisioner = csilibplugins.AzureDiskInTreePluginName
+	case CinderVolumeFilterType:
+		provisioner = csilibplugins.CinderInTreePluginName
+	default:
+		return FakeStorageClassInfo{}
+	}
+	return FakeStorageClassInfo{
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: sc},
+			Provisioner: provisioner,
+		},
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: "standard-sc"},
+			Provisioner: "standard-sc",
+		},
 	}
 }
 
@@ -846,27 +923,59 @@ func getFakePVCInfo(filterName string) FakePersistentVolumeClaimInfo {
 	return FakePersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "some" + filterName + "Vol",
+				StorageClassName: &filterName,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "someNon" + filterName + "Vol",
+				StorageClassName: &filterName,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "pvcWithDeletedPV",
+				StorageClassName: &filterName,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "anotherPVCWithDeletedPV",
+				StorageClassName: &filterName,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "",
+				StorageClassName: &filterName,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "",
+				StorageClassName: &filterName,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCwithDefaultSCPod"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "",
+				StorageClassName: utilpointer.StringPtr("standard-sc"),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCwithInvalidSCPod"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName:       "",
+				StorageClassName: utilpointer.StringPtr("invalid-sc"),
+			},
 		},
 	}
 }
