@@ -14,6 +14,7 @@ go_test(
         "finalization_test.go",
         "objectmeta_test.go",
         "registration_test.go",
+        "scope_test.go",
         "subresources_test.go",
         "table_test.go",
         "validation_test.go",
