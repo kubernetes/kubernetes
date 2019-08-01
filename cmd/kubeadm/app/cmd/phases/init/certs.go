@@ -218,18 +218,18 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
+		// if using external etcd, skips etcd certificate authority generation
+		if data.Cfg().Etcd.External != nil && ca.Name == "etcd-ca" {
+			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
+			return nil
+		}
+
 		if _, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
 				return nil
 			}
 			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
-			return nil
-		}
-
-		// if using external etcd, skips etcd certificate authority generation
-		if data.Cfg().Etcd.External != nil && ca.Name == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
 			return nil
 		}
 
@@ -248,6 +248,12 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("certs phase invoked with an invalid data struct")
+		}
+
+		// if using external etcd, skips etcd certificates generation
+		if data.Cfg().Etcd.External != nil && cert.CAName == "etcd-ca" {
+			fmt.Printf("[certs] External etcd mode: Skipping %s certificate generation\n", cert.BaseName)
+			return nil
 		}
 
 		if certData, _, err := pkiutil.TryLoadCertAndKeyFromDisk(data.CertificateDir(), cert.BaseName); err == nil {
@@ -271,12 +277,6 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			}
 
 			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
-		}
-
-		// if using external etcd, skips etcd certificates generation
-		if data.Cfg().Etcd.External != nil && cert.CAName == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", cert.BaseName)
-			return nil
 		}
 
 		// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)
