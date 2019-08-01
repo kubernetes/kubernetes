@@ -1,0 +1,39 @@
+linters-settings:
+  gocyclo:
+    min-complexity: 10
+  goconst:
+    min-len: 2
+    min-occurrences: 4
+  lll:
+    line-length: 100
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - importShadow
+      - paramTypeCombine
+      - commentFormatting # https://github.com/go-critic/go-critic/issues/755
+      - unnamedResult
+    settings:
+      hugeParam:
+        sizeThreshold: 256
+
+issues:
+  exclude-use-default: false
+  exclude:
+    # unparam
+    - 'result .* is always'
+    - 'always receives'
+
+linters:
+  enable-all: true
+  disable:
+    - dupl
+    - gochecknoglobals
+    - gochecknoinits
+    - gosec
+    - scopelint
+    - maligned

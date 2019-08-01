@@ -1,0 +1,56 @@
+meta:
+  project: gotestsum
+
+mount=source:
+  bind: .
+  path: /go/src/gotest.tools/gotestsum
+
+mount=buildcache:
+  bind: ~/.cache/go-build
+  path: /root/.cache/go-build
+
+mount=modcache:
+  bind: ~/go/pkg/mod
+  path: /go/pkg/mod
+
+image=builder:
+  image: gotestsum-dev
+  context: dobifiles/
+  dockerfile: Dockerfile
+  target: dev
+  args:
+    GOLANG_VERSION: '{env.GOLANG_VERSION:}' 
+
+job=shell:
+  use: builder
+  mounts: [source, buildcache, modcache]
+  interactive: true
+  command: sh
+
+job=watch:
+  use: builder
+  mounts: [source, buildcache, modcache]
+  interactive: true
+  command: |
+      filewatcher -x vendor ./dist/gotestsum -- -test.timeout 10s
+  env: ['GOTESTSUM_FORMAT=short-verbose']
+  depends: [binary]
+
+job=test-unit:
+  use: builder
+  mounts: [source, buildcache, modcache]
+  interactive: true
+  command: scripts/test-unit
+
+job=lint:
+  use: builder
+  mounts: [source, buildcache, modcache]
+  command: golangci-lint run
+
+job=binary:
+  use: builder
+  mounts: [source, buildcache, modcache]
+  command: bash -c 'mkdir -p dist; go build -o dist/gotestsum .'
+
+alias=test:
+  tasks: [test-unit]
