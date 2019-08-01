@@ -32,7 +32,7 @@ import (
 var (
 	// ErrorNoAuth indicates that no credentials are provided.
 	ErrorNoAuth = fmt.Errorf("no credentials provided for Azure cloud provider")
-	// Tenenatid value for Azure Stack ADFS case.
+	// ADFSIdentitySystem indicates value of tenantId for ADFS on Azure Stack.
 	ADFSIdentitySystem = "ADFS"
 )
 
@@ -64,11 +64,11 @@ type AzureAuthConfig struct {
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration
 func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
-	var tenantId string
+	var tenantID string
 	if strings.EqualFold(config.IdentitySystem, ADFSIdentitySystem) {
-		tenantId = "adfs"
+		tenantID = "adfs"
 	} else {
-		tenantId = config.TenantID
+		tenantID = config.TenantID
 	}
 
 	if config.UseManagedIdentityExtension {
@@ -89,7 +89,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 			env.ServiceManagementEndpoint)
 	}
 
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantId)
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
