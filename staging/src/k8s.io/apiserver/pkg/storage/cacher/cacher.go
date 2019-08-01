@@ -160,57 +160,6 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 	i.valueWatchers = map[string]watchersMap{}
 }
 
-// As we don't need a high precision here, we keep all watchers timeout within a
-// second in a bucket, and pop up them once at the timeout. To be more specific,
-// if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
-type watcherBookmarkTimeBuckets struct {
-	lock            sync.Mutex
-	watchersBuckets map[int64][]*cacheWatcher
-	startBucketID   int64
-	clock           clock.Clock
-}
-
-func newTimeBucketWatchers(clock clock.Clock) *watcherBookmarkTimeBuckets {
-	return &watcherBookmarkTimeBuckets{
-		watchersBuckets: make(map[int64][]*cacheWatcher),
-		startBucketID:   clock.Now().Unix(),
-		clock:           clock,
-	}
-}
-
-// adds a watcher to the bucket, if the deadline is before the start, it will be
-// added to the first one.
-func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
-	nextTime, ok := w.nextBookmarkTime(t.clock.Now())
-	if !ok {
-		return false
-	}
-	bucketID := nextTime.Unix()
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if bucketID < t.startBucketID {
-		bucketID = t.startBucketID
-	}
-	watchers, _ := t.watchersBuckets[bucketID]
-	t.watchersBuckets[bucketID] = append(watchers, w)
-	return true
-}
-
-func (t *watcherBookmarkTimeBuckets) popExpiredWatchers() [][]*cacheWatcher {
-	currentBucketID := t.clock.Now().Unix()
-	// There should be one or two elements in almost all cases
-	expiredWatchers := make([][]*cacheWatcher, 0, 2)
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	for ; t.startBucketID <= currentBucketID; t.startBucketID++ {
-		if watchers, ok := t.watchersBuckets[t.startBucketID]; ok {
-			delete(t.watchersBuckets, t.startBucketID)
-			expiredWatchers = append(expiredWatchers, watchers)
-		}
-	}
-	return expiredWatchers
-}
-
 type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
 
 type indexedTriggerFunc struct {
@@ -291,8 +240,8 @@ type Cacher struct {
 	// during current dispatching, but stopping was deferred to the end of
 	// dispatching that event to avoid race with closing channels in watchers.
 	watchersToStop []*cacheWatcher
-	// Maintain a timeout queue to send the bookmark event before the watcher times out.
-	bookmarkWatchers *watcherBookmarkTimeBuckets
+	// latestResourceVersion is the latest resource version
+	latestResourceVersion uint64
 	// watchBookmark feature-gate
 	watchBookmarkEnabled bool
 }
@@ -350,7 +299,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		stopCh:               stopCh,
 		clock:                clock,
 		timer:                time.NewTimer(time.Duration(0)),
-		bookmarkWatchers:     newTimeBucketWatchers(clock),
 		watchBookmarkEnabled: utilfeature.DefaultFeatureGate.Enabled(features.WatchBookmark),
 	}
 
@@ -471,13 +419,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		chanSize = 1000
 	}
 
-	// Determine watch timeout('0' means deadline is not set, ignore checking)
-	deadline, _ := ctx.Deadline()
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, c.watchBookmarkEnabled && pred.AllowWatchBookmarks, c.objectType)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -507,15 +453,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		// Update watcher.forget function once we can compute it.
 		watcher.forget = forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
 		c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
-
-		// Add it to the queue only when server and client support watch bookmarks.
-		if c.watchBookmarkEnabled && watcher.allowWatchBookmarks {
-			c.bookmarkWatchers.addWatcher(watcher)
-		}
 		c.watcherIdx++
 	}()
 
-	go watcher.process(ctx, initEvents, watchRV)
+	go watcher.process(ctx, initEvents, watchRV, c.newBookmarkEvent)
 	return watcher, nil
 }
 
@@ -766,15 +707,6 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 }
 
 func (c *Cacher) dispatchEvents() {
-	// Jitter to help level out any aggregate load.
-	bookmarkTimer := c.clock.NewTimer(wait.Jitter(time.Second, 0.25))
-	// Stop the timer when watchBookmarkFeatureGate is not enabled.
-	if !c.watchBookmarkEnabled && !bookmarkTimer.Stop() {
-		<-bookmarkTimer.C()
-	}
-	defer bookmarkTimer.Stop()
-
-	lastProcessedResourceVersion := uint64(0)
 	for {
 		select {
 		case event, ok := <-c.incoming:
@@ -782,26 +714,6 @@ func (c *Cacher) dispatchEvents() {
 				return
 			}
 			c.dispatchEvent(&event)
-			lastProcessedResourceVersion = event.ResourceVersion
-		case <-bookmarkTimer.C():
-			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
-			// Never send a bookmark event if we did not see an event here, this is fine
-			// because we don't provide any guarantees on sending bookmarks.
-			if lastProcessedResourceVersion == 0 {
-				// pop expired watchers in case there has been no update
-				c.bookmarkWatchers.popExpiredWatchers()
-				continue
-			}
-			bookmarkEvent := &watchCacheEvent{
-				Type:            watch.Bookmark,
-				Object:          c.newFunc(),
-				ResourceVersion: lastProcessedResourceVersion,
-			}
-			if err := c.versioner.UpdateObject(bookmarkEvent.Object, bookmarkEvent.ResourceVersion); err != nil {
-				klog.Errorf("failure to set resourceVersion to %d on bookmark event %+v", bookmarkEvent.ResourceVersion, bookmarkEvent.Object)
-				continue
-			}
-			c.dispatchEvent(bookmarkEvent)
 		case <-c.stopCh:
 			return
 		}
@@ -811,67 +723,39 @@ func (c *Cacher) dispatchEvents() {
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	c.startDispatching(event)
 	defer c.finishDispatching()
-	// Watchers stopped after startDispatching will be delayed to finishDispatching,
 
-	// Since add() can block, we explicitly add when cacher is unlocked.
-	// Dispatching event in nonblocking way first, which make faster watchers
-	// not be blocked by slower ones.
-	if event.Type == watch.Bookmark {
-		for _, watcher := range c.watchersBuffer {
-			watcher.nonblockingAdd(event)
-		}
-	} else {
-		c.blockedWatchers = c.blockedWatchers[:0]
-		for _, watcher := range c.watchersBuffer {
-			if !watcher.nonblockingAdd(event) {
-				c.blockedWatchers = append(c.blockedWatchers, watcher)
-			}
-		}
-
-		if len(c.blockedWatchers) > 0 {
-			// dispatchEvent is called very often, so arrange
-			// to reuse timers instead of constantly allocating.
-			startTime := time.Now()
-			timeout := c.dispatchTimeoutBudget.takeAvailable()
-			c.timer.Reset(timeout)
-
-			// Make sure every watcher will try to send event without blocking first,
-			// even if the timer has already expired.
-			timer := c.timer
-			for _, watcher := range c.blockedWatchers {
-				if !watcher.add(event, timer) {
-					// fired, clean the timer by set it to nil.
-					timer = nil
-				}
-			}
-
-			// Stop the timer if it is not fired
-			if timer != nil && !timer.Stop() {
-				// Consume triggered (but not yet received) timer event
-				// so that future reuse does not get a spurious timeout.
-				<-timer.C
-			}
-
-			c.dispatchTimeoutBudget.returnUnused(timeout - time.Since(startTime))
+	c.blockedWatchers = c.blockedWatchers[:0]
+	for _, watcher := range c.watchersBuffer {
+		if !watcher.nonblockingAdd(event) {
+			c.blockedWatchers = append(c.blockedWatchers, watcher)
 		}
 	}
-}
 
-func (c *Cacher) startDispatchingBookmarkEvents() {
-	// Pop already expired watchers. However, explicitly ignore stopped ones,
-	// as we don't delete watcher from bookmarkWatchers when it is stopped.
-	for _, watchers := range c.bookmarkWatchers.popExpiredWatchers() {
-		for _, watcher := range watchers {
-			// c.Lock() is held here.
-			// watcher.stopThreadUnsafe() is protected by c.Lock()
-			if watcher.stopped {
-				continue
+	if len(c.blockedWatchers) > 0 {
+		// dispatchEvent is called very often, so arrange
+		// to reuse timers instead of constantly allocating.
+		startTime := time.Now()
+		timeout := c.dispatchTimeoutBudget.takeAvailable()
+		c.timer.Reset(timeout)
+
+		// Make sure every watcher will try to send event without blocking first,
+		// even if the timer has already expired.
+		timer := c.timer
+		for _, watcher := range c.blockedWatchers {
+			if !watcher.add(event, timer) {
+				// fired, clean the timer by set it to nil.
+				timer = nil
 			}
-			c.watchersBuffer = append(c.watchersBuffer, watcher)
-			// Given that we send bookmark event once at deadline-2s, never push again
-			// after the watcher pops up from the buckets. Once we decide to change the
-			// strategy to more sophisticated, we may need it here.
 		}
+
+		// Stop the timer if it is not fired
+		if timer != nil && !timer.Stop() {
+			// Consume triggered (but not yet received) timer event
+			// so that future reuse does not get a spurious timeout.
+			<-timer.C
+		}
+
+		c.dispatchTimeoutBudget.returnUnused(timeout - time.Since(startTime))
 	}
 }
 
@@ -883,6 +767,8 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 	c.Lock()
 	defer c.Unlock()
 
+	c.latestResourceVersion = event.ResourceVersion
+
 	c.dispatching = true
 	// We are reusing the slice to avoid memory reallocations in every
 	// dispatchEvent() call. That may prevent Go GC from freeing items
@@ -890,12 +776,6 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 	// of the slice, but there is only a limited number of those and the
 	// gain from avoiding memory allocations is much bigger.
 	c.watchersBuffer = c.watchersBuffer[:0]
-
-	if event.Type == watch.Bookmark {
-		c.startDispatchingBookmarkEvents()
-		// return here to reduce following code indentation and diff
-		return
-	}
 
 	// Iterate over "allWatchers" no matter what the trigger function is.
 	for _, watcher := range c.watchers.allWatchers {
@@ -1002,6 +882,25 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 	return c.versioner.ParseResourceVersion(resourceVersion)
 }
 
+// newBookmarkEvent returns the current BOOKMARK event for the cacheWatcher,
+// NOT need to call c.Lock() as latestResourceVersion is no need to be guaranteed
+func (c *Cacher) newBookmarkEvent() *watch.Event {
+	if !c.watchBookmarkEnabled || c.latestResourceVersion == 0 {
+		return nil
+	}
+
+	obj := c.newFunc()
+	if err := c.versioner.UpdateObject(obj, c.latestResourceVersion); err != nil {
+		klog.Errorf("failed to update BOOKMARK event resource version, err: %v", err)
+		return nil
+	}
+
+	return &watch.Event{
+		Type:   watch.Bookmark,
+		Object: obj,
+	}
+}
+
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type cacherListerWatcher struct {
 	storage        storage.Interface
@@ -1082,22 +981,19 @@ func (c *errWatcher) Stop() {
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input     chan *watchCacheEvent
-	result    chan watch.Event
-	done      chan struct{}
-	filter    filterWithAttrsFunc
-	stopped   bool
-	forget    func()
-	versioner storage.Versioner
-	// The watcher will be closed by server after the deadline,
-	// save it here to send bookmark events before that.
-	deadline            time.Time
+	input               chan *watchCacheEvent
+	result              chan watch.Event
+	done                chan struct{}
+	filter              filterWithAttrsFunc
+	stopped             bool
+	forget              func()
+	versioner           storage.Versioner
 	allowWatchBookmarks bool
 	// Object type of the cache watcher interests
 	objectType reflect.Type
 }
 
-func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, deadline time.Time, allowWatchBookmarks bool, objectType reflect.Type) *cacheWatcher {
+func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, allowWatchBookmarks bool, objectType reflect.Type) *cacheWatcher {
 	return &cacheWatcher{
 		input:               make(chan *watchCacheEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
@@ -1106,7 +1002,6 @@ func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), ve
 		stopped:             false,
 		forget:              forget,
 		versioner:           versioner,
-		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
 		objectType:          objectType,
 	}
@@ -1170,20 +1065,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	}
 }
 
-func (c *cacheWatcher) nextBookmarkTime(now time.Time) (time.Time, bool) {
-	// For now we return 2s before deadline (and maybe +infinity is now already passed this time)
-	// but it gives us extensibility for the future(false when deadline is not set).
-	if c.deadline.IsZero() {
-		return c.deadline, false
-	}
-	return c.deadline.Add(-2 * time.Second), true
-}
-
 func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event {
-	if event.Type == watch.Bookmark {
-		return &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
-	}
-
 	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
 	oldObjPasses := false
 	if event.PrevObject != nil {
@@ -1243,7 +1125,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64, bookmarkEvent func() *watch.Event) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -1286,6 +1168,18 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 				c.sendWatchCacheEvent(event)
 			}
 		case <-ctx.Done():
+			if !c.allowWatchBookmarks {
+				return
+			}
+			event := bookmarkEvent()
+			if event == nil {
+				return
+			}
+			// send BOOKMARK event using non-blocking method
+			select {
+			case c.result <- *event:
+			default:
+			}
 			return
 		}
 	}

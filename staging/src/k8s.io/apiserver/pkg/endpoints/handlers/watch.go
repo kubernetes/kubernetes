@@ -43,7 +43,7 @@ var neverExitWatch <-chan time.Time = make(chan time.Time)
 
 // timeoutFactory abstracts watch timeout logic for testing
 type TimeoutFactory interface {
-	TimeoutCh() (<-chan time.Time, func() bool)
+	TimeoutCh() (<-chan time.Time, func() bool, func(duration time.Duration) bool)
 }
 
 // realTimeoutFactory implements timeoutFactory
@@ -52,13 +52,13 @@ type realTimeoutFactory struct {
 }
 
 // TimeoutCh returns a channel which will receive something when the watch times out,
-// and a cleanup function to call when this happens.
-func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
+// a cleanup function to call when this happens, and a reset timeout function
+func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool, func(duration time.Duration) bool) {
 	if w.timeout == 0 {
-		return neverExitWatch, func() bool { return false }
+		return neverExitWatch, func() bool { return false }, func(duration time.Duration) bool { return false }
 	}
 	t := time.NewTimer(w.timeout)
-	return t.C, t.Stop
+	return t.C, t.Stop, t.Reset
 }
 
 // serveWatch will serve a watch response.
@@ -199,7 +199,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	e := streaming.NewEncoder(framer, s.Encoder)
 
 	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
+	timeoutCh, cleanup, reset := s.TimeoutFactory.TimeoutCh()
 	defer cleanup()
 	defer s.Watching.Stop()
 
@@ -209,6 +209,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
+	hasTimeout := false
 	var unknown runtime.Unknown
 	internalEvent := &metav1.InternalEvent{}
 	outEvent := &metav1.WatchEvent{}
@@ -219,7 +220,14 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case <-cn.CloseNotify():
 			return
 		case <-timeoutCh:
-			return
+			if hasTimeout {
+				return
+			}
+
+			// Reset timeout to 100ms and continue to receive BOOKMARK event from Watcher.
+			// 100ms timer will not be triggered in most scenes, because the Watcher will close the result channel.
+			hasTimeout = true
+			reset(100 * time.Millisecond)
 		case event, ok := <-ch:
 			if !ok {
 				// End of results.
