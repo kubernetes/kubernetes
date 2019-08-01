@@ -52,7 +52,6 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
 	tcpService = jig.WaitForLoadBalancerOrFail(ns.Name, tcpService.Name, e2eservice.LoadBalancerCreateTimeoutDefault)
-	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 
 	// Get info to hit it with
 	tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
@@ -111,11 +110,9 @@ func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, 
 		<-done
 	}
 
-	// Sanity check and hit it once more
+	// Hit it once more
 	ginkgo.By("hitting the pod through the service's LoadBalancer")
 	e2eservice.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
-	t.jig.SanityCheckService(t.tcpService, v1.ServiceTypeLoadBalancer)
-
 	if testFinalizer {
 		defer func() {
 			ginkgo.By("Check that service can be deleted with finalizer")

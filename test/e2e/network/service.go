@@ -274,7 +274,6 @@ var _ = SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, serviceName)
 		servicePort := 8080
 		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 		defer func() {
 			framework.Logf("Cleaning up the sourceip test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
@@ -345,7 +344,6 @@ var _ = SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, serviceName)
 		servicePort := 8080
 		svc := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
-		jig.SanityCheckService(svc, v1.ServiceTypeClusterIP)
 		serviceIP := svc.Spec.ClusterIP
 		framework.Logf("hairpin-test cluster ip: %s", serviceIP)
 
@@ -589,11 +587,9 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
 		tcpService := jig.CreateTCPServiceOrFail(ns1, nil)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
 		udpService := jig.CreateUDPServiceOrFail(ns2, nil)
-		jig.SanityCheckService(udpService, v1.ServiceTypeClusterIP)
 
 		ginkgo.By("verifying that TCP and UDP use the same port")
 		if tcpService.Spec.Ports[0].Port != udpService.Spec.Ports[0].Port {
@@ -614,7 +610,6 @@ var _ = SIGDescribe("Services", func() {
 		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(tcpService, v1.ServiceTypeNodePort)
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
@@ -622,7 +617,6 @@ var _ = SIGDescribe("Services", func() {
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
 		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
 		framework.Logf("UDP node port: %d", udpNodePort)
 
@@ -681,7 +675,6 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
 		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name, loadBalancerCreateTimeout)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
 		}
@@ -714,7 +707,6 @@ var _ = SIGDescribe("Services", func() {
 			ginkgo.By("waiting for the UDP service to have a load balancer")
 			// 2nd one should be faster since they ran in parallel.
 			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name, loadBalancerCreateTimeout)
-			jig.SanityCheckService(udpService, v1.ServiceTypeLoadBalancer)
 			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
 			}
@@ -745,7 +737,6 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("changing the TCP service's NodePort")
 		tcpService = jig.ChangeServiceNodePortOrFail(ns1, tcpService.Name, tcpNodePort)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 		tcpNodePortOld := tcpNodePort
 		tcpNodePort = int(tcpService.Spec.Ports[0].NodePort)
 		if tcpNodePort == tcpNodePortOld {
@@ -758,11 +749,6 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("changing the UDP service's NodePort")
 		udpService = jig.ChangeServiceNodePortOrFail(ns2, udpService.Name, udpNodePort)
-		if loadBalancerSupportsUDP {
-			jig.SanityCheckService(udpService, v1.ServiceTypeLoadBalancer)
-		} else {
-			jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
-		}
 		udpNodePortOld := udpNodePort
 		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
 		if udpNodePort == udpNodePortOld {
@@ -799,7 +785,6 @@ var _ = SIGDescribe("Services", func() {
 		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *v1.Service) {
 			s.Spec.Ports[0].Port++
 		})
-		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 		svcPortOld := svcPort
 		svcPort = int(tcpService.Spec.Ports[0].Port)
 		if svcPort == svcPortOld {
@@ -816,11 +801,6 @@ var _ = SIGDescribe("Services", func() {
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
 			s.Spec.Ports[0].Port++
 		})
-		if loadBalancerSupportsUDP {
-			jig.SanityCheckService(udpService, v1.ServiceTypeLoadBalancer)
-		} else {
-			jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
-		}
 		if int(udpService.Spec.Ports[0].Port) != svcPort {
 			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
 		}
@@ -892,7 +872,6 @@ var _ = SIGDescribe("Services", func() {
 		})
 		// Wait for the load balancer to be destroyed asynchronously
 		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 
 		ginkgo.By("changing UDP service back to type=ClusterIP")
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
@@ -902,7 +881,6 @@ var _ = SIGDescribe("Services", func() {
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
 			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort, loadBalancerCreateTimeout)
-			jig.SanityCheckService(udpService, v1.ServiceTypeClusterIP)
 		}
 
 		ginkgo.By("checking the TCP NodePort is closed")
@@ -939,7 +917,6 @@ var _ = SIGDescribe("Services", func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 		framework.Logf("Service Port TCP: %v", tcpService.Spec.Ports[0].Port)
 
 		ginkgo.By("changing the TCP service to type=NodePort")
@@ -1006,7 +983,6 @@ var _ = SIGDescribe("Services", func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 
 		ginkgo.By("changing the ExternalName service to type=ClusterIP")
 		clusterIPService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
@@ -1042,7 +1018,6 @@ var _ = SIGDescribe("Services", func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 
 		ginkgo.By("changing the ExternalName service to type=NodePort")
 		nodePortService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
@@ -1077,7 +1052,6 @@ var _ = SIGDescribe("Services", func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(clusterIPService, v1.ServiceTypeClusterIP)
 
 		ginkgo.By("Creating active service to test reachability when its FQDN is referred as externalName for another service")
 		externalServiceName := "externalsvc"
@@ -1117,7 +1091,6 @@ var _ = SIGDescribe("Services", func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
 
 		ginkgo.By("Creating active service to test reachability when its FQDN is referred as externalName for another service")
 		externalServiceName := "externalsvc"
@@ -1515,7 +1488,6 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 
 		// timeout when we haven't just created the load balancer
 		normalReachabilityTimeout := 2 * time.Minute
@@ -1589,7 +1561,6 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, createTimeout)
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
 		svcPort := int(svc.Spec.Ports[0].Port)
 		// should have an internal IP.
@@ -1638,7 +1609,6 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("Loadbalancer IP not changed to external.")
 		}
 		// should have an external IP.
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeFalse())
 
 		ginkgo.By("hitting the external load balancer")
@@ -1667,7 +1637,6 @@ var _ = SIGDescribe("Services", func() {
 				framework.Failf("Loadbalancer IP not changed to internal.")
 			}
 			// should have the given static internal IP.
-			jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 			framework.ExpectEqual(e2eservice.GetIngressPoint(lbIngress), internalStaticIP)
 		}
 	})
@@ -2466,7 +2435,6 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	jig := e2eservice.NewTestJig(cs, serviceName)
 	ginkgo.By("waiting for loadbalancer for service " + ns + "/" + serviceName)
 	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, e2eservice.LoadBalancerCreateTimeoutDefault)
-	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
 		podNodePairs, err := e2enode.PodNodePairs(cs, ns)
 		framework.Logf("[pod,node] pairs: %+v; err: %v", podNodePairs, err)

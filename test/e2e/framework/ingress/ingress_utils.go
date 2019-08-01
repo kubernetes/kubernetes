@@ -851,7 +851,6 @@ func (cont *NginxIngressController) Init() {
 			{Name: "stats", Port: 18080}}
 	})
 	cont.lbSvc = serviceJig.WaitForLoadBalancerOrFail(cont.Ns, "nginx-ingress-lb", e2eservice.GetServiceLoadBalancerCreationTimeout(cont.Client))
-	serviceJig.SanityCheckService(cont.lbSvc, v1.ServiceTypeLoadBalancer)
 
 	read := func(file string) string {
 		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))

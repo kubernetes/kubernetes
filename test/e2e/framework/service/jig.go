@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -106,6 +105,7 @@ func (j *TestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *v1.
 	if err != nil {
 		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
+	j.sanityCheckService(result, svc.Spec.Type)
 	return result
 }
 
@@ -121,6 +121,7 @@ func (j *TestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc *v1.Se
 	if err != nil {
 		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
+	j.sanityCheckService(result, svc.Spec.Type)
 	return result
 }
 
@@ -136,6 +137,7 @@ func (j *TestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc *v1.Se
 	if err != nil {
 		framework.Failf("Failed to create UDP Service %q: %v", svc.Name, err)
 	}
+	j.sanityCheckService(result, svc.Spec.Type)
 	return result
 }
 
@@ -161,6 +163,7 @@ func (j *TestJig) CreateExternalNameServiceOrFail(namespace string, tweak func(s
 	if err != nil {
 		framework.Failf("Failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
+	j.sanityCheckService(result, svc.Spec.Type)
 	return result
 }
 
@@ -197,7 +200,6 @@ func (j *TestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, 
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		j.RunOrFail(namespace, nil)
 	}
-	j.SanityCheckService(svc, v1.ServiceTypeNodePort)
 	return svc
 }
 
@@ -207,11 +209,8 @@ func (j *TestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, 
 // the standard netexec container used everywhere in this test.
 func (j *TestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool,
 	tweak func(svc *v1.Service)) *v1.Service {
-	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and ExternalTrafficPolicy=Local")
-	j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		// We need to turn affinity off for our LB distribution tests
-		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+	j.CreateLoadBalancerService(namespace, serviceName, timeout, func(svc *v1.Service) {
+		ginkgo.By("setting ExternalTrafficPolicy=Local")
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		if tweak != nil {
 			tweak(svc)
@@ -223,28 +222,27 @@ func (j *TestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName stri
 		j.RunOrFail(namespace, nil)
 	}
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	svc := j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
-	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
-	return svc
+	return j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 }
 
 // CreateLoadBalancerService creates a loadbalancer service and waits
 // for it to acquire an ingress IP.
 func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
-	j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		// We need to turn affinity off for our LB distribution tests
-		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
-		if tweak != nil {
-			tweak(svc)
-		}
-	})
+	svc := j.newServiceTemplate(namespace, v1.ProtocolTCP, 80)
+	svc.Spec.Type = v1.ServiceTypeLoadBalancer
+	// We need to turn affinity off for our LB distribution tests
+	svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+	if tweak != nil {
+		tweak(svc)
+	}
+	_, err := j.Client.CoreV1().Services(namespace).Create(svc)
+	if err != nil {
+		framework.Failf("Failed to create LoadBalancer Service %q: %v", svc.Name, err)
+	}
 
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	svc := j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
-	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
-	return svc
+	return j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 }
 
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
@@ -361,8 +359,12 @@ func (j *TestJig) WaitForAvailableEndpoint(namespace, serviceName string, timeou
 	framework.ExpectNoError(err, "No subset of available IP address found for the endpoint %s within timeout %v", serviceName, timeout)
 }
 
-// SanityCheckService performs sanity checks on the given service
-func (j *TestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
+// sanityCheckService performs sanity checks on the given service; in particular, ensuring
+// that creating/updating a service allocates IPs, ports, etc, as needed.
+func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
+	if svcType == "" {
+		svcType = v1.ServiceTypeClusterIP
+	}
 	if svc.Spec.Type != svcType {
 		framework.Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
 	}
@@ -371,12 +373,12 @@ func (j *TestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
 		if svc.Spec.ExternalName != "" {
 			framework.Failf("unexpected Spec.ExternalName (%s) for service, expected empty", svc.Spec.ExternalName)
 		}
-		if svc.Spec.ClusterIP != api.ClusterIPNone && svc.Spec.ClusterIP == "" {
-			framework.Failf("didn't get ClusterIP for non-ExternamName service")
+		if svc.Spec.ClusterIP == "" {
+			framework.Failf("didn't get ClusterIP for non-ExternalName service")
 		}
 	} else {
 		if svc.Spec.ClusterIP != "" {
-			framework.Failf("unexpected Spec.ClusterIP (%s) for ExternamName service, expected empty", svc.Spec.ClusterIP)
+			framework.Failf("unexpected Spec.ClusterIP (%s) for ExternalName service, expected empty", svc.Spec.ClusterIP)
 		}
 	}
 
@@ -422,9 +424,10 @@ func (j *TestJig) UpdateService(namespace, name string, update func(*v1.Service)
 			return nil, fmt.Errorf("failed to get Service %q: %v", name, err)
 		}
 		update(service)
-		service, err = j.Client.CoreV1().Services(namespace).Update(service)
+		result, err := j.Client.CoreV1().Services(namespace).Update(service)
 		if err == nil {
-			return service, nil
+			j.sanityCheckService(result, service.Spec.Type)
+			return result, nil
 		}
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
 			return nil, fmt.Errorf("failed to update Service %q: %v", name, err)
@@ -457,6 +460,7 @@ func (j *TestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, 
 		}
 		return true
 	})
+	j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 	return service
 }
 
@@ -490,6 +494,7 @@ func (j *TestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
+	j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 	return service
 }
 
@@ -506,6 +511,7 @@ func (j *TestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip st
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) == 0
 	})
+	j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 	return service
 }
 
@@ -838,7 +844,7 @@ func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod)
 func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
 	svcType := svc.Spec.Type
 
-	j.SanityCheckService(svc, svcType)
+	j.sanityCheckService(svc, svcType)
 
 	switch svcType {
 	case v1.ServiceTypeClusterIP:

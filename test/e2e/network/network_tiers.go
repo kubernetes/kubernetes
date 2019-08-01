@@ -154,7 +154,6 @@ func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, ns, svcName, existingIP st
 		// Verify that the new ingress IP is the requested IP if it's set.
 		framework.ExpectEqual(ingressIP, svc.Spec.LoadBalancerIP)
 	}
-	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	// If the IP has been used by previous test, sometimes we get the lingering
 	// 404 errors even after the LB is long gone. Tolerate and retry until the
 	// the new LB is fully established since this feature is still Alpha in GCP.

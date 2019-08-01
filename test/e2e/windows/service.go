@@ -54,7 +54,6 @@ var _ = SIGDescribe("Services", func() {
 		e2eservice := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(e2eservice, v1.ServiceTypeNodePort)
 		nodePort := int(e2eservice.Spec.Ports[0].NodePort)
 
 		ginkgo.By("creating Pod to be part of service " + serviceName)
