@@ -357,11 +357,13 @@ func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, sco
 		if !ok {
 			err := fmt.Errorf("normalize score plugin %v has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
 			errCh.SendErrorWithCancel(err, cancel)
+			return
 		}
 		status := pl.NormalizeScore(pc, pod, nodeScoreList)
 		if !status.IsSuccess() {
 			err := fmt.Errorf("normalize score plugin %v failed with error %v", pl.Name(), status.Message())
 			errCh.SendErrorWithCancel(err, cancel)
+			return
 		}
 	})
 
@@ -387,6 +389,7 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 		if !ok {
 			err := fmt.Errorf("score plugin %v has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
 			errCh.SendErrorWithCancel(err, cancel)
+			return
 		}
 		for i := range nodeScoreList {
 			nodeScoreList[i] = nodeScoreList[i] * weight

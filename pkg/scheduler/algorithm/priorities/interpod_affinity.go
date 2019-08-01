@@ -203,6 +203,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 				for _, existingPod := range nodeInfo.Pods() {
 					if err := processPod(existingPod); err != nil {
 						errCh.SendErrorWithCancel(err, cancel)
+						return
 					}
 				}
 			} else {
@@ -211,6 +212,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 				for _, existingPod := range nodeInfo.PodsWithAffinity() {
 					if err := processPod(existingPod); err != nil {
 						errCh.SendErrorWithCancel(err, cancel)
+						return
 					}
 				}
 			}
