@@ -17,6 +17,8 @@ limitations under the License.
 package file
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
@@ -34,18 +36,18 @@ import (
 // RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func RetrieveValidatedConfigInfo(filepath, clustername string) (*clientcmdapi.Config, error) {
+func RetrieveValidatedConfigInfo(filepath, clustername string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
 	config, err := clientcmd.LoadFromFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	return ValidateConfigInfo(config, clustername)
+	return ValidateConfigInfo(config, clustername, discoveryTimeout)
 }
 
 // ValidateConfigInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert/client certificates  and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clientcmdapi.Config, error) {
+func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
 	err := validateKubeConfig(config)
 	if err != nil {
 		return nil, err
@@ -91,7 +93,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
 
 	var clusterinfoCM *v1.ConfigMap
-	wait.PollInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
+	err = wait.Poll(constants.DiscoveryRetryInterval, discoveryTimeout, func() (bool, error) {
 		var err error
 		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
@@ -106,6 +108,9 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		}
 		return true, nil
 	})
+	if err == wait.ErrWaitTimeout {
+		return nil, errors.Errorf("Abort reading the %s ConfigMap after timeout of %v", bootstrapapi.ConfigMapClusterInfo, discoveryTimeout)
+	}
 
 	// If we couldn't fetch the cluster-info ConfigMap, just return the cluster-info object the user provided
 	if clusterinfoCM == nil {

@@ -27,7 +27,10 @@ go_test(
     name = "go_default_test",
     srcs = ["discovery_test.go"],
     embed = [":go_default_library"],
-    deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+    ],
 )
 
 filegroup(
