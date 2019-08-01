@@ -64,6 +64,7 @@ const (
 // AttachOptions declare the arguments accepted by the Attach command
 type AttachOptions struct {
 	exec.StreamOptions
+	genericclioptions.StreamFlags
 
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
@@ -111,6 +112,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmdutil.CheckErr(o.Run())
 		},
 	}
+	o.StreamFlags.AddFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
@@ -120,7 +122,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 // RemoteAttach defines the interface accepted by the Attach command - provided for test stubbing
 type RemoteAttach interface {
-	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
+	Attach(method string, url *url.URL, pingInterval time.Duration, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
 }
 
 // DefaultAttachFunc is the default AttachFunc used
@@ -143,7 +145,7 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			TTY:       raw,
 		}, scheme.ParameterCodec)
 
-		return o.Attach.Attach("POST", req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
+		return o.Attach.Attach("POST", req.URL(), o.PingInterval, o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
 	}
 }
 
@@ -151,7 +153,7 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 type DefaultRemoteAttach struct{}
 
 // Attach executes attach to a running container
-func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+func (*DefaultRemoteAttach) Attach(method string, url *url.URL, pingInterval time.Duration, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -162,6 +164,7 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 		Stderr:            stderr,
 		Tty:               tty,
 		TerminalSizeQueue: terminalSizeQueue,
+		PingInterval:      pingInterval,
 	})
 }
 

@@ -18,6 +18,7 @@ package logs
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -91,7 +92,7 @@ type LogsOptions struct {
 	Options       runtime.Object
 	Resources     []string
 
-	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
+	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer, time.Duration) error
 
 	// PodLogOptions
 	SinceTime       string
@@ -115,6 +116,7 @@ type LogsOptions struct {
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
 	genericclioptions.IOStreams
+	genericclioptions.StreamFlags
 
 	TailSpecified bool
 }
@@ -150,6 +152,9 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 		Aliases: []string{"log"},
 	}
+
+	o.StreamFlags.AddFlags(cmd)
+
 	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
@@ -328,7 +333,7 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 	for _, request := range requests {
 		go func(request rest.ResponseWrapper) {
 			defer wg.Done()
-			if err := o.ConsumeRequestFn(request, writer); err != nil {
+			if err := o.ConsumeRequestFn(request, writer, o.PingInterval); err != nil {
 				if !o.IgnoreLogErrors {
 					writer.CloseWithError(err)
 
@@ -353,7 +358,7 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 
 func (o LogsOptions) sequentialConsumeRequest(requests []rest.ResponseWrapper) error {
 	for _, request := range requests {
-		if err := o.ConsumeRequestFn(request, o.Out); err != nil {
+		if err := o.ConsumeRequestFn(request, o.Out, o.PingInterval); err != nil {
 			return err
 		}
 	}
@@ -369,8 +374,10 @@ func (o LogsOptions) sequentialConsumeRequest(requests []rest.ResponseWrapper) e
 // A successful read returns err == nil, not err == io.EOF.
 // Because the function is defined to read from request until io.EOF, it does
 // not treat an io.EOF as an error to be reported.
-func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
-	readCloser, err := request.Stream()
+func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer, pingInterval time.Duration) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	readCloser, err := request.StreamWithPing(ctx, pingInterval)
 	if err != nil {
 		return err
 	}

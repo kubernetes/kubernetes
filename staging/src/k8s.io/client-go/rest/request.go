@@ -43,6 +43,8 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/keepalive"
+	keepalivehttp "k8s.io/client-go/util/keepalive/http"
 	"k8s.io/klog"
 )
 
@@ -62,6 +64,7 @@ type HTTPClient interface {
 type ResponseWrapper interface {
 	DoRaw() ([]byte, error)
 	Stream() (io.ReadCloser, error)
+	StreamWithPing(ctx context.Context, pingInterval time.Duration) (io.ReadCloser, error)
 }
 
 // RequestConstructionError is returned when there's an error assembling a request.
@@ -689,6 +692,17 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		}
 		return nil, err
 	}
+}
+
+func (r *Request) StreamWithPing(ctx context.Context, pingInterval time.Duration) (io.ReadCloser, error) {
+	if ctx != nil && pingInterval > 0 {
+		client := r.client
+		if client == nil {
+			client = http.DefaultClient
+		}
+		keepalive.KeepAliveWithPinger(ctx, keepalivehttp.NewHttpPinger(client.(*http.Client), r.URL().Scheme, r.URL().Host), pingInterval)
+	}
+	return r.Stream()
 }
 
 // request connects to the server and invokes the provided function when a server response is

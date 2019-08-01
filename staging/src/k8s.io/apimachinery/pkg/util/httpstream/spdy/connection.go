@@ -90,6 +90,11 @@ func (c *connection) Close() error {
 	return c.conn.Close()
 }
 
+// Ping pings the other end of the connection and returns the latency
+func (c *connection) Ping() (time.Duration, error) {
+	return c.conn.Ping()
+}
+
 // CreateStream creates a new stream with the specified headers and registers
 // it with the connection.
 func (c *connection) CreateStream(headers http.Header) (httpstream.Stream, error) {

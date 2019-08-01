@@ -21,7 +21,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
+	"k8s.io/client-go/util/keepalive"
+	keepalivespdy "k8s.io/client-go/util/keepalive/spdy"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -31,14 +34,16 @@ import (
 )
 
 // StreamOptions holds information pertaining to the current streaming session:
-// input/output streams, if the client is requesting a TTY, and a terminal size queue to
-// support terminal resizing.
+// input/output streams, if the client is requesting a TTY, a terminal size queue to
+// support terminal resizing and a ping interval to perform automated pings across
+// the underlying connection
 type StreamOptions struct {
 	Stdin             io.Reader
 	Stdout            io.Writer
 	Stderr            io.Writer
 	Tty               bool
 	TerminalSizeQueue TerminalSizeQueue
+	PingInterval      time.Duration
 }
 
 // Executor is an interface for transporting shell-style streams.
@@ -121,6 +126,10 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 		return err
 	}
 	defer conn.Close()
+
+	if options.PingInterval > 0 {
+		keepalive.KeepAliveWithPinger(req.Context(), keepalivespdy.NewSpdyPinger(conn), options.PingInterval)
+	}
 
 	var streamer streamProtocolHandler
 

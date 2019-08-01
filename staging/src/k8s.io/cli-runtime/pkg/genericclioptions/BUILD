@@ -16,6 +16,7 @@ go_library(
         "name_flags.go",
         "print_flags.go",
         "record_flags.go",
+        "stream_flags.go",
         "template_flags.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/genericclioptions",

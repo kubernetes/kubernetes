@@ -41,6 +41,8 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/keepalive"
+	keepaliverestclient "k8s.io/client-go/util/keepalive/restclient"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -82,6 +84,7 @@ type GetOptions struct {
 	Export         bool
 
 	genericclioptions.IOStreams
+	genericclioptions.StreamFlags
 }
 
 var (
@@ -170,6 +173,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	}
 
 	o.PrintFlags.AddFlags(cmd)
+	o.StreamFlags.AddFlags(cmd)
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
@@ -687,7 +691,15 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
-		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
+		if o.PingInterval > 0 {
+			client, err := f.RESTClient()
+			if err != nil {
+				return err
+			}
+			keepalive.KeepAliveWithPinger(ctx, keepaliverestclient.NewRESTClientPinger(client), o.PingInterval)
+		}
+
+		_, err = watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			objToPrint := e.Object
 			if o.OutputWatchEvents {
 				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}

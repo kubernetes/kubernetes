@@ -48,6 +48,8 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/util/jsonpath:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keepalive:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keepalive/restclient:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/rawhttp:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",

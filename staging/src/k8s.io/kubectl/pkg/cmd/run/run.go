@@ -139,6 +139,7 @@ type RunOptions struct {
 	TTY            bool
 
 	genericclioptions.IOStreams
+	genericclioptions.StreamFlags
 }
 
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
@@ -171,6 +172,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	o.DeleteFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
+	o.StreamFlags.AddFlags(cmd)
 
 	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)
@@ -576,7 +578,7 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 	for _, request := range requests {
-		if err := logs.DefaultConsumeRequest(request, opts.Out); err != nil {
+		if err := logs.DefaultConsumeRequest(request, opts.Out, opts.PingInterval); err != nil {
 			return err
 		}
 	}

@@ -73,6 +73,8 @@ type Connection interface {
 	CreateStream(headers http.Header) (Stream, error)
 	// Close resets all streams and closes the connection.
 	Close() error
+	// Ping pings the other end of the connection and returns the latency
+	Ping() (time.Duration, error)
 	// CloseChan returns a channel that is closed when the underlying connection is closed.
 	CloseChan() <-chan bool
 	// SetIdleTimeout sets the amount of time the connection may remain idle before
