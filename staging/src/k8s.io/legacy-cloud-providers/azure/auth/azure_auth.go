@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -31,6 +32,8 @@ import (
 var (
 	// ErrorNoAuth indicates that no credentials are provided.
 	ErrorNoAuth = fmt.Errorf("no credentials provided for Azure cloud provider")
+	// ADFSIdentitySystem indicates value of tenantId for ADFS on Azure Stack.
+	ADFSIdentitySystem = "ADFS"
 )
 
 // AzureAuthConfig holds auth related part of cloud config
@@ -55,10 +58,19 @@ type AzureAuthConfig struct {
 	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty" yaml:"userAssignedIdentityID,omitempty"`
 	// The ID of the Azure Subscription that the cluster is deployed in
 	SubscriptionID string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
+	// Identity system value for the deployment. This gets populate for Azure Stack case.
+	IdentitySystem string `json:"identitySystem,omitempty" yaml:"identitySystem,omitempty"`
 }
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration
 func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
+	var tenantID string
+	if strings.EqualFold(config.IdentitySystem, ADFSIdentitySystem) {
+		tenantID = "adfs"
+	} else {
+		tenantID = config.TenantID
+	}
+
 	if config.UseManagedIdentityExtension {
 		klog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
 		msiEndpoint, err := adal.GetMSIVMEndpoint()
@@ -77,7 +89,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 			env.ServiceManagementEndpoint)
 	}
 
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID)
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
