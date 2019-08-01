@@ -84,10 +84,10 @@ func TestMounterGetPath(t *testing.T) {
 		}
 		csiMounter := mounter.(*csiMountMgr)
 
-		path := csiMounter.GetPath()
+		mountPath := csiMounter.GetPath()
 
-		if tc.path != path {
-			t.Errorf("expecting path %s, got %s", tc.path, path)
+		if tc.path != mountPath {
+			t.Errorf("expecting path %s, got %s", tc.path, mountPath)
 		}
 	}
 }
@@ -215,10 +215,10 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				t.Errorf("default value of file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
 			}
 
-			path := csiMounter.GetPath()
-			if _, err := os.Stat(path); err != nil {
+			mountPath := csiMounter.GetPath()
+			if _, err := os.Stat(mountPath); err != nil {
 				if os.IsNotExist(err) {
-					t.Errorf("SetUp() failed, volume path not created: %s", path)
+					t.Errorf("SetUp() failed, volume path not created: %s", mountPath)
 				} else {
 					t.Errorf("SetUp() failed: %v", err)
 				}

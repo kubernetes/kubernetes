@@ -549,12 +549,11 @@ func TestPluginNewMounter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		plug, tmpDir := newTestPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-
-		registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
-
 		t.Run(test.name, func(t *testing.T) {
+			plug, tmpDir := newTestPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 			mounter, err := plug.NewMounter(
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
@@ -668,12 +667,11 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		plug, tmpDir := newTestPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-
-		registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
-
 		t.Run(test.name, func(t *testing.T) {
+			plug, tmpDir := newTestPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 			mounter, err := plug.NewMounter(
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
