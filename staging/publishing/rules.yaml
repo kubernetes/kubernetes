@@ -628,6 +628,8 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
+    - repository: component-base
+      branch: master
     - repository: metrics
       branch: master
   - source:
@@ -643,6 +645,8 @@ rules:
     - repository: client-go
       branch: release-12.0
     - repository: code-generator
+      branch: release-1.15
+    - repository: component-base
       branch: release-1.15      
     - repository: metrics
       branch: release-1.15

@@ -22,9 +22,7 @@ go_test(
         "validation_suite_test.go",
         "validation_test.go",
     ],
-    data = [
-        "//staging/src/k8s.io/kubectl/test/data/openapi",
-    ],
+    data = ["//staging/src/k8s.io/kubectl/test/data"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",

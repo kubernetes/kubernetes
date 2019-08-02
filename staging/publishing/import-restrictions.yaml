@@ -130,6 +130,7 @@
   - k8s.io/apimachinery
   - k8s.io/cli-runtime
   - k8s.io/client-go
+  - k8s.io/component-base
   - k8s.io/kubectl
   - k8s.io/kube-openapi
   - k8s.io/metrics

@@ -33,7 +33,7 @@ go_test(
     ],
     data = [
         "test_swagger.json",
-        "//staging/src/k8s.io/kubectl/test/data/openapi",
+        "//staging/src/k8s.io/kubectl/test/data",
     ],
     embed = [":go_default_library"],
     deps = [

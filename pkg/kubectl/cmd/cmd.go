@@ -30,51 +30,52 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
+	cmdpkg "k8s.io/kubectl/pkg/cmd"
+	"k8s.io/kubectl/pkg/cmd/annotate"
+	"k8s.io/kubectl/pkg/cmd/apiresources"
+	"k8s.io/kubectl/pkg/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/attach"
+	"k8s.io/kubectl/pkg/cmd/autoscale"
+	"k8s.io/kubectl/pkg/cmd/certificates"
+	"k8s.io/kubectl/pkg/cmd/clusterinfo"
+	"k8s.io/kubectl/pkg/cmd/completion"
+	cmdconfig "k8s.io/kubectl/pkg/cmd/config"
+	"k8s.io/kubectl/pkg/cmd/cp"
+	"k8s.io/kubectl/pkg/cmd/create"
+	"k8s.io/kubectl/pkg/cmd/delete"
+	"k8s.io/kubectl/pkg/cmd/describe"
+	"k8s.io/kubectl/pkg/cmd/diff"
+	"k8s.io/kubectl/pkg/cmd/drain"
+	"k8s.io/kubectl/pkg/cmd/edit"
+	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
+	"k8s.io/kubectl/pkg/cmd/explain"
+	"k8s.io/kubectl/pkg/cmd/expose"
+	"k8s.io/kubectl/pkg/cmd/label"
+	"k8s.io/kubectl/pkg/cmd/logs"
+	"k8s.io/kubectl/pkg/cmd/options"
+	"k8s.io/kubectl/pkg/cmd/patch"
+	"k8s.io/kubectl/pkg/cmd/plugin"
+	"k8s.io/kubectl/pkg/cmd/portforward"
+	"k8s.io/kubectl/pkg/cmd/proxy"
+	"k8s.io/kubectl/pkg/cmd/replace"
+	"k8s.io/kubectl/pkg/cmd/rollingupdate"
+	"k8s.io/kubectl/pkg/cmd/rollout"
+	"k8s.io/kubectl/pkg/cmd/run"
+	"k8s.io/kubectl/pkg/cmd/scale"
+	"k8s.io/kubectl/pkg/cmd/set"
+	"k8s.io/kubectl/pkg/cmd/taint"
+	"k8s.io/kubectl/pkg/cmd/top"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/version"
+	"k8s.io/kubectl/pkg/cmd/wait"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/annotate"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/apiresources"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/attach"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/autoscale"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/certificates"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/clusterinfo"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/completion"
-	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/cp"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/describe"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/diff"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/drain"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/edit"
-	cmdexec "k8s.io/kubernetes/pkg/kubectl/cmd/exec"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/explain"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/expose"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/get"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/label"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/logs"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/options"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/patch"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/plugin"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/portforward"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/proxy"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/replace"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/rollingupdate"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/run"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/scale"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/taint"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/top"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/version"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/kustomize"
+	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
 
 const (
@@ -445,10 +446,10 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			return initProfiling()
+			return cmdpkg.InitProfiling()
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
-			return flushProfiling()
+			return cmdpkg.FlushProfiling()
 		},
 		BashCompletionFunction: bashCompletionFunc,
 	}
@@ -460,7 +461,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
-	addProfilingFlags(flags)
+	cmdpkg.AddProfilingFlags(flags)
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
@@ -562,7 +563,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(f, ioStreams)
+	alpha := cmdpkg.NewCmdAlpha(f, ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
