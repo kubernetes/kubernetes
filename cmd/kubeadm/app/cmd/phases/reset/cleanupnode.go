@@ -79,7 +79,7 @@ func runCleanupNode(c workflow.RunData) error {
 
 	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
-		klog.Errorf("[reset] Failed to remove containers: %v", err)
+		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 	}
 
 	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
@@ -97,7 +97,7 @@ func runCleanupNode(c workflow.RunData) error {
 func absoluteKubeletRunDirectory() (string, error) {
 	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
-		klog.Errorf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v", kubeadmconstants.KubeletRunDirectory, err)
+		klog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
 		return "", err
 	}
 
@@ -106,7 +106,7 @@ func absoluteKubeletRunDirectory() (string, error) {
 	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
-		klog.Errorf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		klog.Warningf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
 	}
 	return absoluteKubeletRunDirectory, nil
 }
@@ -132,7 +132,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := CleanDir(dir); err != nil {
-			klog.Errorf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			klog.Warningf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
 		}
 	}
 
@@ -146,7 +146,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
 		if err := os.RemoveAll(path); err != nil {
-			klog.Errorf("[reset] Failed to remove file: %q [%v]\n", path, err)
+			klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 		}
 	}
 }
