@@ -737,6 +737,9 @@ func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, acces
 	if !e.EnableGarbageCollection {
 		return false, []string{}
 	}
+	if accessor.GetDeletionTimestamp() != nil {
+		return false, []string{}
+	}
 	shouldOrphan := shouldOrphanDependents(ctx, e, accessor, options)
 	shouldDeleteDependentInForeground := shouldDeleteDependents(ctx, e, accessor, options)
 	newFinalizers := []string{}
