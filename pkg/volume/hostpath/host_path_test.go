@@ -19,7 +19,6 @@ package hostpath
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -154,15 +153,15 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
 		nil,
 		volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
-	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: tempPath}}}}}
+	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{
+		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}}}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatalf("Can't find the plugin by name")
 	}
 	options := volume.VolumeOptions{
 		PVC:                           volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
@@ -170,9 +169,16 @@ func TestProvisioner(t *testing.T) {
 	}
 	creator, err := plug.NewProvisioner(options)
 	if err != nil {
-		t.Errorf("Failed to make a new Provisioner: %v", err)
+		t.Fatalf("Failed to make a new Provisioner: %v", err)
 	}
-	pv, err := creator.Provision(nil, nil)
+
+	hostPathCreator, ok := creator.(*hostPathProvisioner)
+	if !ok {
+		t.Fatal("Not a hostPathProvisioner")
+	}
+	hostPathCreator.basePath = fmt.Sprintf("%s.%s", "hostPath_pv", uuid.NewUUID())
+
+	pv, err := hostPathCreator.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error creating volume: %v", err)
 	}
@@ -191,8 +197,7 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Expected reclaim policy %+v but got %+v", v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
 	}
 
-	pvDir := filepath.Dir(pv.Spec.HostPath.Path)
-	os.RemoveAll(pvDir)
+	os.RemoveAll(hostPathCreator.basePath)
 
 }
 
