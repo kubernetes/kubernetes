@@ -13,6 +13,9 @@ go_library(
         "vsphere_volume.go",
         "vsphere_volume_block.go",
         "vsphere_volume_util.go",
+        "vsphere_volume_util_linux.go",
+        "vsphere_volume_util_unsupported.go",
+        "vsphere_volume_util_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/vsphere_volume",
     deps = [

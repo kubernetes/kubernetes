@@ -27,7 +27,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/vsphere"
@@ -73,16 +72,6 @@ type VolumeSpec struct {
 	StoragePolicyID   string
 	StoragePolicyName string
 	Labels            map[string]string
-}
-
-func verifyDevicePath(path string) (string, error) {
-	if pathExists, err := mount.PathExists(path); err != nil {
-		return "", fmt.Errorf("Error checking if path exists: %v", err)
-	} else if pathExists {
-		return path, nil
-	}
-
-	return "", nil
 }
 
 // CreateVolume creates a vSphere volume.
