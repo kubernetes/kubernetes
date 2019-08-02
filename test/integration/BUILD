@@ -75,6 +75,7 @@ filegroup(
         "//test/integration/ttlcontroller:all-srcs",
         "//test/integration/util:all-srcs",
         "//test/integration/volume:all-srcs",
+        "//test/integration/volumescheduling:all-srcs",
     ],
     tags = ["automanaged"],
 )
