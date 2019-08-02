@@ -90,7 +90,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 		p, err := factory(pc, f)
 		if err != nil {
-			return nil, fmt.Errorf("error initializing plugin %v: %v", name, err)
+			return nil, fmt.Errorf("error initializing plugin %q: %v", name, err)
 		}
 		pluginsMap[name] = p
 
@@ -107,11 +107,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[pf.Name]; ok {
 				p, ok := pg.(PrefilterPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend prefilter plugin", pf.Name)
+					return nil, fmt.Errorf("plugin %q does not extend prefilter plugin", pf.Name)
 				}
 				f.prefilterPlugins = append(f.prefilterPlugins, p)
 			} else {
-				return nil, fmt.Errorf("prefilter plugin %v does not exist", pf.Name)
+				return nil, fmt.Errorf("prefilter plugin %q does not exist", pf.Name)
 			}
 		}
 	}
@@ -121,11 +121,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[r.Name]; ok {
 				p, ok := pg.(FilterPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend filter plugin", r.Name)
+					return nil, fmt.Errorf("plugin %q does not extend filter plugin", r.Name)
 				}
 				f.filterPlugins = append(f.filterPlugins, p)
 			} else {
-				return nil, fmt.Errorf("filter plugin %v does not exist", r.Name)
+				return nil, fmt.Errorf("filter plugin %q does not exist", r.Name)
 			}
 		}
 	}
@@ -136,10 +136,10 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				// First, make sure the plugin implements ScorePlugin interface.
 				p, ok := pg.(ScorePlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend score plugin", sc.Name)
+					return nil, fmt.Errorf("plugin %q does not extend score plugin", sc.Name)
 				}
 				if f.pluginNameToWeightMap[p.Name()] == 0 {
-					return nil, fmt.Errorf("score plugin %v is not configured with weight", p.Name())
+					return nil, fmt.Errorf("score plugin %q is not configured with weight", p.Name())
 				}
 				f.scorePlugins = append(f.scorePlugins, p)
 
@@ -150,7 +150,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 					f.scoreWithNormalizePlugins = append(f.scoreWithNormalizePlugins, np)
 				}
 			} else {
-				return nil, fmt.Errorf("score plugin %v does not exist", sc.Name)
+				return nil, fmt.Errorf("score plugin %q does not exist", sc.Name)
 			}
 		}
 	}
@@ -160,11 +160,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[r.Name]; ok {
 				p, ok := pg.(ReservePlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend reserve plugin", r.Name)
+					return nil, fmt.Errorf("plugin %q does not extend reserve plugin", r.Name)
 				}
 				f.reservePlugins = append(f.reservePlugins, p)
 			} else {
-				return nil, fmt.Errorf("reserve plugin %v does not exist", r.Name)
+				return nil, fmt.Errorf("reserve plugin %q does not exist", r.Name)
 			}
 		}
 	}
@@ -174,11 +174,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[r.Name]; ok {
 				p, ok := pg.(PostFilterPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend post-filter plugin", r.Name)
+					return nil, fmt.Errorf("plugin %q does not extend post-filter plugin", r.Name)
 				}
 				f.postFilterPlugins = append(f.postFilterPlugins, p)
 			} else {
-				return nil, fmt.Errorf("post-filter plugin %v does not exist", r.Name)
+				return nil, fmt.Errorf("post-filter plugin %q does not exist", r.Name)
 			}
 		}
 	}
@@ -188,11 +188,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[pb.Name]; ok {
 				p, ok := pg.(PrebindPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend prebind plugin", pb.Name)
+					return nil, fmt.Errorf("plugin %q does not extend prebind plugin", pb.Name)
 				}
 				f.prebindPlugins = append(f.prebindPlugins, p)
 			} else {
-				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
+				return nil, fmt.Errorf("prebind plugin %q does not exist", pb.Name)
 			}
 		}
 	}
@@ -202,11 +202,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[pb.Name]; ok {
 				p, ok := pg.(BindPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend bind plugin", pb.Name)
+					return nil, fmt.Errorf("plugin %q does not extend bind plugin", pb.Name)
 				}
 				f.bindPlugins = append(f.bindPlugins, p)
 			} else {
-				return nil, fmt.Errorf("bind plugin %v does not exist", pb.Name)
+				return nil, fmt.Errorf("bind plugin %q does not exist", pb.Name)
 			}
 		}
 	}
@@ -216,11 +216,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[pb.Name]; ok {
 				p, ok := pg.(PostbindPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend postbind plugin", pb.Name)
+					return nil, fmt.Errorf("plugin %q does not extend postbind plugin", pb.Name)
 				}
 				f.postbindPlugins = append(f.postbindPlugins, p)
 			} else {
-				return nil, fmt.Errorf("postbind plugin %v does not exist", pb.Name)
+				return nil, fmt.Errorf("postbind plugin %q does not exist", pb.Name)
 			}
 		}
 	}
@@ -230,11 +230,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[ur.Name]; ok {
 				p, ok := pg.(UnreservePlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend unreserve plugin", ur.Name)
+					return nil, fmt.Errorf("plugin %q does not extend unreserve plugin", ur.Name)
 				}
 				f.unreservePlugins = append(f.unreservePlugins, p)
 			} else {
-				return nil, fmt.Errorf("unreserve plugin %v does not exist", ur.Name)
+				return nil, fmt.Errorf("unreserve plugin %q does not exist", ur.Name)
 			}
 		}
 	}
@@ -244,11 +244,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[pr.Name]; ok {
 				p, ok := pg.(PermitPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend permit plugin", pr.Name)
+					return nil, fmt.Errorf("plugin %q does not extend permit plugin", pr.Name)
 				}
 				f.permitPlugins = append(f.permitPlugins, p)
 			} else {
-				return nil, fmt.Errorf("permit plugin %v does not exist", pr.Name)
+				return nil, fmt.Errorf("permit plugin %q does not exist", pr.Name)
 			}
 		}
 	}
@@ -258,14 +258,14 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[qs.Name]; ok {
 				p, ok := pg.(QueueSortPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend queue sort plugin", qs.Name)
+					return nil, fmt.Errorf("plugin %q does not extend queue sort plugin", qs.Name)
 				}
 				f.queueSortPlugins = append(f.queueSortPlugins, p)
 				if len(f.queueSortPlugins) > 1 {
 					return nil, fmt.Errorf("only one queue sort plugin can be enabled")
 				}
 			} else {
-				return nil, fmt.Errorf("queue sort plugin %v does not exist", qs.Name)
+				return nil, fmt.Errorf("queue sort plugin %q does not exist", qs.Name)
 			}
 		}
 	}
@@ -293,11 +293,11 @@ func (f *framework) RunPrefilterPlugins(
 		status := pl.Prefilter(pc, pod)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
+				msg := fmt.Sprintf("rejected by %q at prefilter: %v", pl.Name(), status.Message())
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
 			}
-			msg := fmt.Sprintf("error while running %v prefilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running %q prefilter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -316,7 +316,7 @@ func (f *framework) RunFilterPlugins(pc *PluginContext,
 		status := pl.Filter(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() != Unschedulable {
-				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %v filter plugin for pod %v: %v",
+				errMsg := fmt.Sprintf("error while running %q filter plugin for pod %q: %v",
 					pl.Name(), pod.Name, status.Message())
 				klog.Error(errMsg)
 				return NewStatus(Error, errMsg)
@@ -340,7 +340,7 @@ func (f *framework) RunPostFilterPlugins(
 	for _, pl := range f.postFilterPlugins {
 		status := pl.PostFilter(pc, pod, nodes, filteredNodesStatuses)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %v postfilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running %q postfilter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -372,7 +372,7 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	})
 
 	if err := errCh.ReceiveError(); err != nil {
-		msg := fmt.Sprintf("error while running score plugin for pod %v: %v", pod.Name, err)
+		msg := fmt.Sprintf("error while running score plugin for pod %q: %v", pod.Name, err)
 		klog.Error(msg)
 		return nil, NewStatus(Error, msg)
 	}
@@ -391,20 +391,20 @@ func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, sco
 		pl := f.scoreWithNormalizePlugins[index]
 		nodeScoreList, ok := scores[pl.Name()]
 		if !ok {
-			err := fmt.Errorf("normalize score plugin %v has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
+			err := fmt.Errorf("normalize score plugin %q has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
 		status := pl.NormalizeScore(pc, pod, nodeScoreList)
 		if !status.IsSuccess() {
-			err := fmt.Errorf("normalize score plugin %v failed with error %v", pl.Name(), status.Message())
+			err := fmt.Errorf("normalize score plugin %q failed with error %v", pl.Name(), status.Message())
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
 	})
 
 	if err := errCh.ReceiveError(); err != nil {
-		msg := fmt.Sprintf("error while running normalize score plugin for pod %v: %v", pod.Name, err)
+		msg := fmt.Sprintf("error while running normalize score plugin for pod %q: %v", pod.Name, err)
 		klog.Error(msg)
 		return NewStatus(Error, msg)
 	}
@@ -423,7 +423,7 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 		weight := f.pluginNameToWeightMap[pl.Name()]
 		nodeScoreList, ok := scores[pl.Name()]
 		if !ok {
-			err := fmt.Errorf("score plugin %v has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
+			err := fmt.Errorf("score plugin %q has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
@@ -433,7 +433,7 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 	})
 
 	if err := errCh.ReceiveError(); err != nil {
-		msg := fmt.Sprintf("error while applying score weights for pod %v: %v", pod.Name, err)
+		msg := fmt.Sprintf("error while applying score weights for pod %q: %v", pod.Name, err)
 		klog.Error(msg)
 		return NewStatus(Error, msg)
 	}
@@ -450,11 +450,11 @@ func (f *framework) RunPrebindPlugins(
 		status := pl.Prebind(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at prebind: %v", pl.Name(), status.Message())
+				msg := fmt.Sprintf("rejected by %q at prebind: %v", pl.Name(), status.Message())
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
 			}
-			msg := fmt.Sprintf("error while running %v prebind plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running %q prebind plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -474,7 +474,7 @@ func (f *framework) RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName stri
 			continue
 		}
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("bind plugin %v failed to bind pod %v/%v: %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
+			msg := fmt.Sprintf("bind plugin %q failed to bind pod \"%v/%v\": %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -499,7 +499,7 @@ func (f *framework) RunReservePlugins(
 	for _, pl := range f.reservePlugins {
 		status := pl.Reserve(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %v reserve plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -530,7 +530,7 @@ func (f *framework) RunPermitPlugins(
 		status, d := pl.Permit(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at permit: %v", pl.Name(), status.Message())
+				msg := fmt.Sprintf("rejected by %q at permit: %v", pl.Name(), status.Message())
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
 			}
@@ -541,7 +541,7 @@ func (f *framework) RunPermitPlugins(
 				}
 				statusCode = Wait
 			} else {
-				msg := fmt.Sprintf("error while running %v permit plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+				msg := fmt.Sprintf("error while running %q permit plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 				klog.Error(msg)
 				return NewStatus(Error, msg)
 			}
@@ -555,10 +555,10 @@ func (f *framework) RunPermitPlugins(
 		f.waitingPods.add(w)
 		defer f.waitingPods.remove(pod.UID)
 		timer := time.NewTimer(timeout)
-		klog.V(4).Infof("waiting for %v for pod %v at permit", timeout, pod.Name)
+		klog.V(4).Infof("waiting for %v for pod %q at permit", timeout, pod.Name)
 		select {
 		case <-timer.C:
-			msg := fmt.Sprintf("pod %v rejected due to timeout after waiting %v at permit", pod.Name, timeout)
+			msg := fmt.Sprintf("pod %q rejected due to timeout after waiting %v at permit", pod.Name, timeout)
 			klog.V(4).Infof(msg)
 			return NewStatus(Unschedulable, msg)
 		case s := <-w.s:
@@ -568,7 +568,7 @@ func (f *framework) RunPermitPlugins(
 					klog.V(4).Infof(msg)
 					return NewStatus(s.Code(), msg)
 				}
-				msg := fmt.Sprintf("error received while waiting at permit for pod %v: %v", pod.Name, s.Message())
+				msg := fmt.Sprintf("error received while waiting at permit for pod %q: %v", pod.Name, s.Message())
 				klog.Error(msg)
 				return NewStatus(Error, msg)
 			}
