@@ -162,6 +162,11 @@ type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)
 }
 
+// CSINodeInfo interface represents anything that can get CSINode object from node ID.
+type CSINodeInfo interface {
+	GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error)
+}
+
 // PersistentVolumeInfo interface represents anything that can get persistent volume object by PV ID.
 type PersistentVolumeInfo interface {
 	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
@@ -285,6 +290,7 @@ type MaxPDVolumeCountChecker struct {
 	filter         VolumeFilter
 	volumeLimitKey v1.ResourceName
 	maxVolumeFunc  func(node *v1.Node) int
+	csiNodeInfo    CSINodeInfo
 	pvInfo         PersistentVolumeInfo
 	pvcInfo        PersistentVolumeClaimInfo
 	scInfo         StorageClassInfo
@@ -316,8 +322,8 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(
-	filterName string, scInfo StorageClassInfo, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
+func NewMaxPDVolumeCountPredicate(filterName string, csiNodeInfo CSINodeInfo, scInfo StorageClassInfo,
+	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
 
@@ -345,6 +351,7 @@ func NewMaxPDVolumeCountPredicate(
 		filter:               filter,
 		volumeLimitKey:       volumeLimitKey,
 		maxVolumeFunc:        getMaxVolumeFunc(filterName),
+		csiNodeInfo:          csiNodeInfo,
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
 		scInfo:               scInfo,
@@ -492,8 +499,20 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 		return true, nil, nil
 	}
 
-	// If a plugin has been migrated to a CSI driver, defer to the CSI predicate.
-	if c.filter.IsMigrated(nodeInfo.CSINode()) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	csiNode, err := c.csiNodeInfo.GetCSINodeInfo(node.Name)
+	if err != nil {
+		// we don't fail here because the CSINode object is only necessary
+		// for determining whether the migration is enabled or not
+		klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+	}
+
+	// if a plugin has been migrated to a CSI driver, defer to the CSI predicate
+	if c.filter.IsMigrated(csiNode) {
 		return true, nil, nil
 	}
 
@@ -514,7 +533,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 	}
 
 	numNewVolumes := len(newVolumes)
-	maxAttachLimit := c.maxVolumeFunc(nodeInfo.Node())
+	maxAttachLimit := c.maxVolumeFunc(node)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		volumeLimits := nodeInfo.VolumeLimits()

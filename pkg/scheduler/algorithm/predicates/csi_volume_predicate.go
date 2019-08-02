@@ -32,23 +32,41 @@ import (
 
 // CSIMaxVolumeLimitChecker defines predicate needed for counting CSI volumes
 type CSIMaxVolumeLimitChecker struct {
-	pvInfo  PersistentVolumeInfo
-	pvcInfo PersistentVolumeClaimInfo
-	scInfo  StorageClassInfo
+	csiNodeInfo CSINodeInfo
+	pvInfo      PersistentVolumeInfo
+	pvcInfo     PersistentVolumeClaimInfo
+	scInfo      StorageClassInfo
 
 	randomVolumeIDPrefix string
 }
 
 // NewCSIMaxVolumeLimitPredicate returns a predicate for counting CSI volumes
 func NewCSIMaxVolumeLimitPredicate(
-	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, scInfo StorageClassInfo) FitPredicate {
+	csiNodeInfo CSINodeInfo, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, scInfo StorageClassInfo) FitPredicate {
 	c := &CSIMaxVolumeLimitChecker{
+		csiNodeInfo:          csiNodeInfo,
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
 		scInfo:               scInfo,
 		randomVolumeIDPrefix: rand.String(32),
 	}
 	return c.attachableLimitPredicate
+}
+
+func (c *CSIMaxVolumeLimitChecker) getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1beta1.CSINode) map[v1.ResourceName]int64 {
+	// TODO: stop getting values from Node object in v1.18
+	nodeVolumeLimits := nodeInfo.VolumeLimits()
+	if csiNode != nil {
+		for i := range csiNode.Spec.Drivers {
+			d := csiNode.Spec.Drivers[i]
+			if d.Allocatable != nil && d.Allocatable.Count != nil {
+				// TODO: drop GetCSIAttachLimitKey once we don't get values from Node object (v1.18)
+				k := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(d.Name))
+				nodeVolumeLimits[k] = int64(*d.Allocatable.Count)
+			}
+		}
+	}
+	return nodeVolumeLimits
 }
 
 func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
@@ -62,8 +80,20 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 		return true, nil, nil
 	}
 
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	// If CSINode doesn't exist, the predicate may read the limits from Node object
+	csiNode, err := c.csiNodeInfo.GetCSINodeInfo(node.Name)
+	if err != nil {
+		// TODO: return the error once CSINode is created by default (2 releases)
+		klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+	}
+
 	newVolumes := make(map[string]string)
-	if err := c.filterAttachableVolumes(nodeInfo, pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
+	if err := c.filterAttachableVolumes(csiNode, pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
 		return false, nil, err
 	}
 
@@ -73,14 +103,14 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 	}
 
 	// If the node doesn't have volume limits, the predicate will always be true
-	nodeVolumeLimits := nodeInfo.VolumeLimits()
+	nodeVolumeLimits := c.getVolumeLimits(nodeInfo, csiNode)
 	if len(nodeVolumeLimits) == 0 {
 		return true, nil, nil
 	}
 
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.Pods() {
-		if err := c.filterAttachableVolumes(nodeInfo, existingPod.Spec.Volumes, existingPod.Namespace, attachedVolumes); err != nil {
+		if err := c.filterAttachableVolumes(csiNode, existingPod.Spec.Volumes, existingPod.Namespace, attachedVolumes); err != nil {
 			return false, nil, err
 		}
 	}
@@ -113,8 +143,7 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 }
 
 func (c *CSIMaxVolumeLimitChecker) filterAttachableVolumes(
-	nodeInfo *schedulernodeinfo.NodeInfo, volumes []v1.Volume, namespace string, result map[string]string) error {
-
+	csiNode *storagev1beta1.CSINode, volumes []v1.Volume, namespace string, result map[string]string) error {
 	for _, vol := range volumes {
 		// CSI volumes can only be used as persistent volumes
 		if vol.PersistentVolumeClaim == nil {
@@ -133,7 +162,6 @@ func (c *CSIMaxVolumeLimitChecker) filterAttachableVolumes(
 			continue
 		}
 
-		csiNode := nodeInfo.CSINode()
 		driverName, volumeHandle := c.getCSIDriverInfo(csiNode, pvc)
 		if driverName == "" || volumeHandle == "" {
 			klog.V(5).Infof("Could not find a CSI driver name or volume handle, not counting volume")

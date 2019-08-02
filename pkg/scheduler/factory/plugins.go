@@ -43,6 +43,7 @@ type PluginFactoryArgs struct {
 	NodeLister                     algorithm.NodeLister
 	PDBLister                      algorithm.PDBLister
 	NodeInfo                       predicates.NodeInfo
+	CSINodeInfo                    predicates.CSINodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
 	StorageClassInfo               predicates.StorageClassInfo
