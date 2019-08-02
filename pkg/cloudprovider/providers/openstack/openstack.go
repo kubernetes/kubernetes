@@ -143,6 +143,10 @@ type OpenStack struct {
 	metadataOpts MetadataOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
+	// Options for reading config data from a secret
+	secretName      string
+	secretNamespace string
+	kubeconfigPath  string
 }
 
 // Config is used to read and store information from the cloud configuration file
@@ -283,10 +287,10 @@ func createKubernetesClient(kubeconfigPath string) (*kubernetes.Clientset, error
 }
 
 // setConfigFromSecret allows setting up the config from k8s secret
-func setConfigFromSecret(cfg *Config) error {
-	secretName := cfg.Global.SecretName
-	secretNamespace := cfg.Global.SecretNamespace
-	kubeconfigPath := cfg.Global.KubeconfigPath
+func (os *OpenStack) setConfigFromSecret() error {
+	secretName := os.secretName
+	secretNamespace := os.secretNamespace
+	kubeconfigPath := os.kubeconfigPath
 
 	k8sClient, err := createKubernetesClient(kubeconfigPath)
 	if err != nil {
@@ -295,9 +299,11 @@ func setConfigFromSecret(cfg *Config) error {
 
 	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
-		klog.Warningf("Cannot get secret %s in namespace %s. error: %q", secretName, secretNamespace, err)
+		klog.Errorf("Cannot get secret %s in namespace %s. error: %q", secretName, secretNamespace, err)
 		return err
 	}
+
+	cfg := &Config{}
 
 	if content, ok := secret.Data["clouds.conf"]; ok {
 		err = gcfg.ReadStringInto(cfg, string(content))
@@ -305,11 +311,34 @@ func setConfigFromSecret(cfg *Config) error {
 			klog.Error("Cannot parse data from the secret.")
 			return fmt.Errorf("cannot parse data from the secret")
 		}
+		provider, err := newProvider(*cfg)
+		if err != nil {
+			klog.Errorf("Cannot initialize cloud provider using data from the secret.")
+			return fmt.Errorf("cannot initialize cloud provider using data from the secret")
+		}
+		os.provider = provider
+		os.region = cfg.Global.Region
+		klog.Info("OpenStack cloud provider was initialized using data from the secret.")
 		return nil
 	}
 
 	klog.Error("Cannot find \"clouds.conf\" key in the secret.")
 	return fmt.Errorf("cannot find \"clouds.conf\" key in the secret")
+}
+
+func (os *OpenStack) ensureCloudProviderWasInitialized() error {
+	if os.provider != nil {
+		return nil
+	}
+
+	if os.secretName != "" && os.secretNamespace != "" {
+		err := os.setConfigFromSecret()
+		if err == nil {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cloud provider is not initialized")
 }
 
 func readConfig(config io.Reader) (Config, error) {
@@ -328,14 +357,6 @@ func readConfig(config io.Reader) (Config, error) {
 	err := gcfg.ReadInto(&cfg, config)
 	if err != nil {
 		return cfg, err
-	}
-
-	if cfg.Global.SecretName != "" && cfg.Global.SecretNamespace != "" {
-		klog.Infof("Set credentials from secret %s in namespace %s", cfg.Global.SecretName, cfg.Global.SecretNamespace)
-		err = setConfigFromSecret(&cfg)
-		if err != nil {
-			return cfg, err
-		}
 	}
 
 	return cfg, nil
@@ -396,7 +417,7 @@ func checkOpenStackOpts(openstackOpts *OpenStack) error {
 	return checkMetadataSearchOrder(openstackOpts.metadataOpts.SearchOrder)
 }
 
-func newOpenStack(cfg Config) (*OpenStack, error) {
+func newProvider(cfg Config) (*gophercloud.ProviderClient, error) {
 	provider, err := openstack.NewClient(cfg.Global.AuthURL)
 	if err != nil {
 		return nil, err
@@ -426,22 +447,37 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		return nil, err
 	}
 
+	provider.HTTPClient.Timeout = cfg.Metadata.RequestTimeout.Duration
+
+	return provider, nil
+}
+
+func newOpenStack(cfg Config) (*OpenStack, error) {
 	emptyDuration := MyDuration{}
 	if cfg.Metadata.RequestTimeout == emptyDuration {
 		cfg.Metadata.RequestTimeout.Duration = time.Duration(defaultTimeOut)
 	}
-	provider.HTTPClient.Timeout = cfg.Metadata.RequestTimeout.Duration
-
 	os := OpenStack{
-		provider:     provider,
-		region:       cfg.Global.Region,
-		lbOpts:       cfg.LoadBalancer,
-		bsOpts:       cfg.BlockStorage,
-		routeOpts:    cfg.Route,
-		metadataOpts: cfg.Metadata,
+		secretName:      cfg.Global.SecretName,
+		secretNamespace: cfg.Global.SecretNamespace,
+		kubeconfigPath:  cfg.Global.KubeconfigPath,
+		region:          cfg.Global.Region,
+		lbOpts:          cfg.LoadBalancer,
+		bsOpts:          cfg.BlockStorage,
+		routeOpts:       cfg.Route,
+		metadataOpts:    cfg.Metadata,
 	}
 
-	err = checkOpenStackOpts(&os)
+	// Skip provider initialization if we're going to read auth data from a secret.
+	if cfg.Global.SecretName == "" || cfg.Global.SecretNamespace == "" {
+		provider, err := newProvider(cfg)
+		if err != nil {
+			return nil, err
+		}
+		os.provider = provider
+	}
+
+	err := checkOpenStackOpts(&os)
 	if err != nil {
 		return nil, err
 	}
@@ -477,6 +513,7 @@ func NewFakeOpenStackCloud(cfg Config) (*OpenStack, error) {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (os *OpenStack) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	os.ensureCloudProviderWasInitialized()
 }
 
 // mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
@@ -678,6 +715,11 @@ func getAttachedInterfacesByID(client *gophercloud.ServiceClient, serviceID stri
 
 // Clusters is a no-op
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
+	err := os.ensureCloudProviderWasInitialized()
+	if err != nil {
+		return nil, false
+	}
+
 	return nil, false
 }
 
@@ -694,6 +736,11 @@ func (os *OpenStack) HasClusterID() bool {
 // LoadBalancer initializes a LbaasV2 object
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	klog.V(4).Info("openstack.LoadBalancer() called")
+
+	err := os.ensureCloudProviderWasInitialized()
+	if err != nil {
+		return nil, false
+	}
 
 	if reflect.DeepEqual(os.lbOpts, LoadBalancerOpts{}) {
 		klog.V(4).Info("LoadBalancer section is empty/not defined in cloud-config")
@@ -818,6 +865,11 @@ func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeN
 // Routes initializes routes support
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	klog.V(4).Info("openstack.Routes() called")
+
+	err := os.ensureCloudProviderWasInitialized()
+	if err != nil {
+		return nil, false
+	}
 
 	network, err := os.NewNetworkV2()
 	if err != nil {
