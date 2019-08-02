@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -250,7 +251,10 @@ pluginConfig:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
-				Plugins:            nil,
+				Plugins: &config.Plugins{
+					PostFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: "interpod-affinity-plugin"}}},
+					Score:      &config.PluginSet{Enabled: []config.Plugin{{Name: "interpod-affinity-plugin"}}},
+				},
 			},
 		},
 		{
@@ -330,6 +334,10 @@ pluginConfig:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
+				Plugins: &config.Plugins{
+					PostFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: "interpod-affinity-plugin"}}},
+					Score:      &config.PluginSet{Enabled: []config.Plugin{{Name: "interpod-affinity-plugin"}}},
+				},
 			},
 		},
 		{

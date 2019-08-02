@@ -51,6 +51,7 @@ import (
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/plugin/pkg/scheduling/interpodaffinity"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
@@ -167,6 +168,8 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 			return err
 		}
 	}
+
+	registry.Register(interpodaffinity.Name, interpodaffinity.New)
 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,

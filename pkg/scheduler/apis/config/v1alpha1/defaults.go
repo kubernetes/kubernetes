@@ -20,7 +20,7 @@ import (
 	"net"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
@@ -28,6 +28,7 @@ import (
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/plugin/pkg/scheduling/interpodaffinity"
 )
 
 // When the --failure-domains scheduler flag is not specified,
@@ -102,5 +103,24 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 	if obj.BindTimeoutSeconds == nil {
 		defaultBindTimeoutSeconds := int64(600)
 		obj.BindTimeoutSeconds = &defaultBindTimeoutSeconds
+	}
+
+	if obj.Plugins == nil {
+		obj.Plugins = &kubeschedulerconfigv1alpha1.Plugins{
+			PostFilter: &kubeschedulerconfigv1alpha1.PluginSet{
+				Enabled: []kubeschedulerconfigv1alpha1.Plugin{
+					{
+						Name: interpodaffinity.Name,
+					},
+				},
+			},
+			Score: &kubeschedulerconfigv1alpha1.PluginSet{
+				Enabled: []kubeschedulerconfigv1alpha1.Plugin{
+					{
+						Name: interpodaffinity.Name,
+					},
+				},
+			},
+		}
 	}
 }

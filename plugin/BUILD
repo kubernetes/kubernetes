@@ -40,6 +40,7 @@ filegroup(
         "//plugin/pkg/admission/storage/storageclass/setdefault:all-srcs",
         "//plugin/pkg/admission/storage/storageobjectinuseprotection:all-srcs",
         "//plugin/pkg/auth:all-srcs",
+        "//plugin/pkg/scheduling/interpodaffinity:all-srcs",
     ],
     tags = ["automanaged"],
 )
