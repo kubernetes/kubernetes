@@ -384,8 +384,12 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 		var gottenObj *unstructured.Unstructured
 		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
 		resource := info.Mapping.Resource.Resource
-		if !contains(conditionMap[resource], w.conditionName) {
-			return nil, false, fmt.Errorf("available condition on resource %s are %s", resource, conditionMap[resource])
+
+		// Avoid fast fail on CRD, no item in conditionMap of CRD
+		if conditions, ok := conditionMap[resource]; ok {
+			if !contains(conditions, w.conditionName) {
+				return nil, false, fmt.Errorf("available condition on resource %s are %s", resource, conditions)
+			}
 		}
 
 		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
