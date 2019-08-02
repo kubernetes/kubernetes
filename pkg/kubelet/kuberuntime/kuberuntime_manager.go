@@ -625,9 +625,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  2. Kill pod sandbox if necessary.
 //  3. Kill any containers that should not be running.
 //  4. Create sandbox if necessary.
-//  5. Create init containers.
-//  6. Create normal containers.
-//  7. Create ephemeral containers.
+//  5. Create ephemeral containers.
+//  6. Create init containers.
+//  7. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
@@ -758,7 +758,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	}
 
 	// Helper containing boilerplate common to starting all types of containers.
-	// typeName is a label used to describe this type of container in log messages.
+	// typeName is a label used to describe this type of container in log messages,
+	// currently: "container", "init container" or "ephemeral container"
 	start := func(typeName string, container *v1.Container) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
@@ -787,7 +788,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		return nil
 	}
 
-	// Step 5: start the init container.
+	// Step 5: start ephemeral containers
+	// These are started "prior" to init containers to allow running ephemeral containers even when there
+	// are errors starting an init container. In practice init containers will start first since ephemeral
+	// containers cannot be specified on pod creation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for _, idx := range podContainerChanges.EphemeralContainersToStart {
+			c := (*v1.Container)(&pod.Spec.EphemeralContainers[idx].EphemeralContainerCommon)
+			start("ephemeral container", c)
+		}
+	}
+
+	// Step 6: start the init container.
 	if container := podContainerChanges.NextInitContainerToStart; container != nil {
 		// Start the next init container.
 		if err := start("init container", container); err != nil {
@@ -798,17 +810,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		klog.V(4).Infof("Completed init container %q for pod %q", container.Name, format.Pod(pod))
 	}
 
-	// Step 6: start containers in podContainerChanges.ContainersToStart.
+	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
 		start("container", &pod.Spec.Containers[idx])
-	}
-
-	// Step 7: start ephemeral containers
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		for _, idx := range podContainerChanges.EphemeralContainersToStart {
-			c := (*v1.Container)(&pod.Spec.EphemeralContainers[idx].EphemeralContainerCommon)
-			start("ephemeral container", c)
-		}
 	}
 
 	return

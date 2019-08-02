@@ -383,10 +383,12 @@ func TestGetContainerSpec(t *testing.T) {
 			wantContainer: &v1.Container{Name: "debug-container"},
 		},
 	} {
-		gotContainer := GetContainerSpec(tc.havePod, tc.haveName)
-		if diff := cmp.Diff(tc.wantContainer, gotContainer); diff != "" {
-			t.Errorf("GetContainerSpec for %q returned diff (-want +got):%v", tc.name, diff)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			gotContainer := GetContainerSpec(tc.havePod, tc.haveName)
+			if diff := cmp.Diff(tc.wantContainer, gotContainer); diff != "" {
+				t.Fatalf("GetContainerSpec for %q returned diff (-want +got):%v", tc.name, diff)
+			}
+		})
 	}
 }
 

@@ -1420,7 +1420,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 			ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
 		}
 
-		// TODO(verb): By now we've iterated podStatus 3 times. We could refactor this to make a single
+		// #80875: By now we've iterated podStatus 3 times. We could refactor this to make a single
 		// pass through podStatus.ContainerStatuses
 		apiPodStatus.EphemeralContainerStatuses = kl.convertToAPIContainerStatuses(
 			pod, podStatus,
