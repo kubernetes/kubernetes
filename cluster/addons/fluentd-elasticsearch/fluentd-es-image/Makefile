@@ -19,9 +19,8 @@ IMAGE = fluentd
 TAG = v2.7.0
 
 build:
-	docker build  --tag ${PREFIX}/${IMAGE}:${TAG} .
+	docker build --tag ${PREFIX}/${IMAGE}:${TAG} .
 
 push:
 	docker push ${PREFIX}/${IMAGE}:${TAG}
 	docker push ${PREFIX}/${IMAGE}:latest
-	
