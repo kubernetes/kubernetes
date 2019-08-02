@@ -502,7 +502,6 @@ staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/apiserver
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
-staging/src/k8s.io/kubectl/pkg/cmd
 staging/src/k8s.io/kubectl/pkg/cmd/annotate
 staging/src/k8s.io/kubectl/pkg/cmd/apply
 staging/src/k8s.io/kubectl/pkg/cmd/attach
