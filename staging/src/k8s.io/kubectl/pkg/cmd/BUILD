@@ -2,10 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "alpha.go",
-        "profiling.go",
-    ],
+    srcs = ["alpha.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd",
     importpath = "k8s.io/kubectl/pkg/cmd",
     visibility = [
@@ -17,7 +14,6 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

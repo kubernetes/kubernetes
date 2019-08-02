@@ -446,10 +446,10 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			return cmdpkg.InitProfiling()
+			return initProfiling()
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
-			return cmdpkg.FlushProfiling()
+			return flushProfiling()
 		},
 		BashCompletionFunction: bashCompletionFunc,
 	}
@@ -461,7 +461,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
-	cmdpkg.AddProfilingFlags(flags)
+	addProfilingFlags(flags)
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
