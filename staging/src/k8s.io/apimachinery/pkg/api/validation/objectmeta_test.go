@@ -264,6 +264,31 @@ func TestValidateFinalizersUpdate(t *testing.T) {
 			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"x/a", "y/b"}},
 			ExpectedErr: "",
 		},
+		"duplicated finalizers for objects being deleted": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a"}},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a", "x/a"}},
+			ExpectedErr: "x/a",
+		},
+		"duplicated finalizers for objects being deleted with removal": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a", "x/b"}},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a", "x/a"}},
+			ExpectedErr: "x/a",
+		},
+		"no duplicated finalizers for objects being deleted": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a"}},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a"}},
+			ExpectedErr: "",
+		},
+		"no duplicated finalizers for objects being deleted - order": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a", "x/b"}},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/b", "x/a"}},
+			ExpectedErr: "",
+		},
+		"no duplicated finalizers for objects being deleted - removal": {
+			Old:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a", "x/b", "x/c"}},
+			New:         metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &metav1.Time{}, Finalizers: []string{"x/a", "x/b"}},
+			ExpectedErr: "",
+		},
 	}
 	for name, tc := range testcases {
 		errs := ValidateObjectMetaUpdate(&tc.New, &tc.Old, field.NewPath("field"))
@@ -271,6 +296,10 @@ func TestValidateFinalizersUpdate(t *testing.T) {
 			if len(tc.ExpectedErr) != 0 {
 				t.Errorf("case: %q, expected error to contain %q", name, tc.ExpectedErr)
 			}
+			continue
+		}
+		if len(tc.ExpectedErr) == 0 {
+			t.Errorf("case: %q, didn't expect an error but got %q", name, errs.ToAggregate())
 		} else if e, a := tc.ExpectedErr, errs.ToAggregate().Error(); !strings.Contains(a, e) {
 			t.Errorf("case: %q, expected error to contain %q, got error %q", name, e, a)
 		}

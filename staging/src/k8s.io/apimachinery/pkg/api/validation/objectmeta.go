@@ -112,6 +112,20 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 	extra := sets.NewString(newFinalizers...).Difference(sets.NewString(oldFinalizers...))
 	if len(extra) != 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("no new finalizers can be added if the object is being deleted, found new finalizers %#v", extra.List())))
+		return allErrs
+	}
+
+	seenFinalizers := sets.NewString()
+	duplicates := sets.NewString()
+	for _, newFinalizer := range newFinalizers {
+		if !seenFinalizers.Has(newFinalizer) {
+			seenFinalizers.Insert(newFinalizer)
+			continue
+		}
+		duplicates.Insert(newFinalizer)
+	}
+	if len(duplicates) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("no new finalizers can be added if the object is being deleted, found new finalizers %#v", duplicates.List())))
 	}
 	return allErrs
 }
