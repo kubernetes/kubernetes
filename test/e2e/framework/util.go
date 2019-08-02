@@ -2105,7 +2105,7 @@ func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 			if !apierrs.IsConflict(err) {
 				ExpectNoError(err)
 			} else {
-				e2elog.Logf("Conflict when trying to add/update avoidPonds %v to %v", avoidPods, nodeName)
+				e2elog.Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
 			}
 		}
 		return true, nil
