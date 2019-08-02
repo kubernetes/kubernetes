@@ -63,7 +63,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 		// forget() has to stop the watcher, as only stopping the watcher
 		// triggers stopping the process() goroutine which we are in the
 		// end waiting for in this test.
-		w.stop()
+		w.stopThreadUnsafe()
 	}
 	initEvents := []*watchCacheEvent{
 		{Object: &v1.Pod{}},
@@ -472,7 +472,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	done := make(chan struct{})
 	filter := func(string, labels.Set, fields.Set) bool { return true }
 	forget := func() {
-		w.stop()
+		w.stopThreadUnsafe()
 		done <- struct{}{}
 	}
 
