@@ -62,9 +62,12 @@ const (
 // The constants are used to map from the machine type (number of CPUs) to the limit of
 // persistent disks that can be attached to an instance. Please refer to gcloud doc
 // https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+// These constants are all the documented attach limit minus one because the
+// node boot disk is considered an attachable disk so effective attach limit is
+// one less.
 const (
-	VolumeLimit16  = 16
-	VolumeLimit128 = 128
+	volumeLimitSmall = 15
+	VolumeLimitBig   = 127
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -115,7 +118,7 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.GCEVolumeLimitKey: VolumeLimit16,
+		util.GCEVolumeLimitKey: volumeLimitSmall,
 	}
 	cloud := plugin.host.GetCloudProvider()
 
@@ -143,9 +146,9 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 		return volumeLimits, nil
 	}
 	if strings.HasPrefix(instanceType, "n1-") || strings.HasPrefix(instanceType, "custom-") {
-		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit128
+		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimitBig
 	} else {
-		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit16
+		volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
 	}
 
 	return volumeLimits, nil
