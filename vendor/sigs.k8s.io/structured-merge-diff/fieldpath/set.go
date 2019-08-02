@@ -173,8 +173,16 @@ type setNode struct {
 
 // SetNodeMap is a map of PathElement to subset.
 type SetNodeMap struct {
-	members []setNode
+	members sortedSetNode
 }
+
+type sortedSetNode []setNode
+
+// Implement the sort interface; this would permit bulk creation, which would
+// be faster than doing it one at a time via Insert.
+func (s sortedSetNode) Len() int           { return len(s) }
+func (s sortedSetNode) Less(i, j int) bool { return s[i].pathElement.Less(s[j].pathElement) }
+func (s sortedSetNode) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // Descend adds pe to the set if necessary, returning the associated subset.
 func (s *SetNodeMap) Descend(pe PathElement) *Set {
