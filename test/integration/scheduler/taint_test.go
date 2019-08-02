@@ -69,7 +69,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 
-	context := initTestMaster(t, "default", admission)
+	context := InitTestMaster(t, "default", admission)
 
 	// Build clientset and informers for controllers.
 	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
@@ -85,9 +85,9 @@ func TestTaintNodeByCondition(t *testing.T) {
 	defer algorithmprovider.ApplyFeatureGates()()
 
 	context = initTestScheduler(t, context, false, nil)
-	cs := context.clientSet
+	cs := context.ClientSet
 	informers := context.informerFactory
-	nsName := context.ns.Name
+	nsName := context.Ns.Name
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
@@ -112,13 +112,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(context.stopCh)
+	go nc.Run(context.StopCh)
 
 	// Waiting for all controller sync.
-	externalInformers.Start(context.stopCh)
-	externalInformers.WaitForCacheSync(context.stopCh)
-	informers.Start(context.stopCh)
-	informers.WaitForCacheSync(context.stopCh)
+	externalInformers.Start(context.StopCh)
+	externalInformers.WaitForCacheSync(context.StopCh)
+	informers.Start(context.StopCh)
+	informers.WaitForCacheSync(context.StopCh)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -553,12 +553,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 				pods = append(pods, createdPod)
 
 				if p.fits {
-					if err := waitForPodToSchedule(cs, createdPod); err != nil {
+					if err := WaitForPodToSchedule(cs, createdPod); err != nil {
 						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 							pod.Namespace, pod.Name, err)
 					}
 				} else {
-					if err := waitForPodUnschedulable(cs, createdPod); err != nil {
+					if err := WaitForPodUnschedulable(cs, createdPod); err != nil {
 						t.Errorf("Unschedulable pod %s/%s gets scheduled on the node, err: %v",
 							pod.Namespace, pod.Name, err)
 					}

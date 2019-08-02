@@ -466,13 +466,13 @@ func TestPrefilterPlugin(t *testing.T) {
 	emptyPluginConfig := []schedulerconfig.PluginConfig{}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "prefilter-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "prefilter-plugin", nil),
 		false, nil, registry, prefilterPlugin, emptyPluginConfig, false, time.Second)
 
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -502,17 +502,17 @@ func TestPrefilterPlugin(t *testing.T) {
 		pfPlugin.rejectPrefilter = test.reject
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
 
 		if test.reject || test.fail {
-			if err = waitForPodUnschedulable(cs, pod); err != nil {
+			if err = WaitForPodUnschedulable(cs, pod); err != nil {
 				t.Errorf("test #%v: Didn't expect the pod to be scheduled. error: %v", i, err)
 			}
 		} else {
-			if err = waitForPodToSchedule(cs, pod); err != nil {
+			if err = WaitForPodToSchedule(cs, pod); err != nil {
 				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 			}
 		}
@@ -539,23 +539,23 @@ func TestScorePlugin(t *testing.T) {
 		},
 	}
 	context, cs := initTestContextForScorePlugin(t, plugins)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
 	for i, fail := range []bool{false, true} {
 		scPlugin.failScore = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Fatalf("Error while creating a test pod: %v", err)
 		}
 
 		if fail {
-			if err = waitForPodUnschedulable(cs, pod); err != nil {
+			if err = WaitForPodUnschedulable(cs, pod); err != nil {
 				t.Errorf("test #%v: Didn't expect the pod to be scheduled. error: %v", i, err)
 			}
 		} else {
-			if err = waitForPodToSchedule(cs, pod); err != nil {
+			if err = WaitForPodToSchedule(cs, pod); err != nil {
 				t.Errorf("Expected the pod to be scheduled. error: %v", err)
 			} else {
 				p, err := getPod(cs, pod.Name, pod.Namespace)
@@ -589,16 +589,16 @@ func TestNormalizeScorePlugin(t *testing.T) {
 		},
 	}
 	context, cs := initTestContextForScorePlugin(t, plugins)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
 	// Create a best effort pod.
 	pod, err := createPausePod(cs,
-		initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 	if err != nil {
 		t.Fatalf("Error while creating a test pod: %v", err)
 	}
 
-	if err = waitForPodToSchedule(cs, pod); err != nil {
+	if err = WaitForPodToSchedule(cs, pod); err != nil {
 		t.Errorf("Expected the pod to be scheduled. error: %v", err)
 	}
 
@@ -631,12 +631,12 @@ func TestReservePlugin(t *testing.T) {
 	emptyPluginConfig := []schedulerconfig.PluginConfig{}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "reserve-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "reserve-plugin", nil),
 		false, nil, registry, reservePlugin, emptyPluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -647,7 +647,7 @@ func TestReservePlugin(t *testing.T) {
 		resPlugin.failReserve = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -657,7 +657,7 @@ func TestReservePlugin(t *testing.T) {
 				t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 			}
 		} else {
-			if err = waitForPodToSchedule(cs, pod); err != nil {
+			if err = WaitForPodToSchedule(cs, pod); err != nil {
 				t.Errorf("Expected the pod to be scheduled. error: %v", err)
 			}
 		}
@@ -694,12 +694,12 @@ func TestPrebindPlugin(t *testing.T) {
 		},
 	}
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "prebind-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "prebind-plugin", nil),
 		false, nil, registry, preBindPlugin, preBindPluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -733,7 +733,7 @@ func TestPrebindPlugin(t *testing.T) {
 		pbdPlugin.rejectPrebind = test.reject
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -744,11 +744,11 @@ func TestPrebindPlugin(t *testing.T) {
 			}
 		} else {
 			if test.reject {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
+				if err = WaitForPodUnschedulable(cs, pod); err != nil {
 					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
 				}
 			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
+				if err = WaitForPodToSchedule(cs, pod); err != nil {
 					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				}
 			}
@@ -801,12 +801,12 @@ func TestUnreservePlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "unreserve-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "unreserve-plugin", nil),
 		false, nil, registry, plugins, pluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -841,7 +841,7 @@ func TestUnreservePlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -855,14 +855,14 @@ func TestUnreservePlugin(t *testing.T) {
 			}
 		} else {
 			if test.prebindReject {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
+				if err = WaitForPodUnschedulable(cs, pod); err != nil {
 					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
 				}
 				if unresPlugin.numUnreserveCalled == 0 {
 					t.Errorf("test #%v: Expected the unreserve plugin to be called %d times, was called %d times.", i, pbdPlugin.numPrebindCalled, unresPlugin.numUnreserveCalled)
 				}
 			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
+				if err = WaitForPodToSchedule(cs, pod); err != nil {
 					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				}
 				if unresPlugin.numUnreserveCalled > 0 {
@@ -884,9 +884,9 @@ type pluginInvokeEvent struct {
 
 // TestBindPlugin tests invocation of bind plugins.
 func TestBindPlugin(t *testing.T) {
-	testContext := initTestMaster(t, "bind-plugin", nil)
-	bindPlugin1 := &BindPlugin{PluginName: "bind-plugin-1", client: testContext.clientSet}
-	bindPlugin2 := &BindPlugin{PluginName: "bind-plugin-2", client: testContext.clientSet}
+	testContext := InitTestMaster(t, "bind-plugin", nil)
+	bindPlugin1 := &BindPlugin{PluginName: "bind-plugin-1", client: testContext.ClientSet}
+	bindPlugin2 := &BindPlugin{PluginName: "bind-plugin-2", client: testContext.ClientSet}
 	unreservePlugin := &UnreservePlugin{name: "mock-unreserve-plugin"}
 	postbindPlugin := &PostbindPlugin{name: "mock-post-bind-plugin"}
 	// Create a plugin registry for testing. Register an unreserve, a bind plugin and a postBind plugin.
@@ -938,11 +938,11 @@ func TestBindPlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t, testContext,
+	context := InitTestSchedulerWithOptions(t, testContext,
 		false, nil, registry, plugins, pluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -996,14 +996,14 @@ func TestBindPlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
 
 		if test.expectBoundByScheduler || test.expectBoundByPlugin {
 			// bind plugins skipped to bind the pod
-			if err = waitForPodToSchedule(cs, pod); err != nil {
+			if err = WaitForPodToSchedule(cs, pod); err != nil {
 				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				continue
 			}
@@ -1107,12 +1107,12 @@ func TestPostbindPlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "postbind-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "postbind-plugin", nil),
 		false, nil, registry, plugins, pluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -1147,7 +1147,7 @@ func TestPostbindPlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1161,14 +1161,14 @@ func TestPostbindPlugin(t *testing.T) {
 			}
 		} else {
 			if test.prebindReject {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
+				if err = WaitForPodUnschedulable(cs, pod); err != nil {
 					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
 				}
 				if ptbdPlugin.numPostbindCalled > 0 {
 					t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, ptbdPlugin.numPostbindCalled)
 				}
 			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
+				if err = WaitForPodToSchedule(cs, pod); err != nil {
 					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				}
 				if ptbdPlugin.numPostbindCalled == 0 {
@@ -1207,12 +1207,12 @@ func TestPermitPlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "permit-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "permit-plugin", nil),
 		false, nil, registry, plugins, pluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -1265,7 +1265,7 @@ func TestPermitPlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1275,11 +1275,11 @@ func TestPermitPlugin(t *testing.T) {
 			}
 		} else {
 			if test.reject || test.timeout {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
+				if err = WaitForPodUnschedulable(cs, pod); err != nil {
 					t.Errorf("test #%v: Didn't expect the pod to be scheduled. error: %v", i, err)
 				}
 			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
+				if err = WaitForPodToSchedule(cs, pod); err != nil {
 					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				}
 			}
@@ -1318,12 +1318,12 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "permit-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "permit-plugin", nil),
 		false, nil, registry, plugins, pluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -1353,28 +1353,28 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 
 		// Create two pods.
 		waitingPod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating the waiting pod: %v", err)
 		}
 		signallingPod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "signalling-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "signalling-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating the signalling pod: %v", err)
 		}
 
 		if test.waitReject {
-			if err = waitForPodUnschedulable(cs, waitingPod); err != nil {
+			if err = WaitForPodUnschedulable(cs, waitingPod); err != nil {
 				t.Errorf("test #%v: Didn't expect the waiting pod to be scheduled. error: %v", i, err)
 			}
-			if err = waitForPodUnschedulable(cs, signallingPod); err != nil {
+			if err = WaitForPodUnschedulable(cs, signallingPod); err != nil {
 				t.Errorf("test #%v: Didn't expect the signalling pod to be scheduled. error: %v", i, err)
 			}
 		} else {
-			if err = waitForPodToSchedule(cs, waitingPod); err != nil {
+			if err = WaitForPodToSchedule(cs, waitingPod); err != nil {
 				t.Errorf("test #%v: Expected the waiting pod to be scheduled. error: %v", i, err)
 			}
-			if err = waitForPodToSchedule(cs, signallingPod); err != nil {
+			if err = WaitForPodToSchedule(cs, signallingPod); err != nil {
 				t.Errorf("test #%v: Expected the signalling pod to be scheduled. error: %v", i, err)
 			}
 		}
@@ -1407,12 +1407,12 @@ func TestFilterPlugin(t *testing.T) {
 	emptyPluginConfig := []schedulerconfig.PluginConfig{}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "filter-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "filter-plugin", nil),
 		false, nil, registry, plugin, emptyPluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add a few nodes.
 	_, err := createNodes(cs, "test-node", nil, 2)
 	if err != nil {
@@ -1423,7 +1423,7 @@ func TestFilterPlugin(t *testing.T) {
 		filterPlugin.failFilter = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
-			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.Ns.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1433,7 +1433,7 @@ func TestFilterPlugin(t *testing.T) {
 				t.Errorf("Didn't expect the pod to be scheduled.")
 			}
 		} else {
-			if err = waitForPodToSchedule(cs, pod); err != nil {
+			if err = WaitForPodToSchedule(cs, pod); err != nil {
 				t.Errorf("Expected the pod to be scheduled. error: %v", err)
 			}
 		}
@@ -1471,12 +1471,12 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "preempt-with-permit-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "preempt-with-permit-plugin", nil),
 		false, nil, registry, plugins, pluginConfig, false, time.Second)
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	// Add one node.
 	nodeRes := &v1.ResourceList{
 		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
@@ -1503,7 +1503,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 
 	// Create two pods.
 	waitingPod, err := createPausePod(cs,
-		initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.ns.Name, Priority: &lowPriority, Resources: &resourceRequest}))
+		initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.Ns.Name, Priority: &lowPriority, Resources: &resourceRequest}))
 	if err != nil {
 		t.Errorf("Error while creating the waiting pod: %v", err)
 	}
@@ -1515,12 +1515,12 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	})
 
 	preemptorPod, err := createPausePod(cs,
-		initPausePod(cs, &pausePodConfig{Name: "preemptor-pod", Namespace: context.ns.Name, Priority: &highPriority, Resources: &resourceRequest}))
+		initPausePod(cs, &pausePodConfig{Name: "preemptor-pod", Namespace: context.Ns.Name, Priority: &highPriority, Resources: &resourceRequest}))
 	if err != nil {
 		t.Errorf("Error while creating the preemptor pod: %v", err)
 	}
 
-	if err = waitForPodToSchedule(cs, preemptorPod); err != nil {
+	if err = WaitForPodToSchedule(cs, preemptorPod); err != nil {
 		t.Errorf("Expected the preemptor pod to be scheduled. error: %v", err)
 	}
 
@@ -1536,7 +1536,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	cleanupPods(cs, t, []*v1.Pod{waitingPod, preemptorPod})
 }
 
-func initTestContextForScorePlugin(t *testing.T, plugins *schedulerconfig.Plugins) (*testContext, *clientset.Clientset) {
+func initTestContextForScorePlugin(t *testing.T, plugins *schedulerconfig.Plugins) (*TestContext, *clientset.Clientset) {
 	// Create a plugin registry for testing. Register only a score plugin.
 	registry := framework.Registry{
 		scorePluginName:              NewScorePlugin,
@@ -1547,11 +1547,11 @@ func initTestContextForScorePlugin(t *testing.T, plugins *schedulerconfig.Plugin
 	emptyPluginConfig := []schedulerconfig.PluginConfig{}
 
 	// Create the master and the scheduler with the test plugin set.
-	context := initTestSchedulerWithOptions(t,
-		initTestMaster(t, "score-plugin", nil),
+	context := InitTestSchedulerWithOptions(t,
+		InitTestMaster(t, "score-plugin", nil),
 		false, nil, registry, plugins, emptyPluginConfig, false, time.Second)
 
-	cs := context.clientSet
+	cs := context.ClientSet
 	_, err := createNodes(cs, "test-node", nil, 10)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)

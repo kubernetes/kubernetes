@@ -40,9 +40,9 @@ import (
 // works correctly.
 func TestNodeAffinity(t *testing.T) {
 	context := initTest(t, "node-affinity")
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 	// Add a few nodes.
-	nodes, err := createNodes(context.clientSet, "testnode", nil, 5)
+	nodes, err := createNodes(context.ClientSet, "testnode", nil, 5)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -53,17 +53,17 @@ func TestNodeAffinity(t *testing.T) {
 	labels := map[string]string{
 		labelKey: labelValue,
 	}
-	if err = testutils.AddLabelsToNode(context.clientSet, labeledNode.Name, labels); err != nil {
+	if err = testutils.AddLabelsToNode(context.ClientSet, labeledNode.Name, labels); err != nil {
 		t.Fatalf("Cannot add labels to node: %v", err)
 	}
-	if err = waitForNodeLabels(context.clientSet, labeledNode.Name, labels); err != nil {
+	if err = waitForNodeLabels(context.ClientSet, labeledNode.Name, labels); err != nil {
 		t.Fatalf("Adding labels to node didn't succeed: %v", err)
 	}
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
-	pod, err := runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
+	pod, err := runPausePod(context.ClientSet, initPausePod(context.ClientSet, &pausePodConfig{
 		Name:      podName,
-		Namespace: context.ns.Name,
+		Namespace: context.Ns.Name,
 		Affinity: &v1.Affinity{
 			NodeAffinity: &v1.NodeAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
@@ -97,9 +97,9 @@ func TestNodeAffinity(t *testing.T) {
 // works correctly.
 func TestPodAffinity(t *testing.T) {
 	context := initTest(t, "pod-affinity")
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 	// Add a few nodes.
-	nodesInTopology, err := createNodes(context.clientSet, "in-topology", nil, 5)
+	nodesInTopology, err := createNodes(context.ClientSet, "in-topology", nil, 5)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -110,34 +110,34 @@ func TestPodAffinity(t *testing.T) {
 	}
 	for _, node := range nodesInTopology {
 		// Add topology key to all the nodes.
-		if err = testutils.AddLabelsToNode(context.clientSet, node.Name, nodeLabels); err != nil {
+		if err = testutils.AddLabelsToNode(context.ClientSet, node.Name, nodeLabels); err != nil {
 			t.Fatalf("Cannot add labels to node %v: %v", node.Name, err)
 		}
-		if err = waitForNodeLabels(context.clientSet, node.Name, nodeLabels); err != nil {
+		if err = waitForNodeLabels(context.ClientSet, node.Name, nodeLabels); err != nil {
 			t.Fatalf("Adding labels to node %v didn't succeed: %v", node.Name, err)
 		}
 	}
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
 	labelValue := "S1"
-	_, err = runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
+	_, err = runPausePod(context.ClientSet, initPausePod(context.ClientSet, &pausePodConfig{
 		Name:      "attractor-pod",
-		Namespace: context.ns.Name,
+		Namespace: context.Ns.Name,
 		Labels:    map[string]string{labelKey: labelValue},
 	}))
 	if err != nil {
 		t.Fatalf("Error running the attractor pod: %v", err)
 	}
 	// Add a few more nodes without the topology label.
-	_, err = createNodes(context.clientSet, "other-node", nil, 5)
+	_, err = createNodes(context.ClientSet, "other-node", nil, 5)
 	if err != nil {
 		t.Fatalf("Cannot create the second set of nodes: %v", err)
 	}
 	// Add a new pod with affinity to the attractor pod.
 	podName := "pod-with-podaffinity"
-	pod, err := runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
+	pod, err := runPausePod(context.ClientSet, initPausePod(context.ClientSet, &pausePodConfig{
 		Name:      podName,
-		Namespace: context.ns.Name,
+		Namespace: context.Ns.Name,
 		Affinity: &v1.Affinity{
 			PodAffinity: &v1.PodAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
@@ -161,7 +161,7 @@ func TestPodAffinity(t *testing.T) {
 								},
 							},
 							TopologyKey: topologyKey,
-							Namespaces:  []string{context.ns.Name},
+							Namespaces:  []string{context.Ns.Name},
 						},
 						Weight: 50,
 					},
@@ -187,7 +187,7 @@ func TestPodAffinity(t *testing.T) {
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
 func TestImageLocality(t *testing.T) {
 	context := initTest(t, "image-locality")
-	defer cleanupTest(t, context)
+	defer CleanupTest(t, context)
 
 	// We use a fake large image as the test image used by the pod, which has relatively large image size.
 	image := v1.ContainerImage{
@@ -198,22 +198,22 @@ func TestImageLocality(t *testing.T) {
 	}
 
 	// Create a node with the large image.
-	nodeWithLargeImage, err := createNodeWithImages(context.clientSet, "testnode-large-image", nil, []v1.ContainerImage{image})
+	nodeWithLargeImage, err := createNodeWithImages(context.ClientSet, "testnode-large-image", nil, []v1.ContainerImage{image})
 	if err != nil {
 		t.Fatalf("cannot create node with a large image: %v", err)
 	}
 
 	// Add a few nodes.
-	_, err = createNodes(context.clientSet, "testnode", nil, 10)
+	_, err = createNodes(context.ClientSet, "testnode", nil, 10)
 	if err != nil {
 		t.Fatalf("cannot create nodes: %v", err)
 	}
 
 	// Create a pod with containers each having the specified image.
 	podName := "pod-using-large-image"
-	pod, err := runPodWithContainers(context.clientSet, initPodWithContainers(context.clientSet, &podWithContainersConfig{
+	pod, err := runPodWithContainers(context.ClientSet, initPodWithContainers(context.ClientSet, &podWithContainersConfig{
 		Name:       podName,
-		Namespace:  context.ns.Name,
+		Namespace:  context.Ns.Name,
 		Containers: makeContainersWithImages(image.Names),
 	}))
 	if err != nil {
@@ -251,9 +251,9 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 	defer algorithmprovider.ApplyFeatureGates()()
 
 	context := initTest(t, "eps-priority")
-	cs := context.clientSet
-	ns := context.ns.Name
-	defer cleanupTest(t, context)
+	cs := context.ClientSet
+	ns := context.Ns.Name
+	defer CleanupTest(t, context)
 	// Add 4 nodes.
 	nodes, err := createNodes(cs, "node", nil, 4)
 	if err != nil {

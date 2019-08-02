@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +46,7 @@ import (
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	schedulerutil "k8s.io/kubernetes/test/integration/scheduler"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -238,11 +239,11 @@ func TestVolumeBinding(t *testing.T) {
 			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 		}
 		if test.shouldFail {
-			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+			if err := schedulerutil.WaitForPodUnschedulable(config.client, test.pod); err != nil {
 				t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
 			}
 		} else {
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+			if err := schedulerutil.WaitForPodToSchedule(config.client, test.pod); err != nil {
 				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
 			}
 		}
@@ -361,7 +362,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 
 		// Wait for pod is unschedulable.
 		klog.Infof("Waiting for pod is unschedulable")
-		if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+		if err := schedulerutil.WaitForPodUnschedulable(config.client, test.pod); err != nil {
 			t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
 		}
 
@@ -371,12 +372,12 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		// Wait for pod is scheduled or unscheduable.
 		if !test.shouldFail {
 			klog.Infof("Waiting for pod is scheduled")
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+			if err := schedulerutil.WaitForPodToSchedule(config.client, test.pod); err != nil {
 				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
 			}
 		} else {
 			klog.Infof("Waiting for pod is unschedulable")
-			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+			if err := schedulerutil.WaitForPodUnschedulable(config.client, test.pod); err != nil {
 				t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
 			}
 		}
@@ -485,7 +486,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 	for _, pod := range pods {
 		// Use increased timeout for stress test because there is a higher chance of
 		// PV sync error
-		if err := waitForPodToScheduleWithTimeout(config.client, pod, 2*time.Minute); err != nil {
+		if err := schedulerutil.WaitForPodToScheduleWithTimeout(config.client, pod, 2*time.Minute); err != nil {
 			t.Errorf("Failed to schedule Pod %q: %v", pod.Name, err)
 		}
 	}
@@ -571,7 +572,7 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 	// Validate Pods scheduled
 	scheduledNodes := sets.NewString()
 	for _, pod := range pods {
-		if err := waitForPodToSchedule(config.client, pod); err != nil {
+		if err := schedulerutil.WaitForPodToSchedule(config.client, pod); err != nil {
 			t.Errorf("Failed to schedule Pod %q: %v", pod.Name, err)
 		} else {
 			// Keep track of all the nodes that the Pods were scheduled on
@@ -661,7 +662,7 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
 		// Give time to shceduler to attempt to schedule pod
-		if err := waitForPodUnschedulable(config.client, pod); err != nil {
+		if err := schedulerutil.WaitForPodUnschedulable(config.client, pod); err != nil {
 			t.Errorf("Failed as Pod %s was not unschedulable: %v", pod.Name, err)
 		}
 		// Check pod conditions
@@ -792,11 +793,11 @@ func TestVolumeProvision(t *testing.T) {
 			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 		}
 		if test.shouldFail {
-			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+			if err := schedulerutil.WaitForPodUnschedulable(config.client, test.pod); err != nil {
 				t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
 			}
 		} else {
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+			if err := schedulerutil.WaitForPodToSchedule(config.client, test.pod); err != nil {
 				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
 			}
 		}
@@ -827,16 +828,16 @@ func TestRescheduleProvisioning(t *testing.T) {
 	// Set feature gates
 	controllerCh := make(chan struct{})
 
-	context := initTestMaster(t, "reschedule-volume-provision", nil)
+	context := schedulerutil.InitTestMaster(t, "reschedule-volume-provision", nil)
 
-	clientset := context.clientSet
-	ns := context.ns.Name
+	clientset := context.ClientSet
+	ns := context.Ns.Name
 
 	defer func() {
 		close(controllerCh)
 		deleteTestObjects(clientset, ns, nil)
-		context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-		context.closeFn()
+		context.ClientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+		context.CloseFn()
 	}()
 
 	ctrl, informerFactory, err := initPVController(context, 0)
@@ -883,19 +884,19 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), false, nil, nil,
+	context := schedulerutil.InitTestSchedulerWithOptions(t, schedulerutil.InitTestMaster(t, nsName, nil), false, nil, nil,
 		nil, []schedulerconfig.PluginConfig{}, false, resyncPeriod)
-	clientset := context.clientSet
-	ns := context.ns.Name
+	clientset := context.ClientSet
+	ns := context.Ns.Name
 
 	ctrl, informerFactory, err := initPVController(context, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(context.stopCh)
+	go ctrl.Run(context.StopCh)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(context.stopCh)
-	informerFactory.WaitForCacheSync(context.stopCh)
+	informerFactory.Start(context.StopCh)
+	informerFactory.WaitForCacheSync(context.StopCh)
 
 	// Create shared objects
 	// Create nodes
@@ -916,16 +917,16 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   context.stopCh,
+		stop:   context.StopCh,
 		teardown: func() {
 			deleteTestObjects(clientset, ns, nil)
-			cleanupTest(t, context)
+			schedulerutil.CleanupTest(t, context)
 		},
 	}
 }
 
-func initPVController(context *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
-	clientset := context.clientSet
+func initPVController(context *schedulerutil.TestContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
+	clientset := context.ClientSet
 	// Informers factory for controllers, we disable resync period for testing.
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 
