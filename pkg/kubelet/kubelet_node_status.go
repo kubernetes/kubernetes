@@ -51,7 +51,8 @@ import (
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
 func (kl *Kubelet) registerWithAPIServer() {
-	if kl.registrationCompleted {
+	_, err := kl.kubeClient.CoreV1().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
+	if kl.registrationCompleted && err == nil {
 		return
 	}
 	step := 100 * time.Millisecond
