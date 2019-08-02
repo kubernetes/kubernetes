@@ -340,8 +340,10 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		newStatus, err = s.ensureLoadBalancer(service)
 		if err != nil {
 			if err == cloudprovider.ImplementedElsewhere {
-				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error",
-					key, s.cloud.ProviderName())
+				// ImplementedElsewhere indicates that the ensureLoadBalancer is a nop and the
+				// functionality is implemented by a different controller.  In this case, we
+				// return immediately without doing anything.
+				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, s.cloud.ProviderName())
 				return op, nil
 			}
 			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
