@@ -45,6 +45,8 @@ import (
 )
 
 var (
+	// conditionMap keeps which condition can be wait on given resource.
+	conditionMap = make(map[string][]string)
 	waitLong = templates.LongDesc(`
 		Experimental: Wait for a specific condition on one or many resources.
 
@@ -65,6 +67,17 @@ var (
 		kubectl delete pod/busybox1
 		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
 )
+
+
+func init() {
+	// Copy from pkg/apis/core/types.go and pkg/apis/apps/type.go
+	conditionMap["pods"] = []string{"PodScheduled", "Ready", "Initialized", "Unschedulable", "ContainersReady"}
+	conditionMap["deployments"] = []string{"Available", "Progressing", "RepicaFailure"}
+	conditionMap["services"] = []string{}
+	conditionMap["nodes"] = []string{"Ready", "MemoryPressure", "DiskPressure", "NetworkUnavailable"}
+	// And go on...
+}
+
 
 // errNoMatchingResources is returned when there is no resources matching a query.
 var errNoMatchingResources = errors.New("no matching resources found")
@@ -349,6 +362,15 @@ type ConditionalWait struct {
 	errOut io.Writer
 }
 
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if strings.ToLower(a) == strings.ToLower(e) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsConditionMet is a conditionfunc for waiting on an API condition to be met
 func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
@@ -361,6 +383,11 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 
 		var gottenObj *unstructured.Unstructured
 		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
+		resource := info.Mapping.Resource.Resource
+		if !contains(conditionMap[resource], w.conditionName) {
+			return nil, false, fmt.Errorf("available condition on resource %s are %s", resource, conditionMap[resource])
+		}
+
 		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
 
 		resourceVersion := ""
