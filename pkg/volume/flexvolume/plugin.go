@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	flexVolumePluginName       = "kubernetes.io/flexvolume"
+	flexVolumePluginName = "kubernetes.io/flexvolume"
 )
 
 // FlexVolumePlugin object.
