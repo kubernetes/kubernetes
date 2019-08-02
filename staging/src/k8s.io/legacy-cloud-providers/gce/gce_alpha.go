@@ -38,6 +38,9 @@ type AlphaFeatureGate struct {
 
 // Enabled returns true if the provided alpha feature is enabled
 func (af *AlphaFeatureGate) Enabled(key string) bool {
+	if af == nil || af.features == nil {
+		return false
+	}
 	return af.features[key]
 }
 

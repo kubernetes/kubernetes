@@ -36,12 +36,8 @@ const (
 	allInstances = "ALL"
 )
 
-func (g *Cloud) usesSubsets() bool {
-	return g.AlphaFeatureGate != nil && g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets)
-}
-
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if g.usesSubsets() {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
 		return nil, cloudprovider.ImplementedElsewhere
 	}
 
@@ -210,7 +206,7 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
-	if g.usesSubsets() {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
 		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()
