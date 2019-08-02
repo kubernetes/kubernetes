@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // addResourceList adds the resources in newList to list
@@ -68,34 +70,47 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	return
 }
 
-// GetResourceRequest finds and returns the request for a specific resource.
+// GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
+func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+
+	requestQuantity := resource.Quantity{Format: resource.BinarySI}
+
+	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk
+		return requestQuantity
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
+			requestQuantity.Add(rQuantity)
+		}
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
+			if requestQuantity.Cmp(rQuantity) < 0 {
+				requestQuantity = rQuantity
+			}
+		}
+	}
+
+	return requestQuantity
+}
+
+// GetResourceRequest finds and returns the request value for a specific resource.
 func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	if resource == v1.ResourcePods {
 		return 1
 	}
-	totalResources := int64(0)
-	for _, container := range pod.Spec.Containers {
-		if rQuantity, ok := container.Resources.Requests[resource]; ok {
-			if resource == v1.ResourceCPU {
-				totalResources += rQuantity.MilliValue()
-			} else {
-				totalResources += rQuantity.Value()
-			}
-		}
+
+	requestQuantity := GetResourceRequestQuantity(pod, resource)
+
+	if resource == v1.ResourceCPU {
+		return requestQuantity.MilliValue()
+	} else {
+		return requestQuantity.Value()
 	}
-	// take max_resource(sum_pod, any_init_container)
-	for _, container := range pod.Spec.InitContainers {
-		if rQuantity, ok := container.Resources.Requests[resource]; ok {
-			if resource == v1.ResourceCPU {
-				if rQuantity.MilliValue() > totalResources {
-					totalResources = rQuantity.MilliValue()
-				}
-			} else if rQuantity.Value() > totalResources {
-				totalResources = rQuantity.Value()
-			}
-		}
-	}
-	return totalResources
+
 }
 
 // ExtractResourceValueByContainerName extracts the value of a resource
