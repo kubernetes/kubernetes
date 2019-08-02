@@ -274,19 +274,23 @@ func (f *framework) QueueSortFunc() LessFunc {
 // cycle is aborted.
 func (f *framework) RunPrefilterPlugins(
 	pc *PluginContext, pod *v1.Pod) *Status {
-	for _, pl := range f.prefilterPlugins {
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := schedutil.NewErrorChannel()
+	workqueue.ParallelizeUntil(ctx, 16, len(f.prefilterPlugins), func(index int) {
+		pl := f.prefilterPlugins[index]
 		status := pl.Prefilter(pc, pod)
 		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
-				klog.V(4).Infof(msg)
-				return NewStatus(status.Code(), msg)
-			}
-			msg := fmt.Sprintf("error while running %v prefilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
-			klog.Error(msg)
-			return NewStatus(Error, msg)
+			msg := fmt.Errorf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
+			klog.V(4).Info(msg)
+			errCh.SendErrorWithCancel(msg, cancel)
+			return
 		}
+	})
+
+	if err := errCh.ReceiveError(); err != nil {
+		return NewStatus(Unschedulable, err.Error())
 	}
+
 	return nil
 }
 
@@ -410,19 +414,23 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 // error containing the rejection message or the error occurred in the plugin.
 func (f *framework) RunPrebindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
-	for _, pl := range f.prebindPlugins {
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := schedutil.NewErrorChannel()
+	workqueue.ParallelizeUntil(ctx, 16, len(f.prebindPlugins), func(index int) {
+		pl := f.prebindPlugins[index]
 		status := pl.Prebind(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
-				msg := fmt.Sprintf("rejected by %v at prebind: %v", pl.Name(), status.Message())
-				klog.V(4).Infof(msg)
-				return NewStatus(status.Code(), msg)
-			}
-			msg := fmt.Sprintf("error while running %v prebind plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
-			klog.Error(msg)
-			return NewStatus(Error, msg)
+			msg := fmt.Errorf("rejected by %v at prebind: %v", pl.Name(), status.Message())
+			klog.V(4).Info(msg)
+			errCh.SendErrorWithCancel(msg, cancel)
+			return
 		}
+	})
+
+	if err := errCh.ReceiveError(); err != nil {
+		return NewStatus(Unschedulable, err.Error())
 	}
+
 	return nil
 }
 
@@ -450,9 +458,10 @@ func (f *framework) RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName stri
 // RunPostbindPlugins runs the set of configured postbind plugins.
 func (f *framework) RunPostbindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) {
-	for _, pl := range f.postbindPlugins {
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(f.postbindPlugins), func(index int) {
+		pl := f.postbindPlugins[index]
 		pl.Postbind(pc, pod, nodeName)
-	}
+	})
 }
 
 // RunReservePlugins runs the set of configured reserve plugins. If any of these
@@ -460,23 +469,33 @@ func (f *framework) RunPostbindPlugins(
 // returns the error. In such case, pod will not be scheduled.
 func (f *framework) RunReservePlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
-	for _, pl := range f.reservePlugins {
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := schedutil.NewErrorChannel()
+	workqueue.ParallelizeUntil(ctx, 16, len(f.reservePlugins), func(index int) {
+		pl := f.reservePlugins[index]
 		status := pl.Reserve(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %v reserve plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Errorf("error while running %v reserve plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
-			return NewStatus(Error, msg)
+			errCh.SendErrorWithCancel(msg, cancel)
+			return
 		}
+	})
+
+	if err := errCh.ReceiveError(); err != nil {
+		return NewStatus(Error, err.Error())
 	}
+
 	return nil
 }
 
 // RunUnreservePlugins runs the set of configured unreserve plugins.
 func (f *framework) RunUnreservePlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) {
-	for _, pl := range f.unreservePlugins {
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(f.unreservePlugins), func(index int) {
+		pl := f.unreservePlugins[index]
 		pl.Unreserve(pc, pod, nodeName)
-	}
+	})
 }
 
 // RunPermitPlugins runs the set of configured permit plugins. If any of these
