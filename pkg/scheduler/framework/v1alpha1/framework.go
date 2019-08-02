@@ -280,15 +280,21 @@ func (f *framework) RunPrefilterPlugins(
 		pl := f.prefilterPlugins[index]
 		status := pl.Prefilter(pc, pod)
 		if !status.IsSuccess() {
-			msg := fmt.Errorf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
-			klog.V(4).Info(msg)
-			errCh.SendErrorWithCancel(msg, cancel)
+			if status.Code() == Unschedulable {
+				status.message = fmt.Sprintf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
+				klog.V(4).Info(status.message)
+			} else {
+				status.message = fmt.Sprintf("error while running %v prefilter plugin for pod %v: %v",
+					pl.Name(), pod.Name, status.Message())
+				klog.Error(status.message)
+			}
+			errCh.SendErrorWithCancel(status, cancel)
 			return
 		}
 	})
 
 	if err := errCh.ReceiveError(); err != nil {
-		return NewStatus(Unschedulable, err.Error())
+		return err.(*Status)
 	}
 
 	return nil
@@ -420,15 +426,21 @@ func (f *framework) RunPrebindPlugins(
 		pl := f.prebindPlugins[index]
 		status := pl.Prebind(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			msg := fmt.Errorf("rejected by %v at prebind: %v", pl.Name(), status.Message())
-			klog.V(4).Info(msg)
-			errCh.SendErrorWithCancel(msg, cancel)
+			if status.Code() == Unschedulable {
+				status.message = fmt.Sprintf("rejected by %v at prebind: %v", pl.Name(), status.Message())
+				klog.V(4).Infof(status.message)
+			} else {
+				status.message = fmt.Sprintf("error while running %v prebind plugin for pod %v: %v",
+					pl.Name(), pod.Name, status.Message())
+				klog.Error(status.message)
+			}
+			errCh.SendErrorWithCancel(status, cancel)
 			return
 		}
 	})
 
 	if err := errCh.ReceiveError(); err != nil {
-		return NewStatus(Unschedulable, err.Error())
+		return err.(*Status)
 	}
 
 	return nil

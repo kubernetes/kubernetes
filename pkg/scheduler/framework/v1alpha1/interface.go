@@ -90,6 +90,12 @@ func (s *Status) AsError() error {
 	return errors.New(s.message)
 }
 
+// Error returns the same message as that of the Status, it is used to implement
+// the `error` interface.
+func (s *Status) Error() string {
+	return s.Message()
+}
+
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, msg string) *Status {
 	return &Status{
