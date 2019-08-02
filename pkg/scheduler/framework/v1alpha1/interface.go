@@ -31,10 +31,16 @@ import (
 type Code int
 
 // NodeScoreList declares a list of nodes and their scores.
-type NodeScoreList []int
+type NodeScoreList []NodeScore
 
-// PluginToNodeScoreMap declares a map from plugin name to its NodeScoreList.
-type PluginToNodeScoreMap map[string]NodeScoreList
+// NodeScore is a struct with node name and score.
+type NodeScore struct {
+	Name  string
+	Score int
+}
+
+// PluginToNodeScores declares a map from plugin name to its NodeScoreList.
+type PluginToNodeScores map[string]NodeScoreList
 
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
@@ -294,17 +300,17 @@ type Framework interface {
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status)
+	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScores, *Status)
 
 	// RunNormalizeScorePlugins runs the normalize score plugins. It should be called after
-	// RunScorePlugins with the PluginToNodeScoreMap result. It then modifies the map with
+	// RunScorePlugins with the PluginToNodeScores result. It then modifies the map with
 	// normalized scores. It returns a non-success Status if any of the normalize score plugins
 	// returns a non-success status.
-	RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status
+	RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status
 
 	// ApplyScoreWeights applies weights to the score results. It should be called after
 	// RunNormalizeScorePlugins.
-	ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status
+	ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status
 
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
