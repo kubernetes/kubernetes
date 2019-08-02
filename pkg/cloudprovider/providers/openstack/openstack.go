@@ -267,6 +267,7 @@ func createKubernetesClient(kubeconfigPath string) (*kubernetes.Clientset, error
 	if err != nil {
 		return nil, err
 	}
+	cfg.DisableCompression = true
 
 	client, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
