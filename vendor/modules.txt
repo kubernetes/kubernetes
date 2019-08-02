@@ -1029,6 +1029,7 @@ gotest.tools/gotestsum
 gotest.tools/gotestsum/internal/junitxml
 gotest.tools/gotestsum/testjson
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1

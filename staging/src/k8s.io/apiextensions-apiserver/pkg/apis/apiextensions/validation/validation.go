@@ -298,7 +298,7 @@ func validateConversionReviewVersions(versions []string, requireRecognizedVersio
 		if requireRecognizedVersion && !hasAcceptedVersion {
 			allErrs = append(allErrs, field.Invalid(
 				fldPath, versions,
-				fmt.Sprintf("none of the versions accepted by this server. accepted version(s) are %v",
+				fmt.Sprintf("must include at least one of %v",
 					strings.Join(acceptedConversionReviewVersion, ", "))))
 		}
 	}
