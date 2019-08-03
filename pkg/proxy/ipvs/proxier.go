@@ -1691,25 +1691,6 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 			continue
 		}
 		if _, ok := activeServices[cs]; !ok {
-			rsList, _ := proxier.ipvs.GetRealServers(svc)
-
-			// If we still have real servers graceful termination is not done
-			if len(rsList) > 0 {
-				continue
-			}
-
-			// Applying graceful termination to all real servers
-			for _, rs := range rsList {
-				uniqueRS := GetUniqueRSName(svc, rs)
-				// If RS is already in the graceful termination list, no need to add it again
-				if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
-					continue
-				}
-				klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
-				if err := proxier.gracefuldeleteManager.GracefulDeleteRS(svc, rs); err != nil {
-					klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
-				}
-			}
 			klog.V(4).Infof("Delete service %s", svc.String())
 			if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
 				klog.Errorf("Failed to delete service %s, error: %v", svc.String(), err)
