@@ -128,6 +128,6 @@ func decodeUnstructuredIntoAPIObject(action core.Action, unstructuredObj runtime
 
 func printIfNotExists(err error) {
 	if apierrors.IsNotFound(err) {
-		fmt.Println("[dryrun] The GET request didn't yield any result, the API Server returned a NotFound error.")
+		fmt.Println("[dryrun] The GET request didn't yield any result, the API Server returned a NotFound error")
 	}
 }

@@ -79,7 +79,7 @@ func (d *DaemonSetPrepuller) CreateFunc(component string) error {
 
 // WaitFunc waits for all Pods in the specified DaemonSet to be in the Running state
 func (d *DaemonSetPrepuller) WaitFunc(component string) {
-	fmt.Printf("[upgrade/prepull] Prepulling image for component %s.\n", component)
+	fmt.Printf("[upgrade/prepull] Prepulling image for component %s\n", component)
 	d.waiter.WaitForPodsWithLabel("k8s-app=upgrade-prepull-" + component)
 }
 
@@ -91,7 +91,7 @@ func (d *DaemonSetPrepuller) DeleteFunc(component string) error {
 	if err := apiclient.DeleteDaemonSetForeground(d.client, metav1.NamespaceSystem, dsName); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "unable to cleanup the DaemonSet used for prepulling %s", component)
 	}
-	fmt.Printf("[upgrade/prepull] Prepulled image for component %s.\n", component)
+	fmt.Printf("[upgrade/prepull] Prepulled image for component %s\n", component)
 	return nil
 }
 

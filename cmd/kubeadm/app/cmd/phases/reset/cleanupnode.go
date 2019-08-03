@@ -55,16 +55,16 @@ func runCleanupNode(c workflow.RunData) error {
 	certsDir := r.CertificatesDir()
 
 	// Try to stop the kubelet service
-	klog.V(1).Infoln("[reset] Getting init system")
+	klog.V(1).Infoln("[reset] getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
-		klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+		klog.Warningln("[reset] WARNING: The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
+		klog.Warningln("[reset] WARNING: Please ensure kubelet is stopped manually")
 	} else {
 		fmt.Println("[reset] Stopping the kubelet service")
 		if err := initSystem.ServiceStop("kubelet"); err != nil {
-			klog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
-			klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+			klog.Warningf("[reset] WARNING: The kubelet service could not be stopped by kubeadm: [%v]\n", err)
+			klog.Warningln("[reset] WARNING: Please ensure kubelet is stopped manually")
 		}
 	}
 
@@ -77,7 +77,7 @@ func runCleanupNode(c workflow.RunData) error {
 		r.AddDirsToClean(kubeletRunDir)
 	}
 
-	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
+	klog.V(1).Info("[reset] removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
 		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 	}
@@ -85,7 +85,7 @@ func runCleanupNode(c workflow.RunData) error {
 	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
-	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
+	klog.V(1).Infoln("[reset] removing contents from the config and pki directories")
 	if certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
@@ -103,7 +103,7 @@ func absoluteKubeletRunDirectory() (string, error) {
 
 	// Only unmount mount points which start with "/var/lib/kubelet" or absolute path of symbolic link, and avoid using empty absoluteKubeletRunDirectory
 	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", absoluteKubeletRunDirectory)
-	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
+	klog.V(1).Infof("[reset] executing command %q", umountDirsCmd)
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
 		klog.Warningf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))

@@ -133,7 +133,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		case constants.KubeScheduler:
 			path = flags.schedulerManifestPath
 		default:
-			klog.Errorf("[diff] unknown spec %v", spec)
+			klog.Errorf("[diff] Unknown spec %v", spec)
 			continue
 		}
 

@@ -90,13 +90,13 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
-		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
+		klog.V(1).Infof("[reset] loaded client set from kubeconfig file: %s", options.kubeconfigPath)
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false)
 		if err != nil {
-			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+			klog.Warningf("[reset] WARNING: Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
 	} else {
-		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
+		klog.V(1).Infof("[reset] could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrors(cfg))
@@ -115,10 +115,10 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		if err != nil {
 			return nil, err
 		}
-		klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
+		klog.V(1).Infof("[reset] detected and using CRI socket: %s", criSocketPath)
 	} else {
 		criSocketPath = options.criSocketPath
-		klog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
+		klog.V(1).Infof("[reset] using specified CRI socket: %s", criSocketPath)
 	}
 
 	return &resetData{
@@ -206,7 +206,7 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 func cleanDirs(data *resetData) {
 	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
 	for _, dir := range data.dirsToClean {
-		klog.V(1).Infof("[reset] Deleting content of %s", dir)
+		klog.V(1).Infof("[reset] deleting content of %s", dir)
 		phases.CleanDir(dir)
 	}
 }

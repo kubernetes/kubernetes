@@ -48,7 +48,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// This is usually the case of Token discovery, but it can also be used with a discovery file
 	// without embedded authentication credentials.
 	if len(cfg.Discovery.TLSBootstrapToken) != 0 {
-		klog.V(1).Info("[discovery] Using provided TLSBootstrapToken as authentication credentials for the join process")
+		klog.V(1).Info("[discovery] using provided TLSBootstrapToken as authentication credentials for the join process")
 
 		clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 		return kubeconfigutil.CreateWithToken(

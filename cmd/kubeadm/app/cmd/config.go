@@ -333,7 +333,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 			kubeadmutil.CheckErr(err)
 
 			// Upload the configuration using the file
-			klog.V(1).Infof("[config] uploading configuration")
+			klog.V(1).Infoln("[config] uploading configuration")
 			err = uploadconfig.UploadConfiguration(internalcfg, client)
 			kubeadmutil.CheckErr(err)
 		},
@@ -384,7 +384,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			kubeadmutil.CheckErr(err)
 
 			// Finally, upload the configuration
-			klog.V(1).Infof("[config] uploading configuration")
+			klog.V(1).Infoln("[config] uploading configuration")
 			err = uploadconfig.UploadConfiguration(internalcfg, client)
 			kubeadmutil.CheckErr(err)
 		},

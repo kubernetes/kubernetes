@@ -121,7 +121,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 	}
 
 	if len(flags.criSocket) != 0 {
-		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
+		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file")
 		cfg.NodeRegistration.CRISocket = flags.criSocket
 	}
 
@@ -188,7 +188,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 	fmt.Println("")
 	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", cfg.KubernetesVersion)
 	fmt.Println("")
-	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
+	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so")
 
 	return nil
 }

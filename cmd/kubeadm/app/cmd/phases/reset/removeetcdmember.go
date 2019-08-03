@@ -51,14 +51,14 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	cfg := r.Cfg()
 
 	// Only clear etcd data when using local etcd.
-	klog.V(1).Infoln("[reset] Checking for etcd config")
+	klog.V(1).Infoln("[reset] checking for etcd config")
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
 		r.AddDirsToClean(etcdDataDir)
 		if cfg != nil {
 			if err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg); err != nil {
-				klog.Warningf("[reset] failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
+				klog.Warningf("[reset] WARNING: Failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
 			}
 		}
 	} else {
@@ -76,7 +76,7 @@ func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (str
 	if cfg != nil && cfg.Etcd.Local != nil {
 		return cfg.Etcd.Local.DataDir, nil
 	}
-	klog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
+	klog.Warningln("[reset] WARNING: No kubeadm config, using etcd pod spec to get data directory")
 
 	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
 	if err != nil {

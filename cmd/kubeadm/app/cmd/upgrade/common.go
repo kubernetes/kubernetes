@@ -87,7 +87,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
+	fmt.Println("[upgrade/config] Making sure the configuration is correct")
 
 	var cfg *kubeadmapi.InitConfiguration
 	if flags.cfgPath != "" {
@@ -179,7 +179,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 
 // runPreflightChecks runs the root preflight check
 func runPreflightChecks(ignorePreflightErrors sets.String) error {
-	fmt.Println("[preflight] Running pre-flight checks.")
+	fmt.Println("[preflight] Running pre-flight checks")
 	return preflight.RunRootCheckOnly(ignorePreflightErrors)
 }
 

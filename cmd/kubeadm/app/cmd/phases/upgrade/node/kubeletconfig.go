@@ -106,7 +106,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		}
 
 		fmt.Println("[upgrade] The configuration for this node was successfully updated!")
-		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
+		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager")
 		return nil
 	}
 }

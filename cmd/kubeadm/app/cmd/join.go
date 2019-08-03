@@ -327,7 +327,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.Discovery.BootstrapToken = nil
 	} else {
 		if len(opt.cfgPath) == 0 && len(args) > 1 {
-			klog.Warningf("[preflight] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
+			klog.Warningf("[preflight] WARNING: More than one API server endpoint supplied on command line %v. Using the first one", args)
 		}
 		opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 	}
@@ -426,7 +426,7 @@ func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
 	if j.tlsBootstrapCfg != nil {
 		return j.tlsBootstrapCfg, nil
 	}
-	klog.V(1).Infoln("[preflight] Discovering cluster-info")
+	klog.V(1).Infoln("[preflight] discovering cluster-info")
 	tlsBootstrapCfg, err := discovery.For(j.cfg)
 	j.tlsBootstrapCfg = tlsBootstrapCfg
 	return tlsBootstrapCfg, err
@@ -440,7 +440,7 @@ func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
 	if _, err := j.TLSBootstrapCfg(); err != nil {
 		return nil, err
 	}
-	klog.V(1).Infoln("[preflight] Fetching init configuration")
+	klog.V(1).Infoln("[preflight] fetching init configuration")
 	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, j.tlsBootstrapCfg)
 	j.initCfg = initCfg
 	return initCfg, err
@@ -473,7 +473,7 @@ func (j *joinData) OutputWriter() io.Writer {
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
 func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
 	// Retrieves the kubeadm configuration
-	klog.V(1).Infoln("[preflight] Retrieving KubeConfig objects")
+	klog.V(1).Infoln("[preflight] retrieving KubeConfig objects")
 	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
 	if err != nil {
 		return nil, err

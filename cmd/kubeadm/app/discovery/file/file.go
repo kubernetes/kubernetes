@@ -57,7 +57,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 
 	// If the discovery file config contains authentication credentials
 	if kubeconfigutil.HasAuthenticationCredentials(config) {
-		klog.V(1).Info("[discovery] Using authentication credentials from the discovery file for validating TLS connection")
+		klog.V(1).Info("[discovery] using authentication credentials from the discovery file for validating TLS connection")
 
 		// Use the discovery file config for starting the join process
 		kubeconfig = config
@@ -69,7 +69,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 		}
 	} else {
 		// If the discovery file config does not contains authentication credentials
-		klog.V(1).Info("[discovery] Discovery file does not contains authentication credentials, using unauthenticated request for validating TLS connection")
+		klog.V(1).Info("[discovery] discovery file does not contains authentication credentials, using unauthenticated request for validating TLS connection")
 
 		// Create a new kubeconfig object from the discovery file config, with only the server and the CA cert.
 		// NB. We do this in order to not pick up other possible misconfigurations in the clusterinfo file
@@ -90,7 +90,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 	}
 
 	currentCluster := kubeconfigutil.GetClusterFromKubeConfig(kubeconfig)
-	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
+	klog.V(1).Infof("[discovery] created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
 
 	var clusterinfoCM *v1.ConfigMap
 	err = wait.Poll(constants.DiscoveryRetryInterval, discoveryTimeout, func() (bool, error) {
@@ -100,10 +100,10 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 			if apierrors.IsForbidden(err) {
 				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
 				// In that case, trust the cluster admin and do not refresh the cluster-info data
-				klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
+				klog.Warningf("[discovery] WARNING: Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
 			}
-			klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
+			klog.V(1).Infof("[discovery] error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
 			return false, nil
 		}
 		return true, nil
@@ -120,7 +120,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 	// We somehow got hold of the ConfigMap, try to read some data from it. If we can't, fallback on the user-provided file
 	refreshedBaseKubeConfig, err := tryParseClusterInfoFromConfigMap(clusterinfoCM)
 	if err != nil {
-		klog.V(1).Infof("[discovery] The %s ConfigMap isn't set up properly (%v), but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo, err)
+		klog.V(1).Infof("[discovery] the %s ConfigMap isn't set up properly (%v), but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo, err)
 		return kubeconfig, nil
 	}
 
@@ -128,7 +128,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 	currentCluster.Server = refreshedCluster.Server
 	currentCluster.CertificateAuthorityData = refreshedCluster.CertificateAuthorityData
 
-	klog.V(1).Infof("[discovery] Synced Server and CertificateAuthorityData from the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
+	klog.V(1).Infof("[discovery] synced Server and CertificateAuthorityData from the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	return kubeconfig, nil
 }
 
