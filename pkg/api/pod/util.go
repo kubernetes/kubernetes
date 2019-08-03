@@ -299,7 +299,7 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 	dropPodStatusDisabledFields(podStatus, oldPodStatus)
 }
 
-// dropDisabledFields removes disabled fields from the pod status
+// dropPodStatusDisabledFields removes disabled fields from the pod status
 func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.PodStatus) {
 	// trim PodIPs down to only one entry (non dual stack).
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
