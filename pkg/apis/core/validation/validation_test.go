@@ -5528,8 +5528,6 @@ func getResourceLimits(cpu, memory string) core.ResourceList {
 }
 
 func TestValidateEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	containers := []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
 	initContainers := []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
 	vols := map[string]core.VolumeSource{"vol": {EmptyDir: &core.EmptyDirVolumeSource{}}}
@@ -6567,7 +6565,6 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
 
@@ -6908,34 +6905,6 @@ func TestValidatePodSpec(t *testing.T) {
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
-		}
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
-
-	featuregatedCases := map[string]core.PodSpec{
-		"disabled by EphemeralContainers feature-gate": {
-			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			EphemeralContainers: []core.EphemeralContainer{
-				{
-					EphemeralContainerCommon: core.EphemeralContainerCommon{
-						Name:                     "debug",
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-					},
-				},
-			},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-		},
-	}
-	for expectedErr, spec := range featuregatedCases {
-		errs := ValidatePodSpec(&spec, field.NewPath("field"))
-		if len(errs) == 0 {
-			t.Errorf("expected failure due to gated feature: %s\n%+v", expectedErr, spec)
-		} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, expectedErr) {
-			t.Errorf("unexpected error message for gated feature. Expected error: %s\nActual error: %s", expectedErr, actualErr)
 		}
 	}
 }
@@ -9190,8 +9159,6 @@ func makeValidService() core.Service {
 }
 
 func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	tests := []struct {
 		new  []core.EphemeralContainer
 		old  []core.EphemeralContainer
@@ -10559,8 +10526,6 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 }
 
 func TestValidateReplicationController(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := core.PodTemplate{
 		Template: core.PodTemplateSpec{
