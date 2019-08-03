@@ -10,6 +10,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/app/util:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
