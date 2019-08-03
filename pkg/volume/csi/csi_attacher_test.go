@@ -221,6 +221,8 @@ func TestAttacherAttach(t *testing.T) {
 				status.AttachError = &storage.VolumeError{
 					Message: "attacher error",
 				}
+				errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+				fakeWatcher.Error(&errStatus)
 			} else {
 				status.Attached = true
 			}
