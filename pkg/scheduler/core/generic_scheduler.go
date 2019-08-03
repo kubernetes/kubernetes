@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,9 +89,10 @@ type FailedPredicateMap map[string][]predicates.PredicateFailureReason
 
 // FitError describes a fit error of a pod.
 type FitError struct {
-	Pod              *v1.Pod
-	NumAllNodes      int
-	FailedPredicates FailedPredicateMap
+	Pod                   *v1.Pod
+	NumAllNodes           int
+	FailedPredicates      FailedPredicateMap
+	FilteredNodesStatuses framework.NodeToStatusMap
 }
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -109,6 +110,10 @@ func (f *FitError) Error() string {
 		for _, pred := range predicates {
 			reasons[pred.GetReason()]++
 		}
+	}
+
+	for _, status := range f.FilteredNodesStatuses {
+		reasons[status.Message()]++
 	}
 
 	sortReasonsHistogram := func() []string {
@@ -206,16 +211,23 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Basic checks done")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pluginContext, pod, nodeLister)
+	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod, nodeLister)
 	if err != nil {
 		return result, err
 	}
 
+	// Run "postfilter" plugins.
+	postfilterStatus := g.framework.RunPostFilterPlugins(pluginContext, pod, filteredNodes, filteredNodesStatuses)
+	if !postfilterStatus.IsSuccess() {
+		return result, postfilterStatus.AsError()
+	}
+
 	if len(filteredNodes) == 0 {
 		return result, &FitError{
-			Pod:              pod,
-			NumAllNodes:      numNodes,
-			FailedPredicates: failedPredicateMap,
+			Pod:                   pod,
+			NumAllNodes:           numNodes,
+			FailedPredicates:      failedPredicateMap,
+			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
 	trace.Step("Computing predicates done")
@@ -449,9 +461,10 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod, nodeLister algorithm.NodeLister) ([]*v1.Node, FailedPredicateMap, error) {
+func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod, nodeLister algorithm.NodeLister) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
+	filteredNodesStatuses := framework.NodeToStatusMap{}
 
 	if len(g.predicates) == 0 {
 		filtered = nodeLister.ListNodes()
@@ -495,8 +508,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 				status := g.framework.RunFilterPlugins(pluginContext, pod, nodeName)
 				if !status.IsSuccess() {
 					predicateResultLock.Lock()
-					failedPredicateMap[nodeName] = append(failedPredicateMap[nodeName],
-						predicates.NewFailureReason(status.Message()))
+					filteredNodesStatuses[nodeName] = status
 					if status.Code() != framework.Unschedulable {
 						errs[status.Message()]++
 					}
@@ -524,7 +536,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
-			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
+			return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, errors.CreateAggregateFromMessageCountMap(errs)
 		}
 	}
 
@@ -539,9 +551,9 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 					klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
 						extender, err)
 					continue
-				} else {
-					return []*v1.Node{}, FailedPredicateMap{}, err
 				}
+
+				return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
 			}
 
 			for failedNodeName, failedMsg := range failedMap {
@@ -556,7 +568,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 			}
 		}
 	}
-	return filtered, failedPredicateMap, nil
+	return filtered, failedPredicateMap, filteredNodesStatuses, nil
 }
 
 // addNominatedPods adds pods with equal or greater priority which are nominated

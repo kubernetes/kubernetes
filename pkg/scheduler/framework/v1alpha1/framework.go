@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -41,6 +41,7 @@ type framework struct {
 	queueSortPlugins          []QueueSortPlugin
 	prefilterPlugins          []PrefilterPlugin
 	filterPlugins             []FilterPlugin
+	postFilterPlugins         []PostFilterPlugin
 	scorePlugins              []ScorePlugin
 	scoreWithNormalizePlugins []ScoreWithNormalizePlugin
 	reservePlugins            []ReservePlugin
@@ -168,6 +169,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 	}
 
+	if plugins.PostFilter != nil {
+		for _, r := range plugins.PostFilter.Enabled {
+			if pg, ok := pluginsMap[r.Name]; ok {
+				p, ok := pg.(PostFilterPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend post-filter plugin", r.Name)
+				}
+				f.postFilterPlugins = append(f.postFilterPlugins, p)
+			} else {
+				return nil, fmt.Errorf("post-filter plugin %v does not exist", r.Name)
+			}
+		}
+	}
+
 	if plugins.PreBind != nil {
 		for _, pb := range plugins.PreBind.Enabled {
 			if pg, ok := pluginsMap[pb.Name]; ok {
@@ -287,6 +302,7 @@ func (f *framework) RunPrefilterPlugins(
 			return NewStatus(Error, msg)
 		}
 	}
+
 	return nil
 }
 
@@ -296,17 +312,37 @@ func (f *framework) RunPrefilterPlugins(
 // Meanwhile, the failure message and status are set for the given node.
 func (f *framework) RunFilterPlugins(pc *PluginContext,
 	pod *v1.Pod, nodeName string) *Status {
-
-	for _, p := range f.filterPlugins {
-		status := p.Filter(pc, pod, nodeName)
+	for _, pl := range f.filterPlugins {
+		status := pl.Filter(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() != Unschedulable {
-				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %s filter plugin for pod %s: %s",
-					p.Name(), pod.Name, status.Message())
+				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %v filter plugin for pod %v: %v",
+					pl.Name(), pod.Name, status.Message())
 				klog.Error(errMsg)
 				return NewStatus(Error, errMsg)
 			}
 			return status
+		}
+	}
+
+	return nil
+}
+
+// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
+// of these plugins returns any status other than "Success", the given node is
+// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
+func (f *framework) RunPostFilterPlugins(
+	pc *PluginContext,
+	pod *v1.Pod,
+	nodes []*v1.Node,
+	filteredNodesStatuses NodeToStatusMap,
+) *Status {
+	for _, pl := range f.postFilterPlugins {
+		status := pl.PostFilter(pc, pod, nodes, filteredNodesStatuses)
+		if !status.IsSuccess() {
+			msg := fmt.Sprintf("error while running %v postfilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
 		}
 	}
 
