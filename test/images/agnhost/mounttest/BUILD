@@ -2,14 +2,18 @@ package(default_visibility = ["//visibility:public"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["mt.go"],
-    importpath = "k8s.io/kubernetes/test/images/mounttest",
+    srcs = [
+        "mt.go",
+        "mt_utils.go",
+        "mt_utils_windows.go",
+    ],
+    importpath = "k8s.io/kubernetes/test/images/agnhost/mounttest",
+    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
 )
 
 filegroup(
@@ -23,9 +27,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_binary(
-    name = "mounttest",
-    embed = [":go_default_library"],
 )

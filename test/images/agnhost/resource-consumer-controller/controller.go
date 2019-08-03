@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package resconsumerctrl
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,18 +24,37 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/test/images/resource-consumer/common"
 )
 
-var port = flag.Int("port", 8080, "Port number.")
-var consumerPort = flag.Int("consumer-port", 8080, "Port number of consumers.")
-var consumerServiceName = flag.String("consumer-service-name", "resource-consumer", "Name of service containing resource consumers.")
-var consumerServiceNamespace = flag.String("consumer-service-namespace", "default", "Namespace of service containing resource consumers.")
+// CmdResourceConsumerController is used by agnhost Cobra.
+var CmdResourceConsumerController = &cobra.Command{
+	Use:   "resource-consumer-controller",
+	Short: "Starts a HTTP server that spreads requests around resource consumers",
+	Long:  "Starts a HTTP server that spreads requests around resource consumers. The HTTP server has the same endpoints and usage as the one spawned by the \"resource-consumer\" subcommand.",
+	Args:  cobra.MaximumNArgs(0),
+	Run:   main,
+}
 
-func main() {
-	flag.Parse()
+var (
+	port                     int
+	consumerPort             int
+	consumerServiceName      string
+	consumerServiceNamespace string
+)
+
+func init() {
+	CmdResourceConsumerController.Flags().IntVar(&port, "port", 8080, "Port number.")
+	CmdResourceConsumerController.Flags().IntVar(&consumerPort, "consumer-port", 8080, "Port number of consumers.")
+	CmdResourceConsumerController.Flags().StringVar(&consumerServiceName, "consumer-service-name", "resource-consumer", "Name of service containing resource consumers.")
+	CmdResourceConsumerController.Flags().StringVar(&consumerServiceNamespace, "consumer-service-namespace", "default", "Namespace of service containing resource consumers.")
+}
+
+func main(cmd *cobra.Command, args []string) {
 	mgr := newController()
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), mgr))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), mgr))
 }
 
 type controller struct {
@@ -196,7 +214,7 @@ func (c *controller) sendConsumeCustomMetric(w http.ResponseWriter, metric strin
 }
 
 func createConsumerURL(suffix string) string {
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d%s", *consumerServiceName, *consumerServiceNamespace, *consumerPort, suffix)
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d%s", consumerServiceName, consumerServiceNamespace, consumerPort, suffix)
 }
 
 // sendOneConsumeCPURequest sends POST request for cpu consumption

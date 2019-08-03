@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -16,16 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package mounttest
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"syscall"
 	"time"
+
+	"github.com/spf13/cobra"
 )
+
+// CmdMounttest is used by agnhost Cobra.
+var CmdMounttest = &cobra.Command{
+	Use:   "mounttest",
+	Short: "Creates files with given permissions and outputs FS type, owner, mode, permissions, contents of files",
+	Long:  "Creates files with specific file permissions, and outputs the filesystem type, owner, mode, permissions, content of the given files, if they exist.",
+	Args:  cobra.MaximumNArgs(0),
+	Run:   main,
+}
 
 var (
 	fsTypePath                = ""
@@ -43,32 +50,30 @@ var (
 )
 
 func init() {
-	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
-	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
-	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
-	flag.StringVar(&fileOwnerPath, "file_owner", "", "Path to print the owning UID and GID of")
-	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
-	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
-	flag.StringVar(&newFilePath0660, "new_file_0660", "", "Path to write to and read from with perm 0660")
-	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
-	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
-	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
-	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
-	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
+	CmdMounttest.Flags().StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
+	CmdMounttest.Flags().StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
+	CmdMounttest.Flags().StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
+	CmdMounttest.Flags().StringVar(&fileOwnerPath, "file_owner", "", "Path to print the owning UID and GID of")
+	CmdMounttest.Flags().StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
+	CmdMounttest.Flags().StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
+	CmdMounttest.Flags().StringVar(&newFilePath0660, "new_file_0660", "", "Path to write to and read from with perm 0660")
+	CmdMounttest.Flags().StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
+	CmdMounttest.Flags().StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
+	CmdMounttest.Flags().StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
+	CmdMounttest.Flags().IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
+	CmdMounttest.Flags().BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 }
 
 // This program performs some tests on the filesystem as dictated by the
 // flags passed by the user.
-func main() {
-	flag.Parse()
-
+func main(cmd *cobra.Command, args []string) {
 	var (
 		err  error
 		errs = []error{}
 	)
 
 	// Clear the umask so we can set any mode bits we want.
-	syscall.Umask(0000)
+	umask(0000)
 
 	// NOTE: the ordering of execution of the various command line
 	// flags is intentional and allows a single command to:
@@ -134,75 +139,6 @@ func main() {
 	}
 
 	os.Exit(0)
-}
-
-// Defined by Linux (sys/statfs.h) - the type number for tmpfs mounts.
-const linuxTmpfsMagic = 0x01021994
-
-func fsType(path string) error {
-	if path == "" {
-		return nil
-	}
-
-	buf := syscall.Statfs_t{}
-	if err := syscall.Statfs(path, &buf); err != nil {
-		fmt.Printf("error from statfs(%q): %v\n", path, err)
-		return err
-	}
-
-	if buf.Type == linuxTmpfsMagic {
-		fmt.Printf("mount type of %q: tmpfs\n", path)
-	} else {
-		fmt.Printf("mount type of %q: %v\n", path, buf.Type)
-	}
-
-	return nil
-}
-
-func fileMode(path string) error {
-	if path == "" {
-		return nil
-	}
-
-	fileinfo, err := os.Stat(path)
-	if err != nil {
-		fmt.Printf("error from Stat(%q): %v\n", path, err)
-		return err
-	}
-
-	fmt.Printf("mode of file %q: %v\n", path, fileinfo.Mode())
-	return nil
-}
-
-func filePerm(path string) error {
-	if path == "" {
-		return nil
-	}
-
-	fileinfo, err := os.Stat(path)
-	if err != nil {
-		fmt.Printf("error from Stat(%q): %v\n", path, err)
-		return err
-	}
-
-	fmt.Printf("perms of file %q: %v\n", path, fileinfo.Mode().Perm())
-	return nil
-}
-
-func fileOwner(path string) error {
-	if path == "" {
-		return nil
-	}
-
-	buf := syscall.Stat_t{}
-	if err := syscall.Stat(path, &buf); err != nil {
-		fmt.Printf("error from stat(%q): %v\n", path, err)
-		return err
-	}
-
-	fmt.Printf("owner UID of %q: %v\n", path, buf.Uid)
-	fmt.Printf("owner GID of %q: %v\n", path, buf.Gid)
-	return nil
 }
 
 func readFileContent(path string) error {

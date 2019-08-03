@@ -1,5 +1,0 @@
-amd64=alpine:3.6
-arm=arm32v6/alpine:3.6
-arm64=arm64v8/alpine:3.6
-ppc64le=ppc64le/alpine:3.6
-s390x=s390x/alpine:3.6
