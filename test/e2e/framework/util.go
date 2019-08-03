@@ -354,17 +354,17 @@ func SkipUnlessTaintBasedEvictionsEnabled() {
 
 // SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
 func SkipIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
-			skipInternalf(1, "Not supported under container runtime %s", runtime)
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
+			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
 		}
 	}
 }
 
 // RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
 func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
 			return
 		}
 	}
@@ -3054,14 +3054,14 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
-	url, err := url.Parse(TestContext.Host)
+	hostURL, err := url.Parse(TestContext.Host)
 	if err != nil {
 		e2elog.Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(url.Host) != nil {
-		externalIP = url.Host
+	if net.ParseIP(hostURL.Host) != nil {
+		externalIP = hostURL.Host
 	} else {
-		hostname = url.Host
+		hostname = hostURL.Host
 	}
 
 	return externalIP, internalIP, hostname
@@ -3242,7 +3242,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
 func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	var controller appsv1.DaemonSet
+	var ds appsv1.DaemonSet
 	e2elog.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
@@ -3269,16 +3269,16 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
 
-	json, err := utilyaml.ToJSON(data)
+	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
 	}
 
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &controller)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
-	return &controller, nil
+	return &ds, nil
 }
 
 // waitForServerPreferredNamespacedResources waits until server preferred namespaced resources could be successfully discovered.

@@ -374,7 +374,7 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	userNick := "user"
 	contextNick := "context"
 
-	config := clientcmdapi.NewConfig()
+	configCmd := clientcmdapi.NewConfig()
 
 	credentials := clientcmdapi.NewAuthInfo()
 	credentials.Token = clientCfg.BearerToken
@@ -387,7 +387,7 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	if len(credentials.ClientKey) == 0 {
 		credentials.ClientKeyData = clientCfg.TLSClientConfig.KeyData
 	}
-	config.AuthInfos[userNick] = credentials
+	configCmd.AuthInfos[userNick] = credentials
 
 	cluster := clientcmdapi.NewCluster()
 	cluster.Server = clientCfg.Host
@@ -396,15 +396,15 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 		cluster.CertificateAuthorityData = clientCfg.CAData
 	}
 	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	config.Clusters[clusterNick] = cluster
+	configCmd.Clusters[clusterNick] = cluster
 
 	context := clientcmdapi.NewContext()
 	context.Cluster = clusterNick
 	context.AuthInfo = userNick
-	config.Contexts[contextNick] = context
-	config.CurrentContext = contextNick
+	configCmd.Contexts[contextNick] = context
+	configCmd.CurrentContext = contextNick
 
-	return config
+	return configCmd
 }
 
 // AfterReadingAllFlags makes changes to the context after all flags

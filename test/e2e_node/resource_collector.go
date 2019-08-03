@@ -191,15 +191,15 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 func (r *ResourceCollector) GetLatest() (e2ekubelet.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	kubeletstatsv1alpha1 := make(e2ekubelet.ResourceUsagePerContainer)
+	resourceUsage := make(e2ekubelet.ResourceUsagePerContainer)
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
 			return nil, fmt.Errorf("No resource usage data for %s container (%s)", key, name)
 		}
-		kubeletstatsv1alpha1[key] = contStats[len(contStats)-1]
+		resourceUsage[key] = contStats[len(contStats)-1]
 	}
-	return kubeletstatsv1alpha1, nil
+	return resourceUsage, nil
 }
 
 type resourceUsageByCPU []*e2ekubelet.ContainerResourceUsage
