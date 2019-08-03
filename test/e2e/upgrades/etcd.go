@@ -189,19 +189,19 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	}, 10*time.Millisecond, done)
 	e2elog.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
 
-	gomega.Expect(lastUserCount >= t.successfulWrites).To(gomega.BeTrue())
+	gomega.Expect(lastUserCount).To(gomega.BeNumerically(">=", t.successfulWrites))
 	ratio := float64(success) / float64(success+failures)
 	e2elog.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
 	ratio = float64(t.successfulWrites) / float64(writeAttempts)
 	e2elog.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
 	e2elog.Logf("Errors: %v", errors)
 	// TODO(maisem): tweak this value once we have a few test runs.
-	gomega.Expect(ratio > 0.75).To(gomega.BeTrue())
+	gomega.Expect(ratio).To(gomega.BeNumerically(">", 0.75))
 }
 
 // Teardown does one final check of the data's availability.
 func (t *EtcdUpgradeTest) Teardown(f *framework.Framework) {
 	users, err := t.listUsers()
 	framework.ExpectNoError(err)
-	gomega.Expect(len(users) >= t.successfulWrites).To(gomega.BeTrue())
+	gomega.Expect(len(users)).To(gomega.BeNumerically(">=", t.successfulWrites))
 }
