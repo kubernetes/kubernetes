@@ -868,6 +868,8 @@ func TestGetSchedulerCommand(t *testing.T) {
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
+				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
+				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
 			},
 		},
 	}
