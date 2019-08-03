@@ -301,7 +301,6 @@ These changes are reflected in the following Kubernetes enhancements:
 - Kubectl [get and describe](https://github.com/kubernetes/enhancements/issues/515) now works with extensions
 - Nodes now support [third party monitoring plugins](https://github.com/kubernetes/enhancements/issues/606).
 - A new [Scheduling Framework](https://github.com/kubernetes/enhancements/issues/624) for schedule plugins is now Alpha.
-- ExecutionHook API [designed to trigger hook commands](https://github.com/kubernetes/enhancements/issues/962) in containers is now Alpha.
 - Continued deprecation of extensions/v1beta1, apps/v1beta1, and apps/v1beta2 APIs; these extensions will be retired in 1.16!
 
 Check the [release notes website](https://relnotes.k8s.io/?releaseVersions=1.15.0) for the complete changelog of notable features and fixes.

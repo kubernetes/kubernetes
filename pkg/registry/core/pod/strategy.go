@@ -203,6 +203,7 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 	}
 }
 
+// NodeNameTriggerFunc returns value spec.nodename of given object.
 func NodeNameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Pod).Spec.NodeName
 }

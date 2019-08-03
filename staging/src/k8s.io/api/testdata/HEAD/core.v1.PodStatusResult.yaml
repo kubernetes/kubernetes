@@ -14,9 +14,6 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -28,127 +25,128 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 status:
   conditions:
-  - lastProbeTime: "2942-12-08T14:55:02Z"
-    lastTransitionTime: "2763-08-05T14:40:52Z"
-    message: "25"
-    reason: "24"
-    status: -Ǐ忄*齧獚敆Ȏțê
-    type: (ĿȊ甞谐颋ǅSǡƏS
+  - lastProbeTime: "2508-05-13T03:16:18Z"
+    lastTransitionTime: "2514-12-25T07:56:30Z"
+    message: "19"
+    reason: "18"
+    status: ĿȊ甞谐颋ǅSǡƏS$+½
+    type: ċV夸eɑeʤ脽ěĂ凗蓏Ŋ蛊ĉ
   containerStatuses:
-  - containerID: "59"
-    image: "57"
-    imageID: "58"
+  - containerID: "53"
+    image: "51"
+    imageID: "52"
     lastState:
       running:
-        startedAt: "2059-10-03T11:19:35Z"
+        startedAt: "2835-11-08T19:46:44Z"
       terminated:
-        containerID: "56"
-        exitCode: -1771047449
-        finishedAt: "2659-11-29T13:57:54Z"
-        message: "55"
-        reason: "54"
-        signal: -1280107919
-        startedAt: "2619-11-08T20:15:12Z"
+        containerID: "50"
+        exitCode: 705385560
+        finishedAt: "2801-08-27T04:51:34Z"
+        message: "49"
+        reason: "48"
+        signal: -1876826602
+        startedAt: "2380-12-20T20:55:16Z"
       waiting:
-        message: "53"
-        reason: "52"
-    name: "46"
+        message: "47"
+        reason: "46"
+    name: "40"
     ready: false
-    restartCount: 763139569
+    restartCount: 607015027
     state:
       running:
-        startedAt: "2838-11-28T02:42:14Z"
+        startedAt: "2149-06-18T16:38:18Z"
       terminated:
-        containerID: "51"
-        exitCode: -2020907169
-        finishedAt: "2906-07-22T10:19:33Z"
-        message: "50"
-        reason: "49"
-        signal: 607015027
-        startedAt: "2448-04-25T19:46:34Z"
+        containerID: "45"
+        exitCode: 254375933
+        finishedAt: "2516-08-23T06:28:28Z"
+        message: "44"
+        reason: "43"
+        signal: 523306325
+        startedAt: "2874-05-09T23:28:59Z"
       waiting:
-        message: "48"
-        reason: "47"
+        message: "42"
+        reason: "41"
   ephemeralContainerStatuses:
-  - containerID: "73"
-    image: "71"
-    imageID: "72"
+  - containerID: "67"
+    image: "65"
+    imageID: "66"
     lastState:
       running:
-        startedAt: "2617-08-06T21:50:30Z"
+        startedAt: "2135-11-17T10:03:44Z"
       terminated:
-        containerID: "70"
-        exitCode: 819364842
-        finishedAt: "2772-11-03T11:41:34Z"
-        message: "69"
-        reason: "68"
-        signal: 933484239
-        startedAt: "2907-09-12T12:00:36Z"
+        containerID: "64"
+        exitCode: -580241939
+        finishedAt: "2793-11-04T09:57:32Z"
+        message: "63"
+        reason: "62"
+        signal: 1654683896
+        startedAt: "2964-05-31T10:17:54Z"
       waiting:
-        message: "67"
-        reason: "66"
-    name: "60"
+        message: "61"
+        reason: "60"
+    name: "54"
     ready: true
-    restartCount: -314157282
+    restartCount: 1111087895
     state:
       running:
-        startedAt: "2928-05-04T19:41:29Z"
+        startedAt: "2899-04-10T17:42:26Z"
       terminated:
-        containerID: "65"
-        exitCode: 13677460
-        finishedAt: "2610-09-08T03:07:19Z"
-        message: "64"
-        reason: "63"
-        signal: -444792810
-        startedAt: "2843-03-23T07:04:39Z"
+        containerID: "59"
+        exitCode: 712024464
+        finishedAt: "2617-08-06T21:50:30Z"
+        message: "58"
+        reason: "57"
+        signal: -1579157235
+        startedAt: "2809-10-24T21:55:41Z"
       waiting:
-        message: "62"
-        reason: "61"
-  hostIP: "29"
+        message: "56"
+        reason: "55"
+  hostIP: "23"
   initContainerStatuses:
-  - containerID: "45"
-    image: "43"
-    imageID: "44"
+  - containerID: "39"
+    image: "37"
+    imageID: "38"
     lastState:
       running:
-        startedAt: "2567-05-09T03:50:37Z"
+        startedAt: "2763-08-05T14:40:52Z"
       terminated:
-        containerID: "42"
-        exitCode: -655946460
-        finishedAt: "2680-06-15T09:55:37Z"
-        message: "41"
-        reason: "40"
-        signal: -819620182
-        startedAt: "2516-08-23T06:28:28Z"
+        containerID: "36"
+        exitCode: 1979600290
+        finishedAt: "2194-08-27T14:35:41Z"
+        message: "35"
+        reason: "34"
+        signal: -827642756
+        startedAt: "2055-07-31T00:22:12Z"
       waiting:
-        message: "39"
-        reason: "38"
-    name: "32"
+        message: "33"
+        reason: "32"
+    name: "26"
     ready: true
-    restartCount: -763018796
+    restartCount: -734360256
     state:
       running:
-        startedAt: "2568-01-21T11:26:44Z"
+        startedAt: "2680-10-21T03:40:10Z"
       terminated:
-        containerID: "37"
-        exitCode: -593117110
-        finishedAt: "2491-01-26T12:57:24Z"
-        message: "36"
-        reason: "35"
-        signal: -734360256
-        startedAt: "2777-11-15T04:18:59Z"
+        containerID: "31"
+        exitCode: -1965738697
+        finishedAt: "2570-10-14T17:33:22Z"
+        message: "30"
+        reason: "29"
+        signal: 1390645844
+        startedAt: "2559-01-29T18:41:04Z"
       waiting:
-        message: "34"
-        reason: "33"
-  message: "26"
-  nominatedNodeName: "28"
-  phase: ƗǸƢ6/ʕV
-  podIP: "30"
+        message: "28"
+        reason: "27"
+  message: "20"
+  nominatedNodeName: "22"
+  phase: īqJ枊a8衍`Ĩɘ.蘯
+  podIP: "24"
   podIPs:
-  - ip: "31"
-  reason: "27"
+  - ip: "25"
+  qosClass: ȮO励鹗塢ē ƕP
+  reason: "21"

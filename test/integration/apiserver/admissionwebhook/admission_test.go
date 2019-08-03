@@ -30,7 +30,9 @@ import (
 	"testing"
 	"time"
 
+	admissionreviewv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -151,6 +153,8 @@ var (
 )
 
 type webhookOptions struct {
+	version string
+
 	// phase indicates whether this is a mutating or validating webhook
 	phase string
 	// converted indicates if this webhook makes use of matchPolicy:equivalent and expects conversion.
@@ -165,7 +169,7 @@ type holder struct {
 	t *testing.T
 
 	recordGVR       metav1.GroupVersionResource
-	recordOperation v1beta1.Operation
+	recordOperation string
 	recordNamespace string
 	recordName      string
 
@@ -182,7 +186,7 @@ type holder struct {
 	// When a converted request is recorded, gvrToConvertedGVR[expectGVK] is compared to the GVK seen by the webhook.
 	gvrToConvertedGVK map[metav1.GroupVersionResource]schema.GroupVersionKind
 
-	recorded map[webhookOptions]*v1beta1.AdmissionRequest
+	recorded map[webhookOptions]*admissionRequest
 }
 
 func (h *holder) reset(t *testing.T) {
@@ -200,10 +204,12 @@ func (h *holder) reset(t *testing.T) {
 	h.expectOptions = false
 
 	// Set up the recorded map with nil records for all combinations
-	h.recorded = map[webhookOptions]*v1beta1.AdmissionRequest{}
+	h.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{mutation, validation} {
 		for _, converted := range []bool{true, false} {
-			h.recorded[webhookOptions{phase: phase, converted: converted}] = nil
+			for _, version := range []string{"v1", "v1beta1"} {
+				h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
+			}
 		}
 	}
 }
@@ -217,7 +223,7 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.
 	defer h.lock.Unlock()
 	h.recordGVR = metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 	h.expectGVK = gvk
-	h.recordOperation = operation
+	h.recordOperation = string(operation)
 	h.recordName = name
 	h.recordNamespace = namespace
 	h.expectObject = object
@@ -226,14 +232,28 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.
 	h.expectOptions = options
 
 	// Set up the recorded map with nil records for all combinations
-	h.recorded = map[webhookOptions]*v1beta1.AdmissionRequest{}
+	h.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{mutation, validation} {
 		for _, converted := range []bool{true, false} {
-			h.recorded[webhookOptions{phase: phase, converted: converted}] = nil
+			for _, version := range []string{"v1", "v1beta1"} {
+				h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
+			}
 		}
 	}
 }
-func (h *holder) record(phase string, converted bool, request *v1beta1.AdmissionRequest) {
+
+type admissionRequest struct {
+	Operation   string
+	Resource    metav1.GroupVersionResource
+	SubResource string
+	Namespace   string
+	Name        string
+	Object      runtime.RawExtension
+	OldObject   runtime.RawExtension
+	Options     runtime.RawExtension
+}
+
+func (h *holder) record(version string, phase string, converted bool, request *admissionRequest) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -286,9 +306,9 @@ func (h *holder) record(phase string, converted bool, request *v1beta1.Admission
 	}
 
 	if debug {
-		h.t.Logf("recording: %#v = %s %#v %v", webhookOptions{phase: phase, converted: converted}, request.Operation, request.Resource, request.SubResource)
+		h.t.Logf("recording: %#v = %s %#v %v", webhookOptions{version: version, phase: phase, converted: converted}, request.Operation, request.Resource, request.SubResource)
 	}
-	h.recorded[webhookOptions{phase: phase, converted: converted}] = request
+	h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = request
 }
 
 func (h *holder) verify(t *testing.T) {
@@ -297,12 +317,12 @@ func (h *holder) verify(t *testing.T) {
 
 	for options, value := range h.recorded {
 		if err := h.verifyRequest(options.converted, value); err != nil {
-			t.Errorf("phase:%v, converted:%v error: %v", options.phase, options.converted, err)
+			t.Errorf("version: %v, phase:%v, converted:%v error: %v", options.version, options.phase, options.converted, err)
 		}
 	}
 }
 
-func (h *holder) verifyRequest(converted bool, request *v1beta1.AdmissionRequest) error {
+func (h *holder) verifyRequest(converted bool, request *admissionRequest) error {
 	// Check if current resource should be exempted from Admission processing
 	if admissionExemptResources[gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)] {
 		if request == nil {
@@ -366,8 +386,8 @@ func (h *holder) verifyOptions(options runtime.Object) error {
 	return nil
 }
 
-// TestWebhookV1beta1 tests communication between API server and webhook process.
-func TestWebhookV1beta1(t *testing.T) {
+// TestWebhookAdmission tests communication between API server and webhook process.
+func TestWebhookAdmission(t *testing.T) {
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{
 		t:                 t,
@@ -386,10 +406,17 @@ func TestWebhookV1beta1(t *testing.T) {
 	}
 
 	webhookMux := http.NewServeMux()
-	webhookMux.Handle("/"+mutation, newWebhookHandler(t, holder, mutation, false))
-	webhookMux.Handle("/convert/"+mutation, newWebhookHandler(t, holder, mutation, true))
-	webhookMux.Handle("/"+validation, newWebhookHandler(t, holder, validation, false))
-	webhookMux.Handle("/convert/"+validation, newWebhookHandler(t, holder, validation, true))
+	webhookMux.Handle("/v1beta1/"+mutation, newV1beta1WebhookHandler(t, holder, mutation, false))
+	webhookMux.Handle("/v1beta1/convert/"+mutation, newV1beta1WebhookHandler(t, holder, mutation, true))
+	webhookMux.Handle("/v1beta1/"+validation, newV1beta1WebhookHandler(t, holder, validation, false))
+	webhookMux.Handle("/v1beta1/convert/"+validation, newV1beta1WebhookHandler(t, holder, validation, true))
+	webhookMux.Handle("/v1/"+mutation, newV1WebhookHandler(t, holder, mutation, false))
+	webhookMux.Handle("/v1/convert/"+mutation, newV1WebhookHandler(t, holder, mutation, true))
+	webhookMux.Handle("/v1/"+validation, newV1WebhookHandler(t, holder, validation, false))
+	webhookMux.Handle("/v1/convert/"+validation, newV1WebhookHandler(t, holder, validation, true))
+	webhookMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		holder.t.Errorf("unexpected request to %v", req.URL.Path)
+	}))
 	webhookServer := httptest.NewUnstartedServer(webhookMux)
 	webhookServer.TLS = &tls.Config{
 		RootCAs:      roots,
@@ -488,7 +515,8 @@ func TestWebhookV1beta1(t *testing.T) {
 	// Note: this only works because there are no overlapping resource names in-process that are not co-located
 	convertedResources := map[string]schema.GroupVersionResource{}
 	// build the webhook rules enumerating the specific group/version/resources we want
-	convertedRules := []admissionv1beta1.RuleWithOperations{}
+	convertedV1beta1Rules := []admissionv1beta1.RuleWithOperations{}
+	convertedV1Rules := []admissionv1.RuleWithOperations{}
 	for _, gvr := range gvrsToTest {
 		metaGVR := metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 
@@ -499,9 +527,13 @@ func TestWebhookV1beta1(t *testing.T) {
 			convertedGVR = gvr
 			convertedResources[gvr.Resource] = gvr
 			// add an admission rule indicating we can receive this version
-			convertedRules = append(convertedRules, admissionv1beta1.RuleWithOperations{
+			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionv1beta1.RuleWithOperations{
 				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
 				Rule:       admissionv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
+			})
+			convertedV1Rules = append(convertedV1Rules, admissionv1.RuleWithOperations{
+				Operations: []admissionv1.OperationType{admissionv1.OperationAll},
+				Rule:       admissionv1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
 			})
 		}
 
@@ -510,10 +542,16 @@ func TestWebhookV1beta1(t *testing.T) {
 		holder.gvrToConvertedGVK[metaGVR] = schema.GroupVersionKind{Group: resourcesByGVR[convertedGVR].Group, Version: resourcesByGVR[convertedGVR].Version, Kind: resourcesByGVR[convertedGVR].Kind}
 	}
 
-	if err := createV1beta1MutationWebhook(client, webhookServer.URL+"/"+mutation, webhookServer.URL+"/convert/"+mutation, convertedRules); err != nil {
+	if err := createV1beta1MutationWebhook(client, webhookServer.URL+"/v1beta1/"+mutation, webhookServer.URL+"/v1beta1/convert/"+mutation, convertedV1beta1Rules); err != nil {
 		t.Fatal(err)
 	}
-	if err := createV1beta1ValidationWebhook(client, webhookServer.URL+"/"+validation, webhookServer.URL+"/convert/"+validation, convertedRules); err != nil {
+	if err := createV1beta1ValidationWebhook(client, webhookServer.URL+"/v1beta1/"+validation, webhookServer.URL+"/v1beta1/convert/"+validation, convertedV1beta1Rules); err != nil {
+		t.Fatal(err)
+	}
+	if err := createV1MutationWebhook(client, webhookServer.URL+"/v1/"+mutation, webhookServer.URL+"/v1/convert/"+mutation, convertedV1Rules); err != nil {
+		t.Fatal(err)
+	}
+	if err := createV1ValidationWebhook(client, webhookServer.URL+"/v1/"+validation, webhookServer.URL+"/v1/convert/"+validation, convertedV1Rules); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1118,7 +1156,7 @@ func testNoPruningCustomFancy(c *testContext) {
 // utility methods
 //
 
-func newWebhookHandler(t *testing.T, holder *holder, phase string, converted bool) http.Handler {
+func newV1beta1WebhookHandler(t *testing.T, holder *holder, phase string, converted bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		data, err := ioutil.ReadAll(r.Body)
@@ -1176,18 +1214,124 @@ func newWebhookHandler(t *testing.T, holder *holder, phase string, converted boo
 
 		if review.Request.UserInfo.Username == testClientUsername {
 			// only record requests originating from this integration test's client
-			holder.record(phase, converted, review.Request)
+			reviewRequest := &admissionRequest{
+				Operation:   string(review.Request.Operation),
+				Resource:    review.Request.Resource,
+				SubResource: review.Request.SubResource,
+				Namespace:   review.Request.Namespace,
+				Name:        review.Request.Name,
+				Object:      review.Request.Object,
+				OldObject:   review.Request.OldObject,
+				Options:     review.Request.Options,
+			}
+			holder.record("v1beta1", phase, converted, reviewRequest)
 		}
 
 		review.Response = &v1beta1.AdmissionResponse{
+			Allowed: true,
+			Result:  &metav1.Status{Message: "admitted"},
+		}
+
+		// v1beta1 webhook handler tolerated these not being set. verify the server continues to accept these as unset.
+		review.APIVersion = ""
+		review.Kind = ""
+		review.Response.UID = ""
+
+		// If we're mutating, and have an object, return a patch to exercise conversion
+		if phase == mutation && len(review.Request.Object.Raw) > 0 {
+			review.Response.Patch = []byte(`[{"op":"add","path":"/foo","value":"test"}]`)
+			jsonPatch := v1beta1.PatchTypeJSONPatch
+			review.Response.PatchType = &jsonPatch
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(review); err != nil {
+			t.Errorf("Marshal of response failed with error: %v", err)
+		}
+	})
+}
+
+func newV1WebhookHandler(t *testing.T, holder *holder, phase string, converted bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		data, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+			t.Errorf("contentType=%s, expect application/json", contentType)
+			return
+		}
+
+		review := admissionreviewv1.AdmissionReview{}
+		if err := json.Unmarshal(data, &review); err != nil {
+			t.Errorf("Fail to deserialize object: %s with error: %v", string(data), err)
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		if review.GetObjectKind().GroupVersionKind() != gvk("admission.k8s.io", "v1", "AdmissionReview") {
+			err := fmt.Errorf("Invalid admission review kind: %#v", review.GetObjectKind().GroupVersionKind())
+			t.Error(err)
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		if len(review.Request.Object.Raw) > 0 {
+			u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := json.Unmarshal(review.Request.Object.Raw, u); err != nil {
+				t.Errorf("Fail to deserialize object: %s with error: %v", string(review.Request.Object.Raw), err)
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			review.Request.Object.Object = u
+		}
+		if len(review.Request.OldObject.Raw) > 0 {
+			u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := json.Unmarshal(review.Request.OldObject.Raw, u); err != nil {
+				t.Errorf("Fail to deserialize object: %s with error: %v", string(review.Request.OldObject.Raw), err)
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			review.Request.OldObject.Object = u
+		}
+
+		if len(review.Request.Options.Raw) > 0 {
+			u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := json.Unmarshal(review.Request.Options.Raw, u); err != nil {
+				t.Errorf("Fail to deserialize options object: %s for admission request %#+v with error: %v", string(review.Request.Options.Raw), review.Request, err)
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			review.Request.Options.Object = u
+		}
+
+		if review.Request.UserInfo.Username == testClientUsername {
+			// only record requests originating from this integration test's client
+			reviewRequest := &admissionRequest{
+				Operation:   string(review.Request.Operation),
+				Resource:    review.Request.Resource,
+				SubResource: review.Request.SubResource,
+				Namespace:   review.Request.Namespace,
+				Name:        review.Request.Name,
+				Object:      review.Request.Object,
+				OldObject:   review.Request.OldObject,
+				Options:     review.Request.Options,
+			}
+			holder.record("v1", phase, converted, reviewRequest)
+		}
+
+		review.Response = &admissionreviewv1.AdmissionResponse{
 			Allowed: true,
 			UID:     review.Request.UID,
 			Result:  &metav1.Status{Message: "admitted"},
 		}
 		// If we're mutating, and have an object, return a patch to exercise conversion
 		if phase == mutation && len(review.Request.Object.Raw) > 0 {
-			review.Response.Patch = []byte(`[{"op":"add","path":"/foo","value":"test"}]`)
-			jsonPatch := v1beta1.PatchTypeJSONPatch
+			review.Response.Patch = []byte(`[{"op":"add","path":"/bar","value":"test"}]`)
+			jsonPatch := admissionreviewv1.PatchTypeJSONPatch
 			review.Response.PatchType = &jsonPatch
 		}
 
@@ -1352,6 +1496,84 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 				FailurePolicy:           &fail,
 				MatchPolicy:             &equivalent,
 				AdmissionReviewVersions: []string{"v1beta1"},
+			},
+		},
+	})
+	return err
+}
+
+func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1.RuleWithOperations) error {
+	fail := admissionv1.Fail
+	equivalent := admissionv1.Equivalent
+	none := admissionv1.SideEffectClassNone
+	// Attaching Admission webhook to API server
+	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(&admissionv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "admissionv1.integration.test"},
+		Webhooks: []admissionv1.ValidatingWebhook{
+			{
+				Name: "admissionv1.integration.test",
+				ClientConfig: admissionv1.WebhookClientConfig{
+					URL:      &endpoint,
+					CABundle: localhostCert,
+				},
+				Rules: []admissionv1.RuleWithOperations{{
+					Operations: []admissionv1.OperationType{admissionv1.OperationAll},
+					Rule:       admissionv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+				}},
+				FailurePolicy:           &fail,
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
+				SideEffects:             &none,
+			},
+			{
+				Name: "admissionv1.integration.testconversion",
+				ClientConfig: admissionv1.WebhookClientConfig{
+					URL:      &convertedEndpoint,
+					CABundle: localhostCert,
+				},
+				Rules:                   convertedRules,
+				FailurePolicy:           &fail,
+				MatchPolicy:             &equivalent,
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
+				SideEffects:             &none,
+			},
+		},
+	})
+	return err
+}
+
+func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1.RuleWithOperations) error {
+	fail := admissionv1.Fail
+	equivalent := admissionv1.Equivalent
+	none := admissionv1.SideEffectClassNone
+	// Attaching Mutation webhook to API server
+	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(&admissionv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "mutationv1.integration.test"},
+		Webhooks: []admissionv1.MutatingWebhook{
+			{
+				Name: "mutationv1.integration.test",
+				ClientConfig: admissionv1.WebhookClientConfig{
+					URL:      &endpoint,
+					CABundle: localhostCert,
+				},
+				Rules: []admissionv1.RuleWithOperations{{
+					Operations: []admissionv1.OperationType{admissionv1.OperationAll},
+					Rule:       admissionv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+				}},
+				FailurePolicy:           &fail,
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
+				SideEffects:             &none,
+			},
+			{
+				Name: "mutationv1.integration.testconversion",
+				ClientConfig: admissionv1.WebhookClientConfig{
+					URL:      &convertedEndpoint,
+					CABundle: localhostCert,
+				},
+				Rules:                   convertedRules,
+				FailurePolicy:           &fail,
+				MatchPolicy:             &equivalent,
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
+				SideEffects:             &none,
 			},
 		},
 	})

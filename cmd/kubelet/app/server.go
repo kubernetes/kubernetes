@@ -693,6 +693,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 				ExperimentalPodPidsLimit:              s.PodPidsLimit,
 				EnforceCPULimits:                      s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                     s.CPUCFSQuotaPeriod.Duration,
+				ExperimentalTopologyManagerPolicy:     s.TopologyManagerPolicy,
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,

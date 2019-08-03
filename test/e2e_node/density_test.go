@@ -40,8 +40,8 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("density-test")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// Start a standalone cadvisor pod using 'createSync', the pod is running when it returns
 		f.PodClient().CreateSync(getCadvisorPod())
 		// Resource collector monitors fine-grain CPU/memory usage by a standalone Cadvisor with
@@ -70,7 +70,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
-	Context("create a batch of pods", func() {
+	ginkgo.Context("create a batch of pods", func() {
 		// TODO(coufon): the values are generous, set more precise limits with benchmark data
 		// and add more tests
 		dTests := []densityTest{
@@ -99,22 +99,22 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				itArg.createMethod = "batch"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, testInfo, false)
 
-				By("Verifying latency")
+				ginkgo.By("Verifying latency")
 				logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, true)
 
-				By("Verifying resource")
+				ginkgo.By("Verifying resource")
 				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, true)
 			})
 		}
 	})
 
-	Context("create a batch of pods", func() {
+	ginkgo.Context("create a batch of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -157,22 +157,22 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval [Benchmark][NodeSpecialFeature:Benchmark]", itArg.podsNr, itArg.interval)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				itArg.createMethod = "batch"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, testInfo, true)
 
-				By("Verifying latency")
+				ginkgo.By("Verifying latency")
 				logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, false)
 
-				By("Verifying resource")
+				ginkgo.By("Verifying resource")
 				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
 			})
 		}
 	})
 
-	Context("create a batch of pods with higher API QPS", func() {
+	ginkgo.Context("create a batch of pods with higher API QPS", func() {
 		dTests := []densityTest{
 			{
 				podsNr:      105,
@@ -193,7 +193,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			Context("", func() {
+			ginkgo.Context("", func() {
 				desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval (QPS %d) [Benchmark][NodeSpecialFeature:Benchmark]", itArg.podsNr, itArg.interval, itArg.APIQPSLimit)
 				// The latency caused by API QPS limit takes a large portion (up to ~33%) of e2e latency.
 				// It makes the pod startup latency of Kubelet (creation throughput as well) under-estimated.
@@ -204,22 +204,22 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 					// Set new API QPS limit
 					cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
 				})
-				It(desc, func() {
+				ginkgo.It(desc, func() {
 					itArg.createMethod = "batch"
 					testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 					batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, testInfo, true)
 
-					By("Verifying latency")
+					ginkgo.By("Verifying latency")
 					logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, false)
 
-					By("Verifying resource")
+					ginkgo.By("Verifying resource")
 					logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
 				})
 			})
 		}
 	})
 
-	Context("create a sequence of pods", func() {
+	ginkgo.Context("create a sequence of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -243,21 +243,21 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods", itArg.podsNr, itArg.bgPodsNr)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				itArg.createMethod = "sequence"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg, testInfo)
 
-				By("Verifying latency")
+				ginkgo.By("Verifying latency")
 				logAndVerifyLatency(batchlag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, true)
 
-				By("Verifying resource")
+				ginkgo.By("Verifying resource")
 				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, true)
 			})
 		}
 	})
 
-	Context("create a sequence of pods", func() {
+	ginkgo.Context("create a sequence of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -276,15 +276,15 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark][NodeSpeicalFeature:Benchmark]", itArg.podsNr, itArg.bgPodsNr)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				itArg.createMethod = "sequence"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg, testInfo)
 
-				By("Verifying latency")
+				ginkgo.By("Verifying latency")
 				logAndVerifyLatency(batchlag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, false)
 
-				By("Verifying resource")
+				ginkgo.By("Verifying resource")
 				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
 			})
 		}
@@ -349,15 +349,15 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 
 	rc.Start()
 
-	By("Creating a batch of pods")
+	ginkgo.By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps
 	createTimes := createBatchPodWithRateControl(f, pods, testArg.interval)
 
-	By("Waiting for all Pods to be observed by the watch...")
+	ginkgo.By("Waiting for all Pods to be observed by the watch...")
 
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		return len(watchTimes) == testArg.podsNr
-	}, 10*time.Minute, 10*time.Second).Should(BeTrue())
+	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
 		e2elog.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
@@ -418,7 +418,7 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	bgPods := newTestPods(testArg.bgPodsNr, true, imageutils.GetPauseImageName(), "background_pod")
 	testPods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageName(), podType)
 
-	By("Creating a batch of background pods")
+	ginkgo.By("Creating a batch of background pods")
 
 	// CreatBatch is synchronized, all pods are running when it returns
 	f.PodClient().CreateBatch(bgPods)
@@ -480,7 +480,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	checkPodRunning := func(p *v1.Pod) {
 		mutex.Lock()
 		defer mutex.Unlock()
-		defer GinkgoRecover()
+		defer ginkgo.GinkgoRecover()
 
 		if p.Status.Phase == v1.PodRunning {
 			if _, found := watchTimes[p.Name]; !found {

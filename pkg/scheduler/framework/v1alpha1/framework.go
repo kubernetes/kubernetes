@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -34,20 +34,22 @@ import (
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {
-	registry              Registry
-	nodeInfoSnapshot      *cache.NodeInfoSnapshot
-	waitingPods           *waitingPodsMap
-	pluginNameToWeightMap map[string]int
-	queueSortPlugins      []QueueSortPlugin
-	prefilterPlugins      []PrefilterPlugin
-	filterPlugins         []FilterPlugin
-	scorePlugins          []ScorePlugin
-	reservePlugins        []ReservePlugin
-	prebindPlugins        []PrebindPlugin
-	bindPlugins           []BindPlugin
-	postbindPlugins       []PostbindPlugin
-	unreservePlugins      []UnreservePlugin
-	permitPlugins         []PermitPlugin
+	registry                  Registry
+	nodeInfoSnapshot          *cache.NodeInfoSnapshot
+	waitingPods               *waitingPodsMap
+	pluginNameToWeightMap     map[string]int
+	queueSortPlugins          []QueueSortPlugin
+	prefilterPlugins          []PrefilterPlugin
+	filterPlugins             []FilterPlugin
+	postFilterPlugins         []PostFilterPlugin
+	scorePlugins              []ScorePlugin
+	scoreWithNormalizePlugins []ScoreWithNormalizePlugin
+	reservePlugins            []ReservePlugin
+	prebindPlugins            []PrebindPlugin
+	bindPlugins               []BindPlugin
+	postbindPlugins           []PostbindPlugin
+	unreservePlugins          []UnreservePlugin
+	permitPlugins             []PermitPlugin
 }
 
 const (
@@ -131,6 +133,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.Score != nil {
 		for _, sc := range plugins.Score.Enabled {
 			if pg, ok := pluginsMap[sc.Name]; ok {
+				// First, make sure the plugin implements ScorePlugin interface.
 				p, ok := pg.(ScorePlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %v does not extend score plugin", sc.Name)
@@ -139,6 +142,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 					return nil, fmt.Errorf("score plugin %v is not configured with weight", p.Name())
 				}
 				f.scorePlugins = append(f.scorePlugins, p)
+
+				// Next, if the plugin also implements ScoreWithNormalizePlugin interface,
+				// add it to the normalizeScore plugin list.
+				np, ok := pg.(ScoreWithNormalizePlugin)
+				if ok {
+					f.scoreWithNormalizePlugins = append(f.scoreWithNormalizePlugins, np)
+				}
 			} else {
 				return nil, fmt.Errorf("score plugin %v does not exist", sc.Name)
 			}
@@ -155,6 +165,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				f.reservePlugins = append(f.reservePlugins, p)
 			} else {
 				return nil, fmt.Errorf("reserve plugin %v does not exist", r.Name)
+			}
+		}
+	}
+
+	if plugins.PostFilter != nil {
+		for _, r := range plugins.PostFilter.Enabled {
+			if pg, ok := pluginsMap[r.Name]; ok {
+				p, ok := pg.(PostFilterPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend post-filter plugin", r.Name)
+				}
+				f.postFilterPlugins = append(f.postFilterPlugins, p)
+			} else {
+				return nil, fmt.Errorf("post-filter plugin %v does not exist", r.Name)
 			}
 		}
 	}
@@ -278,6 +302,7 @@ func (f *framework) RunPrefilterPlugins(
 			return NewStatus(Error, msg)
 		}
 	}
+
 	return nil
 }
 
@@ -287,17 +312,37 @@ func (f *framework) RunPrefilterPlugins(
 // Meanwhile, the failure message and status are set for the given node.
 func (f *framework) RunFilterPlugins(pc *PluginContext,
 	pod *v1.Pod, nodeName string) *Status {
-
-	for _, p := range f.filterPlugins {
-		status := p.Filter(pc, pod, nodeName)
+	for _, pl := range f.filterPlugins {
+		status := pl.Filter(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() != Unschedulable {
-				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %s filter plugin for pod %s: %s",
-					p.Name(), pod.Name, status.Message())
+				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %v filter plugin for pod %v: %v",
+					pl.Name(), pod.Name, status.Message())
 				klog.Error(errMsg)
 				return NewStatus(Error, errMsg)
 			}
 			return status
+		}
+	}
+
+	return nil
+}
+
+// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
+// of these plugins returns any status other than "Success", the given node is
+// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
+func (f *framework) RunPostFilterPlugins(
+	pc *PluginContext,
+	pod *v1.Pod,
+	nodes []*v1.Node,
+	filteredNodesStatuses NodeToStatusMap,
+) *Status {
+	for _, pl := range f.postFilterPlugins {
+		status := pl.PostFilter(pc, pod, nodes, filteredNodesStatuses)
+		if !status.IsSuccess() {
+			msg := fmt.Sprintf("error while running %v postfilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
 		}
 	}
 
@@ -317,14 +362,12 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	errCh := schedutil.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
-			// Score plugins' weight has been checked when they are initialized.
-			weight := f.pluginNameToWeightMap[pl.Name()]
 			score, status := pl.Score(pc, pod, nodes[index].Name)
 			if !status.IsSuccess() {
 				errCh.SendErrorWithCancel(fmt.Errorf(status.Message()), cancel)
 				return
 			}
-			pluginToNodeScoreMap[pl.Name()][index] = score * weight
+			pluginToNodeScoreMap[pl.Name()][index] = score
 		}
 	})
 
@@ -335,6 +378,67 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	}
 
 	return pluginToNodeScoreMap, nil
+}
+
+// RunNormalizeScorePlugins runs the NormalizeScore function of Score plugins.
+// It should be called after RunScorePlugins with the PluginToNodeScoreMap result.
+// It then modifies the map with normalized scores. It returns a non-success Status
+// if any of the NormalizeScore functions returns a non-success status.
+func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status {
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := schedutil.NewErrorChannel()
+	workqueue.ParallelizeUntil(ctx, 16, len(f.scoreWithNormalizePlugins), func(index int) {
+		pl := f.scoreWithNormalizePlugins[index]
+		nodeScoreList, ok := scores[pl.Name()]
+		if !ok {
+			err := fmt.Errorf("normalize score plugin %v has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
+			errCh.SendErrorWithCancel(err, cancel)
+			return
+		}
+		status := pl.NormalizeScore(pc, pod, nodeScoreList)
+		if !status.IsSuccess() {
+			err := fmt.Errorf("normalize score plugin %v failed with error %v", pl.Name(), status.Message())
+			errCh.SendErrorWithCancel(err, cancel)
+			return
+		}
+	})
+
+	if err := errCh.ReceiveError(); err != nil {
+		msg := fmt.Sprintf("error while running normalize score plugin for pod %v: %v", pod.Name, err)
+		klog.Error(msg)
+		return NewStatus(Error, msg)
+	}
+
+	return nil
+}
+
+// ApplyScoreWeights applies weights to the score results. It should be called after
+// RunNormalizeScorePlugins.
+func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status {
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := schedutil.NewErrorChannel()
+	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
+		pl := f.scorePlugins[index]
+		// Score plugins' weight has been checked when they are initialized.
+		weight := f.pluginNameToWeightMap[pl.Name()]
+		nodeScoreList, ok := scores[pl.Name()]
+		if !ok {
+			err := fmt.Errorf("score plugin %v has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
+			errCh.SendErrorWithCancel(err, cancel)
+			return
+		}
+		for i := range nodeScoreList {
+			nodeScoreList[i] = nodeScoreList[i] * weight
+		}
+	})
+
+	if err := errCh.ReceiveError(); err != nil {
+		msg := fmt.Sprintf("error while applying score weights for pod %v: %v", pod.Name, err)
+		klog.Error(msg)
+		return NewStatus(Error, msg)
+	}
+
+	return nil
 }
 
 // RunPrebindPlugins runs the set of configured prebind plugins. It returns a
@@ -520,7 +624,6 @@ func pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
 	find(plugins.Filter)
 	find(plugins.PostFilter)
 	find(plugins.Score)
-	find(plugins.NormalizeScore)
 	find(plugins.Reserve)
 	find(plugins.Permit)
 	find(plugins.PreBind)

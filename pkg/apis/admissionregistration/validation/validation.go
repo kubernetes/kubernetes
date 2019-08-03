@@ -152,6 +152,10 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSu
 	return allErrors
 }
 
+// AcceptedAdmissionReviewVersions contains the list of AdmissionReview versions the *prior* version of the API server understands.
+// 1.15: server understands v1beta1; accepted versions are ["v1beta1"]
+// 1.16: server understands v1, v1beta1; accepted versions are ["v1beta1"]
+// 1.17: server understands v1, v1beta1; accepted versions are ["v1","v1beta1"]
 var AcceptedAdmissionReviewVersions = []string{v1beta1.SchemeGroupVersion.Version}
 
 func isAcceptedAdmissionReviewVersion(v string) bool {
@@ -188,7 +192,7 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedVersion
 		if requireRecognizedVersion && !hasAcceptedVersion {
 			allErrors = append(allErrors, field.Invalid(
 				fldPath, versions,
-				fmt.Sprintf("none of the versions accepted by this server. accepted version(s) are %v",
+				fmt.Sprintf("must include at least one of %v",
 					strings.Join(AcceptedAdmissionReviewVersions, ", "))))
 		}
 	}

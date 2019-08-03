@@ -40,6 +40,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -286,8 +287,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to delete pod")
 
 		ginkgo.By("verifying the kubelet observed the termination notice")
-		gomega.Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-			podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
+		err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 			if err != nil {
 				e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 				return false, nil
@@ -304,7 +305,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			}
 			e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 			return true, nil
-		})).NotTo(gomega.HaveOccurred(), "kubelet never observed the termination notice")
+		})
+		framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false

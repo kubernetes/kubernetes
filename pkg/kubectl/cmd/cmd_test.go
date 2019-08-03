@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -100,7 +100,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			}
 
 			if pluginsHandler.executedPlugin != test.expectPlugin {
-				t.Fatalf("unexpected plugin execution: expedcted %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
 			}
 
 			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {

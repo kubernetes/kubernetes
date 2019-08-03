@@ -369,7 +369,7 @@ func dropDisabledFields(
 			return true
 		})
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
 		podSpec.EphemeralContainers = nil
 	}
 
@@ -535,6 +535,13 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 			podSpec.Volumes[i].CSI = nil
 		}
 	}
+}
+
+func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	return len(podSpec.EphemeralContainers) > 0
 }
 
 // subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature

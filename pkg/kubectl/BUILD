@@ -1,74 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "rolling_updater_test.go",
-        "scale_test.go",
-    ],
-    embed = [":go_default_library"],
-    deps = [
-        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/scale:go_default_library",
-        "//staging/src/k8s.io/client-go/scale/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
-    ],
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "conditions.go",
-        "doc.go",
-        "interfaces.go",
-        "rolling_updater.go",
-        "scale.go",
-    ],
+    srcs = ["doc.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl",
-    deps = [
-        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/scale:go_default_library",
-        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util/deployment:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util/podutils:go_default_library",
-        "//vendor/k8s.io/utils/integer:go_default_library",
-        "//vendor/k8s.io/utils/pointer:go_default_library",
-    ],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -82,14 +18,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/apply:all-srcs",
         "//pkg/kubectl/cmd:all-srcs",
-        "//pkg/kubectl/explain:all-srcs",
-        "//pkg/kubectl/generate:all-srcs",
-        "//pkg/kubectl/metricsutil:all-srcs",
-        "//pkg/kubectl/polymorphichelpers:all-srcs",
-        "//pkg/kubectl/proxy:all-srcs",
-        "//pkg/kubectl/util:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

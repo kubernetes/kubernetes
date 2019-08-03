@@ -113,7 +113,7 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 }
 
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet fieldpath.VersionedSet, err error) {
-	fields := metav1.Fields{}
+	fields := EmptyFields
 	if encodedVersionedSet.Fields != nil {
 		fields = *encodedVersionedSet.Fields
 	}

@@ -121,7 +121,7 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 				e, ok := obj.(*v1.Event)
 				ginkgo.By(fmt.Sprintf("Considering event: \nType = [%s], Name = [%s], Reason = [%s], Message = [%s]", e.Type, e.Name, e.Reason, e.Message))
 				framework.ExpectEqual(ok, true)
-				if ok && eventPredicate(e) {
+				if eventPredicate(e) {
 					observedMatchingEvent = true
 				}
 			},

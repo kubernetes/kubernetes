@@ -26,13 +26,13 @@ go_library(
         "//pkg/apis/scheduling/install:go_default_library",
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/validation:go_default_library",
@@ -49,9 +49,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
     ],
 )
 

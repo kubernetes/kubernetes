@@ -23,13 +23,13 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 const (
@@ -437,11 +437,11 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
+			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
 			if test.migrationEnabled {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
-				enableMigrationOnNode(node, csilibplugins.AWSEBSInTreePluginName)
+				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			} else {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
@@ -452,7 +452,8 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				expectedFailureReasons = []PredicateFailureReason{test.expectedFailureReason}
 			}
 
-			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIPVInfo(test.filterName, test.driverNames...),
+			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSINodeInfo(csiNode),
+				getFakeCSIPVInfo(test.filterName, test.driverNames...),
 				getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...),
 				getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0]))
 
@@ -544,8 +545,7 @@ func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) FakePer
 	return pvcInfos
 }
 
-func enableMigrationOnNode(nodeInfo *schedulernodeinfo.NodeInfo, pluginName string) {
-	csiNode := nodeInfo.CSINode()
+func enableMigrationOnNode(csiNode *storagev1beta1.CSINode, pluginName string) {
 	nodeInfoAnnotations := csiNode.GetAnnotations()
 	if nodeInfoAnnotations == nil {
 		nodeInfoAnnotations = map[string]string{}
@@ -557,7 +557,6 @@ func enableMigrationOnNode(nodeInfo *schedulernodeinfo.NodeInfo, pluginName stri
 	nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
 
 	csiNode.Annotations = nodeInfoAnnotations
-	nodeInfo.SetCSINode(csiNode)
 }
 
 func getFakeCSIStorageClassInfo(scName, provisionerName string) FakeStorageClassInfo {
@@ -567,4 +566,11 @@ func getFakeCSIStorageClassInfo(scName, provisionerName string) FakeStorageClass
 			Provisioner: provisionerName,
 		},
 	}
+}
+
+func getFakeCSINodeInfo(csiNode *storagev1beta1.CSINode) FakeCSINodeInfo {
+	if csiNode != nil {
+		return FakeCSINodeInfo(*csiNode)
+	}
+	return FakeCSINodeInfo{}
 }

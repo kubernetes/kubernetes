@@ -36,12 +36,14 @@ func init() {
 	mutationDetectionEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
 }
 
-type CacheMutationDetector interface {
+// MutationDetector is able to monitor if the object be modified outside.
+type MutationDetector interface {
 	AddObject(obj interface{})
 	Run(stopCh <-chan struct{})
 }
 
-func NewCacheMutationDetector(name string) CacheMutationDetector {
+// NewCacheMutationDetector creates a new instance for the defaultCacheMutationDetector.
+func NewCacheMutationDetector(name string) MutationDetector {
 	if !mutationDetectionEnabled {
 		return dummyMutationDetector{}
 	}

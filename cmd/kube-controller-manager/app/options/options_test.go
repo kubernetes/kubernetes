@@ -47,6 +47,7 @@ import (
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
 	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
+	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
@@ -71,6 +72,7 @@ func TestAddFlags(t *testing.T) {
 		"--cluster-signing-cert-file=/cluster-signing-cert",
 		"--cluster-signing-key-file=/cluster-signing-key",
 		"--concurrent-deployment-syncs=10",
+		"--concurrent-statefulset-syncs=15",
 		"--concurrent-endpoint-syncs=10",
 		"--concurrent-gc-syncs=30",
 		"--concurrent-namespace-syncs=20",
@@ -214,6 +216,11 @@ func TestAddFlags(t *testing.T) {
 			&deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs:      10,
 				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
+			},
+		},
+		StatefulSetController: &StatefulSetControllerOptions{
+			&statefulsetconfig.StatefulSetControllerConfiguration{
+				ConcurrentStatefulSetSyncs: 15,
 			},
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{

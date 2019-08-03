@@ -273,8 +273,9 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
-			gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
+			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+				30*time.Second, 10*time.Minute)
+			framework.ExpectNoError(err)
 		}(pod)
 	}
 	wg.Wait()

@@ -44,8 +44,7 @@ require (
 	github.com/cpuguy83/go-md2man v1.0.10
 	github.com/cyphar/filepath-securejoin v0.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1
-	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
-	github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff
+	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/docker/go-connections v0.3.0
 	github.com/docker/go-units v0.3.3
@@ -62,13 +61,10 @@ require (
 	github.com/go-openapi/validate v0.19.2
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus v4.1.0+incompatible
-	github.com/gogo/protobuf v0.0.0-20190410021324-65acae22fc9
+	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.2.0
-	github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450 // indirect
-	github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995 // indirect
-	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
 	github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/go-cmp v0.3.0
@@ -82,9 +78,7 @@ require (
 	github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413 // indirect
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
 	github.com/heketi/utils v0.0.0-20170317161834-435bc5bdfa64 // indirect
-	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.6
-	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/karrick/godirwalk v1.7.5 // indirect
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -148,6 +142,8 @@ require (
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.2
+	gotest.tools v2.2.0+incompatible
+	gotest.tools/gotestsum v0.3.5
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -175,7 +171,6 @@ require (
 	k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
-	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.1.0
 	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
@@ -238,7 +233,7 @@ replace (
 	github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
 	github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
-	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff
+	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker => github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/docker/go-connections => github.com/docker/go-connections v0.3.0
 	github.com/docker/go-units => github.com/docker/go-units v0.3.3
@@ -251,6 +246,7 @@ replace (
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase => github.com/fatih/camelcase v1.0.0
+	github.com/fatih/color => github.com/fatih/color v1.6.0
 	github.com/flynn/go-shlex => github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.7
 	github.com/ghodss/yaml => github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4
@@ -269,7 +265,7 @@ replace (
 	github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.2
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/godbus/dbus => github.com/godbus/dbus v4.1.0+incompatible
-	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20190410021324-65acae22fc9
+	github.com/gogo/protobuf => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock => github.com/golang/mock v1.2.0
@@ -307,7 +303,6 @@ replace (
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.6
-	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
@@ -330,6 +325,8 @@ replace (
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63
 	github.com/marstr/guid => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
 	github.com/marten-seemann/qtls => github.com/marten-seemann/qtls v0.2.3
+	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
+	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.3
 	github.com/mattn/go-shellwords => github.com/mattn/go-shellwords v1.0.5
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.9
@@ -420,9 +417,11 @@ replace (
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
 	google.golang.org/grpc => google.golang.org/grpc v1.13.0
+	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/gcfg.v1 => gopkg.in/gcfg.v1 v1.2.0
+	gopkg.in/gemnasium/logrus-airbrake-hook.v2 => gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
 	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0
 	gopkg.in/mcuadros/go-syslog.v2 => gopkg.in/mcuadros/go-syslog.v2 v2.2.1
 	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -431,6 +430,7 @@ replace (
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.2
 	gotest.tools => gotest.tools v2.2.0+incompatible
+	gotest.tools/gotestsum => gotest.tools/gotestsum v0.3.5
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
@@ -467,7 +467,7 @@ replace (
 	modernc.org/strutil => modernc.org/strutil v1.0.0
 	modernc.org/xc => modernc.org/xc v1.0.0
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
-	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v0.0.0-20190719182312-e94e05bfbbe3
+	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v0.0.0-20190724202554-0c1d754dd648
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.1.0
 	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )

@@ -6,7 +6,7 @@ go 1.12
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/gogo/protobuf v0.0.0-20190410021324-65acae22fc9
+	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.2.0 // indirect
 	github.com/stretchr/testify v1.3.0

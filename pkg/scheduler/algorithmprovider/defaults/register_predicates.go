@@ -61,33 +61,33 @@ func init() {
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxEBSVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 	// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxGCEPDVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 	// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxAzureDiskVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxCSIVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
+			return predicates.NewCSIMaxVolumeLimitPredicate(args.CSINodeInfo, args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 		},
 	)
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxCinderVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
 		},
 	)
 

@@ -40,7 +40,7 @@ type HostPortManager interface {
 	// Add implements port mappings.
 	// id should be a unique identifier for a pod, e.g. podSandboxID.
 	// podPortMapping is the associated port mapping information for the pod.
-	// natInterfaceName is the interface that localhost used to talk to the given pod.
+	// natInterfaceName is the interface that localhost uses to talk to the given pod, if known.
 	Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) error
 	// Remove cleans up matching port mappings
 	// Remove must be able to clean up port mappings without pod IP

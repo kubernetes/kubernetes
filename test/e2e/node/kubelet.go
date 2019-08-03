@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -53,7 +54,7 @@ const (
 func getPodMatches(c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
 	e2elog.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
-	runningPods, err := framework.GetKubeletPods(c, nodeName)
+	runningPods, err := e2ekubelet.GetKubeletPods(c, nodeName)
 	if err != nil {
 		e2elog.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches

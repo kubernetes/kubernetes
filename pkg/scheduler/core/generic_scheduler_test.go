@@ -26,9 +26,10 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -139,6 +140,42 @@ func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[str
 var EmptyPluginRegistry = framework.Registry{}
 var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerconfig.PluginConfig{})
 
+// FakeFilterPlugin is a test filter plugin used by default scheduler.
+type FakeFilterPlugin struct {
+	numFilterCalled int
+	failFilter      bool
+}
+
+var filterPlugin = &FakeFilterPlugin{}
+
+// Name returns name of the plugin.
+func (fp *FakeFilterPlugin) Name() string {
+	return "fake-filter-plugin"
+}
+
+// reset is used to reset filter plugin.
+func (fp *FakeFilterPlugin) reset() {
+	fp.numFilterCalled = 0
+	fp.failFilter = false
+}
+
+// Filter is a test function that returns an error or nil, depending on the
+// value of "failFilter".
+func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	fp.numFilterCalled++
+
+	if fp.failFilter {
+		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+
+	return nil
+}
+
+// NewFilterPlugin is the factory for filtler plugin.
+func NewFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return filterPlugin, nil
+}
+
 func makeNodeList(nodeNames []string) []*v1.Node {
 	result := make([]*v1.Node, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {
@@ -219,6 +256,21 @@ func TestSelectHost(t *testing.T) {
 
 func TestGenericScheduler(t *testing.T) {
 	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
+
+	filterPluginRegistry := framework.Registry{filterPlugin.Name(): NewFilterPlugin}
+	filterFramework, err := framework.NewFramework(filterPluginRegistry, &schedulerconfig.Plugins{
+		Filter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: filterPlugin.Name(),
+				},
+			},
+		},
+	}, []schedulerconfig.PluginConfig{})
+	if err != nil {
+		t.Errorf("Unexpected error when initialize scheduling framework, err :%v", err.Error())
+	}
+
 	tests := []struct {
 		name                     string
 		predicates               map[string]algorithmpredicates.FitPredicate
@@ -229,6 +281,7 @@ func TestGenericScheduler(t *testing.T) {
 		pod                      *v1.Pod
 		pods                     []*v1.Pod
 		buildPredMeta            bool // build predicates metadata or not
+		failFilter               bool
 		expectedHosts            sets.String
 		expectsErr               bool
 		wErr                     error
@@ -246,7 +299,9 @@ func TestGenericScheduler(t *testing.T) {
 				FailedPredicates: FailedPredicateMap{
 					"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
-				}},
+				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
+			},
 		},
 		{
 			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
@@ -309,6 +364,7 @@ func TestGenericScheduler(t *testing.T) {
 					"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
 			},
 		},
 		{
@@ -339,6 +395,7 @@ func TestGenericScheduler(t *testing.T) {
 					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
 			},
 		},
 		{
@@ -426,6 +483,7 @@ func TestGenericScheduler(t *testing.T) {
 				FailedPredicates: FailedPredicateMap{
 					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate, algorithmpredicates.ErrFakePredicate},
 				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
 			},
 		},
 		{
@@ -538,9 +596,29 @@ func TestGenericScheduler(t *testing.T) {
 			expectedHosts: sets.NewString("machine2", "machine3"),
 			wErr:          nil,
 		},
+		{
+			name:          "test with failed filter plugin",
+			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			prioritizers:  []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			nodes:         []string{"3"},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			expectedHosts: nil,
+			failFilter:    true,
+			expectsErr:    true,
+			wErr: &FitError{
+				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				NumAllNodes:      1,
+				FailedPredicates: FailedPredicateMap{},
+				FilteredNodesStatuses: framework.NodeToStatusMap{
+					"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter"),
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			filterPlugin.failFilter = test.failFilter
+
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
@@ -564,7 +642,7 @@ func TestGenericScheduler(t *testing.T) {
 				predMetaProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
-				emptyFramework,
+				filterFramework,
 				[]algorithm.SchedulerExtender{},
 				nil,
 				pvcLister,
@@ -575,11 +653,13 @@ func TestGenericScheduler(t *testing.T) {
 				false)
 			result, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)), framework.NewPluginContext())
 			if !reflect.DeepEqual(err, test.wErr) {
-				t.Errorf("Unexpected error: %v, expected: %v", err, test.wErr)
+				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
 			}
+
+			filterPlugin.reset()
 		})
 	}
 }
@@ -613,7 +693,7 @@ func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
-	_, predicateMap, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, nodes)
+	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, schedulertesting.FakeNodeLister(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -643,7 +723,7 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(predicates, nodes)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, predicateMap, err := scheduler.findNodesThatFit(nil, pod, nodes)
+	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, pod, schedulertesting.FakeNodeLister(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

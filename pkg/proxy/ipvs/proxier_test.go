@@ -24,15 +24,12 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
-
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/proxy"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
@@ -42,6 +39,8 @@ import (
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	ipvstest "k8s.io/kubernetes/pkg/util/ipvs/testing"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 const testHostname = "test-hostname"
@@ -90,11 +89,16 @@ func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedNa
 
 // fakeKernelHandler implements KernelHandler.
 type fakeKernelHandler struct {
-	modules []string
+	modules       []string
+	kernelVersion string
 }
 
 func (fake *fakeKernelHandler) GetModules() ([]string, error) {
 	return fake.modules, nil
+}
+
+func (fake *fakeKernelHandler) GetKernelVersion() (string, error) {
+	return fake.kernelVersion, nil
 }
 
 // fakeKernelHandler implements KernelHandler.
@@ -256,64 +260,79 @@ func TestCleanupLeftovers(t *testing.T) {
 
 func TestCanUseIPVSProxier(t *testing.T) {
 	testCases := []struct {
-		mods         []string
-		kernelErr    error
-		ipsetVersion string
-		ipsetErr     error
-		ok           bool
+		mods          []string
+		kernelVersion string
+		kernelErr     error
+		ipsetVersion  string
+		ipsetErr      error
+		ok            bool
 	}{
 		// case 0, kernel error
 		{
-			mods:         []string{"foo", "bar", "baz"},
-			kernelErr:    fmt.Errorf("oops"),
-			ipsetVersion: "0.0",
-			ok:           false,
+			mods:          []string{"foo", "bar", "baz"},
+			kernelVersion: "4.19",
+			kernelErr:     fmt.Errorf("oops"),
+			ipsetVersion:  "0.0",
+			ok:            false,
 		},
 		// case 1, ipset error
 		{
-			mods:         []string{"foo", "bar", "baz"},
-			ipsetVersion: MinIPSetCheckVersion,
-			ipsetErr:     fmt.Errorf("oops"),
-			ok:           false,
+			mods:          []string{"foo", "bar", "baz"},
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ipsetErr:      fmt.Errorf("oops"),
+			ok:            false,
 		},
 		// case 2, missing required kernel modules and ipset version too low
 		{
-			mods:         []string{"foo", "bar", "baz"},
-			ipsetVersion: "1.1",
-			ok:           false,
+			mods:          []string{"foo", "bar", "baz"},
+			kernelVersion: "4.19",
+			ipsetVersion:  "1.1",
+			ok:            false,
 		},
 		// case 3, missing required ip_vs_* kernel modules
 		{
-			mods:         []string{"ip_vs", "a", "bc", "def"},
-			ipsetVersion: MinIPSetCheckVersion,
-			ok:           false,
+			mods:          []string{"ip_vs", "a", "bc", "def"},
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            false,
 		},
 		// case 4, ipset version too low
 		{
-			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			ipsetVersion: "4.3.0",
-			ok:           false,
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			kernelVersion: "4.19",
+			ipsetVersion:  "4.3.0",
+			ok:            false,
 		},
-		// case 5
+		// case 5, ok for linux kernel 4.19
 		{
-			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			ipsetVersion: MinIPSetCheckVersion,
-			ok:           true,
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            true,
 		},
-		// case 6
+		// case 6, ok for linux kernel 4.18
 		{
-			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4", "foo", "bar"},
-			ipsetVersion: "6.19",
-			ok:           true,
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			kernelVersion: "4.18",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            true,
+		},
+		// case 7. ok when module list has extra modules
+		{
+			mods:          []string{"foo", "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "bar"},
+			kernelVersion: "4.19",
+			ipsetVersion:  "6.19",
+			ok:            true,
 		},
 	}
 
 	for i := range testCases {
-		handle := &fakeKernelHandler{modules: testCases[i].mods}
+		handle := &fakeKernelHandler{modules: testCases[i].mods, kernelVersion: testCases[i].kernelVersion}
 		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
-		ok, _ := CanUseIPVSProxier(handle, versioner)
+		ok, err := CanUseIPVSProxier(handle, versioner)
 		if ok != testCases[i].ok {
-			t.Errorf("Case [%d], expect %v, got %v", i, testCases[i].ok, ok)
+			t.Errorf("Case [%d], expect %v, got %v: err: %v", i, testCases[i].ok, ok, err)
 		}
 	}
 }
@@ -3138,5 +3157,35 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// all addresses should be unbound
 	if len(remainingAddrs) != 0 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 0, len(remainingAddrs))
+	}
+}
+
+func Test_getFirstColumn(t *testing.T) {
+	testCases := []struct {
+		name        string
+		fileContent string
+		want        []string
+		wantErr     bool
+	}{
+		{
+			name: "valid content",
+			fileContent: `libiscsi_tcp 28672 1 iscsi_tcp, Live 0xffffffffc07ae000
+libiscsi 57344 3 ib_iser,iscsi_tcp,libiscsi_tcp, Live 0xffffffffc079a000
+raid10 57344 0 - Live 0xffffffffc0597000`,
+			want:    []string{"libiscsi_tcp", "libiscsi", "raid10"},
+			wantErr: false,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := getFirstColumn(strings.NewReader(test.fileContent))
+			if (err != nil) != test.wantErr {
+				t.Errorf("getFirstColumn() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("getFirstColumn() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }

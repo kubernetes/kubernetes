@@ -24,8 +24,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/davecgh/go-spew/spew"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("ImageID [NodeFeature: ImageID]", func() {
@@ -34,7 +34,7 @@ var _ = framework.KubeDescribe("ImageID [NodeFeature: ImageID]", func() {
 
 	f := framework.NewDefaultFramework("image-id-test")
 
-	It("should be set to the manifest digest (from RepoDigests) when available", func() {
+	ginkgo.It("should be set to the manifest digest (from RepoDigests) when available", func() {
 		podDesc := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-with-repodigest",
@@ -63,6 +63,6 @@ var _ = framework.KubeDescribe("ImageID [NodeFeature: ImageID]", func() {
 			return
 		}
 
-		Expect(status.ContainerStatuses[0].ImageID).To(ContainSubstring(busyBoxImage))
+		gomega.Expect(status.ContainerStatuses[0].ImageID).To(gomega.ContainSubstring(busyBoxImage))
 	})
 })

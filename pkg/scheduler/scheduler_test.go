@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/events/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -415,9 +415,12 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
-			Pod:              secondPod,
-			NumAllNodes:      1,
-			FailedPredicates: core.FailedPredicateMap{node.Name: []predicates.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts}},
+			Pod:         secondPod,
+			NumAllNodes: 1,
+			FailedPredicates: core.FailedPredicateMap{
+				node.Name: []predicates.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
+			},
+			FilteredNodesStatuses: framework.NodeToStatusMap{},
 		}
 		if !reflect.DeepEqual(expectErr, err) {
 			t.Errorf("err want=%v, get=%v", expectErr, err)
@@ -620,9 +623,10 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
-			Pod:              podWithTooBigResourceRequests,
-			NumAllNodes:      len(nodes),
-			FailedPredicates: failedPredicatesMap,
+			Pod:                   podWithTooBigResourceRequests,
+			NumAllNodes:           len(nodes),
+			FailedPredicates:      failedPredicatesMap,
+			FilteredNodesStatuses: framework.NodeToStatusMap{},
 		}
 		if len(fmt.Sprint(expectErr)) > 150 {
 			t.Errorf("message is too spammy ! %v ", len(fmt.Sprint(expectErr)))

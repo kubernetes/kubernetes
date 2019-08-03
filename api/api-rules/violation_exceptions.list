@@ -381,6 +381,7 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,APIVe
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,APIVersions,Versions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,CreateOptions,DryRun
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DeleteOptions,DryRun
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Fields,Raw
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelector,MatchExpressions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelectorRequirement,Values
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,List,Items
@@ -389,6 +390,7 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Objec
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,OwnerReferences
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,PartialObjectMetadataList,Items
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,PatchOptions,DryRun
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ProtoFields,Raw
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,RootPaths,Paths
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,StatusDetails,Causes
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Table,ColumnDefinitions
@@ -599,6 +601,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ResourceQuotaController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,SAController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,StatefulSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,TTLAfterFinishedController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,ConcurrentNamespaceSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,NamespaceSyncPeriod
@@ -630,6 +633,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,S
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,RootCAFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ServiceAccountKeyFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceControllerConfiguration,ConcurrentServiceSyncs
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,StatefulSetControllerConfiguration,ConcurrentStatefulSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,TTLAfterFinishedControllerConfiguration,ConcurrentTTLSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,EnableDynamicProvisioning
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,EnableHostPathProvisioning

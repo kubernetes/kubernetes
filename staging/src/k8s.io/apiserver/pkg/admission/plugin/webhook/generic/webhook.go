@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -65,7 +66,14 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		return nil, err
 	}
 
-	cm, err := webhookutil.NewClientManager(admissionv1beta1.SchemeGroupVersion, admissionv1beta1.AddToScheme)
+	cm, err := webhookutil.NewClientManager(
+		[]schema.GroupVersion{
+			admissionv1beta1.SchemeGroupVersion,
+			admissionv1.SchemeGroupVersion,
+		},
+		admissionv1beta1.AddToScheme,
+		admissionv1.AddToScheme,
+	)
 	if err != nil {
 		return nil, err
 	}

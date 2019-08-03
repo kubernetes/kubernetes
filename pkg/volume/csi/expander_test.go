@@ -64,31 +64,33 @@ func TestNodeExpand(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		plug, tmpDir := newTestPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
+		t.Run(tc.name, func(t *testing.T) {
+			plug, tmpDir := newTestPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
 
-		spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "expandable", "test-vol"), false)
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "expandable", "test-vol"), false)
 
-		newSize, _ := resource.ParseQuantity("20Gi")
+			newSize, _ := resource.ParseQuantity("20Gi")
 
-		resizeOptions := volume.NodeResizeOptions{
-			VolumeSpec:      spec,
-			NewSize:         newSize,
-			DeviceMountPath: "/foo/bar",
-			CSIVolumePhase:  tc.volumePhase,
-		}
-		csiSource, _ := getCSISourceFromSpec(resizeOptions.VolumeSpec)
-
-		csClient := setupClientWithExpansion(t, tc.nodeStageSet, tc.nodeExpansion)
-
-		ok, err := plug.nodeExpandWithClient(resizeOptions, csiSource, csClient)
-		if ok != tc.success {
-			if err != nil {
-				t.Errorf("For %s : expected %v got %v with %v", tc.name, tc.success, ok, err)
-			} else {
-				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, ok)
+			resizeOptions := volume.NodeResizeOptions{
+				VolumeSpec:      spec,
+				NewSize:         newSize,
+				DeviceMountPath: "/foo/bar",
+				CSIVolumePhase:  tc.volumePhase,
 			}
+			csiSource, _ := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 
-		}
+			csClient := setupClientWithExpansion(t, tc.nodeStageSet, tc.nodeExpansion)
+
+			ok, err := plug.nodeExpandWithClient(resizeOptions, csiSource, csClient)
+			if ok != tc.success {
+				if err != nil {
+					t.Errorf("For %s : expected %v got %v with %v", tc.name, tc.success, ok, err)
+				} else {
+					t.Errorf("For %s : expected %v got %v", tc.name, tc.success, ok)
+				}
+
+			}
+		})
 	}
 }

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	dto "github.com/prometheus/client_model/go"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -179,6 +179,14 @@ func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, 
 	return nil, nil
 }
 
+func (*fakeFramework) RunNormalizeScorePlugins(pc *framework.PluginContext, pod *v1.Pod, scores framework.PluginToNodeScoreMap) *framework.Status {
+	return nil
+}
+
+func (*fakeFramework) ApplyScoreWeights(pc *framework.PluginContext, pod *v1.Pod, scores framework.PluginToNodeScoreMap) *framework.Status {
+	return nil
+}
+
 func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
@@ -188,6 +196,10 @@ func (*fakeFramework) RunBindPlugins(pc *framework.PluginContext, pod *v1.Pod, n
 }
 
 func (*fakeFramework) RunPostbindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
+
+func (*fakeFramework) RunPostFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses framework.NodeToStatusMap) *framework.Status {
+	return nil
+}
 
 func (*fakeFramework) RunReservePlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil

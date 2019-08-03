@@ -152,9 +152,7 @@ type Configurator interface {
 	// Exposed for testing
 	GetClient() clientset.Interface
 
-	// TODO(#80216): Remove these methods from the interface.
-	// Needs to be exposed for things like integration tests where we want to make fake nodes.
-	GetNodeLister() corelisters.NodeLister
+	// TODO(#80216): Remove GetScheduledPodLister from the interface.
 	// Exposed for testing
 	GetScheduledPodLister() corelisters.PodLister
 
@@ -165,13 +163,11 @@ type Configurator interface {
 }
 
 // configFactory is the default implementation of the scheduler.Configurator interface.
-// TODO(#80216): Remove pod and node listers.
+// TODO(#80216): Remove pod lister.
 type configFactory struct {
 	client clientset.Interface
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
-	// a means to list all nodes
-	nodeLister corelisters.NodeLister
 	// a means to list all PersistentVolumes
 	pVLister corelisters.PersistentVolumeLister
 	// a means to list all PersistentVolumeClaims
@@ -281,7 +277,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
-		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),
@@ -322,11 +317,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		c.podQueue.Close()
 	}()
 	return c
-}
-
-// GetNodeStore provides the cache to the nodes, mostly internal use, but may also be called by mock-tests.
-func (c *configFactory) GetNodeLister() corelisters.NodeLister {
-	return c.nodeLister
 }
 
 func (c *configFactory) GetHardPodAffinitySymmetricWeight() int32 {
@@ -569,6 +559,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		NodeLister:                     c.schedulerCache,
 		PDBLister:                      c.pdbLister,
 		NodeInfo:                       c.schedulerCache,
+		CSINodeInfo:                    c.schedulerCache,
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},

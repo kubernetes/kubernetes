@@ -79,6 +79,11 @@ var (
 
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type Config struct {
 	auth.AzureAuthConfig
 
