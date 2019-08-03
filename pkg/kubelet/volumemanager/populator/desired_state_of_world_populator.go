@@ -398,15 +398,12 @@ func mountedReadOnlyByPod(podVolume v1.Volume, pod *v1.Pod) bool {
 		return true
 	}
 
-	mountedReadOnly := true
-	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+	return podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
 		if !mountedReadOnlyByContainer(podVolume.Name, c) {
-			mountedReadOnly = false
 			return false
 		}
 		return true
 	})
-	return mountedReadOnly
 }
 
 func mountedReadOnlyByContainer(volumeName string, container *v1.Container) bool {
