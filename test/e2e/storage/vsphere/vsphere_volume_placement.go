@@ -284,8 +284,8 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 
 		defer func() {
 			ginkgo.By("clean up undeleted pods")
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "defer: Failed to delete pod ", podA.Name)
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "defer: Failed to delete pod ", podB.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, podA), "defer: Failed to delete pod ", podA.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, podB), "defer: Failed to delete pod ", podB.Name)
 			ginkgo.By(fmt.Sprintf("wait for volumes to be detached from the node: %v", node1Name))
 			for _, volumePath := range volumePaths {
 				framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node1Name))
@@ -326,9 +326,9 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 			verifyFilesExistOnVSphereVolume(ns, podB.Name, podBFiles...)
 
 			ginkgo.By("Deleting pod-A")
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "Failed to delete pod ", podA.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, podA), "Failed to delete pod ", podA.Name)
 			ginkgo.By("Deleting pod-B")
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "Failed to delete pod ", podB.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, podB), "Failed to delete pod ", podB.Name)
 		}
 	})
 })
@@ -384,7 +384,7 @@ func createAndVerifyFilesOnVolume(namespace string, podname string, newEmptyfile
 
 func deletePodAndWaitForVolumeToDetach(f *framework.Framework, c clientset.Interface, pod *v1.Pod, nodeName string, volumePaths []string) {
 	ginkgo.By("Deleting pod")
-	framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
+	framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod), "Failed to delete pod ", pod.Name)
 
 	ginkgo.By("Waiting for volume to be detached from the node")
 	for _, volumePath := range volumePaths {

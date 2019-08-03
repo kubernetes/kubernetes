@@ -547,13 +547,6 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 	expectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
-// DeletePodOrFail deletes the pod of the specified namespace and name.
-func DeletePodOrFail(c clientset.Interface, ns, name string) {
-	ginkgo.By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
-	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
-}
-
 // CheckPodsRunningReady returns whether all pods whose names are listed in
 // podNames in namespace ns are running and ready, using c and waiting at most
 // timeout.

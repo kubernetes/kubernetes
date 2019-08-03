@@ -154,12 +154,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			scTest.AllowVolumeExpansion = true
 		}
 
-		nodeSelection := framework.NodeSelection{
+		nodeSelection := e2epod.NodeSelection{
 			// The mock driver only works when everything runs on a single node.
 			Name: nodeName,
 		}
 		if len(m.nodeLabel) > 0 {
-			nodeSelection = framework.NodeSelection{
+			nodeSelection = e2epod.NodeSelection{
 				Selector: m.nodeLabel,
 			}
 		}
@@ -185,11 +185,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	createPodWithPVC := func(pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
 		nodeName := m.config.ClientNodeName
-		nodeSelection := framework.NodeSelection{
+		nodeSelection := e2epod.NodeSelection{
 			Name: nodeName,
 		}
 		if len(m.nodeLabel) > 0 {
-			nodeSelection = framework.NodeSelection{
+			nodeSelection = e2epod.NodeSelection{
 				Selector: m.nodeLabel,
 			}
 		}
@@ -206,7 +206,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		for _, pod := range m.pods {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-			errs = append(errs, framework.DeletePodWithWait(f, cs, pod))
+			errs = append(errs, e2epod.DeletePodWithWait(cs, pod))
 		}
 
 		for _, claim := range m.pvcs {
@@ -512,7 +512,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					}
 
 					ginkgo.By("Deleting the previously created pod")
-					err = framework.DeletePodWithWait(f, m.cs, pod)
+					err = e2epod.DeletePodWithWait(m.cs, pod)
 					framework.ExpectNoError(err, "while deleting pod for resizing")
 
 					ginkgo.By("Creating a new pod with same volume")
@@ -626,7 +626,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 	return attachLimit, waitErr
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node framework.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
 	var err error
 	_, err = cs.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
@@ -652,7 +652,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node f
 	return class, claim, pod
 }
 
-func startPausePodInline(cs clientset.Interface, t testsuites.StorageClassTest, node framework.NodeSelection, ns string) *v1.Pod {
+func startPausePodInline(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, ns string) *v1.Pod {
 	pod, err := startPausePodWithInlineVolume(cs,
 		&v1.CSIVolumeSource{
 			Driver: t.Provisioner,
@@ -662,7 +662,7 @@ func startPausePodInline(cs clientset.Interface, t testsuites.StorageClassTest, 
 	return pod
 }
 
-func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node framework.NodeSelection, ns string) (*v1.Pod, error) {
+func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string) (*v1.Pod, error) {
 	return startPausePodWithVolumeSource(cs,
 		v1.VolumeSource{
 			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -673,7 +673,7 @@ func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClai
 		node, ns)
 }
 
-func startPausePodWithInlineVolume(cs clientset.Interface, inlineVolume *v1.CSIVolumeSource, node framework.NodeSelection, ns string) (*v1.Pod, error) {
+func startPausePodWithInlineVolume(cs clientset.Interface, inlineVolume *v1.CSIVolumeSource, node e2epod.NodeSelection, ns string) (*v1.Pod, error) {
 	return startPausePodWithVolumeSource(cs,
 		v1.VolumeSource{
 			CSI: inlineVolume,
@@ -681,7 +681,7 @@ func startPausePodWithInlineVolume(cs clientset.Interface, inlineVolume *v1.CSIV
 		node, ns)
 }
 
-func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.VolumeSource, node framework.NodeSelection, ns string) (*v1.Pod, error) {
+func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.VolumeSource, node e2epod.NodeSelection, ns string) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",

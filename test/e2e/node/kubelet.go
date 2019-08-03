@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -396,9 +397,9 @@ var _ = SIGDescribe("kubelet", func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				err := framework.DeletePodWithWait(f, c, pod)
+				err := e2epod.DeletePodWithWait(c, pod)
 				framework.ExpectNoError(err, "AfterEach: Failed to delete client pod ", pod.Name)
-				err = framework.DeletePodWithWait(f, c, nfsServerPod)
+				err = e2epod.DeletePodWithWait(c, nfsServerPod)
 				framework.ExpectNoError(err, "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
 			})
 
@@ -411,7 +412,7 @@ var _ = SIGDescribe("kubelet", func() {
 					stopNfsServer(nfsServerPod)
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
-					err := framework.DeletePodWithWait(f, c, pod)
+					err := e2epod.DeletePodWithWait(c, pod)
 					framework.ExpectError(err)
 					// pod object is now stale, but is intentionally not nil
 

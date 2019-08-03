@@ -204,13 +204,13 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc), "Failed to bind pv and pvc")
 
 				ginkgo.By("Creating pod")
-				pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+				pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
 				// Setting node
 				pod.Spec.NodeName = l.config.ClientNodeName
 				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
 				framework.ExpectNoError(err, "Failed to create pod")
 				defer func() {
-					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod), "Failed to delete pod")
+					framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
 				}()
 
 				eventSelector := fields.Set{
@@ -282,7 +282,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 		ginkgo.By("Creating pod")
 		var err error
-		pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+		pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
 		// Change volumeMounts to volumeDevices and the other way around
 		pod = swapVolumeMode(pod)
 
@@ -290,7 +290,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
 		framework.ExpectNoError(err, "Failed to create pod")
 		defer func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod), "Failed to delete pod")
+			framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
 		}()
 
 		ginkgo.By("Waiting for the pod to fail")
@@ -332,7 +332,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 		ginkgo.By("Creating pod")
 		var err error
-		pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+		pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
 		for i := range pod.Spec.Containers {
 			pod.Spec.Containers[i].VolumeDevices = nil
 			pod.Spec.Containers[i].VolumeMounts = nil
@@ -342,7 +342,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod))
 		}()
 
 		err = e2epod.WaitForPodNameRunningInNamespace(l.cs, pod.Name, pod.Namespace)

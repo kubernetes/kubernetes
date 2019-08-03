@@ -31,6 +31,7 @@ import (
 	volumeevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -375,7 +376,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 	}
 
 	ginkgo.By("Creating pod to attach PV to the node")
-	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
+	pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
 	framework.ExpectNoError(err)
 
 	if volumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
@@ -391,7 +392,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 	verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 	ginkgo.By("Deleting pod")
-	framework.DeletePodWithWait(f, client, pod)
+	e2epod.DeletePodWithWait(client, pod)
 
 	ginkgo.By("Waiting for volumes to be detached from the node")
 	waitForVSphereDiskToDetach(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
@@ -411,10 +412,10 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 	pvclaims = append(pvclaims, pvclaim)
 
 	ginkgo.By("Creating a pod")
-	pod := framework.MakePod(namespace, nil, pvclaims, false, "")
+	pod := e2epod.MakePod(namespace, nil, pvclaims, false, "")
 	pod, err = client.CoreV1().Pods(namespace).Create(pod)
 	framework.ExpectNoError(err)
-	defer framework.DeletePodWithWait(f, client, pod)
+	defer e2epod.DeletePodWithWait(client, pod)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
@@ -451,9 +452,9 @@ func verifyPodSchedulingFails(client clientset.Interface, namespace string, node
 	pvclaims = append(pvclaims, pvclaim)
 
 	ginkgo.By("Creating a pod")
-	pod, err := framework.CreateUnschedulablePod(client, namespace, nodeSelector, pvclaims, false, "")
+	pod, err := e2epod.CreateUnschedulablePod(client, namespace, nodeSelector, pvclaims, false, "")
 	framework.ExpectNoError(err)
-	defer framework.DeletePodWithWait(f, client, pod)
+	defer e2epod.DeletePodWithWait(client, pod)
 }
 
 func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storage.VolumeBindingMode) error {

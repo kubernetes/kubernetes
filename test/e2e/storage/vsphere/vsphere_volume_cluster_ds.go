@@ -101,7 +101,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		expectVolumeToBeAttached(nodeName, volumePath)
 
 		ginkgo.By("Deleting pod")
-		err = framework.DeletePodWithWait(f, client, pod)
+		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for volumes to be detached from the node")
