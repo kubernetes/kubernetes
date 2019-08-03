@@ -79,8 +79,8 @@ var (
 const (
 	node1                 = "node-1"
 	node2                 = "node-2"
-	podLimit              = 100
-	volsPerPod            = 5
+	podLimit              = 50
+	volsPerPod            = 3
 	nodeAffinityLabelKey  = "kubernetes.io/hostname"
 	provisionerPluginName = "kubernetes.io/mock-provisioner"
 )
