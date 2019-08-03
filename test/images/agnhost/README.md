@@ -40,7 +40,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.8
+        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.9
         name: agnhost
       dnsConfig:
         nameservers:
@@ -290,19 +290,50 @@ Examples:
 
 ```console
 docker run -i \
-  gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
+  gcr.io/kubernetes-e2e-test-images/agnhost:2.9 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
+  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.9 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/logs-generator/README.md?pixel)]()
+
+
+### mounttest
+
+The `mounttest` subcommand can be used to create files with various permissions, read files,
+and output file system type, mode, owner, and permissions for any given file.
+
+The subcommand can accept the following flags:
+
+- `fs_type`: Path to print the FS type for.
+- `file_mode`: Path to print the mode bits of.
+- `file_perm`: Path to print the perms of.
+- `file_owner`: Path to print the owning UID and GID of.
+- `new_file_0644`: Path to write to and read from with perm 0644.
+- `new_file_0666`: Path to write to and read from with perm 0666.
+- `new_file_0660`: Path to write to and read from with perm 0660.
+- `new_file_0777`: Path to write to and read from with perm 0777.
+- `file_content`: Path to read the file content from.
+- `file_content_in_loop`: Path to read the file content in loop from.
+- `retry_time` (default: 180): Retry time during the loop.
+- `break_on_expected_content` (default: true): Break out of loop on expected content (use with `--file_content_in_loop` flag only).
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost mounttest \
+        [--fs_type <path>] [--file_mode <path>] [--file_perm <path>] [--file_owner <path>] \
+        [--new_file_0644 <path>] [--new_file_0666 <path>] [--new_file_0660 <path>] [--new_file_0777 <path>] \
+        [--file_content <path>] [--file_content_in_loop <path>] \
+        [--retry_time <seconds>] [--break_on_expected_content <true_or_false>]
+```
 
 
 ### net
@@ -424,7 +455,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.9 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -479,7 +510,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.9 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -517,6 +548,25 @@ Usage:
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/porter/README.md?pixel)]()
 
 
+### resource-consumer-controller
+
+This subcommand starts an HTTP server that spreads requests around resource consumers. The HTTP server has the same endpoints and usage as the one spawned by the ``resource-consumer`` subcommand.
+
+The subcommand can accept the following flags:
+
+- `port` (default: 8080): The port number to listen to.
+- `consumer-port` (default: 8080): Port number of consumers.
+- `consumer-service-name` (default: `resource-consumer`): Name of service containing resource consumers.
+- `consumer-service-namespace` (default: `default`): Namespace of service containing resource consumers.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost resource-consumer-controller \
+        [--port <port>] [--consumer-port <port>] [--consumer-service-name <service-name>] [--consumer-service-namespace <namespace>]
+```
+
+
 ### serve-hostname
 
 This is a small util app to serve your hostname on TCP and/or UDP. Useful for testing.
@@ -542,6 +592,21 @@ Usage:
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel)]()
 
 
+### test-webserver
+
+Starts a simple HTTP fileserver which serves any file specified in the URL path, if it exists.
+
+The subcommand can accept the following flags:
+
+- `port` (default: `80`): The port number to listen to.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost test-webserver [--port <port>]
+```
+
+
 ### webhook (Kubernetes External Admission Webhook)
 
 The subcommand tests MutatingAdmissionWebhook and ValidatingAdmissionWebhook. After deploying
@@ -561,11 +626,11 @@ Usage:
 
 ## Other tools
 
-The image contains `iperf`.
+The image contains `iperf`, `curl`, `dns-tools` (including `dig`), CoreDNS.
 
 
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.8` for Linux
+The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.9` for Linux
 containers, and `e2eteam/agnhost:2.8` for Windows containers. In the future, the same
 repository can be used for both OSes.
