@@ -32,6 +32,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils/image:go_default_library",
