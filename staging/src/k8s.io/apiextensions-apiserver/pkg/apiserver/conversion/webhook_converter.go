@@ -182,9 +182,11 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		return out, nil
 	}
 
-	trace := utiltrace.New(fmt.Sprintf(
-		"Call conversion webhook: custom resource definition: %s, desired API version: %s, object count: %d, UID: %v",
-		c.name, request.Request.DesiredAPIVersion, objCount, request.Request.UID))
+	trace := utiltrace.New("Call conversion webhook",
+		utiltrace.Field{"custom-resource-definition", c.name},
+		utiltrace.Field{"desired-api-version", request.Request.DesiredAPIVersion},
+		utiltrace.Field{"object-count", objCount},
+		utiltrace.Field{"UID", request.Request.UID})
 	// Only log conversion webhook traces that exceed a 8ms per object limit plus a 50ms request overhead allowance.
 	// The per object limit uses the SLO for conversion webhooks (~4ms per object) plus time to serialize/deserialize
 	// the conversion request on the apiserver side (~4ms per object).

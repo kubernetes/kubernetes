@@ -604,7 +604,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
-	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -673,7 +673,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
 	}
 
-	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -694,7 +694,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	if err != nil {
 		return err
 	}
-	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
+	trace.Step("Listed items from cache", utiltrace.Field{"count", len(objs)})
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
 		// Resize the slice appropriately, since we already know that none
 		// of the elements will be filtered out.
@@ -710,7 +710,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
-	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
+	trace.Step("Filtered items", utiltrace.Field{"count", listVal.Len()})
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err

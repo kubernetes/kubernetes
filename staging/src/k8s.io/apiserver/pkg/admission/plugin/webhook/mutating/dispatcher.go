@@ -173,10 +173,14 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	if err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	trace := utiltrace.New(fmt.Sprintf("Call mutating webhook: configuration: %s, webhook: %s, resource: %v, subResource: %s, operation: %v, UID: %v",
-		invocation.Webhook.GetConfigurationName(), h.Name, request.Request.Resource, request.Request.SubResource, request.Request.Operation, request.Request.UID))
+	trace := utiltrace.New("Call mutating webhook",
+		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
+		utiltrace.Field{"webhook", h.Name},
+		utiltrace.Field{"resource", attr.GetResource()},
+		utiltrace.Field{"subresource", attr.GetSubresource()},
+		utiltrace.Field{"operation", attr.GetOperation()},
+		utiltrace.Field{"UID", uid})
 	defer trace.LogIfLong(500 * time.Millisecond)
-	response := &admissionv1beta1.AdmissionReview{}
 	r := client.Post().Context(ctx).Body(request)
 	if h.TimeoutSeconds != nil {
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
