@@ -19,11 +19,9 @@ package validation
 import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateRuntimeClass validates the RuntimeClass
@@ -34,7 +32,7 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
 	}
 
-	if rc.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if rc.Overhead != nil {
 		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...)
 	}
 

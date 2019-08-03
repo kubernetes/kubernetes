@@ -2614,11 +2614,6 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		return allErrs
 	}
 
-	// Return early if EphemeralContainers disabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		return append(allErrs, field.Forbidden(fldPath, "disabled by EphemeralContainers feature-gate"))
-	}
-
 	allNames := sets.String{}
 	for _, c := range containers {
 		allNames.Insert(c.Name)
@@ -3230,7 +3225,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, ValidatePreemptionPolicy(spec.PreemptionPolicy, fldPath.Child("preemptionPolicy"))...)
 	}
 
-	if spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if spec.Overhead != nil {
 		allErrs = append(allErrs, validateOverhead(spec.Overhead, fldPath.Child("overhead"))...)
 	}
 
@@ -4281,7 +4276,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path) fi
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && len(spec.Spec.EphemeralContainers) > 0 {
+	if len(spec.Spec.EphemeralContainers) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
 	}
 
