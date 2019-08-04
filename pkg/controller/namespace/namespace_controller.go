@@ -20,16 +20,20 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
@@ -46,6 +50,8 @@ const (
 	// * non-leader etcd servers to observe last-minute object creations in a namespace
 	//   so this controller's cleanup can actually clean up all objects
 	namespaceDeletionGracePeriod = 5 * time.Second
+	// controllerName is the name of this controller
+	controllerName = "namespace_controller"
 )
 
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
@@ -58,6 +64,8 @@ type NamespaceController struct {
 	queue workqueue.RateLimitingInterface
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
+	// Used to communicate deletion errors back to users
+	recorder record.EventRecorder
 }
 
 // NewNamespaceController creates a new NamespaceController
@@ -75,8 +83,14 @@ func NewNamespaceController(
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken, true),
 	}
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+	if kubeClient != nil {
+		eventBroadcaster := record.NewBroadcaster()
+		eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+		namespaceController.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName})
+
+		if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+			metrics.RegisterMetricAndTrackRateLimiterUsage(controllerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		}
 	}
 
 	// configure the namespace informer event handlers
@@ -175,7 +189,11 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
-	return nm.namespacedResourcesDeleter.Delete(namespace.Name)
+	err = nm.namespacedResourcesDeleter.Delete(namespace.Name)
+	if err != nil && nm.recorder != nil {
+		nm.recorder.Event(namespace, corev1.EventTypeWarning, "DeletionFailed", err.Error())
+	}
+	return err
 }
 
 // Run starts observing the system with the specified number of workers.

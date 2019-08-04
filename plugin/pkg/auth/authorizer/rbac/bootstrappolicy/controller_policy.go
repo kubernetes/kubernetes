@@ -205,6 +205,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("namespaces/finalize", "namespaces/status").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "delete", "deletecollection").Groups("*").Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("patch", "create").Groups(legacyGroup).Resources("events").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
