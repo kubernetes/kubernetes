@@ -33,8 +33,7 @@ import (
 )
 
 // WithRequestManagement limits the number of in-flight
-// requests in a fine-grained way and is more appropriate than
-// WithRequestManagement for testing
+// requests in a fine-grained way.
 func WithRequestManagement(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
@@ -65,40 +64,25 @@ func WithRequestManagement(
 			return
 		}
 
-		for {
-			rmState := reqMgmt.GetCurrentState()
-			fs := utilflowcontrol.PickFlowSchema(requestDigest, rmState.GetFlowSchemas(), rmState.GetPriorityLevelStates())
-			ps := utilflowcontrol.RequestPriorityState(requestDigest, fs, rmState.GetPriorityLevelStates())
-			if ps.IsExempt() {
-				klog.V(5).Infof("Serving %v without delay\n", r)
+		execute, afterExecute := reqMgmt.Wait(requestDigest)
+		if execute {
+			klog.V(5).Infof("Serving %v after queuing\n", r)
+			timedOut := ctx.Done()
+			finished := make(chan struct{})
+			go func() {
 				handler.ServeHTTP(w, r)
-				return
+				close(finished)
+			}()
+			select {
+			case <-timedOut:
+				klog.V(5).Infof("Timed out waiting for %v to finish\n", r)
+			case <-finished:
 			}
-			hashValue := utilflowcontrol.ComputeFlowDistinguisher(requestDigest, fs)
-			quiescent, execute, afterExecute := ps.GetFairQueuingSystem().Wait(hashValue, ps.GetHandSize())
-			if quiescent {
-				klog.V(3).Infof("Request %v landed in timing splinter, re-classifying", r)
-				continue
-			}
-			if execute {
-				klog.V(5).Infof("Serving %v after queuing\n", r)
-				timedOut := ctx.Done()
-				finished := make(chan struct{})
-				go func() {
-					handler.ServeHTTP(w, r)
-					close(finished)
-				}()
-				select {
-				case <-timedOut:
-					klog.V(5).Infof("Timed out waiting for %v to finish\n", r)
-				case <-finished:
-				}
-				afterExecute()
-			} else {
-				klog.V(5).Infof("Rejecting %v\n", r)
+			afterExecute()
+		} else {
+			klog.V(5).Infof("Rejecting %v\n", r)
 
-				tooManyRequests(r, w)
-			}
+			tooManyRequests(r, w)
 		}
 		return
 	})
