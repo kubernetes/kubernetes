@@ -430,6 +430,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 		}
 	}
 
+	klog.Infof("Start creating PVs and PVCs")
 	// Create enough PVs and PVCs for all the pods
 	pvs := []*v1.PersistentVolume{}
 	pvcs := []*v1.PersistentVolumeClaim{}
@@ -465,6 +466,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 		pvcs = append(pvcs, pvc)
 	}
 
+	klog.Infof("Start creating Pods")
 	pods := []*v1.Pod{}
 	for i := 0; i < podLimit; i++ {
 		// Generate string of all the PVCs for the pod
@@ -480,6 +482,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 		pods = append(pods, pod)
 	}
 
+	klog.Infof("Start validating pod scheduled")
 	// Validate Pods scheduled
 	for _, pod := range pods {
 		// Use increased timeout for stress test because there is a higher chance of
@@ -489,10 +492,12 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 		}
 	}
 
+	klog.Infof("Start validating PVCs scheduled")
 	// Validate PVC/PV binding
 	for _, pvc := range pvcs {
 		validatePVCPhase(t, config.client, pvc.Name, config.ns, v1.ClaimBound, dynamic)
 	}
+	klog.Infof("Start validating PVs scheduled")
 	for _, pv := range pvs {
 		validatePVPhase(t, config.client, pv.Name, v1.VolumeBound)
 	}
