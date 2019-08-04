@@ -824,6 +824,8 @@ func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulernodeinfo.NodeInfo) 
 }
 
 func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
+	m.mutex.Lock()
+        defer m.mutex.Unlock()
 	_, registeredResource := m.healthyDevices[resource]
 	_, allocatedResource := m.allocatedDevices[resource]
 	// Return true if this is either an active device plugin resource or
