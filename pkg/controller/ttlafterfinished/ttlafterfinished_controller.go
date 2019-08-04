@@ -20,7 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/metrics"
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
@@ -36,6 +40,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 	jobutil "k8s.io/kubernetes/pkg/controller/job"
 )
@@ -49,8 +54,8 @@ import (
 // This is implemented outside of Job/Pod controller for separation of concerns, and
 // because it will be extended to handle other finishable resource types.
 type Controller struct {
-	client dynamic.NamespaceableResourceInterface
-	// recorder record.EventRecorder
+	client   dynamic.NamespaceableResourceInterface
+	recorder record.EventRecorder
 
 	resource schema.GroupVersionResource
 	// rLister can list/get resources from the shared informer's store
@@ -70,19 +75,20 @@ type Controller struct {
 	clock clock.Clock
 }
 
-// New creates an instance of Controller
-func New(informerFactory informers.SharedInformerFactory, resource schema.GroupVersionResource, client dynamic.Interface) *Controller {
-	// eventBroadcaster := record.NewBroadcaster()
-	// eventBroadcaster.StartLogging(klog.Infof)
-	// eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+// New creates an instance o Controller
+func New(informerFactory informers.SharedInformerFactory, resource schema.GroupVersionResource, dynamicClient dynamic.Interface, client clientset.Interface) *Controller {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
-	// if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-	// metrics.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
-	// }
+	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
+
+		metrics.RegisterMetricAndTrackRateLimiterUsage(fmt.Sprintf("ttl_%v_after_finished_controller", resource.Resource), client.CoreV1().RESTClient().GetRateLimiter())
+	}
 
 	tc := &Controller{
-		client: client.Resource(resource),
-		// recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
+		client:   dynamicClient.Resource(resource),
+		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: fmt.Sprintf("ttl-%v-after-finished-controller", resource.Resource)}),
 		resource: resource,
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("ttl_%s_to_delete", resource.Resource)),
 	}
@@ -349,7 +355,7 @@ func timeLeftForPod(p *v1.Pod, since *time.Time) (*time.Duration, error) {
 
 func getFinishAndExpireTimeForPod(p *v1.Pod) (*time.Time, *time.Time, error) {
 	if !needsCleanup(p) {
-		return nil, nil, fmt.Errorf("Pod %s/%s should not be cleaned up", p.Namespace, p.Name)
+		return nil, nil, fmt.Errorf("pod %s/%s should not be cleaned up", p.Namespace, p.Name)
 	}
 	finishAt, err := podFinishTime(p)
 	if err != nil {

@@ -510,8 +510,13 @@ func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool,
 	go ttlafterfinished.New(
 		ctx.InformerFactory,
 		schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
-		dynamic.NewForConfigOrDie(ctx.ClientBuilder.ConfigOrDie("ttl-after-finished-controller-jobs")),
-	).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
+		dynamic.NewForConfigOrDie(ctx.ClientBuilder.ConfigOrDie("ttl-jobs-after-finished-controller")),
+		ctx.ClientBuilder.ClientOrDie("ttl-jobs-after-finished-controller")).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
+	go ttlafterfinished.New(
+		ctx.InformerFactory,
+		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+		dynamic.NewForConfigOrDie(ctx.ClientBuilder.ConfigOrDie("ttl-pods-after-finished-controller")),
+		ctx.ClientBuilder.ClientOrDie("ttl-pods-after-finished-controller")).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
 	return nil, true, nil
 }
 
