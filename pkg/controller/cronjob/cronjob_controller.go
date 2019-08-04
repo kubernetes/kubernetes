@@ -202,9 +202,12 @@ func removeOldestJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobControlI
 	klog.V(4).Infof("Cleaning up %d/%d jobs from %s", numToDelete, len(js), nameForLog)
 
 	sort.Sort(byJobStartTime(js))
-	for i := 0; i < numToDelete; i++ {
+	for i := 0; i < numToDelete && i < len(js); i++ {
 		klog.V(4).Infof("Removing job %s from %s", js[i].Name, nameForLog)
-		deleteJob(sj, &js[i], jc, recorder)
+		if !deleteJob(sj, &js[i], jc, recorder) {
+			// the current job is not deleted. extend numToDelete to accommodate
+			numToDelete++
+		}
 	}
 }
 
