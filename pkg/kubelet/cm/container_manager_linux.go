@@ -737,34 +737,6 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 	return []int{}, err
 }
 
-// Ensures that the Docker daemon is in the desired container.
-// Temporarily export the function to be used by dockershim.
-// TODO(yujuhong): Move this function to dockershim once kubelet migrates to
-// dockershim as the default.
-func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
-	type process struct{ name, file string }
-	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
-	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
-		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
-	}
-	var errs []error
-	for _, proc := range dockerProcs {
-		pids, err := getPidsForProcess(proc.name, proc.file)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get pids for %q: %v", proc.name, err))
-			continue
-		}
-
-		// Move if the pid is not already in the desired container.
-		for _, pid := range pids {
-			if err := ensureProcessInContainerWithOOMScore(pid, oomScoreAdj, manager); err != nil {
-				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
-			}
-		}
-	}
-	return utilerrors.NewAggregate(errs)
-}
-
 func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager *fs.Manager) error {
 	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
 		// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.

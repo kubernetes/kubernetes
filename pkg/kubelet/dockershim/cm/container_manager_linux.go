@@ -95,9 +95,34 @@ func (m *containerManager) doWork() {
 	// EnsureDockerInContainer does two things.
 	//   1. Ensure processes run in the cgroups if m.cgroupsManager is not nil.
 	//   2. Ensure processes have the OOM score applied.
-	if err := kubecm.EnsureDockerInContainer(version, dockerOOMScoreAdj, m.cgroupsManager); err != nil {
+	if err := ensureDockerInContainer(version, dockerOOMScoreAdj, m.cgroupsManager); err != nil {
 		klog.Errorf("Unable to ensure the docker processes run in the desired containers: %v", err)
 	}
+}
+
+// Ensures that the Docker daemon is in the desired container.
+func ensureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
+	type process struct{ name, file string }
+	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
+	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
+		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
+	}
+	var errs []error
+	for _, proc := range dockerProcs {
+		pids, err := getPidsForProcess(proc.name, proc.file)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to get pids for %q: %v", proc.name, err))
+			continue
+		}
+
+		// Move if the pid is not already in the desired container.
+		for _, pid := range pids {
+			if err := ensureProcessInContainerWithOOMScore(pid, oomScoreAdj, manager); err != nil {
+				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
+			}
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 func createCgroupManager(name string) (*fs.Manager, error) {
