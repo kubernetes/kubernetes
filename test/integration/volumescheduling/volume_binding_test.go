@@ -408,7 +408,7 @@ func TestVolumeBindingDynamicStressFast(t *testing.T) {
 
 // Like TestVolumeBindingStress but with slow dynamic provisioning
 func TestVolumeBindingDynamicStressSlow(t *testing.T) {
-	testVolumeBindingStress(t, 0, true, 30)
+	testVolumeBindingStress(t, 0, true, 10)
 }
 
 func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, dynamic bool, provisionDelaySeconds int) {
