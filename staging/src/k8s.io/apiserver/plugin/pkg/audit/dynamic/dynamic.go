@@ -201,7 +201,6 @@ func (b *backend) Run(stopCh <-chan struct{}) error {
 // the primary stopChan to the current delegate map.
 func (b *backend) stopAllDelegates() {
 	b.delegateUpdateMutex.Lock()
-	defer b.delegateUpdateMutex.Unlock()
 	for _, d := range b.GetDelegates() {
 		close(d.stopChan)
 	}
