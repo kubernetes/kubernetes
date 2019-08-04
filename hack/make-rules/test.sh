@@ -149,10 +149,11 @@ eval "testargs=(${KUBE_TEST_ARGS:-})"
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
-# The go-junit-report tool needs full test case information to produce a
+# The junit report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   goflags+=(-v)
+  goflags+=(-json)
   # Show only summary lines by matching lines like "status package/test"
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
@@ -241,19 +242,19 @@ produceJUnitXMLReport() {
     return
   fi
 
-  local test_stdout_filenames
   local junit_xml_filename
-  test_stdout_filenames=$(ls "${junit_filename_prefix}"*.stdout)
   junit_xml_filename="${junit_filename_prefix}.xml"
-  if ! command -v go-junit-report >/dev/null 2>&1; then
-    kube::log::error "go-junit-report not found; please install with " \
-      "go get -u github.com/jstemmer/go-junit-report"
+
+  if ! command -v gotestsum >/dev/null 2>&1; then
+    kube::log::error "gotestsum not found; please install with " \
+      "go install k8s.io/kubernetes/vendor/gotest.tools/gotestsum"
     return
   fi
-  go-junit-report < "${test_stdout_filenames}" > "${junit_xml_filename}"
+  gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-    rm "${test_stdout_filenames}"
+    rm "${junit_filename_prefix}"*.stdout
   fi
+
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 

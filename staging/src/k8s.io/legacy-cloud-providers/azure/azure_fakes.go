@@ -192,7 +192,21 @@ func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName strin
 	}
 	return result, autorest.DetailedError{
 		StatusCode: http.StatusNotFound,
-		Message:    "Not such PIP",
+		Message:    "No such PIP",
+	}
+}
+
+func (fAPC *fakeAzurePIPClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fAPC.FakeStore[resourceGroupName][publicIPAddressName]; ok {
+			return entity, nil
+		}
+	}
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "No such PIP",
 	}
 }
 

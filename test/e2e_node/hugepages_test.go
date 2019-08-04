@@ -34,8 +34,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // makePodToVerifyHugePages returns a pod that verifies specified cgroup with hugetlb
@@ -138,8 +138,8 @@ func amountOfResourceAsString(node *v1.Node, resourceName string) string {
 }
 
 func runHugePagesTests(f *framework.Framework) {
-	It("should assign hugepages as expected based on the Pod spec", func() {
-		By("by running a G pod that requests hugepages")
+	ginkgo.It("should assign hugepages as expected based on the Pod spec", func() {
+		ginkgo.By("by running a G pod that requests hugepages")
 		pod := f.PodClient().Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
@@ -162,7 +162,7 @@ func runHugePagesTests(f *framework.Framework) {
 			},
 		})
 		podUID := string(pod.UID)
-		By("checking if the expected hugetlb settings were applied")
+		ginkgo.By("checking if the expected hugetlb settings were applied")
 		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
 		f.PodClient().Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
@@ -174,46 +174,46 @@ func runHugePagesTests(f *framework.Framework) {
 var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 
-	Context("With config updated with hugepages feature enabled", func() {
-		BeforeEach(func() {
-			By("verifying hugepages are supported")
+	ginkgo.Context("With config updated with hugepages feature enabled", func() {
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("verifying hugepages are supported")
 			if !isHugePageSupported() {
 				framework.Skipf("skipping test because hugepages are not supported")
 				return
 			}
-			By("configuring the host to reserve a number of pre-allocated hugepages")
-			Eventually(func() error {
+			ginkgo.By("configuring the host to reserve a number of pre-allocated hugepages")
+			gomega.Eventually(func() error {
 				err := configureHugePages()
 				if err != nil {
 					return err
 				}
 				return nil
-			}, 30*time.Second, framework.Poll).Should(BeNil())
-			By("restarting kubelet to pick up pre-allocated hugepages")
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
 			restartKubelet()
-			By("by waiting for hugepages resource to become available on the local node")
-			Eventually(func() string {
+			ginkgo.By("by waiting for hugepages resource to become available on the local node")
+			gomega.Eventually(func() string {
 				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(Equal("100Mi"))
+			}, 30*time.Second, framework.Poll).Should(gomega.Equal("100Mi"))
 		})
 
 		runHugePagesTests(f)
 
-		AfterEach(func() {
-			By("Releasing hugepages")
-			Eventually(func() error {
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Releasing hugepages")
+			gomega.Eventually(func() error {
 				err := releaseHugePages()
 				if err != nil {
 					return err
 				}
 				return nil
-			}, 30*time.Second, framework.Poll).Should(BeNil())
-			By("restarting kubelet to release hugepages")
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			ginkgo.By("restarting kubelet to release hugepages")
 			restartKubelet()
-			By("by waiting for hugepages resource to not appear available on the local node")
-			Eventually(func() string {
+			ginkgo.By("by waiting for hugepages resource to not appear available on the local node")
+			gomega.Eventually(func() string {
 				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(Equal("0"))
+			}, 30*time.Second, framework.Poll).Should(gomega.Equal("0"))
 		})
 	})
 })

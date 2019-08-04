@@ -1653,7 +1653,7 @@ func (config *DaemonConfig) Run() error {
 		return running == len(nodes.Items), nil
 	})
 	if err != nil {
-		config.LogFunc("Timed out while waiting for DaemonsSet %v/%v to be running.", config.Namespace, config.Name)
+		config.LogFunc("Timed out while waiting for DaemonSet %v/%v to be running.", config.Namespace, config.Name)
 	} else {
 		config.LogFunc("Created Daemon %v/%v", config.Namespace, config.Name)
 	}

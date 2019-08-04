@@ -98,7 +98,7 @@ func TestStartupSequenceHealthzAndReadyz(t *testing.T) {
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
 		InjectedHealthzChecker: hc,
 	}
-	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{"--maximum-startup-sequence-duration", "5s"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{"--maximum-startup-sequence-duration", "15s"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)

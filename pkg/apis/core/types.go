@@ -111,7 +111,7 @@ type VolumeSource struct {
 	// +optional
 	FlexVolume *FlexVolumeSource
 
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// +optional
 	Cinder *CinderVolumeSource
 
@@ -196,7 +196,7 @@ type PersistentVolumeSource struct {
 	// provisioned/attached using an exec based plugin.
 	// +optional
 	FlexVolume *FlexPersistentVolumeSource
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// +optional
 	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
@@ -1034,7 +1034,7 @@ type RBDPersistentVolumeSource struct {
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the cinder volume.
 	VolumeID string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1056,7 +1056,7 @@ type CinderVolumeSource struct {
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderPersistentVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the cinder volume.
 	VolumeID string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.

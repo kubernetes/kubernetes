@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,7 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
+	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog"
@@ -145,20 +144,16 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 		}
 	}
 
-	// Currently dispatcher only supports `v1beta1` AdmissionReview
-	// TODO: Make the dispatcher capable of sending multiple AdmissionReview versions
-	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, invocation.Webhook) {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReviewRequest")}
+	uid, request, response, err := webhookrequest.CreateAdmissionObjects(attr, invocation)
+	if err != nil {
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-
 	// Make the webhook request
-	request := request.CreateAdmissionReview(attr, invocation)
 	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	response := &admissionv1beta1.AdmissionReview{}
-	r := client.Post().Context(ctx).Body(&request)
+	r := client.Post().Context(ctx).Body(request)
 	if h.TimeoutSeconds != nil {
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
 	}
@@ -166,17 +161,19 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
-	if response.Response == nil {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	result, err := webhookrequest.VerifyAdmissionResponse(uid, false, response)
+	if err != nil {
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	for k, v := range response.Response.AuditAnnotations {
+
+	for k, v := range result.AuditAnnotations {
 		key := h.Name + "/" + k
 		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
 			klog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, v, h.Name, err)
 		}
 	}
-	if response.Response.Allowed {
+	if result.Allowed {
 		return nil
 	}
-	return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+	return webhookerrors.ToStatusErr(h.Name, result.Result)
 }

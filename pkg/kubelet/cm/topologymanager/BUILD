@@ -5,8 +5,8 @@ go_library(
     srcs = [
         "fake_topology_manager.go",
         "policy.go",
+        "policy_best_effort.go",
         "policy_none.go",
-        "policy_preferred.go",
         "policy_strict.go",
         "topology_manager.go",
     ],
@@ -41,8 +41,8 @@ go_test(
     name = "go_default_test",
     srcs = [
         "fake_topology_manager_test.go",
+        "policy_best_effort_test.go",
         "policy_none_test.go",
-        "policy_preferred_test.go",
         "policy_strict_test.go",
         "topology_manager_test.go",
     ],

@@ -56,11 +56,6 @@ func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *internalqueue.PodBacko
 	return nil
 }
 
-// GetNodeLister is not implemented yet.
-func (fc *FakeConfigurator) GetNodeLister() corelisters.NodeLister {
-	return nil
-}
-
 // GetClient is not implemented yet.
 func (fc *FakeConfigurator) GetClient() clientset.Interface {
 	return nil

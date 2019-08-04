@@ -73,6 +73,7 @@ type PublicIPAddressesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error)
 	Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
+	GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
 	List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err error)
 }
 
@@ -564,6 +565,23 @@ func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName 
 
 	mc := newMetricContext("public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID, "")
 	result, err = az.client.Get(ctx, resourceGroupName, publicIPAddressName, expand)
+	mc.Observe(err)
+	return
+}
+
+func (az *azPublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+	if !az.rateLimiterReader.TryAccept() {
+		err = createRateLimitErr(false, "VMSSPublicIPGet")
+		return
+	}
+
+	klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): start", resourceGroupName, publicIPAddressName)
+	defer func() {
+		klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): end", resourceGroupName, publicIPAddressName)
+	}()
+
+	mc := newMetricContext("vmss_public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID, "")
+	result, err = az.client.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, expand)
 	mc.Observe(err)
 	return
 }

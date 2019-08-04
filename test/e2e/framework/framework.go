@@ -49,6 +49,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epsp "k8s.io/kubernetes/test/e2e/framework/psp"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -406,7 +407,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
-		createPrivilegedPSPBinding(f, ns.Name)
+		e2epsp.CreatePrivilegedPSPBinding(f.ClientSet, ns.Name)
 	}
 
 	return ns, err

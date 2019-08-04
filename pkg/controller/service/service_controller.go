@@ -339,6 +339,13 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		}
 		newStatus, err = s.ensureLoadBalancer(service)
 		if err != nil {
+			if err == cloudprovider.ImplementedElsewhere {
+				// ImplementedElsewhere indicates that the ensureLoadBalancer is a nop and the
+				// functionality is implemented by a different controller.  In this case, we
+				// return immediately without doing anything.
+				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, s.cloud.ProviderName())
+				return op, nil
+			}
 			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
 		}
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
@@ -703,7 +710,12 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, h
 		}
 		return nil
 	}
-
+	if err == cloudprovider.ImplementedElsewhere {
+		// ImplementedElsewhere indicates that the UpdateLoadBalancer is a nop and the
+		// functionality is implemented by a different controller.  In this case, we
+		// return immediately without doing anything.
+		return nil
+	}
 	// It's only an actual error if the load balancer still exists.
 	if _, exists, err := s.balancer.GetLoadBalancer(context.TODO(), s.clusterName, service); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to check if load balancer exists for service %s/%s: %v", service.Namespace, service.Name, err))

@@ -89,14 +89,15 @@ func setupScheduler(
 	cs clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	stopCh chan struct{},
-) {
+) (restoreFeatureGates func()) {
+	restoreFeatureGates = func() {}
 	// If ScheduleDaemonSetPods is disabled, do not start scheduler.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 		return
 	}
 
 	// Enable Features.
-	algorithmprovider.ApplyFeatureGates()
+	restoreFeatureGates = algorithmprovider.ApplyFeatureGates()
 
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: cs.EventsV1beta1().Events(""),
@@ -136,6 +137,7 @@ func setupScheduler(
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	go sched.Run()
+	return
 }
 
 func testLabels() map[string]string {
@@ -513,7 +515,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 			defer close(stopCh)
 
 			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+			defer setupScheduler(t, clientset, informers, stopCh)()
 
 			informers.Start(stopCh)
 			go dc.Run(5, stopCh)
@@ -557,7 +559,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 			go dc.Run(5, stopCh)
 
 			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+			defer setupScheduler(t, clientset, informers, stopCh)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -595,7 +597,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 			go dc.Run(5, stopCh)
 
 			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+			defer setupScheduler(t, clientset, informers, stopCh)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -665,7 +667,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		go dc.Run(5, stopCh)
 
 		// Start Scheduler
-		setupScheduler(t, clientset, informers, stopCh)
+		defer setupScheduler(t, clientset, informers, stopCh)()
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
@@ -753,7 +755,7 @@ func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) 
 		go dc.Run(5, stopCh)
 
 		// Start Scheduler
-		setupScheduler(t, clientset, informers, stopCh)
+		defer setupScheduler(t, clientset, informers, stopCh)()
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.Template.Spec = resourcePodSpec("", "120M", "75m")
@@ -816,7 +818,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	informers.Start(stopCh)
 	go dc.Run(1, stopCh)
 
-	setupScheduler(t, clientset, informers, stopCh)
+	defer setupScheduler(t, clientset, informers, stopCh)()
 
 	// Create single node
 	_, err := nodeClient.Create(newNode("single-node", nil))
@@ -924,7 +926,7 @@ func TestTaintedNode(t *testing.T) {
 			defer close(stopCh)
 
 			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+			defer setupScheduler(t, clientset, informers, stopCh)()
 			informers.Start(stopCh)
 
 			go dc.Run(5, stopCh)
@@ -996,7 +998,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 			go dc.Run(5, stopCh)
 
 			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+			defer setupScheduler(t, clientset, informers, stopCh)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy

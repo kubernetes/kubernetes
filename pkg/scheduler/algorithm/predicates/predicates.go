@@ -162,6 +162,11 @@ type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)
 }
 
+// CSINodeInfo interface represents anything that can get CSINode object from node ID.
+type CSINodeInfo interface {
+	GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error)
+}
+
 // PersistentVolumeInfo interface represents anything that can get persistent volume object by PV ID.
 type PersistentVolumeInfo interface {
 	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
@@ -285,8 +290,10 @@ type MaxPDVolumeCountChecker struct {
 	filter         VolumeFilter
 	volumeLimitKey v1.ResourceName
 	maxVolumeFunc  func(node *v1.Node) int
+	csiNodeInfo    CSINodeInfo
 	pvInfo         PersistentVolumeInfo
 	pvcInfo        PersistentVolumeClaimInfo
+	scInfo         StorageClassInfo
 
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
@@ -299,6 +306,8 @@ type VolumeFilter struct {
 	// Filter normal volumes
 	FilterVolume           func(vol *v1.Volume) (id string, relevant bool)
 	FilterPersistentVolume func(pv *v1.PersistentVolume) (id string, relevant bool)
+	// MatchProvisioner evaluates if the StorageClass provisioner matches the running predicate
+	MatchProvisioner func(sc *storagev1.StorageClass) (relevant bool)
 	// IsMigrated returns a boolean specifying whether the plugin is migrated to a CSI driver
 	IsMigrated func(csiNode *storagev1beta1.CSINode) bool
 }
@@ -313,8 +322,8 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(
-	filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
+func NewMaxPDVolumeCountPredicate(filterName string, csiNodeInfo CSINodeInfo, scInfo StorageClassInfo,
+	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
 
@@ -342,8 +351,10 @@ func NewMaxPDVolumeCountPredicate(
 		filter:               filter,
 		volumeLimitKey:       volumeLimitKey,
 		maxVolumeFunc:        getMaxVolumeFunc(filterName),
+		csiNodeInfo:          csiNodeInfo,
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
+		scInfo:               scInfo,
 		randomVolumeIDPrefix: rand.String(32),
 	}
 
@@ -418,9 +429,9 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil || pvc == nil {
-				// if the PVC is not found, log the error and count the PV towards the PV limit
-				klog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err)
-				filteredVolumes[pvID] = true
+				// If the PVC is invalid, we don't count the volume because
+				// there's no guarantee that it belongs to the running predicate.
+				klog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC doesn't match predicate when counting limits: %v", namespace, pvcName, err)
 				continue
 			}
 
@@ -428,19 +439,23 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			if pvName == "" {
 				// PVC is not bound. It was either deleted and created again or
 				// it was forcefully unbound by admin. The pod can still use the
-				// original PV where it was bound to -> log the error and count
-				// the PV towards the PV limit
-				klog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
-				filteredVolumes[pvID] = true
+				// original PV where it was bound to, so we count the volume if
+				// it belongs to the running predicate.
+				if c.matchProvisioner(pvc) {
+					klog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
+					filteredVolumes[pvID] = true
+				}
 				continue
 			}
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil || pv == nil {
-				// if the PV is not found, log the error
-				// and count the PV towards the PV limit
-				klog.V(4).Infof("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err)
-				filteredVolumes[pvID] = true
+				// If the PV is invalid and PVC belongs to the running predicate,
+				// log the error and count the PV towards the PV limit.
+				if c.matchProvisioner(pvc) {
+					klog.V(4).Infof("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err)
+					filteredVolumes[pvID] = true
+				}
 				continue
 			}
 
@@ -451,6 +466,20 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 	}
 
 	return nil
+}
+
+// matchProvisioner helps identify if the given PVC belongs to the running predicate.
+func (c *MaxPDVolumeCountChecker) matchProvisioner(pvc *v1.PersistentVolumeClaim) bool {
+	if pvc.Spec.StorageClassName == nil {
+		return false
+	}
+
+	storageClass, err := c.scInfo.GetStorageClassInfo(*pvc.Spec.StorageClassName)
+	if err != nil || storageClass == nil {
+		return false
+	}
+
+	return c.filter.MatchProvisioner(storageClass)
 }
 
 func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
@@ -470,8 +499,20 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 		return true, nil, nil
 	}
 
-	// If a plugin has been migrated to a CSI driver, defer to the CSI predicate.
-	if c.filter.IsMigrated(nodeInfo.CSINode()) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	csiNode, err := c.csiNodeInfo.GetCSINodeInfo(node.Name)
+	if err != nil {
+		// we don't fail here because the CSINode object is only necessary
+		// for determining whether the migration is enabled or not
+		klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+	}
+
+	// if a plugin has been migrated to a CSI driver, defer to the CSI predicate
+	if c.filter.IsMigrated(csiNode) {
 		return true, nil, nil
 	}
 
@@ -492,7 +533,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 	}
 
 	numNewVolumes := len(newVolumes)
-	maxAttachLimit := c.maxVolumeFunc(nodeInfo.Node())
+	maxAttachLimit := c.maxVolumeFunc(node)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		volumeLimits := nodeInfo.VolumeLimits()
@@ -530,6 +571,13 @@ var EBSVolumeFilter = VolumeFilter{
 		return "", false
 	},
 
+	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+		if sc.Provisioner == csilibplugins.AWSEBSInTreePluginName {
+			return true
+		}
+		return false
+	},
+
 	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.AWSEBSInTreePluginName)
 	},
@@ -549,6 +597,13 @@ var GCEPDVolumeFilter = VolumeFilter{
 			return pv.Spec.GCEPersistentDisk.PDName, true
 		}
 		return "", false
+	},
+
+	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+		if sc.Provisioner == csilibplugins.GCEPDInTreePluginName {
+			return true
+		}
+		return false
 	},
 
 	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
@@ -572,6 +627,13 @@ var AzureDiskVolumeFilter = VolumeFilter{
 		return "", false
 	},
 
+	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+		if sc.Provisioner == csilibplugins.AzureDiskInTreePluginName {
+			return true
+		}
+		return false
+	},
+
 	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.AzureDiskInTreePluginName)
 	},
@@ -592,6 +654,13 @@ var CinderVolumeFilter = VolumeFilter{
 			return pv.Spec.Cinder.VolumeID, true
 		}
 		return "", false
+	},
+
+	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+		if sc.Provisioner == csilibplugins.CinderInTreePluginName {
+			return true
+		}
+		return false
 	},
 
 	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {

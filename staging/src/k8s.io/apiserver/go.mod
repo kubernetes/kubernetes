@@ -18,7 +18,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 // indirect
 	github.com/go-openapi/spec v0.19.2
-	github.com/gogo/protobuf v0.0.0-20190410021324-65acae22fc9
+	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
@@ -59,7 +59,7 @@ require (
 	k8s.io/klog v0.3.1
 	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
 	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
-	sigs.k8s.io/structured-merge-diff v0.0.0-20190719182312-e94e05bfbbe3
+	sigs.k8s.io/structured-merge-diff v0.0.0-20190724202554-0c1d754dd648
 	sigs.k8s.io/yaml v1.1.0
 )
 

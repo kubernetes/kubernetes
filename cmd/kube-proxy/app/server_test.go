@@ -73,11 +73,16 @@ func (fake *fakeKernelCompatTester) IsCompatible() error {
 
 // fakeKernelHandler implements KernelHandler.
 type fakeKernelHandler struct {
-	modules []string
+	modules       []string
+	kernelVersion string
 }
 
 func (fake *fakeKernelHandler) GetModules() ([]string, error) {
 	return fake.modules, nil
+}
+
+func (fake *fakeKernelHandler) GetKernelVersion() (string, error) {
+	return fake.kernelVersion, nil
 }
 
 // This test verifies that NewProxyServer does not crash when CleanupAndExit is true.

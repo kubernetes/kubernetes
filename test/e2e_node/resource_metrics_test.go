@@ -29,8 +29,8 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 )
@@ -43,15 +43,15 @@ const (
 
 var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 	f := framework.NewDefaultFramework("resource-metrics")
-	Context("when querying /resource/metrics", func() {
-		BeforeEach(func() {
-			By("Creating test pods")
+	ginkgo.Context("when querying /resource/metrics", func() {
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Creating test pods")
 			numRestarts := int32(1)
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
 			f.PodClient().CreateBatch(pods)
 
-			By("Waiting for test pods to restart the desired number of times")
-			Eventually(func() error {
+			ginkgo.By("Waiting for test pods to restart the desired number of times")
+			gomega.Eventually(func() error {
 				for _, pod := range pods {
 					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
 					if err != nil {
@@ -59,13 +59,13 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 					}
 				}
 				return nil
-			}, time.Minute, 5*time.Second).Should(Succeed())
+			}, time.Minute, 5*time.Second).Should(gomega.Succeed())
 
-			By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
+			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
 		})
-		It("should report resource usage through the v1alpha1 resouce metrics api", func() {
-			By("Fetching node so we can know proper node memory bounds for unconstrained cgroups")
+		ginkgo.It("should report resource usage through the v1alpha1 resouce metrics api", func() {
+			ginkgo.By("Fetching node so we can know proper node memory bounds for unconstrained cgroups")
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
@@ -89,22 +89,22 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
 				}),
 			})
-			By("Giving pods a minute to start up and produce metrics")
-			Eventually(getV1alpha1ResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchV1alpha1Expectations)
-			By("Ensuring the metrics match the expectations a few more times")
-			Consistently(getV1alpha1ResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchV1alpha1Expectations)
+			ginkgo.By("Giving pods a minute to start up and produce metrics")
+			gomega.Eventually(getV1alpha1ResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchV1alpha1Expectations)
+			ginkgo.By("Ensuring the metrics match the expectations a few more times")
+			gomega.Consistently(getV1alpha1ResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchV1alpha1Expectations)
 		})
-		AfterEach(func() {
-			By("Deleting test pods")
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Deleting test pods")
 			f.PodClient().DeleteSync(pod0, &metav1.DeleteOptions{}, 10*time.Minute)
 			f.PodClient().DeleteSync(pod1, &metav1.DeleteOptions{}, 10*time.Minute)
-			if !CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
 				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
-			By("Recording processes in system cgroups")
+			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
 		})
 	})
@@ -127,14 +127,14 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
 		// We already check Metric when matching the Id
 		"Metric": gstruct.Ignore(),
-		"Value":  And(BeNumerically(">=", lower), BeNumerically("<=", upper)),
-		"Timestamp": WithTransform(func(t model.Time) time.Time {
+		"Value":  gomega.And(gomega.BeNumerically(">=", lower), gomega.BeNumerically("<=", upper)),
+		"Timestamp": gomega.WithTransform(func(t model.Time) time.Time {
 			// model.Time is in Milliseconds since epoch
 			return time.Unix(0, int64(t)*int64(time.Millisecond))
 		},
-			And(
-				BeTemporally(">=", time.Now().Add(-maxStatsAge)),
+			gomega.And(
+				gomega.BeTemporally(">=", time.Now().Add(-maxStatsAge)),
 				// Now() is the test start time, not the match time, so permit a few extra minutes.
-				BeTemporally("<", time.Now().Add(2*time.Minute))),
+				gomega.BeTemporally("<", time.Now().Add(2*time.Minute))),
 		)}))
 }

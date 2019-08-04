@@ -26,6 +26,9 @@ const (
 	//
 	// alpha: v1.8 (for Services)
 	AlphaFeatureNetworkTiers = "NetworkTiers"
+	// AlphaFeatureILBSubsets allows InternalLoadBalancer services to include a subset
+	// of cluster nodes as backends instead of all nodes.
+	AlphaFeatureILBSubsets = "ILBSubsets"
 )
 
 // AlphaFeatureGate contains a mapping of alpha features to whether they are enabled
@@ -35,6 +38,9 @@ type AlphaFeatureGate struct {
 
 // Enabled returns true if the provided alpha feature is enabled
 func (af *AlphaFeatureGate) Enabled(key string) bool {
+	if af == nil || af.features == nil {
+		return false
+	}
 	return af.features[key]
 }
 

@@ -2085,3 +2085,92 @@ func TestDropStatusPodIPs(t *testing.T) {
 		}()
 	}
 }
+
+func TestDropEphemeralContainers(t *testing.T) {
+	podWithEphemeralContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:       api.RestartPolicyNever,
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "container1", Image: "testimage"}}},
+			},
+		}
+	}
+	podWithoutEphemeralContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description            string
+		hasEphemeralContainers bool
+		pod                    func() *api.Pod
+	}{
+		{
+			description:            "has subpaths",
+			hasEphemeralContainers: true,
+			pod:                    podWithEphemeralContainers,
+		},
+		{
+			description:            "does not have subpaths",
+			hasEphemeralContainers: false,
+			pod:                    podWithoutEphemeralContainers,
+		},
+		{
+			description:            "is nil",
+			hasEphemeralContainers: false,
+			pod:                    func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasEphemeralContainers, oldPod := oldPodInfo.hasEphemeralContainers, oldPodInfo.pod()
+				newPodHasEphemeralContainers, newPod := newPodInfo.hasEphemeralContainers, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasEphemeralContainers:
+						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasEphemeralContainers:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have subpaths
+						if !reflect.DeepEqual(newPod, podWithoutEphemeralContainers()) {
+							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutEphemeralContainers()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

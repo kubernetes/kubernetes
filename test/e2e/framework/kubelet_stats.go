@@ -503,7 +503,7 @@ func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error)
 
 // PrintAllKubeletPods outputs status of all kubelet pods into log.
 func PrintAllKubeletPods(c clientset.Interface, nodeName string) {
-	podList, err := GetKubeletPods(c, nodeName)
+	podList, err := e2ekubelet.GetKubeletPods(c, nodeName)
 	if err != nil {
 		e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
 		return

@@ -246,7 +246,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
+			common.NewRCByName(c, ns, name, replicas, nil, nil)
 			err = e2epod.VerifyPods(c, ns, name, true, replicas)
 			framework.ExpectNoError(err, "Each pod should start running and responding")
 
@@ -313,7 +313,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
-			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
+			common.NewRCByName(c, ns, name, replicas, &gracePeriod, []string{"serve-hostname"})
 			err = e2epod.VerifyPods(c, ns, name, true, replicas)
 			framework.ExpectNoError(err, "Each pod should start running and responding")
 

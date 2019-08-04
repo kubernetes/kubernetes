@@ -62,19 +62,21 @@ type ClientManager struct {
 }
 
 // NewClientManager creates a clientManager.
-func NewClientManager(gv schema.GroupVersion, addToSchemaFunc func(s *runtime.Scheme) error) (ClientManager, error) {
+func NewClientManager(gvs []schema.GroupVersion, addToSchemaFuncs ...func(s *runtime.Scheme) error) (ClientManager, error) {
 	cache, err := lru.New(defaultCacheSize)
 	if err != nil {
 		return ClientManager{}, err
 	}
 	hookScheme := runtime.NewScheme()
-	if err := addToSchemaFunc(hookScheme); err != nil {
-		return ClientManager{}, err
+	for _, addToSchemaFunc := range addToSchemaFuncs {
+		if err := addToSchemaFunc(hookScheme); err != nil {
+			return ClientManager{}, err
+		}
 	}
 	return ClientManager{
 		cache: cache,
 		negotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(hookScheme).LegacyCodec(gv),
+			Serializer: serializer.NewCodecFactory(hookScheme).LegacyCodec(gvs...),
 		}),
 	}, nil
 }

@@ -94,7 +94,7 @@ func TestApplyFeatureGates(t *testing.T) {
 	// Apply features for algorithm providers.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
-	ApplyFeatureGates()
+	defer ApplyFeatureGates()()
 
 	for _, pn := range algorithmProviderNames {
 		t.Run(pn, func(t *testing.T) {

@@ -81,6 +81,7 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -1782,7 +1783,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
-		podList, err := GetKubeletPods(c, n)
+		podList, err := e2ekubelet.GetKubeletPods(c, n)
 		if err != nil {
 			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
@@ -2104,7 +2105,7 @@ func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 			if !apierrs.IsConflict(err) {
 				ExpectNoError(err)
 			} else {
-				e2elog.Logf("Conflict when trying to add/update avoidPonds %v to %v", avoidPods, nodeName)
+				e2elog.Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
 			}
 		}
 		return true, nil
@@ -2791,34 +2792,6 @@ func UnblockNetwork(from string, to string) {
 		e2elog.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 			"required on host %s: remove rule %s, if exists", from, iptablesRule)
 	}
-}
-
-// GetKubeletPods retrieves the list of pods on the kubelet.
-// TODO(alejandrox1): move to pod subpkg once node methods have been refactored.
-func GetKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	return getKubeletPods(c, node, "pods")
-}
-
-// GetKubeletRunningPods retrieves the list of running pods on the kubelet. The pods
-// includes necessary information (e.g., UID, name, namespace for
-// pods/containers), but do not contain the full spec.
-// TODO(alejandrox1): move to pod subpkg once node methods have been refactored.
-func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	return getKubeletPods(c, node, "runningpods")
-}
-
-// TODO(alejandrox1): move to pod subpkg once node methods have been
-// refactored.
-func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
-	result := &v1.PodList{}
-	client, err := e2enode.ProxyRequest(c, node, resource, ports.KubeletPort)
-	if err != nil {
-		return &v1.PodList{}, err
-	}
-	if err = client.Into(result); err != nil {
-		return &v1.PodList{}, err
-	}
-	return result, nil
 }
 
 // PingCommand is the type to hold ping command.

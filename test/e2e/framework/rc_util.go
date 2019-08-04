@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,12 +36,13 @@ import (
 )
 
 // RcByNamePort returns a ReplicationController with specified name and port
-func RcByNamePort(name string, replicas int32, image string, port int, protocol v1.Protocol,
+func RcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
 	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
 
 	return RcByNameContainer(name, replicas, image, labels, v1.Container{
 		Name:  name,
 		Image: image,
+		Args:  containerArgs,
 		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
 	}, gracePeriod)
 }

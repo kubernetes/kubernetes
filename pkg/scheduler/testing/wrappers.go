@@ -17,9 +17,13 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var zero int64
 
 // NodeSelectorWrapper wraps a NodeSelector inside.
 type NodeSelectorWrapper struct{ v1.NodeSelector }
@@ -149,6 +153,27 @@ func (p *PodWrapper) Name(s string) *PodWrapper {
 // Namespace sets `s` as the namespace of the inner pod.
 func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	p.SetNamespace(s)
+	return p
+}
+
+// Container appends a container into PodSpec of the inner pod.
+func (p *PodWrapper) Container(s string) *PodWrapper {
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
+		Image: s,
+	})
+	return p
+}
+
+// Priority sets a priority value into PodSpec of the inner pod.
+func (p *PodWrapper) Priority(val int32) *PodWrapper {
+	p.Spec.Priority = &val
+	return p
+}
+
+// ZeroTerminationGracePeriod sets the TerminationGracePeriodSeconds of the inner pod to zero.
+func (p *PodWrapper) ZeroTerminationGracePeriod() *PodWrapper {
+	p.Spec.TerminationGracePeriodSeconds = &zero
 	return p
 }
 

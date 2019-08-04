@@ -75,7 +75,7 @@ func verifyRCs(c clientset.Interface, ns string, names []string) {
 }
 
 func createNewRC(c clientset.Interface, ns string, name string) {
-	_, err := common.NewRCByName(c, ns, name, 1, nil)
+	_, err := common.NewRCByName(c, ns, name, 1, nil, nil)
 	framework.ExpectNoError(err)
 }
 

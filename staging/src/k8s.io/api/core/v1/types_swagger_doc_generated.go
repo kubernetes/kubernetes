@@ -186,7 +186,7 @@ func (CephFSVolumeSource) SwaggerDoc() map[string]string {
 
 var map_CinderPersistentVolumeSource = map[string]string{
 	"":          "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
-	"volumeID":  "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"volumeID":  "volume id used to identify the volume in cinder. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"secretRef": "Optional: points to a secret object containing parameters used to connect to OpenStack.",
@@ -198,7 +198,7 @@ func (CinderPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_CinderVolumeSource = map[string]string{
 	"":          "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
-	"volumeID":  "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"volumeID":  "volume id used to identify the volume in cinder. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"secretRef": "Optional: points to a secret object containing parameters used to connect to OpenStack.",
@@ -1332,7 +1332,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"nfs":                  "NFS represents an NFS mount on the host. Provisioned by an admin. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
 	"rbd":                  "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
 	"iscsi":                "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
-	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
@@ -2392,7 +2392,7 @@ var map_VolumeSource = map[string]string{
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
 	"rbd":                   "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
 	"flexVolume":            "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
-	"cinder":                "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cinder":                "Cinder represents a cinder volume attached and mounted on kubelets host machine. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":                "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"flocker":               "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
 	"downwardAPI":           "DownwardAPI represents downward API about the pod that should populate this volume",

@@ -29,8 +29,8 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"github.com/prometheus/common/model"
 )
 
@@ -38,30 +38,30 @@ import (
 var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeature:GPUDevicePlugin][Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
-	Context("DevicePlugin", func() {
+	ginkgo.Context("DevicePlugin", func() {
 		var devicePluginPod *v1.Pod
 		var err error
-		BeforeEach(func() {
-			By("Ensuring that Nvidia GPUs exists on the node")
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
-				Skip("Nvidia GPUs do not exist on the node. Skipping test.")
+				ginkgo.Skip("Nvidia GPUs do not exist on the node. Skipping test.")
 			}
 
-			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
+			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
 			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(gpu.NVIDIADevicePlugin())
 			framework.ExpectNoError(err)
 
-			By("Waiting for GPUs to become available on the local node")
-			Eventually(func() bool {
+			ginkgo.By("Waiting for GPUs to become available on the local node")
+			gomega.Eventually(func() bool {
 				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 5*time.Minute, framework.Poll).Should(BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 
 			if gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
-				Skip("Not enough GPUs to execute this test (at least two needed)")
+				ginkgo.Skip("Not enough GPUs to execute this test (at least two needed)")
 			}
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			l, err := f.PodClient().List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
@@ -74,8 +74,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 		})
 
-		It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
-			By("Creating one GPU pod on a node with at least two GPUs")
+		ginkgo.It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
+			ginkgo.By("Creating one GPU pod on a node with at least two GPUs")
 			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"
 			p1 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
@@ -84,52 +84,52 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			By("Restarting Kubelet and waiting for the current running pod to restart")
+			ginkgo.By("Restarting Kubelet and waiting for the current running pod to restart")
 			restartKubelet()
 
-			By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
+			ginkgo.By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
+			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
 
-			By("Restarting Kubelet and creating another pod")
+			ginkgo.By("Restarting Kubelet and creating another pod")
 			restartKubelet()
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
-			Eventually(func() bool {
+			gomega.Eventually(func() bool {
 				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 5*time.Minute, framework.Poll).Should(BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
-			By("Checking that pods got a different GPU")
+			ginkgo.By("Checking that pods got a different GPU")
 			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 
-			Expect(devId1).To(Not(Equal(devId2)))
+			gomega.Expect(devId1).To(gomega.Not(gomega.Equal(devId2)))
 
-			By("Deleting device plugin.")
+			ginkgo.By("Deleting device plugin.")
 			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
-			By("Waiting for GPUs to become unavailable on the local node")
-			Eventually(func() bool {
+			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
+			gomega.Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return gpu.NumberOfNVIDIAGPUs(node) <= 0
-			}, 10*time.Minute, framework.Poll).Should(BeTrue())
-			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
+			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
+			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
 
 			ensurePodContainerRestart(f, p2.Name, p2.Name)
 			devIdRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			Expect(devIdRestart2).To(Equal(devId2))
-			By("Restarting Kubelet.")
+			gomega.Expect(devIdRestart2).To(gomega.Equal(devId2))
+			ginkgo.By("Restarting Kubelet.")
 			restartKubelet()
-			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
+			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
+			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
 			ensurePodContainerRestart(f, p2.Name, p2.Name)
 			devIdRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			Expect(devIdRestart2).To(Equal(devId2))
+			gomega.Expect(devIdRestart2).To(gomega.Equal(devId2))
 			logDevicePluginMetrics()
 
 			// Cleanup

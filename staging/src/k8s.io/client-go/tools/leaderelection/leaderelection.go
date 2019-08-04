@@ -89,6 +89,12 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.RetryPeriod < 1 {
 		return nil, fmt.Errorf("retryPeriod must be greater than zero")
 	}
+	if lec.Callbacks.OnStartedLeading == nil {
+		return nil, fmt.Errorf("OnStartedLeading callback must not be nil")
+	}
+	if lec.Callbacks.OnStoppedLeading == nil {
+		return nil, fmt.Errorf("OnStoppedLeading callback must not be nil")
+	}
 
 	if lec.Lock == nil {
 		return nil, fmt.Errorf("Lock must not be nil.")

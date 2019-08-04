@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
@@ -119,6 +120,12 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	}
 
 	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
+
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := opts.featureGates[features.IPv6DualStack]; present {
+		kubeletFlags["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
 
 	return kubeletFlags
 }

@@ -54,7 +54,7 @@ type resourceTest struct {
 
 func logPodsOnNodes(c clientset.Interface, nodeNames []string) {
 	for _, n := range nodeNames {
-		podList, err := framework.GetKubeletRunningPods(c, n)
+		podList, err := e2ekubelet.GetKubeletRunningPods(c, n)
 		if err != nil {
 			e2elog.Logf("Unable to retrieve kubelet pods for node %v", n)
 			continue

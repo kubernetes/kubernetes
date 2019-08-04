@@ -27,6 +27,7 @@ kazel_configured_tags = ["openapi-gen"]
 # tags_values_pkgs is a dictionary mapping {k8s build tag: {tag value: [pkgs including that tag:value]}}
 tags_values_pkgs = {"openapi-gen": {
     "false": [
+        "staging/src/k8s.io/api/admission/v1",
         "staging/src/k8s.io/api/admission/v1beta1",
         "staging/src/k8s.io/api/core/v1",
         "staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1",
@@ -114,6 +115,7 @@ tags_pkgs_values = {"openapi-gen": {
     "pkg/apis/abac/v1beta1": ["true"],
     "pkg/apis/auditregistration": ["true"],
     "pkg/version": ["true"],
+    "staging/src/k8s.io/api/admission/v1": ["false"],
     "staging/src/k8s.io/api/admission/v1beta1": ["false"],
     "staging/src/k8s.io/api/admissionregistration/v1": ["true"],
     "staging/src/k8s.io/api/admissionregistration/v1beta1": ["true"],
