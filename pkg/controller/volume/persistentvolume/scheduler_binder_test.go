@@ -51,7 +51,6 @@ var (
 	boundPVC            = makeTestPVC("bound-pvc", "1G", "", pvcBound, "pv-bound", "1", &waitClass)
 	boundPVC2           = makeTestPVC("bound-pvc2", "1G", "", pvcBound, "pv-bound2", "1", &waitClass)
 	boundPVCNode1a      = makeTestPVC("unbound-pvc", "1G", "", pvcBound, "pv-node1a", "1", &waitClass)
-	badPVC              = makeBadPVC()
 	immediateUnboundPVC = makeTestPVC("immediate-unbound-pvc", "1G", "", pvcUnbound, "", "1", &immediateClass)
 	immediateBoundPVC   = makeTestPVC("immediate-bound-pvc", "1G", "", pvcBound, "pv-bound-immediate", "1", &immediateClass)
 
@@ -554,28 +553,6 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 	return pvc
 }
 
-func makeBadPVC() *v1.PersistentVolumeClaim {
-	fs := v1.PersistentVolumeFilesystem
-	return &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "bad-pvc",
-			Namespace:       "testns",
-			UID:             types.UID("pvc-uid"),
-			ResourceVersion: "1",
-			// Don't include SefLink, so that GetReference will fail
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
-				},
-			},
-			StorageClassName: &waitClass,
-			VolumeMode:       &fs,
-		},
-	}
-}
-
 func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentVolumeClaim, className string) *v1.PersistentVolume {
 	fs := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -1043,12 +1020,6 @@ func TestAssumePodVolumes(t *testing.T) {
 			pvs:                   []*v1.PersistentVolume{pvNode1aBound},
 			expectedBindings:      []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
 			expectedProvisionings: []*v1.PersistentVolumeClaim{},
-		},
-		"claimref-failed": {
-			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:   []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(badPVC, pvNode1b)},
-			pvs:        []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			shouldFail: true,
 		},
 		"tmpupdate-failed": {
 			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC},
