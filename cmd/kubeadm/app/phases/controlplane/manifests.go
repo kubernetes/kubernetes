@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -315,10 +315,13 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 
 // getSchedulerCommand builds the right scheduler command from the given config object and version
 func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
+	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	defaultArguments := map[string]string{
-		"bind-address": "127.0.0.1",
-		"leader-elect": "true",
-		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+		"bind-address":              "127.0.0.1",
+		"leader-elect":              "true",
+		"kubeconfig":                kubeconfigFile,
+		"authentication-kubeconfig": kubeconfigFile,
+		"authorization-kubeconfig":  kubeconfigFile,
 	}
 
 	// TODO: The following code should be remvoved after dual-stack is GA.
