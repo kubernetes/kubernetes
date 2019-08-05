@@ -72,9 +72,9 @@ func DealWithValidation(hashValue uint64, numQueues, handSize int32, pick func(i
 	return Deal(hashValue, numQueues, handSize, pick)
 }
 
-// DealToSlices will use specific pick function to return slices of indices
+// DealToSlice will use specific pick function to return slices of indices
 // after Deal
-func DealToSlices(hashValue uint64, numQueues, handSize int32) ([]int32, error) {
+func DealToSlice(hashValue uint64, numQueues, handSize int32) ([]int32, error) {
 	if !ValidateParameters(numQueues, handSize) {
 		return nil, errors.New("bad parameters")
 	}
@@ -90,9 +90,7 @@ func DealToSlices(hashValue uint64, numQueues, handSize int32) ([]int32, error) 
 		return nil
 	}
 
-	if err := Deal(hashValue, numQueues, handSize, pickToSlices); err != nil {
-		return nil, err
-	}
+	_ = Deal(hashValue, numQueues, handSize, pickToSlices)
 
 	return candidates, nil
 }
