@@ -256,12 +256,7 @@ func ValidatePriorityLevelConfigurationStatus(status *flowcontrol.PriorityLevelC
 
 func validateShuffleShardingParameters(handSize, queues int32) bool {
 	// TODO: performance impact from bit-int multiplication?
-	v := big.NewInt(1)
-	for i := int32(0); i < handSize; i++ {
-		v.Mul(v, big.NewInt(int64(queues-i)))
-	}
-	l := v.BitLen()
-	return l <= maxHashBits
+	return int32(big.NewInt(int64(queues)).BitLen())*handSize <= maxHashBits
 }
 
 func hasWildcard(operations []string) bool {
