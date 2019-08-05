@@ -823,6 +823,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 	}
 
 	backOff.Next(key, ts)
+	backOff.GC()
 	return false, "", nil
 }
 
