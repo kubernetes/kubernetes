@@ -105,13 +105,13 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	return true, nil
 }
 
-// IsStaticPod returns true if the pod is a static pod.
+// IsStaticPod returns true if the passed Pod is static.
 func IsStaticPod(pod *v1.Pod) bool {
 	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
-// IsMirrorPod returns true if the pod is a mirror pod.
+// IsMirrorPod returns true if the passed Pod is a Mirror Pod.
 func IsMirrorPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return ok

@@ -129,7 +129,6 @@ pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
-pkg/kubelet/metrics
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
