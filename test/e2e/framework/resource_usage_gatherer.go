@@ -82,6 +82,18 @@ func (s *ResourceUsageSummary) SummaryKind() string {
 	return "ResourceUsageSummary"
 }
 
+type uint64arr []uint64
+
+func (a uint64arr) Len() int           { return len(a) }
+func (a uint64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a uint64arr) Less(i, j int) bool { return a[i] < a[j] }
+
+type usageDataPerContainer struct {
+	cpuData        []float64
+	memUseData     []uint64
+	memWorkSetData []uint64
+}
+
 func computePercentiles(timeSeries []e2ekubelet.ResourceUsagePerContainer, percentilesToCompute []int) map[int]e2ekubelet.ResourceUsagePerContainer {
 	if len(timeSeries) == 0 {
 		return make(map[int]e2ekubelet.ResourceUsagePerContainer)
@@ -167,7 +179,7 @@ func (w *resourceGatherWorker) singleProbe() {
 			}
 		}
 	} else {
-		nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
+		nodeUsage, err := e2ekubelet.GetOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
 		if err != nil {
 			e2elog.Logf("Error while reading data from %v: %v", w.nodeName, err)
 			return

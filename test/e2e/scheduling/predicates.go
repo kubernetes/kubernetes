@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -98,7 +99,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		for _, node := range nodeList.Items {
 			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
-			framework.PrintAllKubeletPods(cs, node.Name)
+			e2ekubelet.PrintAllKubeletPods(cs, node.Name)
 		}
 
 	})

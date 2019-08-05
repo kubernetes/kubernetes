@@ -272,7 +272,7 @@ func formatCPUSummary(summary e2ekubelet.ContainersCPUSummary) string {
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
 
-	for _, containerName := range framework.TargetContainers() {
+	for _, containerName := range e2ekubelet.TargetContainers() {
 		var s []string
 		s = append(s, fmt.Sprintf("%q", containerName))
 		data, ok := summary[containerName]
