@@ -206,6 +206,12 @@ type podToMount struct {
 	outerVolumeSpecName string
 }
 
+const (
+	// Maximum errors to be stored per pod in desiredStateOfWorld.podErrors to
+	// prevent unbound growth.
+	maxPodErrors = 10
+)
+
 func (dsw *desiredStateOfWorld) AddPodToVolume(
 	podName types.UniquePodName,
 	pod *v1.Pod,
@@ -436,7 +442,9 @@ func (dsw *desiredStateOfWorld) AddErrorToPod(podName types.UniquePodName, err s
 	defer dsw.Unlock()
 
 	if errs, found := dsw.podErrors[podName]; found {
-		errs.Insert(err)
+		if errs.Len() <= maxPodErrors {
+			errs.Insert(err)
+		}
 		return
 	}
 	dsw.podErrors[podName] = sets.NewString(err)
