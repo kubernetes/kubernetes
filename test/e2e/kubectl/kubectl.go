@@ -83,10 +83,10 @@ const (
 	updateDemoSelector       = "name=update-demo"
 	guestbookStartupTimeout  = 10 * time.Minute
 	guestbookResponseTimeout = 3 * time.Minute
-	simplePodSelector        = "name=nginx"
-	simplePodName            = "nginx"
-	simplePodResourceName    = "pod/nginx"
-	nginxDefaultOutput       = "Welcome to nginx!"
+	simplePodSelector        = "name=httpd"
+	simplePodName            = "httpd"
+	simplePodResourceName    = "pod/httpd"
+	httpdDefaultOutput       = "It works!"
 	simplePodPort            = 80
 	pausePodSelector         = "name=pause"
 	pausePodName             = "pause"
@@ -96,9 +96,9 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json.in"
 	redisServiceFilename     = "redis-master-service.json"
-	nginxDeployment1Filename = "nginx-deployment1.yaml.in"
-	nginxDeployment2Filename = "nginx-deployment2.yaml.in"
-	nginxDeployment3Filename = "nginx-deployment3.yaml.in"
+	httpdDeployment1Filename = "httpd-deployment1.yaml.in"
+	httpdDeployment2Filename = "httpd-deployment2.yaml.in"
+	httpdDeployment3Filename = "httpd-deployment3.yaml.in"
 	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
@@ -106,7 +106,7 @@ var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
 	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	redisImage    = imageutils.GetE2EImage(imageutils.Redis)
-	nginxImage    = imageutils.GetE2EImage(imageutils.Nginx)
+	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 )
 
@@ -438,7 +438,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
-				output := framework.NewKubectlCommand(fmt.Sprintf("--namespace=%s", ns), "exec", "nginx", "echo", "running", "in", "container").
+				output := framework.NewKubectlCommand(fmt.Sprintf("--namespace=%s", ns), "exec", "httpd", "echo", "running", "in", "container").
 					WithEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
 					ExecOrDie()
 
@@ -474,7 +474,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("Running kubectl via kubectl proxy using " + host)
 			output := framework.NewKubectlCommand(
 				host, fmt.Sprintf("--namespace=%s", ns),
-				"exec", "nginx", "echo", "running", "in", "container",
+				"exec", "httpd", "echo", "running", "in", "container",
 			).ExecOrDie()
 
 			// Verify we got the normal output captured by the exec server
@@ -488,11 +488,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("execing into a container with a successful command")
-			_, err := framework.NewKubectlCommand(nsFlag, "exec", "nginx", "--", "/bin/sh", "-c", "exit 0").Exec()
+			_, err := framework.NewKubectlCommand(nsFlag, "exec", "httpd", "--", "/bin/sh", "-c", "exit 0").Exec()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("execing into a container with a failing command")
-			_, err = framework.NewKubectlCommand(nsFlag, "exec", "nginx", "--", "/bin/sh", "-c", "exit 42").Exec()
+			_, err = framework.NewKubectlCommand(nsFlag, "exec", "httpd", "--", "/bin/sh", "-c", "exit 42").Exec()
 			ee, ok := err.(uexec.ExitError)
 			framework.ExpectEqual(ok, true)
 			framework.ExpectEqual(ee.ExitStatus(), 42)
@@ -615,8 +615,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 			if err != nil {
 				e2elog.Failf("Failed http.Get of forwarded port (%s): %v", localAddr, err)
 			}
-			if !strings.Contains(body, nginxDefaultOutput) {
-				e2elog.Failf("Container port output missing expected value. Wanted:'%s', got: %s", nginxDefaultOutput, body)
+			if !strings.Contains(body, httpdDefaultOutput) {
+				e2elog.Failf("Container port output missing expected value. Wanted:'%s', got: %s", httpdDefaultOutput, body)
 			}
 		})
 
@@ -645,7 +645,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			inClusterHost := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_HOST"))
 			inClusterPort := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
-
+			inClusterURL := net.JoinHostPort(inClusterHost, inClusterPort)
 			e2elog.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
 			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
 
@@ -698,7 +698,7 @@ metadata:
 
 			ginkgo.By("getting pods with in-cluster configs")
 			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=6 2>&1")
-			gomega.Expect(execOutput).To(gomega.MatchRegexp("nginx +1/1 +Running"))
+			gomega.Expect(execOutput).To(gomega.MatchRegexp("httpd +1/1 +Running"))
 			gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
 
@@ -706,13 +706,14 @@ metadata:
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=6 2>&1")
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterHost, inClusterPort)))
+
+			gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterURL)))
 
 			ginkgo.By("creating an object not containing a namespace with in-cluster config")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=6 2>&1")
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/%s/configmaps", inClusterHost, inClusterPort, f.Namespace.Name)))
+			gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/%s/configmaps", inClusterURL, f.Namespace.Name)))
 
 			ginkgo.By("trying to use kubectl with invalid token")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
@@ -735,7 +736,7 @@ metadata:
 			gomega.Expect(execOutput).To(gomega.ContainSubstring("No resources found"))
 			gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf("GET http[s]?://%s:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
+			gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf("GET http[s]?://[\\[]?%s[\\]]?:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
 
 			ginkgo.By("trying to use kubectl with kubeconfig")
 			execOutput = framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --kubeconfig=/tmp/"+overrideKubeconfigName+" --v=6 2>&1")
@@ -811,9 +812,9 @@ metadata:
 		})
 
 		ginkgo.It("apply set/view last-applied", func() {
-			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(nginxDeployment1Filename)))
-			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(nginxDeployment2Filename)))
-			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(nginxDeployment3Filename)))
+			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
+			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment2Filename)))
+			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("deployment replicas number is 2")
@@ -837,16 +838,16 @@ metadata:
 			}
 
 			ginkgo.By("scale set replicas to 3")
-			nginxDeploy := "nginx-deployment"
+			httpdDeploy := "httpd-deployment"
 			debugDiscovery()
-			framework.RunKubectlOrDie("scale", "deployment", nginxDeploy, "--replicas=3", nsFlag)
+			framework.RunKubectlOrDie("scale", "deployment", httpdDeploy, "--replicas=3", nsFlag)
 
 			ginkgo.By("apply file doesn't have replicas but image changed")
 			framework.RunKubectlOrDieInput(deployment3Yaml, "apply", "-f", "-", nsFlag)
 
 			ginkgo.By("verify replicas still is 3 and image has been updated")
 			output = framework.RunKubectlOrDieInput(deployment3Yaml, "get", "-f", "-", nsFlag, "-o", "json")
-			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.Nginx)}
+			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.Httpd)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					e2elog.Failf("Missing %s in kubectl apply", item)
@@ -1422,7 +1423,7 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			name = "e2e-test-nginx-deployment"
+			name = "e2e-test-httpd-deployment"
 			cleanUp = func() { framework.RunKubectlOrDie("delete", "deployment", name, nsFlag) }
 		})
 
@@ -1433,11 +1434,11 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, run default
-			Description: Command ‘kubectl run’ MUST create a running pod with possible replicas given a image using the option --image=’nginx’. The running Pod SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command.
+			Description: Command ‘kubectl run’ MUST create a running pod with possible replicas given a image using the option --image=’httpd’. The running Pod SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command.
 		*/
 		framework.ConformanceIt("should create an rc or deployment from an image ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", name, "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
 			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
@@ -1445,9 +1446,9 @@ metadata:
 				e2elog.Failf("Failed getting pod controlled by %s: %v", name, err)
 			}
 			pods := podlist.Items
-			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != nginxImage {
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
 				framework.RunKubectlOrDie("get", "pods", "-L", "run", nsFlag)
-				e2elog.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", nginxImage, len(pods))
+				e2elog.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", httpdImage, len(pods))
 			}
 		})
 	})
@@ -1458,7 +1459,7 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			rcName = "e2e-test-nginx-rc"
+			rcName = "e2e-test-httpd-rc"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1468,19 +1469,19 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, run rc
-			Description: Command ‘kubectl run’ MUST create a running rc with default one replicas given a image using the option --image=’nginx’. The running replication controller SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command. Also there MUST be 1 pod controlled by this replica set running 1 container with the image specified. A ‘kubetctl logs’ command MUST return the logs from the container in the replication controller.
+			Description: Command ‘kubectl run’ MUST create a running rc with default one replicas given a image using the option --image=’httpd’. The running replication controller SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command. Also there MUST be 1 pod controlled by this replica set running 1 container with the image specified. A ‘kubetctl logs’ command MUST return the logs from the container in the replication controller.
 		*/
 		framework.ConformanceIt("should create an rc from an image ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
 			ginkgo.By("verifying the rc " + rcName + " was created")
 			rc, err := c.CoreV1().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				e2elog.Failf("Failed getting rc %s: %v", rcName, err)
 			}
 			containers := rc.Spec.Template.Spec.Containers
-			if checkContainersImage(containers, nginxImage) {
-				e2elog.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
+			if checkContainersImage(containers, httpdImage) {
+				e2elog.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, httpdImage)
 			}
 
 			ginkgo.By("verifying the pod controlled by rc " + rcName + " was created")
@@ -1490,9 +1491,9 @@ metadata:
 				e2elog.Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
 			}
 			pods := podlist.Items
-			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != nginxImage {
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
 				framework.RunKubectlOrDie("get", "pods", "-L", "run", nsFlag)
-				e2elog.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", nginxImage, len(pods))
+				e2elog.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", httpdImage, len(pods))
 			}
 
 			ginkgo.By("confirm that you can get logs from an rc")
@@ -1519,7 +1520,7 @@ metadata:
 		ginkgo.BeforeEach(func() {
 			c = f.ClientSet
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			rcName = "e2e-test-nginx-rc"
+			rcName = "e2e-test-httpd-rc"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1532,24 +1533,24 @@ metadata:
 			Description: Command ‘kubectl rolling-update’ MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
 		*/
 		framework.ConformanceIt("should support rolling-update to same image ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
 			ginkgo.By("verifying the rc " + rcName + " was created")
 			rc, err := c.CoreV1().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				e2elog.Failf("Failed getting rc %s: %v", rcName, err)
 			}
 			containers := rc.Spec.Template.Spec.Containers
-			if checkContainersImage(containers, nginxImage) {
-				e2elog.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
+			if checkContainersImage(containers, httpdImage) {
+				e2elog.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, httpdImage)
 			}
 			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
 
 			ginkgo.By("rolling-update to same image controller")
 
 			debugDiscovery()
-			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
-			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
+			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
+			framework.ValidateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
 
@@ -1559,7 +1560,7 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			dName = "e2e-test-nginx-deployment"
+			dName = "e2e-test-httpd-deployment"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1582,16 +1583,16 @@ metadata:
 			Description: Command ‘kubectl run’ MUST create a deployment, with --generator=deployment, when a image name is specified in the run command. After the run command there SHOULD be a deployment that should exist with one container running the specified image. Also there SHOULD be a Pod that is controlled by this deployment, with a container running the specified image.
 		*/
 		framework.ConformanceIt("should create a deployment from an image ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", dName, "--image="+nginxImage, "--generator=deployment/apps.v1", nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", dName, "--image="+httpdImage, "--generator=deployment/apps.v1", nsFlag)
 			ginkgo.By("verifying the deployment " + dName + " was created")
 			d, err := c.AppsV1().Deployments(ns).Get(dName, metav1.GetOptions{})
 			if err != nil {
 				e2elog.Failf("Failed getting deployment %s: %v", dName, err)
 			}
 			containers := d.Spec.Template.Spec.Containers
-			if checkContainersImage(containers, nginxImage) {
-				e2elog.Failf("Failed creating deployment %s for 1 pod with expected image %s", dName, nginxImage)
+			if checkContainersImage(containers, httpdImage) {
+				e2elog.Failf("Failed creating deployment %s for 1 pod with expected image %s", dName, httpdImage)
 			}
 
 			ginkgo.By("verifying the pod controlled by deployment " + dName + " was created")
@@ -1601,9 +1602,9 @@ metadata:
 				e2elog.Failf("Failed getting pod controlled by deployment %s: %v", dName, err)
 			}
 			pods := podlist.Items
-			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != nginxImage {
+			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
 				framework.RunKubectlOrDie("get", "pods", "-L", "run", nsFlag)
-				e2elog.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", nginxImage, len(pods))
+				e2elog.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", httpdImage, len(pods))
 			}
 		})
 	})
@@ -1614,7 +1615,7 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			jobName = "e2e-test-nginx-job"
+			jobName = "e2e-test-httpd-job"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1627,16 +1628,16 @@ metadata:
 			Description: Command ‘kubectl run’ MUST create a job, with --generator=job, when a image name is specified in the run command. After the run command there SHOULD be a job that should exist with one container running the specified image. Also there SHOULD be a restart policy on the job spec that SHOULD match the command line.
 		*/
 		framework.ConformanceIt("should create a job from an image when restart is OnFailure ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+nginxImage, nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the job " + jobName + " was created")
 			job, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			if err != nil {
 				e2elog.Failf("Failed getting job %s: %v", jobName, err)
 			}
 			containers := job.Spec.Template.Spec.Containers
-			if checkContainersImage(containers, nginxImage) {
-				e2elog.Failf("Failed creating job %s for 1 pod with expected image %s: %#v", jobName, nginxImage, containers)
+			if checkContainersImage(containers, httpdImage) {
+				e2elog.Failf("Failed creating job %s for 1 pod with expected image %s: %#v", jobName, httpdImage, containers)
 			}
 			if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
 				e2elog.Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
@@ -1687,7 +1688,7 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			podName = "e2e-test-nginx-pod"
+			podName = "e2e-test-httpd-pod"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1700,16 +1701,16 @@ metadata:
 			Description: Command ‘kubectl run’ MUST create a pod, with --generator=run-pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+nginxImage, nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the pod " + podName + " was created")
 			pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				e2elog.Failf("Failed getting pod %s: %v", podName, err)
 			}
 			containers := pod.Spec.Containers
-			if checkContainersImage(containers, nginxImage) {
-				e2elog.Failf("Failed creating pod %s with expected image %s", podName, nginxImage)
+			if checkContainersImage(containers, httpdImage) {
+				e2elog.Failf("Failed creating pod %s with expected image %s", podName, httpdImage)
 			}
 			if pod.Spec.RestartPolicy != v1.RestartPolicyNever {
 				e2elog.Failf("Failed creating a pod with correct restart policy for --restart=Never")
@@ -1723,7 +1724,7 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			podName = "e2e-test-nginx-pod"
+			podName = "e2e-test-httpd-pod"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1736,8 +1737,8 @@ metadata:
 			Description: Command ‘kubectl replace’ on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to ‘kubectl replace’ SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
 		framework.ConformanceIt("should update a single-container pod's image ", func() {
-			ginkgo.By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+nginxImage, "--labels=run="+podName, nsFlag)
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+httpdImage, "--labels=run="+podName, nsFlag)
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": podName}))
@@ -1753,7 +1754,7 @@ metadata:
 			}
 
 			ginkgo.By("replace the image in the pod")
-			podJSON = strings.Replace(podJSON, nginxImage, busyboxImage, 1)
+			podJSON = strings.Replace(podJSON, httpdImage, busyboxImage, 1)
 			framework.RunKubectlOrDieInput(podJSON, "replace", "-f", "-", nsFlag)
 
 			ginkgo.By("verifying the pod " + podName + " has the right image " + busyboxImage)
