@@ -152,7 +152,7 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 	if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
 		clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error while reading client cert file defined in kubeconfig")
 		}
 		authInfo.ClientCertificateData = clientCert
 		authInfo.ClientCertificate = ""
@@ -160,10 +160,29 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 	if len(authInfo.ClientKeyData) == 0 && len(authInfo.ClientKey) != 0 {
 		clientKey, err := ioutil.ReadFile(authInfo.ClientKey)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error while reading client key file defined in kubeconfig")
 		}
 		authInfo.ClientKeyData = clientKey
 		authInfo.ClientKey = ""
+	}
+
+	return nil
+}
+
+// EnsureCertificateAuthorityIsEmbedded check if the certificate authority is provided as an external
+// file and eventually embeds it into the kubeconfig
+func EnsureCertificateAuthorityIsEmbedded(cluster *clientcmdapi.Cluster) error {
+	if cluster == nil {
+		return errors.New("received nil value for Cluster")
+	}
+
+	if len(cluster.CertificateAuthorityData) == 0 && len(cluster.CertificateAuthority) != 0 {
+		ca, err := ioutil.ReadFile(cluster.CertificateAuthority)
+		if err != nil {
+			return errors.Wrap(err, "error while reading certificate authority file defined in kubeconfig")
+		}
+		cluster.CertificateAuthorityData = ca
+		cluster.CertificateAuthority = ""
 	}
 
 	return nil
