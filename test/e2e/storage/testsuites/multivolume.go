@@ -326,7 +326,7 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, ns string,
 	node framework.NodeSelection, pvcs []*v1.PersistentVolumeClaim, readSeedBase int64, writeSeedBase int64) string {
 	ginkgo.By(fmt.Sprintf("Creating pod on %+v with multiple volumes", node))
-	pod, err := framework.CreateSecPodWithNodeSelection(cs, ns, pvcs,
+	pod, err := framework.CreateSecPodWithNodeSelection(cs, ns, pvcs, nil,
 		false, "", false, false, framework.SELinuxLabel,
 		nil, node, framework.PodStartTimeout)
 	defer func() {
@@ -400,7 +400,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
 		pod, err := framework.CreateSecPodWithNodeSelection(cs, ns,
-			[]*v1.PersistentVolumeClaim{pvc},
+			[]*v1.PersistentVolumeClaim{pvc}, nil,
 			false, "", false, false, framework.SELinuxLabel,
 			nil, node, framework.PodStartTimeout)
 		defer func() {
