@@ -426,7 +426,7 @@ func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr
 	return nil
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriter) error {
 	assert.Equal(f.t, testPodSandboxID, podSandboxID)
 	assert.EqualValues(f.t, testPort, port)
 	doServerStreams(f.t, "portforward", stream, stream, nil)

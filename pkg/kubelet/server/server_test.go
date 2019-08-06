@@ -145,7 +145,7 @@ func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, contain
 type fakeRuntime struct {
 	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
 	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
-	portForwardFunc func(string, int32, io.ReadWriteCloser) error
+	portForwardFunc func(string, int32, io.ReadWriter) error
 }
 
 func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
@@ -156,7 +156,7 @@ func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr
 	return f.attachFunc(containerID, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriter) error {
 	return f.portForwardFunc(podSandboxID, port, stream)
 }
 
@@ -1449,7 +1449,7 @@ func TestServePortForward(t *testing.T) {
 				}
 			}
 
-			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriter) error {
 				defer close(portForwardFuncDone)
 				assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
 				// The port should be valid if it reaches here.

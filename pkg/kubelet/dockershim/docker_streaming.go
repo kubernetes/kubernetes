@@ -64,7 +64,7 @@ func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io
 	return attachContainer(r.client, containerID, in, out, errw, tty, resize)
 }
 
-func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriter) error {
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}

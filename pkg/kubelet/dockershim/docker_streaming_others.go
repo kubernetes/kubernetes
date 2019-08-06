@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 )
 
-func (r *streamingRuntime) portForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (r *streamingRuntime) portForward(podSandboxID string, port int32, stream io.ReadWriter) error {
 	container, err := r.client.InspectContainer(podSandboxID)
 	if err != nil {
 		return err

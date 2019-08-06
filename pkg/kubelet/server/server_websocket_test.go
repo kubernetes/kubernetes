@@ -79,7 +79,7 @@ func TestServeWSPortForward(t *testing.T) {
 				}
 			}
 
-			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriter) error {
 				defer close(portForwardFuncDone)
 				assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
 				// The port should be valid if it reaches here.
@@ -172,7 +172,7 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 		assert.Equal(t, podNamespace, namespace, "pod namespace")
 	}
 
-	ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+	ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriter) error {
 		defer portForwardWG.Done()
 		assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
 
