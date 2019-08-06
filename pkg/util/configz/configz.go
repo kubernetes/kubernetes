@@ -34,8 +34,9 @@ limitations under the License.
 //  	}
 //  	pcz.Set(planeConfig)
 //
-//  	configz.InstallHandler(http.DefaultServeMux)
-//  	http.ListenAndServe(":8080", http.DefaultServeMux)
+//      mux := http.NewServeMux()
+//  	configz.InstallHandler(mux)
+//  	http.ListenAndServe(":8080", mux)
 //  }
 package configz
 
