@@ -849,7 +849,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
 		ngNodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
-		gomega.Expect(len(ngNodes)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(ngNodes), 1)
 		node, err := f.ClientSet.CoreV1().Nodes().Get(ngNodes[0], metav1.GetOptions{})
 		ginkgo.By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
 		framework.ExpectNoError(err)
