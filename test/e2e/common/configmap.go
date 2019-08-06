@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -27,7 +27,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
@@ -154,7 +153,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By(fmt.Sprintf("Verifying update of configMap %v/%v", f.Namespace.Name, configMap.Name))
-		gomega.Expect(configMapFromUpdate.Data).NotTo(gomega.Equal(configMapOriginalState.Data))
+		framework.ExpectNotEqual(configMapFromUpdate.Data, configMapOriginalState.Data)
 	})
 })
 
