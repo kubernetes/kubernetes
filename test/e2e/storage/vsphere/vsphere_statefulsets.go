@@ -53,7 +53,7 @@ const (
 	storageclassname = "nginx-sc"
 )
 
-var _ = utils.SIGDescribe("vsphere statefulset", func() {
+var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
 	var (
 		namespace string

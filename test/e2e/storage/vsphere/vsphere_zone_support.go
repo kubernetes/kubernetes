@@ -78,7 +78,7 @@ import (
 	   datastore and VSAN capabilities specifications when any of the former mentioned parameters are incompatible with the rest.
 */
 
-var _ = utils.SIGDescribe("Zone Support", func() {
+var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("zone-support")
 	var (
 		client          clientset.Interface

@@ -43,7 +43,7 @@ import (
    9. delete pvc_vvol
 
 */
-var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector] [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
 	var (
 		c          clientset.Interface
@@ -71,7 +71,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 
 	})
 
-	utils.SIGDescribe("Selector-Label Volume Binding:vsphere", func() {
+	utils.SIGDescribe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {

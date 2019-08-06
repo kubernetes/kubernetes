@@ -31,7 +31,7 @@ import (
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
+var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() {
 	var (
 		c          clientset.Interface
 		ns         string

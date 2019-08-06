@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("Volume Placement", func() {
+var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_placement"
