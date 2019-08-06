@@ -17,7 +17,6 @@ limitations under the License.
 package shufflesharding
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 )
@@ -25,12 +24,12 @@ import (
 func TestValidateParameters(t *testing.T) {
 	tests := []struct {
 		name      string
-		numQueues int32
+		deckSize  int32
 		handSize  int32
 		validated bool
 	}{
 		{
-			"numQueues is < 0",
+			"deckSize is < 0",
 			-100,
 			8,
 			false,
@@ -42,7 +41,7 @@ func TestValidateParameters(t *testing.T) {
 			false,
 		},
 		{
-			"numQueues is 0",
+			"deckSize is 0",
 			0,
 			8,
 			false,
@@ -54,25 +53,25 @@ func TestValidateParameters(t *testing.T) {
 			false,
 		},
 		{
-			"handSize is greater than numQueues",
+			"handSize is greater than deckSize",
 			128,
 			129,
 			false,
 		},
 		{
-			"numQueues: 128 handSize: 6",
+			"deckSize: 128 handSize: 6",
 			128,
 			6,
 			true,
 		},
 		{
-			"numQueues: 1024 handSize: 6",
+			"deckSize: 1024 handSize: 6",
 			1024,
 			6,
 			true,
 		},
 		{
-			"numQueues: 512 handSize: 8",
+			"deckSize: 512 handSize: 8",
 			512,
 			8,
 			false,
@@ -80,7 +79,7 @@ func TestValidateParameters(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if ValidateParameters(test.numQueues, test.handSize) != test.validated {
+			if ValidateParameters(test.deckSize, test.handSize) != test.validated {
 				t.Errorf("test case %s fails", test.name)
 				return
 			}
@@ -89,105 +88,80 @@ func TestValidateParameters(t *testing.T) {
 }
 
 func BenchmarkValidateParameters(b *testing.B) {
-	queueSize, handSize := int32(512), int32(8)
+	deckSize, handSize := int32(512), int32(8)
 	for i := 0; i < b.N; i++ {
-		_ = ValidateParameters(queueSize, handSize)
+		_ = ValidateParameters(deckSize, handSize)
 	}
 }
 
-func TestDealWithValidation(t *testing.T) {
+func TestShuffleAndDealWithValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		numQueues int32
+		deckSize  int32
 		handSize  int32
-		pick      func(int32) error
+		pick      func(int32)
 		validated bool
 	}{
 		{
-			"numQueues is < 0",
+			"deckSize is < 0",
 			-100,
 			8,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			false,
 		},
 		{
 			"handSize is < 0",
 			128,
 			-100,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			false,
 		},
 		{
-			"numQueues is 0",
+			"deckSize is 0",
 			0,
 			8,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			false,
 		},
 		{
 			"handSize is 0",
 			128,
 			0,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			false,
 		},
 		{
-			"handSize is greater than numQueues",
+			"handSize is greater than deckSize",
 			128,
 			129,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			false,
 		},
 		{
-			"numQueues: 128 handSize: 6",
+			"deckSize: 128 handSize: 6",
 			128,
 			6,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			true,
 		},
 		{
-			"numQueues: 1024 handSize: 6",
+			"deckSize: 1024 handSize: 6",
 			1024,
 			6,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			true,
 		},
 		{
-			"numQueues: 128 handSize: 6 with bad pick",
-			128,
-			6,
-			func(i int32) error {
-				return errors.New("for test")
-			},
-			false,
-		},
-		{
-			"numQueues: 512 handSize: 8",
+			"deckSize: 512 handSize: 8",
 			512,
 			8,
-			func(i int32) error {
-				return nil
-			},
+			func(int32) {},
 			false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if (DealWithValidation(rand.Uint64(), test.numQueues, test.handSize, test.pick) == nil) != test.validated {
+			if (ShuffleAndDealWithValidation(rand.Uint64(), test.deckSize, test.handSize, test.pick) == nil) != test.validated {
 				t.Errorf("test case %s fails", test.name)
 				return
 			}
@@ -195,21 +169,19 @@ func TestDealWithValidation(t *testing.T) {
 	}
 }
 
-func BenchmarkDeal(b *testing.B) {
+func BenchmarkShuffleAndDeal(b *testing.B) {
 	hashValue := rand.Uint64()
-	queueSize, handSize := int32(512), int32(8)
-	pick := func(int32) error {
-		return nil
-	}
+	deckSize, handSize := int32(512), int32(8)
+	pick := func(int32) {}
 	for i := 0; i < b.N; i++ {
-		_ = Deal(hashValue, queueSize, handSize, pick)
+		ShuffleAndDeal(hashValue, deckSize, handSize, pick)
 	}
 }
 
-func TestDealToSlices(t *testing.T) {
+func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		numQueues int32
+		deckSize  int32
 		handSize  int32
 		validated bool
 	}{
@@ -220,25 +192,25 @@ func TestDealToSlices(t *testing.T) {
 			false,
 		},
 		{
-			"numQueues == handSize == 4",
+			"deckSize == handSize == 4",
 			4,
 			4,
 			true,
 		},
 		{
-			"numQueues == handSize == 8",
+			"deckSize == handSize == 8",
 			8,
 			8,
 			true,
 		},
 		{
-			"numQueues == handSize == 10",
+			"deckSize == handSize == 10",
 			10,
 			10,
 			true,
 		},
 		{
-			"numQueues == handSize == 12",
+			"deckSize == handSize == 12",
 			12,
 			12,
 			true,
@@ -247,7 +219,7 @@ func TestDealToSlices(t *testing.T) {
 	for _, test := range tests {
 		hashValue := rand.Uint64()
 		t.Run(test.name, func(t *testing.T) {
-			cards, err := DealToSlice(hashValue, test.numQueues, test.handSize)
+			cards, err := ShuffleAndDealToSliceWithValidation(hashValue, test.deckSize, test.handSize)
 			if (err == nil) != test.validated {
 				t.Errorf("test case %s fails in validation check", test.name)
 				return
@@ -273,5 +245,13 @@ func TestDealToSlices(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkShuffleAndDealToSlice(b *testing.B) {
+	hashValue := rand.Uint64()
+	deckSize, handSize := int32(512), int32(8)
+	for i := 0; i < b.N; i++ {
+		_ = ShuffleAndDealToSlice(hashValue, deckSize, handSize)
 	}
 }
