@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filters
+package flowcontrol
 
 import (
 	"sync/atomic"
 	"time"
-
-	"k8s.io/apimachinery/pkg/util/clock"
 
 	// TODO: decide whether to use the existing metrics, which
 	// categorize according to mutating vs readonly, or make new
@@ -57,26 +55,27 @@ type Interface interface {
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
 
-// RequestManagementState is the variable state that this filter is working with at a
-// given point in time.
-type RequestManagementState struct {
+// requestManagementState is the variable state that this filter is
+// working with at a given point in time.
+type requestManagementState struct {
 	// flowSchemas holds the flow schema objects, sorted by increasing
-	// numerical (decreasing logical) matching precedence
+	// numerical (decreasing logical) matching precedence.  Every
+	// FlowSchema in this slice is immutable.
 	flowSchemas FlowSchemaSequence
 
 	// priorityLevelStates maps the PriorityLevelConfiguration object
-	// name to the state for that level
-	priorityLevelStates map[string]*PriorityLevelState
+	// name to the state for that level.  Every field of every
+	// priorityLevelState in here is immutable.  Every name referenced
+	// from a member of `flowSchemas` has an entry here.
+	priorityLevelStates map[string]*priorityLevelState
 }
 
 // FlowSchemaSequence holds sorted set of pointers to FlowSchema objects.
 // FlowSchemaSequence implements `sort.Interface` (TODO: implement this).
 type FlowSchemaSequence []*rmtypesv1alpha1.FlowSchema
 
-// PriorityLevelState holds the state specific to a priority level.
-// golint requires that I write something here,
-// even if I can not think of something better than a tautology.
-type PriorityLevelState struct {
+// priorityLevelState holds the state specific to a priority level.
+type priorityLevelState struct {
 	// config holds the configuration after defaulting logic has been applied
 	config rmtypesv1alpha1.PriorityLevelConfigurationSpec
 
@@ -84,14 +83,14 @@ type PriorityLevelState struct {
 	concurrencyLimit int
 
 	queues fq.QueueSet
+
+	emptyHandler *emptyRelay
 }
 
-// requestManagement holds all the state and infrastructure of this
-// filter
+// requestManagementSystem holds all the state and infrastructure of
+// this filter
 type requestManagementSystem struct {
-	clk clock.Clock
-
-	fairQueuingFactory fq.QueueSetFactory
+	queueSetFactory fq.QueueSetFactory
 
 	// configQueue holds TypedConfigObjectReference values, identifying
 	// config objects that need to be processed
@@ -115,46 +114,37 @@ type requestManagementSystem struct {
 	// requestWaitLimit comes from server configuration.
 	requestWaitLimit time.Duration
 
-	// curState holds a pointer to the current RMState.  That is,
-	// `Load()` produces a `*RMState`.  When a config work queue worker
-	// processes a configuration change, it stores a new pointer here ---
-	// it does NOT side-effect the old `RMState` value.  The new `RMState`
-	// has a freshly constructed slice of FlowSchema pointers and a
-	// freshly constructed map of priority level states.  But the new
-	// `RMState.priorityLevelStates` includes in its range at least all the
-	// `*PriorityLevelState` values of the old `RMState.priorityLevelStates`.
-	// Consequently the filter can load a `*RMState` and work with it
-	// without concern for concurrent updates.  When a priority level is
-	// finally deleted, this will also involve storing a new `*RMState`
-	// pointer here, but in this case the range of the
-	// `RMState.priorityLevels` will be reduced --- by removal of the
-	// priority level that is no longer in use.
+	// curState holds a pointer to the current requestManagementState.
+	// That is, `Load()` produces a `*requestManagementState`.  When a
+	// config work queue worker processes a configuration change, it
+	// stores a new pointer here --- it does NOT side-effect the old
+	// `requestManagementState` value.  The new
+	// `requestManagementState` has a freshly constructed slice of
+	// FlowSchema pointers and a freshly constructed map of priority
+	// level states.
 	curState atomic.Value
 }
 
 // NewRequestManagementSystem creates a new instance of request-management system
 func NewRequestManagementSystem(
 	informerFactory kubeinformers.SharedInformerFactory,
+	queueSetFactory fq.QueueSetFactory,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	clk clock.Clock,
 ) Interface {
 	reqMgmt := &requestManagementSystem{
-		clk:                    clk,
-		configQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "req_mgmt_config_queue"),
-		plLister:               informerFactory.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Lister(),
-		fsLister:               informerFactory.Flowcontrol().V1alpha1().FlowSchemas().Lister(),
+		queueSetFactory:        queueSetFactory,
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,
 	}
-	// TODO: finish implementation
+	klog.V(2).Infof("NewRequestManagementSystem with serverConcurrencyLimit=%d, requestWaitLimit=%s", serverConcurrencyLimit, requestWaitLimit)
+	reqMgmt.initializeConfigController(informerFactory)
+	emptyRMState := &requestManagementState{
+		priorityLevelStates: make(map[string]*priorityLevelState),
+	}
+	reqMgmt.curState.Store(emptyRMState)
+	reqMgmt.digestConfigObjects(nil, nil)
 	return reqMgmt
-}
-
-// Run runs the controller that deals with config API objects
-func (reqMgmt *requestManagementSystem) Run(stopCh <-chan struct{}) error {
-	// TODO: implement
-	return nil
 }
 
 // RequestDigest holds necessary info from request for flow-control
@@ -165,9 +155,9 @@ type RequestDigest struct {
 
 func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (execute bool, afterExecute func()) {
 	for {
-		rmState := reqMgmt.curState.Load().(*RequestManagementState)
+		rmState := reqMgmt.curState.Load().(*requestManagementState)
 		fs := rmState.pickFlowSchema(requestDigest)
-		// RequestManagementState is constructed to guarantee that the following succeeds
+		// requestManagementState is constructed to guarantee that the following succeeds
 		ps := rmState.priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
 		if ps.config.Exempt {
 			klog.V(7).Infof("Serving %v without delay", requestDigest)
@@ -184,8 +174,11 @@ func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (execu
 	}
 }
 
-func (rmState *RequestManagementState) pickFlowSchema(rd RequestDigest) *rmtypesv1alpha1.FlowSchema {
-	return nil
+func (rmState *requestManagementState) pickFlowSchema(rd RequestDigest) *rmtypesv1alpha1.FlowSchema {
+	if len(rmState.flowSchemas) == 0 {
+		return nil
+	}
+	return rmState.flowSchemas[0]
 	// TODO: implement
 }
 

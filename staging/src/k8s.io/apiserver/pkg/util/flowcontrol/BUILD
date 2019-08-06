@@ -2,13 +2,19 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["reqmgmt.go"],
+    srcs = [
+        "default-objects.go",
+        "reqmgmt.go",
+        "reqmgmt-config.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",

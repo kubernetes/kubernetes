@@ -36,7 +36,6 @@ import (
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -499,7 +499,7 @@ func buildGenericConfig(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RequestManagement) {
-		genericConfig.RequestManagement = utilflowcontrol.NewRequestManagementSystem(versionedInformers, genericConfig.MaxRequestsInFlight+genericConfig.MaxMutatingRequestsInFlight, genericConfig.RequestTimeout/4, clock.RealClock{})
+		genericConfig.RequestManagement = utilflowcontrol.NewRequestManagementSystem(versionedInformers, fairqueuing.NewNoRestraintFactory( /* TODO: switch to real implementation */ ), genericConfig.MaxRequestsInFlight+genericConfig.MaxMutatingRequestsInFlight, genericConfig.RequestTimeout/4)
 	}
 
 	return
