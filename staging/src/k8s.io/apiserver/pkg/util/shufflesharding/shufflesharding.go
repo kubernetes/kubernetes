@@ -24,27 +24,27 @@ import (
 const maxHashBits = 60
 
 // ValidateParameters can validate parameters for shuffle sharding
-// in a fast but approximate way, including numQueues and handSize
-// Algorithm: maxHashValue >= numQueues^handSize
-func ValidateParameters(numQueues, handSize int32) bool {
-	if handSize <= 0 || numQueues <= 0 || handSize > numQueues {
+// in a fast but approximate way, including deckSize and handSize
+// Algorithm: maxHashBits >= bits(deckSize^handSize)
+func ValidateParameters(deckSize, handSize int32) bool {
+	if handSize <= 0 || deckSize <= 0 || handSize > deckSize {
 		return false
 	}
 
-	return math.Log2(float64(numQueues))*float64(handSize) <= maxHashBits
+	return math.Log2(float64(deckSize))*float64(handSize) <= maxHashBits
 }
 
-// Deal can shuffle a hash value to handSize-quantity and non-redundant
-// indices of queue, with the pick function, we can get the optimal queue index
-// Eg. From numQueues=128, handSize=8, we can get an index array [12 14 73 18 119 51 117 26],
+// ShuffleAndDeal can shuffle a hash value to handSize-quantity and non-redundant
+// indices of decks, with the pick function, we can get the optimal deck index
+// Eg. From deckSize=128, handSize=8, we can get an index array [12 14 73 18 119 51 117 26],
 // then pick function will choose the optimal index from these
 // Algorithm: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md#queue-assignment-proof-of-concept
-func Deal(hashValue uint64, numQueues, handSize int32, pick func(int32) error) error {
+func ShuffleAndDeal(hashValue uint64, deckSize, handSize int32, pick func(int32)) {
 	remainders := make([]int32, handSize)
 
 	for i := int32(0); i < handSize; i++ {
-		hashValueNext := hashValue / uint64(numQueues-i)
-		remainders[i] = int32(hashValue - uint64(numQueues-i)*hashValueNext)
+		hashValueNext := hashValue / uint64(deckSize-i)
+		remainders[i] = int32(hashValue - uint64(deckSize-i)*hashValueNext)
 		hashValue = hashValueNext
 	}
 
@@ -55,42 +55,43 @@ func Deal(hashValue uint64, numQueues, handSize int32, pick func(int32) error) e
 				candidate++
 			}
 		}
-		if err := pick(candidate); err != nil {
-			return err
-		}
+		pick(candidate)
 	}
-
-	return nil
 }
 
-// DealWithValidation will do validation before Deal
-func DealWithValidation(hashValue uint64, numQueues, handSize int32, pick func(int32) error) error {
-	if !ValidateParameters(numQueues, handSize) {
+// ShuffleAndDealWithValidation will do validation before ShuffleAndDeal
+func ShuffleAndDealWithValidation(hashValue uint64, deckSize, handSize int32, pick func(int32)) error {
+	if !ValidateParameters(deckSize, handSize) {
 		return errors.New("bad parameters")
 	}
 
-	return Deal(hashValue, numQueues, handSize, pick)
+	ShuffleAndDeal(hashValue, deckSize, handSize, pick)
+	return nil
 }
 
-// DealToSlice will use specific pick function to return slices of indices
-// after Deal
-func DealToSlice(hashValue uint64, numQueues, handSize int32) ([]int32, error) {
-	if !ValidateParameters(numQueues, handSize) {
-		return nil, errors.New("bad parameters")
-	}
-
+// ShuffleAndDealToSlice will use specific pick function to return slices of indices
+// after ShuffleAndDeal
+func ShuffleAndDealToSlice(hashValue uint64, deckSize, handSize int32) []int32 {
 	var (
 		candidates = make([]int32, handSize)
 		idx        = 0
 	)
 
-	pickToSlices := func(can int32) error {
+	pickToSlices := func(can int32) {
 		candidates[idx] = can
 		idx++
-		return nil
 	}
 
-	_ = Deal(hashValue, numQueues, handSize, pickToSlices)
+	ShuffleAndDeal(hashValue, deckSize, handSize, pickToSlices)
 
-	return candidates, nil
+	return candidates
+}
+
+// ShuffleAndDealToSliceWithValidation will do validation before ShuffleAndDealToSlice
+func ShuffleAndDealToSliceWithValidation(hashValue uint64, deckSize, handSize int32) ([]int32, error) {
+	if !ValidateParameters(deckSize, handSize) {
+		return nil, errors.New("bad parameters")
+	}
+
+	return ShuffleAndDealToSlice(hashValue, deckSize, handSize), nil
 }
