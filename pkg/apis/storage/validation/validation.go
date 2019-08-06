@@ -187,11 +187,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
 		}
 	case source.InlineVolumeSpec != nil:
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-			allErrs = append(allErrs, storagevalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
-		} else {
-			allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify inlineVolumeSpec when CSIMigration feature is disabled"))
-		}
+		allErrs = append(allErrs, storagevalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
 	}
 	return allErrs
 }
