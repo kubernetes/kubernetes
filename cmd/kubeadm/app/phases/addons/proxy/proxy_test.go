@@ -126,7 +126,7 @@ func TestCompileManifests(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			_, err := kubeadmutil.ParseTemplate(rt.manifest, rt.data)
 			if err != nil {
-				t.Errorf("unexpected ParseTemplate faiure: %+v", err)
+				t.Errorf("unexpected ParseTemplate failure: %+v", err)
 			}
 		})
 	}
