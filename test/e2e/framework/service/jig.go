@@ -788,9 +788,9 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 	cmd := ""
 	switch protocol {
 	case v1.ProtocolTCP:
-		cmd = fmt.Sprintf("nc -z -t -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("nc -zv -t -w 2 %s %v", endpoint, port)
 	case v1.ProtocolUDP:
-		cmd = fmt.Sprintf("nc -z -u -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("nc -zv -u -w 2 %s %v", endpoint, port)
 	default:
 		e2elog.Failf("Service reachablity check is not supported for %v", protocol)
 	}
