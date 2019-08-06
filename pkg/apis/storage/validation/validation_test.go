@@ -394,14 +394,6 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				},
 			},
 		},
-	}
-	for _, volumeAttachment := range migrationDisabledSuccessCases {
-		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
-			t.Errorf("expected success: %v %v", volumeAttachment, errs)
-		}
-	}
-
-	migrationDisabledErrorCases := []storage.VolumeAttachment{
 		{
 			// InlineSpec specified with migration disabled
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -414,13 +406,11 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			},
 		},
 	}
-
-	for _, volumeAttachment := range migrationDisabledErrorCases {
-		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
-			t.Errorf("expected failure: %v %v", volumeAttachment, errs)
+	for _, volumeAttachment := range migrationDisabledSuccessCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %v %v", volumeAttachment, errs)
 		}
 	}
-
 }
 
 func TestVolumeAttachmentUpdateValidation(t *testing.T) {
