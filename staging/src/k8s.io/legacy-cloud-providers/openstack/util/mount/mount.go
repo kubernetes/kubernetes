@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO(thockin): This whole pkg is pretty linux-centric.  As soon as we have
-// an alternate platform, we will need to abstract further.
+// Package mount provides a linux-centric library for mounting filesystems/
+// Vendored for the OpenStack provider and will be removed in 1.17
 package mount
 
 import (
@@ -25,8 +25,10 @@ import (
 	"strings"
 )
 
+// FileType is one of the types of supported Linux file types.
 type FileType string
 
+// A complete list of the support file types in the mount package.
 const (
 	// Default mount command if mounter path is not specified
 	defaultMountCommand           = "mount"
@@ -38,6 +40,7 @@ const (
 	FileTypeBlockDev     FileType = "BlockDevice"
 )
 
+// Interface is the general interface to filesystem mounts.
 type Interface interface {
 	// Mount mounts source to target as fstype with given options.
 	Mount(source string, target string, fstype string, options []string) error
@@ -47,9 +50,9 @@ type Interface interface {
 	// On some platforms, reading mounts is not guaranteed consistent (i.e.
 	// it could change between chunked reads). This is guaranteed to be
 	// consistent.
-	List() ([]MountPoint, error)
+	List() ([]MntPoint, error)
 	// IsMountPointMatch determines if the mountpoint matches the dir
-	IsMountPointMatch(mp MountPoint, dir string) bool
+	IsMountPointMatch(mp MntPoint, dir string) bool
 	// IsNotMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
@@ -126,6 +129,7 @@ type Interface interface {
 	GetMode(pathname string) (os.FileMode, error)
 }
 
+// Subpath is the string path of the volume mount.
 type Subpath struct {
 	// index of the VolumeMount for this container
 	VolumeMountIndex int
@@ -155,8 +159,8 @@ type Exec interface {
 // the mount interface
 var _ Interface = &Mounter{}
 
-// This represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct {
+// MntPoint represents a single line in /proc/mounts or /etc/fstab.
+type MntPoint struct {
 	Device string
 	Path   string
 	Type   string
@@ -212,8 +216,8 @@ func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	return refs, nil
 }
 
-// GetDeviceNameFromMount: given a mnt point, find the device from /proc/mounts
-// returns the device name, reference count, and error code
+// GetDeviceNameFromMount when given a mnt point, find the device from /proc/mounts
+// returns the device name, reference count, and error code.
 func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, error) {
 	mps, err := mounter.List()
 	if err != nil {
@@ -334,14 +338,14 @@ func checkForNetDev(options []string) bool {
 	return false
 }
 
-// TODO: this is a workaround for the unmount device issue caused by gci mounter.
+// HasMountRefs checks the mountPath contains any of the mountRefs.
+// This is a workaround for the unmount device issue caused by gci mounter.
 // In GCI cluster, if gci mounter is used for mounting, the container started by mounter
 // script will cause additional mounts created in the container. Since these mounts are
 // irrelevant to the original mounts, they should be not considered when checking the
 // mount references. Current solution is to filter out those mount paths that contain
 // the string of original mount path.
 // Plan to work on better approach to solve this issue.
-
 func HasMountRefs(mountPath string, mountRefs []string) bool {
 	count := 0
 	for _, ref := range mountRefs {

@@ -23,11 +23,12 @@ import (
 	"os"
 )
 
+// Mounter provides the default unsupported implementation of mount.Interface
 type Mounter struct {
 	mounterPath string
 }
 
-var unsupportedErr = errors.New("util/mount on this platform is not supported")
+var errUnsupported = errors.New(" util/mount on this platform is not supported")
 
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
@@ -38,48 +39,58 @@ func New(mounterPath string) Interface {
 	}
 }
 
+// Mount returns an error
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// Unmount returns an error
 func (mounter *Mounter) Unmount(target string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
-func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, unsupportedErr
+// List returns an error
+func (mounter *Mounter) List() ([]MntPoint, error) {
+	return []MntPoint{}, errUnsupported
 }
 
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+// IsMountPointMatch returns an error
+func (mounter *Mounter) IsMountPointMatch(mp MntPoint, dir string) bool {
 	return (mp.Path == dir)
 }
 
+// IsNotMountPoint returns an error
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
 	return IsNotMountPoint(mounter, dir)
 }
 
+// IsLikelyNotMountPoint returns an error
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	return true, unsupportedErr
+	return true, errUnsupported
 }
 
+// GetDeviceNameFromMount returns an error
 func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", unsupportedErr
+	return "", errUnsupported
 }
 
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	return "", unsupportedErr
+	return "", errUnsupported
 }
 
+// DeviceOpened returns an error
 func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, unsupportedErr
+	return false, errUnsupported
 }
 
+// PathIsDevice returns an error
 func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, unsupportedErr
+	return true, errUnsupported
 }
 
+// MakeRShared returns an error
 func (mounter *Mounter) MakeRShared(path string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
@@ -87,53 +98,65 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 }
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, unsupportedErr
+	return true, errUnsupported
 }
 
+// GetFileType returns an error
 func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	return FileType("fake"), unsupportedErr
+	return FileType("fake"), errUnsupported
 }
 
+// MakeDir returns an error
 func (mounter *Mounter) MakeDir(pathname string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// MakeFile returns an error
 func (mounter *Mounter) MakeFile(pathname string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// ExistsPath returns an error
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
 	return true, errors.New("not implemented")
 }
 
+// EvalHostSymlinks returns an error
 func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
-	return "", unsupportedErr
+	return "", errUnsupported
 }
 
+// PrepareSafeSubpath returns an error
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, unsupportedErr
+	return subPath.Path, nil, errUnsupported
 }
 
+// CleanSubPaths returns an error
 func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// SafeMakeDir returns an error
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// GetMountRefs returns an error
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
+// GetFSGroup returns an error
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("not implemented")
 }
 
+// GetSELinuxSupport returns an error
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
+// GetMode returns an error
 func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
 	return 0, errors.New("not implemented")
 }

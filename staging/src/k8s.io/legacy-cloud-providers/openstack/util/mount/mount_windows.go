@@ -121,12 +121,12 @@ func (mounter *Mounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems. todo
-func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
+func (mounter *Mounter) List() ([]MntPoint, error) {
+	return []MntPoint{}, nil
 }
 
 // IsMountPointMatch determines if the mountpoint matches the dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (mounter *Mounter) IsMountPointMatch(mp MntPoint, dir string) bool {
 	return mp.Path == dir
 }
 
@@ -210,7 +210,7 @@ func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
 	return getFileType(pathname)
 }
 
-// MakeFile creates a new directory
+// MakeDir creates a new directory
 func (mounter *Mounter) MakeDir(pathname string) error {
 	err := os.MkdirAll(pathname, os.FileMode(0755))
 	if err != nil {
@@ -235,7 +235,7 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 
 // ExistsPath checks whether the path exists
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilfile.FileExists(pathname)
+	return utilfile.Exists(pathname)
 }
 
 // EvalHostSymlinks returns the path name after evaluating symlinks
@@ -344,7 +344,7 @@ func lockPath(path string) (uintptr, error) {
 	return uintptr(fd), err
 }
 
-// Lock all directories in subPath and check they're not symlinks.
+// PrepareSafeSubpath locks all directories in subPath and check they're not symlinks.
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
 	handles, err := lockAndCheckSubPath(subPath.VolumePath, subPath.Path)
 
@@ -355,7 +355,7 @@ func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string,
 	return subPath.Path, cleanupAction, err
 }
 
-// No bind-mounts for subpaths are necessary on Windows
+// CleanSubPaths no bind-mounts for subpaths are necessary on Windows
 func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 	return nil
 }
@@ -468,17 +468,19 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return []string{pathname}, nil
 }
 
-// Note that on windows, it always returns 0. We actually don't set FSGroup on
+// GetFSGroup always returns 0. We actually don't set FSGroup on
 // windows platform, see SetVolumeOwnership implementation.
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return 0, nil
 }
 
+// GetSELinuxSupport returns false
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
 	// Windows does not support SELinux.
 	return false, nil
 }
 
+// GetMode returns the filesystem mode.
 func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {

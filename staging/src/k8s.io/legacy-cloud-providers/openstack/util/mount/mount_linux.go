@@ -106,14 +106,14 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 }
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
-func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
+func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
 	mountArgs := makeMountArgs(source, target, fstype, options)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountCmd = mounterPath
 	}
 
-	if m.withSystemd {
+	if mounter.withSystemd {
 		// Try to run mount via systemd-run --scope. This will escape the
 		// service where kubelet runs and any fuse daemons will be started in a
 		// specific scope. kubelet service than can be restarted without killing
@@ -149,7 +149,7 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 	if err != nil {
 		args := strings.Join(mountArgs, " ")
 		klog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
-		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s",
 			err, mountCmd, args, string(output))
 	}
 	return err
@@ -212,21 +212,23 @@ func (mounter *Mounter) Unmount(target string) error {
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
 	}
 	return nil
 }
 
 // List returns a list of all mounted filesystems.
-func (*Mounter) List() ([]MountPoint, error) {
+func (*Mounter) List() ([]MntPoint, error) {
 	return listProcMounts(procMountsPath)
 }
 
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+// IsMountPointMatch determines if a directory is a mountpoint.
+func (mounter *Mounter) IsMountPointMatch(mp MntPoint, dir string) bool {
 	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
 	return ((mp.Path == dir) || (mp.Path == deletedDir))
 }
 
+// IsNotMountPoint determines if a directory is not a mountpoint.
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
 	return IsNotMountPoint(mounter, dir)
 }
@@ -308,7 +310,8 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	return false, errno
 }
 
-//GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
+// GetDeviceNameFromMount when given a mount point, finds the device name from its global
+// mount point
 func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
 	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
 }
@@ -341,7 +344,7 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 	return path.Base(mountPath), nil
 }
 
-func listProcMounts(mountFilePath string) ([]MountPoint, error) {
+func listProcMounts(mountFilePath string) ([]MntPoint, error) {
 	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
 	if err != nil {
 		return nil, err
@@ -349,8 +352,8 @@ func listProcMounts(mountFilePath string) ([]MountPoint, error) {
 	return parseProcMounts(content)
 }
 
-func parseProcMounts(content []byte) ([]MountPoint, error) {
-	out := []MountPoint{}
+func parseProcMounts(content []byte) ([]MntPoint, error) {
+	out := []MntPoint{}
 	lines := strings.Split(string(content), "\n")
 	for _, line := range lines {
 		if line == "" {
@@ -362,7 +365,7 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d): %s", expectedNumFieldsPerLine, len(fields), line)
 		}
 
-		mp := MountPoint{
+		mp := MntPoint{
 			Device: fields[0],
 			Path:   fields[1],
 			Type:   fields[2],
@@ -386,14 +389,17 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 	return out, nil
 }
 
+// MakeRShared makes the bind mount rshared if needed.
 func (mounter *Mounter) MakeRShared(path string) error {
 	return doMakeRShared(path, procMountInfoPath)
 }
 
+// GetFileType returns the string FileType of the path.
 func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
 	return getFileType(pathname)
 }
 
+// MakeDir creates a directory at the specified path.
 func (mounter *Mounter) MakeDir(pathname string) error {
 	err := os.MkdirAll(pathname, os.FileMode(0755))
 	if err != nil {
@@ -404,6 +410,7 @@ func (mounter *Mounter) MakeDir(pathname string) error {
 	return nil
 }
 
+// MakeFile creates a file with permissions 0644 at the specified path.
 func (mounter *Mounter) MakeFile(pathname string) error {
 	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
 	defer f.Close()
@@ -415,10 +422,12 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 	return nil
 }
 
+// ExistsPath returns true if the specified path exists.
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilfile.FileExists(pathname)
+	return utilfile.Exists(pathname)
 }
 
+// EvalHostSymlinks returns the actual path a symlink points to.
 func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
 	return filepath.EvalSymlinks(pathname)
 }
@@ -444,11 +453,11 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			ee, isExitError := err.(utilexec.ExitError)
 			switch {
 			case err == utilexec.ErrExecutableNotFound:
-				klog.Warning("'fsck' not found on system; continuing mount without running 'fsck'.")
+				klog.Warning("'fsck' not found on system; continuing mount without running 'fsck'")
 			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-				klog.Infof("Device %s has errors which were corrected by fsck.", source)
+				klog.Infof("Device %s has errors which were corrected by fsck", source)
 			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s", source, string(out))
 			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
 				klog.Infof("`fsck` error %s", string(out))
 			}
@@ -494,16 +503,14 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 			klog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
-		} else {
-			// Disk is already formatted and failed to mount
-			if len(fstype) == 0 || fstype == existingFormat {
-				// This is mount error
-				return mountErr
-			} else {
-				// Block device is formatted with unexpected filesystem, let the user know
-				return fmt.Errorf("failed to mount the volume as %q, it already contains %s. Mount error: %v", fstype, existingFormat, mountErr)
-			}
 		}
+		// Disk is already formatted and failed to mount
+		if len(fstype) == 0 || fstype == existingFormat {
+			// This is mount error
+			return mountErr
+		}
+		// Block device is formatted with unexpected filesystem, let the user know
+		return fmt.Errorf("failed to mount the volume as %q, it already contains %s. Mount error: %v", fstype, existingFormat, mountErr)
 	}
 	return mountErr
 }
@@ -643,7 +650,7 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 			info.optionalFields = append(info.optionalFields, fields[i])
 		}
 		// Parse the rest 3 fields.
-		i += 1
+		i++
 		if len(fields)-i < 3 {
 			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
 		}
@@ -725,6 +732,7 @@ func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
 	return false, nil
 }
 
+// PrepareSafeSubpath safely creates a new subpath.
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
 	newHostPath, err = doBindSubPath(mounter, subPath)
 
@@ -863,6 +871,7 @@ func doBindSubPath(mounter Interface, subpath Subpath) (hostPath string, err err
 	return bindPathTarget, nil
 }
 
+// CleanSubPaths cleans up the subpath mounts for the volume in the pod directory.
 func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 	return doCleanSubPaths(mounter, podDir, volumeName)
 }
@@ -993,6 +1002,7 @@ func removeEmptyDirs(baseDir, endDir string) error {
 	return nil
 }
 
+// SafeMakeDir safely creates a subdirectory at the specified path base
 func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
 	realBase, err := filepath.EvalSymlinks(base)
 	if err != nil {
@@ -1004,6 +1014,7 @@ func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode
 	return doSafeMakeDir(realFullPath, realBase, perm)
 }
 
+// GetMountRefs finds all of the mount references to the source.
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	if _, err := os.Stat(pathname); os.IsNotExist(err) {
 		return []string{}, nil
@@ -1017,10 +1028,12 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return searchMountPoints(realpath, procMountInfoPath)
 }
 
+// GetSELinuxSupport is common implementation of GetSELinuxSupport on Linux.
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return getSELinuxSupport(pathname, procMountInfoPath)
 }
 
+// GetFSGroup returns the filesystem group for the path name.
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
@@ -1029,6 +1042,7 @@ func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return getFSGroup(realpath)
 }
 
+// GetMode returns the unix filesystem mode for the path.
 func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
 	return getMode(pathname)
 }

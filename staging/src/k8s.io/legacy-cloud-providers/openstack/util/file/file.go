@@ -20,8 +20,8 @@ import (
 	"os"
 )
 
-// FileExists checks if specified file exists.
-func FileExists(filename string) (bool, error) {
+// Exists checks if specified file exists.
+func Exists(filename string) (bool, error) {
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return false, nil
 	} else if err != nil {
@@ -30,8 +30,8 @@ func FileExists(filename string) (bool, error) {
 	return true, nil
 }
 
-// FileOrSymlinkExists checks if specified file or symlink exists.
-func FileOrSymlinkExists(filename string) (bool, error) {
+// OrSymlinkExists checks if specified file or symlink exists.
+func OrSymlinkExists(filename string) (bool, error) {
 	if _, err := os.Lstat(filename); os.IsNotExist(err) {
 		return false, nil
 	} else if err != nil {
