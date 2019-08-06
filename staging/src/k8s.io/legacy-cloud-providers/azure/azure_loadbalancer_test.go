@@ -676,6 +676,83 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 	}
 }
 
+func TestGetLoadBalancerByName(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		existingLBs    []network.LoadBalancer
+		expectedLB     *network.LoadBalancer
+		expectedStatus *v1.LoadBalancerStatus
+		expectedExists bool
+		expectedError  bool
+	}{
+		{
+			desc: "getLoadBalancerByName shall return the corresponding load balancer in the resource group different from the cluster's",
+			existingLBs: []network.LoadBalancer{
+				{
+					Name: to.StringPtr("me"),
+					LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
+						FrontendIPConfigurations: &[]network.FrontendIPConfiguration{
+							{
+								Name: to.StringPtr("atest1"),
+								FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+									PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: to.StringPtr("notMe"),
+					LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
+						FrontendIPConfigurations: &[]network.FrontendIPConfiguration{
+							{
+								Name: to.StringPtr("atest1"),
+								FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+									PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedLB: &network.LoadBalancer{
+				Name: to.StringPtr("me"),
+				LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
+					FrontendIPConfigurations: &[]network.FrontendIPConfiguration{
+						{
+							Name: to.StringPtr("atest1"),
+							FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+								PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+							},
+						},
+					},
+				},
+			},
+			expectedStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: "", Hostname: ""}}},
+			expectedExists: true,
+			expectedError:  false,
+		},
+	}
+
+	for i, test := range testCases {
+		az := getTestCloud()
+		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
+		service.Annotations[ServiceAnnotationLoadBalancerResourceGroup] = "rg1"
+		for _, existingLB := range test.existingLBs {
+			_, err := az.LoadBalancerClient.CreateOrUpdate(context.TODO(), "rg1", *existingLB.Name, existingLB, "")
+			if err != nil {
+				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
+			}
+		}
+
+		lb, status, exists, err := az.getLoadBalancerByName(&service, "me")
+		assert.Equal(t, test.expectedLB, lb, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedStatus, status, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedExists, exists, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
 func TestIsFrontendIPChanged(t *testing.T) {
 	testCases := []struct {
 		desc                   string
