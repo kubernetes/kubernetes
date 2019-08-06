@@ -97,7 +97,6 @@ kube::build::get_docker_wrapped_binaries() {
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    cloud-controller-manager,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
     kube-apiserver,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
     kube-controller-manager,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
     kube-scheduler,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
