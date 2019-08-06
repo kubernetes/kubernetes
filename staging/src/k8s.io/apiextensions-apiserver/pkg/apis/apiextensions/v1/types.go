@@ -36,30 +36,11 @@ const (
 type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
 	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
-	// Version is the version this resource belongs in
-	// Should be always first item in Versions field if provided.
-	// Optional, but at least one of Version or Versions must be set.
-	// Deprecated: Please use `Versions`.
-	// +optional
-	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
-	// Validation describes the validation methods for CustomResources
-	// Optional, the global validation schema for all versions.
-	// Top-level and per-version schemas are mutually exclusive.
-	// +optional
-	Validation *CustomResourceValidation `json:"validation,omitempty" protobuf:"bytes,5,opt,name=validation"`
-	// Subresources describes the subresources for CustomResource
-	// Optional, the global subresources for all versions.
-	// Top-level and per-version subresources are mutually exclusive.
-	// +optional
-	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,6,opt,name=subresources"`
 	// Versions is the list of all supported versions for this resource.
-	// If Version field is provided, this field is optional.
-	// Validation: All versions must use the same validation schema for now. i.e., top
-	// level Validation field is applied to all of these versions.
 	// Order: The version name will be used to compute the order.
 	// If the version string is "kube-like", it will sort above non "kube-like" version strings, which are ordered
 	// lexicographically. "Kube-like" versions start with a "v", then are followed by a number (the major version),
@@ -67,13 +48,7 @@ type CustomResourceDefinitionSpec struct {
 	// by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing
 	// major version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
-	// +optional
-	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
-	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
-	// Optional, the global columns for all versions.
-	// Top-level and per-version columns are mutually exclusive.
-	// +optional
-	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
+	Versions []CustomResourceDefinitionVersion `json:"versions" protobuf:"bytes,7,rep,name=versions"`
 
 	// `conversion` defines conversion settings for the CRD.
 	// +optional
@@ -187,24 +162,12 @@ type CustomResourceDefinitionVersion struct {
 	// flagged as storage version.
 	Storage bool `json:"storage" protobuf:"varint,3,opt,name=storage"`
 	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
-	// Top-level and per-version schemas are mutually exclusive.
-	// Per-version schemas must not all be set to identical values (top-level validation schema should be used instead)
-	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
 	// +optional
 	Schema *CustomResourceValidation `json:"schema,omitempty" protobuf:"bytes,4,opt,name=schema"`
 	// Subresources describes the subresources for CustomResource
-	// Top-level and per-version subresources are mutually exclusive.
-	// Per-version subresources must not all be set to identical values (top-level subresources should be used instead)
-	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,5,opt,name=subresources"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
-	// Top-level and per-version columns are mutually exclusive.
-	// Per-version columns must not all be set to identical values (top-level columns should be used instead)
-	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
-	// NOTE: CRDs created prior to 1.13 populated the top-level additionalPrinterColumns field by default. To apply an
-	// update that changes to per-version additionalPrinterColumns, the top-level additionalPrinterColumns field must
-	// be explicitly set to null
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
 }
