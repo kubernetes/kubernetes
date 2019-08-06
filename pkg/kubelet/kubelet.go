@@ -2291,7 +2291,7 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 	if !crOptions.RedirectContainerStreaming {
-		config.Addr = net.JoinHostPort("localhost", "0")
+		config.Addr = ""
 	} else {
 		// Use a relative redirect (no scheme or host).
 		config.BaseURL = &url.URL{
