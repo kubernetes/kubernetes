@@ -6,7 +6,6 @@ go_library(
         "checkpoint.go",
         "state.go",
         "state_checkpoint.go",
-        "state_file.go",
         "state_mem.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state",
@@ -25,7 +24,6 @@ go_test(
     srcs = [
         "state_checkpoint_test.go",
         "state_compatibility_test.go",
-        "state_file_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
