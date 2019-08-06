@@ -79,8 +79,8 @@ func TestGetAccessModes(t *testing.T) {
 	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteMany) {
 		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteMany)
 	}
-	if volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
-		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
+		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadOnlyMany)
 	}
 }
 
@@ -196,7 +196,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC:                           volumetest.CreateTestPVC("100Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC: volumetest.CreateTestPVC("100Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 

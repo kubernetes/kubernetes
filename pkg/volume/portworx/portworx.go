@@ -107,6 +107,7 @@ func (plugin *portworxVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccess
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
 		v1.ReadWriteMany,
+		v1.ReadOnlyMany,
 	}
 }
 
@@ -394,7 +395,7 @@ var _ volume.Provisioner = &portworxVolumeProvisioner{}
 
 func (c *portworxVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
-		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+		return nil, fmt.Errorf("invalid portworx AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
 	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {
