@@ -101,7 +101,7 @@ write_files:
 
       [Service]
       Type=oneshot
-      ExecStart=-/usr/sbin/logrotate /etc/logrotate.conf
+      ExecStart=-/usr/bin/nice -n19 /usr/bin/ionice -c3 /usr/sbin/logrotate /etc/logrotate.conf
 
       [Install]
       WantedBy=kubernetes.target
