@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 // PolicyStatic is the name of the static policy
@@ -77,6 +78,8 @@ type staticPolicy struct {
 	// (pod, container) -> containerID
 	// for all containers a pod
 	containerMap containerMap
+	// topology manager reference to get container Topology affinity
+	affinity topologymanager.Store
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -85,7 +88,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, affinity topologymanager.Store) Policy {
 	allCPUs := topology.CPUDetails.CPUs()
 	// takeByTopology allocates CPUs associated with low-numbered cores from
 	// allCPUs.
@@ -104,6 +107,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int) Policy
 		topology:     topology,
 		reserved:     reserved,
 		containerMap: newContainerMap(),
+		affinity:     affinity,
 	}
 }
 
