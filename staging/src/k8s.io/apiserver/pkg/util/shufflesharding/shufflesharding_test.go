@@ -17,7 +17,9 @@ limitations under the License.
 package shufflesharding
 
 import (
+	"math"
 	"math/rand"
+	"sort"
 	"testing"
 )
 
@@ -170,11 +172,11 @@ func TestShuffleAndDealWithValidation(t *testing.T) {
 }
 
 func BenchmarkShuffleAndDeal(b *testing.B) {
-	hashValue := rand.Uint64()
+	hashValueBase := math.MaxUint64 / uint64(b.N)
 	deckSize, handSize := int32(512), int32(8)
 	pick := func(int32) {}
 	for i := 0; i < b.N; i++ {
-		ShuffleAndDeal(hashValue, deckSize, handSize, pick)
+		ShuffleAndDeal(hashValueBase*uint64(i), deckSize, handSize, pick)
 	}
 }
 
@@ -192,27 +194,45 @@ func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 			false,
 		},
 		{
-			"deckSize == handSize == 4",
+			"deckSize = handSize = 4",
 			4,
 			4,
 			true,
 		},
 		{
-			"deckSize == handSize == 8",
+			"deckSize = handSize = 8",
 			8,
 			8,
 			true,
 		},
 		{
-			"deckSize == handSize == 10",
+			"deckSize = handSize = 10",
 			10,
 			10,
 			true,
 		},
 		{
-			"deckSize == handSize == 12",
+			"deckSize = handSize = 12",
 			12,
 			12,
+			true,
+		},
+		{
+			"deckSize = 128, handSize = 8",
+			128,
+			8,
+			true,
+		},
+		{
+			"deckSize = 256, handSize = 7",
+			256,
+			7,
+			true,
+		},
+		{
+			"deckSize = 512, handSize = 6",
+			512,
+			6,
 			true,
 		},
 	}
@@ -232,16 +252,18 @@ func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 					return
 				}
 
-				// check cards duplication
-				cardMap := make(map[int32]struct{}, test.handSize)
+				// check cards range and duplication
+				cardMap := make(map[int32]struct{})
 				for _, cardIdx := range cards {
-					cardMap[cardIdx] = struct{}{}
-				}
-				for i := int32(0); i < test.handSize; i++ {
-					if _, ok := cardMap[i]; !ok {
-						t.Errorf("test case %s fails in duplication check", test.name)
+					if cardIdx < 0 || cardIdx >= test.deckSize {
+						t.Errorf("test case %s fails in range check", test.name)
 						return
 					}
+					cardMap[cardIdx] = struct{}{}
+				}
+				if len(cardMap) != int(test.handSize) {
+					t.Errorf("test case %s fails in duplication check", test.name)
+					return
 				}
 			}
 		})
@@ -249,9 +271,34 @@ func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 }
 
 func BenchmarkShuffleAndDealToSlice(b *testing.B) {
-	hashValue := rand.Uint64()
+	hashValueBase := math.MaxUint64 / uint64(b.N)
 	deckSize, handSize := int32(512), int32(8)
 	for i := 0; i < b.N; i++ {
-		_ = ShuffleAndDealToSlice(hashValue, deckSize, handSize)
+		_ = ShuffleAndDealToSlice(hashValueBase*uint64(i), deckSize, handSize)
 	}
+}
+
+func TestUniformDistribution(t *testing.T) {
+	deckSize, handSize := int32(128), int32(3)
+	handCoordinateMap := make(map[int]int)
+
+	allCoordinateCount := 128 * 127 * 126 / 6
+
+	for i := 0; i < allCoordinateCount*16; i++ {
+		hands := ShuffleAndDealToSlice(rand.Uint64(), deckSize, handSize)
+		sort.Slice(hands, func(i, j int) bool {
+			return hands[i] < hands[j]
+		})
+		handCoordinate := 0
+		for _, hand := range hands {
+			handCoordinate = handCoordinate<<7 + int(hand)
+		}
+		handCoordinateMap[handCoordinate]++
+	}
+
+	// TODO: check uniform distribution
+	t.Logf("%d", len(handCoordinateMap))
+	t.Logf("%d", allCoordinateCount)
+
+	return
 }
