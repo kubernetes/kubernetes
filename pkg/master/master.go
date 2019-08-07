@@ -98,6 +98,7 @@ import (
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -361,6 +362,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
 		extensionsrest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
