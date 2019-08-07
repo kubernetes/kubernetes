@@ -43,12 +43,12 @@ func RealVersion(s string) (string, error) {
 }
 
 func traceRouteToMaster() {
-	path, err := exec.LookPath("traceroute")
+	traceroute, err := exec.LookPath("traceroute")
 	if err != nil {
 		e2elog.Logf("Could not find traceroute program")
 		return
 	}
-	cmd := exec.Command(path, "-I", framework.GetMasterHost())
+	cmd := exec.Command(traceroute, "-I", framework.GetMasterHost())
 	out, err := cmd.Output()
 	if len(out) != 0 {
 		e2elog.Logf(string(out))
