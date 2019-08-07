@@ -335,8 +335,6 @@ var _ = SIGDescribe("kubelet", func() {
 			//   - a bug in graceful termination (if it is enabled)
 			//   - docker slow to delete pods (or resource problems causing slowness)
 			start := time.Now()
-			err = waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, 0, 1*time.Minute)
-			framework.ExpectNoError(err)
 			e2elog.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
 				time.Since(start))
 			if resourceMonitor != nil {
