@@ -102,9 +102,9 @@ func (d SystemPresetData) EnsureSystemPresetConfiguration() genericapiserver.Pos
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else if err == nil {
-							klog.V(6).Infof("created system preset FlowSchema %s", flowSchema.Name)
+							klog.V(3).Infof("created system preset FlowSchema %s", flowSchema.Name)
 						} else {
-							klog.V(6).Infof("system preset FlowSchema %s already exists, skipping creating", flowSchema.Name)
+							klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", flowSchema.Name)
 						}
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
@@ -121,9 +121,9 @@ func (d SystemPresetData) EnsureSystemPresetConfiguration() genericapiserver.Pos
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else if err == nil {
-							klog.V(6).Infof("created system preset PriorityLevelConfiguration %s", priorityLevelConfiguration.Name)
+							klog.V(3).Infof("created system preset PriorityLevelConfiguration %s", priorityLevelConfiguration.Name)
 						} else {
-							klog.V(6).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
+							klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
 						}
 					} else if err == nil {
 						// Unable to get the priority class for reasons other than "not found".
