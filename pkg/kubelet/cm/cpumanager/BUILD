@@ -40,6 +40,7 @@ go_test(
         "policy_none_test.go",
         "policy_static_test.go",
         "policy_test.go",
+        "topology_hints_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
