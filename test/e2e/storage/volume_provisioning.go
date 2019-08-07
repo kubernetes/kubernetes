@@ -18,6 +18,7 @@ package storage
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -872,7 +873,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipIfProviderIs("gke")
 			ginkgo.By("creating a Gluster DP server Pod")
 			pod := startGlusterDpServerPod(c, ns)
-			serverURL := "http://" + pod.Status.PodIP + ":8081"
+			serverURL := "http://" + net.JoinHostPort(pod.Status.PodIP, "8081")
 			ginkgo.By("creating a StorageClass")
 			test := testsuites.StorageClassTest{
 				Client:       c,
