@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog"
+	utiltrace "k8s.io/utils/trace"
 )
 
 type validatingDispatcher struct {
@@ -153,6 +154,14 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
+	trace := utiltrace.New("Call validating webhook",
+		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
+		utiltrace.Field{"webhook", h.Name},
+		utiltrace.Field{"resource", attr.GetResource()},
+		utiltrace.Field{"subresource", attr.GetSubresource()},
+		utiltrace.Field{"operation", attr.GetOperation()},
+		utiltrace.Field{"UID", uid})
+	defer trace.LogIfLong(500 * time.Millisecond)
 	r := client.Post().Context(ctx).Body(request)
 	if h.TimeoutSeconds != nil {
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
@@ -160,6 +169,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 	if err := r.Do().Into(response); err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
+	trace.Step("Request completed")
 
 	result, err := webhookrequest.VerifyAdmissionResponse(uid, false, response)
 	if err != nil {

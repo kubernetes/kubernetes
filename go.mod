@@ -170,7 +170,7 @@ require (
 	k8s.io/metrics v0.0.0
 	k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3
 	k8s.io/sample-apiserver v0.0.0
-	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 	sigs.k8s.io/yaml v1.1.0
 	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
@@ -460,7 +460,7 @@ replace (
 	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-	k8s.io/utils => k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+	k8s.io/utils => k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0
 	modernc.org/mathutil => modernc.org/mathutil v1.0.0

@@ -187,7 +187,7 @@ func (g *genericScheduler) snapshot() error {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister, pluginContext *framework.PluginContext) (result ScheduleResult, err error) {
-	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
+	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
