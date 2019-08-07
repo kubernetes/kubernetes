@@ -87,10 +87,17 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		var err error
 
 		framework.AllNodesReady(cs, time.Minute)
-		masterNodes, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+
+		// NOTE: Here doesn't get nodeList for supporting a master nodes which can host workload pods.
+		masterNodes, _, err = e2enode.GetMasterAndWorkerNodes(cs)
 		if err != nil {
 			e2elog.Logf("Unexpected error occurred: %v", err)
 		}
+		nodeList, err = e2enode.GetReadySchedulableNodesOrDie(cs)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 
