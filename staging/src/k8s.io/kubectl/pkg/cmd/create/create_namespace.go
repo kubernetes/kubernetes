@@ -36,7 +36,7 @@ var (
 	  kubectl create namespace my-namespace`))
 )
 
-// NamespaceOpts is the options for 'create namespare' sub command
+// NamespaceOpts is the options for 'create namespace' sub command
 type NamespaceOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
