@@ -1097,7 +1097,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-			SchedulerName:                  "some-scheduler-name",
 			Client:                         client,
 			NodeInformer:                   informerFactory.Core().V1().Nodes(),
 			PodInformer:                    informerFactory.Core().V1().Pods(),

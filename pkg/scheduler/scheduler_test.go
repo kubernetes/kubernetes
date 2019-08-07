@@ -57,12 +57,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
-// EmptyFramework is an empty framework used in tests.
-// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
-var EmptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, EmptyPluginConfig)
-
-// EmptyPluginConfig is an empty plugin config used in tests.
-var EmptyPluginConfig = []kubeschedulerconfig.PluginConfig{}
+var (
+	emptyPluginRegistry = framework.Registry{}
+	// emptyPluginConfig is an empty plugin config used in tests.
+	emptyPluginConfig []kubeschedulerconfig.PluginConfig
+	// emptyFramework is an empty framework used in tests.
+	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
+	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, emptyPluginConfig)
+)
 
 type fakeBinder struct {
 	b func(binding *v1.Binding) error
@@ -195,9 +197,9 @@ func TestSchedulerCreation(t *testing.T) {
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
-		EmptyPluginRegistry,
+		emptyPluginRegistry,
 		nil,
-		EmptyPluginConfig,
+		emptyPluginConfig,
 		WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err != nil {
@@ -299,7 +301,7 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Framework:    EmptyFramework,
+				Framework:    emptyFramework,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 			})
@@ -649,7 +651,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyPriorityMetadataProducer,
-		EmptyFramework,
+		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -681,7 +683,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Recorder:            &events.FakeRecorder{},
 		PodConditionUpdater: fakePodConditionUpdater{},
 		PodPreemptor:        fakePodPreemptor{},
-		Framework:           EmptyFramework,
+		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
 
@@ -695,7 +697,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	framework, _ := framework.NewFramework(EmptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
+	framework, _ := framework.NewFramework(emptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
