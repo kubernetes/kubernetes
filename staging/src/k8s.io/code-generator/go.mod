@@ -26,5 +26,3 @@ replace (
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	k8s.io/code-generator => ../code-generator
 )
-
-replace github.com/json-iterator/go => github.com/json-iterator/go v1.1.7
