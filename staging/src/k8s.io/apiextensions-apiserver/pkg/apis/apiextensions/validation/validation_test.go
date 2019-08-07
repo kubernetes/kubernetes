@@ -3585,6 +3585,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		input            apiextensions.CustomResourceValidation
 		mustBeStructural bool
 		statusEnabled    bool
+		opts             validationOptions
 		wantError        bool
 	}{
 		{
@@ -3726,7 +3727,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateCustomResourceDefinitionValidation(&tt.input, tt.mustBeStructural, tt.statusEnabled, false, field.NewPath("spec", "validation"))
+			got := validateCustomResourceDefinitionValidation(&tt.input, tt.mustBeStructural, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 			if !tt.wantError && len(got) > 0 {
 				t.Errorf("Expected no error, but got: %v", got)
 			} else if tt.wantError && len(got) == 0 {
