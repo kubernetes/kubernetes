@@ -54,7 +54,7 @@ const (
 	// TODO (vladimirvivien) would be nice to name socket with a .sock extension
 	// for consistency.
 	csiAddrTemplate = "/var/lib/kubelet/plugins/%v/csi.sock"
-	csiTimeout      = 15 * time.Second
+	csiTimeout      = 2 * time.Minute
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
 	fsTypeBlockName = "block"
