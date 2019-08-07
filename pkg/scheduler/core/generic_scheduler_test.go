@@ -651,7 +651,7 @@ func TestGenericScheduler(t *testing.T) {
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
-			result, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)), framework.NewPluginContext())
+			result, err := scheduler.Schedule(test.pod, framework.NewPluginContext())
 			if !reflect.DeepEqual(err, test.wErr) {
 				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
@@ -693,7 +693,7 @@ func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
-	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, schedulertesting.FakeNodeLister(nodes))
+	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -723,7 +723,7 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(predicates, nodes)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, pod, schedulertesting.FakeNodeLister(nodes))
+	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1935,7 +1935,7 @@ func TestPreempt(t *testing.T) {
 			if test.failedPredMap != nil {
 				failedPredMap = test.failedPredMap
 			}
-			node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
+			node, victims, _, err := scheduler.Preempt(test.pod, error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
@@ -1965,7 +1965,7 @@ func TestPreempt(t *testing.T) {
 				test.pod.Status.NominatedNodeName = node.Name
 			}
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, victims, _, err = scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
+			node, victims, _, err = scheduler.Preempt(test.pod, error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}

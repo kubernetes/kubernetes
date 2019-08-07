@@ -153,7 +153,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister, pc *framework.PluginContext) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(pod *v1.Pod, pc *framework.PluginContext) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -164,7 +164,7 @@ func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
 	return nil
 }
 
-func (es mockScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+func (es mockScheduler) Preempt(pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
 }
 
@@ -285,7 +285,6 @@ func TestScheduler(t *testing.T) {
 
 			s := NewFromConfig(&factory.Config{
 				SchedulerCache: sCache,
-				NodeLister:     sCache,
 				Algorithm:      item.algo,
 				GetBinder: func(pod *v1.Pod) factory.Binder {
 					return fakeBinder{func(b *v1.Binding) error {
@@ -666,7 +665,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 
 	config := &factory.Config{
 		SchedulerCache: scache,
-		NodeLister:     scache,
 		Algorithm:      algo,
 		GetBinder: func(pod *v1.Pod) factory.Binder {
 			return fakeBinder{func(b *v1.Binding) error {
@@ -719,7 +717,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 
 	sched := NewFromConfig(&factory.Config{
 		SchedulerCache: scache,
-		NodeLister:     scache,
 		Algorithm:      algo,
 		GetBinder: func(pod *v1.Pod) factory.Binder {
 			return fakeBinder{func(b *v1.Binding) error {
