@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -273,6 +274,63 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 		return nil, err
 	}
 	return crd, nil
+}
+
+// CreateNewV1CustomResourceDefinitionWatchUnsafe creates the CRD and makes sure
+// the apiextension apiserver has installed the CRD. But it's not safe to watch
+// the created CR. Please call CreateNewV1CustomResourceDefinition if you need to
+// watch the CR.
+func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(v1CRD)
+	if err != nil {
+		return nil, err
+	}
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// wait until all resources appears in discovery
+	for _, version := range servedVersions(crd) {
+		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			return existsInDiscovery(crd, apiExtensionsClient, version)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return v1CRD, err
+}
+
+// CreateNewV1CustomResourceDefinition creates the given CRD and makes sure its watch cache is primed on the server.
+func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD, apiExtensionsClient)
+	if err != nil {
+		return nil, err
+	}
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// This is only for a test.  We need the watch cache to have a resource version that works for the test.
+	// When new REST storage is created, the storage cacher for the CR starts asynchronously.
+	// REST API operations return like list use the RV of etcd, but the storage cacher's reflector's list
+	// can get a different RV because etcd can be touched in between the initial list operation (if that's what you're doing first)
+	// and the storage cache reflector starting.
+	// Later, you can issue a watch with the REST apis list.RV and end up earlier than the storage cacher.
+	// The general working model is that if you get a "resourceVersion too old" message, you re-list and rewatch.
+	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
+	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
+	// before like the created RV could be too old to watch.
+	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+		return isWatchCachePrimed(crd, dynamicClientSet)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v1CRD, nil
 }
 
 func resourceClientForVersion(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.Interface, namespace, version string) dynamic.ResourceInterface {
