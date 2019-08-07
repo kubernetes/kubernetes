@@ -51,9 +51,6 @@ func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec)
 			Strategy: NoneConverter,
 		}
 	}
-	if obj.PreserveUnknownFields == nil {
-		obj.PreserveUnknownFields = utilpointer.BoolPtr(true)
-	}
 }
 
 // SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference

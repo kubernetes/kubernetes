@@ -72,6 +72,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, nil, requestGV)...)
+	allErrs = append(allErrs, validatePreserveUnknownFields(obj, nil, requestGV)...)
 	return allErrs
 }
 
@@ -98,6 +99,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, oldObj, requestGV)...)
+	allErrs = append(allErrs, validatePreserveUnknownFields(obj, oldObj, requestGV)...)
 	return allErrs
 }
 
@@ -1157,6 +1159,25 @@ func validateAPIApproval(newCRD, oldCRD *apiextensions.CustomResourceDefinition,
 	default:
 		return field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), newCRD.Annotations[v1beta1.KubeAPIApprovedAnnotation], reason)}
 	}
+}
+
+func validatePreserveUnknownFields(crd, oldCRD *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
+	if requestGV == v1beta1.SchemeGroupVersion {
+		// no-op for compatibility with v1beta1
+		return nil
+	}
+
+	if oldCRD != nil && oldCRD.Spec.PreserveUnknownFields != nil && *oldCRD.Spec.PreserveUnknownFields {
+		// no-op for compatibility with existing data
+		return nil
+	}
+
+	var errs field.ErrorList
+	if crd != nil && crd.Spec.PreserveUnknownFields != nil && *crd.Spec.PreserveUnknownFields {
+		// disallow changing spec.preserveUnknownFields=false to spec.preserveUnknownFields=true
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("preserveUnknownFields"), crd.Spec.PreserveUnknownFields, "cannot set to true, set x-preserve-unknown-fields to true in spec.versions[*].schema instead"))
+	}
+	return errs
 }
 
 // SchemaHasInvalidTypes returns true if it contains invalid offending openapi-v3 specification.

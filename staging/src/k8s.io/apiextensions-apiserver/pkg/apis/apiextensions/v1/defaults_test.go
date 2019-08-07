@@ -39,8 +39,7 @@ func TestDefaults(t *testing.T) {
 			original: &CustomResourceDefinition{},
 			expected: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
-					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
 				},
 			},
 		},
@@ -57,7 +56,6 @@ func TestDefaults(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
 				},
 			},
 			expected: &CustomResourceDefinition{
@@ -71,7 +69,6 @@ func TestDefaults(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
 				},
 			},
 		},
@@ -79,9 +76,8 @@ func TestDefaults(t *testing.T) {
 			name: "storage status defaults",
 			original: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
-					Scope:                 NamespaceScoped,
-					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					Scope:      NamespaceScoped,
+					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: false, Served: true},
 						{Name: "v2", Storage: true, Served: true},
@@ -91,9 +87,8 @@ func TestDefaults(t *testing.T) {
 			},
 			expected: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
-					Scope:                 NamespaceScoped,
-					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					Scope:      NamespaceScoped,
+					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: false, Served: true},
 						{Name: "v2", Storage: true, Served: true},
@@ -109,9 +104,8 @@ func TestDefaults(t *testing.T) {
 			name: "version defaults",
 			original: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
-					Scope:                 NamespaceScoped,
-					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					Scope:      NamespaceScoped,
+					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: true},
 					},
@@ -119,9 +113,8 @@ func TestDefaults(t *testing.T) {
 			},
 			expected: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
-					Scope:                 NamespaceScoped,
-					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					Scope:      NamespaceScoped,
+					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: true},
 					},

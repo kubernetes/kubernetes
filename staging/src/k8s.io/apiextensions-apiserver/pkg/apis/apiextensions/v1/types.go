@@ -57,8 +57,9 @@ type CustomResourceDefinitionSpec struct {
 	// preserveUnknownFields disables pruning of object fields which are not
 	// specified in the OpenAPI schema. apiVersion, kind, metadata and known
 	// fields inside metadata are always preserved.
-	// Defaults to true in v1beta and will default to false in v1.
-	PreserveUnknownFields *bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
+	// This field is deprecated in favor of setting `x-preserve-unknown-fields` to true in `spec.versions[*].schema.openAPIV3Schema`.
+	// +optional
+	PreserveUnknownFields bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.
