@@ -24,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -37,7 +39,7 @@ var ProberResults = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Subsystem: "prober",
 		Name:      "probe_total",
-		Help:      "Cumulative number of a liveness or readiness probe for a container by result.",
+		Help:      "Cumulative number of a liveness, readiness or startup probe for a container by result.",
 	},
 	[]string{"probe_type",
 		"result",
@@ -88,6 +90,9 @@ type manager struct {
 	// livenessManager manages the results of liveness probes
 	livenessManager results.Manager
 
+	// startupManager manages the results of startup probes
+	startupManager results.Manager
+
 	// prober executes the probe actions.
 	prober *prober
 }
@@ -102,11 +107,13 @@ func NewManager(
 
 	prober := newProber(runner, refManager, recorder)
 	readinessManager := results.NewManager()
+	startupManager := results.NewManager()
 	return &manager{
 		statusManager:    statusManager,
 		prober:           prober,
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
+		startupManager:   startupManager,
 		workers:          make(map[probeKey]*worker),
 	}
 }
@@ -115,6 +122,8 @@ func NewManager(
 func (m *manager) Start() {
 	// Start syncing readiness.
 	go wait.Forever(m.updateReadiness, 0)
+	// Start syncing startup.
+	go wait.Forever(m.updateStartup, 0)
 }
 
 // Key uniquely identifying container probes
@@ -124,12 +133,13 @@ type probeKey struct {
 	probeType     probeType
 }
 
-// Type of probe (readiness or liveness)
+// Type of probe (liveness, readiness or startup)
 type probeType int
 
 const (
 	liveness probeType = iota
 	readiness
+	startup
 
 	probeResultSuccessful string = "successful"
 	probeResultFailed     string = "failed"
@@ -143,6 +153,8 @@ func (t probeType) String() string {
 		return "Readiness"
 	case liveness:
 		return "Liveness"
+	case startup:
+		return "Startup"
 	default:
 		return "UNKNOWN"
 	}
@@ -155,6 +167,18 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
+
+		if c.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled(features.StartupProbeEnabled) {
+			key.probeType = startup
+			if _, ok := m.workers[key]; ok {
+				klog.Errorf("Startup probe already exists! %v - %v",
+					format.Pod(pod), c.Name)
+				return
+			}
+			w := newWorker(m, startup, pod, c)
+			m.workers[key] = w
+			go w.run()
+		}
 
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
@@ -189,7 +213,7 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
-		for _, probeType := range [...]probeType{readiness, liveness} {
+		for _, probeType := range [...]probeType{readiness, liveness, startup} {
 			key.probeType = probeType
 			if worker, ok := m.workers[key]; ok {
 				worker.stop()
@@ -222,6 +246,20 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 			ready = !exists
 		}
 		podStatus.ContainerStatuses[i].Ready = ready
+
+		var started bool
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbeEnabled) {
+			started = true
+		} else if c.State.Running == nil {
+			started = false
+		} else if result, ok := m.startupManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
+			started = result == results.Success
+		} else {
+			// The check whether there is a probe which hasn't run yet.
+			_, exists := m.getWorker(podUID, c.Name, startup)
+			started = !exists
+		}
+		podStatus.ContainerStatuses[i].Started = &started
 	}
 	// init containers are ready if they have exited with success or if a readiness probe has
 	// succeeded.
@@ -260,4 +298,11 @@ func (m *manager) updateReadiness() {
 
 	ready := update.Result == results.Success
 	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
+}
+
+func (m *manager) updateStartup() {
+	update := <-m.startupManager.Updates()
+
+	started := update.Result == results.Success
+	m.statusManager.SetContainerStartup(update.PodUID, update.ContainerID, started)
 }
