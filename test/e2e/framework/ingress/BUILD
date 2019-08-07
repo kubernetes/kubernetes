@@ -23,6 +23,7 @@ go_library(
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/manifest:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
