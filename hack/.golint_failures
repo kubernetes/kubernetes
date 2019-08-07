@@ -170,7 +170,6 @@ pkg/registry/certificates/rest
 pkg/registry/coordination/rest
 pkg/registry/core/componentstatus
 pkg/registry/core/endpoint/storage
-pkg/registry/core/event
 pkg/registry/core/event/storage
 pkg/registry/core/limitrange/storage
 pkg/registry/core/namespace
