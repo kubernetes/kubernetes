@@ -344,7 +344,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds))
+		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds, repoToPull))
 		err := client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 		// If there was no error, return success
 		if err == nil {

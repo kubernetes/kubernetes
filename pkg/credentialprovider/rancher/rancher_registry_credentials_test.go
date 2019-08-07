@@ -82,7 +82,7 @@ func TestRancherCredentialsProvide(t *testing.T) {
 	}
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	keyring.Add(provider.Provide())
+	keyring.Add(provider.Provide(""))
 
 	for _, registry := range serverAddresses {
 		fullImagePath := path.Join(registry, image)
