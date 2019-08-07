@@ -34,6 +34,7 @@ func AddCustomGlobalFlags(fs *pflag.FlagSet) {
 
 	// Adds flags from k8s.io/kubernetes/pkg/cloudprovider/providers.
 	globalflag.Register(fs, "cloud-provider-gce-lb-src-cidrs")
+	fs.MarkDeprecated("cloud-provider-gce-lb-src-cidrs", "This flag will be removed once the GCE Cloud Provider is removed from kube-apiserver")
 
 	// Adds flags from k8s.io/apiserver/pkg/admission.
 	globalflag.Register(fs, "default-not-ready-toleration-seconds")
