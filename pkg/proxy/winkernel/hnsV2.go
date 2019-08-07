@@ -186,6 +186,8 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 				if len(plist.FrontendVIPs) == 0 || plist.FrontendVIPs[0] != vip {
 					continue
 				}
+			} else if len(plist.FrontendVIPs) != 0 {
+				continue
 			}
 			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
