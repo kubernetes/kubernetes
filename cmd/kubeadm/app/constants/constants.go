@@ -371,6 +371,10 @@ const (
 	// to avoid kubeadm dependency on the internal module
 	// TODO: share Mode* constants in component config
 
+	// ModeAlwaysAllow is the mode to set all requests as authorized
+	ModeAlwaysAllow string = "AlwaysAllow"
+	// ModeAlwaysDeny is the mode to set no requests as authorized
+	ModeAlwaysDeny string = "AlwaysDeny"
 	// ModeABAC is the mode to use Attribute Based Access Control to authorize
 	ModeABAC string = "ABAC"
 	// ModeWebhook is the mode to make an external webhook call to authorize
