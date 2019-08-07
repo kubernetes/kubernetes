@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 )
 
 type staticPolicyTest struct {
@@ -737,6 +738,96 @@ func TestStaticPolicyRemove(t *testing.T) {
 		if _, found := st.assignments[testCase.containerID]; found {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected containerID %v not be in assignments %v",
 				testCase.description, testCase.containerID, st.assignments)
+		}
+	}
+}
+
+func TestTopologyAwareAllocateCPUs(t *testing.T) {
+	testCases := []struct {
+		description     string
+		topo            *topology.CPUTopology
+		stAssignments   state.ContainerCPUAssignments
+		stDefaultCPUSet cpuset.CPUSet
+		numRequested    int
+		socketMask      socketmask.SocketMask
+		expCSet         cpuset.CPUSet
+	}{
+		{
+			description:     "Request 2 CPUs, No SocketMask",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    2,
+			socketMask:      nil,
+			expCSet:         cpuset.NewCPUSet(0, 6),
+		},
+		{
+			description:     "Request 2 CPUs, SocketMask on Socket 0",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    2,
+			socketMask: func() socketmask.SocketMask {
+				mask, _ := socketmask.NewSocketMask(0)
+				return mask
+			}(),
+			expCSet: cpuset.NewCPUSet(0, 6),
+		},
+		{
+			description:     "Request 2 CPUs, SocketMask on Socket 1",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    2,
+			socketMask: func() socketmask.SocketMask {
+				mask, _ := socketmask.NewSocketMask(1)
+				return mask
+			}(),
+			expCSet: cpuset.NewCPUSet(1, 7),
+		},
+		{
+			description:     "Request 8 CPUs, SocketMask on Socket 0",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    8,
+			socketMask: func() socketmask.SocketMask {
+				mask, _ := socketmask.NewSocketMask(0)
+				return mask
+			}(),
+			expCSet: cpuset.NewCPUSet(0, 6, 2, 8, 4, 10, 1, 7),
+		},
+		{
+			description:     "Request 8 CPUs, SocketMask on Socket 1",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    8,
+			socketMask: func() socketmask.SocketMask {
+				mask, _ := socketmask.NewSocketMask(1)
+				return mask
+			}(),
+			expCSet: cpuset.NewCPUSet(1, 7, 3, 9, 5, 11, 0, 6),
+		},
+	}
+	for _, tc := range testCases {
+		policy := NewStaticPolicy(tc.topo, 0, topologymanager.NewFakeManager()).(*staticPolicy)
+		st := &mockState{
+			assignments:   tc.stAssignments,
+			defaultCPUSet: tc.stDefaultCPUSet,
+		}
+		policy.Start(st)
+
+		cset, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask)
+		if err != nil {
+			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v not error %v",
+				tc.description, tc.expCSet, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(tc.expCSet, cset) {
+			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v but got %v",
+				tc.description, tc.expCSet, cset)
 		}
 	}
 }
