@@ -186,8 +186,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	// Lock required for leader election
 	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"cloud-controller-manager",
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		c.LeaderElectionClient.CoreV1(),
 		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{

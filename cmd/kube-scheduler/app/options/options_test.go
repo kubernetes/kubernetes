@@ -234,14 +234,14 @@ pluginConfig:
 				MetricsBindAddress:             "0.0.0.0:10251",
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:   true,
-						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:  "endpoints",
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpoints",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
 					},
-					LockObjectNamespace: "kube-system",
-					LockObjectName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					Kubeconfig:  configKubeconfig,
@@ -314,14 +314,14 @@ pluginConfig:
 				MetricsBindAddress:             "", // defaults empty when not running from config file
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:   true,
-						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:  "endpoints",
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpoints",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
 					},
-					LockObjectNamespace: "kube-system",
-					LockObjectName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					Kubeconfig:  flagKubeconfig,
@@ -375,14 +375,14 @@ pluginConfig:
 				MetricsBindAddress:             "0.0.0.0:10251",
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:   true,
-						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:  "endpoints",
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpoints",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
 					},
-					LockObjectNamespace: "kube-system",
-					LockObjectName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					Kubeconfig:  configKubeconfig,

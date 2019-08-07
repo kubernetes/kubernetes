@@ -257,9 +257,10 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
+
 	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"kube-controller-manager",
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		c.LeaderElectionClient.CoreV1(),
 		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
