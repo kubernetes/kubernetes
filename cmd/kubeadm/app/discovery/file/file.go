@@ -17,8 +17,6 @@ limitations under the License.
 package file
 
 import (
-	"io/ioutil"
-
 	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
@@ -53,58 +51,44 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return nil, err
 	}
 
-	// This is the cluster object we've got from the cluster-info kubeconfig file
-	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
+	var kubeconfig *clientcmdapi.Config
 
-	// Create a new kubeconfig object from the given, just copy over the server and the CA cert
-	// We do this in order to not pick up other possible misconfigurations in the clusterinfo file
-	kubeconfig := kubeconfigutil.CreateBasic(
-		defaultCluster.Server,
-		clustername,
-		"", // no user provided
-		defaultCluster.CertificateAuthorityData,
-	)
-	// load pre-existing client certificates
-	if config.Contexts[config.CurrentContext] != nil && len(config.AuthInfos) > 0 {
-		user := config.Contexts[config.CurrentContext].AuthInfo
-		authInfo, ok := config.AuthInfos[user]
-		if !ok || authInfo == nil {
-			return nil, errors.Errorf("empty settings for user %q", user)
-		}
-		if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
-			clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
-			if err != nil {
-				return nil, err
-			}
-			authInfo.ClientCertificateData = clientCert
-		}
-		if len(authInfo.ClientKeyData) == 0 && len(authInfo.ClientKey) != 0 {
-			clientKey, err := ioutil.ReadFile(authInfo.ClientKey)
-			if err != nil {
-				return nil, err
-			}
-			authInfo.ClientKeyData = clientKey
-		}
+	// If the discovery file config contains authentication credentials
+	if kubeconfigutil.HasAuthenticationCredentials(config) {
+		klog.V(1).Info("[discovery] Using authentication credentials from the discovery file for validating TLS connection")
 
-		if len(authInfo.ClientCertificateData) == 0 || len(authInfo.ClientKeyData) == 0 {
-			return nil, errors.New("couldn't read authentication info from the given kubeconfig file")
+		// Use the discovery file config for starting the join process
+		kubeconfig = config
+
+		// We should ensure that all the authentication info is embedded in config file, so everything will work also when
+		// the kubeconfig file will be stored in /etc/kubernetes/boostrap-kubelet.conf
+		if err := kubeconfigutil.EnsureAuthenticationInfoAreEmbedded(kubeconfig); err != nil {
+			return nil, errors.Wrap(err, "error while reading client cert file or client key file")
 		}
-		kubeconfig = kubeconfigutil.CreateWithCerts(
-			defaultCluster.Server,
+	} else {
+		// If the discovery file config does not contains authentication credentials
+		klog.V(1).Info("[discovery] Discovery file does not contains authentication credentials, using unauthenticated request for validating TLS connection")
+
+		// Create a new kubeconfig object from the discovery file config, with only the server and the CA cert.
+		// NB. We do this in order to not pick up other possible misconfigurations in the clusterinfo file
+		var fileCluster = kubeconfigutil.GetClusterFromKubeConfig(config)
+		kubeconfig = kubeconfigutil.CreateBasic(
+			fileCluster.Server,
 			clustername,
 			"", // no user provided
-			defaultCluster.CertificateAuthorityData,
-			authInfo.ClientKeyData,
-			authInfo.ClientCertificateData,
+			fileCluster.CertificateAuthorityData,
 		)
 	}
 
+	// Try to read the cluster-info config map; this step was required by the original design in order
+	// to validate the TLS connection to the server early in the process
 	client, err := kubeconfigutil.ToClientSet(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", defaultCluster.Server)
+	currentCluster := kubeconfigutil.GetClusterFromKubeConfig(kubeconfig)
+	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
 
 	var clusterinfoCM *v1.ConfigMap
 	wait.PollInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
@@ -113,11 +97,11 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		if err != nil {
 			if apierrors.IsForbidden(err) {
 				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
-				// In that case, trust the cluster admin and do not refresh the cluster-info credentials
+				// In that case, trust the cluster admin and do not refresh the cluster-info data
 				klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
 			}
-			klog.V(1).Infof("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
+			klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
 			return false, nil
 		}
 		return true, nil
@@ -135,9 +119,12 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return kubeconfig, nil
 	}
 
-	klog.V(1).Infoln("[discovery] Synced cluster-info information from the API Server so we have got the latest information")
-	// In an HA world in the future, this will make more sense, because now we've got new information, possibly about new API Servers to talk to
-	return refreshedBaseKubeConfig, nil
+	refreshedCluster := kubeconfigutil.GetClusterFromKubeConfig(refreshedBaseKubeConfig)
+	currentCluster.Server = refreshedCluster.Server
+	currentCluster.CertificateAuthorityData = refreshedCluster.CertificateAuthorityData
+
+	klog.V(1).Infof("[discovery] Synced Server and CertificateAuthorityData from the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
+	return kubeconfig, nil
 }
 
 // tryParseClusterInfoFromConfigMap tries to parse a kubeconfig file from a ConfigMap key
