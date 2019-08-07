@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"reflect"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type Device struct {

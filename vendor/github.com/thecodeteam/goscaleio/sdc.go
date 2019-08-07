@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type Sdc struct {
@@ -131,7 +131,7 @@ func GetSdcLocalGUID() (sdcGUID string, err error) {
 
 	out, err := exec.Command("/opt/emc/scaleio/sdc/bin/drv_cfg", "--query_guid").Output()
 	if err != nil {
-		return "", fmt.Errorf("Error querying volumes: ", err)
+		return "", fmt.Errorf("GetSdcLocalGUID: query vols failed: %v", err)
 	}
 
 	sdcGUID = strings.Replace(string(out), "\n", "", -1)

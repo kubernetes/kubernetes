@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type SdcMappedVolume struct {
@@ -140,7 +140,8 @@ func GetLocalVolumeMap() (mappedVolumes []*SdcMappedVolume, err error) {
 
 	out, err := exec.Command("/opt/emc/scaleio/sdc/bin/drv_cfg", "--query_vols").Output()
 	if err != nil {
-		return []*SdcMappedVolume{}, fmt.Errorf("Error querying volumes: ", err)
+		return []*SdcMappedVolume{},
+			fmt.Errorf("GetLocalVolumeMap: query vols failed: %v", err)
 	}
 
 	result := string(out)

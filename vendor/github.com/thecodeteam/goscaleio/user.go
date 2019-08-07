@@ -3,7 +3,7 @@ package goscaleio
 import (
 	"fmt"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 func (system *System) GetUser() (user []types.User, err error) {

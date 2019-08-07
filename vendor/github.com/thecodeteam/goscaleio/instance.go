@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 func (client *Client) GetInstance(systemhref string) (systems []*types.System, err error) {

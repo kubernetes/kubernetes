@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"reflect"
 
-	types "github.com/codedellemc/goscaleio/types/v1"
+	types "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type Sds struct {
@@ -41,13 +41,13 @@ func (protectionDomain *ProtectionDomain) CreateSds(name string, ipList []string
 		return "", fmt.Errorf("Must provide at least 1 SDS IP")
 	} else if len(ipList) == 1 {
 		sdsIP := types.SdsIp{IP: ipList[0], Role: "all"}
-		sdsIPList := &types.SdsIpList{sdsIP}
+		sdsIPList := &types.SdsIpList{SdsIP: sdsIP}
 		sdsParam.IPList = append(sdsParam.IPList, sdsIPList)
 	} else if len(ipList) >= 2 {
 		sdsIP1 := types.SdsIp{IP: ipList[0], Role: "sdcOnly"}
 		sdsIP2 := types.SdsIp{IP: ipList[1], Role: "sdsOnly"}
-		sdsIPList1 := &types.SdsIpList{sdsIP1}
-		sdsIPList2 := &types.SdsIpList{sdsIP2}
+		sdsIPList1 := &types.SdsIpList{SdsIP: sdsIP1}
+		sdsIPList2 := &types.SdsIpList{SdsIP: sdsIP2}
 		sdsParam.IPList = append(sdsParam.IPList, sdsIPList1)
 		sdsParam.IPList = append(sdsParam.IPList, sdsIPList2)
 	}

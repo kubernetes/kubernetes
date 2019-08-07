@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/klog"
 
-	siotypes "github.com/codedellemc/goscaleio/types/v1"
+	siotypes "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type sioMgr struct {
