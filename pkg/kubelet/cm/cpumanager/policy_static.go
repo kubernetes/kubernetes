@@ -190,7 +190,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 		}
 	}()
 
-	if numCPUs := guaranteedCPUs(pod, container); numCPUs != 0 {
+	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
 		klog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 		// container belongs in an exclusively allocated pool
 
@@ -257,7 +257,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, 
 	return result, nil
 }
 
-func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
+func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return 0
 	}
