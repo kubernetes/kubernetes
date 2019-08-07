@@ -66,9 +66,6 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 
 		metav1.Convert_Map_string_To_string_To_v1_LabelSelector,
 		metav1.Convert_v1_LabelSelector_To_Map_string_To_string,
-
-		Convert_internalversion_ListOptions_To_v1_ListOptions,
-		Convert_v1_ListOptions_To_internalversion_ListOptions,
 	)
 	if err != nil {
 		return err

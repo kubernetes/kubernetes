@@ -24,7 +24,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
         "doc.go",
         "register.go",
         "types.go",
