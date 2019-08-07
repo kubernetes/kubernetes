@@ -1784,6 +1784,55 @@ func TestPodSpreadMap_removePod(t *testing.T) {
 	}
 }
 
+func BenchmarkTestGetTPMapMatchingSpreadConstraints(b *testing.B) {
+	tests := []struct {
+		name             string
+		pod              *v1.Pod
+		existingPodsNum  int
+		allNodesNum      int
+		filteredNodesNum int
+	}{
+		{
+			name: "1000nodes/single-constraint-zone",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			existingPodsNum:  10000,
+			allNodesNum:      1000,
+			filteredNodesNum: 500,
+		},
+		{
+			name: "1000nodes/single-constraint-node",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			existingPodsNum:  10000,
+			allNodesNum:      1000,
+			filteredNodesNum: 500,
+		},
+		{
+			name: "1000nodes/two-constraints-zone-node",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			existingPodsNum:  10000,
+			allNodesNum:      1000,
+			filteredNodesNum: 500,
+		},
+	}
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			existingPods, allNodes, _ := st.MakeNodesAndPods(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				getTPMapMatchingSpreadConstraints(tt.pod, nodeNameToInfo)
+			}
+		})
+	}
+}
+
 var (
 	hardSpread = v1.DoNotSchedule
 	softSpread = v1.ScheduleAnyway

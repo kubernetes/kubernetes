@@ -6,6 +6,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake_lister.go",
+        "workload_prep.go",
         "wrappers.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/testing",
