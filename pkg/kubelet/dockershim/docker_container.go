@@ -235,7 +235,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 		}
 
 		if supported {
-			klog.Warningf("Cannot create symbolic link because container log file doesn't exist!")
+			klog.Warningf("Cannot create symbolic link because container(%s) log file doesn't exist!", containerID)
 		} else {
 			klog.V(5).Infof("Unsupported logging driver by CRI")
 		}
