@@ -180,7 +180,7 @@ func gatherTestSuiteMetrics() error {
 		return fmt.Errorf("failed to grab metrics: %v", err)
 	}
 
-	metricsForE2E := (*e2emetrics.MetricsForE2E)(&received)
+	metricsForE2E := (*e2emetrics.ComponentCollection)(&received)
 	metricsJSON := metricsForE2E.PrintJSON()
 	if TestContext.ReportDir != "" {
 		filePath := path.Join(TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")

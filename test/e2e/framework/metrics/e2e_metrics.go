@@ -33,10 +33,10 @@ const (
 	caFunctionMetricLabel = "function"
 )
 
-// MetricsForE2E is metrics collection of components.
-type MetricsForE2E Collection
+// ComponentCollection is metrics collection of components.
+type ComponentCollection Collection
 
-func (m *MetricsForE2E) filterMetrics() {
+func (m *ComponentCollection) filterMetrics() {
 	apiServerMetrics := make(APIServerMetrics)
 	for _, metric := range interestingAPIServerMetrics {
 		apiServerMetrics[metric] = (*m).APIServerMetrics[metric]
@@ -78,7 +78,7 @@ func printSample(sample *model.Sample) string {
 }
 
 // PrintHumanReadable returns e2e metrics with JSON format.
-func (m *MetricsForE2E) PrintHumanReadable() string {
+func (m *ComponentCollection) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
 	for _, interestingMetric := range interestingAPIServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
@@ -126,14 +126,14 @@ func PrettyPrintJSON(metrics interface{}) string {
 }
 
 // PrintJSON returns e2e metrics with JSON format.
-func (m *MetricsForE2E) PrintJSON() string {
+func (m *ComponentCollection) PrintJSON() string {
 	m.filterMetrics()
 	return PrettyPrintJSON(m)
 }
 
 // SummaryKind returns the summary of e2e metrics.
-func (m *MetricsForE2E) SummaryKind() string {
-	return "MetricsForE2E"
+func (m *ComponentCollection) SummaryKind() string {
+	return "ComponentCollection"
 }
 
 func makeKey(a, b model.LabelValue) string {
@@ -142,7 +142,7 @@ func makeKey(a, b model.LabelValue) string {
 
 // ComputeClusterAutoscalerMetricsDelta computes the change in cluster
 // autoscaler metrics.
-func (m *MetricsForE2E) ComputeClusterAutoscalerMetricsDelta(before Collection) {
+func (m *ComponentCollection) ComputeClusterAutoscalerMetricsDelta(before Collection) {
 	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 			beforeSamplesMap := make(map[string]*model.Sample)

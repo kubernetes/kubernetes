@@ -372,8 +372,8 @@ func (f *Framework) AfterEach() {
 			if err != nil {
 				e2elog.Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
 			}
-			(*e2emetrics.MetricsForE2E)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
-			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.MetricsForE2E)(&received))
+			(*e2emetrics.ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
+			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
 		}
 	}
 
