@@ -489,6 +489,12 @@ const (
 	//
 	// Schedule pods evenly across available topology domains.
 	EvenPodsSpread featuregate.Feature = "EvenPodsSpread"
+
+	// owner: @matthyx
+	// alpha: v1.16
+	//
+	// Enables the startupProbe in kubelet worker.
+	StartupProbe featuregate.Feature = "StartupProbe"
 )
 
 func init() {
@@ -569,6 +575,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
+	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -592,6 +599,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
-	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
+	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
 	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Alpha},
 }
