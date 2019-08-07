@@ -85,6 +85,68 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 		enabledFeatures []featuregate.Feature
 	}{
 		{
+			name: "invalid types allowed via v1beta1",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{
+						Name:    "version",
+						Served:  true,
+						Storage: true,
+					}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+		},
+		{
+			name: "invalid types disallowed via v1",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors: []validationMatch{
+				unsupported("spec.validation.openAPIV3Schema.properties[foo].type"),
+			},
+		},
+		{
 			name: "webhookconfig: invalid port 0",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
@@ -2546,6 +2608,163 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 		enabledFeatures []featuregate.Feature
 	}{
 		{
+			name: "invalid type updates allowed via v1beta1",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+		},
+		{
+			name: "invalid types updates disallowed via v1",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors: []validationMatch{
+				unsupported("spec.validation.openAPIV3Schema.properties[foo].type"),
+			},
+		},
+		{
+			name: "invalid types updates allowed via v1 if old object has invalid types",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus2"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+		},
+		{
 			name: "webhookconfig: should pass on invalid ConversionReviewVersion with old invalid versions",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "42"},
@@ -4317,6 +4536,39 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			mustBeStructural: true,
 			wantError:        false,
+		},
+		{
+			name: "require valid types, valid",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+				},
+			},
+			opts:             validationOptions{requireValidPropertyType: true},
+			mustBeStructural: true,
+			wantError:        false,
+		},
+		{
+			name: "require valid types, invalid",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "null",
+				},
+			},
+			opts:             validationOptions{requireValidPropertyType: true},
+			mustBeStructural: true,
+			wantError:        true,
+		},
+		{
+			name: "require valid types, invalid",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "bogus",
+				},
+			},
+			opts:             validationOptions{requireValidPropertyType: true},
+			mustBeStructural: true,
+			wantError:        true,
 		},
 	}
 	for _, tt := range tests {

@@ -66,6 +66,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		requireRecognizedConversionReviewVersion: true,
 		requireImmutableNames:                    false,
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, nil),
+		requireValidPropertyType:                 requireValidPropertyType(requestGV, nil),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -87,6 +88,8 @@ type validationOptions struct {
 	requireImmutableNames bool
 	// requireOpenAPISchema requires an openapi V3 schema be specified
 	requireOpenAPISchema bool
+	// requireValidPropertyType requires property types specified in the validation schema to be valid openapi v3 types
+	requireValidPropertyType bool
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
@@ -96,6 +99,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
 		requireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, &oldObj.Spec),
+		requireValidPropertyType:                 requireValidPropertyType(requestGV, &oldObj.Spec),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
@@ -650,7 +654,8 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 		}
 
 		openAPIV3Schema := &specStandardValidatorV3{
-			allowDefaults: opts.allowDefaults,
+			allowDefaults:            opts.allowDefaults,
+			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true)...)
 
@@ -779,9 +784,10 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 }
 
 type specStandardValidatorV3 struct {
-	allowDefaults          bool
-	disallowDefaultsReason string
-	isInsideResourceMeta   bool
+	allowDefaults            bool
+	disallowDefaultsReason   string
+	isInsideResourceMeta     bool
+	requireValidPropertyType bool
 }
 
 func (v *specStandardValidatorV3) withForbiddenDefaults(reason string) specStandardValidator {
@@ -812,6 +818,10 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 	//
 	// WARNING: if anything new is allowed below, NewStructural must be adapted to support it.
 	//
+
+	if v.requireValidPropertyType && len(schema.Type) > 0 && !openapiV3Types.Has(schema.Type) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), schema.Type, openapiV3Types.List()))
+	}
 
 	if schema.Default != nil {
 		if v.allowDefaults {
@@ -1168,6 +1178,19 @@ func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
 	return false
 }
 
+// requireValidPropertyType returns true if valid openapi v3 types should be required for the given API version
+func requireValidPropertyType(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if requestGV == v1beta1.SchemeGroupVersion {
+		// for compatibility
+		return false
+	}
+	if oldCRDSpec != nil && specHasInvalidTypes(oldCRDSpec) {
+		// don't tighten validation on existing persisted data
+		return false
+	}
+	return true
+}
+
 // validateAPIApproval returns a list of errors if the API approval annotation isn't valid
 func validateAPIApproval(newCRD, oldCRD *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
 	// check to see if we need confirm API approval for kube group.
@@ -1226,6 +1249,18 @@ func validatePreserveUnknownFields(crd, oldCRD *apiextensions.CustomResourceDefi
 		errs = append(errs, field.Invalid(field.NewPath("spec").Child("preserveUnknownFields"), crd.Spec.PreserveUnknownFields, "cannot set to true, set x-preserve-unknown-fields to true in spec.versions[*].schema instead"))
 	}
 	return errs
+}
+
+func specHasInvalidTypes(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if spec.Validation != nil && SchemaHasInvalidTypes(spec.Validation.OpenAPIV3Schema) {
+		return true
+	}
+	for _, v := range spec.Versions {
+		if v.Schema != nil && SchemaHasInvalidTypes(v.Schema.OpenAPIV3Schema) {
+			return true
+		}
+	}
+	return false
 }
 
 // SchemaHasInvalidTypes returns true if it contains invalid offending openapi-v3 specification.
