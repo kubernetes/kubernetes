@@ -36,6 +36,8 @@ pkg/apis/core/validation
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
+pkg/apis/flowcontrol/v1alpha1
+pkg/apis/flowcontrol/validation
 pkg/apis/networking/v1
 pkg/apis/node/v1alpha1
 pkg/apis/policy
@@ -240,6 +242,11 @@ pkg/registry/core/serviceaccount/storage
 pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
+pkg/registry/flowcontrol/flowschema
+pkg/registry/flowcontrol/flowschema/storage
+pkg/registry/flowcontrol/prioritylevelconfiguration
+pkg/registry/flowcontrol/prioritylevelconfiguration/storage
+pkg/registry/flowcontrol/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
 pkg/registry/node/rest
