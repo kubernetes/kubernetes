@@ -348,6 +348,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				"ext4",
 				"xfs",
 			),
+			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,

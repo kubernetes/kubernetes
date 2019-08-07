@@ -366,6 +366,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		accessMode = spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
+	var mountOptions []string
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.MountOptions != nil {
+		mountOptions = spec.PersistentVolume.Spec.MountOptions
+	}
+
 	fsType := csiSource.FSType
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
@@ -374,7 +379,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		fsType,
 		accessMode,
 		nodeStageSecrets,
-		csiSource.VolumeAttributes)
+		csiSource.VolumeAttributes,
+		mountOptions)
 
 	if err != nil {
 		return err
