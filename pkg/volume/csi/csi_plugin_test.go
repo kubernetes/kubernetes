@@ -81,6 +81,12 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 	return csiPlug, tmpDir
 }
 
+func makeTestPVWithMountOptions(name string, sizeGig int, driverName, volID string, mountOptions []string) *api.PersistentVolume {
+	pv := makeTestPV(name, sizeGig, driverName, volID)
+	pv.Spec.MountOptions = mountOptions
+	return pv
+}
+
 func makeTestPV(name string, sizeGig int, driverName, volID string) *api.PersistentVolume {
 	return &api.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{

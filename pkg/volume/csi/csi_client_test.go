@@ -110,6 +110,7 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	c.t.Log("calling fake.NodeStageVolume...")
 	req := &csipbv1.NodeStageVolumeRequest{
@@ -122,7 +123,8 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 			},
 			AccessType: &csipbv1.VolumeCapability_Mount{
 				Mount: &csipbv1.VolumeCapability_MountVolume{
-					FsType: fsType,
+					FsType:     fsType,
+					MountFlags: mountOptions,
 				},
 			},
 		},
@@ -338,10 +340,11 @@ func TestClientNodeStageVolume(t *testing.T) {
 		stagingTargetPath string
 		fsType            string
 		secrets           map[string]string
+		mountOptions      []string
 		mustFail          bool
 		err               error
 	}{
-		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4"},
+		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4", mountOptions: []string{"unvalidated"}},
 		{name: "missing volID", stagingTargetPath: "/test/path", mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
 		{name: "bad fs", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "badfs", mustFail: true},
@@ -369,6 +372,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 			api.ReadWriteOnce,
 			tc.secrets,
 			map[string]string{"attr0": "val0"},
+			tc.mountOptions,
 		)
 		checkErr(t, tc.mustFail, err)
 
