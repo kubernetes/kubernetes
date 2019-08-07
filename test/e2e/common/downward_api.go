@@ -23,16 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-)
-
-var (
-	hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
-	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
 )
 
 var _ = Describe("[sig-node] Downward API", func() {
@@ -90,7 +84,6 @@ var _ = Describe("[sig-node] Downward API", func() {
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func() {
-		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -218,7 +211,6 @@ var _ = Describe("[sig-node] Downward API", func() {
 	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func() {
-		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
