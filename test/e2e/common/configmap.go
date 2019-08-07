@@ -138,7 +138,6 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	ginkgo.It("should patch ConfigMap successfully", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
-		configMapOriginalState := *configMap
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
 		framework.ExpectNoError(err)
@@ -153,7 +152,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By(fmt.Sprintf("Verifying update of configMap %v/%v", f.Namespace.Name, configMap.Name))
-		framework.ExpectNotEqual(configMapFromUpdate.Data, configMapOriginalState.Data)
+		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
 	})
 })
 
