@@ -50,6 +50,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -972,7 +973,7 @@ func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "glusterdynamic-provisioner",
-					Image: "docker.io/gluster/glusterdynamic-provisioner:v1.0",
+					Image: imageutils.GetE2EImage(imageutils.GlusterDynamicProvisioner),
 					Args: []string{
 						"-config=" + "/etc/heketi/heketi.json",
 					},
