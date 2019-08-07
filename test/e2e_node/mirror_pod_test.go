@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-			framework.ExpectEqual(pod.Spec.Containers, 1)
+			framework.ExpectEqual(len(pod.Spec.Containers), 1)
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 		/*
