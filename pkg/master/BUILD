@@ -60,6 +60,7 @@ go_library(
         "//pkg/registry/discovery/rest:go_default_library",
         "//pkg/registry/events/rest:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
+        "//pkg/registry/flowcontrol/rest:go_default_library",
         "//pkg/registry/networking/rest:go_default_library",
         "//pkg/registry/node/rest:go_default_library",
         "//pkg/registry/policy/rest:go_default_library",

@@ -225,16 +225,16 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		}
 	} else {
 		if spec.AssuredConcurrencyShares != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("assuredConcurrencyShares"), spec.AssuredConcurrencyShares, "must be positive for exempt priority"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("assuredConcurrencyShares"), "must be zero for exempt priority"))
 		}
 		if spec.QueueLengthLimit != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("queueLengthLimit"), spec.QueueLengthLimit, "must be positive for exempt priority"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queueLengthLimit"), "must be zero for exempt priority"))
 		}
 		if spec.Queues != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("queues"), spec.Queues, "must be positive for exempt priority"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queues"), "must be zero for exempt priority"))
 		}
 		if spec.HandSize != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), spec.HandSize, "must be positive for exempt priority"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("handSize"), "must be zero for exempt priority"))
 		}
 	}
 	if spec.HandSize > spec.Queues {
