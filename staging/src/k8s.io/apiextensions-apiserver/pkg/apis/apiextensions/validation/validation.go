@@ -25,9 +25,11 @@ import (
 	govalidate "github.com/go-openapi/validate"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 
+	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -48,7 +50,7 @@ var (
 )
 
 // ValidateCustomResourceDefinition statically validates
-func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinition) field.ErrorList {
+func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
 	nameValidationFn := func(name string, prefix bool) []string {
 		ret := genericvalidation.NameIsDNSSubdomain(name, prefix)
 		requiredName := obj.Spec.Names.Plural + "." + obj.Spec.Group
@@ -62,15 +64,17 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpec(&obj.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
+	allErrs = append(allErrs, validateAPIApproval(obj, nil, requestGV)...)
 	return allErrs
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
-func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
+func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpecUpdate(&obj.Spec, &oldObj.Spec, apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established), field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
+	allErrs = append(allErrs, validateAPIApproval(obj, oldObj, requestGV)...)
 	return allErrs
 }
 
@@ -1093,4 +1097,45 @@ func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
 	}
 
 	return false
+}
+
+// validateAPIApproval returns a list of errors if the API approval annotation isn't valid
+func validateAPIApproval(newCRD, oldCRD *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
+	// check to see if we need confirm API approval for kube group.
+
+	if requestGV == v1beta1.SchemeGroupVersion {
+		// no-op for compatibility with v1beta1
+		return nil
+	}
+	if !apihelpers.IsProtectedCommunityGroup(newCRD.Spec.Group) {
+		// no-op for non-protected groups
+		return nil
+	}
+
+	// default to a state that allows missing values to continue to be missing
+	var oldApprovalState *apihelpers.APIApprovalState
+	if oldCRD != nil {
+		t, _ := apihelpers.GetAPIApprovalState(oldCRD.Annotations)
+		oldApprovalState = &t
+	}
+	newApprovalState, reason := apihelpers.GetAPIApprovalState(newCRD.Annotations)
+
+	// if the approval state hasn't changed, never fail on approval validation
+	// this is allowed so that a v1 client that is simply updating spec and not mutating this value doesn't get rejected.  Imagine a controller controlling a CRD spec.
+	if oldApprovalState != nil && *oldApprovalState == newApprovalState {
+		return nil
+	}
+
+	// in v1, we require valid approval strings
+	switch newApprovalState {
+	case apihelpers.APIApprovalInvalid:
+		return field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), newCRD.Annotations[v1beta1.KubeAPIApprovedAnnotation], reason)}
+	case apihelpers.APIApprovalMissing:
+		return field.ErrorList{field.Required(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), reason)}
+	case apihelpers.APIApproved, apihelpers.APIApprovalBypassed:
+		// success
+		return nil
+	default:
+		return field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), newCRD.Annotations[v1beta1.KubeAPIApprovedAnnotation], reason)}
+	}
 }
