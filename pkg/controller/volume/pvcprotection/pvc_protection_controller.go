@@ -127,7 +127,7 @@ func (c *Controller) processNextWorkItem() bool {
 
 	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey.(string))
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error parsing PVC key %q: %v", pvcKey, err))
+		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %v", pvcKey, err))
 		return true
 	}
 
@@ -233,7 +233,7 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 
 	pods, err := c.podLister.Pods(pvc.Namespace).List(labels.Everything())
 	if err != nil {
-		return false, fmt.Errorf("Cache-based list of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
+		return false, fmt.Errorf("cache-based list of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
 	}
 
 	for _, pod := range pods {
@@ -251,7 +251,7 @@ func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 
 	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return false, fmt.Errorf("Live list of pods failed: %s", err.Error())
+		return false, fmt.Errorf("live list of pods failed: %s", err.Error())
 	}
 
 	for _, pod := range podsList.Items {
@@ -288,7 +288,7 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 	}
 	key, err := cache.MetaNamespaceKeyFunc(pvc)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
 		return
 	}
 	klog.V(4).Infof("Got event on PVC %s", key)
@@ -322,12 +322,12 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return nil
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
 			return nil
 		}
 	}
