@@ -44,6 +44,7 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
 		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessSSHKeyPresent()
 
 		err := framework.RunRC(testutils.RCConfig{
 			Client:    f.ClientSet,

@@ -116,6 +116,8 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 	})
 
 	ginkgo.It("should be resizable when mounted", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		driver := "dummy-attachable"
 
 		node := nodeList.Items[0]
