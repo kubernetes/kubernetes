@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 			ginkgo.It("Kubelet's oom-score-adj should be -999", func() {
 				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
 				gomega.Expect(err).To(gomega.BeNil(), "failed to get list of kubelet pids")
-				gomega.Expect(len(kubeletPids)).To(gomega.Equal(1), "expected only one kubelet process; found %d", len(kubeletPids))
+				framework.ExpectEqual(len(kubeletPids), 1, "expected only one kubelet process; found %d", len(kubeletPids))
 				gomega.Eventually(func() error {
 					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
 				}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
