@@ -383,6 +383,15 @@ func dropDisabledFields(
 		})
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbeEnabled) {
+		// drop startupProbe from all containers if the feature is disabled
+		for i := range podSpec.Containers {
+			if podSpec.Containers[i].StartupProbe != nil {
+				podSpec.Containers[i].StartupProbe = nil
+			}
+		}
+	}
+
 	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)

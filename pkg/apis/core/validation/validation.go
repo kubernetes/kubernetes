@@ -2696,6 +2696,9 @@ func validateInitContainers(containers, otherContainers []core.Container, device
 		if ctr.ReadinessProbe != nil {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("readinessProbe"), ctr.ReadinessProbe, "must not be set for init containers"))
 		}
+		if ctr.StartupProbe != nil {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("startupProbe"), ctr.StartupProbe, "must not be set for init containers"))
+		}
 	}
 	return allErrs
 }
@@ -2737,6 +2740,11 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 		// Liveness-specific validation
 		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
+		}
+		allErrs = append(allErrs, validateProbe(ctr.StartupProbe, idxPath.Child("startupProbe"))...)
+		// Startup-specific validation
+		if ctr.StartupProbe != nil && ctr.StartupProbe.SuccessThreshold != 1 {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("startupProbe", "successThreshold"), ctr.StartupProbe.SuccessThreshold, "must be 1"))
 		}
 
 		switch ctr.TerminationMessagePolicy {

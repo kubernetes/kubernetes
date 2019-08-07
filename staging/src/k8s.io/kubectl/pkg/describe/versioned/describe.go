@@ -58,6 +58,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1699,6 +1700,11 @@ func describeContainerProbe(container corev1.Container, w PrefixWriter) {
 	if container.ReadinessProbe != nil {
 		probe := DescribeProbe(container.ReadinessProbe)
 		w.Write(LEVEL_2, "Readiness:\t%s\n", probe)
+	}
+	// Avoid cyclic dependency on k8s.io/kubernetes by not using features.StartupProbeEnabled
+	if container.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled("StartupProbeEnabled") {
+		probe := DescribeProbe(container.StartupProbe)
+		w.Write(LEVEL_2, "Startup:\t%s\n", probe)
 	}
 }
 
