@@ -27,8 +27,10 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest/fake"
 
 	// TODO we need to remove this linkage and create our own scheme
@@ -473,6 +475,88 @@ func TestHelperListSelectorCombination(t *testing.T) {
 				if err != nil && err.Error() != tt.ErrMsg {
 					t.Errorf("%q expected error: %q", tt.Name, tt.ErrMsg)
 				}
+			}
+		})
+	}
+}
+
+func TestHelperPatch(t *testing.T) {
+	tests := []struct {
+		Name            string
+		Resp            *http.Response
+		HTTPClient      *http.Client
+		HttpErr         error
+		Namespace       string
+		NamespaceScoped bool
+		Pt              types.PatchType
+		Obj             runtime.Object
+		Options         *metav1.PatchOptions
+		Err             bool
+	}{
+		{
+			Name: "test 1",
+			Resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     header(),
+				Body:       objBody(&metav1.Status{Status: metav1.StatusSuccess}),
+			},
+			HTTPClient: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method == "PUT" {
+					return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})}, nil
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}, TypeMeta: metav1.TypeMeta{Kind: "Pod"}})}, nil
+			}),
+			HttpErr:         nil,
+			Namespace:       "foo",
+			NamespaceScoped: true,
+			Pt:              types.StrategicMergePatchType,
+			Obj:             &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			Err:             false,
+		},
+		{
+			Name: "test 2",
+			Resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     header(),
+				Body:       objBody(&metav1.Status{Status: metav1.StatusSuccess}),
+			},
+			HTTPClient: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.Method == "PUT" {
+					return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})}, nil
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10", ManagedFields: []metav1.ManagedFieldsEntry{metav1.ManagedFieldsEntry{Manager: "true"}}}, TypeMeta: metav1.TypeMeta{Kind: "Pod"}})}, nil
+			}),
+			HttpErr:         nil,
+			Namespace:       "foo",
+			NamespaceScoped: true,
+			Pt:              types.StrategicMergePatchType,
+			Obj:             &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ManagedFields: []metav1.ManagedFieldsEntry{metav1.ManagedFieldsEntry{Manager: "true"}}}, TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			Err:             true,
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			client := &fake.RESTClient{
+				GroupVersion:         corev1GV,
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client:               tt.HTTPClient,
+				Resp:                 tt.Resp,
+				Err:                  tt.HttpErr,
+			}
+			modifier := &Helper{
+				RESTClient:      client,
+				NamespaceScoped: tt.NamespaceScoped,
+			}
+
+			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, tt.Obj)
+			if err != nil {
+				t.Errorf("unable to encode obj %v. Error: %v", tt.Obj, err)
+			}
+
+			_, err = modifier.Patch(tt.Namespace, "foo", tt.Pt, data, tt.Options)
+			if (err != nil) != tt.Err {
+				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
 			}
 		})
 	}

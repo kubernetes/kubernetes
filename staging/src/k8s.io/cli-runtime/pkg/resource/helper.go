@@ -17,10 +17,12 @@ limitations under the License.
 package resource
 
 import (
+	"errors"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -142,6 +144,21 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 	if options == nil {
 		options = &metav1.PatchOptions{}
 	}
+
+	obj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, data)
+	if err != nil {
+		return nil, err
+	}
+
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(objMeta.GetManagedFields()) > 0 {
+		return nil, errors.New("managed fields must be empty")
+	}
+
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
