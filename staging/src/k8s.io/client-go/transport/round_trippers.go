@@ -333,9 +333,9 @@ type requestInfo struct {
 	RequestVerb    string
 	RequestURL     string
 
-	ResponseStatus  string
-	ResponseHeaders http.Header
-	ResponseErr     error
+	ResponseStatusCode int
+	ResponseHeaders    http.Header
+	ResponseErr        error
 
 	Duration time.Duration
 }
@@ -355,7 +355,7 @@ func (r *requestInfo) complete(response *http.Response, err error) {
 		r.ResponseErr = err
 		return
 	}
-	r.ResponseStatus = response.Status
+	r.ResponseStatusCode = response.StatusCode
 	r.ResponseHeaders = response.Header
 }
 
@@ -435,10 +435,10 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	reqInfo.complete(response, err)
 
 	if rt.levels[debugURLTiming] {
-		klog.Infof("%s %s %s in %d milliseconds", reqInfo.RequestVerb, reqInfo.RequestURL, reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
+		klog.Infof("%s %s %d in %d milliseconds", reqInfo.RequestVerb, reqInfo.RequestURL, reqInfo.ResponseStatusCode, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
 	if rt.levels[debugResponseStatus] {
-		klog.Infof("Response Status: %s in %d milliseconds", reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
+		klog.Infof("Response Status: %d in %d milliseconds", reqInfo.ResponseStatusCode, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
 	if rt.levels[debugResponseHeaders] {
 		klog.Infof("Response Headers:")

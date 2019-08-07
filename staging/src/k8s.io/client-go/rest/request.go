@@ -768,6 +768,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			}
 			// For the purpose of retry, we set the artificial "retry-after" response.
 			// TODO: Should we clean the original response if it exists?
+			klog.V(5).Infof("Retrying a connection reset error")
 			resp = &http.Response{
 				StatusCode: http.StatusInternalServerError,
 				Header:     http.Header{"Retry-After": []string{"1"}},
