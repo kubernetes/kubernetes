@@ -1832,8 +1832,6 @@ k8s.io/legacy-cloud-providers/azure
 k8s.io/legacy-cloud-providers/azure/auth
 k8s.io/legacy-cloud-providers/gce
 k8s.io/legacy-cloud-providers/openstack
-k8s.io/legacy-cloud-providers/openstack/util/file
-k8s.io/legacy-cloud-providers/openstack/util/io
 k8s.io/legacy-cloud-providers/openstack/util/mount
 k8s.io/legacy-cloud-providers/vsphere
 k8s.io/legacy-cloud-providers/vsphere/testing

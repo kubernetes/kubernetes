@@ -32,10 +32,10 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfile "k8s.io/cloud-provider-openstack/pkg/util/file"
-	utilio "k8s.io/cloud-provider-openstack/pkg/util/io"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
+	utilio "k8s.io/utils/io"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -424,7 +424,7 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 
 // ExistsPath returns true if the specified path exists.
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilfile.Exists(pathname)
+	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 
 // EvalHostSymlinks returns the actual path a symlink points to.

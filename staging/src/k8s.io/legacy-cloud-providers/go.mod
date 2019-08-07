@@ -15,7 +15,6 @@ require (
 	github.com/aws/aws-sdk-go v1.16.26
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/gophercloud/gophercloud v0.1.0
-	github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/prometheus/client_golang v0.9.2
 	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c

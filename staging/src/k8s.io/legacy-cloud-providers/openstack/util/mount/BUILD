@@ -14,15 +14,15 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-            "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/file:go_default_library",
-            "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/io:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
+            "//vendor/k8s.io/utils/io:go_default_library",
+            "//vendor/k8s.io/utils/path:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
-            "//staging/src/k8s.io/legacy-cloud-providers/openstack/util/file:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/utils/path:go_default_library",
         ],
         "//conditions:default": [],
     }),
