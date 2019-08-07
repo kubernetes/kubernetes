@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -141,7 +141,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -186,7 +186,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 5, time.Minute*5)
+		RunLivenessTest(f, pod, 5, time.Minute*5)
 	})
 
 	/*
@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
 		}
 		pod := testWebServerPodSpec(nil, livenessProbe, "test-webserver", 80)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -221,7 +221,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -236,7 +236,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -251,7 +251,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 		// Expect an event of type "ProbeWarning".
 		expectedEvent := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -262,6 +262,16 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(WaitTimeoutForEvent(
 			f.ClientSet, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
+
+	/*
+		Release : v1.15
+		Testname: Pod liveness probe, using local file, delayed by startup probe
+		Description: A Pod is created with liveness probe that uses ‘exec’ command to cat /temp/health file. Liveness probe MUST not fail until startup probe succeeds.
+
+		This test is located in test/e2e_node/startup_probe_test.go as it requires tempSetCurrentKubeletConfig
+		to enable the feature gate for startupProbe, once removed test should come here.
+	*/
+
 })
 
 func getContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
@@ -404,7 +414,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 	return probe
 }
 
-func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
+func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
