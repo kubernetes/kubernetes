@@ -17,20 +17,21 @@ limitations under the License.
 package customresourcedefinition
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
@@ -517,6 +518,9 @@ func TestValidateAPIApproval(t *testing.T) {
 			annotationValue: "invalid",
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
+				if len(errors) == 0 {
+					t.Fatal("expected errors, got none")
+				}
 				if e, a := `metadata.annotations[api-approved.kubernetes.io]: Invalid value: "invalid": protected groups must have approval annotation "api-approved.kubernetes.io" with either a URL or a reason starting with "unapproved", see https://github.com/kubernetes/enhancements/pull/1111`, errors.ToAggregate().Error(); e != a {
 					t.Fatal(errors)
 				}
@@ -538,6 +542,9 @@ func TestValidateAPIApproval(t *testing.T) {
 			oldAnnotationValue: strPtr("invalid"),
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
+				if len(errors) == 0 {
+					t.Fatal("expected errors, got none")
+				}
 				if e, a := `metadata.annotations[api-approved.kubernetes.io]: Required value: protected groups must have approval annotation "api-approved.kubernetes.io", see https://github.com/kubernetes/enhancements/pull/1111`, errors.ToAggregate().Error(); e != a {
 					t.Fatal(errors)
 				}
@@ -551,6 +558,9 @@ func TestValidateAPIApproval(t *testing.T) {
 			oldAnnotationValue: strPtr(""),
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
+				if len(errors) == 0 {
+					t.Fatal("expected errors, got none")
+				}
 				if e, a := `metadata.annotations[api-approved.kubernetes.io]: Invalid value: "invalid": protected groups must have approval annotation "api-approved.kubernetes.io" with either a URL or a reason starting with "unapproved", see https://github.com/kubernetes/enhancements/pull/1111`, errors.ToAggregate().Error(); e != a {
 					t.Fatal(errors)
 				}
@@ -563,6 +573,9 @@ func TestValidateAPIApproval(t *testing.T) {
 			annotationValue: "",
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
+				if len(errors) == 0 {
+					t.Fatal("expected errors, got none")
+				}
 				if e, a := `metadata.annotations[api-approved.kubernetes.io]: Required value: protected groups must have approval annotation "api-approved.kubernetes.io", see https://github.com/kubernetes/enhancements/pull/1111`, errors.ToAggregate().Error(); e != a {
 					t.Fatal(errors)
 				}
@@ -597,6 +610,9 @@ func TestValidateAPIApproval(t *testing.T) {
 			annotationValue: "invalid",
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
+				if len(errors) == 0 {
+					t.Fatal("expected errors, got none")
+				}
 				if e, a := `metadata.annotations[api-approved.kubernetes.io]: Invalid value: "invalid": protected groups must have approval annotation "api-approved.kubernetes.io" with either a URL or a reason starting with "unapproved", see https://github.com/kubernetes/enhancements/pull/1111`, errors.ToAggregate().Error(); e != a {
 					t.Fatal(errors)
 				}
@@ -606,24 +622,48 @@ func TestValidateAPIApproval(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{APIVersion: test.version})
 			crd := &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: test.annotationValue}},
+				ObjectMeta: metav1.ObjectMeta{Name: "foos." + test.group, Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: test.annotationValue}, ResourceVersion: "1"},
 				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group: test.group,
+					Group:    test.group,
+					Scope:    apiextensions.NamespaceScoped,
+					Version:  "v1",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "v1", Storage: true, Served: true}},
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "foos", Singular: "foo", Kind: "Foo", ListKind: "FooList"},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: pointer.BoolPtr(true)},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"v1"},
 				},
 			}
 			var oldCRD *apiextensions.CustomResourceDefinition
 			if test.oldAnnotationValue != nil {
 				oldCRD = &apiextensions.CustomResourceDefinition{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: *test.oldAnnotationValue}},
+					ObjectMeta: metav1.ObjectMeta{Name: "foos." + test.group, Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: *test.oldAnnotationValue}, ResourceVersion: "1"},
 					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group: test.group,
+						Group:    test.group,
+						Scope:    apiextensions.NamespaceScoped,
+						Version:  "v1",
+						Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "v1", Storage: true, Served: true}},
+						Names:    apiextensions.CustomResourceDefinitionNames{Plural: "foos", Singular: "foo", Kind: "Foo", ListKind: "FooList"},
+						Validation: &apiextensions.CustomResourceValidation{
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: pointer.BoolPtr(true)},
+						},
+					},
+					Status: apiextensions.CustomResourceDefinitionStatus{
+						StoredVersions: []string{"v1"},
 					},
 				}
 			}
 
-			actual := validateAPIApproval(ctx, crd, oldCRD)
+			var actual field.ErrorList
+			if oldCRD == nil {
+				actual = validation.ValidateCustomResourceDefinition(crd, schema.GroupVersion{Group: "apiextensions.k8s.io", Version: test.version})
+			} else {
+				actual = validation.ValidateCustomResourceDefinitionUpdate(crd, oldCRD, schema.GroupVersion{Group: "apiextensions.k8s.io", Version: test.version})
+			}
 			test.validateError(t, actual)
 		})
 	}

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -78,6 +79,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 	tests := []struct {
 		name            string
 		resource        *apiextensions.CustomResourceDefinition
+		requestGV       schema.GroupVersion
 		errors          []validationMatch
 		enabledFeatures []featuregate.Feature
 	}{
@@ -315,6 +317,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				forbidden("spec", "conversion", "webhookClientConfig"),
 			},
@@ -354,6 +357,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				forbidden("spec", "conversion", "conversionReviewVersions"),
 			},
@@ -665,7 +669,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version1"},
 				},
 			},
-			errors: []validationMatch{},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			errors:    []validationMatch{},
 		},
 		{
 			name: "webhook conversion without preserveUnknownFields=false",
@@ -705,6 +710,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version1"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("spec", "conversion", "strategy"),
 			},
@@ -788,6 +794,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("spec", "versions"),
 			},
@@ -826,6 +833,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("spec", "versions"),
 				invalid("status", "storedVersions"),
@@ -865,6 +873,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("status", "storedVersions"),
 			},
@@ -898,6 +907,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("status", "storedVersions"),
 			},
@@ -914,6 +924,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("status", "storedVersions"),
 				invalid("metadata", "name"),
@@ -966,6 +977,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("status", "storedVersions"),
 				invalid("metadata", "name"),
@@ -1014,6 +1026,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("metadata", "name"),
 				invalid("spec", "group"),
@@ -1054,6 +1067,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "additionalProperties"),
 			},
@@ -1092,7 +1106,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			errors: []validationMatch{},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			errors:    []validationMatch{},
 		},
 		{
 			name: "per-version fields may not all be set to identical values (top-level field should be used instead)",
@@ -1136,6 +1151,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				// Per-version schema/subresources/columns may not all be set to identical values.
 				// Note that the test will fail if we de-duplicate the expected errors below.
@@ -1421,6 +1437,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version0"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				invalid("spec", "versions[3]", "subresources", "scale", "labelSelectorPath"),
 			},
@@ -1457,6 +1474,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disabled feature-gate
 			},
@@ -1491,6 +1509,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				required("spec", "validation", "openAPIV3Schema", "type"),
 			},
@@ -1525,6 +1544,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				required("spec", "validation", "openAPIV3Schema", "type"),
 			},
@@ -1563,6 +1583,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				required("spec", "validation", "openAPIV3Schema", "type"),
 			},
@@ -1626,6 +1647,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "x-kubernetes-embedded-resource"),
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[apiVersion]", "properties[foo]", "x-kubernetes-embedded-resource"),
@@ -2388,7 +2410,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
 				tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
 			}
-			errs := ValidateCustomResourceDefinition(tc.resource)
+			errs := ValidateCustomResourceDefinition(tc.resource, tc.requestGV)
 			seenErrs := make([]bool, len(errs))
 
 			for _, expectedError := range tc.errors {
@@ -2420,6 +2442,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 		name            string
 		old             *apiextensions.CustomResourceDefinition
 		resource        *apiextensions.CustomResourceDefinition
+		requestGV       schema.GroupVersion
 		errors          []validationMatch
 		enabledFeatures []featuregate.Feature
 	}{
@@ -3350,7 +3373,8 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			errors: []validationMatch{},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			errors:    []validationMatch{},
 		},
 		{
 			name: "setting defaults with enabled feature gate",
@@ -3528,7 +3552,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)()
 			}
 
-			errs := ValidateCustomResourceDefinitionUpdate(tc.resource, tc.old)
+			errs := ValidateCustomResourceDefinitionUpdate(tc.resource, tc.old, tc.requestGV)
 			seenErrs := make([]bool, len(errs))
 
 			for _, expectedError := range tc.errors {
@@ -3561,6 +3585,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		input            apiextensions.CustomResourceValidation
 		mustBeStructural bool
 		statusEnabled    bool
+		opts             validationOptions
 		wantError        bool
 	}{
 		{
@@ -3702,7 +3727,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateCustomResourceDefinitionValidation(&tt.input, tt.mustBeStructural, tt.statusEnabled, false, field.NewPath("spec", "validation"))
+			got := validateCustomResourceDefinitionValidation(&tt.input, tt.mustBeStructural, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 			if !tt.wantError && len(got) > 0 {
 				t.Errorf("Expected no error, but got: %v", got)
 			} else if tt.wantError && len(got) == 0 {
