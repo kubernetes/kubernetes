@@ -20,69 +20,72 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strings"
 	"testing"
 )
 
 func TestValidateParameters(t *testing.T) {
 	tests := []struct {
-		name      string
-		deckSize  int32
-		handSize  int32
-		validated bool
+		name     string
+		deckSize int
+		handSize int
+		errors   []string
 	}{
 		{
 			"deckSize is < 0",
 			-100,
 			8,
-			false,
+			[]string{"deckSize is not positive"},
 		},
 		{
 			"handSize is < 0",
 			128,
 			-100,
-			false,
+			[]string{"handSize is not positive"},
 		},
 		{
 			"deckSize is 0",
 			0,
 			8,
-			false,
+			[]string{"deckSize is not positive"},
 		},
 		{
 			"handSize is 0",
 			128,
 			0,
-			false,
+			[]string{"handSize is not positive"},
 		},
 		{
 			"handSize is greater than deckSize",
 			128,
 			129,
-			false,
+			[]string{"handSize is greater than deckSize"},
 		},
 		{
 			"deckSize: 128 handSize: 6",
 			128,
 			6,
-			true,
+			nil,
 		},
 		{
 			"deckSize: 1024 handSize: 6",
 			1024,
 			6,
-			true,
+			nil,
 		},
 		{
 			"deckSize: 512 handSize: 8",
 			512,
 			8,
-			false,
+			[]string{"more than 60 bits of entropy required"},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if ValidateParameters(test.deckSize, test.handSize) != test.validated {
-				t.Errorf("test case %s fails", test.name)
+			got := strings.Join(ValidateParameters(test.deckSize, test.handSize), ";")
+			expected := strings.Join(test.errors, ";")
+			if got != expected {
+				t.Errorf("test case %s got %q but expected %q", test.name, got, expected)
 				return
 			}
 		})
@@ -90,7 +93,7 @@ func TestValidateParameters(t *testing.T) {
 }
 
 func BenchmarkValidateParameters(b *testing.B) {
-	deckSize, handSize := int32(512), int32(8)
+	deckSize, handSize := 512, 8
 	for i := 0; i < b.N; i++ {
 		_ = ValidateParameters(deckSize, handSize)
 	}
@@ -99,65 +102,65 @@ func BenchmarkValidateParameters(b *testing.B) {
 func TestShuffleAndDealWithValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		deckSize  int32
-		handSize  int32
-		pick      func(int32)
+		deckSize  int
+		handSize  int
+		pick      func(int)
 		validated bool
 	}{
 		{
 			"deckSize is < 0",
 			-100,
 			8,
-			func(int32) {},
+			func(int) {},
 			false,
 		},
 		{
 			"handSize is < 0",
 			128,
 			-100,
-			func(int32) {},
+			func(int) {},
 			false,
 		},
 		{
 			"deckSize is 0",
 			0,
 			8,
-			func(int32) {},
+			func(int) {},
 			false,
 		},
 		{
 			"handSize is 0",
 			128,
 			0,
-			func(int32) {},
+			func(int) {},
 			false,
 		},
 		{
 			"handSize is greater than deckSize",
 			128,
 			129,
-			func(int32) {},
+			func(int) {},
 			false,
 		},
 		{
 			"deckSize: 128 handSize: 6",
 			128,
 			6,
-			func(int32) {},
+			func(int) {},
 			true,
 		},
 		{
 			"deckSize: 1024 handSize: 6",
 			1024,
 			6,
-			func(int32) {},
+			func(int) {},
 			true,
 		},
 		{
 			"deckSize: 512 handSize: 8",
 			512,
 			8,
-			func(int32) {},
+			func(int) {},
 			false,
 		},
 	}
@@ -173,8 +176,8 @@ func TestShuffleAndDealWithValidation(t *testing.T) {
 
 func BenchmarkShuffleAndDeal(b *testing.B) {
 	hashValueBase := math.MaxUint64 / uint64(b.N)
-	deckSize, handSize := int32(512), int32(8)
-	pick := func(int32) {}
+	deckSize, handSize := 512, 8
+	pick := func(int) {}
 	for i := 0; i < b.N; i++ {
 		ShuffleAndDeal(hashValueBase*uint64(i), deckSize, handSize, pick)
 	}
@@ -183,8 +186,8 @@ func BenchmarkShuffleAndDeal(b *testing.B) {
 func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		deckSize  int32
-		handSize  int32
+		deckSize  int
+		handSize  int
 		validated bool
 	}{
 		{
@@ -253,13 +256,13 @@ func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 				}
 
 				// check cards range and duplication
-				cardMap := make(map[int32]struct{})
-				for _, cardIdx := range cards {
-					if cardIdx < 0 || cardIdx >= test.deckSize {
+				cardMap := make(map[int]struct{})
+				for _, card := range cards {
+					if card < 0 || card >= int(test.deckSize) {
 						t.Errorf("test case %s fails in range check", test.name)
 						return
 					}
-					cardMap[cardIdx] = struct{}{}
+					cardMap[card] = struct{}{}
 				}
 				if len(cardMap) != int(test.handSize) {
 					t.Errorf("test case %s fails in duplication check", test.name)
@@ -272,33 +275,73 @@ func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
 
 func BenchmarkShuffleAndDealToSlice(b *testing.B) {
 	hashValueBase := math.MaxUint64 / uint64(b.N)
-	deckSize, handSize := int32(512), int32(8)
+	deckSize, handSize := 512, 8
 	for i := 0; i < b.N; i++ {
 		_ = ShuffleAndDealToSlice(hashValueBase*uint64(i), deckSize, handSize)
 	}
 }
 
-func TestUniformDistribution(t *testing.T) {
-	deckSize, handSize := int32(128), int32(3)
-	handCoordinateMap := make(map[int]int)
-
-	allCoordinateCount := 128 * 127 * 126 / 6
-
-	for i := 0; i < allCoordinateCount*16; i++ {
-		hands := ShuffleAndDealToSlice(rand.Uint64(), deckSize, handSize)
-		sort.Slice(hands, func(i, j int) bool {
-			return hands[i] < hands[j]
-		})
-		handCoordinate := 0
-		for _, hand := range hands {
-			handCoordinate = handCoordinate<<7 + int(hand)
-		}
-		handCoordinateMap[handCoordinate]++
+// ff computes the falling factorial `n!/(n-m)!` and requires n to be
+// positive and m to be in the range [0, n] and requires the answer to
+// fit in an int
+func ff(n, m int) int {
+	ans := 1
+	for f := n; f > n-m; f-- {
+		ans *= f
 	}
+	return ans
+}
 
-	// TODO: check uniform distribution
-	t.Logf("%d", len(handCoordinateMap))
-	t.Logf("%d", allCoordinateCount)
+func TestUniformDistribution(t *testing.T) {
+	const spare = 64 - maxHashBits
+	tests := []struct {
+		deckSize, handSize int
+		hashMax            int
+	}{
+		{64, 3, 1 << uint(math.Ceil(math.Log2(float64(ff(64, 3))))+spare)},
+		{128, 3, ff(128, 3)},
+		{128, 3, 3 * ff(128, 3)},
+		{70, 4, ff(70, 4)},
+	}
+	for _, test := range tests {
+		handCoordinateMap := make(map[int]int) // maps coded hand to count of times seen
 
+		fallingFactorial := ff(test.deckSize, test.handSize)
+		permutations := ff(test.handSize, test.handSize)
+		allCoordinateCount := fallingFactorial / permutations
+		nff := float64(test.hashMax) / float64(fallingFactorial)
+		minCount := permutations * int(math.Floor(nff))
+		maxCount := permutations * int(math.Ceil(nff))
+		aHand := make([]int, test.handSize)
+		for i := 0; i < test.hashMax; i++ {
+			ShuffleAndDealIntoHand(uint64(i), test.deckSize, aHand)
+			sort.IntSlice(aHand).Sort()
+			handCoordinate := 0
+			for _, card := range aHand {
+				handCoordinate = handCoordinate<<7 + card
+			}
+			handCoordinateMap[handCoordinate]++
+		}
+
+		t.Logf("Deck size = %v, hand size = %v, number of possible hands = %d, number of hands seen = %d, number of deals = %d, expected count range = [%v, %v]", test.deckSize, test.handSize, allCoordinateCount, len(handCoordinateMap), test.hashMax, minCount, maxCount)
+
+		// histogram maps (count of times a hand is seen) to (number of hands having that count)
+		histogram := make(map[int]int)
+		for _, count := range handCoordinateMap {
+			histogram[count] = histogram[count] + 1
+		}
+
+		var goodSum int
+		for count := minCount; count <= maxCount; count++ {
+			goodSum += histogram[count]
+		}
+
+		goodPct := 100 * float64(goodSum) / float64(allCoordinateCount)
+
+		t.Logf("good percentage = %v, histogram = %v", goodPct, histogram)
+		if goodSum != allCoordinateCount {
+			t.Errorf("Only %v percent of the hands got a central count", goodPct)
+		}
+	}
 	return
 }
