@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -120,7 +121,6 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 			return nil, err
 		}
 	}
-
 	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
 	// There is no need to check for pdb.
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
@@ -154,6 +154,22 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
 		refresh := false
+		// Pending Pods don't count towards healthy; allow removal of pending pod as long as we have enough healthy ones.
+		if pod.Status.Phase == api.PodPending && pdb.Spec.MaxUnavailable != nil {
+			expectedPods := int(pdb.Status.ExpectedPods)
+			maxUnavailable, err := intstr.GetValueFromIntOrPercent(pdb.Spec.MaxUnavailable, expectedPods, true)
+			if err == nil {
+				if int(pdb.Status.CurrentHealthy) >= expectedPods-maxUnavailable {
+					_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
+					if err != nil {
+						return err
+					}
+					rtStatus = &metav1.Status{
+						Status: metav1.StatusSuccess}
+					return nil
+				}
+			}
+		}
 		err = retry.RetryOnConflict(EvictionsRetry, func() error {
 			if refresh {
 				pdb, err = r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).Get(pdbName, metav1.GetOptions{})

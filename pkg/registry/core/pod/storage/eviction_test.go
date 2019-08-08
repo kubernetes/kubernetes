@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -39,6 +40,7 @@ import (
 )
 
 func TestEviction(t *testing.T) {
+	maxUnavailable1 := intstr.FromInt(1)
 	testcases := []struct {
 		name     string
 		pdbs     []runtime.Object
@@ -59,6 +61,79 @@ func TestEviction(t *testing.T) {
 				pod := validNewPod()
 				pod.Labels = map[string]string{"a": "true"}
 				pod.Spec.NodeName = "foo"
+				return pod
+			}(),
+			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError: true,
+		},
+		{
+			name: "matching pdbs with disruptions allowed, enough healthy, pod pending",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}},
+					MaxUnavailable: &maxUnavailable1,
+				},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 1,
+					ExpectedPods:          2,
+					CurrentHealthy:        1,
+				},
+			}},
+			pod: func() *api.Pod {
+				pod := validNewPod()
+				pod.Labels = map[string]string{"a": "true"}
+				pod.Name = "foo"
+				pod.Spec.NodeName = "foo"
+				pod.Status.Phase = api.PodRunning
+				return pod
+			}(),
+			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectDeleted: true,
+		},
+		{
+			name: "matching pdbs with disruptions not allowed, enough healthy, pod pending",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}},
+					MaxUnavailable: &maxUnavailable1,
+				},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 0,
+					ExpectedPods:          2,
+					CurrentHealthy:        1,
+				},
+			}},
+			pod: func() *api.Pod {
+				pod := validNewPod()
+				pod.Labels = map[string]string{"a": "true"}
+				pod.Spec.NodeName = "foo"
+				pod.Status.Phase = api.PodPending
+				return pod
+			}(),
+			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectDeleted: true,
+		},
+		{
+			name: "matching pdbs with disruptions not allowed, not enough healthy, pod pending",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}},
+					MaxUnavailable: &maxUnavailable1,
+				},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 0,
+					ExpectedPods:          2,
+					CurrentHealthy:        0,
+				},
+			}},
+			pod: func() *api.Pod {
+				pod := validNewPod()
+				pod.Labels = map[string]string{"a": "true"}
+				pod.Spec.NodeName = "foo"
+				pod.Status.Phase = api.PodPending
 				return pod
 			}(),
 			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
