@@ -24,7 +24,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -236,7 +238,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 		ginkgo.By("Creating pod")
 		var err error
-		pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, false, "", false, false, framework.SELinuxLabel, nil)
+		pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
 		// Change volumeMounts to volumeDevices and the other way around
 		pod = swapVolumeMode(pod)
 
@@ -247,10 +249,31 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 		}()
 
-		// TODO: find a faster way how to check the pod can't start,
-		// perhaps when https://github.com/kubernetes/kubernetes/issues/79794 is fixed.
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, pod.Name, l.ns.Name, framework.PodStartTimeout)
-		framework.ExpectError(err, "pod with mismatched block/filesystem volumes should not start")
+		ginkgo.By("Waiting for pod to fail")
+		// Wait for an event that the pod is invalid.
+		eventSelector := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      pod.Name,
+			"involvedObject.namespace": l.ns.Name,
+			"reason":                   events.FailedMountVolume,
+		}.AsSelector().String()
+
+		var msg string
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			msg = "has volumeMode Block, but is specified in volumeMounts"
+		} else {
+			msg = "has volumeMode Filesystem, but is specified in volumeDevices"
+		}
+		err = e2epod.WaitTimeoutForPodEvent(l.cs, pod.Name, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+		// Events are unreliable, don't depend on them. They're used only to speed up the test.
+		if err != nil {
+			e2elog.Logf("Warning: did not get event about mismatched volume use")
+		}
+
+		// Check the pod is still not running
+		p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+		framework.ExpectEqual(p.Status.Phase, v1.PodPending)
 	})
 
 }
