@@ -27,7 +27,7 @@ import (
 
 // FakeMounter implements mount.Interface for tests.
 type FakeMounter struct {
-	MountPoints []MountPoint
+	MountPoints []Point
 	Log         []FakeAction
 	// Error to return for a path when calling IsLikelyNotMountPoint
 	MountCheckErrors map[string]error
@@ -98,7 +98,7 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 	if err != nil {
 		absTarget = target
 	}
-	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: opts})
+	f.MountPoints = append(f.MountPoints, Point{Device: source, Path: absTarget, Type: fstype, Opts: opts})
 	klog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
 	return nil
@@ -115,14 +115,14 @@ func (f *FakeMounter) Unmount(target string) error {
 		absTarget = target
 	}
 
-	newMountpoints := []MountPoint{}
+	newMountpoints := []Point{}
 	for _, mp := range f.MountPoints {
 		if mp.Path == absTarget {
 			klog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, absTarget)
 			// Don't copy it to newMountpoints
 			continue
 		}
-		newMountpoints = append(newMountpoints, MountPoint{Device: mp.Device, Path: mp.Path, Type: mp.Type})
+		newMountpoints = append(newMountpoints, Point{Device: mp.Device, Path: mp.Path, Type: mp.Type})
 	}
 	f.MountPoints = newMountpoints
 	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: absTarget})
@@ -131,7 +131,7 @@ func (f *FakeMounter) Unmount(target string) error {
 }
 
 // List returns all the in-memory mountpoints for FakeMounter
-func (f *FakeMounter) List() ([]MountPoint, error) {
+func (f *FakeMounter) List() ([]Point, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -139,7 +139,7 @@ func (f *FakeMounter) List() ([]MountPoint, error) {
 }
 
 // IsMountPointMatch tests if dir and mp are the same path
-func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (f *FakeMounter) IsMountPointMatch(mp Point, dir string) bool {
 	return mp.Path == dir
 }
 
@@ -188,7 +188,7 @@ func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 
 // FakeHostUtil is a fake mount.HostUtils implementation for testing
 type FakeHostUtil struct {
-	MountPoints []MountPoint
+	MountPoints []Point
 	Filesystem  map[string]FileType
 
 	mutex sync.Mutex

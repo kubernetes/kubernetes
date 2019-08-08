@@ -140,12 +140,12 @@ func (n *Mounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems in the host's mount namespace.
-func (*Mounter) List() ([]mount.MountPoint, error) {
+func (*Mounter) List() ([]mount.Point, error) {
 	return mount.ListProcMounts(hostProcMountsPath)
 }
 
 // IsMountPointMatch tests if dir and mp are the same path
-func (*Mounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+func (*Mounter) IsMountPointMatch(mp mount.Point, dir string) bool {
 	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
 	return (mp.Path == dir) || (mp.Path == deletedDir)
 }

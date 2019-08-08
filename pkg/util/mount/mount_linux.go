@@ -216,12 +216,12 @@ func (mounter *Mounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems.
-func (*Mounter) List() ([]MountPoint, error) {
+func (*Mounter) List() ([]Point, error) {
 	return ListProcMounts(procMountsPath)
 }
 
 // IsMountPointMatch returns true if the path in mp is the same as dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (mounter *Mounter) IsMountPointMatch(mp Point, dir string) bool {
 	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
 	return ((mp.Path == dir) || (mp.Path == deletedDir))
 }
@@ -407,7 +407,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 }
 
 // ListProcMounts is shared with NsEnterMounter
-func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
+func ListProcMounts(mountFilePath string) ([]Point, error) {
 	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
 	if err != nil {
 		return nil, err
@@ -415,8 +415,8 @@ func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
 	return parseProcMounts(content)
 }
 
-func parseProcMounts(content []byte) ([]MountPoint, error) {
-	out := []MountPoint{}
+func parseProcMounts(content []byte) ([]Point, error) {
+	out := []Point{}
 	lines := strings.Split(string(content), "\n")
 	for _, line := range lines {
 		if line == "" {
@@ -428,7 +428,7 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d): %s", expectedNumFieldsPerLine, len(fields), line)
 		}
 
-		mp := MountPoint{
+		mp := Point{
 			Device: fields[0],
 			Path:   fields[1],
 			Type:   fields[2],

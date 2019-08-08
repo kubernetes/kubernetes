@@ -42,11 +42,11 @@ func (mounter *execMounter) Unmount(target string) error {
 	return nil
 }
 
-func (mounter *execMounter) List() ([]mount.MountPoint, error) {
-	return []mount.MountPoint{}, nil
+func (mounter *execMounter) List() ([]mount.Point, error) {
+	return []mount.Point{}, nil
 }
 
-func (mounter *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+func (mounter *execMounter) IsMountPointMatch(mp mount.Point, dir string) bool {
 	return (mp.Path == dir)
 }
 

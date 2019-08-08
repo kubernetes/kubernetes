@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -438,7 +438,7 @@ func Test_ConstructVolumeSpec(t *testing.T) {
 		t.Skipf("Test_ConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
 	}
 	fm := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/fc/50060e801049cfd1-lun-0"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod2"},
@@ -489,7 +489,7 @@ func Test_ConstructVolumeSpec(t *testing.T) {
 
 func Test_ConstructVolumeSpecNoRefs(t *testing.T) {
 	fm := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{Device: "/dev/sdd", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
 		},
 	}

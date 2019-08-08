@@ -21,6 +21,10 @@ package fsquota
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -28,9 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
-	"os"
-	"strings"
-	"testing"
 )
 
 const dummyMountData = `sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
@@ -63,7 +64,7 @@ const dummyMountTest = `/dev/sda1 / ext4 rw,noatime 0 0
 
 func dummyFakeMount1() mount.Interface {
 	return &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{
 				Device: "tmpfs",
 				Path:   "/tmp",
@@ -224,7 +225,7 @@ func TestDetectMountPoint(t *testing.T) {
 	}
 }
 
-var dummyMountPoints = []mount.MountPoint{
+var dummyMountPoints = []mount.Point{
 	{
 		Device: "/dev/sda2",
 		Path:   "/quota1",

@@ -32,7 +32,7 @@ import (
 
 func fakeContainerMgrMountInt() mount.Interface {
 	return &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -65,7 +65,7 @@ func TestCgroupMountValidationSuccess(t *testing.T) {
 
 func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 	mountInt := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -89,7 +89,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 
 func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 	mountInt := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -119,7 +119,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
 	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
 	mountInt := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+		MountPoints: []mount.Point{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",

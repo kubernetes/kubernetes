@@ -405,14 +405,14 @@ func TestCleanSubPaths(t *testing.T) {
 		name string
 		// Function that prepares directory structure for the test under given
 		// base.
-		prepare func(base string) ([]mount.MountPoint, error)
+		prepare func(base string) ([]mount.Point, error)
 		// Function that validates directory structure after the test
 		validate    func(base string) error
 		expectError bool
 	}{
 		{
 			name: "not-exists",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				return nil, nil
 			},
 			validate: func(base string) error {
@@ -422,7 +422,7 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-not-mount",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				return nil, os.MkdirAll(filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "0"), defaultPerm)
 			},
 			validate: func(base string) error {
@@ -432,7 +432,7 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-file",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1")
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
@@ -446,7 +446,7 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-container-not-dir",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
@@ -460,7 +460,7 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-multiple-container-not-dir",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol)
 				if err := os.MkdirAll(filepath.Join(path, "container1"), defaultPerm); err != nil {
 					return nil, err
@@ -478,12 +478,12 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-mount",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "0")
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
 				}
-				mounts := []mount.MountPoint{{Device: "/dev/sdb", Path: path}}
+				mounts := []mount.Point{{Device: "/dev/sdb", Path: path}}
 				return mounts, nil
 			},
 			validate: func(base string) error {
@@ -492,7 +492,7 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-mount-multiple",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "0")
 				path2 := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "1")
 				path3 := filepath.Join(base, containerSubPathDirectoryName, testVol, "container2", "1")
@@ -505,7 +505,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(path3, defaultPerm); err != nil {
 					return nil, err
 				}
-				mounts := []mount.MountPoint{
+				mounts := []mount.Point{
 					{Device: "/dev/sdb", Path: path},
 					{Device: "/dev/sdb", Path: path3},
 				}
@@ -517,7 +517,7 @@ func TestCleanSubPaths(t *testing.T) {
 		},
 		{
 			name: "subpath-mount-multiple-vols",
-			prepare: func(base string) ([]mount.MountPoint, error) {
+			prepare: func(base string) ([]mount.Point, error) {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "0")
 				path2 := filepath.Join(base, containerSubPathDirectoryName, "vol2", "container1", "1")
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
@@ -526,7 +526,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(path2, defaultPerm); err != nil {
 					return nil, err
 				}
-				mounts := []mount.MountPoint{
+				mounts := []mount.Point{
 					{Device: "/dev/sdb", Path: path},
 				}
 				return mounts, nil
@@ -578,9 +578,9 @@ var (
 )
 
 func setupFakeMounter(testMounts []string) *mount.FakeMounter {
-	mounts := []mount.MountPoint{}
+	mounts := []mount.Point{}
 	for _, mountPoint := range testMounts {
-		mounts = append(mounts, mount.MountPoint{Device: "/foo", Path: mountPoint})
+		mounts = append(mounts, mount.Point{Device: "/foo", Path: mountPoint})
 	}
 	return &mount.FakeMounter{MountPoints: mounts}
 }

@@ -50,12 +50,12 @@ func (*Mounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems. It is a noop for unsupported systems
-func (*Mounter) List() ([]mount.MountPoint, error) {
-	return []mount.MountPoint{}, nil
+func (*Mounter) List() ([]mount.Point, error) {
+	return []mount.Point{}, nil
 }
 
 // IsMountPointMatch tests if dir and mp are the same path
-func (*Mounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+func (*Mounter) IsMountPointMatch(mp mount.Point, dir string) bool {
 	return (mp.Path == dir)
 }
 

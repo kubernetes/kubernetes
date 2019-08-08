@@ -41,35 +41,35 @@ func TestDoCleanupMountPoint(t *testing.T) {
 		// the given base directory.
 		// Returns a fake MountPoint, a fake error for the mount point,
 		// and error if the prepare function encountered a fatal error.
-		prepare   func(base string) (MountPoint, error, error)
+		prepare   func(base string) (Point, error, error)
 		expectErr bool
 	}{
 		"mount-ok": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepare: func(base string) (Point, error, error) {
 				path := filepath.Join(base, testMount)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
-					return MountPoint{}, nil, err
+					return Point{}, nil, err
 				}
-				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
+				return Point{Device: "/dev/sdb", Path: path}, nil, nil
 			},
 		},
 		"mount-corrupted": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepare: func(base string) (Point, error, error) {
 				path := filepath.Join(base, testMount)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
-					return MountPoint{}, nil, err
+					return Point{}, nil, err
 				}
-				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ESTALE), nil
+				return Point{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ESTALE), nil
 			},
 			corruptedMnt: true,
 		},
 		"mount-err-not-corrupted": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepare: func(base string) (Point, error, error) {
 				path := filepath.Join(base, testMount)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
-					return MountPoint{}, nil, err
+					return Point{}, nil, err
 				}
-				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ETIMEDOUT), nil
+				return Point{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ETIMEDOUT), nil
 			},
 			expectErr: true,
 		},
@@ -94,7 +94,7 @@ func TestDoCleanupMountPoint(t *testing.T) {
 			}
 
 			fake := &FakeMounter{
-				MountPoints:      []MountPoint{mountPoint},
+				MountPoints:      []Point{mountPoint},
 				MountCheckErrors: map[string]error{mountPoint.Path: mountError},
 			}
 

@@ -57,9 +57,9 @@ type Interface interface {
 	// On some platforms, reading mounts directly from the OS is not guaranteed
 	// consistent (i.e. it could change between chunked reads). This is guaranteed
 	// to be consistent.
-	List() ([]MountPoint, error)
+	List() ([]Point, error)
 	// IsMountPointMatch determines if the mountpoint matches the dir.
-	IsMountPointMatch(mp MountPoint, dir string) bool
+	IsMountPointMatch(mp Point, dir string) bool
 	// IsLikelyNotMountPoint uses heuristics to determine if a directory
 	// is not a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
@@ -119,8 +119,8 @@ var _ Interface = &Mounter{}
 // the HostUtils Interface.
 var _ HostUtils = &hostUtil{}
 
-// MountPoint represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct {
+// Point represents a single line in /proc/mounts or /etc/fstab.
+type Point struct {
 	Device string
 	Path   string
 	Type   string

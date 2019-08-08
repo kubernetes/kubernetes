@@ -45,15 +45,15 @@ func TestReadProcMountsFrom(t *testing.T) {
 	if len(mounts) != 3 {
 		t.Fatalf("expected 3 mounts, got %d", len(mounts))
 	}
-	mp := MountPoint{"/dev/0", "/path/to/0", "type0", []string{"flags"}, 0, 0}
+	mp := Point{"/dev/0", "/path/to/0", "type0", []string{"flags"}, 0, 0}
 	if !mountPointsEqual(&mounts[0], &mp) {
 		t.Errorf("got unexpected MountPoint[0]: %#v", mounts[0])
 	}
-	mp = MountPoint{"/dev/1", "/path/to/1", "type1", []string{"flags"}, 1, 1}
+	mp = Point{"/dev/1", "/path/to/1", "type1", []string{"flags"}, 1, 1}
 	if !mountPointsEqual(&mounts[1], &mp) {
 		t.Errorf("got unexpected MountPoint[1]: %#v", mounts[1])
 	}
-	mp = MountPoint{"/dev/2", "/path/to/2", "type2", []string{"flags", "1", "2=3"}, 2, 2}
+	mp = Point{"/dev/2", "/path/to/2", "type2", []string{"flags", "1", "2=3"}, 2, 2}
 	if !mountPointsEqual(&mounts[2], &mp) {
 		t.Errorf("got unexpected MountPoint[2]: %#v", mounts[2])
 	}
@@ -71,7 +71,7 @@ func TestReadProcMountsFrom(t *testing.T) {
 	}
 }
 
-func mountPointsEqual(a, b *MountPoint) bool {
+func mountPointsEqual(a, b *Point) bool {
 	if a.Device != b.Device || a.Path != b.Path || a.Type != b.Type || !reflect.DeepEqual(a.Opts, b.Opts) || a.Pass != b.Pass || a.Freq != b.Freq {
 		return false
 	}
@@ -80,7 +80,7 @@ func mountPointsEqual(a, b *MountPoint) bool {
 
 func TestGetMountRefs(t *testing.T) {
 	fm := &FakeMounter{
-		MountPoints: []MountPoint{
+		MountPoints: []Point{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},
@@ -144,7 +144,7 @@ func setEquivalent(set1, set2 []string) bool {
 
 func TestGetDeviceNameFromMount(t *testing.T) {
 	fm := &FakeMounter{
-		MountPoints: []MountPoint{
+		MountPoints: []Point{
 			{Device: "/dev/disk/by-path/prefix-lun-1",
 				Path: "/mnt/111"},
 			{Device: "/dev/disk/by-path/prefix-lun-1",
@@ -173,7 +173,7 @@ func TestGetDeviceNameFromMount(t *testing.T) {
 
 func TestGetMountRefsByDev(t *testing.T) {
 	fm := &FakeMounter{
-		MountPoints: []MountPoint{
+		MountPoints: []Point{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},

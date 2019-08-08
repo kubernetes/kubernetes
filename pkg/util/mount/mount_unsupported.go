@@ -50,12 +50,12 @@ func (mounter *Mounter) Unmount(target string) error {
 }
 
 // List always returns an error on unsupported platforms
-func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, errUnsupported
+func (mounter *Mounter) List() ([]Point, error) {
+	return []Point{}, errUnsupported
 }
 
 // IsMountPointMatch returns true if the path in mp is the same as dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (mounter *Mounter) IsMountPointMatch(mp Point, dir string) bool {
 	return (mp.Path == dir)
 }
 

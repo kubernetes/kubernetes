@@ -87,11 +87,11 @@ func (m *execMounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems.
-func (m *execMounter) List() ([]mount.MountPoint, error) {
+func (m *execMounter) List() ([]mount.Point, error) {
 	return m.wrappedMounter.List()
 }
 
-func (m *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+func (m *execMounter) IsMountPointMatch(mp mount.Point, dir string) bool {
 	return m.wrappedMounter.IsMountPointMatch(mp, dir)
 }
 

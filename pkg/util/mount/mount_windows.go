@@ -164,12 +164,12 @@ func (mounter *Mounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems. todo
-func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
+func (mounter *Mounter) List() ([]Point, error) {
+	return []Point{}, nil
 }
 
 // IsMountPointMatch determines if the mountpoint matches the dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (mounter *Mounter) IsMountPointMatch(mp Point, dir string) bool {
 	return mp.Path == dir
 }
 
