@@ -121,7 +121,7 @@ func (hu *hostUtil) MakeDir(pathname string) error {
 	return errUnsupported
 }
 
-func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+func (hu *hostUtil) PathExists(pathname string) (bool, error) {
 	return true, errUnsupported
 }
 

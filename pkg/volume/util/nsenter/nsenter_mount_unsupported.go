@@ -122,9 +122,9 @@ func (*hostUtil) MakeFile(pathname string) error {
 	return nil
 }
 
-// ExistsPath checks if pathname exists. Always returns an error on unsupported
+// PathExists checks if pathname exists. Always returns an error on unsupported
 // platforms
-func (*hostUtil) ExistsPath(pathname string) (bool, error) {
+func (*hostUtil) PathExists(pathname string) (bool, error) {
 	return true, errors.New("not implemented")
 }
 

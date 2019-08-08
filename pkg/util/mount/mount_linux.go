@@ -582,7 +582,7 @@ func (hu *hostUtil) MakeFile(pathname string) error {
 	return nil
 }
 
-func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+func (hu *hostUtil) PathExists(pathname string) (bool, error) {
 	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 

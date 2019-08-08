@@ -186,7 +186,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 			return true, fmt.Errorf("readlink error: %v", err)
 		}
 		hu := NewHostUtil()
-		exists, err := hu.ExistsPath(target)
+		exists, err := hu.PathExists(target)
 		if err != nil {
 			return true, err
 		}
@@ -393,8 +393,8 @@ func (hu *hostUtil) MakeFile(pathname string) error {
 	return nil
 }
 
-// ExistsPath checks whether the path exists
-func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+// PathExists checks whether the path exists
+func (hu *hostUtil) PathExists(pathname string) (bool, error) {
 	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 

@@ -21,7 +21,7 @@ import (
 	"os"
 	"regexp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -364,7 +364,7 @@ type fileTypeChecker struct {
 }
 
 func (ftc *fileTypeChecker) Exists() bool {
-	exists, err := ftc.hu.ExistsPath(ftc.path)
+	exists, err := ftc.hu.PathExists(ftc.path)
 	return exists && err == nil
 }
 
