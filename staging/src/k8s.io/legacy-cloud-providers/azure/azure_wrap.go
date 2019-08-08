@@ -233,7 +233,7 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		lb, err := az.LoadBalancerClient.Get(ctx, az.ResourceGroup, key, "")
+		lb, err := az.LoadBalancerClient.Get(ctx, az.getLoadBalancerResourceGroup(), key, "")
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr

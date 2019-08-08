@@ -93,8 +93,6 @@ const (
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
 	clusterNameKey = "kubernetes-cluster-name"
-	// LoadBalancerName
-	LoadBalancerName = "load-balancer-name"
 )
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -221,40 +219,15 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 
 // GetLoadBalancerName returns the LoadBalancer name.
 func (az *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	if lbName, found := service.Annotations[LoadBalancerName]; found && strings.TrimSpace(lbName) != "" {
-		return lbName
-	}
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
-func (az *Cloud) getLoadBalancerResourceGroup(service *v1.Service) string {
-	if rgName, found := service.Annotations[ServiceAnnotationLoadBalancerResourceGroup]; found && strings.TrimSpace(rgName) != "" {
-		return rgName
+func (az *Cloud) getLoadBalancerResourceGroup() string {
+	if az.LoadBalancerResourceGroup != "" {
+		return az.LoadBalancerResourceGroup
 	}
+
 	return az.ResourceGroup
-}
-
-// getLoadBalancerByName get the specific lb with given load balancer name and resource group.
-// It works with annotation "service.beta.kubernetes.io/azure-load-balancer-resource-group"
-func (az *Cloud) getLoadBalancerByName(service *v1.Service, lbName string) (lb *network.LoadBalancer, status *v1.LoadBalancerStatus, exists bool, err error) {
-	existingLBs, err := az.ListLB(service)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	if existingLBs == nil {
-		return nil, nil, false, fmt.Errorf("cannot obtain the load balancer %q", lbName)
-	}
-	for _, existingLB := range existingLBs {
-		if strings.EqualFold(*existingLB.Name, lbName) {
-			status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
-			if err != nil {
-				return nil, nil, false, err
-			}
-			return &existingLB, status, true, err
-		}
-	}
-
-	return nil, nil, false, fmt.Errorf("cannot obtain the load balancer %q", lbName)
 }
 
 // getServiceLoadBalancer gets the loadbalancer for the service if it already exists.
@@ -629,32 +602,14 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
 // nodes only used if wantLb is true
 func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node, wantLb bool) (*network.LoadBalancer, error) {
-	var (
-		lb     *network.LoadBalancer
-		exists bool
-		err    error
-		rgName string
-	)
-
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s) - wantLb(%t): started", serviceName, wantLb)
-
-	if rgName = az.getLoadBalancerResourceGroup(service); rgName != az.ResourceGroup {
-		lbName := az.GetLoadBalancerName(context.Background(), clusterName, service)
-		lb, _, exists, err = az.getLoadBalancerByName(service, lbName)
-		if err != nil {
-			klog.Errorf("reconcileLoadBalancer: failed to get load balancer for service %q in resource group %q, error: %v, will continue in the default resource group", serviceName, rgName, err)
-		}
+	lb, _, _, err := az.getServiceLoadBalancer(service, clusterName, nodes, wantLb)
+	if err != nil {
+		klog.Errorf("reconcileLoadBalancer: failed to get load balancer for service %q, error: %v", serviceName, err)
+		return nil, err
 	}
-	if !exists || strings.TrimSpace(rgName) == "" || strings.TrimSpace(rgName) == az.ResourceGroup {
-		lb, _, _, err = az.getServiceLoadBalancer(service, clusterName, nodes, wantLb)
-		if err != nil {
-			klog.Errorf("reconcileLoadBalancer: failed to get load balancer for service %q, error: %v", serviceName, err)
-			return nil, err
-		}
-	}
-
 	lbName := *lb.Name
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))

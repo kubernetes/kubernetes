@@ -163,6 +163,13 @@ type Config struct {
 
 	// The cloud configure type for Azure cloud provider. Supported values are file, secret and merge.
 	CloudConfigType cloudConfigType `json:"cloudConfigType,omitempty" yaml:"cloudConfigType,omitempty"`
+
+	// LoadBalancerName determines the specific name of the load balancer user want to use, working with
+	// LoadBalancerResourceGroup
+	LoadBalancerName string `json:"loadBalancerName,omitempty" yaml:"loadBalancerName,omitempty"`
+	// LoadBalancerResourceGroup determines the specific resource group of the load balancer user want to use, working
+	// with LoadBalancerName
+	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)
