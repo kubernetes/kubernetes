@@ -39,7 +39,9 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 )
 
@@ -318,6 +320,10 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 // TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		return nil
+	}
+
 	// We only generate list links on objects that implement ListInterface - historically we duck typed this
 	// check via reflection, but as we move away from reflection we require that you not only carry Items but
 	// ListMeta into order to be identified as a list.
