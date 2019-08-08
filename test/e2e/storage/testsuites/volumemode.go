@@ -28,10 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
+	volevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -202,13 +204,33 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
 				ginkgo.By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
-					nil, false, "", false, false, framework.SELinuxLabel,
-					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+				pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+				// Setting node
+				pod.Spec.NodeName = l.config.ClientNodeName
+				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+				framework.ExpectNoError(err)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
-				framework.ExpectError(err)
+
+				eventSelector := fields.Set{
+					"involvedObject.kind":      "Pod",
+					"involvedObject.name":      pod.Name,
+					"involvedObject.namespace": l.ns.Name,
+					"reason":                   events.FailedMountVolume,
+				}.AsSelector().String()
+				msg := "Unable to attach or mount volumes"
+
+				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+				if err != nil {
+					e2elog.Logf("Warning: did not get event about FailedMountVolume")
+				}
+
+				// Check the pod is still not running
+				p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+				framework.ExpectEqual(p.Status.Phase, v1.PodPending)
 			})
 		}
 
@@ -228,8 +250,24 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				framework.ExpectNoError(err)
 
-				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-				framework.ExpectError(err)
+				eventSelector := fields.Set{
+					"involvedObject.kind":      "PersistentVolumeClaim",
+					"involvedObject.name":      l.pvc.Name,
+					"involvedObject.namespace": l.ns.Name,
+					"reason":                   volevents.ProvisioningFailed,
+				}.AsSelector().String()
+				msg := "does not support block volume provisioning"
+
+				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
+				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+				if err != nil {
+					e2elog.Logf("Warning: did not get event about provisioing failed")
+				}
+
+				// Check the pvc is still pending
+				pvc, err := l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Get(l.pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to re-read the pvc after event (or timeout)")
+				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending)
 			})
 		}
 	default:
