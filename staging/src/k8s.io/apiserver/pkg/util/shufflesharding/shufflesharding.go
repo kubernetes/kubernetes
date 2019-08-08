@@ -18,20 +18,34 @@ package shufflesharding
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"strings"
 )
 
 const maxHashBits = 60
 
-// ValidateParameters can validate parameters for shuffle sharding
-// in a fast but approximate way, including deckSize and handSize
-// Algorithm: maxHashBits >= bits(deckSize^handSize)
-func ValidateParameters(deckSize, handSize int32) bool {
-	if handSize <= 0 || deckSize <= 0 || handSize > deckSize {
-		return false
+// ValidateParameters finds errors in the parameters for shuffle
+// sharding.  Returns a slice for which `len()` is 0 if and only if
+// there are no errors.  The entropy requirement is evaluated in a
+// fast but approximate way: bits(deckSize^handSize).
+func ValidateParameters(deckSize, handSize int) (errs []string) {
+	if handSize <= 0 {
+		errs = append(errs, "handSize is not positive")
 	}
-
-	return math.Log2(float64(deckSize))*float64(handSize) <= maxHashBits
+	if deckSize <= 0 {
+		errs = append(errs, "deckSize is not positive")
+	}
+	if len(errs) > 0 {
+		return
+	}
+	if handSize > deckSize {
+		return []string{"handSize is greater than deckSize"}
+	}
+	if math.Log2(float64(deckSize))*float64(handSize) > maxHashBits {
+		return []string{fmt.Sprintf("more than %d bits of entropy required", maxHashBits)}
+	}
+	return
 }
 
 // ShuffleAndDeal can shuffle a hash value to handSize-quantity and non-redundant
@@ -39,16 +53,16 @@ func ValidateParameters(deckSize, handSize int32) bool {
 // Eg. From deckSize=128, handSize=8, we can get an index array [12 14 73 18 119 51 117 26],
 // then pick function will choose the optimal index from these
 // Algorithm: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md#queue-assignment-proof-of-concept
-func ShuffleAndDeal(hashValue uint64, deckSize, handSize int32, pick func(int32)) {
-	remainders := make([]int32, handSize)
+func ShuffleAndDeal(hashValue uint64, deckSize, handSize int, pick func(int)) {
+	remainders := make([]int, handSize)
 
-	for i := int32(0); i < handSize; i++ {
+	for i := 0; i < handSize; i++ {
 		hashValueNext := hashValue / uint64(deckSize-i)
-		remainders[i] = int32(hashValue - uint64(deckSize-i)*hashValueNext)
+		remainders[i] = int(hashValue - uint64(deckSize-i)*hashValueNext)
 		hashValue = hashValueNext
 	}
 
-	for i := int32(0); i < handSize; i++ {
+	for i := 0; i < handSize; i++ {
 		candidate := remainders[i]
 		for j := i; j > 0; j-- {
 			if candidate >= remainders[j-1] {
@@ -60,9 +74,9 @@ func ShuffleAndDeal(hashValue uint64, deckSize, handSize int32, pick func(int32)
 }
 
 // ShuffleAndDealWithValidation will do validation before ShuffleAndDeal
-func ShuffleAndDealWithValidation(hashValue uint64, deckSize, handSize int32, pick func(int32)) error {
-	if !ValidateParameters(deckSize, handSize) {
-		return errors.New("bad parameters")
+func ShuffleAndDealWithValidation(hashValue uint64, deckSize, handSize int, pick func(int)) error {
+	if errs := ValidateParameters(deckSize, handSize); len(errs) > 0 {
+		return errors.New(strings.Join(errs, ";"))
 	}
 
 	ShuffleAndDeal(hashValue, deckSize, handSize, pick)
@@ -71,14 +85,14 @@ func ShuffleAndDealWithValidation(hashValue uint64, deckSize, handSize int32, pi
 
 // ShuffleAndDealToSlice will use specific pick function to return slices of indices
 // after ShuffleAndDeal
-func ShuffleAndDealToSlice(hashValue uint64, deckSize, handSize int32) []int32 {
+func ShuffleAndDealToSlice(hashValue uint64, deckSize, handSize int) []int {
 	var (
-		candidates = make([]int32, handSize)
+		candidates = make([]int, handSize)
 		idx        = 0
 	)
 
-	pickToSlices := func(can int32) {
-		candidates[idx] = can
+	pickToSlices := func(can int) {
+		candidates[idx] = int(can)
 		idx++
 	}
 
@@ -87,11 +101,33 @@ func ShuffleAndDealToSlice(hashValue uint64, deckSize, handSize int32) []int32 {
 	return candidates
 }
 
+// ShuffleAndDealIntoHand shuffles a deck of the given size by the
+// given hash value and deals cards into the given slice.  The virtue
+// of this function compared to ShuffleAndDealToSlice is that the
+// caller provides the storage for the hand.
+func ShuffleAndDealIntoHand(hashValue uint64, deckSize int, hand []int) {
+	handSize := len(hand)
+	var idx int
+	ShuffleAndDeal(hashValue, deckSize, handSize, func(card int) {
+		hand[idx] = int(card)
+		idx++
+	})
+}
+
 // ShuffleAndDealToSliceWithValidation will do validation before ShuffleAndDealToSlice
-func ShuffleAndDealToSliceWithValidation(hashValue uint64, deckSize, handSize int32) ([]int32, error) {
-	if !ValidateParameters(deckSize, handSize) {
-		return nil, errors.New("bad parameters")
+func ShuffleAndDealToSliceWithValidation(hashValue uint64, deckSize, handSize int) ([]int, error) {
+	if errs := ValidateParameters(deckSize, handSize); len(errs) > 0 {
+		return nil, errors.New(strings.Join(errs, ";"))
 	}
 
 	return ShuffleAndDealToSlice(hashValue, deckSize, handSize), nil
+}
+
+// ShuffleAndDealIntoHandWithValidation does validation and then ShuffleAndDealIntoHand
+func ShuffleAndDealIntoHandWithValidation(hashValue uint64, deckSize int, hand []int) error {
+	if errs := ValidateParameters(deckSize, len(hand)); len(errs) > 0 {
+		return errors.New(strings.Join(errs, ";"))
+	}
+	ShuffleAndDealIntoHand(hashValue, deckSize, hand)
+	return nil
 }

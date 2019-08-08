@@ -16,6 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
