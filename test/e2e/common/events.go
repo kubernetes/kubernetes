@@ -18,6 +18,7 @@ package common
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -148,4 +150,26 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 		return observedMatchingEvent, nil
 	})
 	return err == nil, err
+}
+
+// WaitTimeoutForEvent waits the given timeout duration for an event to occur.
+func WaitTimeoutForEvent(c clientset.Interface, namespace, eventSelector, msg string, timeout time.Duration) error {
+	interval := 2 * time.Second
+	return wait.PollImmediate(interval, timeout, eventOccurred(c, namespace, eventSelector, msg))
+}
+
+func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) wait.ConditionFunc {
+	options := metav1.ListOptions{FieldSelector: eventSelector}
+	return func() (bool, error) {
+		events, err := c.CoreV1().Events(namespace).List(options)
+		if err != nil {
+			return false, fmt.Errorf("got error while getting events: %v", err)
+		}
+		for _, event := range events.Items {
+			if strings.Contains(event.Message, msg) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
 }
