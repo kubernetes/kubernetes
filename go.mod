@@ -12,7 +12,6 @@ require (
 	github.com/Azure/go-autorest v11.1.2+incompatible
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
-	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/Microsoft/hcsshim v0.8.6
 	github.com/PuerkitoBio/purell v1.1.1
@@ -111,7 +110,6 @@ require (
 	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
-	github.com/russross/blackfriday v1.5.2
 	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
 	github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d // indirect
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect

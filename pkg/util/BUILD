@@ -36,7 +36,6 @@ filegroup(
         "//pkg/util/mount:all-srcs",
         "//pkg/util/netsh:all-srcs",
         "//pkg/util/node:all-srcs",
-        "//pkg/util/normalizer:all-srcs",
         "//pkg/util/oom:all-srcs",
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/pod:all-srcs",
