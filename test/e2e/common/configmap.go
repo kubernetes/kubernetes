@@ -135,7 +135,12 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 
-	ginkgo.It("should patch ConfigMap successfully", func() {
+	/*
+	   Release : v1.16
+	   Testname: ConfigMap: Patch Validation
+	   Description: Create a ConfigMap, and proceed to update it. Value of ConfigMap data MUST change after update.
+	*/
+	framework.ConformanceIt("should patch ConfigMap successfully", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
