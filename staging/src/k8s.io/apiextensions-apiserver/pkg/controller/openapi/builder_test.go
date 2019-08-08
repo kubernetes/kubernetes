@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/go-openapi/spec"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -414,6 +417,107 @@ func TestNewBuilder(t *testing.T) {
 				t.Errorf("unexpected list schema: %s (want/got)", schemaDiff(&wantedItemsSchema, gotListSchema))
 			}
 		})
+	}
+}
+
+func TestCRDRouteParameterBuilder(t *testing.T) {
+	testCRDKind := "Foo"
+	testCRDGroup := "foo-group"
+	testCRDVersion := "foo-version"
+	testCRDResourceName := "foos"
+
+	testCases := []struct {
+		scope apiextensions.ResourceScope
+		paths map[string]struct {
+			expectNamespaceParam bool
+			expectNameParam      bool
+			expectedActions      sets.String
+		}
+	}{
+		{
+			scope: apiextensions.NamespaceScoped,
+			paths: map[string]struct {
+				expectNamespaceParam bool
+				expectNameParam      bool
+				expectedActions      sets.String
+			}{
+				"/apis/foo-group/foo-version/foos":                                      {expectNamespaceParam: false, expectNameParam: false, expectedActions: sets.NewString("list")},
+				"/apis/foo-group/foo-version/namespaces/{namespace}/foos":               {expectNamespaceParam: true, expectNameParam: false, expectedActions: sets.NewString("post", "list", "deletecollection")},
+				"/apis/foo-group/foo-version/namespaces/{namespace}/foos/{name}":        {expectNamespaceParam: true, expectNameParam: true, expectedActions: sets.NewString("get", "put", "patch", "delete")},
+				"/apis/foo-group/foo-version/namespaces/{namespace}/foos/{name}/scale":  {expectNamespaceParam: true, expectNameParam: true, expectedActions: sets.NewString("get", "patch", "put")},
+				"/apis/foo-group/foo-version/namespaces/{namespace}/foos/{name}/status": {expectNamespaceParam: true, expectNameParam: true, expectedActions: sets.NewString("get", "patch", "put")},
+			},
+		},
+		{
+			scope: apiextensions.ClusterScoped,
+			paths: map[string]struct {
+				expectNamespaceParam bool
+				expectNameParam      bool
+				expectedActions      sets.String
+			}{
+				"/apis/foo-group/foo-version/foos":               {expectNamespaceParam: false, expectNameParam: false, expectedActions: sets.NewString("post", "list", "deletecollection")},
+				"/apis/foo-group/foo-version/foos/{name}":        {expectNamespaceParam: false, expectNameParam: true, expectedActions: sets.NewString("get", "put", "patch", "delete")},
+				"/apis/foo-group/foo-version/foos/{name}/scale":  {expectNamespaceParam: false, expectNameParam: true, expectedActions: sets.NewString("get", "patch", "put")},
+				"/apis/foo-group/foo-version/foos/{name}/status": {expectNamespaceParam: false, expectNameParam: true, expectedActions: sets.NewString("get", "patch", "put")},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testNamespacedCRD := &apiextensions.CustomResourceDefinition{
+			Spec: apiextensions.CustomResourceDefinitionSpec{
+				Scope: testCase.scope,
+				Group: testCRDGroup,
+				Names: apiextensions.CustomResourceDefinitionNames{
+					Kind:   testCRDKind,
+					Plural: testCRDResourceName,
+				},
+				Versions: []apiextensions.CustomResourceDefinitionVersion{
+					{
+						Name: testCRDVersion,
+					},
+				},
+				Subresources: &apiextensions.CustomResourceSubresources{
+					Status: &apiextensions.CustomResourceSubresourceStatus{},
+					Scale:  &apiextensions.CustomResourceSubresourceScale{},
+				},
+			},
+		}
+		swagger, err := BuildSwagger(testNamespacedCRD, testCRDVersion)
+		require.NoError(t, err)
+		require.Equal(t, len(testCase.paths), len(swagger.Paths.Paths), testCase.scope)
+		for path, expected := range testCase.paths {
+			t.Run(path, func(t *testing.T) {
+				path, ok := swagger.Paths.Paths[path]
+				if !ok {
+					t.Errorf("unexpected path %v", path)
+				}
+
+				hasNamespaceParam := false
+				hasNameParam := false
+				for _, param := range path.Parameters {
+					if param.In == "path" && param.Name == "namespace" {
+						hasNamespaceParam = true
+					}
+					if param.In == "path" && param.Name == "name" {
+						hasNameParam = true
+					}
+				}
+				assert.Equal(t, expected.expectNamespaceParam, hasNamespaceParam)
+				assert.Equal(t, expected.expectNameParam, hasNameParam)
+
+				actions := sets.NewString()
+				for _, operation := range []*spec.Operation{path.Get, path.Post, path.Put, path.Patch, path.Delete} {
+					if operation != nil {
+						action, ok := operation.VendorExtensible.Extensions.GetString(endpoints.ROUTE_META_ACTION)
+						if ok {
+							actions.Insert(action)
+						}
+					}
+				}
+				assert.Equal(t, expected.expectedActions, actions)
+			})
+		}
 	}
 }
 
