@@ -40,10 +40,12 @@ var (
 
 type noopRegistry struct{}
 
-func (noopRegistry) Register(metrics.Registerable) error  { return nil }
-func (noopRegistry) MustRegister(...metrics.Registerable) {}
-func (noopRegistry) Unregister(metrics.Registerable) bool { return true }
-func (noopRegistry) Gather() ([]*dto.MetricFamily, error) { return nil, nil }
+func (noopRegistry) Register(metrics.Registerable) error     { return nil }
+func (noopRegistry) MustRegister(...metrics.Registerable)    {}
+func (noopRegistry) RawRegister(prometheus.Collector) error  { return nil }
+func (noopRegistry) RawMustRegister(...prometheus.Collector) {}
+func (noopRegistry) Unregister(metrics.Registerable) bool    { return true }
+func (noopRegistry) Gather() ([]*dto.MetricFamily, error)    { return nil, nil }
 
 type metricsRegistryFactory struct {
 	globalRegistry    metrics.KubeRegistry
@@ -79,7 +81,8 @@ func SetRegistryFactoryVersion(ver apimachineryversion.Info) []error {
 		prometheus.NewGoCollector(),
 		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
 	}
-	globalRegistryFactory.globalRegistry = metrics.NewPreloadedKubeRegistry(ver, preloadedMetrics...)
+	globalRegistryFactory.globalRegistry = metrics.NewKubeRegistry(ver)
+	globalRegistryFactory.globalRegistry.RawMustRegister(preloadedMetrics...)
 	globalRegistryFactory.kubeVersion = &ver
 	for _, c := range globalRegistryFactory.registerQueue {
 		err := globalRegistryFactory.globalRegistry.Register(c)
