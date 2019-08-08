@@ -686,6 +686,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		klog.V(4).Infof("Creating sandbox for pod %q", format.Pod(pod))
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
+		backOffKey := fmt.Sprintf("%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID))
+		if backOff.IsInBackOffSinceUpdate(backOffKey, backOff.Clock.Now()) {
+			msg := fmt.Sprintf("Back-off create sandbox for pod %q", format.Pod(pod))
+			klog.V(4).Infof(msg)
+			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
+			return
+		}
 		podSandboxID, msg, err = m.createPodSandbox(pod, podContainerChanges.Attempt)
 		if err != nil {
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
@@ -694,6 +701,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			if referr != nil {
 				klog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), referr)
 			}
+			backOff.Next(backOffKey, backOff.Clock.Now())
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed create pod sandbox: %v", err)
 			return
 		}
