@@ -1464,7 +1464,7 @@ func TestFilterPlugin(t *testing.T) {
 		}
 
 		if fail {
-			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err == nil {
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podUnschedulable(cs, pod.Namespace, pod.Name)); err != nil {
 				t.Errorf("Didn't expect the pod to be scheduled.")
 			}
 		} else {
