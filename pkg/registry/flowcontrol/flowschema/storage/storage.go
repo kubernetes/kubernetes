@@ -28,9 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	flowcontrolbootstrap "k8s.io/kubernetes/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
-	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema"
 )
 
@@ -58,7 +55,7 @@ type REST struct {
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &flowcontrol.FlowSchema{} },
-		NewListFunc:              func() runtime.Object { return &flowcontrol.FlowSchema{} },
+		NewListFunc:              func() runtime.Object { return &flowcontrol.FlowSchemaList{} },
 		DefaultQualifiedResource: flowcontrol.Resource("flowschemas"),
 
 		CreateStrategy: flowschema.Strategy,
@@ -66,7 +63,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		DeleteStrategy: flowschema.Strategy,
 
 		// TODO: develop printer handler for flowschema resource
-		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
+		// TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
