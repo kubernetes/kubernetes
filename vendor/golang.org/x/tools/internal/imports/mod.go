@@ -22,8 +22,9 @@ import (
 // moduleResolver implements resolver for modules using the go command as little
 // as feasible.
 type moduleResolver struct {
-	env *fixEnv
+	env *ProcessEnv
 
+	initialized   bool
 	main          *moduleJSON
 	modsByModPath []*moduleJSON // All modules, ordered by # of path components in module Path...
 	modsByDir     []*moduleJSON // ...or Dir.
@@ -48,7 +49,7 @@ type moduleErrorJSON struct {
 }
 
 func (r *moduleResolver) init() error {
-	if r.main != nil {
+	if r.initialized {
 		return nil
 	}
 	stdout, err := r.env.invokeGo("list", "-m", "-json", "...")
@@ -61,7 +62,7 @@ func (r *moduleResolver) init() error {
 			return err
 		}
 		if mod.Dir == "" {
-			if Debug {
+			if r.env.Debug {
 				log.Printf("module %v has not been downloaded and will be ignored", mod.Path)
 			}
 			// Can't do anything with a module that's not downloaded.
@@ -87,6 +88,7 @@ func (r *moduleResolver) init() error {
 		return count(j) < count(i) // descending order
 	})
 
+	r.initialized = true
 	return nil
 }
 
@@ -202,7 +204,9 @@ func (r *moduleResolver) scan(_ references) ([]*pkg, error) {
 	// Walk GOROOT, GOPATH/pkg/mod, and the main module.
 	roots := []gopathwalk.Root{
 		{filepath.Join(r.env.GOROOT, "/src"), gopathwalk.RootGOROOT},
-		{r.main.Dir, gopathwalk.RootCurrentModule},
+	}
+	if r.main != nil {
+		roots = append(roots, gopathwalk.Root{r.main.Dir, gopathwalk.RootCurrentModule})
 	}
 	for _, p := range filepath.SplitList(r.env.GOPATH) {
 		roots = append(roots, gopathwalk.Root{filepath.Join(p, "/pkg/mod"), gopathwalk.RootModuleCache})
@@ -249,7 +253,7 @@ func (r *moduleResolver) scan(_ references) ([]*pkg, error) {
 			matches := modCacheRegexp.FindStringSubmatch(subdir)
 			modPath, err := module.DecodePath(filepath.ToSlash(matches[1]))
 			if err != nil {
-				if Debug {
+				if r.env.Debug {
 					log.Printf("decoding module cache path %q: %v", subdir, err)
 				}
 				return
@@ -299,7 +303,7 @@ func (r *moduleResolver) scan(_ references) ([]*pkg, error) {
 			importPathShort: VendorlessPath(importPath),
 			dir:             dir,
 		})
-	}, gopathwalk.Options{Debug: Debug, ModulesEnabled: true})
+	}, gopathwalk.Options{Debug: r.env.Debug, ModulesEnabled: true})
 	return result, nil
 }
 

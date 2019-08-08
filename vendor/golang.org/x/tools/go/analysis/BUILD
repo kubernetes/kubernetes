@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "analysis.go",
+        "diagnostic.go",
         "doc.go",
         "validate.go",
     ],
