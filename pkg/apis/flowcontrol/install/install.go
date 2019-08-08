@@ -34,4 +34,5 @@ func init() {
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(flowcontrol.AddToScheme(scheme))
 	utilruntime.Must(flowcontrolv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(flowcontrolv1alpha1.SchemeGroupVersion))
 }
