@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -294,7 +294,7 @@ func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {
 		exec = nil
 	}
 	if exec == nil {
-		return mount.NewOsExec()
+		return mount.NewOSExec()
 	}
 	return exec
 }
