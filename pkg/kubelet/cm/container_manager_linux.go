@@ -67,7 +67,7 @@ import (
 )
 
 const (
-	dockerProcessName     = "docker"
+	dockerProcessName     = "dockerd"
 	dockerPidFile         = "/var/run/docker.pid"
 	containerdProcessName = "docker-containerd"
 	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
