@@ -207,6 +207,7 @@ var (
 		"PodsPerCore",
 		"Port",
 		"ProtectKernelDefaults",
+		"ReadOnlyBindAddress",
 		"ReadOnlyPort",
 		"RegistryBurst",
 		"RegistryPullQPS",

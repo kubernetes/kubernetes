@@ -101,6 +101,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.HealthzBindAddress == "" {
 		obj.HealthzBindAddress = "127.0.0.1"
 	}
+	if obj.ReadOnlyBindAddress == "" {
+		obj.ReadOnlyBindAddress = obj.Address
+	}
 	if obj.OOMScoreAdj == nil {
 		obj.OOMScoreAdj = utilpointer.Int32Ptr(int32(qos.KubeletOOMScoreAdj))
 	}

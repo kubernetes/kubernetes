@@ -109,6 +109,9 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 
 	// Disable the readonly port of the kubelet, in order to not expose unnecessary information
 	externalkubeletcfg.ReadOnlyPort = 0
+	if externalkubeletcfg.ReadOnlyBindAddress == "" {
+		externalkubeletcfg.ReadOnlyBindAddress = externalkubeletcfg.Address
+	}
 
 	// Enables client certificate rotation for the kubelet
 	externalkubeletcfg.RotateCertificates = true

@@ -72,6 +72,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.OOMScoreAdj = int32(qos.KubeletOOMScoreAdj)
 			obj.Port = ports.KubeletPort
+			obj.ReadOnlyBindAddress = "0.0.0.0"
 			obj.ReadOnlyPort = ports.KubeletReadOnlyPort
 			obj.RegistryBurst = 10
 			obj.RegistryPullQPS = 5

@@ -136,6 +136,12 @@ type KubeletConfiguration struct {
 	// Default: 0 (disabled)
 	// +optional
 	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
+	// readOnlyBindAddress is the IP address for the readonly server to serve on
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that monitor Kubelet health.
+	// Default: ""
+	// +optional
+	ReadOnlyBindAddress string `json:"readOnlyBindAddress,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS. (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate

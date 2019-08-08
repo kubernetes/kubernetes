@@ -144,6 +144,7 @@ ComponentConfigs:
     Port: 10250
     ProtectKernelDefaults: false
     QOSReserved: null
+    ReadOnlyBindAddress: 1.2.3.4
     ReadOnlyPort: 0
     RegistryBurst: 10
     RegistryPullQPS: 5
