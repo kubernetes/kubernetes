@@ -914,7 +914,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	if !isSecondaryControlPlane {
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
-		// Check if IVPS kube-proxy mode is supported
+		// Check if IPVS kube-proxy mode is supported
 		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 			checks = append(checks, IPVSProxierCheck{exec: execer})
 		}
