@@ -470,6 +470,7 @@ filegroup(
         "//vendor/k8s.io/utils/buffer:all-srcs",
         "//vendor/k8s.io/utils/clock:all-srcs",
         "//vendor/k8s.io/utils/exec:all-srcs",
+        "//vendor/k8s.io/utils/inotify:all-srcs",
         "//vendor/k8s.io/utils/integer:all-srcs",
         "//vendor/k8s.io/utils/io:all-srcs",
         "//vendor/k8s.io/utils/keymutex:all-srcs",
