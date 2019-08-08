@@ -29,6 +29,7 @@ import (
 	_ "golang.org/x/lint/golint"
 	_ "gotest.tools"
 	_ "gotest.tools/gotestsum"
+	_ "honnef.co/go/tools/cmd/staticcheck"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
 	_ "k8s.io/gengo/examples/deepcopy-gen/generators"

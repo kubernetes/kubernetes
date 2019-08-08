@@ -12,6 +12,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/spf13/pflag v1.0.3
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc // indirect
+	golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac // indirect
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	k8s.io/gengo v0.0.0-20190813173942-955ffa8fcfc9
