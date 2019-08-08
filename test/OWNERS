@@ -21,12 +21,12 @@ reviewers:
   - zmerlynn
   - vishh
   - xichengliudui
-  - andrewsykim
   - neolit123
   - stevesloka
   - johnSchnake
   - SataQiu
 approvers:
+  - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
   - rramkumar1
