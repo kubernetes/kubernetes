@@ -257,8 +257,6 @@ pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/iscsi
 pkg/volume/rbd
-pkg/volume/scaleio
-pkg/volume/storageos
 pkg/volume/testing
 pkg/volume/util/fs
 pkg/volume/util/volumepathhandler
