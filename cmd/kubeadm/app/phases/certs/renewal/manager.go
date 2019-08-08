@@ -116,7 +116,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			longName: "certificate embedded in the kubeconfig file for the scheduler manager to use",
 			fileName: kubeadmconstants.SchedulerKubeConfigFileName,
 		},
-		//NB. we are escluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
+		//NB. we are excluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
 	}
 
 	// create a CertificateRenewHandler for each kubeConfig file
