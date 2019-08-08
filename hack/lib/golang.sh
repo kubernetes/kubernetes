@@ -71,7 +71,6 @@ kube::golang::server_targets() {
     cmd/kube-proxy
     cmd/kube-apiserver
     cmd/kube-controller-manager
-    cmd/cloud-controller-manager
     cmd/kubelet
     cmd/kubeadm
     cmd/hyperkube
@@ -90,7 +89,6 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 kube::golang::server_image_targets() {
   # NOTE: this contains cmd targets for kube::build::get_docker_wrapped_binaries
   local targets=(
-    cmd/cloud-controller-manager
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kube-scheduler
@@ -320,7 +318,6 @@ readonly KUBE_ALL_TARGETS=(
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
 readonly KUBE_STATIC_LIBRARIES=(
-  cloud-controller-manager
   kube-apiserver
   kube-controller-manager
   kube-scheduler
