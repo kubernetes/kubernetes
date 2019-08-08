@@ -39,6 +39,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/registry:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/util/clock:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:all-srcs",
