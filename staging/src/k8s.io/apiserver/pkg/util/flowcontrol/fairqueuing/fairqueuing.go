@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/util/clock"
+	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog"
 )
 
@@ -222,30 +223,6 @@ func (qs *queueSetImpl) GetRequestsExecuting() int {
 	return total
 }
 
-func shuffleDealAndPick(v, nq uint64,
-	lengthOfQueue func(int) int,
-	mr func(int /*in [0, nq-1]*/) int, /*in [0, numQueues-1] and excluding previously determined members of I*/
-	nRem, minLen, bestIdx int) int {
-	if nRem < 1 {
-		return bestIdx
-	}
-	vNext := v / nq
-	ai := int(v - nq*vNext)
-	ii := mr(ai)
-	mrNext := func(a int /*in [0, nq-2]*/) int /*in [0, numQueues-1] and excluding I[0], I[1], ... ii*/ {
-		if a < ai {
-			return mr(a)
-		}
-		return mr(a + 1)
-	}
-	lenI := lengthOfQueue(ii)
-	if lenI < minLen {
-		minLen = lenI
-		bestIdx = ii
-	}
-	return shuffleDealAndPick(vNext, nq-1, lengthOfQueue, mrNext, nRem-1, minLen, bestIdx)
-}
-
 // ChooseQueueIdx uses shuffle sharding to select an queue index
 // using a 'hashValue'.  The 'hashValue' derives a hand from a set range of
 // indexes (range 'desiredNumQueues') and returns the queue with the least queued packets
@@ -254,10 +231,16 @@ func (qs *queueSetImpl) ChooseQueueIdx(hashValue uint64, handSize int) int {
 	// TODO(aaron-prindle) currently a lock is held for this in a larger anonymous function
 	// verify that makes sense...
 
+	bestQueueIdx := -1
+	bestQueueLen := int(math.MaxInt32)
 	// desiredNumQueues is used here instead of numQueues to omit quiesce queues
-	return shuffleDealAndPick(hashValue, uint64(qs.desiredNumQueues),
-		func(idx int) int { return len(qs.queues[idx].Requests) },
-		func(i int) int { return i }, handSize, math.MaxInt32, -1)
+	shufflesharding.ShuffleAndDeal(hashValue, qs.desiredNumQueues, handSize, func(queueIdx int) {
+		thisLen := len(qs.queues[queueIdx].Requests)
+		if thisLen < bestQueueLen {
+			bestQueueIdx, bestQueueLen = queueIdx, thisLen
+		}
+	})
+	return bestQueueIdx
 }
 
 // rejectOrEnqueue rejects or enqueues the newly arrived request if
