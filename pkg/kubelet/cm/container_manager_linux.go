@@ -200,6 +200,15 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+	// Mitigation of the issue fixed in master where hugetlb prefix for page sizes with "KiB"
+	// is "kB" in runc, but the correct is "KB"
+	// See https://github.com/opencontainers/runc/pull/2065
+	// and https://github.com/kubernetes/kubernetes/pull/78495
+	// for more info.
+	for i, pageSize := range fs.HugePageSizes {
+		fs.HugePageSizes[i] = strings.ReplaceAll(pageSize, "kB", "KB")
+	}
+
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
