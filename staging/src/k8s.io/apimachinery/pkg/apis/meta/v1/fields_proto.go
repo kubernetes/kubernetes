@@ -27,13 +27,20 @@ import (
 // that matches Fields. Do not use in Go structs.
 type ProtoFields struct {
 	// Map is the representation used in the alpha version of this API
-	Map map[string]Fields `json:"-" protobuf:"bytes,1,rep,name=map"`
+	Map map[string]ProtoFields `json:"-" protobuf:"bytes,1,rep,name=map"`
 
 	// Raw is the underlying serialization of this object.
 	Raw []byte `json:"-" protobuf:"bytes,2,opt,name=raw"`
 }
 
+// MarshalJSON implements json.Marshaler
+func (p ProtoFields) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&p.Map)
+}
+
 // ProtoFields returns the Fields as a new ProtoFields value.
+// There is no way to serialize into the alpha format (populating
+// the 'map' field) by calling this function.
 func (m *Fields) ProtoFields() *ProtoFields {
 	if m == nil {
 		return &ProtoFields{}
@@ -49,7 +56,11 @@ func (m *Fields) Size() (n int) {
 }
 
 // Unmarshal implements the protobuf marshalling interface.
-func (m *Fields) Unmarshal(data []byte) error {
+// If the serialized proto has anything in the alpha format, with
+// the 'map' field populated, convert it to the raw json bytes format
+// to preserve compatibility. Otherwise, just directly copy the value
+// of the 'raw' field.
+func (m *Fields) Unmarshal(data []byte) (err error) {
 	if len(data) == 0 {
 		return nil
 	}
@@ -58,13 +69,11 @@ func (m *Fields) Unmarshal(data []byte) error {
 		return err
 	}
 	if len(p.Map) == 0 {
-		return json.Unmarshal(p.Raw, &m)
+		m.Raw = p.Raw
+	} else {
+		m.Raw, err = json.Marshal(&p)
 	}
-	b, err := json.Marshal(&p.Map)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, &m)
+	return err
 }
 
 // Marshal implements the protobuf marshaling interface.
