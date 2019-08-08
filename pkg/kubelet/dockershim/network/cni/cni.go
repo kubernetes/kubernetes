@@ -84,14 +84,14 @@ type cniPortMapping struct {
 // see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md and
 // https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
 type cniBandwidthEntry struct {
-	// IngressRate is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If ingressRate is set, ingressBurst must also be set
+	// IngressRate is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If IngressRate is set, IngressBurst must also be set
 	IngressRate int `json:"ingressRate,omitempty"`
-	// IngressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If ingressBurst is set, ingressRate must also be set
+	// IngressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If IngressBurst is set, IngressRate must also be set
 	// NOTE: it's not used for now and defaults to 0. If IngressRate is set IngressBurst will be math.MaxInt32 ~ 2Gbit
 	IngressBurst int `json:"ingressBurst,omitempty"`
-	// EgressRate is the bandwidth is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If egressRate is set, egressBurst must also be set
+	// EgressRate is the bandwidth is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If EgressRate is set, EgressBurst must also be set
 	EgressRate int `json:"egressRate,omitempty"`
-	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If egressBurst is set, egressRate must also be set
+	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If EgressBurst is set, EgressRate must also be set
 	// NOTE: it's not used for now and defaults to 0. If EgressRate is set EgressBurst will be math.MaxInt32 ~ 2Gbit
 	EgressBurst int `json:"egressBurst,omitempty"`
 }
@@ -409,11 +409,13 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 			// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
 			// Rates are in bits per second, burst values are in bits.
 			bandwidthParam.IngressRate = int(ingress.Value())
-			bandwidthParam.IngressBurst = math.MaxInt32 // limit to math.MaxInt32 ~ 2Gbit
+			// Limit IngressBurst to math.MaxInt32, in practice limiting to 2Gbit is the equivalent of setting no limit
+			bandwidthParam.IngressBurst = math.MaxInt32
 		}
 		if egress != nil {
 			bandwidthParam.EgressRate = int(egress.Value())
-			bandwidthParam.EgressBurst = math.MaxInt32 // limit to math.MaxInt32 ~ 2Gbit
+			// Limit EgressBurst to math.MaxInt32, in practice limiting to 2Gbit is the equivalent of setting no limit
+			bandwidthParam.EgressBurst = math.MaxInt32
 		}
 		rt.CapabilityArgs["bandwidth"] = bandwidthParam
 	}
