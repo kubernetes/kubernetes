@@ -12,6 +12,7 @@ go_test(
         "controller_ref_test.go",
         "conversion_test.go",
         "duration_test.go",
+        "fields_proto_test.go",
         "group_version_test.go",
         "helpers_test.go",
         "labels_test.go",

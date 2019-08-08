@@ -228,7 +228,7 @@ message ExportOptions {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message Fields {
   // Map is the representation used in the alpha version of this API
-  map<string, Fields> map = 1;
+  map<string, ProtoFields> map = 1;
 
   // Raw is the underlying serialization of this object.
   optional bytes raw = 2;
@@ -787,7 +787,7 @@ message Preconditions {
 // that matches Fields. Do not use in Go structs.
 message ProtoFields {
   // Map is the representation used in the alpha version of this API
-  map<string, Fields> map = 1;
+  map<string, ProtoFields> map = 1;
 
   // Raw is the underlying serialization of this object.
   optional bytes raw = 2;

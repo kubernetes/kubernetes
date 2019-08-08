@@ -14,6 +14,9 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fields:
+      "18":
+        "19": null
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -46,6 +49,9 @@ spec:
         "24": "25"
       managedFields:
       - apiVersion: "34"
+        fields:
+          "18":
+            "19": null
         manager: "33"
         operation: ȎțêɘĲ斬³;Ơ歿
       name: "19"
@@ -87,6 +93,9 @@ spec:
             "46": "47"
           managedFields:
           - apiVersion: "56"
+            fields:
+              "18":
+                "19": null
             manager: "55"
             operation: 聻鎥ʟ<$洅ɹ7\弌Þ帺萸
           name: "41"

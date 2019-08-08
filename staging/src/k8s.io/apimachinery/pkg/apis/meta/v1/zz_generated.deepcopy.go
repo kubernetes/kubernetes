@@ -869,7 +869,7 @@ func (in *ProtoFields) DeepCopyInto(out *ProtoFields) {
 	*out = *in
 	if in.Map != nil {
 		in, out := &in.Map, &out.Map
-		*out = make(map[string]Fields, len(*in))
+		*out = make(map[string]ProtoFields, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}

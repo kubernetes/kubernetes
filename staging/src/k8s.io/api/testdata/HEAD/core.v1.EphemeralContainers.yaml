@@ -165,6 +165,9 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fields:
+      "18":
+        "19": null
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"

@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fields": {"18":{"19":null}}
       }
     ]
   },
@@ -79,7 +80,8 @@
           {
             "manager": "33",
             "operation": "ȎțêɘĲ斬³;Ơ歿",
-            "apiVersion": "34"
+            "apiVersion": "34",
+            "fields": {"18":{"19":null}}
           }
         ]
       },
@@ -135,7 +137,8 @@
               {
                 "manager": "55",
                 "operation": "聻鎥ʟ\u003c$洅ɹ7\\弌Þ帺萸",
-                "apiVersion": "56"
+                "apiVersion": "56",
+                "fields": {"18":{"19":null}}
               }
             ]
           },
