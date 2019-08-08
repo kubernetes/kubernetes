@@ -39,8 +39,7 @@ type exampleHandler struct {
 
 	eventChans map[string]chan examplePluginEvent // map[pluginName]eventChan
 
-	m     sync.Mutex
-	count int
+	m sync.Mutex
 
 	permitDeprecatedDir bool
 }

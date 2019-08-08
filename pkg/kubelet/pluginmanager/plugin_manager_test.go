@@ -31,12 +31,7 @@ import (
 	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
-)
-
-const (
-	testHostname = "test-hostname"
 )
 
 var (
@@ -44,13 +39,6 @@ var (
 	deprecatedSocketDir string
 	supportedVersions   = []string{"v1beta1", "v1beta2"}
 )
-
-// fake cache.PluginHandler
-type PluginHandler interface {
-	ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error
-	RegisterPlugin(pluginName, endpoint string, versions []string) error
-	DeRegisterPlugin(pluginName string)
-}
 
 type fakePluginHandler struct {
 	validatePluginCalled   bool
@@ -111,20 +99,6 @@ func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(deprecatedSocketDir))
 	os.MkdirAll(socketDir, 0755)
 	os.MkdirAll(deprecatedSocketDir, 0755)
-}
-
-func newWatcher(
-	t *testing.T, testDeprecatedDir bool,
-	desiredStateOfWorldCache cache.DesiredStateOfWorld) *pluginwatcher.Watcher {
-
-	depSocketDir := ""
-	if testDeprecatedDir {
-		depSocketDir = deprecatedSocketDir
-	}
-	w := pluginwatcher.NewWatcher(socketDir, depSocketDir, desiredStateOfWorldCache)
-	require.NoError(t, w.Start(wait.NeverStop))
-
-	return w
 }
 
 func waitForRegistration(t *testing.T, fakePluginHandler *fakePluginHandler) {

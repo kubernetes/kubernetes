@@ -160,15 +160,6 @@ func (lcm *localCM) GetCapacity() v1.ResourceList {
 	return lcm.capacity
 }
 
-// sortableNodeAddress is a type for sorting []v1.NodeAddress
-type sortableNodeAddress []v1.NodeAddress
-
-func (s sortableNodeAddress) Len() int { return len(s) }
-func (s sortableNodeAddress) Less(i, j int) bool {
-	return (string(s[i].Type) + s[i].Address) < (string(s[j].Type) + s[j].Address)
-}
-func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
-
 func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
 		desc                string

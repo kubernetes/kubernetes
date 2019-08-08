@@ -661,9 +661,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 	}
 }
 
-type responder struct {
-	errorMessage string
-}
+type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	klog.Errorf("Error while proxying request: %v", err)

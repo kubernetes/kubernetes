@@ -115,9 +115,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-type DummyImpl struct {
-	dummy string
-}
+type DummyImpl struct{}
 
 func NewDummyImpl() *DummyImpl {
 	return &DummyImpl{}

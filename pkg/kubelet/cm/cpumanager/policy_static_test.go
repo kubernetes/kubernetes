@@ -52,11 +52,8 @@ type staticPolicyMultiContainerTest struct {
 	stAssignments    state.ContainerCPUAssignments
 	stDefaultCPUSet  cpuset.CPUSet
 	pod              *v1.Pod
-	expErr           error
-	expCPUAlloc      bool
 	expInitCSets     []cpuset.CPUSet
 	expCSets         []cpuset.CPUSet
-	expPanic         bool
 }
 
 func TestStaticPolicyName(t *testing.T) {
