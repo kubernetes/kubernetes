@@ -22,12 +22,10 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -139,32 +137,8 @@ type PodPreemptor interface {
 }
 
 // Configurator defines I/O, caching, and other functionality needed to
-// construct a new scheduler. An implementation of this can be seen in
-// factory.go.
-type Configurator interface {
-	// Exposed for testing
-	GetHardPodAffinitySymmetricWeight() int32
-
-	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
-	GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error)
-	GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error)
-
-	// Exposed for testing
-	GetClient() clientset.Interface
-
-	// TODO(#80216): Remove GetScheduledPodLister from the interface.
-	// Exposed for testing
-	GetScheduledPodLister() corelisters.PodLister
-
-	Create() (*Config, error)
-	CreateFromProvider(providerName string) (*Config, error)
-	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
-	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
-}
-
-// configFactory is the default implementation of the scheduler.Configurator interface.
-// TODO(#80216): Remove pod lister.
-type configFactory struct {
+// construct a new scheduler.
+type Configurator struct {
 	client clientset.Interface
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
@@ -196,10 +170,6 @@ type configFactory struct {
 
 	schedulerCache internalcache.Cache
 
-	// SchedulerName of a scheduler is used to select which pods will be
-	// processed by this scheduler, based on pods's "spec.schedulerName".
-	schedulerName string
-
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
@@ -226,7 +196,6 @@ type configFactory struct {
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
 type ConfigFactoryArgs struct {
-	SchedulerName                  string
 	Client                         clientset.Interface
 	NodeInformer                   coreinformers.NodeInformer
 	PodInformer                    coreinformers.PodInformer
@@ -251,7 +220,7 @@ type ConfigFactoryArgs struct {
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
 // return the interface.
-func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
+func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 	stopEverything := args.StopCh
 	if stopEverything == nil {
 		stopEverything = wait.NeverStop
@@ -274,7 +243,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		csiNodeLister = args.CSINodeInformer.Lister()
 	}
 
-	c := &configFactory{
+	c := &Configurator{
 		client:                         args.Client,
 		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
 		pVLister:                       args.PvInformer.Lister(),
@@ -289,7 +258,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		framework:                      framework,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
-		schedulerName:                  args.SchedulerName,
 		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
 		disablePreemption:              args.DisablePreemption,
 		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
@@ -299,9 +267,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	// Setup volume binder
 	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	c.scheduledPodsHasSynced = args.PodInformer.Informer().HasSynced
-	// ScheduledPodLister is something we provide to plug-in functions that
-	// they may need to call.
-	c.scheduledPodLister = assignedPodLister{args.PodInformer.Lister()}
 
 	// Setup cache debugger
 	debugger := cachedebugger.New(
@@ -319,31 +284,18 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	return c
 }
 
-func (c *configFactory) GetHardPodAffinitySymmetricWeight() int32 {
+// GetHardPodAffinitySymmetricWeight is exposed for testing.
+func (c *Configurator) GetHardPodAffinitySymmetricWeight() int32 {
 	return c.hardPodAffinitySymmetricWeight
 }
 
-func (c *configFactory) GetSchedulerName() string {
-	return c.schedulerName
-}
-
-// GetClient provides a kubernetes Client, mostly internal use, but may also be called by mock-tests.
-func (c *configFactory) GetClient() clientset.Interface {
-	return c.client
-}
-
-// GetScheduledPodLister provides a pod lister, mostly internal use, but may also be called by mock-tests.
-func (c *configFactory) GetScheduledPodLister() corelisters.PodLister {
-	return c.scheduledPodLister
-}
-
 // Create creates a scheduler with the default algorithm provider.
-func (c *configFactory) Create() (*Config, error) {
+func (c *Configurator) Create() (*Config, error) {
 	return c.CreateFromProvider(DefaultProvider)
 }
 
-// Creates a scheduler from the name of a registered algorithm provider.
-func (c *configFactory) CreateFromProvider(providerName string) (*Config, error) {
+// CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
+func (c *Configurator) CreateFromProvider(providerName string) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
@@ -352,8 +304,8 @@ func (c *configFactory) CreateFromProvider(providerName string) (*Config, error)
 	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
 }
 
-// Creates a scheduler from the configuration file
-func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, error) {
+// CreateFromConfig creates a scheduler from the configuration file
+func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
@@ -430,8 +382,8 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
-// Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error) {
+// CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
+func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
 	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
@@ -443,12 +395,12 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
-	priorityConfigs, err := c.GetPriorityFunctionConfigs(priorityKeys)
+	priorityConfigs, err := c.getPriorityFunctionConfigs(priorityKeys)
 	if err != nil {
 		return nil, err
 	}
 
-	priorityMetaProducer, err := c.GetPriorityMetadataProducer()
+	priorityMetaProducer, err := c.getPriorityMetadataProducer()
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +466,7 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 	}
 }
 
-func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, error) {
+func (c *Configurator) getPriorityFunctionConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -523,7 +475,7 @@ func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]
 	return getPriorityFunctionConfigs(priorityKeys, *pluginArgs)
 }
 
-func (c *configFactory) GetPriorityMetadataProducer() (priorities.PriorityMetadataProducer, error) {
+func (c *Configurator) getPriorityMetadataProducer() (priorities.PriorityMetadataProducer, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -532,7 +484,9 @@ func (c *configFactory) GetPriorityMetadataProducer() (priorities.PriorityMetada
 	return getPriorityMetadataProducer(*pluginArgs)
 }
 
-func (c *configFactory) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
+// GetPredicateMetadataProducer returns a function to build Predicate Metadata.
+// It is used by the scheduler and other components, such as k8s.io/autoscaler/cluster-autoscaler.
+func (c *Configurator) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -540,7 +494,9 @@ func (c *configFactory) GetPredicateMetadataProducer() (predicates.PredicateMeta
 	return getPredicateMetadataProducer(*pluginArgs)
 }
 
-func (c *configFactory) GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error) {
+// GetPredicates returns the predicate functions.
+// It is used by the scheduler and other components, such as k8s.io/autoscaler/cluster-autoscaler.
+func (c *Configurator) GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -549,7 +505,7 @@ func (c *configFactory) GetPredicates(predicateKeys sets.String) (map[string]pre
 	return getFitPredicateFunctions(predicateKeys, *pluginArgs)
 }
 
-func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
+func (c *Configurator) getPluginArgs() (*PluginFactoryArgs, error) {
 	return &PluginFactoryArgs{
 		PodLister:                      c.schedulerCache,
 		ServiceLister:                  c.serviceLister,
@@ -566,65 +522,6 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil
-}
-
-// assignedPodLister filters the pods returned from a PodLister to
-// only include those that have a node name set.
-type assignedPodLister struct {
-	corelisters.PodLister
-}
-
-// List lists all Pods in the indexer for a given namespace.
-func (l assignedPodLister) List(selector labels.Selector) ([]*v1.Pod, error) {
-	list, err := l.PodLister.List(selector)
-	if err != nil {
-		return nil, err
-	}
-	filtered := make([]*v1.Pod, 0, len(list))
-	for _, pod := range list {
-		if len(pod.Spec.NodeName) > 0 {
-			filtered = append(filtered, pod)
-		}
-	}
-	return filtered, nil
-}
-
-// List lists all Pods in the indexer for a given namespace.
-func (l assignedPodLister) Pods(namespace string) corelisters.PodNamespaceLister {
-	return assignedPodNamespaceLister{l.PodLister.Pods(namespace)}
-}
-
-// assignedPodNamespaceLister filters the pods returned from a PodNamespaceLister to
-// only include those that have a node name set.
-type assignedPodNamespaceLister struct {
-	corelisters.PodNamespaceLister
-}
-
-// List lists all Pods in the indexer for a given namespace.
-func (l assignedPodNamespaceLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	list, err := l.PodNamespaceLister.List(selector)
-	if err != nil {
-		return nil, err
-	}
-	filtered := make([]*v1.Pod, 0, len(list))
-	for _, pod := range list {
-		if len(pod.Spec.NodeName) > 0 {
-			filtered = append(filtered, pod)
-		}
-	}
-	return filtered, nil
-}
-
-// Get retrieves the Pod from the indexer for a given namespace and name.
-func (l assignedPodNamespaceLister) Get(name string) (*v1.Pod, error) {
-	pod, err := l.PodNamespaceLister.Get(name)
-	if err != nil {
-		return nil, err
-	}
-	if len(pod.Spec.NodeName) > 0 {
-		return pod, nil
-	}
-	return nil, errors.NewNotFound(schema.GroupResource{Resource: string(v1.ResourcePods)}, name)
 }
 
 type podInformer struct {

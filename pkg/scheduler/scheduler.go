@@ -144,7 +144,6 @@ func New(client clientset.Interface,
 	}
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  options.schedulerName,
 		Client:                         client,
 		NodeInformer:                   nodeInformer,
 		PodInformer:                    podInformer,

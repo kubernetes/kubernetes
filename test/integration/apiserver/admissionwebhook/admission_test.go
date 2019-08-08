@@ -386,8 +386,18 @@ func (h *holder) verifyOptions(options runtime.Object) error {
 	return nil
 }
 
-// TestWebhookAdmission tests communication between API server and webhook process.
-func TestWebhookAdmission(t *testing.T) {
+// TestWebhookAdmissionWithWatchCache tests communication between API server and webhook process.
+func TestWebhookAdmissionWithWatchCache(t *testing.T) {
+	testWebhookAdmission(t, true)
+}
+
+// TestWebhookAdmissionWithoutWatchCache tests communication between API server and webhook process.
+func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
+	testWebhookAdmission(t, false)
+}
+
+// testWebhookAdmission tests communication between API server and webhook process.
+func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{
 		t:                 t,
@@ -428,6 +438,7 @@ func TestWebhookAdmission(t *testing.T) {
 	// start API server
 	etcdConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		fmt.Sprintf("--watch-cache=%v", watchCache),
 		// turn off admission plugins that add finalizers
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		// force enable all resources so we can check storage.

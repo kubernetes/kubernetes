@@ -57,9 +57,9 @@ func StartApiserver() (string, ShutdownFunc) {
 }
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
-// and event broadcaster. It returns a handle to the configurator for the running scheduler
+// and event broadcaster. It returns a handle to the configurator args for the running scheduler
 // and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (factory.Configurator, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface) (*factory.ConfigFactoryArgs, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	stopCh := make(chan struct{})
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
@@ -67,9 +67,10 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 
 	evtBroadcaster.StartRecordingToSink(stopCh)
 
-	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
+	configuratorArgs := createSchedulerConfiguratorArgs(clientSet, informerFactory, stopCh)
+	configurator := factory.NewConfigFactory(configuratorArgs)
 
-	config, err := schedulerConfigurator.CreateFromConfig(schedulerapi.Policy{})
+	config, err := configurator.CreateFromConfig(schedulerapi.Policy{})
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
@@ -95,18 +96,17 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 		close(stopCh)
 		klog.Infof("destroyed scheduler")
 	}
-	return schedulerConfigurator, shutdownFunc
+	return configuratorArgs, shutdownFunc
 }
 
-// createSchedulerConfigurator create a configurator for scheduler with given informer factory and default name.
-func createSchedulerConfigurator(
+// createSchedulerConfigurator create a configurator for scheduler with given informer factory.
+func createSchedulerConfiguratorArgs(
 	clientSet clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	stopCh <-chan struct{},
-) factory.Configurator {
+) *factory.ConfigFactoryArgs {
 
-	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  v1.DefaultSchedulerName,
+	return &factory.ConfigFactoryArgs{
 		Client:                         clientSet,
 		NodeInformer:                   informerFactory.Core().V1().Nodes(),
 		PodInformer:                    informerFactory.Core().V1().Pods(),
@@ -123,5 +123,5 @@ func createSchedulerConfigurator(
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		StopCh:                         stopCh,
-	})
+	}
 }

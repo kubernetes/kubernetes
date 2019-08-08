@@ -267,7 +267,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 				return nil, err
 			}
 		} else {
-			diskURI, err = diskController.CreateBlobDisk(name, storage.SkuName(storageAccountType), requestGiB)
+			diskURI, err = diskController.CreateBlobDisk(name, storage.SkuName(skuName), requestGiB)
 			if err != nil {
 				return nil, err
 			}

@@ -1029,6 +1029,7 @@ func TestScaledValue(t *testing.T) {
 		{0, Micro, 1000 * 1000},
 		{0, Milli, 1000},
 		{0, 0, 1},
+		{2, -2, 100 * 100},
 	}
 
 	for _, item := range table {

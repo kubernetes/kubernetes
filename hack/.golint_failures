@@ -114,7 +114,6 @@ pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
-pkg/kubelet/client
 pkg/kubelet/cm
 pkg/kubelet/config
 pkg/kubelet/container
@@ -129,7 +128,6 @@ pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
-pkg/kubelet/metrics
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
@@ -172,7 +170,6 @@ pkg/registry/certificates/rest
 pkg/registry/coordination/rest
 pkg/registry/core/componentstatus
 pkg/registry/core/endpoint/storage
-pkg/registry/core/event
 pkg/registry/core/event/storage
 pkg/registry/core/limitrange/storage
 pkg/registry/core/namespace
@@ -242,7 +239,6 @@ pkg/util/iptables
 pkg/util/iptables/testing
 pkg/util/labels
 pkg/util/mount
-pkg/util/normalizer
 pkg/util/oom
 pkg/util/procfs
 pkg/util/removeall
@@ -260,8 +256,6 @@ pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/iscsi
 pkg/volume/rbd
-pkg/volume/scaleio
-pkg/volume/storageos
 pkg/volume/testing
 pkg/volume/util/fs
 pkg/volume/util/volumepathhandler

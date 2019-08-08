@@ -188,6 +188,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	}
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
+	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
+	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
 
 	return &s, nil
 }
@@ -391,6 +393,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	if err != nil {
 		return nil, err
 	}
+	kubeconfig.DisableCompression = true
 	kubeconfig.ContentConfig.ContentType = s.Generic.ClientConnection.ContentType
 	kubeconfig.QPS = s.Generic.ClientConnection.QPS
 	kubeconfig.Burst = int(s.Generic.ClientConnection.Burst)

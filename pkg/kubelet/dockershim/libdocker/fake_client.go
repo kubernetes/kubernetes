@@ -71,12 +71,13 @@ type FakeDockerClient struct {
 	// Images pulled by ref (name or ID).
 	ImagesPulled []string
 
-	VersionInfo     dockertypes.Version
-	Information     dockertypes.Info
-	ExecInspect     *dockertypes.ContainerExecInspect
-	execCmd         []string
-	EnableSleep     bool
-	ImageHistoryMap map[string][]dockerimagetypes.HistoryResponseItem
+	VersionInfo       dockertypes.Version
+	Information       dockertypes.Info
+	ExecInspect       *dockertypes.ContainerExecInspect
+	execCmd           []string
+	EnableSleep       bool
+	ImageHistoryMap   map[string][]dockerimagetypes.HistoryResponseItem
+	ContainerStatsMap map[string]*dockertypes.StatsJSON
 }
 
 const (
@@ -913,9 +914,19 @@ func (f *FakeDockerPuller) GetImageRef(image string) (string, error) {
 	return image, err
 }
 
+func (f *FakeDockerClient) InjectContainerStats(data map[string]*dockertypes.StatsJSON) {
+	f.Lock()
+	defer f.Unlock()
+	f.ContainerStatsMap = data
+}
+
 func (f *FakeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.appendCalled(CalledDetail{name: "getContainerStats"})
-	return nil, fmt.Errorf("not implemented")
+	f.appendCalled(CalledDetail{name: "get_container_stats"})
+	stats, ok := f.ContainerStatsMap[id]
+	if !ok {
+		return nil, fmt.Errorf("container %q not found", id)
+	}
+	return stats, nil
 }

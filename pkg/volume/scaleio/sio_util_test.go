@@ -93,7 +93,7 @@ func TestUtilValidateConfigs(t *testing.T) {
 		confKey.secretName: "sio-secret",
 		confKey.system:     "sio",
 	}
-	if err := validateConfigs(data); err != gatewayNotProvidedErr {
+	if err := validateConfigs(data); err != errGatewayNotProvided {
 		t.Error("Expecting error for missing gateway, but did not get it")
 	}
 }

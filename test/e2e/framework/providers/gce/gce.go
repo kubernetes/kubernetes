@@ -170,8 +170,8 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) erro
 	}
 
 	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
-		e2eservice := p.gceCloud.ComputeServices().GA
-		list, err := e2eservice.ForwardingRules.List(project, region).Do()
+		computeservice := p.gceCloud.ComputeServices().GA
+		list, err := computeservice.ForwardingRules.List(project, region).Do()
 		if err != nil {
 			return false, err
 		}

@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 				if p.Name == nonCriticalBestEffort.Name {
 					gomega.Expect(p.Status.Phase).NotTo(gomega.Equal(v1.PodFailed), fmt.Sprintf("pod: %v should be preempted", p.Name))
 				} else {
-					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodFailed), fmt.Sprintf("pod: %v should not be preempted", p.Name))
+					framework.ExpectEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should not be preempted", p.Name))
 				}
 			}
 		})
@@ -115,7 +115,7 @@ func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	gomega.Expect(len(nodeList.Items)).To(gomega.Equal(1))
+	framework.ExpectEqual(len(nodeList.Items), 1)
 	capacity := nodeList.Items[0].Status.Allocatable
 	return v1.ResourceList{
 		v1.ResourceCPU:    capacity[v1.ResourceCPU],

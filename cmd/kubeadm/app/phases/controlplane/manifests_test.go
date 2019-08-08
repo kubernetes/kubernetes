@@ -29,7 +29,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -360,7 +359,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: map[string]string{
-							"authorization-mode": authzmodes.ModeABAC,
+							"authorization-mode": kubeadmconstants.ModeABAC,
 						},
 					},
 				},
@@ -448,7 +447,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: map[string]string{
-							"authorization-mode": authzmodes.ModeWebhook,
+							"authorization-mode": kubeadmconstants.ModeWebhook,
 						},
 					},
 				},
@@ -868,6 +867,8 @@ func TestGetSchedulerCommand(t *testing.T) {
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
+				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
+				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
 			},
 		},
 	}
@@ -897,37 +898,37 @@ func TestGetAuthzModes(t *testing.T) {
 		},
 		{
 			name:     "add missing Node",
-			authMode: []string{authzmodes.ModeRBAC},
+			authMode: []string{kubeadmconstants.ModeRBAC},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "add missing RBAC",
-			authMode: []string{authzmodes.ModeNode},
+			authMode: []string{kubeadmconstants.ModeNode},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "add defaults to ABAC",
-			authMode: []string{authzmodes.ModeABAC},
+			authMode: []string{kubeadmconstants.ModeABAC},
 			expected: "Node,RBAC,ABAC",
 		},
 		{
 			name:     "add defaults to RBAC+Webhook",
-			authMode: []string{authzmodes.ModeRBAC, authzmodes.ModeWebhook},
+			authMode: []string{kubeadmconstants.ModeRBAC, kubeadmconstants.ModeWebhook},
 			expected: "Node,RBAC,Webhook",
 		},
 		{
 			name:     "add default to Webhook",
-			authMode: []string{authzmodes.ModeWebhook},
+			authMode: []string{kubeadmconstants.ModeWebhook},
 			expected: "Node,RBAC,Webhook",
 		},
 		{
 			name:     "AlwaysAllow ignored",
-			authMode: []string{authzmodes.ModeAlwaysAllow},
+			authMode: []string{kubeadmconstants.ModeAlwaysAllow},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "AlwaysDeny ignored",
-			authMode: []string{authzmodes.ModeAlwaysDeny},
+			authMode: []string{kubeadmconstants.ModeAlwaysDeny},
 			expected: "Node,RBAC",
 		},
 		{
@@ -937,12 +938,12 @@ func TestGetAuthzModes(t *testing.T) {
 		},
 		{
 			name:     "Multiple ignored",
-			authMode: []string{authzmodes.ModeAlwaysAllow, authzmodes.ModeAlwaysDeny, "foo"},
+			authMode: []string{kubeadmconstants.ModeAlwaysAllow, kubeadmconstants.ModeAlwaysDeny, "foo"},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "all",
-			authMode: []string{authzmodes.ModeNode, authzmodes.ModeRBAC, authzmodes.ModeWebhook, authzmodes.ModeABAC},
+			authMode: []string{kubeadmconstants.ModeNode, kubeadmconstants.ModeRBAC, kubeadmconstants.ModeWebhook, kubeadmconstants.ModeABAC},
 			expected: "Node,RBAC,ABAC,Webhook",
 		},
 	}

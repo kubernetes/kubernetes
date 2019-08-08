@@ -83,13 +83,16 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -353,17 +356,17 @@ func SkipUnlessTaintBasedEvictionsEnabled() {
 
 // SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
 func SkipIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
-			skipInternalf(1, "Not supported under container runtime %s", runtime)
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
+			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
 		}
 	}
 }
 
 // RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
 func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
 			return
 		}
 	}
@@ -378,6 +381,55 @@ func RunIfSystemSpecNameIs(names ...string) {
 		}
 	}
 	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
+}
+
+// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
+// to flip to Ready, log its output and delete it.
+func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
+	path := "test/images/clusterapi-tester/pod.yaml"
+	e2elog.Logf("Parsing pod from %v", path)
+	p, err := manifest.PodFromManifest(path)
+	if err != nil {
+		e2elog.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
+		return
+	}
+	p.Namespace = ns
+	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
+		e2elog.Logf("Failed to create %v: %v", p.Name, err)
+		return
+	}
+	defer func() {
+		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
+			e2elog.Logf("Failed to delete pod %v: %v", p.Name, err)
+		}
+	}()
+	timeout := 5 * time.Minute
+	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
+		e2elog.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
+		return
+	}
+	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
+	if err != nil {
+		e2elog.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
+	} else {
+		e2elog.Logf("Output of clusterapi-tester:\n%v", logs)
+	}
+}
+
+// getDefaultClusterIPFamily obtains the default IP family of the cluster
+// using the Cluster IP address of the kubernetes service created in the default namespace
+// This unequivocally identifies the default IP family because services are single family
+func getDefaultClusterIPFamily(c clientset.Interface) string {
+	// Get the ClusterIP of the kubernetes service created in the default namespace
+	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+	if err != nil {
+		e2elog.Failf("Failed to get kubernetes service ClusterIP: %v", err)
+	}
+
+	if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
+		return "ipv6"
+	}
+	return "ipv4"
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
@@ -1799,7 +1851,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 					c.Name, c.Ready, c.RestartCount)
 			}
 		}
-		HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
+		e2emetrics.HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
 		// TODO: Log node resource info
 	}
 }
@@ -2669,6 +2721,36 @@ func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddr
 	return
 }
 
+// GetHostAddress gets the node for a pod and returns the first
+// address. Returns an error if the node the pod is on doesn't have an
+// address.
+func GetHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
+	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	// Try externalAddress first
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeExternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+	// If no externalAddress found, try internalAddress
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+
+	// If not found, return error
+	return "", fmt.Errorf("No address for pod %v on node %v",
+		p.Name, p.Spec.NodeName)
+}
+
 type extractRT struct {
 	http.Header
 }
@@ -3053,14 +3135,14 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
-	url, err := url.Parse(TestContext.Host)
+	hostURL, err := url.Parse(TestContext.Host)
 	if err != nil {
 		e2elog.Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(url.Host) != nil {
-		externalIP = url.Host
+	if net.ParseIP(hostURL.Host) != nil {
+		externalIP = hostURL.Host
 	} else {
-		hostname = url.Host
+		hostname = hostURL.Host
 	}
 
 	return externalIP, internalIP, hostname
@@ -3241,7 +3323,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
 func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	var controller appsv1.DaemonSet
+	var ds appsv1.DaemonSet
 	e2elog.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
@@ -3268,16 +3350,16 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
 
-	json, err := utilyaml.ToJSON(data)
+	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
 	}
 
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &controller)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
-	return &controller, nil
+	return &ds, nil
 }
 
 // waitForServerPreferredNamespacedResources waits until server preferred namespaced resources could be successfully discovered.

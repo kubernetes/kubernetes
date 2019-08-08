@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -142,7 +143,7 @@ var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []sched
 
 // FakeFilterPlugin is a test filter plugin used by default scheduler.
 type FakeFilterPlugin struct {
-	numFilterCalled int
+	numFilterCalled int32
 	failFilter      bool
 }
 
@@ -162,7 +163,7 @@ func (fp *FakeFilterPlugin) reset() {
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
 func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
-	fp.numFilterCalled++
+	atomic.AddInt32(&fp.numFilterCalled, 1)
 
 	if fp.failFilter {
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -171,7 +172,7 @@ func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nod
 	return nil
 }
 
-// NewFilterPlugin is the factory for filtler plugin.
+// NewFilterPlugin is the factory for filter plugin.
 func NewFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return filterPlugin, nil
 }

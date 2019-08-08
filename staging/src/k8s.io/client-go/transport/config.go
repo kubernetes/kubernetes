@@ -47,6 +47,10 @@ type Config struct {
 	// Impersonate is the config that this Config will impersonate using
 	Impersonate ImpersonationConfig
 
+	// DisableCompression bypasses automatic GZip compression requests to the
+	// server.
+	DisableCompression bool
+
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use
 	// WrapTransport for most client level operations.

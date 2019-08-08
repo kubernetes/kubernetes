@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -236,16 +237,16 @@ func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfo(csiNode *storagev1beta1.CSIN
 func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfoFromSC(csiNode *storagev1beta1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
 	namespace := pvc.Namespace
 	pvcName := pvc.Name
-	scName := pvc.Spec.StorageClassName
+	scName := v1helper.GetPersistentVolumeClaimClass(pvc)
 
 	// If StorageClass is not set or not found, then PVC must be using immediate binding mode
 	// and hence it must be bound before scheduling. So it is safe to not count it.
-	if scName == nil {
+	if scName == "" {
 		klog.V(5).Infof("PVC %s/%s has no StorageClass", namespace, pvcName)
 		return "", ""
 	}
 
-	storageClass, err := c.scInfo.GetStorageClassInfo(*scName)
+	storageClass, err := c.scInfo.GetStorageClassInfo(scName)
 	if err != nil {
 		klog.V(5).Infof("Could not get StorageClass for PVC %s/%s: %v", namespace, pvcName, err)
 		return "", ""

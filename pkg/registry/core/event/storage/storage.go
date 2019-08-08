@@ -43,7 +43,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
 	store := &genericregistry.Store{
 		NewFunc:       func() runtime.Object { return &api.Event{} },
 		NewListFunc:   func() runtime.Object { return &api.EventList{} },
-		PredicateFunc: event.MatchEvent,
+		PredicateFunc: event.Matcher,
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},

@@ -120,7 +120,7 @@ func TestNotExemptClusterScopedResource(t *testing.T) {
 	}
 	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, &metav1.CreateOptions{}, false, nil)
 	matcher := Matcher{}
-	matches, err := matcher.MatchNamespaceSelector(webhook.NewValidatingWebhookAccessor("mock-hook", hook), attr)
+	matches, err := matcher.MatchNamespaceSelector(webhook.NewValidatingWebhookAccessor("mock-hook", "mock-cfg", hook), attr)
 	if err != nil {
 		t.Fatal(err)
 	}

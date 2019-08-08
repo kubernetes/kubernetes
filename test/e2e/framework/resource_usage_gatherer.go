@@ -82,6 +82,18 @@ func (s *ResourceUsageSummary) SummaryKind() string {
 	return "ResourceUsageSummary"
 }
 
+type uint64arr []uint64
+
+func (a uint64arr) Len() int           { return len(a) }
+func (a uint64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a uint64arr) Less(i, j int) bool { return a[i] < a[j] }
+
+type usageDataPerContainer struct {
+	cpuData        []float64
+	memUseData     []uint64
+	memWorkSetData []uint64
+}
+
 func computePercentiles(timeSeries []e2ekubelet.ResourceUsagePerContainer, percentilesToCompute []int) map[int]e2ekubelet.ResourceUsagePerContainer {
 	if len(timeSeries) == 0 {
 		return make(map[int]e2ekubelet.ResourceUsagePerContainer)
@@ -167,7 +179,7 @@ func (w *resourceGatherWorker) singleProbe() {
 			}
 		}
 	} else {
-		nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
+		nodeUsage, err := e2ekubelet.GetOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
 		if err != nil {
 			e2elog.Logf("Error while reading data from %v: %v", w.nodeName, err)
 			return
@@ -254,58 +266,59 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 			probeDuration:               options.ProbeDuration,
 			printVerboseLogs:            options.PrintVerboseLogs,
 		})
-	} else {
-		// Tracks kube-system pods if no valid PodList is passed in.
-		var err error
-		if pods == nil {
-			pods, err = c.CoreV1().Pods("kube-system").List(metav1.ListOptions{})
-			if err != nil {
-				e2elog.Logf("Error while listing Pods: %v", err)
-				return nil, err
-			}
-		}
-		dnsNodes := make(map[string]bool)
-		for _, pod := range pods.Items {
-			if (options.Nodes == MasterNodes) && !system.IsMasterNode(pod.Spec.NodeName) {
-				continue
-			}
-			if (options.Nodes == MasterAndDNSNodes) && !system.IsMasterNode(pod.Spec.NodeName) && pod.Labels["k8s-app"] != "kube-dns" {
-				continue
-			}
-			for _, container := range pod.Status.InitContainerStatuses {
-				g.containerIDs = append(g.containerIDs, container.Name)
-			}
-			for _, container := range pod.Status.ContainerStatuses {
-				g.containerIDs = append(g.containerIDs, container.Name)
-			}
-			if options.Nodes == MasterAndDNSNodes {
-				dnsNodes[pod.Spec.NodeName] = true
-			}
-		}
-		nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		return &g, nil
+	}
+
+	// Tracks kube-system pods if no valid PodList is passed in.
+	var err error
+	if pods == nil {
+		pods, err = c.CoreV1().Pods("kube-system").List(metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Error while listing Nodes: %v", err)
+			e2elog.Logf("Error while listing Pods: %v", err)
 			return nil, err
 		}
+	}
+	dnsNodes := make(map[string]bool)
+	for _, pod := range pods.Items {
+		if (options.Nodes == MasterNodes) && !system.IsMasterNode(pod.Spec.NodeName) {
+			continue
+		}
+		if (options.Nodes == MasterAndDNSNodes) && !system.IsMasterNode(pod.Spec.NodeName) && pod.Labels["k8s-app"] != "kube-dns" {
+			continue
+		}
+		for _, container := range pod.Status.InitContainerStatuses {
+			g.containerIDs = append(g.containerIDs, container.Name)
+		}
+		for _, container := range pod.Status.ContainerStatuses {
+			g.containerIDs = append(g.containerIDs, container.Name)
+		}
+		if options.Nodes == MasterAndDNSNodes {
+			dnsNodes[pod.Spec.NodeName] = true
+		}
+	}
+	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		e2elog.Logf("Error while listing Nodes: %v", err)
+		return nil, err
+	}
 
-		for _, node := range nodeList.Items {
-			if options.Nodes == AllNodes || system.IsMasterNode(node.Name) || dnsNodes[node.Name] {
-				g.workerWg.Add(1)
-				g.workers = append(g.workers, resourceGatherWorker{
-					c:                           c,
-					nodeName:                    node.Name,
-					wg:                          &g.workerWg,
-					containerIDs:                g.containerIDs,
-					stopCh:                      g.stopCh,
-					finished:                    false,
-					inKubemark:                  false,
-					resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
-					probeDuration:               options.ProbeDuration,
-					printVerboseLogs:            options.PrintVerboseLogs,
-				})
-				if options.Nodes == MasterNodes {
-					break
-				}
+	for _, node := range nodeList.Items {
+		if options.Nodes == AllNodes || system.IsMasterNode(node.Name) || dnsNodes[node.Name] {
+			g.workerWg.Add(1)
+			g.workers = append(g.workers, resourceGatherWorker{
+				c:                           c,
+				nodeName:                    node.Name,
+				wg:                          &g.workerWg,
+				containerIDs:                g.containerIDs,
+				stopCh:                      g.stopCh,
+				finished:                    false,
+				inKubemark:                  false,
+				resourceDataGatheringPeriod: options.ResourceDataGatheringPeriod,
+				probeDuration:               options.ProbeDuration,
+				printVerboseLogs:            options.PrintVerboseLogs,
+			})
+			if options.Nodes == MasterNodes {
+				break
 			}
 		}
 	}
@@ -380,32 +393,36 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 				CPU:  usage.CPUUsageInCores,
 				Mem:  usage.MemoryWorkingSetInBytes,
 			})
+
 			// Verifying 99th percentile of resource usage
-			if perc == 99 {
-				// Name has a form: <pod_name>/<container_name>
-				containerName := strings.Split(name, "/")[1]
-				if constraint, ok := constraints[containerName]; ok {
-					if usage.CPUUsageInCores > constraint.CPUConstraint {
-						violatedConstraints = append(
-							violatedConstraints,
-							fmt.Sprintf("Container %v is using %v/%v CPU",
-								name,
-								usage.CPUUsageInCores,
-								constraint.CPUConstraint,
-							),
-						)
-					}
-					if usage.MemoryWorkingSetInBytes > constraint.MemoryConstraint {
-						violatedConstraints = append(
-							violatedConstraints,
-							fmt.Sprintf("Container %v is using %v/%v MB of memory",
-								name,
-								float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
-								float64(constraint.MemoryConstraint)/(1024*1024),
-							),
-						)
-					}
-				}
+			if perc != 99 {
+				continue
+			}
+			// Name has a form: <pod_name>/<container_name>
+			containerName := strings.Split(name, "/")[1]
+			constraint, ok := constraints[containerName]
+			if !ok {
+				continue
+			}
+			if usage.CPUUsageInCores > constraint.CPUConstraint {
+				violatedConstraints = append(
+					violatedConstraints,
+					fmt.Sprintf("Container %v is using %v/%v CPU",
+						name,
+						usage.CPUUsageInCores,
+						constraint.CPUConstraint,
+					),
+				)
+			}
+			if usage.MemoryWorkingSetInBytes > constraint.MemoryConstraint {
+				violatedConstraints = append(
+					violatedConstraints,
+					fmt.Sprintf("Container %v is using %v/%v MB of memory",
+						name,
+						float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
+						float64(constraint.MemoryConstraint)/(1024*1024),
+					),
+				)
 			}
 		}
 	}

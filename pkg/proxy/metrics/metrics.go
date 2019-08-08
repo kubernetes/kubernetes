@@ -68,9 +68,12 @@ var (
 			Subsystem: kubeProxySubsystem,
 			Name:      "network_programming_duration_seconds",
 			Help:      "In Cluster Network Programming Latency in seconds",
-			// TODO(mm4tt): Reevaluate buckets before 1.14 release.
-			// The last bucket will be [0.001s*2^20 ~= 17min, +inf)
-			Buckets: prometheus.ExponentialBuckets(0.001, 2, 20),
+			Buckets: merge(
+				prometheus.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
+				prometheus.LinearBuckets(1, 1, 59),      // 1s, 2s, 3s, ... 59s
+				prometheus.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
+				prometheus.LinearBuckets(120, 30, 7),    // 2min, 2.5min, 3min, ..., 5min
+			),
 		},
 	)
 
@@ -139,4 +142,12 @@ func SinceInMicroseconds(start time.Time) float64 {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+func merge(slices ...[]float64) []float64 {
+	result := make([]float64, 1)
+	for _, s := range slices {
+		result = append(result, s...)
+	}
+	return result
 }

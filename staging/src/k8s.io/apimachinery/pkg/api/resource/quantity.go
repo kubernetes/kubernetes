@@ -697,7 +697,9 @@ func (q *Quantity) MilliValue() int64 {
 	return q.ScaledValue(Milli)
 }
 
-// ScaledValue returns the value of ceil(q * 10^scale); this could overflow an int64.
+// ScaledValue returns the value of ceil(q / 10^scale).
+// For example, NewQuantity(1, DecimalSI).ScaledValue(Milli) returns 1000.
+// This could overflow an int64.
 // To detect overflow, call Value() first and verify the expected magnitude.
 func (q *Quantity) ScaledValue(scale Scale) int64 {
 	if q.d.Dec == nil {

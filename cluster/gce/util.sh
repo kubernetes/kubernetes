@@ -1066,6 +1066,18 @@ ETCD_APISERVER_SERVER_KEY: $(yaml-quote ${ETCD_APISERVER_SERVER_KEY_BASE64:-})
 ETCD_APISERVER_SERVER_CERT: $(yaml-quote ${ETCD_APISERVER_SERVER_CERT_BASE64:-})
 ETCD_APISERVER_CLIENT_KEY: $(yaml-quote ${ETCD_APISERVER_CLIENT_KEY_BASE64:-})
 ETCD_APISERVER_CLIENT_CERT: $(yaml-quote ${ETCD_APISERVER_CLIENT_CERT_BASE64:-})
+KONNECTIVITY_SERVER_CA_KEY: $(yaml-quote ${KONNECTIVITY_SERVER_CA_KEY_BASE64:-})
+KONNECTIVITY_SERVER_CA_CERT: $(yaml-quote ${KONNECTIVITY_SERVER_CA_CERT_BASE64:-})
+KONNECTIVITY_SERVER_CERT: $(yaml-quote ${KONNECTIVITY_SERVER_CERT_BASE64:-})
+KONNECTIVITY_SERVER_KEY: $(yaml-quote ${KONNECTIVITY_SERVER_KEY_BASE64:-})
+KONNECTIVITY_SERVER_CLIENT_CERT: $(yaml-quote ${KONNECTIVITY_SERVER_CLIENT_CERT_BASE64:-})
+KONNECTIVITY_SERVER_CLIENT_KEY: $(yaml-quote ${KONNECTIVITY_SERVER_CLIENT_KEY_BASE64:-})
+KONNECTIVITY_AGENT_CA_KEY: $(yaml-quote ${KONNECTIVITY_AGENT_CA_KEY_BASE64:-})
+KONNECTIVITY_AGENT_CA_CERT: $(yaml-quote ${KONNECTIVITY_AGENT_CA_CERT_BASE64:-})
+KONNECTIVITY_AGENT_CERT: $(yaml-quote ${KONNECTIVITY_AGENT_CERT_BASE64:-})
+KONNECTIVITY_AGENT_KEY: $(yaml-quote ${KONNECTIVITY_AGENT_KEY_BASE64:-})
+KONNECTIVITY_AGENT_CLIENT_CERT: $(yaml-quote ${KONNECTIVITY_AGENT_CLIENT_CERT_BASE64:-})
+KONNECTIVITY_AGENT_CLIENT_KEY: $(yaml-quote ${KONNECTIVITY_AGENT_CLIENT_KEY_BASE64:-})
 EOF
 }
 
@@ -1206,6 +1218,13 @@ EOF
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     cat >>$file <<EOF
 REMOUNT_VOLUME_PLUGIN_DIR: $(yaml-quote ${REMOUNT_VOLUME_PLUGIN_DIR:-true})
+EOF
+  fi
+  if [[ "${master}" == "false" ]]; then
+    cat >>$file <<EOF
+KONNECTIVITY_AGENT_CA_CERT: $(yaml-quote ${KONNECTIVITY_AGENT_CA_CERT_BASE64:-})
+KONNECTIVITY_AGENT_CLIENT_KEY: $(yaml-quote ${KONNECTIVITY_AGENT_CLIENT_KEY_BASE64:-})
+KONNECTIVITY_AGENT_CLIENT_CERT: $(yaml-quote ${KONNECTIVITY_AGENT_CLIENT_CERT_BASE64:-})
 EOF
   fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
@@ -1464,6 +1483,11 @@ EOF
 MAX_PODS_PER_NODE: $(yaml-quote ${MAX_PODS_PER_NODE})
 EOF
   fi
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE: $(yaml-quote ${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE})
+EOF
+  fi
 }
 
 
@@ -1549,6 +1573,7 @@ function create-certs {
   setup-easyrsa
   PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
   AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
+  KONNECTIVITY_SERVER_PRIMARY_CN="${primary_cn}" KONNECTIVITY_SERVER_SANS="${sans}" generate-konnectivity-server-certs
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
@@ -1570,6 +1595,22 @@ function create-certs {
   REQUESTHEADER_CA_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   PROXY_CLIENT_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | base64 | tr -d '\r\n')
   PROXY_CLIENT_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | base64 | tr -d '\r\n')
+
+  # Setting up the Kubernetes API Server Konnectivity Server auth.
+  # This includes certs for both API Server to Konnectivity Server and
+  # Konnectivity Agent to Konnectivity Server.
+  KONNECTIVITY_SERVER_CA_KEY_BASE64=$(cat "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CA_CERT_BASE64=$(cat "${KONNECTIVITY_SERVER_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CERT_BASE64=$(cat "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/server.crt" | base64 | tr -d '\r\n')
+  KONNECTIVITY_SERVER_KEY_BASE64=$(cat "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/server.key" | base64 | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CLIENT_CERT_BASE64=$(cat "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/client.crt" | base64 | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CLIENT_KEY_BASE64=$(cat "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/client.key" | base64 | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CA_KEY_BASE64=$(cat "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CA_CERT_BASE64=$(cat "${KONNECTIVITY_AGENT_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CERT_BASE64=$(cat "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/server.crt" | base64 | tr -d '\r\n')
+  KONNECTIVITY_AGENT_KEY_BASE64=$(cat "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/server.key" | base64 | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CLIENT_CERT_BASE64=$(cat "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/client.crt" | base64 | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CLIENT_KEY_BASE64=$(cat "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/client.key" | base64 | tr -d '\r\n')
 }
 
 # Set up easy-rsa directory structure.
@@ -1590,9 +1631,15 @@ function setup-easyrsa {
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     mkdir easy-rsa-master/aggregator
-    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator) &>${cert_create_debug_output} || true
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator
+    mkdir easy-rsa-master/konnectivity-server
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/konnectivity-server
+    mkdir easy-rsa-master/konnectivity-agent
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/konnectivity-agent) &>${cert_create_debug_output} || true
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
+  KONNECTIVITY_SERVER_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/konnectivity-server"
+  KONNECTIVITY_AGENT_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/konnectivity-agent"
   if [ ! -x "${CERT_DIR}/easyrsa" -o ! -x "${AGGREGATOR_CERT_DIR}/easyrsa" ]; then
     # TODO(roberthbailey,porridge): add better error handling here,
     # see https://github.com/kubernetes/kubernetes/issues/55229
@@ -1726,7 +1773,92 @@ function generate-aggregator-certs {
   fi
 }
 
+# Runs the easy RSA commands to generate server side certificate files
+# for the konnectivity server. This includes both server side to both
+# konnectivity-server and konnectivity-agent.
+# The generated files are in ${KONNECTIVITY_SERVER_CERT_DIR} and
+# ${KONNECTIVITY_AGENT_CERT_DIR}
 #
+# Assumed vars
+#   KUBE_TEMP
+#   KONNECTIVITY_SERVER_CERT_DIR
+#   KONNECTIVITY_SERVER_PRIMARY_CN: Primary canonical name
+#   KONNECTIVITY_SERVER_SANS: Subject alternate names
+#
+function generate-konnectivity-server-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    # Make the client <-> konnectivity server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/konnectivity-server"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${KONNECTIVITY_SERVER_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="IP:127.0.0.1,${KONNECTIVITY_SERVER_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
+    # create the konnectivity server cert with the correct groups
+    echo '{"CN":"konnectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
+    rm -f "konnectivity-server.csr"
+
+    # Make the agent <-> konnectivity server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/konnectivity-agent"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${KONNECTIVITY_SERVER_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${KONNECTIVITY_SERVER_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
+    # create the konnectivity server cert with the correct groups
+    echo '{"CN":"koonectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    rm -f "konnectivity-agent.csr"
+
+    echo `ls ${KONNECTIVITY_SERVER_CERT_DIR}/pki/`
+    echo `ls ${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/`
+    echo `ls ${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/`
+    echo `ls ${KONNECTIVITY_AGENT_CERT_DIR}/pki/`
+    echo `ls ${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/`
+    echo `ls ${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/`
+    echo "completed main certificate section") &>${cert_create_debug_output} || true
+
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/ca.key" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/ca.crt" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/server.crt" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/server.key" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/client.crt" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/client.key" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/ca.key" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/ca.crt" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/server.crt" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/server.key" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/client.crt" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate konnectivity-server certificates: Aborting ===" >&2
+    exit 2
+  fi
+}
+
 # Using provided master env, extracts value from provided key.
 #
 # Args:
@@ -1766,6 +1898,16 @@ function parse-master-env() {
   ETCD_APISERVER_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_SERVER_CERT")
   ETCD_APISERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_KEY")
   ETCD_APISERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_CERT")
+  KONNECTIVITY_SERVER_CA_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CA_KEY")
+  KONNECTIVITY_SERVER_CA_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CA_CERT")
+  KONNECTIVITY_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CERT")
+  KONNECTIVITY_SERVER_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_KEY")
+  KONNECTIVITY_SERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CLIENT_CERT")
+  KONNECTIVITY_SERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CLIENT_KEY")
+  KONNECTIVITY_AGENT_CA_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_CA_KEY")
+  KONNECTIVITY_AGENT_CA_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_CA_CERT")
+  KONNECTIVITY_AGENT_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_CERT")
+  KONNECTIVITY_AGENT_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_KEY")
 }
 
 # Update or verify required gcloud components are installed
@@ -2505,6 +2647,15 @@ function create-master() {
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
 
+  echo "Configuring firewall for apiserver konnectivity server"
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    gcloud compute firewall-rules create "${MASTER_NAME}-konnectivity-server" \
+      --project "${NETWORK_PROJECT}" \
+      --network "${NETWORK}" \
+      --target-tags "${MASTER_TAG}" \
+      --allow tcp:8132 &
+  fi
+
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
   gcloud compute disks create "${MASTER_NAME}-pd" \
@@ -3197,7 +3348,7 @@ function kube-down() {
   # If there are no more remaining master replicas, we should delete all remaining network resources.
   if [[ "${REMAINING_MASTER_COUNT}" -eq 0 ]]; then
     # Delete firewall rule for the master, etcd servers, and nodes.
-    delete-firewall-rules "${MASTER_NAME}-https" "${MASTER_NAME}-etcd" "${NODE_TAG}-all"
+    delete-firewall-rules "${MASTER_NAME}-https" "${MASTER_NAME}-etcd" "${NODE_TAG}-all" "${MASTER_NAME}-konnectivity-server"
     # Delete the master's reserved IP
     if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       gcloud compute addresses delete \

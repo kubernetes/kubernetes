@@ -191,15 +191,15 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 func (r *ResourceCollector) GetLatest() (e2ekubelet.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	kubeletstatsv1alpha1 := make(e2ekubelet.ResourceUsagePerContainer)
+	resourceUsage := make(e2ekubelet.ResourceUsagePerContainer)
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
 			return nil, fmt.Errorf("No resource usage data for %s container (%s)", key, name)
 		}
-		kubeletstatsv1alpha1[key] = contStats[len(contStats)-1]
+		resourceUsage[key] = contStats[len(contStats)-1]
 	}
-	return kubeletstatsv1alpha1, nil
+	return resourceUsage, nil
 }
 
 type resourceUsageByCPU []*e2ekubelet.ContainerResourceUsage
@@ -272,7 +272,7 @@ func formatCPUSummary(summary e2ekubelet.ContainersCPUSummary) string {
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
 
-	for _, containerName := range framework.TargetContainers() {
+	for _, containerName := range e2ekubelet.TargetContainers() {
 		var s []string
 		s = append(s, fmt.Sprintf("%q", containerName))
 		data, ok := summary[containerName]

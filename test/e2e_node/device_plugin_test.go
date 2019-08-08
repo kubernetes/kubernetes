@@ -105,7 +105,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			var resourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
 			e2elog.Logf("pod resources %v", podResources)
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(len(podResources.PodResources)).To(gomega.Equal(2))
+			framework.ExpectEqual(len(podResources.PodResources), 2)
 			for _, res := range podResources.GetPodResources() {
 				if res.Name == pod1.Name {
 					resourcesForOurPod = res
@@ -113,13 +113,13 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 			e2elog.Logf("resourcesForOurPod %v", resourcesForOurPod)
 			gomega.Expect(resourcesForOurPod).NotTo(gomega.BeNil())
-			gomega.Expect(resourcesForOurPod.Name).To(gomega.Equal(pod1.Name))
-			gomega.Expect(resourcesForOurPod.Namespace).To(gomega.Equal(pod1.Namespace))
-			gomega.Expect(len(resourcesForOurPod.Containers)).To(gomega.Equal(1))
-			gomega.Expect(resourcesForOurPod.Containers[0].Name).To(gomega.Equal(pod1.Spec.Containers[0].Name))
-			gomega.Expect(len(resourcesForOurPod.Containers[0].Devices)).To(gomega.Equal(1))
-			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].ResourceName).To(gomega.Equal(resourceName))
-			gomega.Expect(len(resourcesForOurPod.Containers[0].Devices[0].DeviceIds)).To(gomega.Equal(1))
+			framework.ExpectEqual(resourcesForOurPod.Name, pod1.Name)
+			framework.ExpectEqual(resourcesForOurPod.Namespace, pod1.Namespace)
+			framework.ExpectEqual(len(resourcesForOurPod.Containers), 1)
+			framework.ExpectEqual(resourcesForOurPod.Containers[0].Name, pod1.Spec.Containers[0].Name)
+			framework.ExpectEqual(len(resourcesForOurPod.Containers[0].Devices), 1)
+			framework.ExpectEqual(resourcesForOurPod.Containers[0].Devices[0].ResourceName, resourceName)
+			framework.ExpectEqual(len(resourcesForOurPod.Containers[0].Devices[0].DeviceIds), 1)
 
 			pod1, err = f.PodClient().Get(pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -128,7 +128,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Confirming that device assignment persists even after container restart")
 			devIdAfterRestart := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			gomega.Expect(devIdAfterRestart).To(gomega.Equal(devId1))
+			framework.ExpectEqual(devIdAfterRestart, devId1)
 
 			restartTime := time.Now()
 			ginkgo.By("Restarting Kubelet")
@@ -167,7 +167,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
 			ginkgo.By("Confirming that after a kubelet restart, fake-device assignement is kept")
 			devIdRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
+			framework.ExpectEqual(devIdRestart1, devId1)
 
 			ginkgo.By("Waiting for resource to become available on the local node after re-registration")
 			gomega.Eventually(func() bool {
@@ -200,11 +200,11 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
 			devIdRestart1 = parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
+			framework.ExpectEqual(devIdRestart1, devId1)
 
 			ensurePodContainerRestart(f, pod2.Name, pod2.Name)
 			devIdRestart2 := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
-			gomega.Expect(devIdRestart2).To(gomega.Equal(devId2))
+			framework.ExpectEqual(devIdRestart2, devId2)
 
 			ginkgo.By("Re-register resources")
 			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)

@@ -91,7 +91,7 @@ func mergeValidatingWebhookConfigurations(configurations []*v1beta1.ValidatingWe
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, &c.Webhooks[i]))
+			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
 		}
 	}
 	return accessors

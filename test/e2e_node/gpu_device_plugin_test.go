@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			ginkgo.By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
+			framework.ExpectEqual(devIdRestart1, devId1)
 
 			ginkgo.By("Restarting Kubelet and creating another pod")
 			restartKubelet()
@@ -103,7 +103,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			ginkgo.By("Checking that pods got a different GPU")
 			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 
-			gomega.Expect(devId1).To(gomega.Not(gomega.Equal(devId2)))
+			framework.ExpectEqual(devId1, devId2)
 
 			ginkgo.By("Deleting device plugin.")
 			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
@@ -116,20 +116,20 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
+			framework.ExpectEqual(devIdRestart1, devId1)
 
 			ensurePodContainerRestart(f, p2.Name, p2.Name)
 			devIdRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			gomega.Expect(devIdRestart2).To(gomega.Equal(devId2))
+			framework.ExpectEqual(devIdRestart2, devId2)
 			ginkgo.By("Restarting Kubelet.")
 			restartKubelet()
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			gomega.Expect(devIdRestart1).To(gomega.Equal(devId1))
+			framework.ExpectEqual(devIdRestart1, devId1)
 			ensurePodContainerRestart(f, p2.Name, p2.Name)
 			devIdRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			gomega.Expect(devIdRestart2).To(gomega.Equal(devId2))
+			framework.ExpectEqual(devIdRestart2, devId2)
 			logDevicePluginMetrics()
 
 			// Cleanup
