@@ -17,10 +17,10 @@ limitations under the License.
 package proxy
 
 import (
-	"net"
-	"testing"
-
 	"github.com/davecgh/go-spew/spew"
+	"net"
+	"reflect"
+	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,7 @@ func makeTestServiceInfo(clusterIP string, port int, protocol string, healthchec
 		clusterIP: net.ParseIP(clusterIP),
 		port:      port,
 		protocol:  v1.Protocol(protocol),
+		annotations: make(map[string]string),
 	}
 	if healthcheckNodePort != 0 {
 		info.healthCheckNodePort = healthcheckNodePort
@@ -142,6 +143,21 @@ func TestServiceToServiceMap(t *testing.T) {
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns2", "cluster-ip", "p1"): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0),
 				makeServicePortName("ns2", "cluster-ip", "p2"): makeTestServiceInfo("172.16.55.4", 1235, "UDP", 0),
+			},
+		},
+		{
+			desc: "cluster ip service with annotation",
+			service: makeTestService("ns2", "cluster-ip", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeClusterIP
+				svc.Spec.ClusterIP = "172.16.55.4"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
+				svc.ObjectMeta.Annotations["kube-proxy.kubernetes.io/ipvs-scheduler"] = "lc"
+				svc.ObjectMeta.Annotations["ignored-annotation"] = "junk"
+			}),
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("ns2", "cluster-ip", "p1"): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0, func(info *BaseServiceInfo) {
+					info.Annotations["kube-proxy.kubernetes.io/ipvs-scheduler"] = "lc"
+				}),
 			},
 		},
 		{
@@ -377,6 +393,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 				!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
 				!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) {
+				len(svcInfo.annotations) > 0 && !reflect.DeepEqual(svcInfo.annotations, expectedInfo.annotations) {
 				t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 			}
 		}

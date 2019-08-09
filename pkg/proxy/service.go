@@ -51,6 +51,7 @@ type BaseServiceInfo struct {
 	loadBalancerSourceRanges []string
 	healthCheckNodePort      int
 	onlyNodeLocalEndpoints   bool
+	annotations              map[string]string
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -105,6 +106,11 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 	return info.externalIPs
 }
 
+// GetAnnotationsis part of ServicePort interface.
+func (info *BaseServiceInfo) GetAnnotations() map[string]string {
+	return info.Annotations
+}
+
 // LoadBalancerIPStrings is part of ServicePort interface.
 func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
 	var ips []string
@@ -139,6 +145,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		sessionAffinityType:    service.Spec.SessionAffinity,
 		stickyMaxAgeSeconds:    stickyMaxAgeSeconds,
 		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
+		annotations:            make(map[string]string),
 	}
 
 	if sct.isIPv6Mode == nil {
@@ -170,6 +177,11 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		}
 	}
 
+	for k, v := range service.ObjectMeta.Annotations {
+		if strings.HasPrefix(k, "kube-proxy.kubernetes.io/") {
+			info.Annotations[k] = v
+		}
+	}
 	return info
 }
 
