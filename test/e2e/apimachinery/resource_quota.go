@@ -22,7 +22,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -52,7 +52,12 @@ var extendedResourceName = "example.com/dongle"
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
 
-	ginkgo.It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, resourcequotas
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -70,7 +75,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a service.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, service
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a Service. Its creation MUST be successful and resource usage count against the Service object and resourceQuota object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the Service. Deletion MUST succeed and resource usage count against the Service object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a service.", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -109,9 +121,18 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a secret.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, secret
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a Secret. Its creation MUST be successful and resource usage count against the Secret object and resourceQuota object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the Secret. Deletion MUST succeed and resource usage count against the Secret object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a secret.", func() {
 		ginkgo.By("Discovering how many secrets are in namespace by default")
 		found, unchanged := 0, 0
+		// On contended servers the service account controller can slow down, leading to the count changing during a run.
+		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
 		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			secrets, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -168,7 +189,16 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a pod.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, pod
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a Pod with resource request count for CPU, Memory, EphemeralStorage and ExtendedResourceName. Pod creation MUST be successful and respective resource usage count MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Create another Pod with resource request exceeding remaining quota. Pod creation MUST fail as the request exceeds ResourceQuota limits.
+		Update the successfully created pod's resource requests. Updation MUST fail as a Pod can not dynamically update its resource requirements.
+		Delete the successfully created Pod. Pod Deletion MUST be scuccessful and it MUST release the allocated resource counts from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a pod.", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -257,9 +287,17 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 	})
-
-	ginkgo.It("should create a ResourceQuota and capture the life of a configMap.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, configmap
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a ConfigMap. Its creation MUST be successful and resource usage count against the ConfigMap object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the ConfigMap. Deletion MUST succeed and resource usage count against the ConfigMap object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a configMap.", func() {
 		found, unchanged := 0, 0
+		// On contended servers the service account controller can slow down, leading to the count changing during a run.
+		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
 		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -317,7 +355,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a replication controller.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, replicationController
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a ReplicationController. Its creation MUST be successful and resource usage count against the ReplicationController object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the ReplicationController. Deletion MUST succeed and resource usage count against the ReplicationController object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a replication controller.", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -356,7 +401,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a replica set.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, replicaSet
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a ReplicaSet. Its creation MUST be successful and resource usage count against the ReplicaSet object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the ReplicaSet. Deletion MUST succeed and resource usage count against the ReplicaSet object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+	*/
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a replica set.", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -395,6 +447,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, pvc
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create PersistentVolumeClaim (PVC) to request storage capacity of 1G. PVC creation MUST be successful and resource usage count against the PVC and storage object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the PVC. Deletion MUST succeed and resource usage count against its PVC and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+		[NotConformancePromotable] as test suite do not have any e2e at this moment which are explicitly verifying PV and PVC behaviour.
+	*/
 	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
@@ -437,6 +497,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, object count quota, storageClass
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create PersistentVolumeClaim (PVC) with specified storageClass to request storage capacity of 1G. PVC creation MUST be successful and resource usage count against PVC, storageClass and storage object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the PVC. Deletion MUST succeed and resource usage count against  PVC, storageClass and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+		[NotConformancePromotable] as test suite do not have any e2e at this moment which are explicitly verifying PV and PVC behaviour.
+	*/
 	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage]", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
@@ -573,7 +641,16 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota with terminating scopes.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, quota scope, Terminating and NotTerminating scope
+		Description: Create two ResourceQuotas, one with 'Terminating' scope and another 'NotTerminating' scope. Request and the limit counts for CPU and Memory resources are set for the ResourceQuota. Creation MUST be successful and their ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a Pod with specified CPU and Memory ResourceRequirements fall within quota limits. Pod creation MUST be successful and usage count MUST be captured in ResourceQuotaStatus of 'NotTerminating' scoped ResourceQuota but MUST NOT in 'Terminating' scoped ResourceQuota.
+		Delete the Pod. Pod deletion MUST succeed and Pod resource usage count MUST be released from ResourceQuotaStatus of 'NotTerminating' scoped ResourceQuota.
+		Create a pod with specified activeDeadlineSeconds and resourceRequirements for CPU and Memory fall within quota limits. Pod creation MUST be successful and usage count MUST be captured in ResourceQuotaStatus of 'Terminating' scoped ResourceQuota but MUST NOT in 'NotTerminating' scoped ResourceQuota.
+		Delete the Pod. Pod deletion MUST succeed and Pod resource usage count MUST be released from ResourceQuotaStatus of 'Terminating' scoped ResourceQuota.
+	*/
+	framework.ConformanceIt("should verify ResourceQuota with terminating scopes.", func() {
 		ginkgo.By("Creating a ResourceQuota with terminating scope")
 		quotaTerminatingName := "quota-terminating"
 		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope(quotaTerminatingName, v1.ResourceQuotaScopeTerminating))
@@ -677,7 +754,16 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota with best effort scope.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, quota scope, BestEffort and NotBestEffort scope
+		Description: Create two ResourceQuotas, one with 'BestEffort' scope and another with 'NotBestEffort' scope. Creation MUST be successful and their ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create a 'BestEffort' Pod by not explicitly specifying resource limits and requests. Pod creation MUST be successful and usage count MUST be captured in ResourceQuotaStatus of 'BestEffort' scoped ResourceQuota but MUST NOT in 'NotBestEffort' scoped ResourceQuota.
+		Delete the Pod. Pod deletion MUST succeed and Pod resource usage count MUST be released from ResourceQuotaStatus of 'BestEffort' scoped ResourceQuota.
+		Create a 'NotBestEffort' Pod by explicitly specifying resource limits and requests. Pod creation MUST be successful and usage count MUST be captured in ResourceQuotaStatus of 'NotBestEffort' scoped ResourceQuota but MUST NOT in 'BestEffort' scoped ResourceQuota.
+		Delete the Pod. Pod deletion MUST succeed and Pod resource usage count MUST be released from ResourceQuotaStatus of 'NotBestEffort' scoped ResourceQuota.
+	*/
+	framework.ConformanceIt("should verify ResourceQuota with best effort scope.", func() {
 		ginkgo.By("Creating a ResourceQuota with best effort scope")
 		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
 		framework.ExpectNoError(err)
@@ -750,7 +836,15 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		framework.ExpectNoError(err)
 	})
-	ginkgo.It("Should be able to update and delete ResourceQuota.", func() {
+
+	/*
+		Release: v1.16
+		Testname: ResourceQuota, update and delete
+		Description: Create a ResourceQuota for CPU and Memory quota limits. Creation MUST be successful.
+		When ResourceQuota is updated to modify CPU and Memory quota limits, update MUST succeed with updated values for CPU and Memory limits.
+		When ResourceQuota is deleted, it MUST not be available in the namespace.
+	*/
+	framework.ConformanceIt("should be able to update and delete ResourceQuota.", func() {
 		client := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -1562,6 +1656,8 @@ func deleteResourceQuota(c clientset.Interface, namespace, name string) error {
 }
 
 // countResourceQuota counts the number of ResourceQuota in the specified namespace
+// On contended servers the service account controller can slow down, leading to the count changing during a run.
+// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
 func countResourceQuota(c clientset.Interface, namespace string) (int, error) {
 	found, unchanged := 0, 0
 	return found, wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
