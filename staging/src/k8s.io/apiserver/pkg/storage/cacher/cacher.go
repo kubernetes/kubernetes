@@ -821,6 +821,9 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			watcher.nonblockingAdd(event)
 		}
 	} else {
+		// Cache serializations of the object across all watchers.
+		event.Object = newObjectWithSerializations(event.Object)
+
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
 			if !watcher.nonblockingAdd(event) {
@@ -1194,21 +1197,35 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 		return nil
 	}
 
+	// FIXME: Avoid those strange ifs below.
+	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
+		watchEvent.Type = watch.Added
+		if _, ok := event.Object.(*ObjectWithSerializations); ok {
+			watchEvent.Object = event.Object
+		} else {
+			watchEvent.Object = event.Object.DeepCopyObject()
+		}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
+		watchEvent.Type = watch.Modified
+		if _, ok := event.Object.(*ObjectWithSerializations); ok {
+			watchEvent.Object = event.Object
+		} else {
+			watchEvent.Object = event.Object.DeepCopyObject()
+		}
 	case !curObjPasses && oldObjPasses:
+		watchEvent.Type = watch.Deleted
 		// return a delete event with the previous object content, but with the event's resource version
 		oldObj := event.PrevObject.DeepCopyObject()
 		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
 		}
-		return &watch.Event{Type: watch.Deleted, Object: oldObj}
+		// FIXME: For now we don't do any caching here.
+		watchEvent.Object = oldObj
 	}
 
-	return nil
+	return &watchEvent
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
