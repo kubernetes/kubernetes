@@ -202,18 +202,13 @@ message PriorityLevelConfigurationReference {
 
 // PriorityLevelConfigurationSpec is specification of a priority level
 message PriorityLevelConfigurationSpec {
-  // `globalDefault` specifies whether this priority level should be considered as the default priority for requests
-  // that do not have any priority level. Only one PriorityClass should be marked as `globalDefault`.
-  // +optional
-  optional bool globalDefault = 1;
-
   // `exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level.
   // Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued)
   // and do not detract from the concurrency available for non-exempt requests. In a more sophisticated system, the
   // exempt priority level would be the highest priority level. The field is default to false and only those system
   // preset priority level can be exempt.
   // +optional
-  optional bool exempt = 2;
+  optional bool exempt = 1;
 
   // `assuredConcurrencyShares` is a positive number for a non-exempt priority level, representing the weight by which
   // the priority level shares the concurrency from the global limit. The concurrency limit of an apiserver is divided
@@ -223,24 +218,24 @@ message PriorityLevelConfigurationSpec {
   //             ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )
   //
   // +optional
-  optional int32 assuredConcurrencyShares = 3;
+  optional int32 assuredConcurrencyShares = 2;
 
   // `queues` is a number of queues that belong to a non-exempt PriorityLevelConfiguration object. The queues exist
   // independently at each apiserver. The value must be positive for a non-exempt priority level and setting it to 1
   // disables shufflesharding and makes the distinguisher method irrelevant.
   // +optional
-  optional int32 queues = 4;
+  optional int32 queues = 3;
 
   // `handSize` is a small positive number for applying shuffle sharding. When a request arrives at an apiserver the
   // request flow identifier’s string pair is hashed and the hash value is used to shuffle the queue indices and deal
   // a hand of the size specified here. If empty, the hand size will the be set to 1.
   // +optional
-  optional int32 handSize = 5;
+  optional int32 handSize = 4;
 
   // `queueLengthLimit` is a length limit applied to each queue belongs to the priority.  The value must be positive
   // for a non-exempt priority level.
   // +optional
-  optional int32 queueLengthLimit = 6;
+  optional int32 queueLengthLimit = 5;
 }
 
 // PriorityLevelConfigurationStatus represents the current state of a "request-priority".
@@ -252,7 +247,7 @@ message PriorityLevelConfigurationStatus {
 // Subject matches a set of users.
 // Syntactically, Subject is a general API object reference.
 // Authorization produces a username and a set of groups, and we imagine special kinds of non-namespaced objects,
-// User and Group in API group "rbac.authorization.k8s.io", to represent such a username or group.
+// User and Group in API group "flowcontrol.apiserver.k8s.io", to represent such a username or group.
 // The only kind of true object reference that currently will match any users is ServiceAccount.
 message Subject {
   // `kind` of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
@@ -261,7 +256,7 @@ message Subject {
 
   // `apiGroup` holds the API group of the referenced subject.
   // Defaults to "" for ServiceAccount subjects.
-  // Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
+  // Defaults to "flowcontrol.apiserver.k8s.io" for User and Group subjects.
   // +optional
   optional string apiGroup = 2;
 

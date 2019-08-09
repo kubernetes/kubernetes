@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "generated.pb.go",
+        "helpers.go",
         "register.go",
         "types.go",
         "types_swagger_doc_generated.go",
