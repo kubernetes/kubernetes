@@ -61,6 +61,14 @@ const (
 	Skip
 )
 
+const (
+	// MaxNodeScore is the maximum score a Score plugin is expected to return.
+	MaxNodeScore int = 10
+
+	// MinNodeScore is the minimum score a Score plugin is expected to return.
+	MinNodeScore int = 0
+)
+
 // Status indicates the result of running a plugin. It consists of a code and a
 // message. When the status code is not `Success`, the status message should
 // explain why.

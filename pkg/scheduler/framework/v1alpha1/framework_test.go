@@ -604,6 +604,60 @@ func TestApplyScoreWeights(t *testing.T) {
 			},
 			err: true,
 		},
+		{
+			name:    "Score plugin return score greater than MaxNodeScore",
+			plugins: plugin1And2,
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: MaxNodeScore + 1,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: MinNodeScore,
+					},
+					{
+						Name:  "node2",
+						Score: 5,
+					},
+				},
+			},
+			err: true,
+		},
+		{
+			name:    "Score plugin return score less than MinNodeScore",
+			plugins: plugin1And2,
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: MaxNodeScore,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: MinNodeScore - 1,
+					},
+					{
+						Name:  "node2",
+						Score: 5,
+					},
+				},
+			},
+			err: true,
+		},
 	}
 
 	for _, tt := range tests {

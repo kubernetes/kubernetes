@@ -431,8 +431,16 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
-		for i := range nodeScoreList {
-			nodeScoreList[i].Score = nodeScoreList[i].Score * weight
+
+		for i, nodeScore := range nodeScoreList {
+			// return error if score plugin returns invalid score.
+			if nodeScore.Score > MaxNodeScore || nodeScore.Score < MinNodeScore {
+				err := fmt.Errorf("score plugin %q returns an invalid score %q, it should in the range of [MinNodeScore, MaxNodeScore] after normalizing", pl.Name(), nodeScore.Score)
+				errCh.SendErrorWithCancel(err, cancel)
+				return
+			}
+
+			nodeScoreList[i].Score = nodeScore.Score * weight
 		}
 	})
 
