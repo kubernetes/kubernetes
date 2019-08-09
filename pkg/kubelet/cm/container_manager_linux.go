@@ -888,7 +888,7 @@ func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 func isKernelPid(pid int) bool {
 	// Kernel threads have no associated executable.
 	_, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
-	return err != nil
+	return err != nil && os.IsNotExist(err)
 }
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
