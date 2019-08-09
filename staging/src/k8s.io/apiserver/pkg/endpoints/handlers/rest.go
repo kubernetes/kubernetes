@@ -321,7 +321,10 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		return nil
+		// TODO(#81191): Not setting selflink break CSI volume tests with alpha features,
+		// as they need to update the client-go dependency (to fix GetReferences function).
+		// Reenable it once new versions of CSI drivers are used by tests.
+		// return nil
 	}
 
 	// We only generate list links on objects that implement ListInterface - historically we duck typed this
