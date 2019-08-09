@@ -46,11 +46,12 @@ const (
 )
 
 type fakePodKiller struct {
-	killedPods []*v1.Pod
+	killedPods          []*v1.Pod
+	errDuringPodKilling bool
 }
 
-func newFakePodKiller() *fakePodKiller {
-	return &fakePodKiller{killedPods: []*v1.Pod{}}
+func newFakePodKiller(errPodKilling bool) *fakePodKiller {
+	return &fakePodKiller{killedPods: []*v1.Pod{}, errDuringPodKilling: errPodKilling}
 }
 
 func (f *fakePodKiller) clear() {
@@ -62,6 +63,10 @@ func (f *fakePodKiller) getKilledPods() []*v1.Pod {
 }
 
 func (f *fakePodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+	if f.errDuringPodKilling {
+		f.killedPods = []*v1.Pod{}
+		return fmt.Errorf("problem killing pod %v", pod)
+	}
 	f.killedPods = append(f.killedPods, pod)
 	return nil
 }
@@ -90,6 +95,45 @@ func getTestCriticalPodAdmissionHandler(podProvider *fakePodProvider, podKiller 
 	}
 }
 
+func TestEvictPodsToFreeRequestsWithError(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+	type testRun struct {
+		testName              string
+		inputPods             []*v1.Pod
+		insufficientResources admissionRequirementList
+		expectErr             bool
+		expectedOutput        []*v1.Pod
+	}
+	podProvider := newFakePodProvider()
+	podKiller := newFakePodKiller(true)
+	criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
+	allPods := getTestPods()
+	runs := []testRun{
+		{
+			testName: "multiple pods eviction error",
+			inputPods: []*v1.Pod{
+				allPods[critical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
+				allPods[guaranteed], allPods[highRequestGuaranteed]},
+			insufficientResources: getAdmissionRequirementList(0, 550, 0),
+			expectErr:             false,
+			expectedOutput:        nil,
+		},
+	}
+	for _, r := range runs {
+		podProvider.setPods(r.inputPods)
+		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[critical], r.insufficientResources)
+		outputPods := podKiller.getKilledPods()
+		if !r.expectErr && outErr != nil {
+			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
+		} else if r.expectErr && outErr == nil {
+			t.Errorf("evictPodsToFreeRequests expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
+		} else if !podListEqual(r.expectedOutput, outputPods) {
+			t.Errorf("evictPodsToFreeRequests expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
+		}
+		podKiller.clear()
+	}
+}
+
 func TestEvictPodsToFreeRequests(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	type testRun struct {
@@ -100,7 +144,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 		expectedOutput        []*v1.Pod
 	}
 	podProvider := newFakePodProvider()
-	podKiller := newFakePodKiller()
+	podKiller := newFakePodKiller(false)
 	criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
 	allPods := getTestPods()
 	runs := []testRun{
