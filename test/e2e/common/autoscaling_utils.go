@@ -478,7 +478,10 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(runDeployment(dpConfig))
+		ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", dpConfig.Name, dpConfig.Namespace))
+		dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
+		dpConfig.ContainerDumpFunc = framework.LogFailedContainers
+		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
 		break
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
@@ -552,12 +555,4 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(autoscalerName, nil)
-}
-
-// runDeployment runs a delopyment with the specified config.
-func runDeployment(config testutils.DeploymentConfig) error {
-	ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = framework.LogFailedContainers
-	return testutils.RunDeployment(config)
 }
