@@ -767,7 +767,7 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, predicateMap, recorder)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
-	s.config.VolumeBinder = fakeVolumeBinder
+	s.VolumeBinder = fakeVolumeBinder
 	return s, bindingChan, errChan
 }
 
