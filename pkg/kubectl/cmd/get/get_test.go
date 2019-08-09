@@ -442,6 +442,73 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 	}
 }
 
+func TestNoBlankLinesForGetMultipleTableResource(t *testing.T) {
+	pods, svcs, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svcs.Items...)}, nil
+			case p == "/namespaces/test/statefulsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/jobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/cronjobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/daemonsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/deployments" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/replicasets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
+pod/bar   0/0              0          <unknown>
+
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
+`
+	for _, cmdArgs := range [][]string{{"pods,services,jobs"}, {"all"}} {
+		cmd.Run(cmd, cmdArgs)
+
+		if e, a := expected, buf.String(); e != a {
+			t.Errorf("[kubectl get %v] expected\n%v\ngot\n%v", cmdArgs, e, a)
+		}
+
+		// The error out should be empty
+		if e, a := "", bufErr.String(); e != a {
+			t.Errorf("[kubectl get %v] expected\n%v\ngot\n%v", cmdArgs, e, a)
+		}
+
+		buf.Reset()
+		bufErr.Reset()
+	}
+}
+
 func TestNoBlankLinesForGetAll(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
