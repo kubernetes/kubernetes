@@ -47,7 +47,6 @@ func newValidatingWebhookConfiguration(hooks []admissionregistration.ValidatingW
 
 func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
-	validSideEffect := &unknownSideEffect
 	validClientConfig := admissionregistration.WebhookClientConfig{
 		URL: strPtr("https://example.com"),
 	}
@@ -63,7 +62,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
@@ -84,10 +83,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -96,10 +96,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1", "invalid-version"},
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -130,19 +131,20 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
 		},
 		{
@@ -151,12 +153,12 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
@@ -168,12 +170,12 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
@@ -269,7 +271,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -282,6 +284,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
+			gv: schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 		},
 		{
 			name: `resource "*" cannot mix with resources that don't have subresources`,
@@ -289,7 +292,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -310,7 +313,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -331,7 +334,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -344,6 +347,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
+			gv: schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 		},
 		{
 			name: "resource */a cannot mix with x/a",
@@ -351,7 +355,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -372,7 +376,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -393,7 +397,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					FailurePolicy: func() *admissionregistration.FailurePolicyType {
 						r := admissionregistration.FailurePolicyType("other")
 						return &r
@@ -408,7 +412,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
@@ -422,10 +426,10 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					SideEffects:  nil,
 				},
 			}, true),
-			expectedError: `webhooks[0].sideEffects: Required value: must specify one of None, NoneOnDryRun, Some, Unknown`,
+			expectedError: `webhooks[0].sideEffects: Required value: must specify one of None, NoneOnDryRun`,
 		},
 		{
-			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\"",
+			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\" via v1beta1",
 			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
@@ -436,7 +440,23 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					}(),
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: `webhooks[0].sideEffects: Unsupported value: "other": supported values: "None", "NoneOnDryRun", "Some", "Unknown"`,
+		},
+		{
+			name: "SideEffects can only be \"None\" or \"NoneOnDryRun\" via v1",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects: func() *admissionregistration.SideEffectClass {
+						r := admissionregistration.SideEffectClass("other")
+						return &r
+					}(),
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1"},
+			expectedError: `webhooks[0].sideEffects: Unsupported value: "other": supported values: "None", "NoneOnDryRun"`,
 		},
 		{
 			name: "both service and URL missing",
@@ -579,9 +599,10 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -597,9 +618,10 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -615,7 +637,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "//": segment[0] may not be empty`,
@@ -633,7 +655,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
@@ -650,7 +672,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo/bar//": segment[2] may not be empty`,
@@ -668,7 +690,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
@@ -687,7 +709,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 								Port:      0,
 							},
 						},
-						SideEffects: validSideEffect,
+						SideEffects: &unknownSideEffect,
 					},
 				}, true),
 			expectedError: `Invalid value: 0: port is not valid: must be between 1 and 65535, inclusive`,
@@ -706,7 +728,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 								Port:      65536,
 							},
 						},
-						SideEffects: validSideEffect,
+						SideEffects: &unknownSideEffect,
 					},
 				}, true),
 			expectedError: `Invalid value: 65536: port is not valid: must be between 1 and 65535, inclusive`,
@@ -717,7 +739,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(31),
 				},
 			}, true),
@@ -729,7 +751,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(0),
 				},
 			}, true),
@@ -741,7 +763,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(-1),
 				},
 			}, true),
@@ -753,22 +775,23 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(1),
 				},
 				{
 					Name:           "webhook2.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(15),
 				},
 				{
 					Name:           "webhook3.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
+			gv: schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 		},
 	}
 	for _, test := range tests {
@@ -791,7 +814,6 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 
 func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
-	validSideEffect := &unknownSideEffect
 	validClientConfig := admissionregistration.WebhookClientConfig{
 		URL: strPtr("https://example.com"),
 	}
@@ -808,7 +830,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
@@ -816,7 +838,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			expectedError: ``,
@@ -827,7 +849,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1", "invalid-v2"},
 				},
 			}, true),
@@ -835,7 +857,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v0"},
 				},
 			}, true),
@@ -847,7 +869,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
@@ -855,7 +877,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 				},
 			}, true),
@@ -867,7 +889,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
@@ -875,7 +897,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			expectedError: `Invalid value: []string{"invalid-v1"}`,
@@ -886,19 +908,19 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
@@ -910,24 +932,24 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
@@ -939,19 +961,19 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
@@ -994,7 +1016,6 @@ func newMutatingWebhookConfiguration(hooks []admissionregistration.MutatingWebho
 
 func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
-	validSideEffect := &unknownSideEffect
 	validClientConfig := admissionregistration.WebhookClientConfig{
 		URL: strPtr("https://example.com"),
 	}
@@ -1010,7 +1031,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
@@ -1031,10 +1052,11 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -1043,10 +1065,11 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1", "invalid-version"},
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -1077,19 +1100,20 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
 		},
 		{
@@ -1098,12 +1122,12 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
@@ -1115,12 +1139,12 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
@@ -1216,7 +1240,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -1229,6 +1253,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
+			gv: schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 		},
 		{
 			name: `resource "*" cannot mix with resources that don't have subresources`,
@@ -1236,7 +1261,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -1257,7 +1282,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -1278,7 +1303,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -1291,6 +1316,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
+			gv: schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 		},
 		{
 			name: "resource */a cannot mix with x/a",
@@ -1298,7 +1324,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -1319,7 +1345,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -1340,7 +1366,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 					FailurePolicy: func() *admissionregistration.FailurePolicyType {
 						r := admissionregistration.FailurePolicyType("other")
 						return &r
@@ -1355,7 +1381,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
@@ -1369,10 +1395,10 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					SideEffects:  nil,
 				},
 			}, true),
-			expectedError: `webhooks[0].sideEffects: Required value: must specify one of None, NoneOnDryRun, Some, Unknown`,
+			expectedError: `webhooks[0].sideEffects: Required value: must specify one of None, NoneOnDryRun`,
 		},
 		{
-			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\"",
+			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\" via v1beta1",
 			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
@@ -1383,7 +1409,23 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					}(),
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: `webhooks[0].sideEffects: Unsupported value: "other": supported values: "None", "NoneOnDryRun", "Some", "Unknown"`,
+		},
+		{
+			name: "SideEffects can only be \"None\" or \"NoneOnDryRun\" via v1",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects: func() *admissionregistration.SideEffectClass {
+						r := admissionregistration.SideEffectClass("other")
+						return &r
+					}(),
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1"},
+			expectedError: `webhooks[0].sideEffects: Unsupported value: "other": supported values: "None", "NoneOnDryRun"`,
 		},
 		{
 			name: "both service and URL missing",
@@ -1526,9 +1568,10 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -1544,9 +1587,10 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 			expectedError: ``,
 		},
 		{
@@ -1562,7 +1606,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "//": segment[0] may not be empty`,
@@ -1580,7 +1624,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
@@ -1597,7 +1641,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo/bar//": segment[2] may not be empty`,
@@ -1615,7 +1659,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
-					SideEffects: validSideEffect,
+					SideEffects: &unknownSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
@@ -1634,7 +1678,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 								Port:      0,
 							},
 						},
-						SideEffects: validSideEffect,
+						SideEffects: &unknownSideEffect,
 					},
 				}, true),
 			expectedError: `Invalid value: 0: port is not valid: must be between 1 and 65535, inclusive`,
@@ -1653,7 +1697,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 								Port:      65536,
 							},
 						},
-						SideEffects: validSideEffect,
+						SideEffects: &unknownSideEffect,
 					},
 				}, true),
 			expectedError: `Invalid value: 65536: port is not valid: must be between 1 and 65535, inclusive`,
@@ -1664,7 +1708,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(31),
 				},
 			}, true),
@@ -1676,7 +1720,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(0),
 				},
 			}, true),
@@ -1688,7 +1732,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(-1),
 				},
 			}, true),
@@ -1700,22 +1744,23 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(1),
 				},
 				{
 					Name:           "webhook2.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(15),
 				},
 				{
 					Name:           "webhook3.k8s.io",
 					ClientConfig:   validClientConfig,
-					SideEffects:    validSideEffect,
+					SideEffects:    &unknownSideEffect,
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
+			gv: schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
 		},
 	}
 	for _, test := range tests {
@@ -1738,7 +1783,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 
 func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
-	validSideEffect := &unknownSideEffect
+	noSideEffect := admissionregistration.SideEffectClassNone
 	validClientConfig := admissionregistration.WebhookClientConfig{
 		URL: strPtr("https://example.com"),
 	}
@@ -1755,7 +1800,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
@@ -1763,7 +1808,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			expectedError: ``,
@@ -1774,7 +1819,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1", "invalid-v2"},
 				},
 			}, true),
@@ -1782,7 +1827,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v0"},
 				},
 			}, true),
@@ -1794,7 +1839,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
@@ -1802,7 +1847,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 				},
 			}, true),
@@ -1814,7 +1859,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
-					SideEffects:             validSideEffect,
+					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
@@ -1822,7 +1867,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
 			expectedError: `Invalid value: []string{"invalid-v1"}`,
@@ -1833,24 +1878,24 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
@@ -1862,19 +1907,76 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
 				},
 			}, true),
 			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
-					SideEffects:  validSideEffect,
+					SideEffects:  &unknownSideEffect,
+				},
+			}, false),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+			expectedError: ``,
+		},
+		{
+			name: "Webhooks can't have side effects when old config has no side effects via v1",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &unknownSideEffect,
+				},
+			}, true),
+			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1"},
+			expectedError: `Unsupported value: "Unknown": supported values: "None", "NoneOnDryRun"`,
+		},
+		{
+			name: "Webhooks can have side effects when old config has side effects",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &unknownSideEffect,
+				},
+			}, true),
+			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &unknownSideEffect,
+				},
+			}, true),
+			gv:            schema.GroupVersion{Group: "foo", Version: "bar"},
+			expectedError: ``,
+		},
+		{
+			name: "Webhooks can have side effects when updated via v1beta1",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &unknownSideEffect,
+				},
+			}, true),
+			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &noSideEffect,
 				},
 			}, false),
 			gv:            schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
