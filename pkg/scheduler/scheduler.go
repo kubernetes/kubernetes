@@ -563,6 +563,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !permitStatus.IsSuccess() {
 			var reason string
 			if permitStatus.Code() == framework.Unschedulable {
+				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
 				metrics.PodScheduleErrors.Inc()
@@ -582,6 +583,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !prebindStatus.IsSuccess() {
 			var reason string
 			if prebindStatus.Code() == framework.Unschedulable {
+				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
 				metrics.PodScheduleErrors.Inc()
