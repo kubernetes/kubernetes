@@ -492,7 +492,11 @@ pod/bar   0/0              0          <unknown>
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
-	for _, cmdArgs := range [][]string{{"pods,services,jobs"}, {"all"}} {
+	for _, cmdArgs := range [][]string{
+		{"pods,services,jobs"},
+		{"deployments,pods,statefulsets,services,jobs"},
+		{"all"},
+	} {
 		cmd.Run(cmd, cmdArgs)
 
 		if e, a := expected, buf.String(); e != a {

@@ -524,9 +524,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	// output an empty line separating output
 	separatorWriter := &separatorWriterWrapper{Delegate: trackingWriter}
 
-	// remember how much we've written
-	written := 0
-
 	w := utilprinters.GetNewTabWriter(separatorWriter)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
@@ -549,14 +546,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			w.Flush()
 			w.SetRememberedWidths(nil)
 
-			// add linebreak between resource groups (if there is more than one)
-			// skip linebreak above first resource group
-			if lastMapping != nil && !o.NoHeaders {
-				// If we've written output since the last time we started a new set of headers, write an empty line to separate object types
-				if written != trackingWriter.Written {
-					separatorWriter.SetReady(true)
-					written = trackingWriter.Written
-				}
+			// add linebreaks between resource groups (if there is more than one)
+			// when it satisfies all following 3 conditions:
+			// 1) it's not the first resource group
+			// 2) it has row header
+			// 3) we've written output since the last time we started a new set of headers
+			if lastMapping != nil && !o.NoHeaders && trackingWriter.Written > 0 {
+				separatorWriter.SetReady(true)
 			}
 
 			printer, err = o.ToPrinter(mapping, nil, printWithNamespace, printWithKind)
