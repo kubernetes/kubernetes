@@ -30,7 +30,23 @@ func SetDefaults_FlowSchema(obj *v1alpha1.FlowSchema) {
 
 // SetDefaults_FlowSchema sets default values for flow schema
 func SetDefaults_PriorityLevelConfiguration(obj *v1alpha1.PriorityLevelConfiguration) {
-	if obj.Spec.HandSize == 0 {
-		obj.Spec.HandSize = flowcontrol.PriorityLevelConfigurationDefaultHandSize
+	if !obj.Spec.Exempt {
+		if obj.Spec.HandSize == 0 {
+			obj.Spec.HandSize = flowcontrol.PriorityLevelConfigurationDefaultHandSize
+		}
+	}
+}
+
+// SetDefaults_Subject defaults fields for subject
+func SetDefaults_Subject(obj *v1alpha1.Subject) {
+	if len(obj.APIGroup) == 0 {
+		switch obj.Kind {
+		case v1alpha1.ServiceAccountKind:
+			// do nothing
+		case v1alpha1.UserKind:
+			obj.APIGroup = GroupName
+		case v1alpha1.GroupKind:
+			obj.APIGroup = GroupName
+		}
 	}
 }
