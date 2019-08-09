@@ -406,7 +406,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{

@@ -430,7 +430,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		defer cleanup()
 
 		// Change volume container to busybox so we can exec later
-		l.pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+		l.pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost))
 		l.pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
 
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
@@ -505,7 +505,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("init-volume-%s", suffix),
-					Image: volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image: volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost)),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -640,7 +640,7 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image:   volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost)),
 					Command: volume.GenerateScriptCmd("echo nothing"),
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -781,9 +781,9 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost))
 	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
-	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost))
 	pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
 	// Add liveness probe to subpath container
 	pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
@@ -881,9 +881,9 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
 	// Change to busybox
-	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost))
 	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
-	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.Agnhost))
 	pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
 
 	// If grace period is too short, then there is not enough time for the volume

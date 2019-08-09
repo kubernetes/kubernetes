@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", `[[ "${HOST_IP:?}" == "${POD_IP:?}" ]] && echo 'OK' || echo "HOST_IP: '${HOST_IP}' != POD_IP: '${POD_IP}'"`},
 						Env:     env,
 					},
@@ -243,7 +243,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "env"},
 						Env:     env,
 					},
@@ -342,7 +342,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 					Containers: []v1.Container{
 						{
 							Name:    "dapi-container",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 							Command: []string{"sh", "-c", "env"},
 							Env:     env,
 						},
@@ -367,7 +367,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 			Containers: []v1.Container{
 				{
 					Name:    "dapi-container",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"sh", "-c", "env"},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
@@ -399,7 +399,7 @@ func testDownwardAPIForEphemeralStorage(f *framework.Framework, podName string, 
 			Containers: []v1.Container{
 				{
 					Name:    "dapi-container",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"sh", "-c", "env"},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{

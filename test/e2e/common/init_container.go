@@ -69,19 +69,19 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 				},
 				Containers: []v1.Container{
 					{
 						Name:    "run1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -135,12 +135,12 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -207,12 +207,12 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/false"},
 					},
 					{
 						Name:    "init2",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -323,19 +323,19 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/false"},
 					},
 				},
 				Containers: []v1.Container{
 					{
 						Name:    "run1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{

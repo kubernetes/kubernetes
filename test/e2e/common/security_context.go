@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 	})
 
 	ginkgo.Context("When creating a container with runAsNonRoot", func() {
-		rootImage := imageutils.GetE2EImage(imageutils.BusyBox)
+		rootImage := imageutils.GetE2EImage(imageutils.Agnhost)
 		nonRootImage := imageutils.GetE2EImage(imageutils.NonRoot)
 		makeNonRootPod := func(podName, image string, userid *int64) *v1.Pod {
 			return &v1.Pod{

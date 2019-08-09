@@ -53,7 +53,7 @@ var CurrentSuite Suite
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
-	imageutils.GetE2EImage(imageutils.BusyBox),
+	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
@@ -85,7 +85,7 @@ var testImages testImagesStruct
 func init() {
 	testImages = testImagesStruct{
 		imageutils.GetE2EImage(imageutils.Agnhost),
-		imageutils.GetE2EImage(imageutils.BusyBox),
+		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.GBFrontend),
 		imageutils.GetE2EImage(imageutils.Kitten),
 		imageutils.GetE2EImage(imageutils.Mounttest),

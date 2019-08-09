@@ -248,7 +248,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 				Containers: []v1.Container{
 					{
 						Name:    busyBoxMainContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/sh"},
 						Args:    []string{"-c", "sleep 100000"},
 						VolumeMounts: []v1.VolumeMount{
@@ -260,7 +260,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 					},
 					{
 						Name:    busyBoxSubContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/sh"},
 						Args:    []string{"-c", fmt.Sprintf("echo %s > %s", message, busyBoxSubVolumeFilePath)},
 						VolumeMounts: []v1.VolumeMount{

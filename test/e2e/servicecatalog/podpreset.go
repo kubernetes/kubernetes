@@ -101,7 +101,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -220,7 +220,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Env:     []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
 						Command: []string{"/bin/true"},
 					},

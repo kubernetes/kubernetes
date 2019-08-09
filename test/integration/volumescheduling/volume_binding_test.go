@@ -1088,7 +1088,7 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "while true; do sleep 1; done"},
 				},

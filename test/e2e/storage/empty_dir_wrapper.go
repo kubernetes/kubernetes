@@ -384,8 +384,14 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:         "test-container",
-							Image:        imageutils.GetE2EImage(imageutils.Pause),
+							Name:    "test-container",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"sleep", "10000"},
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("10m"),
+								},
+							},
 							VolumeMounts: volumeMounts,
 						},
 					},

@@ -193,7 +193,7 @@ func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: imageutils.GetE2EImage(imageutils.BusyBox),
+									Image: imageutils.GetE2EImage(imageutils.Agnhost),
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",

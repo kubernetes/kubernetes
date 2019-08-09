@@ -327,7 +327,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: imageutils.GetE2EImage(imageutils.BusyBox),
+									Image: imageutils.GetE2EImage(imageutils.Agnhost),
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",

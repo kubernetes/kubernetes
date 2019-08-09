@@ -93,7 +93,7 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			Containers: []v1.Container{
 				{
 					Name:  string(uuid),
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 				},
 			},
 			SchedulerName: "please don't schedule my pods",

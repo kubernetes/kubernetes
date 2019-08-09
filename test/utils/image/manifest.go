@@ -126,8 +126,6 @@ const (
 	AuthenticatedAlpine
 	// AuthenticatedWindowsNanoServer image
 	AuthenticatedWindowsNanoServer
-	// BusyBox image
-	BusyBox
 	// CheckMetadataConcealment image
 	CheckMetadataConcealment
 	// CudaVectorAdd image
@@ -212,7 +210,6 @@ func initImageConfigs() map[int]Config {
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
 	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
-	configs[BusyBox] = Config{dockerLibraryRegistry, "busybox", "1.29"}
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}

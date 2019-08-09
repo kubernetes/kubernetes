@@ -105,7 +105,7 @@ var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
 	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
-	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
+	busyboxImage  = imageutils.GetE2EImage(imageutils.Agnhost)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 

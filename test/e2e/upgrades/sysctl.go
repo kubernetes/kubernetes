@@ -127,7 +127,7 @@ func sysctlTestPod(name string, sysctls map[string]string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "test-container",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: append([]string{"/bin/sysctl"}, keys...),
 				},
 			},

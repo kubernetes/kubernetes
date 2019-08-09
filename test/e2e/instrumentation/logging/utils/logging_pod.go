@@ -169,7 +169,7 @@ func (p *execLoggingPod) Start(f *framework.Framework) error {
 			Containers: []v1.Container{
 				{
 					Name:    loggingContainerName,
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: p.cmd,
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{

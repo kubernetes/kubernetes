@@ -320,7 +320,7 @@ func busyBoxPodSpec(readinessProbe, livenessProbe *v1.Probe, cmd []string) *v1.P
 			Containers: []v1.Container{
 				{
 					Name:           "busybox",
-					Image:          imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:          imageutils.GetE2EImage(imageutils.Agnhost),
 					Command:        cmd,
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,

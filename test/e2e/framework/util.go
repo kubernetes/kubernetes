@@ -179,7 +179,7 @@ const (
 
 var (
 	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+	BusyBoxImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 	// AgnHostImage is the image URI of AgnHost
 	AgnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)

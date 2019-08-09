@@ -37,7 +37,7 @@ import (
 
 var (
 	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage          = imageutils.GetE2EImage(imageutils.BusyBox)
+	BusyBoxImage          = imageutils.GetE2EImage(imageutils.Agnhost)
 	durationForStuckMount = 110 * time.Second
 )
 

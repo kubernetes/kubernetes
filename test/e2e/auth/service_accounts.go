@@ -214,7 +214,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				ServiceAccountName: sa.Name,
 				Containers: []v1.Container{{
 					Name:    "test",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"sleep", "100000"}, // run and pause
 				}},
 				TerminationGracePeriodSeconds: &zero,                 // terminate quickly when deleted

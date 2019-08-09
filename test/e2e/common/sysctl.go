@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 				Containers: []v1.Container{
 					{
 						Name:  "test-container",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,

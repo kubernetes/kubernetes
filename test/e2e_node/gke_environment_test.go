@@ -179,7 +179,7 @@ func checkDockerConfig() error {
 // checkDockerNetworkClient checks client networking by pinging an external IP
 // address from a container.
 func checkDockerNetworkClient() error {
-	imageName := imageutils.GetE2EImage(imageutils.BusyBox)
+	imageName := imageutils.GetE2EImage(imageutils.Agnhost)
 	output, err := runCommand("docker", "run", "--rm", imageName, "sh", "-c", "ping -w 5 -q google.com")
 	if err != nil {
 		return err

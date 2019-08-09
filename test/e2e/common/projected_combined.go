@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 		pod.Spec.Containers = []v1.Container{
 			{
 				Name:    "projected-all-volume-test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 				Command: []string{"sh", "-c", "cat /all/podname && cat /all/secret-data && cat /all/configmap-data"},
 				VolumeMounts: []v1.VolumeMount{
 					{

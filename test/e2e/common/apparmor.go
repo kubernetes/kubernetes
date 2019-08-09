@@ -116,7 +116,7 @@ done`, testCmd)
 			Affinity: loaderAffinity,
 			Containers: []v1.Container{{
 				Name:    "test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 				Command: []string{"sh", "-c", testCmd},
 			}},
 			RestartPolicy: v1.RestartPolicyNever,

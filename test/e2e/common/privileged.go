@@ -93,14 +93,14 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            c.privilegedContainer,
-					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{Privileged: &isPrivileged},
 					Command:         []string{"/bin/sleep", "10000"},
 				},
 				{
 					Name:            c.notPrivilegedContainer,
-					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{Privileged: &notPrivileged},
 					Command:         []string{"/bin/sleep", "10000"},

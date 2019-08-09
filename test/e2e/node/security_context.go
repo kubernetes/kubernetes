@@ -51,7 +51,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

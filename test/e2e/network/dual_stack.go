@@ -88,7 +88,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "dualstack-pod-ips",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					},
 				},
 			},

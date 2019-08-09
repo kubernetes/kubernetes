@@ -53,7 +53,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "env-test",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
@@ -101,7 +101,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "env-test",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "env"},
 						EnvFrom: []v1.EnvFromSource{
 							{

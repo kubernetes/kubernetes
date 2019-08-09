@@ -282,7 +282,7 @@ func newCronJob(name, schedule string) *batchv1beta1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:    "c",
-									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+									Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 									Command: []string{"sleep", "300"},
 								},
 							},

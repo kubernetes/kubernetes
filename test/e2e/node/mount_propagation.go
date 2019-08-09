@@ -45,7 +45,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 			Containers: []v1.Container{
 				{
 					Name:    containerName,
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"sh", "-c", cmd},
 					VolumeMounts: []v1.VolumeMount{
 						{

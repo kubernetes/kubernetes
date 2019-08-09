@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []v1.EnvVar{
 							{
@@ -133,7 +133,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c"},
 						Args:    []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []v1.EnvVar{
@@ -169,7 +169,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "test -d /testcontainer/" + podName + ";echo $?"},
 						Env: []v1.EnvVar{
 							{
@@ -230,7 +230,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "dapi-container",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Env: []v1.EnvVar{
 							{
 								Name:  "POD_NAME",
@@ -279,7 +279,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "dapi-container",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Env: []v1.EnvVar{
 							{
 								Name:  "POD_NAME",
@@ -329,7 +329,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "tail -f /dev/null"},
 						Env: []v1.EnvVar{
 							{
@@ -420,7 +420,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "tail -f /dev/null"},
 						Env: []v1.EnvVar{
 							{
@@ -530,7 +530,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    fmt.Sprintf("init-volume-%s", suffix),
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"sh", "-c", "mkdir -p /volume_mount/foo; touch /volume_mount/foo/test.log"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -548,7 +548,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{"/bin/sh", "-ec", "sleep 100000"},
 						Env: []v1.EnvVar{
 							{

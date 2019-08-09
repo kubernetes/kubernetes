@@ -183,7 +183,7 @@ func testDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 					Containers: []v1.Container{
 						{
 							Name:    "write-pod",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 							Command: []string{"/bin/sh"},
 							Args:    []string{"-c", command},
 							SecurityContext: &v1.SecurityContext{

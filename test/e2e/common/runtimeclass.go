@@ -107,7 +107,7 @@ func newRuntimeClassPod(runtimeClassName string) *v1.Pod {
 			RuntimeClassName: &runtimeClassName,
 			Containers: []v1.Container{{
 				Name:    "test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 				Command: []string{"true"},
 			}},
 			RestartPolicy:                v1.RestartPolicyNever,
