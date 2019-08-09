@@ -429,6 +429,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 		if err != nil {
 			klog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableNAT, err)
+			metrics.IptablesRestoreFailuresTotal.Inc()
 			encounteredError = true
 		}
 	}
@@ -455,6 +456,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		// Write it.
 		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
 			klog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFilter, err)
+			metrics.IptablesRestoreFailuresTotal.Inc()
 			encounteredError = true
 		}
 	}
@@ -1401,6 +1403,7 @@ func (proxier *Proxier) syncProxyRules() {
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		klog.Errorf("Failed to execute iptables-restore: %v", err)
+		metrics.IptablesRestoreFailuresTotal.Inc()
 		// Revert new local ports.
 		klog.V(2).Infof("Closing local ports after iptables-restore failure")
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
