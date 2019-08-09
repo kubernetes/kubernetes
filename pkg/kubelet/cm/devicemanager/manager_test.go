@@ -109,8 +109,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			t.Fatalf("timeout while waiting for manager update")
 		}
 		capacity, allocatable, _ := m.GetCapacity()
-		resourceCapacity, _ := capacity[v1.ResourceName(testResourceName)]
-		resourceAllocatable, _ := allocatable[v1.ResourceName(testResourceName)]
+		resourceCapacity := capacity[v1.ResourceName(testResourceName)]
+		resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
 		require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 		require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
@@ -125,8 +125,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			t.Fatalf("timeout while waiting for manager update")
 		}
 		capacity, allocatable, _ = m.GetCapacity()
-		resourceCapacity, _ = capacity[v1.ResourceName(testResourceName)]
-		resourceAllocatable, _ = allocatable[v1.ResourceName(testResourceName)]
+		resourceCapacity = capacity[v1.ResourceName(testResourceName)]
+		resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 		require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 		require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices shouldn't change.")
 
@@ -142,8 +142,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			t.Fatalf("timeout while waiting for manager update")
 		}
 		capacity, allocatable, _ = m.GetCapacity()
-		resourceCapacity, _ = capacity[v1.ResourceName(testResourceName)]
-		resourceAllocatable, _ = allocatable[v1.ResourceName(testResourceName)]
+		resourceCapacity = capacity[v1.ResourceName(testResourceName)]
+		resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 		require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 		require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices of plugin previously registered should be removed.")
 		p2.Stop()
@@ -178,8 +178,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 		t.FailNow()
 	}
 	capacity, allocatable, _ := m.GetCapacity()
-	resourceCapacity, _ := capacity[v1.ResourceName(testResourceName)]
-	resourceAllocatable, _ := allocatable[v1.ResourceName(testResourceName)]
+	resourceCapacity := capacity[v1.ResourceName(testResourceName)]
+	resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
@@ -194,8 +194,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	}
 
 	capacity, allocatable, _ = m.GetCapacity()
-	resourceCapacity, _ = capacity[v1.ResourceName(testResourceName)]
-	resourceAllocatable, _ = allocatable[v1.ResourceName(testResourceName)]
+	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
+	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
@@ -211,8 +211,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	}
 
 	capacity, allocatable, _ = m.GetCapacity()
-	resourceCapacity, _ = capacity[v1.ResourceName(testResourceName)]
-	resourceAllocatable, _ = allocatable[v1.ResourceName(testResourceName)]
+	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
+	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 	require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices of previous registered should be removed")
 	p2.Stop()

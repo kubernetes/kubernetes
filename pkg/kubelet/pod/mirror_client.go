@@ -92,7 +92,6 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	}
 	klog.V(2).Infof("Deleting a mirror pod %q (uid %#v)", podFullName, uid)
 	var GracePeriodSeconds int64
-	GracePeriodSeconds = 0
 	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
 		// Unfortunately, there's no generic error for failing a precondition
 		if !(errors.IsNotFound(err) || errors.IsConflict(err)) {

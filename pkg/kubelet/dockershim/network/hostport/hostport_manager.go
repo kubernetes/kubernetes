@@ -351,7 +351,7 @@ func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[util
 		}
 	}
 
-	for _, line := range strings.Split(string(iptablesData.Bytes()), "\n") {
+	for _, line := range strings.Split(iptablesData.String(), "\n") {
 		if strings.HasPrefix(line, fmt.Sprintf("-A %s", kubeHostportChainPrefix)) ||
 			strings.HasPrefix(line, fmt.Sprintf("-A %s", string(kubeHostportsChain))) {
 			existingHostportRules = append(existingHostportRules, line)
@@ -382,8 +382,6 @@ func filterRules(rules []string, filters []utiliptables.Chain) []string {
 // filterChains deletes all entries of filter chains from chain map
 func filterChains(chains map[utiliptables.Chain]string, filterChains []utiliptables.Chain) {
 	for _, chain := range filterChains {
-		if _, ok := chains[chain]; ok {
-			delete(chains, chain)
-		}
+		delete(chains, chain)
 	}
 }

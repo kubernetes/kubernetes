@@ -507,7 +507,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
 	if err != nil {
 		errList = append(errList, err)
-	} else if portMappings != nil && len(portMappings) > 0 {
+	} else if len(portMappings) > 0 {
 		if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
 			Namespace:    namespace,
 			Name:         name,

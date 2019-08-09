@@ -980,7 +980,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 
 	updatedNode, err = applyNodeStatusPatch(updatedNode, patchAction.GetPatch())
 	require.NoError(t, err)
-	memCapacity, _ := updatedNode.Status.Capacity[v1.ResourceMemory]
+	memCapacity := updatedNode.Status.Capacity[v1.ResourceMemory]
 	updatedMemoryCapacity, _ := (&memCapacity).AsInt64()
 	assert.Equal(t, newMemoryCapacity, updatedMemoryCapacity, "Memory capacity")
 
@@ -2001,8 +2001,6 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 			utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 			taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
 			"test unschedulable taint for TaintNodesByCondition")
-
-		return
 	})
 }
 

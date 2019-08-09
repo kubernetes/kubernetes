@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
@@ -76,7 +75,6 @@ func (f *fakePluginHandler) DeRegisterPlugin(pluginName string) {
 	f.Lock()
 	defer f.Unlock()
 	f.deregisterPluginCalled = true
-	return
 }
 
 func init() {
@@ -143,7 +141,7 @@ func TestPluginRegistration(t *testing.T) {
 
 	// Add handler for device plugin
 	fakeHandler := newFakePluginHandler()
-	pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, fakeHandler)
+	pluginManager.AddHandler(registerapi.DevicePlugin, fakeHandler)
 
 	// Add a new plugin
 	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
