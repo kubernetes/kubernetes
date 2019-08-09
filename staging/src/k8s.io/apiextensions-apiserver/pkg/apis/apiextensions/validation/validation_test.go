@@ -1944,8 +1944,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("spec", "validation", "openAPIV3Schema", "properties[a]", "default"),
-				invalid("spec", "validation", "openAPIV3Schema", "properties[c]", "default"),
-				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[c]", "default", "foo"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "default", "bad"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "properties[bad]", "pattern"),
 				// we also expected unpruned and valid defaults under x-kubernetes-preserve-unknown-fields. We could be more
 				// strict here, but want to encourage proper specifications by forbidding other defaults.

@@ -820,9 +820,8 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 
 				// validate the default value with user the provided schema.
 				validator := govalidate.NewSchemaValidator(s.ToGoOpenAPI(), nil, "", strfmt.Default)
-				if err := apiservervalidation.ValidateCustomResource(interface{}(*schema.Default), validator); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, fmt.Sprintf("must validate: %v", err)))
-				}
+
+				allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(fldPath.Child("default"), interface{}(*schema.Default), validator)...)
 			}
 		} else {
 			detail := "must not be set"

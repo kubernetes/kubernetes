@@ -17,11 +17,16 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
+	"strings"
+
+	openapierrors "github.com/go-openapi/errors"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
@@ -39,16 +44,50 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
-func ValidateCustomResource(customResource interface{}, validator *validate.SchemaValidator) error {
+func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator *validate.SchemaValidator) field.ErrorList {
 	if validator == nil {
 		return nil
 	}
 
 	result := validator.Validate(customResource)
-	if result.AsError() != nil {
-		return result.AsError()
+	if result.IsValid() {
+		return nil
 	}
-	return nil
+	var allErrs field.ErrorList
+	for _, err := range result.Errors {
+		switch err := err.(type) {
+
+		case *openapierrors.Validation:
+			switch err.Code() {
+
+			case openapierrors.RequiredFailCode:
+				allErrs = append(allErrs, field.Required(fldPath.Child(strings.TrimPrefix(err.Name, ".")), ""))
+
+			case openapierrors.EnumFailCode:
+				values := []string{}
+				for _, allowedValue := range err.Values {
+					if s, ok := allowedValue.(string); ok {
+						values = append(values, s)
+					} else {
+						allowedJSON, _ := json.Marshal(allowedValue)
+						values = append(values, string(allowedJSON))
+					}
+				}
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child(strings.TrimPrefix(err.Name, ".")), err.Value, values))
+
+			default:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.Invalid(fldPath.Child(strings.TrimPrefix(err.Name, ".")), value, err.Error()))
+			}
+
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
+		}
+	}
+	return allErrs
 }
 
 // ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema.

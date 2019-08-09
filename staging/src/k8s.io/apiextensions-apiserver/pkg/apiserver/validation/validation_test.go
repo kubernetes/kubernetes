@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/go-openapi/spec"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // TestRoundTrip checks the conversion to go-openapi types.
@@ -121,12 +123,17 @@ func stripIntOrStringType(x interface{}) interface{} {
 	}
 }
 
+type failingObject struct {
+	object     interface{}
+	expectErrs []string
+}
+
 func TestValidateCustomResource(t *testing.T) {
 	tests := []struct {
 		name           string
 		schema         apiextensions.JSONSchemaProps
 		objects        []interface{}
-		failingObjects []interface{}
+		failingObjects []failingObject
 	}{
 		{name: "!nullable",
 			schema: apiextensions.JSONSchemaProps{
@@ -141,12 +148,13 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{},
 				map[string]interface{}{"field": map[string]interface{}{}},
 			},
-			failingObjects: []interface{}{
-				map[string]interface{}{"field": "foo"},
-				map[string]interface{}{"field": 42},
-				map[string]interface{}{"field": true},
-				map[string]interface{}{"field": 1.2},
-				map[string]interface{}{"field": []interface{}{}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": "foo"}, expectErrs: []string{`field: Invalid value: "string": field in body must be of type object: "string"`}},
+				{object: map[string]interface{}{"field": 42}, expectErrs: []string{`field: Invalid value: "integer": field in body must be of type object: "integer"`}},
+				{object: map[string]interface{}{"field": true}, expectErrs: []string{`field: Invalid value: "boolean": field in body must be of type object: "boolean"`}},
+				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{`field: Invalid value: "number": field in body must be of type object: "number"`}},
+				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type object: "array"`}},
+				{object: map[string]interface{}{"field": nil}, expectErrs: []string{`field: Invalid value: "null": field in body must be of type object: "null"`}},
 			},
 		},
 		{name: "nullable",
@@ -163,12 +171,12 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{"field": map[string]interface{}{}},
 				map[string]interface{}{"field": nil},
 			},
-			failingObjects: []interface{}{
-				map[string]interface{}{"field": "foo"},
-				map[string]interface{}{"field": 42},
-				map[string]interface{}{"field": true},
-				map[string]interface{}{"field": 1.2},
-				map[string]interface{}{"field": []interface{}{}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": "foo"}, expectErrs: []string{`field: Invalid value: "string": field in body must be of type object: "string"`}},
+				{object: map[string]interface{}{"field": 42}, expectErrs: []string{`field: Invalid value: "integer": field in body must be of type object: "integer"`}},
+				{object: map[string]interface{}{"field": true}, expectErrs: []string{`field: Invalid value: "boolean": field in body must be of type object: "boolean"`}},
+				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{`field: Invalid value: "number": field in body must be of type object: "number"`}},
+				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type object: "array"`}},
 			},
 		},
 		{name: "nullable and no type",
@@ -203,12 +211,12 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{"field": 42},
 				map[string]interface{}{"field": "foo"},
 			},
-			failingObjects: []interface{}{
-				map[string]interface{}{"field": nil},
-				map[string]interface{}{"field": true},
-				map[string]interface{}{"field": 1.2},
-				map[string]interface{}{"field": map[string]interface{}{}},
-				map[string]interface{}{"field": []interface{}{}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": nil}, expectErrs: []string{`field: Invalid value: "null": field in body must be of type integer,string: "null"`}},
+				{object: map[string]interface{}{"field": true}, expectErrs: []string{`field: Invalid value: "boolean": field in body must be of type integer,string: "boolean"`}},
+				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{`field: Invalid value: "number": field in body must be of type integer,string: "number"`}},
+				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{`field: Invalid value: "object": field in body must be of type integer,string: "object"`}},
+				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type integer,string: "array"`}},
 			},
 		},
 		{name: "nullable and x-kubernetes-int-or-string",
@@ -226,11 +234,11 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{"field": "foo"},
 				map[string]interface{}{"field": nil},
 			},
-			failingObjects: []interface{}{
-				map[string]interface{}{"field": true},
-				map[string]interface{}{"field": 1.2},
-				map[string]interface{}{"field": map[string]interface{}{}},
-				map[string]interface{}{"field": []interface{}{}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": true}, expectErrs: []string{`field: Invalid value: "boolean": field in body must be of type integer,string: "boolean"`}},
+				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{`field: Invalid value: "number": field in body must be of type integer,string: "number"`}},
+				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{`field: Invalid value: "object": field in body must be of type integer,string: "object"`}},
+				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type integer,string: "array"`}},
 			},
 		},
 		{name: "nullable, x-kubernetes-int-or-string and user-provided anyOf",
@@ -252,11 +260,27 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{"field": 42},
 				map[string]interface{}{"field": "foo"},
 			},
-			failingObjects: []interface{}{
-				map[string]interface{}{"field": true},
-				map[string]interface{}{"field": 1.2},
-				map[string]interface{}{"field": map[string]interface{}{}},
-				map[string]interface{}{"field": []interface{}{}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": true}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "boolean": field in body must be of type integer,string: "boolean"`,
+					`field: Invalid value: "boolean": field in body must be of type integer: "boolean"`,
+				}},
+				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
+					`field: Invalid value: "number": field in body must be of type integer: "number"`,
+				}},
+				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "object": field in body must be of type integer,string: "object"`,
+					`field: Invalid value: "object": field in body must be of type integer: "object"`,
+				}},
+				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "array": field in body must be of type integer,string: "array"`,
+					`field: Invalid value: "array": field in body must be of type integer: "array"`,
+				}},
 			},
 		},
 		{name: "nullable, x-kubernetes-int-or-string and user-provider allOf",
@@ -282,11 +306,31 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{"field": 42},
 				map[string]interface{}{"field": "foo"},
 			},
-			failingObjects: []interface{}{
-				map[string]interface{}{"field": true},
-				map[string]interface{}{"field": 1.2},
-				map[string]interface{}{"field": map[string]interface{}{}},
-				map[string]interface{}{"field": []interface{}{}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": true}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "boolean": field in body must be of type integer,string: "boolean"`,
+					`field: Invalid value: "boolean": field in body must be of type integer: "boolean"`,
+				}},
+				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
+					`field: Invalid value: "number": field in body must be of type integer: "number"`,
+				}},
+				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "object": field in body must be of type integer,string: "object"`,
+					`field: Invalid value: "object": field in body must be of type integer: "object"`,
+				}},
+				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{
+					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`field: Invalid value: "array": field in body must be of type integer,string: "array"`,
+					`field: Invalid value: "array": field in body must be of type integer: "array"`,
+				}},
 			},
 		},
 		{name: "invalid regex",
@@ -298,7 +342,59 @@ func TestValidateCustomResource(t *testing.T) {
 					},
 				},
 			},
-			failingObjects: []interface{}{map[string]interface{}{"field": "foo"}},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": "foo"}, expectErrs: []string{"field: Invalid value: \"\": field in body should match '+, but pattern is invalid: error parsing regexp: missing argument to repetition operator: `+`'"}},
+			},
+		},
+		{name: "required field",
+			schema: apiextensions.JSONSchemaProps{
+				Required: []string{"field"},
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Type:     "object",
+						Required: []string{"nested"},
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"nested": {},
+						},
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"test": "a"}, expectErrs: []string{`field: Required value`}},
+				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{`field.nested: Required value`}},
+			},
+		},
+		{name: "enum",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Type:     "object",
+						Required: []string{"nestedint", "nestedstring"},
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"nestedint": {
+								Type: "integer",
+								Enum: []apiextensions.JSON{1, 2},
+							},
+							"nestedstring": {
+								Type: "string",
+								Enum: []apiextensions.JSON{"a", "b"},
+							},
+						},
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
+					`field.nestedint: Required value`,
+					`field.nestedstring: Required value`,
+				}},
+				{object: map[string]interface{}{"field": map[string]interface{}{"nestedint": "x", "nestedstring": true}}, expectErrs: []string{
+					`field.nestedint: Invalid value: "string": field.nestedint in body must be of type integer: "string"`,
+					`field.nestedint: Unsupported value: "x": supported values: "1", "2"`,
+					`field.nestedstring: Invalid value: "boolean": field.nestedstring in body must be of type string: "boolean"`,
+					`field.nestedstring: Unsupported value: true: supported values: "a", "b"`,
+				}},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -308,13 +404,25 @@ func TestValidateCustomResource(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, obj := range tt.objects {
-				if err := ValidateCustomResource(obj, validator); err != nil {
-					t.Errorf("unexpected validation error for %v: %v", obj, err)
+				if errs := ValidateCustomResource(nil, obj, validator); len(errs) > 0 {
+					t.Errorf("unexpected validation error for %v: %v", obj, errs)
 				}
 			}
-			for _, obj := range tt.failingObjects {
-				if err := ValidateCustomResource(obj, validator); err == nil {
-					t.Errorf("missing error for %v", obj)
+			for i, failingObject := range tt.failingObjects {
+				if errs := ValidateCustomResource(nil, failingObject.object, validator); len(errs) == 0 {
+					t.Errorf("missing error for %v", failingObject.object)
+				} else {
+					sawErrors := sets.NewString()
+					for _, err := range errs {
+						sawErrors.Insert(err.Error())
+					}
+					expectErrs := sets.NewString(failingObject.expectErrs...)
+					for _, unexpectedError := range sawErrors.Difference(expectErrs).List() {
+						t.Errorf("%d: unexpected error: %s", i, unexpectedError)
+					}
+					for _, missingError := range expectErrs.Difference(sawErrors).List() {
+						t.Errorf("%d: missing error:    %s", i, missingError)
+					}
 				}
 			}
 		})
@@ -367,11 +475,11 @@ func TestItemsProperty(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := ValidateCustomResource(tt.args.object, validator); (err != nil) != tt.wantErr {
-				if err == nil {
+			if errs := ValidateCustomResource(nil, tt.args.object, validator); (len(errs) > 0) != tt.wantErr {
+				if len(errs) == 0 {
 					t.Error("expected error, but didn't get one")
 				} else {
-					t.Errorf("unexpected validation error: %v", err)
+					t.Errorf("unexpected validation error: %v", errs)
 				}
 			}
 		})
