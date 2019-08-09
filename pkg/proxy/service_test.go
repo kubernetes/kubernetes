@@ -33,9 +33,9 @@ const testHostname = "test-hostname"
 
 func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServiceInfo)) *BaseServiceInfo {
 	info := &BaseServiceInfo{
-		clusterIP: net.ParseIP(clusterIP),
-		port:      port,
-		protocol:  v1.Protocol(protocol),
+		clusterIP:   net.ParseIP(clusterIP),
+		port:        port,
+		protocol:    v1.Protocol(protocol),
 		annotations: make(map[string]string),
 	}
 	if healthcheckNodePort != 0 {
