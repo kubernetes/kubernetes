@@ -783,6 +783,14 @@ func (proxier *Proxier) OnEndpointsSynced() {
 // EntryInvalidErr indicates if an ipset entry is invalid or not
 const EntryInvalidErr = "error adding entry %s to ipset %s"
 
+func (proxier *Proxier) getScheduler(sp proxy.ServicePort) string {
+	if v, ok := sp.GetAnnotations()["kube-proxy.kubernetes.io/ipvs-scheduler"]; ok {
+		// Check that the scheduler is valid?
+		return v
+	}
+	return proxier.ipvsScheduler
+}
+
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -960,7 +968,7 @@ func (proxier *Proxier) syncProxyRules() {
 			Address:   svcInfo.ClusterIP(),
 			Port:      uint16(svcInfo.Port()),
 			Protocol:  string(svcInfo.Protocol()),
-			Scheduler: proxier.ipvsScheduler,
+			Scheduler: proxier.getScheduler(svcInfo),
 		}
 		// Set session affinity flag and timeout for IPVS service
 		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
@@ -1034,7 +1042,7 @@ func (proxier *Proxier) syncProxyRules() {
 				Address:   net.ParseIP(externalIP),
 				Port:      uint16(svcInfo.Port()),
 				Protocol:  string(svcInfo.Protocol()),
-				Scheduler: proxier.ipvsScheduler,
+				Scheduler: proxier.getScheduler(svcInfo),
 			}
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
@@ -1135,7 +1143,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Address:   net.ParseIP(ingress),
 					Port:      uint16(svcInfo.Port()),
 					Protocol:  string(svcInfo.Protocol()),
-					Scheduler: proxier.ipvsScheduler,
+					Scheduler: proxier.getScheduler(svcInfo),
 				}
 				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
@@ -1270,7 +1278,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Address:   nodeIP,
 					Port:      uint16(svcInfo.NodePort()),
 					Protocol:  string(svcInfo.Protocol()),
-					Scheduler: proxier.ipvsScheduler,
+					Scheduler: proxier.getScheduler(svcInfo),
 				}
 				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
