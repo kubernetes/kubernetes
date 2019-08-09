@@ -88,9 +88,8 @@ func GetValidatedSources(sources []string) ([]string, error) {
 			return []string{FileSource, HTTPSource, ApiserverSource}, nil
 		case FileSource, HTTPSource, ApiserverSource:
 			validated = append(validated, source)
-			break
 		case "":
-			break
+			// Skip
 		default:
 			return []string{}, fmt.Errorf("unknown pod source %q", source)
 		}

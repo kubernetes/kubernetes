@@ -146,7 +146,7 @@ type ContainerStats struct {
 	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
+	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // PodReference contains enough information to locate the referenced pod.

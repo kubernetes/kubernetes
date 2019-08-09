@@ -538,6 +538,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.heartbeatClient, err = clientset.NewForConfig(config)
+	require.NoError(t, err)
 	kubelet.onRepeatedHeartbeatFailure = func() {
 		atomic.AddInt64(&failureCallbacks, 1)
 	}

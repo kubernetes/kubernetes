@@ -396,10 +396,10 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 	}
 	if c.ResolverConfig != "" {
 		f, err := os.Open(c.ResolverConfig)
-		defer f.Close()
 		if err != nil {
 			klog.Error("Could not open resolverConf file")
 		} else {
+			defer f.Close()
 			_, hostSearch, _, err := parseResolvConf(f)
 			if err != nil {
 				klog.Errorf("Error for parsing the resolv.conf file: %v", err)

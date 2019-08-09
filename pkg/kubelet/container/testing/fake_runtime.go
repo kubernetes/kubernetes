@@ -271,14 +271,6 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 
 	f.CalledFunctions = append(f.CalledFunctions, "KillContainerInPod")
 	f.KilledContainers = append(f.KilledContainers, container.Name)
-
-	var containers []v1.Container
-	for _, c := range pod.Spec.Containers {
-		if c.Name == container.Name {
-			continue
-		}
-		containers = append(containers, c)
-	}
 	return f.Err
 }
 
