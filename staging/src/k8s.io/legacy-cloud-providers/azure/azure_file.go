@@ -21,6 +21,7 @@ import (
 
 	azs "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
+
 	"k8s.io/klog"
 )
 

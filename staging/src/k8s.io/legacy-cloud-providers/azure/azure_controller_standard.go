@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 // AttachDisk attaches a vhd to vm
