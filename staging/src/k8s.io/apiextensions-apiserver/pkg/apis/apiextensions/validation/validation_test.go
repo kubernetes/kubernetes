@@ -2765,6 +2765,190 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 			requestGV: apiextensionsv1.SchemeGroupVersion,
 		},
 		{
+			name: "structural to non-structural updates allowed via v1beta1",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Scope:    apiextensions.ResourceScope("Cluster"),
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Scope:    apiextensions.ResourceScope("Cluster"),
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {}}, // untyped object
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+		},
+		{
+			name: "structural to non-structural updates not allowed via v1",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Scope:    apiextensions.ResourceScope("Cluster"),
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Scope:    apiextensions.ResourceScope("Cluster"),
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {}}, // untyped object
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.properties[foo].type"),
+			},
+		},
+		{
+			name: "absent schema to non-structural updates not allowed via v1",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:                 "group.com",
+					Scope:                 apiextensions.ResourceScope("Cluster"),
+					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions:              []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation:            &apiextensions.CustomResourceValidation{},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Scope:    apiextensions.ResourceScope("Cluster"),
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {}}, // untyped object
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.properties[foo].type"),
+			},
+		},
+		{
+			name: "non-structural updates allowed via v1 if old object has non-structural schema",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{Name: "version", Served: true, Storage: true, Schema: &apiextensions.CustomResourceValidation{
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+								Type:       "object",
+								Properties: map[string]apiextensions.JSONSchemaProps{"foo": {}}, // untyped object, non-structural
+							},
+						}},
+						{Name: "version2", Served: true, Storage: false, Schema: &apiextensions.CustomResourceValidation{
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+								Type:       "object",
+								Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "number"}}, // structural
+							},
+						}},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{Name: "version", Served: true, Storage: true, Schema: &apiextensions.CustomResourceValidation{
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+								Type:       "object",
+								Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Description: "b"}}, // untyped object, non-structural
+							},
+						}},
+						{Name: "version2", Served: true, Storage: false, Schema: &apiextensions.CustomResourceValidation{
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+								Type:       "object",
+								Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Description: "a"}}, // untyped object, non-structural
+							},
+						}},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors:    []validationMatch{},
+		},
+		{
 			name: "webhookconfig: should pass on invalid ConversionReviewVersion with old invalid versions",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "42"},
@@ -4394,12 +4578,11 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 
 func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            apiextensions.CustomResourceValidation
-		mustBeStructural bool
-		statusEnabled    bool
-		opts             validationOptions
-		wantError        bool
+		name          string
+		input         apiextensions.CustomResourceValidation
+		statusEnabled bool
+		opts          validationOptions
+		wantError     bool
 	}{
 		{
 			name:      "empty",
@@ -4524,8 +4707,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{},
 			},
-			mustBeStructural: true,
-			wantError:        true,
+			opts:      validationOptions{requireStructuralSchema: true},
+			wantError: true,
 		},
 		{
 			name: "must be structural",
@@ -4534,8 +4717,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 				},
 			},
-			mustBeStructural: true,
-			wantError:        false,
+			opts:      validationOptions{requireStructuralSchema: true},
+			wantError: false,
 		},
 		{
 			name: "require valid types, valid",
@@ -4544,9 +4727,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 				},
 			},
-			opts:             validationOptions{requireValidPropertyType: true},
-			mustBeStructural: true,
-			wantError:        false,
+			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			wantError: false,
 		},
 		{
 			name: "require valid types, invalid",
@@ -4555,9 +4737,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "null",
 				},
 			},
-			opts:             validationOptions{requireValidPropertyType: true},
-			mustBeStructural: true,
-			wantError:        true,
+			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			wantError: true,
 		},
 		{
 			name: "require valid types, invalid",
@@ -4566,14 +4747,13 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "bogus",
 				},
 			},
-			opts:             validationOptions{requireValidPropertyType: true},
-			mustBeStructural: true,
-			wantError:        true,
+			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			wantError: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateCustomResourceDefinitionValidation(&tt.input, tt.mustBeStructural, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
+			got := validateCustomResourceDefinitionValidation(&tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 			if !tt.wantError && len(got) > 0 {
 				t.Errorf("Expected no error, but got: %v", got)
 			} else if tt.wantError && len(got) == 0 {
