@@ -311,6 +311,8 @@ func getAllParentLinks(path string) ([]string, error) {
 
 type hostUtil struct{}
 
+// NewHostUtil returns a struct that implements the HostUtils interface on
+// windows platforms
 func NewHostUtil() HostUtils {
 	return &hostUtil{}
 }
