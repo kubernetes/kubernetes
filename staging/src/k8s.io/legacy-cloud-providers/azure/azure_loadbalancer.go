@@ -72,6 +72,9 @@ const (
 	// to specify the resource group of load balancer objects that are not in the same resource group as the cluster.
 	ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
 
+	// ServiceAnnotationLoadBalancerPIPName specifies the pip that will be applied to load balancer
+	ServiceAnnotationLoadBalancerPIPName = "service.beta.kubernetes.io/azure-load-balancer-pip-name"
+
 	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
 	// to specify a list of allowed service tags separated by comma
 	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for all supported service tags.
@@ -393,6 +396,9 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 				if err != nil {
 					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress Name from ID(%s)", serviceName, *lb.Name, *pipID)
 				}
+				if name, found := service.Annotations[ServiceAnnotationLoadBalancerPIPName]; found && name != "" {
+					pipName = name
+				}
 				pip, existsPip, err := az.getPublicIPAddress(az.getPublicIPAddressResourceGroup(service), pipName)
 				if err != nil {
 					return nil, err
@@ -411,6 +417,10 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 }
 
 func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, error) {
+	if name, found := service.Annotations[ServiceAnnotationLoadBalancerPIPName]; found && name != "" {
+		return name, nil
+	}
+
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
 		return az.getPublicIPName(clusterName, service), nil
