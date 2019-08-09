@@ -171,6 +171,18 @@ func TestIsCriticalPod(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod5",
+					Namespace: "kube-system",
+					Annotations: map[string]string{
+						ConfigSourceAnnotationKey: "abc",
+					},
+				},
+			},
+			expected: true,
+		},
 	}
 	for i, data := range cases {
 		actual := IsCriticalPod(&data.pod)

@@ -146,6 +146,9 @@ func (sp SyncPodType) String() string {
 // or equal to SystemCriticalPriority. Both the default scheduler and the kubelet use this function
 // to make admission and scheduling decisions.
 func IsCriticalPod(pod *v1.Pod) bool {
+	if IsStaticPod(pod) {
+		return true
+	}
 	if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
 		return true
 	}
@@ -192,4 +195,10 @@ func IsCriticalPodBasedOnPriority(priority int32) bool {
 		return true
 	}
 	return false
+}
+
+// IsStaticPod returns true if the pod is a static pod.
+func IsStaticPod(pod *v1.Pod) bool {
+	source, err := GetPodSource(pod)
+	return err == nil && source != ApiserverSource
 }

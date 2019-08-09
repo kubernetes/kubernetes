@@ -25,7 +25,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -232,7 +232,8 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb, to.String(lb.Etag))
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
 		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
@@ -259,7 +260,8 @@ func (az *Cloud) createOrUpdateLBWithRetry(service *v1.Service, lb network.LoadB
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb, to.String(lb.Etag))
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
 		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		done, retryError := az.processHTTPRetryResponse(service, "CreateOrUpdateLoadBalancer", resp, err)
 		if done && err == nil {
@@ -282,10 +284,11 @@ func (az *Cloud) ListLB(service *v1.Service) ([]network.LoadBalancer, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		allLBs, err := az.LoadBalancerClient.List(ctx, az.ResourceGroup)
+		rgName := az.getLoadBalancerResourceGroup()
+		allLBs, err := az.LoadBalancerClient.List(ctx, rgName)
 		if err != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", err.Error())
-			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", az.ResourceGroup, err)
+			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", rgName, err)
 			return nil, err
 		}
 		klog.V(2).Infof("LoadBalancerClient.List(%v) success", az.ResourceGroup)
@@ -304,11 +307,12 @@ func (az *Cloud) listLBWithRetry(service *v1.Service) ([]network.LoadBalancer, e
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		allLBs, retryErr = az.LoadBalancerClient.List(ctx, az.ResourceGroup)
+		rgName := az.getLoadBalancerResourceGroup()
+		allLBs, retryErr = az.LoadBalancerClient.List(ctx, rgName)
 		if retryErr != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", retryErr.Error())
 			klog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
-				az.ResourceGroup,
+				rgName,
 				retryErr)
 			return false, retryErr
 		}
@@ -450,7 +454,8 @@ func (az *Cloud) DeleteLB(service *v1.Service, lbName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.Delete(ctx, az.ResourceGroup, lbName)
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
 				// Invalidate the cache right after updating
@@ -471,7 +476,8 @@ func (az *Cloud) deleteLBWithRetry(service *v1.Service, lbName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.Delete(ctx, az.ResourceGroup, lbName)
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
 		done, err := az.processHTTPRetryResponse(service, "DeleteLoadBalancer", resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after deleting

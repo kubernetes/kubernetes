@@ -640,7 +640,7 @@ func makeHTTPHealthCheck(name, path string, port int32) *compute.HttpHealthCheck
 // The HC interval will be reconciled to 8 seconds.
 // If the existing health check is larger than the default interval,
 // the configuration will be kept.
-func mergeHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+func mergeHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) {
 	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
 		newHC.CheckIntervalSec = hc.CheckIntervalSec
 	}
@@ -653,16 +653,23 @@ func mergeHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) *compute.HttpHeal
 	if hc.HealthyThreshold > newHC.HealthyThreshold {
 		newHC.HealthyThreshold = hc.HealthyThreshold
 	}
-	return newHC
 }
 
 // needToUpdateHTTPHealthChecks checks whether the http healthcheck needs to be
 // updated.
 func needToUpdateHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) bool {
-	changed := hc.Port != newHC.Port || hc.RequestPath != newHC.RequestPath || hc.Description != newHC.Description
-	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
-	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
-	return changed
+	switch {
+	case
+		hc.Port != newHC.Port,
+		hc.RequestPath != newHC.RequestPath,
+		hc.Description != newHC.Description,
+		hc.CheckIntervalSec < newHC.CheckIntervalSec,
+		hc.TimeoutSec < newHC.TimeoutSec,
+		hc.UnhealthyThreshold < newHC.UnhealthyThreshold,
+		hc.HealthyThreshold < newHC.HealthyThreshold:
+		return true
+	}
+	return false
 }
 
 func (g *Cloud) ensureHTTPHealthCheck(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {
@@ -685,7 +692,7 @@ func (g *Cloud) ensureHTTPHealthCheck(name, path string, port int32) (hc *comput
 	klog.V(4).Infof("Checking http health check params %s", name)
 	if needToUpdateHTTPHealthChecks(hc, newHC) {
 		klog.Warningf("Health check %v exists but parameters have drifted - updating...", name)
-		newHC = mergeHTTPHealthChecks(hc, newHC)
+		mergeHTTPHealthChecks(hc, newHC)
 		if err := g.UpdateHTTPHealthCheck(newHC); err != nil {
 			klog.Warningf("Failed to reconcile http health check %v parameters", name)
 			return nil, err

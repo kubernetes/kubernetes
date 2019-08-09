@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
@@ -219,8 +219,15 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 
 // GetLoadBalancerName returns the LoadBalancer name.
 func (az *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(service)
+}
+
+func (az *Cloud) getLoadBalancerResourceGroup() string {
+	if az.LoadBalancerResourceGroup != "" {
+		return az.LoadBalancerResourceGroup
+	}
+
+	return az.ResourceGroup
 }
 
 // getServiceLoadBalancer gets the loadbalancer for the service if it already exists.

@@ -315,6 +315,17 @@ func (fVMC *fakeAzureVirtualMachinesClient) CreateOrUpdate(ctx context.Context, 
 	return nil, nil
 }
 
+func (fVMC *fakeAzureVirtualMachinesClient) Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	if _, ok := fVMC.FakeStore[resourceGroupName]; !ok {
+		fVMC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachine)
+	}
+
+	return nil, nil
+}
+
 func (fVMC *fakeAzureVirtualMachinesClient) Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()

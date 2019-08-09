@@ -771,13 +771,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		// shallow copy
 		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
-		statusScope.Serializer = unstructuredNegotiatedSerializer{
-			typer: typer, creator: creator,
-			converter:             safeConverter,
-			structuralSchemas:     structuralSchemas,
-			structuralSchemaGK:    kind.GroupKind(),
-			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
-		}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,

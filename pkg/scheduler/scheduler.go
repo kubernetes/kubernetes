@@ -563,6 +563,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !permitStatus.IsSuccess() {
 			var reason string
 			if permitStatus.Code() == framework.Unschedulable {
+				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
 				metrics.PodScheduleErrors.Inc()
@@ -582,6 +583,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !prebindStatus.IsSuccess() {
 			var reason string
 			if prebindStatus.Code() == framework.Unschedulable {
+				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
 				metrics.PodScheduleErrors.Inc()
@@ -606,11 +608,28 @@ func (sched *Scheduler) scheduleOne() {
 			fwk.RunUnreservePlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 			sched.recordSchedulingFailure(assumedPod, err, SchedulerError, fmt.Sprintf("Binding rejected: %v", err))
 		} else {
-			klog.V(2).Infof("pod %v/%v is bound successfully on node %v, %d nodes evaluated, %d nodes were found feasible", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
+			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
+			if klog.V(2) {
+				node, _ := sched.Cache().GetNodeInfo(scheduleResult.SuggestedHost)
+				klog.Infof("pod %v/%v is bound successfully on node %q, %d nodes evaluated, %d nodes were found feasible. Bound node resource: %q.", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes, nodeResourceString(node))
+			}
+
 			metrics.PodScheduleSuccesses.Inc()
 
 			// Run "postbind" plugins.
 			fwk.RunPostbindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
+}
+
+// nodeResourceString returns a string representation of node resources.
+func nodeResourceString(n *v1.Node) string {
+	if n == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("Capacity: %s; Allocatable: %s.", resourceString(&n.Status.Capacity), resourceString(&n.Status.Allocatable))
+}
+
+func resourceString(r *v1.ResourceList) string {
+	return fmt.Sprintf("CPU<%s>|Memory<%s>|Pods<%s>|StorageEphemeral<%s>", r.Cpu().String(), r.Memory().String(), r.Pods().String(), r.StorageEphemeral().String())
 }

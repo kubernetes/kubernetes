@@ -1634,7 +1634,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
-	if kubepod.IsStaticPod(pod) {
+	if kubetypes.IsStaticPod(pod) {
 		podFullName := kubecontainer.GetPodFullName(pod)
 		deleted := false
 		if mirrorPod != nil {
