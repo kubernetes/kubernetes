@@ -116,6 +116,16 @@ var (
 			Help:      "Cumulative proxy rules Service changes",
 		},
 	)
+
+	// IptablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
+	// seen.
+	IptablesRestoreFailuresTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: kubeProxySubsystem,
+			Name:      "sync_proxy_rules_iptables_restore_failures_total",
+			Help:      "Cumulative proxy iptables restore failures",
+		},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -131,6 +141,7 @@ func RegisterMetrics() {
 		prometheus.MustRegister(EndpointChangesTotal)
 		prometheus.MustRegister(ServiceChangesPending)
 		prometheus.MustRegister(ServiceChangesTotal)
+		prometheus.MustRegister(IptablesRestoreFailuresTotal)
 	})
 }
 
