@@ -261,7 +261,12 @@ __kubectl_custom_func() {
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec | kubectl_port-forward | kubectl_top_pod | kubectl_attach)
+	kubectl_port-forward)
+	    __kubectl_parse_get "service" "{{ range .items  }}svc/{{ .metadata.name }} {{ end }}"
+            __kubectl_get_resource_pod
+            return
+            ;;
+        kubectl_exec | kubectl_top_pod | kubectl_attach)
             __kubectl_get_resource_pod
             return
             ;;
