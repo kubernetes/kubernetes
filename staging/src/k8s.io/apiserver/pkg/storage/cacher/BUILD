@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cacher.go",
+        "caching_object.go",
         "time_budget.go",
         "util.go",
         "watch_cache.go",
@@ -19,6 +20,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
