@@ -32,7 +32,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -479,7 +478,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(e2edeploy.RunDeployment(dpConfig))
+		framework.ExpectNoError(runDeployment(dpConfig))
 		break
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
@@ -553,4 +552,12 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(autoscalerName, nil)
+}
+
+// runDeployment runs a delopyment with the specified config.
+func runDeployment(config testutils.DeploymentConfig) error {
+	ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
+	config.NodeDumpFunc = framework.DumpNodeDebugInfo
+	config.ContainerDumpFunc = framework.LogFailedContainers
+	return testutils.RunDeployment(config)
 }
