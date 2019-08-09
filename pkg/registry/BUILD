@@ -75,6 +75,7 @@ filegroup(
         "//pkg/registry/events/rest:all-srcs",
         "//pkg/registry/extensions/controller/storage:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
+        "//pkg/registry/flowcontrol/bootstrap:all-srcs",
         "//pkg/registry/flowcontrol/flowschema:all-srcs",
         "//pkg/registry/flowcontrol/prioritylevelconfiguration:all-srcs",
         "//pkg/registry/flowcontrol/rest:all-srcs",

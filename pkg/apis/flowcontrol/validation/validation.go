@@ -204,12 +204,6 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if name != flowcontrol.PriorityLevelConfigurationNameSystemTop && spec.Exempt {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must not be exempt"))
-	}
-	if name != flowcontrol.PriorityLevelConfigurationNameWorkloadLow && spec.GlobalDefault {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("globalDefault"), "must not be global default"))
-	}
 	if !spec.Exempt {
 		if spec.AssuredConcurrencyShares <= 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("assuredConcurrencyShares"), spec.AssuredConcurrencyShares, "must be positive"))

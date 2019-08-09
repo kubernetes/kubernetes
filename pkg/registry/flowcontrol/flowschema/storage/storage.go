@@ -18,16 +18,15 @@ package storage
 
 import (
 	"context"
-	"errors"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
-	flowcontrolbootstrap "k8s.io/kubernetes/pkg/apis/flowcontrol/bootstrap"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema"
 )
 
@@ -62,8 +61,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: flowschema.Strategy,
 		DeleteStrategy: flowschema.Strategy,
 
-		// TODO: develop printer handler for flowschema resource
-		// TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -76,15 +74,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
-// Delete ensures that system priority classes are not deleted.
-func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	for _, pl := range flowcontrolbootstrap.SystemPriorityLevelConfigurations() {
-		if name == pl.Name {
-			return nil, false, apierrors.NewForbidden(flowcontrol.Resource("flowschemas"), pl.Name, errors.New("this is a system flow schema and cannot be deleted"))
-		}
-	}
+var _ rest.ShortNamesProvider = &REST{}
 
-	return r.Store.Delete(ctx, name, deleteValidation, options)
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"fs"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.

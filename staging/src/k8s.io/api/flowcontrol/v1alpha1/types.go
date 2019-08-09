@@ -44,6 +44,18 @@ const (
 	NonResourceAll = "*"
 )
 
+// System preset priority level names
+const (
+	PriorityLevelConfigurationNameExempt = "exempt"
+)
+
+// Conditions
+const (
+	FlowSchemaConditionDangling = "Dangling"
+
+	PriorityLevelConfigurationConditionConcurrencyShared = "ConcurrencyShared"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -183,17 +195,13 @@ type PriorityLevelConfigurationList struct {
 
 // PriorityLevelConfigurationSpec is specification of a priority level
 type PriorityLevelConfigurationSpec struct {
-	// `globalDefault` specifies whether this priority level should be considered as the default priority for requests
-	// that do not have any priority level. Only one PriorityClass should be marked as `globalDefault`.
-	// +optional
-	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"varint,1,opt,name=globalDefault"`
 	// `exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level.
 	// Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued)
 	// and do not detract from the concurrency available for non-exempt requests. In a more sophisticated system, the
 	// exempt priority level would be the highest priority level. The field is default to false and only those system
 	// preset priority level can be exempt.
 	// +optional
-	Exempt bool `json:"exempt,omitempty" protobuf:"varint,2,opt,name=exempt"`
+	Exempt bool `json:"exempt,omitempty" protobuf:"varint,1,opt,name=exempt"`
 	// `assuredConcurrencyShares` is a positive number for a non-exempt priority level, representing the weight by which
 	// the priority level shares the concurrency from the global limit. The concurrency limit of an apiserver is divided
 	// among the non-exempt priority levels in proportion to their assured concurrency shares. Basically this produces
@@ -202,21 +210,21 @@ type PriorityLevelConfigurationSpec struct {
 	//             ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )
 	//
 	// +optional
-	AssuredConcurrencyShares int32 `json:"assuredConcurrencyShares,omitempty" protobuf:"varint,3,opt,name=assuredConcurrencyShares"`
+	AssuredConcurrencyShares int32 `json:"assuredConcurrencyShares,omitempty" protobuf:"varint,2,opt,name=assuredConcurrencyShares"`
 	// `queues` is a number of queues that belong to a non-exempt PriorityLevelConfiguration object. The queues exist
 	// independently at each apiserver. The value must be positive for a non-exempt priority level and setting it to 1
 	// disables shufflesharding and makes the distinguisher method irrelevant.
 	// +optional
-	Queues int32 `json:"queues,omitempty" protobuf:"varint,4,opt,name=queues"`
+	Queues int32 `json:"queues,omitempty" protobuf:"varint,3,opt,name=queues"`
 	// `handSize` is a small positive number for applying shuffle sharding. When a request arrives at an apiserver the
 	// request flow identifier’s string pair is hashed and the hash value is used to shuffle the queue indices and deal
 	// a hand of the size specified here. If empty, the hand size will the be set to 1.
 	// +optional
-	HandSize int32 `json:"handSize,omitempty" protobuf:"varint,5,opt,name=handSize"`
+	HandSize int32 `json:"handSize,omitempty" protobuf:"varint,4,opt,name=handSize"`
 	// `queueLengthLimit` is a length limit applied to each queue belongs to the priority.  The value must be positive
 	// for a non-exempt priority level.
 	// +optional
-	QueueLengthLimit int32 `json:"queueLengthLimit,omitempty" protobuf:"varint,6,opt,name=queueLengthLimit"`
+	QueueLengthLimit int32 `json:"queueLengthLimit,omitempty" protobuf:"varint,5,opt,name=queueLengthLimit"`
 }
 
 // PriorityLevelConfigurationConditionType is a valid value for PriorityLevelConfigurationStatusCondition.Type
@@ -246,7 +254,7 @@ type PriorityLevelConfigurationCondition struct {
 // Subject matches a set of users.
 // Syntactically, Subject is a general API object reference.
 // Authorization produces a username and a set of groups, and we imagine special kinds of non-namespaced objects,
-// User and Group in API group "rbac.authorization.k8s.io", to represent such a username or group.
+// User and Group in API group "flowcontrol.apiserver.k8s.io", to represent such a username or group.
 // The only kind of true object reference that currently will match any users is ServiceAccount.
 type Subject struct {
 	// `kind` of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
@@ -254,7 +262,7 @@ type Subject struct {
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// `apiGroup` holds the API group of the referenced subject.
 	// Defaults to "" for ServiceAccount subjects.
-	// Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
+	// Defaults to "flowcontrol.apiserver.k8s.io" for User and Group subjects.
 	// +optional
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,2,opt.name=apiGroup"`
 	// `name` of the object being referenced.
