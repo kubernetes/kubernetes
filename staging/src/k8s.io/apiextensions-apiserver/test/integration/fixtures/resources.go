@@ -370,6 +370,29 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 	return nil
 }
 
+// DeleteCustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
+func DeleteCustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
+	list, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(deleteListOpts)
+	if err != nil {
+		return err
+	}
+	if err = apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(nil, deleteListOpts); err != nil {
+		return err
+	}
+	for _, crd := range list.Items {
+		for _, version := range servedVersions(&crd) {
+			err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+				exists, err := existsInDiscovery(&crd, apiExtensionsClient, version)
+				return !exists, err
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // CreateNewVersionedScaleClient returns a scale client.
 func CreateNewVersionedScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config, version string) (scale.ScalesGetter, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
