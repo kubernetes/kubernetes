@@ -65,6 +65,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		allowDefaults:                            allowDefaults(requestGV),
 		requireRecognizedConversionReviewVersion: true,
 		requireImmutableNames:                    false,
+		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, nil),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -84,6 +85,8 @@ type validationOptions struct {
 	requireRecognizedConversionReviewVersion bool
 	// requireImmutableNames disables changing spec.names
 	requireImmutableNames bool
+	// requireOpenAPISchema requires an openapi V3 schema be specified
+	requireOpenAPISchema bool
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
@@ -92,6 +95,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 		allowDefaults:                            allowDefaults(requestGV) || specHasDefaults(&oldObj.Spec),
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
 		requireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
+		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, &oldObj.Spec),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
@@ -161,10 +165,23 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 	allErrs = append(allErrs, validateEnumStrings(fldPath.Child("scope"), string(spec.Scope), []string{string(apiextensions.ClusterScoped), string(apiextensions.NamespaceScoped)}, true)...)
 
+	// enabling pruning requires structural schemas
 	mustBeStructural := false
 	if spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields == false {
 		mustBeStructural = true
-		// check that either a global schema or versioned schemas are set
+	}
+
+	if opts.requireOpenAPISchema {
+		// check that either a global schema or versioned schemas are set in all versions
+		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
+			for i, v := range spec.Versions {
+				if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
+					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), "schemas are required"))
+				}
+			}
+		}
+	} else if spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields == false {
+		// check that either a global schema or versioned schemas are set in served versions
 		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
 			for i, v := range spec.Versions {
 				schemaPath := fldPath.Child("versions").Index(i).Child("schema", "openAPIV3Schema")
@@ -944,6 +961,30 @@ func allowedAtRootSchema(field string) bool {
 		}
 	}
 	return false
+}
+
+// requireOpenAPISchema returns true if the request group version requires a schema
+func requireOpenAPISchema(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if requestGV == v1beta1.SchemeGroupVersion {
+		// for backwards compatibility
+		return false
+	}
+	if oldCRDSpec != nil && !allVersionsSpecifyOpenAPISchema(oldCRDSpec) {
+		// don't tighten validation on existing persisted data
+		return false
+	}
+	return true
+}
+func allVersionsSpecifyOpenAPISchema(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil {
+		return true
+	}
+	for _, v := range spec.Versions {
+		if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults
