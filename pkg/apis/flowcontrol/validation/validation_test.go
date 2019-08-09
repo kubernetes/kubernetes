@@ -383,7 +383,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					GlobalDefault:            false,
 					Exempt:                   false,
 					AssuredConcurrencyShares: 100,
 					Queues:                   512,
@@ -392,67 +391,15 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{},
-		},
-		{
-			name: "customized priority level w/ global-default should fail",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "system-foo",
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					GlobalDefault:            true,
-					Exempt:                   false,
-					AssuredConcurrencyShares: 100,
-					Queues:                   512,
-					HandSize:                 4,
-					QueueLengthLimit:         100,
-				},
-			},
-			expectedErrors: field.ErrorList{
-				field.Forbidden(field.NewPath("spec").Child("globalDefault"), "must not be global default"),
-			},
-		},
-		{
-			name: "system top priority level w/ global-default should work",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameWorkloadLow,
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					GlobalDefault:            true,
-					Exempt:                   false,
-					AssuredConcurrencyShares: 100,
-					Queues:                   512,
-					HandSize:                 4,
-					QueueLengthLimit:         100,
-				},
-			},
-			expectedErrors: field.ErrorList{},
-		},
-		{
-			name: "customized priority level w/ exempt should fail",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "system-foo",
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					GlobalDefault: false,
-					Exempt:        true,
-				},
-			},
-			expectedErrors: field.ErrorList{
-				field.Forbidden(field.NewPath("spec").Child("exempt"), "must not be exempt"),
-			},
 		},
 		{
 			name: "system low priority level w/ exempt should work",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameSystemTop,
+					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					GlobalDefault: false,
-					Exempt:        true,
+					Exempt: true,
 				},
 			},
 			expectedErrors: field.ErrorList{},
