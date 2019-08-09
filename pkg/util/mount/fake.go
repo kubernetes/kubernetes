@@ -261,10 +261,10 @@ func (hu *FakeHostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return pathname, nil
 }
 
-// GetFSGroup returns FSGroup of pathname.
+// GetOwner returns the integer ID for the user and group of the given path
 // Not implemented for testing
-func (hu *FakeHostUtil) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("GetFSGroup not implemented")
+func (hu *FakeHostUtil) GetOwner(pathname string) (int64, int64, error) {
+	return -1, -1, errors.New("GetOwner not implemented")
 }
 
 // GetSELinuxSupport tests if pathname is on a mount that supports SELinux.
