@@ -46,8 +46,7 @@ const (
 
 // System preset priority level names
 const (
-	PriorityLevelConfigurationNameSystemTop   = "system-top"
-	PriorityLevelConfigurationNameWorkloadLow = "workload-low"
+	PriorityLevelConfigurationNameExempt = "exempt"
 )
 
 // Default settings for flow-schema
@@ -58,6 +57,11 @@ const (
 // Default settings for priority-level-configuration
 const (
 	PriorityLevelConfigurationDefaultHandSize int32 = 1
+)
+
+// Conditions
+const (
+	FlowSchemaConditionDangling = "Dangling"
 )
 
 // +genclient
@@ -199,10 +203,6 @@ type PriorityLevelConfigurationList struct {
 
 // PriorityLevelConfigurationSpec is specification of a priority level
 type PriorityLevelConfigurationSpec struct {
-	// `globalDefault` specifies whether this priority level should be considered as the default priority for requests
-	// that do not have any priority level. Only one PriorityClass should be marked as `globalDefault`.
-	// +optional
-	GlobalDefault bool
 	// `exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level.
 	// Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued)
 	// and do not detract from the concurrency available for non-exempt requests. In a more sophisticated system, the
@@ -262,7 +262,7 @@ type PriorityLevelConfigurationCondition struct {
 // Subject matches a set of users.
 // Syntactically, Subject is a general API object reference.
 // Authorization produces a username and a set of groups, and we imagine special kinds of non-namespaced objects,
-// User and Group in API group "rbac.authorization.k8s.io", to represent such a username or group.
+// User and Group in API group "flowcontrol.apiserver.k8s.io", to represent such a username or group.
 // The only kind of true object reference that currently will match any users is ServiceAccount.
 type Subject struct {
 	// `kind` of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
@@ -270,7 +270,7 @@ type Subject struct {
 	Kind string
 	// `apiGroup` holds the API group of the referenced subject.
 	// Defaults to "" for ServiceAccount subjects.
-	// Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
+	// Defaults to "flowcontrol.apiserver.k8s.io" for User and Group subjects.
 	// +optional
 	APIGroup string
 	// `name` of the object being referenced.

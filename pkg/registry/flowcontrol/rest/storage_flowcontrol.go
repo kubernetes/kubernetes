@@ -33,7 +33,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
-	"k8s.io/kubernetes/pkg/apis/flowcontrol/bootstrap"
+	flowcontrolbootstrap "k8s.io/kubernetes/pkg/registry/flowcontrol/bootstrap"
 	flowschemastore "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema/storage"
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
 )
@@ -71,8 +71,8 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	systemPreset := SystemPresetData{
-		FlowSchemas:                 bootstrap.SystemFlowSchemas(),
-		PriorityLevelConfigurations: bootstrap.SystemPriorityLevelConfigurations(),
+		FlowSchemas:                 flowcontrolbootstrap.DefaultFlowSchemas(),
+		PriorityLevelConfigurations: flowcontrolbootstrap.DefaultPriorityLevelConfigurations(),
 	}
 	// TODO: default flow-schemas and priority levels
 	return PostStartHookName, systemPreset.EnsureSystemPresetConfiguration(), nil

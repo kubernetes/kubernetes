@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "helpers.go",
         "register.go",
         "types.go",
         "zz_generated.deepcopy.go",
@@ -29,7 +30,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/flowcontrol/bootstrap:all-srcs",
         "//pkg/apis/flowcontrol/install:all-srcs",
         "//pkg/apis/flowcontrol/v1alpha1:all-srcs",
         "//pkg/apis/flowcontrol/validation:all-srcs",

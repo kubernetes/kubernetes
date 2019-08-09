@@ -36,7 +36,6 @@ import (
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
+	flowcontrolbootstrap "k8s.io/kubernetes/pkg/registry/flowcontrol/bootstrap"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -499,7 +500,7 @@ func buildGenericConfig(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RequestManagement) {
-		genericConfig.RequestManagement = utilflowcontrol.NewRequestManagementSystem(versionedInformers, genericConfig.MaxRequestsInFlight+genericConfig.MaxMutatingRequestsInFlight, genericConfig.RequestTimeout/4, clock.RealClock{})
+		genericConfig.RequestManagement = BuildRequestManagement(s, clientgoExternalClient, versionedInformers)
 	}
 
 	return
@@ -527,6 +528,19 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	return authorizationConfig.New()
+}
+
+// BuildRequestManagement constructs the authenticator
+func BuildRequestManagement(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
+	return utilflowcontrol.NewRequestManagementSystemWithPreservation(
+		versionedInformer,
+		extclient.FlowcontrolV1alpha1(),
+		fairqueuing.NewNoRestraintFactory( /* TODO: switch to real implementation */ ),
+		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
+		s.GenericServerRunOptions.RequestTimeout/4,
+		flowcontrolbootstrap.PreservingFlowSchemas,
+		flowcontrolbootstrap.PreservingPriorityLevelConfigurations,
+	)
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
