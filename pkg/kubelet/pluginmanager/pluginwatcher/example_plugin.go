@@ -138,7 +138,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 			v1beta2 := &pluginServiceV1Beta2{server: e}
 			v1beta2.RegisterService()
 		default:
-			return fmt.Errorf("Unsupported service: '%s'", service)
+			return fmt.Errorf("unsupported service: '%s'", service)
 		}
 	}
 
@@ -169,7 +169,7 @@ func (e *examplePlugin) Stop() error {
 	case <-c:
 		break
 	case <-time.After(time.Second):
-		return errors.New("Timed out on waiting for stop completion")
+		return errors.New("timed out on waiting for stop completion")
 	}
 
 	if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {

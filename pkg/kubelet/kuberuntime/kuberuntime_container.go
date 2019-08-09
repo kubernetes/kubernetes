@@ -749,7 +749,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
 	if err != nil {
 		klog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
-		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
+		return fmt.Errorf("unable to retrieve container logs for %v", containerID.String())
 	}
 	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }

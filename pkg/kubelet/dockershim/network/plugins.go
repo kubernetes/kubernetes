@@ -161,12 +161,12 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	if chosenPlugin != nil {
 		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
+			allErrs = append(allErrs, fmt.Errorf("network plugin %q failed init: %v", networkPluginName, err))
 		} else {
 			klog.V(1).Infof("Loaded network plugin %q", networkPluginName)
 		}
 	} else {
-		allErrs = append(allErrs, fmt.Errorf("Network plugin %q not found.", networkPluginName))
+		allErrs = append(allErrs, fmt.Errorf("network plugin %q not found", networkPluginName))
 	}
 
 	return chosenPlugin, utilerrors.NewAggregate(allErrs)
@@ -235,16 +235,16 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	output, err := execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
 		"ip", "-o", addrType, "addr", "show", "dev", interfaceName, "scope", "global").CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
+		return nil, fmt.Errorf("unexpected command output %s with error: %v", output, err)
 	}
 
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 1 {
-		return nil, fmt.Errorf("Unexpected command output %s", output)
+		return nil, fmt.Errorf("unexpected command output %s", output)
 	}
 	fields := strings.Fields(lines[0])
 	if len(fields) < 4 {
-		return nil, fmt.Errorf("Unexpected address output %s ", lines[0])
+		return nil, fmt.Errorf("unexpected address output %s ", lines[0])
 	}
 	ip, _, err := net.ParseCIDR(fields[3])
 	if err != nil {
@@ -390,7 +390,7 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 
 	netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
 	if err != nil {
-		return nil, fmt.Errorf("NetworkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
+		return nil, fmt.Errorf("networkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
 	return netStatus, nil
@@ -404,7 +404,7 @@ func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer
 
 	klog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
 	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
-		return fmt.Errorf("NetworkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
 	return nil
@@ -418,7 +418,7 @@ func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontai
 
 	klog.V(3).Infof("Calling network plugin %s to tear down pod %q", pm.plugin.Name(), fullPodName)
 	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
-		return fmt.Errorf("NetworkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+		return fmt.Errorf("networkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
 	return nil

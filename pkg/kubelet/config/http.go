@@ -138,6 +138,6 @@ func (s *sourceURL) extractFromURL() error {
 	}
 
 	return fmt.Errorf("%v: received '%v', but couldn't parse as "+
-		"single (%v) or multiple pods (%v).\n",
+		"single (%v) or multiple pods (%v)",
 		s.url, string(data), singlePodErr, multiPodErr)
 }

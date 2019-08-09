@@ -191,8 +191,6 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 		klog.V(4).Infof("CheckLimitsForResolvConf: " + log)
 		return
 	}
-
-	return
 }
 
 // parseResolvConf reads a resolv.conf file from the given reader, and parses

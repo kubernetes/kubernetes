@@ -303,7 +303,7 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 
 	// Delete cgroups using libcontainers Managers Destroy() method
 	if err = manager.Destroy(); err != nil {
-		return fmt.Errorf("Unable to destroy cgroup paths for cgroup %v : %v", cgroupConfig.Name, err)
+		return fmt.Errorf("unable to destroy cgroup paths for cgroup %v : %v", cgroupConfig.Name, err)
 	}
 
 	return nil
@@ -346,14 +346,14 @@ func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	for sys, required := range getSupportedSubsystems() {
 		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
 			if required {
-				return fmt.Errorf("Failed to find subsystem mount for required subsystem: %v", sys.Name())
+				return fmt.Errorf("failed to find subsystem mount for required subsystem: %v", sys.Name())
 			}
 			// the cgroup is not mounted, but its not required so continue...
 			klog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
 			continue
 		}
 		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
-			return fmt.Errorf("Failed to set config for supported subsystems : %v", err)
+			return fmt.Errorf("failed to set config for supported subsystems : %v", err)
 		}
 	}
 	return nil
@@ -560,14 +560,14 @@ func getStatsSupportedSubsystems(cgroupPaths map[string]string) (*libcontainercg
 	for sys, required := range getSupportedSubsystems() {
 		if _, ok := cgroupPaths[sys.Name()]; !ok {
 			if required {
-				return nil, fmt.Errorf("Failed to find subsystem mount for required subsystem: %v", sys.Name())
+				return nil, fmt.Errorf("failed to find subsystem mount for required subsystem: %v", sys.Name())
 			}
 			// the cgroup is not mounted, but its not required so continue...
 			klog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
 			continue
 		}
 		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
-			return nil, fmt.Errorf("Failed to get stats for supported subsystems : %v", err)
+			return nil, fmt.Errorf("failed to get stats for supported subsystems : %v", err)
 		}
 	}
 	return stats, nil

@@ -237,7 +237,7 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("Invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
+		return fmt.Errorf("invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
 	}
 	return nil
 }
