@@ -131,6 +131,40 @@
 			"ForbiddenPrefixes": []
 		},
 		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/test/e2e/framework/",
+			"AllowedPrefixes": [],
+			"ForbiddenPrefixes": [
+				"k8s.io/kubernetes/test/e2e/framework/auth",
+				"k8s.io/kubernetes/test/e2e/framework/config",
+				"k8s.io/kubernetes/test/e2e/framework/deployment",
+				"k8s.io/kubernetes/test/e2e/framework/deviceplugin",
+				"k8s.io/kubernetes/test/e2e/framework/endpoints",
+				"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper",
+				"k8s.io/kubernetes/test/e2e/framework/gpu",
+				"k8s.io/kubernetes/test/e2e/framework/ingress",
+				"k8s.io/kubernetes/test/e2e/framework/job",
+				"k8s.io/kubernetes/test/e2e/framework/kubelet",
+				"k8s.io/kubernetes/test/e2e/framework/lifecycle",
+				"k8s.io/kubernetes/test/e2e/framework/log",
+				"k8s.io/kubernetes/test/e2e/framework/metrics",
+				"k8s.io/kubernetes/test/e2e/framework/node",
+				"k8s.io/kubernetes/test/e2e/framework/perf",
+				"k8s.io/kubernetes/test/e2e/framework/pod",
+				"k8s.io/kubernetes/test/e2e/framework/podlogs",
+				"k8s.io/kubernetes/test/e2e/framework/providers",
+				"k8s.io/kubernetes/test/e2e/framework/psp",
+				"k8s.io/kubernetes/test/e2e/framework/replicaset",
+				"k8s.io/kubernetes/test/e2e/framework/resource",
+				"k8s.io/kubernetes/test/e2e/framework/service",
+				"k8s.io/kubernetes/test/e2e/framework/ssh",
+				"k8s.io/kubernetes/test/e2e/framework/statefulset",
+				"k8s.io/kubernetes/test/e2e/framework/testfiles",
+				"k8s.io/kubernetes/test/e2e/framework/timer",
+				"k8s.io/kubernetes/test/e2e/framework/viperconfig",
+				"k8s.io/kubernetes/test/e2e/framework/volume"
+			]
+		},
+		{
 			"SelectorRegexp": "k8s[.]io/kubernetes/third_party/",
 			"AllowedPrefixes": [
                                 "k8s.io/kubernetes/third_party/forked/golang/expansion"
