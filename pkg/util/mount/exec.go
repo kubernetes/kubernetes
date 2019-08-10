@@ -18,8 +18,8 @@ package mount
 
 import "k8s.io/utils/exec"
 
-// NewOsExec returns a new Exec interface implementation based on exec()
-func NewOsExec() Exec {
+// NewOSExec returns a new Exec interface implementation based on exec()
+func NewOSExec() Exec {
 	return &osExec{}
 }
 
