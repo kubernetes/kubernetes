@@ -188,7 +188,7 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 }
 
 func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error) {
-	return &hostPathProvisioner{options: options, host: host, plugin: plugin}, nil
+	return &hostPathProvisioner{options: options, host: host, plugin: plugin, basePath: "hostpath_pv"}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -268,19 +268,20 @@ func (c *hostPathUnmounter) TearDownAt(dir string) error {
 // hostPathProvisioner implements a Provisioner for the HostPath plugin
 // This implementation is meant for testing only and only works in a single node cluster.
 type hostPathProvisioner struct {
-	host    volume.VolumeHost
-	options volume.VolumeOptions
-	plugin  *hostPathPlugin
+	host     volume.VolumeHost
+	options  volume.VolumeOptions
+	plugin   *hostPathPlugin
+	basePath string
 }
 
-// Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
+// Create for hostPath simply creates a local /tmp/%/%s directory as a new PersistentVolume, default /tmp/hostpath_pv/%s.
 // This Provisioner is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
 func (r *hostPathProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if util.CheckPersistentVolumeClaimModeBlock(r.options.PVC) {
 		return nil, fmt.Errorf("%s does not support block volume provisioning", r.plugin.GetPluginName())
 	}
 
-	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
+	fullpath := fmt.Sprintf("/tmp/%s/%s", r.basePath, uuid.NewUUID())
 
 	capacity := r.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	pv := &v1.PersistentVolume{
