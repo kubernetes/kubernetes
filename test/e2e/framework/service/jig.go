@@ -769,15 +769,32 @@ func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod 
 		testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
 	}
 }
+
 func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod) {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 	for _, internalAddr := range internalAddrs {
+		// If the node's internal address points to localhost, then we are not
+		// able to test the service reachability via that address
+		if isInvalidOrLocalhostAddress(internalAddr) {
+			e2elog.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
+			continue
+		}
 		testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
 	}
 	for _, externalAddr := range externalAddrs {
 		testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
 	}
+}
+
+// isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
+// parsable or the loopback address. Otherwise it will return `false`.
+func isInvalidOrLocalhostAddress(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil || parsedIP.IsLoopback() {
+		return true
+	}
+	return false
 }
 
 // testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.
