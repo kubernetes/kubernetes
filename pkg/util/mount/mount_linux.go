@@ -758,26 +758,28 @@ func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return GetSELinux(pathname, procMountInfoPath)
 }
 
-func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
+// GetOwner returns the integer ID for the user and group of the given path
+func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
-		return 0, err
+		return -1, -1, err
 	}
-	return GetFSGroupLinux(realpath)
+	return GetOwnerLinux(realpath)
 }
 
 func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return GetModeLinux(pathname)
 }
 
-// GetFSGroupLinux is shared between Linux and NsEnterMounter
+// GetOwnerLinux is shared between Linux and NsEnterMounter
 // pathname must already be evaluated for symlinks
-func GetFSGroupLinux(pathname string) (int64, error) {
+func GetOwnerLinux(pathname string) (int64, int64, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {
-		return 0, err
+		return -1, -1, err
 	}
-	return int64(info.Sys().(*syscall.Stat_t).Gid), nil
+	stat := info.Sys().(*syscall.Stat_t)
+	return int64(stat.Uid), int64(stat.Gid), nil
 }
 
 // GetModeLinux is shared between Linux and NsEnterMounter

@@ -334,14 +334,14 @@ func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return hu.ne.EvalSymlinks(pathname, true)
 }
 
-// GetFSGroup returns FSGroup of pathname.
-func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
+// GetOwner returns the integer ID for the user and group of the given path
+func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
 	hostPath, err := hu.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
-		return -1, err
+		return -1, -1, err
 	}
 	kubeletpath := hu.ne.KubeletPath(hostPath)
-	return mount.GetFSGroupLinux(kubeletpath)
+	return mount.GetOwnerLinux(kubeletpath)
 }
 
 // GetSELinuxSupport tests if pathname is on a mount that supports SELinux.

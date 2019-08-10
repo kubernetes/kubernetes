@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -480,7 +480,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 		refs = m.filterPodMounts(refs)
 		if len(refs) > 0 {
 			fsGroupNew := int64(*mounterArgs.FsGroup)
-			fsGroupOld, err := m.hostUtil.GetFSGroup(m.globalPath)
+			_, fsGroupOld, err := m.hostUtil.GetOwner(m.globalPath)
 			if err != nil {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}

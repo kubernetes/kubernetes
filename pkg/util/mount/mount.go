@@ -95,8 +95,8 @@ type HostUtils interface {
 	ExistsPath(pathname string) (bool, error)
 	// EvalHostSymlinks returns the path name after evaluating symlinks.
 	EvalHostSymlinks(pathname string) (string, error)
-	// GetFSGroup returns FSGroup of the path.
-	GetFSGroup(pathname string) (int64, error)
+	// GetOwner returns the integer ID for the user and group of the given path
+	GetOwner(pathname string) (int64, int64, error)
 	// GetSELinuxSupport returns true if given path is on a mount that supports
 	// SELinux.
 	GetSELinuxSupport(pathname string) (bool, error)

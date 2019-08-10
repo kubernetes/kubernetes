@@ -130,8 +130,9 @@ func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return "", errUnsupported
 }
 
-func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
-	return -1, errUnsupported
+// GetOwner returns the integer ID for the user and group of the given path
+func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
+	return -1, -1, errUnsupported
 }
 
 func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
