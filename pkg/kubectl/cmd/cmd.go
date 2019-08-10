@@ -258,6 +258,10 @@ __kubectl_custom_func() {
             return
             ;;
         kubectl_logs)
+	    __kubectl_parse_get "deploy" "{{ range .items  }}deploy/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "sts" "{{ range .items  }}sts/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "rs" "{{ range .items  }}rs/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "job" "{{ range .items  }}job/{{ .metadata.name }} {{ end }}"
             __kubectl_require_pod_and_container
             return
             ;;
