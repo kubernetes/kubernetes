@@ -59,18 +59,14 @@ func TestExtractFromHttpBadness(t *testing.T) {
 func TestExtractInvalidPods(t *testing.T) {
 	var testCases = []struct {
 		desc string
-		pod  *v1.Pod
+		pod  interface{}
 	}{
 		{
-			desc: "No version",
+			desc: "Invalid TypeMeta",
 			pod:  &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: ""}},
 		},
 		{
-			desc: "Invalid version",
-			pod:  &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "v1betta2"}},
-		},
-		{
-			desc: "Invalid volume name",
+			desc: "Invalid Spec",
 			pod: &v1.Pod{
 				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 				Spec: v1.PodSpec{
@@ -79,29 +75,18 @@ func TestExtractInvalidPods(t *testing.T) {
 			},
 		},
 		{
-			desc: "Duplicate volume names",
+			desc: "Invalid ObjectMeta",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{{Name: "repeated"}, {Name: "repeated"}},
-				},
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v1"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "_INVALID_"},
 			},
 		},
 		{
-			desc: "Unspecified container name",
-			pod: &v1.Pod{
+			desc: "Invalid Object",
+			pod: &api.Pod{
 				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: ""}},
-				},
-			},
-		},
-		{
-			desc: "Invalid container name",
-			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "_INVALID_"}},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
 			},
 		},
