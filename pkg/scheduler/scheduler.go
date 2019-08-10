@@ -326,13 +326,15 @@ func (sched *Scheduler) preempt(fwk framework.Framework, preemptor *v1.Pod, sche
 		}
 
 		for _, victim := range victims {
-			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
-				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
-				return "", err
-			}
 			// If the victim is a WaitingPod, send a reject message to the PermitPlugin
 			if waitingPod := fwk.GetWaitingPod(victim.UID); waitingPod != nil {
 				waitingPod.Reject("preempted")
+			} else {
+				klog.Infof("victim is not waiting pod %v", *victim)
+			}
+			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
+				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+				return "", err
 			}
 			sched.config.Recorder.Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 

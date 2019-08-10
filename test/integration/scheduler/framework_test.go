@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/api/errors"
 	"testing"
 	"time"
 
@@ -1420,6 +1421,15 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 
 		perPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{waitingPod, signallingPod})
+		_, err = cs.CoreV1().Pods(signallingPod.Namespace).Get(signallingPod.Name, metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			cleanupPods(cs, t, []*v1.Pod{signallingPod})
+		}
+		_, err = cs.CoreV1().Pods(signallingPod.Namespace).Get(signallingPod.Name, metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			t.Errorf("couldn't cleanup %q", signallingPod.Name)
+			t.FailNow()
+		}
 	}
 }
 
