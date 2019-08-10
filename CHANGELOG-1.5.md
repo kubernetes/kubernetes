@@ -511,7 +511,7 @@ filename | sha256 hash
 * Admit critical pods in the kubelet ([#38836](https://github.com/kubernetes/kubernetes/pull/38836), [@bprashanth](https://github.com/bprashanth))
 * assign -998 as the oom_score_adj for critical pods (e.g. kube-proxy) ([#39114](https://github.com/kubernetes/kubernetes/pull/39114), [@dchen1107](https://github.com/dchen1107))
 * Don't evict static pods ([#39059](https://github.com/kubernetes/kubernetes/pull/39059), [@bprashanth](https://github.com/bprashanth))
-* Fix an issue where AWS tear-down leaks an DHCP Option Set. ([#38645](https://github.com/kubernetes/kubernetes/pull/38645), [@zmerlynn](https://github.com/zmerlynn))
+* Fix an issue where AWS tear-down leaksa a DHCP Option Set. ([#38645](https://github.com/kubernetes/kubernetes/pull/38645), [@zmerlynn](https://github.com/zmerlynn))
 * Give apply the versioned struct that generated from the type defined in the restmapping. ([#38982](https://github.com/kubernetes/kubernetes/pull/38982), [@ymqytw](https://github.com/ymqytw))
 * Add support for Azure Container Registry, update Azure dependencies ([#37783](https://github.com/kubernetes/kubernetes/pull/37783), [@brendandburns](https://github.com/brendandburns))
 * Fixes an issue where `hack/local-up-cluster.sh` would fail on the API server start with ([#38898](https://github.com/kubernetes/kubernetes/pull/38898), [@deads2k](https://github.com/deads2k))

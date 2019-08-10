@@ -92,7 +92,7 @@ type DaemonSetsController struct {
 	podControl    controller.PodControlInterface
 	crControl     controller.ControllerRevisionControlInterface
 
-	// An dsc is temporarily suspended after creating/deleting these many replicas.
+	// A dsc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
 	burstReplicas int
 
@@ -538,7 +538,7 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully its deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an ds to create more replicas asap, not wait
+		// for modification of the deletion timestamp and expect a ds to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod.
 		dsc.deletePod(curPod)
 		return
