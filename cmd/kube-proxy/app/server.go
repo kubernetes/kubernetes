@@ -435,7 +435,10 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Validate(args); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
-			klog.Fatal(opts.Run())
+
+			if err := opts.Run(); err != nil {
+				klog.Fatalf("error running kube-proxy: %v", err)
+			}
 		},
 	}
 
