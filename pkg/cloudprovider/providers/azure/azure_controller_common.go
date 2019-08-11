@@ -19,15 +19,17 @@ package azure
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/util/keymutex"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/klog"
 )
 
 const (
@@ -92,6 +94,32 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName) (VMSet, error) 
 
 // AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI.
 func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) error {
+	if isManagedDisk {
+		diskName := path.Base(diskURI)
+		resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+		if err != nil {
+			return err
+		}
+
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		disk, err := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
+		if err != nil {
+			return err
+		}
+
+		if disk.ManagedBy != nil {
+			attachErr := fmt.Sprintf(
+				"disk(%s) already attached to node(%s), could not be attached to node(%s)",
+				diskURI, *disk.ManagedBy, nodeName)
+			attachedNode := path.Base(*disk.ManagedBy)
+			klog.V(2).Infof("found dangling volume %s attached to node %s", diskURI, attachedNode)
+			danglingErr := volumeutil.NewDanglingError(attachErr, types.NodeName(attachedNode), "")
+			return danglingErr
+		}
+	}
+
 	vmset, err := c.getNodeVMSet(nodeName)
 	if err != nil {
 		return err
