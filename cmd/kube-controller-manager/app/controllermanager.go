@@ -365,6 +365,7 @@ var ControllersDisabledByDefault = sets.NewString(
 	"bootstrapsigner",
 	"tokencleaner",
 )
+var controllersMap = map[ControllerLoopMode]map[string]InitFunc{}
 
 const (
 	saTokenControllerName = "serviceaccount-token"
@@ -373,6 +374,9 @@ const (
 // NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
 // paired to their InitFunc.  This allows for structured downstream composition and subdivision.
 func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
+	if len(controllersMap) > 0 && len(controllersMap[loopMode]) > 0 {
+		return controllersMap[loopMode]
+	}
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -411,6 +415,8 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["pv-protection"] = startPVProtectionController
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController
 	controllers["root-ca-cert-publisher"] = startRootCACertPublisher
+
+	controllersMap[loopMode] = controllers
 
 	return controllers
 }
