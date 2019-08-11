@@ -74,6 +74,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:go_default_library",
