@@ -202,7 +202,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), appsv1.RecreateDeploymentStrategyType)
+		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "agnhost", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RecreateDeploymentStrategyType)
 
 		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
 		framework.ExpectNoError(err, "failed to create audit-deployment")

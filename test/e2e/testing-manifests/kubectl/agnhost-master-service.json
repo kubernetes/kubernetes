@@ -2,9 +2,9 @@
    "kind":"Service",
    "apiVersion":"v1",
    "metadata":{
-      "name":"redis-master",
+      "name":"agnhost-master",
       "labels":{
-         "app":"redis",
+         "app":"agnhost",
          "role":"master"
       }
    },
@@ -12,11 +12,11 @@
       "ports": [
         {
           "port":6379,
-          "targetPort":"redis-server"
+          "targetPort":"agnhost-server"
         }
       ],
       "selector":{
-         "app":"redis",
+         "app":"agnhost",
          "role":"master"
       }
    }

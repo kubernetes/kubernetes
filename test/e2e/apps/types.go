@@ -24,7 +24,7 @@ import (
 // NOTE(claudiub): These constants should NOT be used as Pod Container Images.
 const (
 	WebserverImageName = "httpd"
-	RedisImageName     = "redis"
+	AgnhostImageName   = "agnhost"
 )
 
 var (
@@ -46,6 +46,6 @@ var (
 	// NewWebserverImage is the fully qualified URI to the HttpdNew image
 	NewWebserverImage = imageutils.GetE2EImage(imageutils.HttpdNew)
 
-	// RedisImage is the fully qualified URI to the Redis image
-	RedisImage = imageutils.GetE2EImage(imageutils.Redis)
+	// AgnhostImage is the fully qualified URI to the Agnhost image
+	AgnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
