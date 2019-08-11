@@ -474,7 +474,12 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 
 	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
 	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-	probeCmd += fmt.Sprintf(`podARec=$$(getent hosts $$(hostname | awk '{print $1}') | tr ":." "-" | awk '{print $$1".%s.pod.%s"}');`, namespace, dnsDomain)
+
+	if framework.TestContext.IPFamily == "ipv6" {
+		probeCmd += fmt.Sprintf(`podARec=$$(getent hosts $$(hostname | awk '{print $1}') | tr ":." "-" | awk '{print $$1".%s.pod.%s"}');`, namespace, dnsDomain)
+	} else {
+		probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
+	}
 	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A $${podARec} AAAA)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
 	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A $${podARec} AAAA)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
 	fileNames = append(fileNames, podARecByUDPFileName)
