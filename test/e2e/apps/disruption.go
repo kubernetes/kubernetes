@@ -177,7 +177,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 			if c.shouldDeny {
 				err = cs.CoreV1().Pods(ns).Evict(e)
-				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+				gomega.Expect(err).Should(gomega.HavePrefix("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -215,7 +215,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			},
 		}
 		err = cs.CoreV1().Pods(ns).Evict(e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		gomega.Expect(err).Should(gomega.HavePrefix("Cannot evict pod as it would violate the pod's disruption budget."))
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
 		updatePDBMinAvailableOrDie(cs, ns, intstr.FromInt(2))

@@ -203,8 +203,9 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 		// budgets, we can sometimes compute a sensible suggested value.  But
 		// even without that, we can give a suggestion (10 minutes?) that
 		// prevents well-behaved clients from hammering us.
-		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
-		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: fmt.Sprintf("The disruption budget %s is still being processed by the server.", pdb.Name)})
+		msg := fmt.Sprintf("The disruption budget %s is still being processed by the server.", pdb.Name)
+		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget. "+msg, 0)
+		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: msg})
 		return err
 	}
 	if pdb.Status.PodDisruptionsAllowed < 0 {
@@ -214,8 +215,9 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 		return errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("DisruptedPods map too big - too many evictions not confirmed by PDB controller"))
 	}
 	if pdb.Status.PodDisruptionsAllowed == 0 {
-		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
-		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy)})
+		msg := fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy)
+		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget. "+msg, 0)
+		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: msg})
 		return err
 	}
 
