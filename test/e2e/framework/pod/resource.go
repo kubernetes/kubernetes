@@ -41,11 +41,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-)
-
 // TODO: Move to its own subpkg.
 // expectNoErrorWithRetries to their own subpackages within framework.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
