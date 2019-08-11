@@ -549,9 +549,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/node/v1alpha1.RuntimeClass":                                                                       schema_k8sio_api_node_v1alpha1_RuntimeClass(ref),
 		"k8s.io/api/node/v1alpha1.RuntimeClassList":                                                                   schema_k8sio_api_node_v1alpha1_RuntimeClassList(ref),
 		"k8s.io/api/node/v1alpha1.RuntimeClassSpec":                                                                   schema_k8sio_api_node_v1alpha1_RuntimeClassSpec(ref),
+		"k8s.io/api/node/v1alpha1.Scheduling":                                                                         schema_k8sio_api_node_v1alpha1_Scheduling(ref),
 		"k8s.io/api/node/v1beta1.Overhead":                                                                            schema_k8sio_api_node_v1beta1_Overhead(ref),
 		"k8s.io/api/node/v1beta1.RuntimeClass":                                                                        schema_k8sio_api_node_v1beta1_RuntimeClass(ref),
 		"k8s.io/api/node/v1beta1.RuntimeClassList":                                                                    schema_k8sio_api_node_v1beta1_RuntimeClassList(ref),
+		"k8s.io/api/node/v1beta1.Scheduling":                                                                          schema_k8sio_api_node_v1beta1_Scheduling(ref),
 		"k8s.io/api/policy/v1beta1.AllowedCSIDriver":                                                                  schema_k8sio_api_policy_v1beta1_AllowedCSIDriver(ref),
 		"k8s.io/api/policy/v1beta1.AllowedFlexVolume":                                                                 schema_k8sio_api_policy_v1beta1_AllowedFlexVolume(ref),
 		"k8s.io/api/policy/v1beta1.AllowedHostPath":                                                                   schema_k8sio_api_policy_v1beta1_AllowedHostPath(ref),
@@ -906,7 +908,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhook(ref common.Refere
 					},
 					"sideEffects": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SideEffects states whether this webhookk has side effects. Acceptable values are: Unknown, None, Some, NoneOnDryRun Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission change and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some.",
+							Description: "SideEffects states whether this webhook has side effects. Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown). Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission change and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1292,7 +1294,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhook(ref common.Refe
 					},
 					"sideEffects": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SideEffects states whether this webhookk has side effects. Acceptable values are: Unknown, None, Some, NoneOnDryRun Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission change and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some.",
+							Description: "SideEffects states whether this webhook has side effects. Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown). Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission change and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -13577,7 +13579,7 @@ func schema_k8sio_api_core_v1_EndpointPort(ref common.ReferenceCallback) common.
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The name of this port (corresponds to ServicePort.Name). Must be a DNS_LABEL. Optional only if one port is defined.",
+							Description: "The name of this port.  This must match the 'name' field in the corresponding ServicePort. Must be a DNS_LABEL. Optional only if one port is defined.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -21122,7 +21124,7 @@ func schema_k8sio_api_core_v1_ServicePort(ref common.ReferenceCallback) common.O
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. This maps to the 'Name' field in EndpointPort objects. Optional if only one ServicePort is defined on this service.",
+							Description: "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. When considering the endpoints for a Service, this must match the 'name' field in the EndpointPort. Optional if only one ServicePort is defined on this service.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -26089,12 +26091,66 @@ func schema_k8sio_api_node_v1alpha1_RuntimeClassSpec(ref common.ReferenceCallbac
 							Ref:         ref("k8s.io/api/node/v1alpha1.Overhead"),
 						},
 					},
+					"scheduling": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Scheduling holds the scheduling constraints to ensure that pods running with this RuntimeClass are scheduled to nodes that support it. If scheduling is nil, this RuntimeClass is assumed to be supported by all nodes.",
+							Ref:         ref("k8s.io/api/node/v1alpha1.Scheduling"),
+						},
+					},
 				},
 				Required: []string{"runtimeHandler"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/node/v1alpha1.Overhead"},
+			"k8s.io/api/node/v1alpha1.Overhead", "k8s.io/api/node/v1alpha1.Scheduling"},
+	}
+}
+
+func schema_k8sio_api_node_v1alpha1_Scheduling(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Scheduling specifies the scheduling constraints for nodes supporting a RuntimeClass.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeSelector lists labels that must be present on nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The RuntimeClass nodeSelector is merged with a pod's existing nodeSelector. Any conflicts will cause the pod to be rejected in admission.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "tolerations are appended (excluding duplicates) to pods running with this RuntimeClass during admission, effectively unioning the set of nodes tolerated by the pod and the RuntimeClass.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.Toleration"},
 	}
 }
 
@@ -26167,12 +26223,18 @@ func schema_k8sio_api_node_v1beta1_RuntimeClass(ref common.ReferenceCallback) co
 							Ref:         ref("k8s.io/api/node/v1beta1.Overhead"),
 						},
 					},
+					"scheduling": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Scheduling holds the scheduling constraints to ensure that pods running with this RuntimeClass are scheduled to nodes that support it. If scheduling is nil, this RuntimeClass is assumed to be supported by all nodes.",
+							Ref:         ref("k8s.io/api/node/v1beta1.Scheduling"),
+						},
+					},
 				},
 				Required: []string{"handler"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/node/v1beta1.Overhead", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/node/v1beta1.Overhead", "k8s.io/api/node/v1beta1.Scheduling", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -26222,6 +26284,54 @@ func schema_k8sio_api_node_v1beta1_RuntimeClassList(ref common.ReferenceCallback
 		},
 		Dependencies: []string{
 			"k8s.io/api/node/v1beta1.RuntimeClass", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_node_v1beta1_Scheduling(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Scheduling specifies the scheduling constraints for nodes supporting a RuntimeClass.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeSelector lists labels that must be present on nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The RuntimeClass nodeSelector is merged with a pod's existing nodeSelector. Any conflicts will cause the pod to be rejected in admission.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "tolerations are appended (excluding duplicates) to pods running with this RuntimeClass during admission, effectively unioning the set of nodes tolerated by the pod and the RuntimeClass.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.Toleration"},
 	}
 }
 
