@@ -17,6 +17,7 @@ limitations under the License.
 package eventratelimit
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -516,7 +517,7 @@ func TestEventRateLimiting(t *testing.T) {
 				}
 				if err != nil {
 					statusErr, ok := err.(*errors.StatusError)
-					if ok && statusErr.ErrStatus.Code != errors.StatusTooManyRequests {
+					if ok && statusErr.ErrStatus.Code != http.StatusTooManyRequests {
 						t.Fatalf("%v: Request %v should yield a 429 response: %v", tc.name, rqIndex, err)
 					}
 				}

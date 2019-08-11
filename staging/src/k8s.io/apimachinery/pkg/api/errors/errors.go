@@ -30,6 +30,8 @@ import (
 )
 
 const (
+	// DEPRECATED: please use http.StatusTooManyRequests, this will be removed in
+	// the future version.
 	// StatusTooManyRequests means the server experienced too many requests within a
 	// given window and that the client must wait to perform the action again.
 	StatusTooManyRequests = 429
@@ -349,7 +351,7 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 func NewTooManyRequestsError(message string) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,
-		Code:    StatusTooManyRequests,
+		Code:    http.StatusTooManyRequests,
 		Reason:  metav1.StatusReasonTooManyRequests,
 		Message: fmt.Sprintf("Too many requests: %s", message),
 	}}
