@@ -1293,33 +1293,34 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 
 type ready struct {
 	ok bool
+	m  *sync.RWMutex
 	c  *sync.Cond
 }
 
 func newReady() *ready {
-	return &ready{c: sync.NewCond(&sync.RWMutex{})}
+	mux := &sync.RWMutex{}
+	return &ready{c: sync.NewCond(mux.RLocker()), m: mux}
 }
 
 func (r *ready) wait() {
-	r.c.L.Lock()
+	r.m.RLock()
 	for !r.ok {
 		r.c.Wait()
 	}
-	r.c.L.Unlock()
+	r.m.RUnlock()
 }
 
 // TODO: Make check() function more sophisticated, in particular
 // allow it to behave as "waitWithTimeout".
 func (r *ready) check() bool {
-	rwMutex := r.c.L.(*sync.RWMutex)
-	rwMutex.RLock()
-	defer rwMutex.RUnlock()
+	r.m.RLock()
+	defer r.m.RUnlock()
 	return r.ok
 }
 
 func (r *ready) set(ok bool) {
-	r.c.L.Lock()
-	defer r.c.L.Unlock()
+	r.m.Lock()
+	defer r.m.Unlock()
 	r.ok = ok
 	r.c.Broadcast()
 }
