@@ -208,6 +208,9 @@ var (
 	// BusyBoxImage is the image URI of BusyBox.
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
+	// AgnHostImage is the image URI of AgnHost
+	AgnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
+
 	// For parsing Kubectl version for version-skewed testing.
 	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 
@@ -474,8 +477,8 @@ func ProxyMode(f *Framework) (string, error) {
 			Containers: []v1.Container{
 				{
 					Name:    "detector",
-					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"/bin/sleep", "3600"},
+					Image:   AgnHostImage,
+					Command: []string{"pause"},
 				},
 			},
 		},
@@ -2876,29 +2879,19 @@ func UnblockNetwork(from string, to string) {
 	}
 }
 
-// PingCommand is the type to hold ping command.
-type PingCommand string
-
-const (
-	// IPv4PingCommand is a ping command for IPv4.
-	IPv4PingCommand PingCommand = "ping"
-	// IPv6PingCommand is a ping command for IPv6.
-	IPv6PingCommand PingCommand = "ping6"
-)
-
 // CheckConnectivityToHost launches a pod to test connectivity to the specified
 // host. An error will be returned if the host is not reachable from the pod.
 //
 // An empty nodeName will use the schedule to choose where the pod is executed.
-func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, pingCmd PingCommand, timeout int) error {
+func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, port, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
 
 	command := []string{
-		string(pingCmd),
-		"-c", "3", // send 3 pings
-		"-W", "2", // wait at most 2 seconds for a reply
+		"nc",
+		"-vz",
 		"-w", strconv.Itoa(timeout),
 		host,
+		strconv.Itoa(port),
 	}
 
 	pod := &v1.Pod{
@@ -2909,7 +2902,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, pingC
 			Containers: []v1.Container{
 				{
 					Name:    contName,
-					Image:   BusyBoxImage,
+					Image:   AgnHostImage,
 					Command: command,
 				},
 			},
@@ -3257,7 +3250,7 @@ func (f *Framework) NewAgnhostPod(name string, args ...string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "agnhost",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Image: AgnHostImage,
 					Args:  args,
 				},
 			},
