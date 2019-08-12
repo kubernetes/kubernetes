@@ -48,14 +48,17 @@ type ControllerStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) ControllerStorage {
-	controllerREST, statusREST := NewREST(optsGetter)
+func NewStorage(optsGetter generic.RESTOptionsGetter) (ControllerStorage, error) {
+	controllerREST, statusREST, err := NewREST(optsGetter)
+	if err != nil {
+		return ControllerStorage{}, err
+	}
 
 	return ControllerStorage{
 		Controller: controllerREST,
 		Status:     statusREST,
 		Scale:      &ScaleREST{store: controllerREST.Store},
-	}
+	}, nil
 }
 
 type REST struct {
@@ -63,7 +66,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.ReplicationController{} },
 		NewListFunc:              func() runtime.Object { return &api.ReplicationControllerList{} },
@@ -78,13 +81,13 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicationcontroller.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = replicationcontroller.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider

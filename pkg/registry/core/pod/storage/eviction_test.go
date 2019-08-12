@@ -170,7 +170,10 @@ func newFailDeleteUpdateStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServ
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage := NewStorage(restOptions, nil, nil, nil)
+	storage, err := NewStorage(restOptions, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	storage.Pod.Store.Storage = genericregistry.DryRunnableStorage{
 		Storage: FailDeleteUpdateStorage{storage.Pod.Store.Storage.Storage},
 		Codec:   apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion),

@@ -47,7 +47,10 @@ const defaultReplicas = 100
 func newStorage(t *testing.T) (*DeploymentStorage, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, apps.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "deployments"}
-	deploymentStorage := NewStorage(restOptions)
+	deploymentStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return &deploymentStorage, server
 }
 

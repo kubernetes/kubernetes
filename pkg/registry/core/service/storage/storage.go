@@ -36,7 +36,7 @@ type GenericREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewGenericREST(optsGetter generic.RESTOptionsGetter) (*GenericREST, *StatusREST) {
+func NewGenericREST(optsGetter generic.RESTOptionsGetter) (*GenericREST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Service{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
@@ -52,12 +52,12 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter) (*GenericREST, *Status
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = service.StatusStrategy
-	return &GenericREST{store}, &StatusREST{store: &statusStore}
+	return &GenericREST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 var (

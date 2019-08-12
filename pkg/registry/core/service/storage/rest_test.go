@@ -176,12 +176,15 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 
 	serviceStorage := &serviceStorage{}
 
-	podStorage := podstore.NewStorage(generic.RESTOptions{
+	podStorage, err := podstore.NewStorage(generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	if pods != nil && len(pods.Items) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range pods.Items {
@@ -191,11 +194,14 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 			}
 		}
 	}
-	endpointStorage := endpointstore.NewREST(generic.RESTOptions{
+	endpointStorage, err := endpointstore.NewREST(generic.RESTOptions{
 		StorageConfig:  etcdStorage,
 		Decorator:      generic.UndecoratedStorage,
 		ResourcePrefix: "endpoints",
 	})
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	if endpoints != nil && len(endpoints.Items) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range endpoints.Items {

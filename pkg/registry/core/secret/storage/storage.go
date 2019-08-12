@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against secrets.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Secret{} },
 		NewListFunc:              func() runtime.Object { return &api.SecretList{} },
@@ -53,7 +53,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": secret.NameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
-	return &REST{store}
+	return &REST{store}, nil
 }

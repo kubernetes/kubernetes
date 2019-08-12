@@ -42,7 +42,11 @@ func newStorage(t *testing.T) (*ScaleREST, *etcd3testing.EtcdTestServer, storage
 		d()
 		server.Terminate(t)
 	}
-	return NewStorage(restOptions).Scale, server, s, destroyFunc
+	storage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return storage.Scale, server, s, destroyFunc
 }
 
 var validPodTemplate = api.PodTemplate{

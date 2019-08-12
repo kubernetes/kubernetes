@@ -182,7 +182,10 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.ExtraConfig.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, _, err := certStorageProvider.NewRESTStorage(masterCfg.ExtraConfig.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 
 	exceptions := registrytest.StrategyExceptions{
 		HasExportStrategy: []string{

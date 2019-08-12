@@ -37,7 +37,10 @@ import (
 func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
-	namespaceStorage, _, _ := NewREST(restOptions)
+	namespaceStorage, _, _, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return namespaceStorage, server
 }
 
@@ -278,7 +281,10 @@ func TestFinalizeDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
 	// get finalize storage
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
-	storage, _, finalizeStorage := NewREST(restOptions)
+	storage, _, finalizeStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
@@ -318,7 +324,10 @@ func TestFinalizeDeletingNamespaceWithIncompleteMetadataFinalizers(t *testing.T)
 	// get finalize storage
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
-	storage, _, finalizeStorage := NewREST(restOptions)
+	storage, _, finalizeStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()

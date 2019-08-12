@@ -46,14 +46,17 @@ type StatefulSetStorage struct {
 	Scale       *ScaleREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) StatefulSetStorage {
-	statefulSetRest, statefulSetStatusRest := NewREST(optsGetter)
+func NewStorage(optsGetter generic.RESTOptionsGetter) (StatefulSetStorage, error) {
+	statefulSetRest, statefulSetStatusRest, err := NewREST(optsGetter)
+	if err != nil {
+		return StatefulSetStorage{}, err
+	}
 
 	return StatefulSetStorage{
 		StatefulSet: statefulSetRest,
 		Status:      statefulSetStatusRest,
 		Scale:       &ScaleREST{store: statefulSetRest.Store},
-	}
+	}, nil
 }
 
 // rest implements a RESTStorage for statefulsets against etcd
@@ -62,7 +65,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against statefulsets.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.StatefulSet{} },
 		NewListFunc:              func() runtime.Object { return &apps.StatefulSetList{} },
@@ -76,12 +79,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = statefulset.StatusStrategy
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement CategoriesProvider

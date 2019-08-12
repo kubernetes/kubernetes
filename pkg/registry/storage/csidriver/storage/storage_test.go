@@ -38,7 +38,10 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "csidrivers",
 	}
-	csiDriverStorage := NewStorage(restOptions)
+	csiDriverStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return csiDriverStorage.CSIDriver, server
 }
 
