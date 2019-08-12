@@ -57,6 +57,10 @@ type Registerable interface {
 // KubeRegistry is an interface which implements a subset of prometheus.Registerer and
 // prometheus.Gatherer interfaces
 type KubeRegistry interface {
+	// Deprecated
+	RawRegister(prometheus.Collector) error
+	// Deprecated
+	RawMustRegister(...prometheus.Collector)
 	Register(Registerable) error
 	MustRegister(...Registerable)
 	Unregister(Registerable) bool
@@ -96,6 +100,24 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 	kr.PromRegistry.MustRegister(metrics...)
 }
 
+// RawRegister takes a native prometheus.Collector and registers the collector
+// to the registry. This bypasses metrics safety checks, so should only be used
+// to register custom prometheus collectors.
+//
+// Deprecated
+func (kr *kubeRegistry) RawRegister(c prometheus.Collector) error {
+	return kr.PromRegistry.Register(c)
+}
+
+// RawMustRegister takes a native prometheus.Collector and registers the collector
+// to the registry. This bypasses metrics safety checks, so should only be used
+// to register custom prometheus collectors.
+//
+// Deprecated
+func (kr *kubeRegistry) RawMustRegister(cs ...prometheus.Collector) {
+	kr.PromRegistry.MustRegister(cs...)
+}
+
 // Unregister unregisters the Collector that equals the Collector passed
 // in as an argument.  (Two Collectors are considered equal if their
 // Describe method yields the same set of descriptors.) The function
@@ -124,19 +146,4 @@ func NewKubeRegistry(v apimachineryversion.Info) KubeRegistry {
 		PromRegistry: prometheus.NewRegistry(),
 		version:      parseVersion(v),
 	}
-}
-
-// NewPreloadedKubeRegistry creates a new Registry with preloaded prometheus collectors
-// already registered. This is exposed specifically to maintain backwards
-// compatibility with the global prometheus registry.
-//
-// Deprecated
-func NewPreloadedKubeRegistry(v apimachineryversion.Info, cs ...prometheus.Collector) KubeRegistry {
-	registry := &kubeRegistry{
-		PromRegistry: prometheus.NewRegistry(),
-		version:      parseVersion(v),
-	}
-
-	registry.PromRegistry.MustRegister(cs...)
-	return registry
 }
