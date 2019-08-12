@@ -104,6 +104,10 @@ var (
 //       # golang reference time in the format that the expiration timestamp uses.
 //       # If omitted, defaults to time.RFC3339Nano
 //       "time-fmt": "2006-01-02 15:04:05.999999999"
+//
+//       # Raw JSON Options
+//       # If "credentials-json" is set, then the token source is constructed from those credentials.
+//       "credential-json": "{\"client_id\":\"my_client}"
 //     }
 //   }
 // }
@@ -153,6 +157,16 @@ func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, e
 
 	// Google Application Credentials-based token source
 	scopes := parseScopes(gcpConfig)
+
+	credsJson := gcpConfig["credential-json"]
+	if len(credsJson) != 0 {
+		creds, err := google.CredentialsFromJSON(context.Background(), []byte(credsJson), scopes...)
+		if err != nil {
+			return nil, fmt.Errorf("cannot construct google credentials from json: %v", err)
+		}
+		return creds.TokenSource, nil
+	}
+
 	ts, err := google.DefaultTokenSource(context.Background(), scopes...)
 	if err != nil {
 		return nil, fmt.Errorf("cannot construct google default token source: %v", err)

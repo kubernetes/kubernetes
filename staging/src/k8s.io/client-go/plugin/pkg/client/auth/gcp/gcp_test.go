@@ -196,6 +196,26 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 	}
 }
 
+func Test_tokenSource_jsonCredentials(t *testing.T) {
+	ts, err := tokenSource(false, map[string]string{
+		"credential-json": `{"type":"service_account"}`,
+	})
+	if err != nil {
+		t.Fatalf("failed to get a token source: %+v", err)
+	}
+	if ts == nil {
+		t.Fatal("returned nil token source")
+	}
+}
+
+func Test_tokenSource_jsonCredentials_fails(t *testing.T) {
+	if _, err := tokenSource(false, map[string]string{
+		"credential-json": `{"type":"service_account}`,
+	}); err == nil {
+		t.Fatalf("expected error because specified JSON is malformed")
+	}
+}
+
 func Test_parseScopes(t *testing.T) {
 	cases := []struct {
 		in  map[string]string
