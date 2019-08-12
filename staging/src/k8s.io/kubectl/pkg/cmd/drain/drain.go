@@ -351,6 +351,7 @@ func (o *DrainCmdOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 }
 
 func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+	stopCh := make(chan struct{})
 	returnCh := make(chan error, 1)
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
@@ -361,7 +362,7 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 	}
 
 	for _, pod := range pods {
-		go func(pod corev1.Pod, returnCh chan error) {
+		go func(pod corev1.Pod, returnCh chan error, stopCh chan struct{}) {
 			for {
 				fmt.Fprintf(o.Out, "evicting pod %q\n", pod.Name)
 				err := o.drainer.EvictPod(pod, policyGroupVersion)
@@ -371,20 +372,27 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 					returnCh <- nil
 					return
 				} else if apierrors.IsTooManyRequests(err) {
-					fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
-					time.Sleep(5 * time.Second)
+					select {
+					case <-stopCh:
+						returnCh <- fmt.Errorf("global timeout!! Skip eviction retries for pod %q", pod.Name)
+						return
+					default:
+						fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
+						time.Sleep(5 * time.Second)
+					}
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
 				}
 			}
+
 			_, err := o.waitForDelete([]corev1.Pod{pod}, 1*time.Second, globalTimeout, true, getPodFn)
 			if err == nil {
 				returnCh <- nil
 			} else {
 				returnCh <- fmt.Errorf("error when waiting for pod %q terminating: %v", pod.Name, err)
 			}
-		}(pod, returnCh)
+		}(pod, returnCh, stopCh)
 	}
 
 	doneCount := 0
