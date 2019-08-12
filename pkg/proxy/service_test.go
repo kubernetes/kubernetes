@@ -17,10 +17,11 @@ limitations under the License.
 package proxy
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
