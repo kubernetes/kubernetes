@@ -932,7 +932,7 @@ func TestDeterminePublicIPName(t *testing.T) {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
 		}
-		ip, err := az.determinePublicIPName("testCluster", &service)
+		ip, _, err := az.determinePublicIPName("testCluster", &service)
 		assert.Equal(t, test.expectedIP, ip, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
@@ -1713,6 +1713,7 @@ func TestReconcilePublicIP(t *testing.T) {
 	testCases := []struct {
 		desc          string
 		wantLb        bool
+		annotations   map[string]string
 		existingPIPs  []network.PublicIPAddress
 		expectedID    string
 		expectedPIP   *network.PublicIPAddress
@@ -1743,11 +1744,73 @@ func TestReconcilePublicIP(t *testing.T) {
 			expectedID: "/subscriptions/subscription/resourceGroups/rg/providers/" +
 				"Microsoft.Network/publicIPAddresses/testCluster-atest1",
 		},
+		{
+			desc:        "reconcilePublicIP shall report error if the given PIP name doesn't exist in the resource group",
+			wantLb:      true,
+			annotations: map[string]string{ServiceAnnotationPIPName: "testPIP"},
+			existingPIPs: []network.PublicIPAddress{
+				{
+					Name: to.StringPtr("pip1"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+				{
+					Name: to.StringPtr("pip2"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			desc:        "reconcilePublicIP shall delete unwanted PIP when given the name of desired PIP",
+			wantLb:      true,
+			annotations: map[string]string{ServiceAnnotationPIPName: "testPIP"},
+			existingPIPs: []network.PublicIPAddress{
+				{
+					Name: to.StringPtr("pip1"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+				{
+					Name: to.StringPtr("pip2"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+				{
+					Name: to.StringPtr("testPIP"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+			},
+			expectedPIP: &network.PublicIPAddress{
+				ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
+				Name: to.StringPtr("testPIP"),
+				Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+			},
+		},
+		{
+			desc:        "reconcilePublicIP shall find the PIP by given name and shall not delete the PIP which is not owned by service",
+			wantLb:      true,
+			annotations: map[string]string{ServiceAnnotationPIPName: "testPIP"},
+			existingPIPs: []network.PublicIPAddress{
+				{
+					Name: to.StringPtr("pip1"),
+				},
+				{
+					Name: to.StringPtr("pip2"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+				{
+					Name: to.StringPtr("testPIP"),
+				},
+			},
+			expectedPIP: &network.PublicIPAddress{
+				ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
+				Name: to.StringPtr("testPIP"),
+			},
+		},
 	}
 
 	for i, test := range testCases {
 		az := getTestCloud()
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
+		service.Annotations = test.annotations
 		for _, pip := range test.existingPIPs {
 			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
 			if err != nil {
@@ -1797,7 +1860,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
 		}
-		pip, err := az.ensurePublicIPExists(&service, "pip1", "", "")
+		pip, err := az.ensurePublicIPExists(&service, "pip1", "", "", false)
 		if test.expectedID != "" {
 			assert.Equal(t, test.expectedID, to.String(pip.ID), "TestCase[%d]: %s", i, test.desc)
 		} else {
