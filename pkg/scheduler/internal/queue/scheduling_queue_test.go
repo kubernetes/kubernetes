@@ -308,7 +308,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 // Pods in and before current scheduling cycle will be put back to activeQueue
 // if we were trying to schedule them when we received move request.
 func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
-	q := NewPriorityQueueWithClock(nil, clock.NewFakeClock(time.Now()), nil)
+	q := NewPriorityQueue(nil, nil, WithClock(clock.NewFakeClock(time.Now())))
 	totalNum := 10
 	expectedPods := make([]v1.Pod, 0, totalNum)
 	for i := 0; i < totalNum; i++ {
@@ -625,6 +625,23 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	}
 	if !reflect.DeepEqual(q.nominatedPods, expectedNominatedPods) {
 		t.Errorf("Unexpected nominated map after deleting pods. Expected: %v, got: %v", expectedNominatedPods, q.nominatedPods)
+	}
+}
+
+func TestPriorityQueue_NewWithOptions(t *testing.T) {
+	q := NewPriorityQueue(
+		nil,
+		nil,
+		WithPodInitialBackoffDuration(2*time.Second),
+		WithPodMaxBackoffDuration(20*time.Second),
+	)
+
+	if q.podBackoff.initialDuration != 2*time.Second {
+		t.Errorf("Unexpected pod backoff initial duration. Expected: %v, got: %v", 2*time.Second, q.podBackoff.initialDuration)
+	}
+
+	if q.podBackoff.maxDuration != 20*time.Second {
+		t.Errorf("Unexpected pod backoff max duration. Expected: %v, got: %v", 2*time.Second, q.podBackoff.maxDuration)
 	}
 }
 
@@ -1208,7 +1225,7 @@ func TestPodTimestamp(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueue(nil, nil, WithClock(clock.NewFakeClock(timestamp)))
 			var podInfoList []*framework.PodInfo
 
 			for i, op := range test.operations {
@@ -1375,7 +1392,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueue(nil, nil, WithClock(clock.NewFakeClock(timestamp)))
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)

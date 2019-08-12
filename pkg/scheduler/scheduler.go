@@ -122,6 +122,8 @@ type schedulerOptions struct {
 	disablePreemption               bool
 	percentageOfNodesToScore        int32
 	bindTimeoutSeconds              int64
+	podInitialBackoffSeconds        int64
+	podMaxBackoffSeconds            int64
 	frameworkRegistry               framework.Registry
 	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
 	frameworkPlugins                *kubeschedulerconfig.Plugins
@@ -194,12 +196,28 @@ func WithFrameworkPluginConfig(pluginConfig []kubeschedulerconfig.PluginConfig) 
 	}
 }
 
+// WithPodInitialBackoffSeconds sets podInitialBackoffSeconds for Scheduler, the default value is 1
+func WithPodInitialBackoffSeconds(podInitialBackoffSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.podInitialBackoffSeconds = podInitialBackoffSeconds
+	}
+}
+
+// WithPodMaxBackoffSeconds sets podMaxBackoffSeconds for Scheduler, the default value is 10
+func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.podMaxBackoffSeconds = podMaxBackoffSeconds
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	schedulerName:                   v1.DefaultSchedulerName,
 	hardPodAffinitySymmetricWeight:  v1.DefaultHardPodAffinitySymmetricWeight,
 	disablePreemption:               false,
 	percentageOfNodesToScore:        schedulerapi.DefaultPercentageOfNodesToScore,
 	bindTimeoutSeconds:              BindTimeoutSeconds,
+	podInitialBackoffSeconds:        int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:            int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	frameworkRegistry:               frameworkplugins.NewDefaultRegistry(),
 	frameworkConfigProducerRegistry: frameworkplugins.NewDefaultConfigProducerRegistry(),
 	// The plugins and pluginConfig options are currently nil because we currently don't have
@@ -253,6 +271,8 @@ func New(client clientset.Interface,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
+		PodInitialBackoffSeconds:       options.podInitialBackoffSeconds,
+		PodMaxBackoffSeconds:           options.podMaxBackoffSeconds,
 		Registry:                       options.frameworkRegistry,
 		PluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
 		Plugins:                        options.frameworkPlugins,

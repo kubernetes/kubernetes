@@ -190,6 +190,8 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		scheduler.WithFrameworkRegistry(registry),
 		scheduler.WithFrameworkPlugins(cc.ComponentConfig.Plugins),
 		scheduler.WithFrameworkPluginConfig(cc.ComponentConfig.PluginConfig),
+		scheduler.WithPodMaxBackoffSeconds(*cc.ComponentConfig.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(*cc.ComponentConfig.PodInitialBackoffSeconds),
 	)
 	if err != nil {
 		return err
