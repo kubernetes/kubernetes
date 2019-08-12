@@ -49,6 +49,16 @@ PUSH_REGISTRY?=staging-k8s.gcr.io
 
 MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
 
+# Install binaries matching base distro permissions
+BIN_INSTALL := install -m 0555
+
+# Hosts running SELinux need :z added to volume mounts
+SELINUX_ENABLED := $(shell cat /sys/fs/selinux/enforce 2> /dev/null || echo 0)
+
+ifeq ($(SELINUX_ENABLED),1)
+  DOCKER_VOL_OPTS?=:z
+endif
+
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
@@ -73,14 +83,15 @@ ifeq ($(ARCH),s390x)
 endif
 
 build:
-	# Copy the content in this dir to the temp dir,
-	# without copying the subdirectories.
-	find ./ -maxdepth 1 -type f | xargs -I {} cp {} $(TEMP_DIR)
+	# Explicitly copy files to the temp directory
+	$(BIN_INSTALL) migrate-if-needed.sh $(TEMP_DIR)
+	install Dockerfile $(TEMP_DIR)
 
 	# Compile migrate
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"
-
+	migrate_tmp_dir=$(shell mktemp -d); \
+	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
+	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR)
 
 ifeq ($(ARCH),amd64)
 
@@ -89,9 +100,9 @@ ifeq ($(ARCH),amd64)
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
 		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$version/etcd-v$$version-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
-		cp $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
-		cp $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
-		cp $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
+		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
+		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
+		$(BIN_INSTALL) $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
 	done
 else
 
@@ -104,15 +115,15 @@ else
 
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
-		docker run --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
+		docker run --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
 			"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
 			&& cd /go/src/github.com/coreos/etcd \
 			&& git checkout v$${version} \
 			&& $(arch_prefix) GOARCH=$(ARCH) ./build \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
-		cp $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
-		cp $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
-		cp $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
+		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
+		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
+		$(BIN_INSTALL) $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
 	done
 
 	# Add this ENV variable in order to workaround an unsupported arch blocker
@@ -150,7 +161,7 @@ push-manifest:
 	docker manifest push --purge ${MANIFEST_IMAGE}:${IMAGE_TAG}
 
 unit-test:
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go test -v k8s.io/kubernetes/cluster/images/etcd/migrate"
 
 # Integration tests require both a golang build environment and all the etcd binaries from a `k8s.gcr.io/etcd` image (`/usr/local/bin/etcd-<version>`, ...).
@@ -163,7 +174,7 @@ build-integration-test-image: build
 	docker build --pull -t etcd-integration-test $(TEMP_DIR)_integration_test
 
 integration-test:
-	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -e GOARCH=$(ARCH) etcd-integration-test \
+	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) etcd-integration-test \
 		/bin/bash -c "CGO_ENABLED=0 go test -tags=integration k8s.io/kubernetes/cluster/images/etcd/migrate -args -v 10 -logtostderr true"
 
 integration-build-test: build-integration-test-image integration-test
