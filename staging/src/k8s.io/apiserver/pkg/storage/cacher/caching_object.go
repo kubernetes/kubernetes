@@ -21,6 +21,7 @@ import (
 	"io"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -131,6 +132,30 @@ func newObjectWithSerializations(object runtime.Object) *ObjectWithSerialization
 
 // InterceptEncode implements runtime.CustomEncoder interface.
 func (o *ObjectWithSerializations) InterceptEncode(e runtime.WithVersionEncoder, w io.Writer) error {
+	// FIXME: For now don't do any caching here to prove it works fine.
+	switch obj := o.Object.(type) {
+	case *runtime.Unknown:
+		return e.Encoder.Encode(obj, w)
+	case runtime.Unstructured:
+		// An unstructured list can contain objects of multiple group version kinds. don't short-circuit just
+		// because the top-level type matches our desired destination type. actually send the object to the converter
+		// to give it a chance to convert the list items if needed.
+		if _, ok := obj.(*unstructured.UnstructuredList); !ok {
+			// avoid conversion roundtrip if GVK is the right one already or is empty (yes, this is a hack, but the old behaviour we rely on in kubectl)
+			objGVK := obj.GetObjectKind().GroupVersionKind()
+			if len(objGVK.Version) == 0 {
+				return e.Encoder.Encode(obj, w)
+			}
+			targetGVK, ok := e.Version.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
+			if !ok {
+				return runtime.NewNotRegisteredGVKErrForTarget("FIXME", objGVK, e.Version)
+			}
+			if targetGVK == objGVK {
+				return e.Encoder.Encode(obj, w)
+			}
+		}
+	}
+
 	gvks, isUnversioned, err := e.ObjectTyper.ObjectKinds(o.Object)
 	if err != nil {
 		klog.Errorf("AAAA: error: %v %v", err, o.Object)
