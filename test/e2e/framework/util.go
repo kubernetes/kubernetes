@@ -81,14 +81,18 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -149,9 +153,6 @@ const (
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
 
 	podRespondingTimeout = 15 * time.Minute
-	// ServiceRespondingTimeout is how long to wait for a service to be responding.
-	ServiceRespondingTimeout = 2 * time.Minute
-
 	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
 	ClaimProvisionTimeout = 5 * time.Minute
 
@@ -220,11 +221,6 @@ var (
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
-
-// GetServicesProxyRequest returns a request for a service proxy.
-func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
-	return request.Resource("services").SubResource("proxy"), nil
-}
 
 // RunID is a unique identifier of the e2e run.
 // Beware that this ID is not the same for all tests in the e2e run, because each Ginkgo node creates it separately.
@@ -360,17 +356,17 @@ func SkipUnlessTaintBasedEvictionsEnabled() {
 
 // SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
 func SkipIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
-			skipInternalf(1, "Not supported under container runtime %s", runtime)
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
+			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
 		}
 	}
 }
 
 // RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
 func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
 			return
 		}
 	}
@@ -385,6 +381,55 @@ func RunIfSystemSpecNameIs(names ...string) {
 		}
 	}
 	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
+}
+
+// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
+// to flip to Ready, log its output and delete it.
+func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
+	path := "test/images/clusterapi-tester/pod.yaml"
+	e2elog.Logf("Parsing pod from %v", path)
+	p, err := manifest.PodFromManifest(path)
+	if err != nil {
+		e2elog.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
+		return
+	}
+	p.Namespace = ns
+	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
+		e2elog.Logf("Failed to create %v: %v", p.Name, err)
+		return
+	}
+	defer func() {
+		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
+			e2elog.Logf("Failed to delete pod %v: %v", p.Name, err)
+		}
+	}()
+	timeout := 5 * time.Minute
+	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
+		e2elog.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
+		return
+	}
+	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
+	if err != nil {
+		e2elog.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
+	} else {
+		e2elog.Logf("Output of clusterapi-tester:\n%v", logs)
+	}
+}
+
+// getDefaultClusterIPFamily obtains the default IP family of the cluster
+// using the Cluster IP address of the kubernetes service created in the default namespace
+// This unequivocally identifies the default IP family because services are single family
+func getDefaultClusterIPFamily(c clientset.Interface) string {
+	// Get the ClusterIP of the kubernetes service created in the default namespace
+	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+	if err != nil {
+		e2elog.Failf("Failed to get kubernetes service ClusterIP: %v", err)
+	}
+
+	if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
+		return "ipv6"
+	}
+	return "ipv4"
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
@@ -1254,43 +1299,6 @@ func KubectlVersion() (*utilversion.Version, error) {
 	return utilversion.ParseSemantic(matches[1])
 }
 
-// ServiceResponding waits for the service to be responding.
-func ServiceResponding(c clientset.Interface, ns, name string) error {
-	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
-
-	return wait.PollImmediate(Poll, ServiceRespondingTimeout, func() (done bool, err error) {
-		proxyRequest, errProxy := GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
-		if errProxy != nil {
-			e2elog.Logf("Failed to get services proxy request: %v:", errProxy)
-			return false, nil
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
-		defer cancel()
-
-		body, err := proxyRequest.Namespace(ns).
-			Context(ctx).
-			Name(name).
-			Do().
-			Raw()
-		if err != nil {
-			if ctx.Err() != nil {
-				e2elog.Failf("Failed to GET from service %s: %v", name, err)
-				return true, err
-			}
-			e2elog.Logf("Failed to GET from service %s: %v:", name, err)
-			return false, nil
-		}
-		got := string(body)
-		if len(got) == 0 {
-			e2elog.Logf("Service %s: expected non-empty response", name)
-			return false, err // stop polling
-		}
-		e2elog.Logf("Service %s: found nonempty answer: %s", name, got)
-		return true, nil
-	})
-}
-
 // RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	e2elog.Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
@@ -1827,7 +1835,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
-		podList, err := GetKubeletPods(c, n)
+		podList, err := e2ekubelet.GetKubeletPods(c, n)
 		if err != nil {
 			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
@@ -1843,7 +1851,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 					c.Name, c.Ready, c.RestartCount)
 			}
 		}
-		HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
+		e2emetrics.HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
 		// TODO: Log node resource info
 	}
 }
@@ -2149,7 +2157,7 @@ func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 			if !apierrs.IsConflict(err) {
 				ExpectNoError(err)
 			} else {
-				e2elog.Logf("Conflict when trying to add/update avoidPonds %v to %v", avoidPods, nodeName)
+				e2elog.Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
 			}
 		}
 		return true, nil
@@ -2713,6 +2721,36 @@ func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddr
 	return
 }
 
+// GetHostAddress gets the node for a pod and returns the first
+// address. Returns an error if the node the pod is on doesn't have an
+// address.
+func GetHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
+	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	// Try externalAddress first
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeExternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+	// If no externalAddress found, try internalAddress
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+
+	// If not found, return error
+	return "", fmt.Errorf("No address for pod %v on node %v",
+		p.Name, p.Spec.NodeName)
+}
+
 type extractRT struct {
 	http.Header
 }
@@ -2836,34 +2874,6 @@ func UnblockNetwork(from string, to string) {
 		e2elog.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 			"required on host %s: remove rule %s, if exists", from, iptablesRule)
 	}
-}
-
-// GetKubeletPods retrieves the list of pods on the kubelet.
-// TODO(alejandrox1): move to pod subpkg once node methods have been refactored.
-func GetKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	return getKubeletPods(c, node, "pods")
-}
-
-// GetKubeletRunningPods retrieves the list of running pods on the kubelet. The pods
-// includes necessary information (e.g., UID, name, namespace for
-// pods/containers), but do not contain the full spec.
-// TODO(alejandrox1): move to pod subpkg once node methods have been refactored.
-func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	return getKubeletPods(c, node, "runningpods")
-}
-
-// TODO(alejandrox1): move to pod subpkg once node methods have been
-// refactored.
-func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
-	result := &v1.PodList{}
-	client, err := e2enode.ProxyRequest(c, node, resource, ports.KubeletPort)
-	if err != nil {
-		return &v1.PodList{}, err
-	}
-	if err = client.Into(result); err != nil {
-		return &v1.PodList{}, err
-	}
-	return result, nil
 }
 
 // PingCommand is the type to hold ping command.
@@ -3125,14 +3135,14 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
-	url, err := url.Parse(TestContext.Host)
+	hostURL, err := url.Parse(TestContext.Host)
 	if err != nil {
 		e2elog.Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(url.Host) != nil {
-		externalIP = url.Host
+	if net.ParseIP(hostURL.Host) != nil {
+		externalIP = hostURL.Host
 	} else {
-		hostname = url.Host
+		hostname = hostURL.Host
 	}
 
 	return externalIP, internalIP, hostname
@@ -3313,7 +3323,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
 func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	var controller appsv1.DaemonSet
+	var ds appsv1.DaemonSet
 	e2elog.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
@@ -3340,16 +3350,16 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
 
-	json, err := utilyaml.ToJSON(data)
+	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
 	}
 
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &controller)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
-	return &controller, nil
+	return &ds, nil
 }
 
 // waitForServerPreferredNamespacedResources waits until server preferred namespaced resources could be successfully discovered.

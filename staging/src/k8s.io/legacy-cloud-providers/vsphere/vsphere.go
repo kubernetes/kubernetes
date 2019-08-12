@@ -123,6 +123,11 @@ type VirtualCenterConfig struct {
 // Structure that represents the content of vsphere.conf file.
 // Users specify the configuration of one or more Virtual Centers in vsphere.conf where
 // the Kubernetes master and worker nodes are running.
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type VSphereConfig struct {
 	Global struct {
 		// vCenter username.
@@ -773,7 +778,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 
 		// Below logic can be performed only on master node where VC details are preset.
 		if vs.cfg == nil {
-			return "", fmt.Errorf("The current node can't detremine InstanceID for %q", convertToString(nodeName))
+			return "", fmt.Errorf("The current node can't determine InstanceID for %q", convertToString(nodeName))
 		}
 
 		// Create context
@@ -1322,8 +1327,8 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 
 		// if datastoreInfo is still not determined, it is an error condition
 		if datastoreInfo == nil {
-			klog.Errorf("ambigous datastore name %s, cannot be found among: %v", datastoreName, candidateDatastoreInfos)
-			return "", fmt.Errorf("ambigous datastore name %s", datastoreName)
+			klog.Errorf("ambiguous datastore name %s, cannot be found among: %v", datastoreName, candidateDatastoreInfos)
+			return "", fmt.Errorf("ambiguous datastore name %s", datastoreName)
 		}
 		ds := datastoreInfo.Datastore
 		volumeOptions.Datastore = datastoreInfo.Info.Name
@@ -1474,12 +1479,12 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	zone := cloudprovider.Zone{}
 	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
 	if err != nil {
-		klog.Errorf("Cannot connent to vsphere. Get zone for node %s error", nodeName)
+		klog.Errorf("Cannot connect to vsphere. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
 	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
 	if err != nil {
-		klog.Errorf("Cannot connent to datacenter. Get zone for node %s error", nodeName)
+		klog.Errorf("Cannot connect to datacenter. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
 	vmHost, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)

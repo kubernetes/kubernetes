@@ -19,8 +19,10 @@ package ipvs
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,13 +30,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -473,6 +475,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 // KernelHandler can handle the current installed kernel modules.
 type KernelHandler interface {
 	GetModules() ([]string, error)
+	GetKernelVersion() (string, error)
 }
 
 // LinuxKernelHandler implements KernelHandler interface.
@@ -490,11 +493,17 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 // GetModules returns all installed kernel modules.
 func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	// Check whether IPVS required kernel modules are built-in
-	kernelVersion, ipvsModules, err := utilipvs.GetKernelVersionAndIPVSMods(handle.executor)
+	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
 		return nil, err
 	}
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
+	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
+	if err != nil {
+		return nil, fmt.Errorf("error parseing kernel version %q: %v", kernelVersionStr, err)
+	}
+	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
+
+	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
 	b, err := ioutil.ReadFile(builtinModsFilePath)
 	if err != nil {
 		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
@@ -516,13 +525,47 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 
 	// Find out loaded kernel modules
-	out, err := handle.executor.Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
+	modulesFile, err := os.Open("/proc/modules")
 	if err != nil {
 		return nil, err
 	}
 
-	mods := strings.Split(string(out), "\n")
+	mods, err := getFirstColumn(modulesFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
+	}
+
 	return append(mods, bmods...), nil
+}
+
+// getFirstColumn reads all the content from r into memory and return a
+// slice which consists of the first word from each line.
+func getFirstColumn(r io.Reader) ([]string, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(b), "\n")
+	words := make([]string, 0, len(lines))
+	for i := range lines {
+		fields := strings.Fields(lines[i])
+		if len(fields) > 0 {
+			words = append(words, fields[0])
+		}
+	}
+	return words, nil
+}
+
+// GetKernelVersion returns currently running kernel version.
+func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
+	kernelVersionFile := "/proc/sys/kernel/osrelease"
+	fileContent, err := ioutil.ReadFile(kernelVersionFile)
+	if err != nil {
+		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
+	}
+
+	return strings.TrimSpace(string(fileContent)), nil
 }
 
 // CanUseIPVSProxier returns true if we can use the ipvs Proxier.
@@ -534,12 +577,21 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
 	}
-	wantModules := sets.NewString()
 	loadModules := sets.NewString()
-	linuxKernelHandler := NewLinuxKernelHandler()
-	_, ipvsModules, _ := utilipvs.GetKernelVersionAndIPVSMods(linuxKernelHandler.executor)
-	wantModules.Insert(ipvsModules...)
 	loadModules.Insert(mods...)
+
+	kernelVersionStr, err := handle.GetKernelVersion()
+	if err != nil {
+		return false, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+	}
+	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
+	if err != nil {
+		return false, fmt.Errorf("error parseing kernel version %q: %v", kernelVersionStr, err)
+	}
+	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
+	wantModules := sets.NewString()
+	wantModules.Insert(mods...)
+
 	modules := wantModules.Difference(loadModules).UnsortedList()
 	var missingMods []string
 	ConntrackiMissingCounter := 0
@@ -808,6 +860,44 @@ func (proxier *Proxier) syncProxyRules() {
 	// activeBindAddrs represents ip address successfully bind to DefaultDummyDevice in this round of sync
 	activeBindAddrs := map[string]bool{}
 
+	hasNodePort := false
+	for _, svc := range proxier.serviceMap {
+		svcInfo, ok := svc.(*serviceInfo)
+		if ok && svcInfo.NodePort() != 0 {
+			hasNodePort = true
+			break
+		}
+	}
+
+	// Both nodeAddresses and nodeIPs can be reused for all nodePort services
+	// and only need to be computed if we have at least one nodePort service.
+	var (
+		// List of node addresses to listen on if a nodePort is set.
+		nodeAddresses []string
+		// List of node IP addresses to be used as IPVS services if nodePort is set.
+		nodeIPs []net.IP
+	)
+
+	if hasNodePort {
+		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+		if err != nil {
+			klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
+		}
+		if err == nil && nodeAddrSet.Len() > 0 {
+			nodeAddresses = nodeAddrSet.List()
+			for _, address := range nodeAddresses {
+				if utilproxy.IsZeroCIDR(address) {
+					nodeIPs, err = proxier.ipGetter.NodeIPs()
+					if err != nil {
+						klog.Errorf("Failed to list all node IPs from host, err: %v", err)
+					}
+					break
+				}
+				nodeIPs = append(nodeIPs, net.ParseIP(address))
+			}
+		}
+	}
+
 	// Build IPVS rules for each service.
 	for svcName, svc := range proxier.serviceMap {
 		svcInfo, ok := svc.(*serviceInfo)
@@ -1064,14 +1154,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.NodePort() != 0 {
-			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-			if err != nil {
-				klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
+			if len(nodeAddresses) == 0 || len(nodeIPs) == 0 {
+				// Skip nodePort configuration since an error occurred when
+				// computing nodeAddresses or nodeIPs.
 				continue
 			}
 
 			var lps []utilproxy.LocalPort
-			for address := range addresses {
+			for _, address := range nodeAddresses {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
 					IP:          address,
@@ -1174,18 +1264,6 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Build ipvs kernel routes for each node ip address
-			var nodeIPs []net.IP
-			for address := range addresses {
-				if !utilproxy.IsZeroCIDR(address) {
-					nodeIPs = append(nodeIPs, net.ParseIP(address))
-					continue
-				}
-				// zero cidr
-				nodeIPs, err = proxier.ipGetter.NodeIPs()
-				if err != nil {
-					klog.Errorf("Failed to list all node IPs from host, err: %v", err)
-				}
-			}
 			for _, nodeIP := range nodeIPs {
 				// ipvs call
 				serv := &utilipvs.VirtualServer{
@@ -1232,6 +1310,7 @@ func (proxier *Proxier) syncProxyRules() {
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		klog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesData.Bytes())
+		metrics.IptablesRestoreFailuresTotal.Inc()
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
@@ -1782,11 +1861,11 @@ func (l *listenPortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Clo
 
 func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
+	// use ipvs to redirect traffic.
 	// This ensures a) that it's safe to use that port and b) that (a) stays
 	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
 	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
+	// be bad because ipvs would silently claim the traffic but the process
 	// would never know.
 	// NOTE: We should not need to have a real listen()ing socket - bind()
 	// should be enough, but I can't figure out a way to e2e test without

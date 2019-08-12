@@ -88,7 +88,12 @@ func NewHyperKubeCommand() (*cobra.Command, []func() *cobra.Command) {
 	scheduler := func() *cobra.Command { return kubescheduler.NewSchedulerCommand() }
 	kubectlCmd := func() *cobra.Command { return kubectl.NewDefaultKubectlCommand() }
 	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand() }
-	cloudController := func() *cobra.Command { return cloudcontrollermanager.NewCloudControllerManagerCommand() }
+	cloudController := func() *cobra.Command {
+		cmd := cloudcontrollermanager.NewCloudControllerManagerCommand()
+		cmd.Deprecated = "please use the cloud controller manager specific " +
+			"to your external cloud provider"
+		return cmd
+	}
 
 	commandFns := []func() *cobra.Command{
 		apiserver,

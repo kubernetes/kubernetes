@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
 )
@@ -36,6 +37,10 @@ const (
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
@@ -201,6 +206,9 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+		return cloudprovider.ImplementedElsewhere
+	}
 	g.sharedResourceLock.Lock()
 	defer g.sharedResourceLock.Unlock()
 
@@ -407,7 +415,7 @@ func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedN
 
 	if needToUpdateHealthChecks(hc, expectedHC) {
 		klog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
-		expectedHC = mergeHealthChecks(hc, expectedHC)
+		mergeHealthChecks(hc, expectedHC)
 		if err := g.UpdateHealthCheck(expectedHC); err != nil {
 			klog.Warningf("Failed to reconcile http health check %v parameters", name)
 			return nil, err
@@ -629,7 +637,7 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 // The HC interval will be reconciled to 8 seconds.
 // If the existing health check is larger than the default interval,
 // the configuration will be kept.
-func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
+func mergeHealthChecks(hc, newHC *compute.HealthCheck) {
 	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
 		newHC.CheckIntervalSec = hc.CheckIntervalSec
 	}
@@ -642,18 +650,24 @@ func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
 	if hc.HealthyThreshold > newHC.HealthyThreshold {
 		newHC.HealthyThreshold = hc.HealthyThreshold
 	}
-	return newHC
 }
 
 // needToUpdateHealthChecks checks whether the healthcheck needs to be updated.
 func needToUpdateHealthChecks(hc, newHC *compute.HealthCheck) bool {
-	if hc.HttpHealthCheck == nil || newHC.HttpHealthCheck == nil {
+	switch {
+	case
+		hc.HttpHealthCheck == nil,
+		newHC.HttpHealthCheck == nil,
+		hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port,
+		hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath,
+		hc.Description != newHC.Description,
+		hc.CheckIntervalSec < newHC.CheckIntervalSec,
+		hc.TimeoutSec < newHC.TimeoutSec,
+		hc.UnhealthyThreshold < newHC.UnhealthyThreshold,
+		hc.HealthyThreshold < newHC.HealthyThreshold:
 		return true
 	}
-	changed := hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port || hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath || hc.Description != newHC.Description
-	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
-	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
-	return changed
+	return false
 }
 
 // backendsListEqual asserts that backend lists are equal by instance group link only

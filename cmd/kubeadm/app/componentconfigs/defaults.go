@@ -24,6 +24,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
@@ -49,6 +50,12 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 
 	if externalproxycfg.ClientConnection.Kubeconfig == "" {
 		externalproxycfg.ClientConnection.Kubeconfig = KubeproxyKubeConfigFileName
+	}
+
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := internalcfg.FeatureGates[features.IPv6DualStack]; present {
+		externalproxycfg.FeatureGates[features.IPv6DualStack] = enabled
 	}
 
 	// Run the rest of the kube-proxy defaulting code

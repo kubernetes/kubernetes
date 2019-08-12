@@ -7,10 +7,11 @@ go 1.12
 require (
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.2
 	github.com/go-openapi/strfmt v0.19.0
 	github.com/go-openapi/validate v0.19.2
-	github.com/gogo/protobuf v1.0.0
+	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
@@ -28,7 +29,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v0.3.1
 	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
-	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 	sigs.k8s.io/yaml v1.1.0
 )
 

@@ -9,7 +9,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/klog v0.3.1
-	k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 )
 
 replace (

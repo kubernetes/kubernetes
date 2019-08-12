@@ -687,7 +687,7 @@ func TestCleanupDirs(t *testing.T) {
 }
 
 func TestRenewCertsByComponent(t *testing.T) {
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 
 	tests := []struct {
 		name                  string

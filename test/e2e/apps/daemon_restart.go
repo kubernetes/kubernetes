@@ -298,7 +298,6 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	})
 
 	ginkgo.It("Kubelet should not restart containers across restart", func() {
-
 		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
 		if err != nil {
 			e2elog.Logf("Unexpected error occurred: %v", err)

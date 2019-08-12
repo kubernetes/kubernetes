@@ -111,7 +111,7 @@ type VolumeSource struct {
 	// +optional
 	FlexVolume *FlexVolumeSource
 
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// +optional
 	Cinder *CinderVolumeSource
 
@@ -196,7 +196,7 @@ type PersistentVolumeSource struct {
 	// provisioned/attached using an exec based plugin.
 	// +optional
 	FlexVolume *FlexPersistentVolumeSource
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// +optional
 	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
@@ -229,7 +229,7 @@ type PersistentVolumeSource struct {
 	// +optional
 	Local *LocalVolumeSource
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
+	// More info: https://examples.k8s.io/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
 	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver.
@@ -947,22 +947,22 @@ type GlusterfsVolumeSource struct {
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsPersistentVolumeSource struct {
 	// EndpointsName is the endpoint name that details Glusterfs topology.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	EndpointsName string
 
 	// Path is the Glusterfs volume path.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	Path string
 
 	// ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
 	// Defaults to false.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
 	ReadOnly bool
 
 	// EndpointsNamespace is the namespace that contains Glusterfs endpoint.
 	// If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
 	EndpointsNamespace *string
 }
@@ -1034,7 +1034,7 @@ type RBDPersistentVolumeSource struct {
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the cinder volume.
 	VolumeID string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1056,7 +1056,7 @@ type CinderVolumeSource struct {
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderPersistentVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the cinder volume.
 	VolumeID string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.

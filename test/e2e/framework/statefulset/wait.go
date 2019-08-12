@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -32,8 +32,8 @@ import (
 // a RollingUpdateStatefulSetStrategyType with a non-nil RollingUpdate and Partition. All Pods with ordinals less
 // than or equal to the Partition are expected to be at set's current revision. All other Pods are expected to be
 // at its update revision.
-func WaitForPartitionedRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*appsv1.StatefulSet, *corev1.PodList) {
-	var pods *corev1.PodList
+func WaitForPartitionedRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
 	if set.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
 		e2elog.Failf("StatefulSet %s/%s attempt to wait for partitioned update with updateStrategy %s",
 			set.Namespace,
@@ -45,7 +45,7 @@ func WaitForPartitionedRollingUpdate(c clientset.Interface, set *appsv1.Stateful
 			set.Namespace,
 			set.Name)
 	}
-	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *corev1.PodList) (bool, error) {
+	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		partition := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
@@ -102,8 +102,8 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
 				isReady := podutil.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
-				e2elog.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, corev1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
-				if p.Status.Phase != corev1.PodRunning || !desiredReadiness {
+				e2elog.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
 					return false, nil
 				}
 			}
@@ -115,7 +115,7 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 }
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
-func WaitForState(c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *corev1.PodList) (bool, error)) {
+func WaitForState(c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
@@ -133,7 +133,7 @@ func WaitForState(c clientset.Interface, ss *appsv1.StatefulSet, until func(*app
 // WaitForStatus waits for the StatefulSetStatus's ObservedGeneration to be greater than or equal to set's Generation.
 // The returned StatefulSet contains such a StatefulSetStatus
 func WaitForStatus(c clientset.Interface, set *appsv1.StatefulSet) *appsv1.StatefulSet {
-	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods *corev1.PodList) (bool, error) {
+	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation {
 			set = set2
 			return true, nil
@@ -149,9 +149,9 @@ func WaitForRunningAndReady(c clientset.Interface, numStatefulPods int32, ss *ap
 }
 
 // WaitForPodReady waits for the Pod named podName in set to exist and have a Ready condition.
-func WaitForPodReady(c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *corev1.PodList) {
-	var pods *corev1.PodList
-	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *corev1.PodList) (bool, error) {
+func WaitForPodReady(c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
+	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
@@ -165,9 +165,9 @@ func WaitForPodReady(c clientset.Interface, set *appsv1.StatefulSet, podName str
 }
 
 // WaitForPodNotReady waits for the Pod named podName in set to exist and to not have a Ready condition.
-func WaitForPodNotReady(c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *corev1.PodList) {
-	var pods *corev1.PodList
-	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *corev1.PodList) (bool, error) {
+func WaitForPodNotReady(c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
+	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
@@ -182,15 +182,15 @@ func WaitForPodNotReady(c clientset.Interface, set *appsv1.StatefulSet, podName 
 
 // WaitForRollingUpdate waits for all Pods in set to exist and have the correct revision and for the RollingUpdate to
 // complete. set must have a RollingUpdateStatefulSetStrategyType.
-func WaitForRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*appsv1.StatefulSet, *corev1.PodList) {
-	var pods *corev1.PodList
+func WaitForRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
 	if set.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
 		e2elog.Failf("StatefulSet %s/%s attempt to wait for rolling update with updateStrategy %s",
 			set.Namespace,
 			set.Name,
 			set.Spec.UpdateStrategy.Type)
 	}
-	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *corev1.PodList) (bool, error) {
+	WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		if len(pods.Items) < int(*set.Spec.Replicas) {

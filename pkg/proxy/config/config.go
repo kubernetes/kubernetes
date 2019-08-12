@@ -40,7 +40,7 @@ type ServiceHandler interface {
 	// OnServiceDelete is called whenever deletion of an existing service
 	// object is observed.
 	OnServiceDelete(service *v1.Service)
-	// OnServiceSynced is called once all the initial even handlers were
+	// OnServiceSynced is called once all the initial event handlers were
 	// called and the state is fully propagated to local cache.
 	OnServiceSynced()
 }

@@ -63,7 +63,6 @@
 				"k8s.io/kubernetes/pkg/controller",
 				"k8s.io/kubernetes/pkg/features",
 				"k8s.io/kubernetes/pkg/fieldpath",
-				"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
 				"k8s.io/kubernetes/pkg/kubelet/apis",
 				"k8s.io/kubernetes/pkg/kubelet/qos",
 				"k8s.io/kubernetes/pkg/kubelet/types",

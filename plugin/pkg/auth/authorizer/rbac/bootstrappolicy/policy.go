@@ -300,7 +300,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-view", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "endpoints", "persistentvolumeclaims", "configmaps").RuleOrDie(),
+					"services", "services/status", "endpoints", "persistentvolumeclaims", "persistentvolumeclaims/status", "configmaps").RuleOrDie(),
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
 					"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
 				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
@@ -309,22 +309,22 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
 					"controllerrevisions",
-					"statefulsets", "statefulsets/scale",
-					"daemonsets",
-					"deployments", "deployments/scale",
-					"replicasets", "replicasets/scale").RuleOrDie(),
+					"statefulsets", "statefulsets/status", "statefulsets/scale",
+					"daemonsets", "daemonsets/status",
+					"deployments", "deployments/status", "deployments/scale",
+					"replicasets", "replicasets/status", "replicasets/scale").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers", "horizontalpodautoscalers/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "cronjobs/status", "jobs/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale",
+				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "daemonsets/status", "deployments", "deployments/scale", "deployments/status",
+					"ingresses", "ingresses/status", "replicasets", "replicasets/scale", "replicasets/status", "replicationcontrollers/scale",
 					"networkpolicies").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets", "poddisruptionbudgets/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingresses/status").RuleOrDie(),
 			},
 		},
 		{

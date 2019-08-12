@@ -18,6 +18,7 @@ package csi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	api "k8s.io/api/core/v1"
@@ -44,8 +45,7 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 	klog.V(4).Infof(log("Expander.NodeExpand(%s)", resizeOptions.DeviceMountPath))
 	csiSource, err := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 	if err != nil {
-		klog.Error(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
-		return false, err
+		return false, errors.New(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
 	}
 
 	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver))

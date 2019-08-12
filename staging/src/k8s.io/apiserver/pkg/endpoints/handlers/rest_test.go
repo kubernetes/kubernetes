@@ -463,7 +463,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			patchType:   patchType,
 			patchBytes:  patch,
 
-			trace: utiltrace.New("Patch" + name),
+			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
 		}
 
 		resultObj, _, err := p.patchResource(ctx, &RequestScope{})

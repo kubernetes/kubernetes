@@ -94,7 +94,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
-		return starts, fmt.Errorf("Unparseable schedule: %s : %s", sj.Spec.Schedule, err)
+		return starts, fmt.Errorf("unparseable schedule: %s : %s", sj.Spec.Schedule, err)
 	}
 
 	var earliestTime time.Time

@@ -39,4 +39,9 @@ SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
   "example:v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
   --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+"$(dirname "${BASH_SOURCE[0]}")"/../generate-groups.sh all \
+  k8s.io/code-generator/_examples/HyphenGroup k8s.io/code-generator/_examples/HyphenGroup/apis \
+  "example:v1" \
+  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 

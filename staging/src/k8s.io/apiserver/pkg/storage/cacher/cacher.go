@@ -163,8 +163,8 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 // As we don't need a high precision here, we keep all watchers timeout within a
 // second in a bucket, and pop up them once at the timeout. To be more specific,
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
-// This is NOT thread-safe.
 type watcherBookmarkTimeBuckets struct {
+	lock            sync.Mutex
 	watchersBuckets map[int64][]*cacheWatcher
 	startBucketID   int64
 	clock           clock.Clock
@@ -186,6 +186,8 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 		return false
 	}
 	bucketID := nextTime.Unix()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	if bucketID < t.startBucketID {
 		bucketID = t.startBucketID
 	}
@@ -198,6 +200,8 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchers() [][]*cacheWatcher {
 	currentBucketID := t.clock.Now().Unix()
 	// There should be one or two elements in almost all cases
 	expiredWatchers := make([][]*cacheWatcher, 0, 2)
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	for ; t.startBucketID <= currentBucketID; t.startBucketID++ {
 		if watchers, ok := t.watchersBuckets[t.startBucketID]; ok {
 			delete(t.watchersBuckets, t.startBucketID)
@@ -600,7 +604,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
-	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -669,7 +673,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
 	}
 
-	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -690,7 +694,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	if err != nil {
 		return err
 	}
-	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
+	trace.Step("Listed items from cache", utiltrace.Field{"count", len(objs)})
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
 		// Resize the slice appropriately, since we already know that none
 		// of the elements will be filtered out.
@@ -706,7 +710,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
-	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
+	trace.Step("Filtered items", utiltrace.Field{"count", listVal.Len()})
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err
@@ -784,6 +788,8 @@ func (c *Cacher) dispatchEvents() {
 			// Never send a bookmark event if we did not see an event here, this is fine
 			// because we don't provide any guarantees on sending bookmarks.
 			if lastProcessedResourceVersion == 0 {
+				// pop expired watchers in case there has been no update
+				c.bookmarkWatchers.popExpiredWatchers()
 				continue
 			}
 			bookmarkEvent := &watchCacheEvent{
@@ -856,7 +862,8 @@ func (c *Cacher) startDispatchingBookmarkEvents() {
 	// as we don't delete watcher from bookmarkWatchers when it is stopped.
 	for _, watchers := range c.bookmarkWatchers.popExpiredWatchers() {
 		for _, watcher := range watchers {
-			// watcher.stop() is protected by c.Lock()
+			// c.Lock() is held here.
+			// watcher.stopThreadUnsafe() is protected by c.Lock()
 			if watcher.stopped {
 				continue
 			}
@@ -926,7 +933,7 @@ func (c *Cacher) finishDispatching() {
 	defer c.Unlock()
 	c.dispatching = false
 	for _, watcher := range c.watchersToStop {
-		watcher.stop()
+		watcher.stopThreadUnsafe()
 	}
 	c.watchersToStop = c.watchersToStop[:0]
 }
@@ -941,7 +948,7 @@ func (c *Cacher) stopWatcherThreadUnsafe(watcher *cacheWatcher) {
 	if c.dispatching {
 		c.watchersToStop = append(c.watchersToStop, watcher)
 	} else {
-		watcher.stop()
+		watcher.stopThreadUnsafe()
 	}
 }
 
@@ -971,7 +978,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 		defer c.Unlock()
 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
-		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stop()
+		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopThreadUnsafe()
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(index, triggerValue, triggerSupported, c.stopWatcherThreadUnsafe)
 	}
@@ -1073,8 +1080,8 @@ func (c *errWatcher) Stop() {
 }
 
 // cacheWatcher implements watch.Interface
+// this is not thread-safe
 type cacheWatcher struct {
-	sync.Mutex
 	input     chan *watchCacheEvent
 	result    chan watch.Event
 	done      chan struct{}
@@ -1115,12 +1122,8 @@ func (c *cacheWatcher) Stop() {
 	c.forget()
 }
 
-// TODO(#73958)
-// stop() is protected by Cacher.Lock(), rename it to
-// stopThreadUnsafe and remove the sync.Mutex.
-func (c *cacheWatcher) stop() {
-	c.Lock()
-	defer c.Unlock()
+// we rely on the fact that stopThredUnsafe is actually protected by Cacher.Lock()
+func (c *cacheWatcher) stopThreadUnsafe() {
 	if !c.stopped {
 		c.stopped = true
 		close(c.done)

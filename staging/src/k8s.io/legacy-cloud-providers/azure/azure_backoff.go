@@ -19,17 +19,23 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+)
+
+const (
+	// not active means the instance is under deleting from Azure VMSS.
+	vmssVMNotActiveErrorMessage = "not an active Virtual Machine Scale Set VM instanceId"
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -133,10 +139,14 @@ func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]st
 		var retryErr error
 		privateIPs, retryErr = az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
 		if retryErr != nil {
+			// won't retry since the instance doesn't exist on Azure.
+			if retryErr == cloudprovider.InstanceNotFound {
+				return true, retryErr
+			}
 			klog.Errorf("GetPrivateIPsByNodeName(%s): backoff failure, will retry,err=%v", nodeName, retryErr)
 			return false, nil
 		}
-		klog.V(2).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
+		klog.V(3).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
 		return true, nil
 	})
 	return privateIPs, err
@@ -160,7 +170,7 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 			klog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		klog.V(2).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
+		klog.V(3).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	return ip, publicIP, err
@@ -222,7 +232,8 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb, to.String(lb.Etag))
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
 		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
@@ -249,7 +260,8 @@ func (az *Cloud) createOrUpdateLBWithRetry(service *v1.Service, lb network.LoadB
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb, to.String(lb.Etag))
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
 		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		done, retryError := az.processHTTPRetryResponse(service, "CreateOrUpdateLoadBalancer", resp, err)
 		if done && err == nil {
@@ -272,10 +284,11 @@ func (az *Cloud) ListLB(service *v1.Service) ([]network.LoadBalancer, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		allLBs, err := az.LoadBalancerClient.List(ctx, az.ResourceGroup)
+		rgName := az.getLoadBalancerResourceGroup()
+		allLBs, err := az.LoadBalancerClient.List(ctx, rgName)
 		if err != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", err.Error())
-			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", az.ResourceGroup, err)
+			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", rgName, err)
 			return nil, err
 		}
 		klog.V(2).Infof("LoadBalancerClient.List(%v) success", az.ResourceGroup)
@@ -294,11 +307,12 @@ func (az *Cloud) listLBWithRetry(service *v1.Service) ([]network.LoadBalancer, e
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		allLBs, retryErr = az.LoadBalancerClient.List(ctx, az.ResourceGroup)
+		rgName := az.getLoadBalancerResourceGroup()
+		allLBs, retryErr = az.LoadBalancerClient.List(ctx, rgName)
 		if retryErr != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", retryErr.Error())
 			klog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
-				az.ResourceGroup,
+				rgName,
 				retryErr)
 			return false, retryErr
 		}
@@ -440,7 +454,8 @@ func (az *Cloud) DeleteLB(service *v1.Service, lbName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.Delete(ctx, az.ResourceGroup, lbName)
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
 				// Invalidate the cache right after updating
@@ -461,7 +476,8 @@ func (az *Cloud) deleteLBWithRetry(service *v1.Service, lbName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.Delete(ctx, az.ResourceGroup, lbName)
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
 		done, err := az.processHTTPRetryResponse(service, "DeleteLoadBalancer", resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after deleting
@@ -582,7 +598,15 @@ func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName 
 		defer cancel()
 
 		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source)
-		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
+		klog.V(10).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s): end", VMScaleSetName, instanceID)
+
+		if strings.Contains(err.Error(), vmssVMNotActiveErrorMessage) {
+			// When instances are under deleting, updating API would report "not an active Virtual Machine Scale Set VM instanceId" error.
+			// Since they're under deleting, we shouldn't send more update requests for it.
+			klog.V(3).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s) gets error message %q, abort backoff because it's probably under deleting", VMScaleSetName, instanceID, vmssVMNotActiveErrorMessage)
+			return true, nil
+		}
+
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }

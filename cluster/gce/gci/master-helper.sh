@@ -33,10 +33,12 @@ source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 function create-master-instance {
   local address=""
   [[ -n ${1:-} ]] && address="${1}"
+  local internal_address=""
+  [[ -n ${2:-} ]] && internal_address="${2}"
 
   write-master-env
   ensure-gci-metadata-files
-  create-master-instance-internal "${MASTER_NAME}" "${address}"
+  create-master-instance-internal "${MASTER_NAME}" "${address}" "${internal_address}"
 }
 
 function replicate-master-instance() {
@@ -89,6 +91,31 @@ function replicate-master-instance() {
 }
 
 
+# run-gcloud-command runs a given command over ssh with retries.
+function run-gcloud-command() {
+  local master_name="${1}"
+  local zone="${2}"
+  local command="${3}"
+
+  local retries=5
+  local sleep_sec=10
+
+  local result=""
+
+  for attempt in $(seq 1 ${retries}); do
+    if result=$(gcloud compute ssh "${master_name}" --project "${PROJECT}" --zone "${zone}" --command "${command}" -- -oConnectTimeout=60 2>&1); then
+      echo "Successfully executed '${command}' on ${master_name}"
+      return 0
+    fi
+
+    sleep "${sleep_sec}"
+  done
+  echo "Failed to execute '${command}' on ${master_name} despite ${retries} attempts" >&2
+  echo "Last attempt failed with: ${result}" >&2
+  return 1
+}
+
+
 function create-master-instance-internal() {
   local gcloud="gcloud"
   local retries=5
@@ -101,6 +128,7 @@ function create-master-instance-internal() {
 
   local -r master_name="${1}"
   local -r address="${2:-}"
+  local -r internal_address="${3:-}"
 
   local preemptible_master=""
   if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
@@ -153,6 +181,10 @@ function create-master-instance-internal() {
       ${preemptible_master} \
       ${network} 2>&1); then
       echo "${result}" >&2
+
+      if [[ -n "${internal_address:-}" ]]; then
+        attach-internal-master-ip "${master_name}" "${ZONE}" "${internal_address}"
+      fi
       return 0
     else
       echo "${result}" >&2

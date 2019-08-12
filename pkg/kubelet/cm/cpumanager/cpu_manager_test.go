@@ -140,6 +140,49 @@ func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 	}
 }
 
+func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{},
+			Containers:     []v1.Container{},
+		},
+	}
+
+	for i, cpu := range initCPUs {
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, v1.Container{
+			Name: "initContainer-" + string(i),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.request),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.limit),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+				},
+			},
+		})
+	}
+
+	for i, cpu := range appCPUs {
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name: "appContainer-" + string(i),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.request),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.limit),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+				},
+			},
+		})
+	}
+
+	return pod
+}
+
 func TestCPUManagerAdd(t *testing.T) {
 	testPolicy := NewStaticPolicy(
 		&topology.CPUTopology{
@@ -232,7 +275,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			description:                "invalid policy name",
 			cpuPolicyName:              "invalid",
 			nodeAllocatableReservation: nil,
-			expectedPolicy:             "none",
+			expectedError:              fmt.Errorf("unknown policy: \"invalid\""),
 		},
 		{
 			description:                "static policy",

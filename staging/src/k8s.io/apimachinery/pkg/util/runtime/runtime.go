@@ -40,11 +40,7 @@ var PanicHandlers = []func(interface{}){logPanic}
 // called in case of panic.  HandleCrash actually crashes, after calling the
 // handlers and logging the panic message.
 //
-// TODO: remove this function. We are switching to a world where it's safe for
-// apiserver to panic, since it will be restarted by kubelet. At the beginning
-// of the Kubernetes project, nothing was going to restart apiserver and so
-// catching panics was important. But it's actually much simpler for monitoring
-// software if we just exit when an unexpected panic happens.
+// E.g., you can provide one or more additional handlers for something like shutting down go routines gracefully.
 func HandleCrash(additionalHandlers ...func(interface{})) {
 	if r := recover(); r != nil {
 		for _, fn := range PanicHandlers {

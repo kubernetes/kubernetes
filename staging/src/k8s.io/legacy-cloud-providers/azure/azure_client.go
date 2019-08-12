@@ -49,6 +49,7 @@ func createRateLimitErr(isWrite bool, opName string) error {
 // VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
 type VirtualMachinesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachine, source string) (resp *http.Response, err error)
+	Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
 	List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachine, err error)
 }
@@ -73,6 +74,7 @@ type PublicIPAddressesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error)
 	Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
+	GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
 	List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err error)
 }
 
@@ -197,6 +199,29 @@ func (az *azVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceG
 
 	mc := newMetricContext("vm", "create_or_update", resourceGroupName, az.client.SubscriptionID, source)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, VMName, parameters)
+	if err != nil {
+		return future.Response(), err
+	}
+
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
+}
+
+func (az *azVirtualMachinesClient) Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error) {
+	// /* Write rate limiting */
+	if !az.rateLimiterWriter.TryAccept() {
+		err = createRateLimitErr(true, "VMUpdate")
+		return
+	}
+
+	klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): start", resourceGroupName, VMName)
+	defer func() {
+		klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): end", resourceGroupName, VMName)
+	}()
+
+	mc := newMetricContext("vm", "update", resourceGroupName, az.client.SubscriptionID, source)
+	future, err := az.client.Update(ctx, resourceGroupName, VMName, parameters)
 	if err != nil {
 		return future.Response(), err
 	}
@@ -564,6 +589,23 @@ func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName 
 
 	mc := newMetricContext("public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID, "")
 	result, err = az.client.Get(ctx, resourceGroupName, publicIPAddressName, expand)
+	mc.Observe(err)
+	return
+}
+
+func (az *azPublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+	if !az.rateLimiterReader.TryAccept() {
+		err = createRateLimitErr(false, "VMSSPublicIPGet")
+		return
+	}
+
+	klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): start", resourceGroupName, publicIPAddressName)
+	defer func() {
+		klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): end", resourceGroupName, publicIPAddressName)
+	}()
+
+	mc := newMetricContext("vmss_public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID, "")
+	result, err = az.client.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, expand)
 	mc.Observe(err)
 	return
 }

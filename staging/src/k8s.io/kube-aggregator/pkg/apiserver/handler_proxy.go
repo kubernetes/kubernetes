@@ -18,11 +18,10 @@ package apiserver
 
 import (
 	"context"
+	"k8s.io/klog"
 	"net/http"
 	"net/url"
 	"sync/atomic"
-
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"

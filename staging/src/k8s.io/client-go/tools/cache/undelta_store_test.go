@@ -47,7 +47,7 @@ func TestUpdateCallsPush(t *testing.T) {
 	}
 
 	var got []interface{}
-	var callcount int = 0
+	var callcount = 0
 	push := func(m []interface{}) {
 		callcount++
 		got = m
@@ -73,7 +73,7 @@ func TestDeleteCallsPush(t *testing.T) {
 	}
 
 	var got []interface{}
-	var callcount int = 0
+	var callcount = 0
 	push := func(m []interface{}) {
 		callcount++
 		got = m
@@ -110,7 +110,7 @@ func TestReplaceCallsPush(t *testing.T) {
 	}
 
 	var got []interface{}
-	var callcount int = 0
+	var callcount = 0
 	push := func(m []interface{}) {
 		callcount++
 		got = m

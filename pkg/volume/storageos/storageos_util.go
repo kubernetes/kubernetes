@@ -37,9 +37,12 @@ const (
 	modeFile
 	modeUnsupported
 
-	ErrDeviceNotFound     = "device not found"
+	//ErrDeviceNotFound defines "device not found"
+	ErrDeviceNotFound = "device not found"
+	//ErrDeviceNotSupported defines "device not supported"
 	ErrDeviceNotSupported = "device not supported"
-	ErrNotAvailable       = "not available"
+	//ErrNotAvailable defines "not available"
+	ErrNotAvailable = "not available"
 )
 
 type deviceType int

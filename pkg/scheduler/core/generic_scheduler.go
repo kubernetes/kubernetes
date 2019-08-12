@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
 	"strings"
 	"sync"
@@ -28,7 +29,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -88,9 +89,10 @@ type FailedPredicateMap map[string][]predicates.PredicateFailureReason
 
 // FitError describes a fit error of a pod.
 type FitError struct {
-	Pod              *v1.Pod
-	NumAllNodes      int
-	FailedPredicates FailedPredicateMap
+	Pod                   *v1.Pod
+	NumAllNodes           int
+	FailedPredicates      FailedPredicateMap
+	FilteredNodesStatuses framework.NodeToStatusMap
 }
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -108,6 +110,10 @@ func (f *FitError) Error() string {
 		for _, pred := range predicates {
 			reasons[pred.GetReason()]++
 		}
+	}
+
+	for _, status := range f.FilteredNodesStatuses {
+		reasons[status.Message()]++
 	}
 
 	sortReasonsHistogram := func() []string {
@@ -160,7 +166,6 @@ type genericScheduler struct {
 	prioritizers             []priorities.PriorityConfig
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
-	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
 	nodeInfoSnapshot         *internalcache.NodeInfoSnapshot
 	volumeBinder             *volumebinder.VolumeBinder
@@ -182,7 +187,7 @@ func (g *genericScheduler) snapshot() error {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister, pluginContext *framework.PluginContext) (result ScheduleResult, err error) {
-	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
+	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
@@ -195,11 +200,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 		return result, prefilterStatus.AsError()
 	}
 
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return result, err
-	}
-	if len(nodes) == 0 {
+	numNodes := g.cache.NodeTree().NumNodes()
+	if numNodes == 0 {
 		return result, ErrNoNodesAvailable
 	}
 
@@ -209,16 +211,23 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Basic checks done")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pluginContext, pod, nodes)
+	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod, nodeLister)
 	if err != nil {
 		return result, err
 	}
 
+	// Run "postfilter" plugins.
+	postfilterStatus := g.framework.RunPostFilterPlugins(pluginContext, pod, filteredNodes, filteredNodesStatuses)
+	if !postfilterStatus.IsSuccess() {
+		return result, postfilterStatus.AsError()
+	}
+
 	if len(filteredNodes) == 0 {
 		return result, &FitError{
-			Pod:              pod,
-			NumAllNodes:      len(nodes),
-			FailedPredicates: failedPredicateMap,
+			Pod:                   pod,
+			NumAllNodes:           numNodes,
+			FailedPredicates:      failedPredicateMap,
+			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
 	trace.Step("Computing predicates done")
@@ -271,34 +280,29 @@ func (g *genericScheduler) Predicates() map[string]predicates.FitPredicate {
 	return g.predicates
 }
 
-// findMaxScores returns the indexes of nodes in the "priorityList" that has the highest "Score".
-func findMaxScores(priorityList schedulerapi.HostPriorityList) []int {
-	maxScoreIndexes := make([]int, 0, len(priorityList)/2)
-	maxScore := priorityList[0].Score
-	for i, hp := range priorityList {
-		if hp.Score > maxScore {
-			maxScore = hp.Score
-			maxScoreIndexes = maxScoreIndexes[:0]
-			maxScoreIndexes = append(maxScoreIndexes, i)
-		} else if hp.Score == maxScore {
-			maxScoreIndexes = append(maxScoreIndexes, i)
-		}
-	}
-	return maxScoreIndexes
-}
-
 // selectHost takes a prioritized list of nodes and then picks one
-// in a round-robin manner from the nodes that had the highest score.
+// in a reservoir sampling manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
-
-	maxScores := findMaxScores(priorityList)
-	ix := int(g.lastNodeIndex % uint64(len(maxScores)))
-	g.lastNodeIndex++
-
-	return priorityList[maxScores[ix]].Host, nil
+	maxScore := priorityList[0].Score
+	selected := priorityList[0].Host
+	cntOfMaxScore := 1
+	for _, hp := range priorityList[1:] {
+		if hp.Score > maxScore {
+			maxScore = hp.Score
+			selected = hp.Host
+			cntOfMaxScore = 1
+		} else if hp.Score == maxScore {
+			cntOfMaxScore++
+			if rand.Intn(cntOfMaxScore) == 0 {
+				// Replace the candidate with probability of 1/cntOfMaxScore
+				selected = hp.Host
+			}
+		}
+	}
+	return selected, nil
 }
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
@@ -324,10 +328,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
-	allNodes, err := nodeLister.List()
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	allNodes := nodeLister.ListNodes()
 	if len(allNodes) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
@@ -460,12 +461,13 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
+func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod, nodeLister algorithm.NodeLister) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
+	filteredNodesStatuses := framework.NodeToStatusMap{}
 
 	if len(g.predicates) == 0 {
-		filtered = nodes
+		filtered = nodeLister.ListNodes()
 	} else {
 		allNodes := int32(g.cache.NodeTree().NumNodes())
 		numNodesToFind := g.numFeasibleNodesToFind(allNodes)
@@ -506,8 +508,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 				status := g.framework.RunFilterPlugins(pluginContext, pod, nodeName)
 				if !status.IsSuccess() {
 					predicateResultLock.Lock()
-					failedPredicateMap[nodeName] = append(failedPredicateMap[nodeName],
-						predicates.NewFailureReason(status.Message()))
+					filteredNodesStatuses[nodeName] = status
 					if status.Code() != framework.Unschedulable {
 						errs[status.Message()]++
 					}
@@ -535,7 +536,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
-			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
+			return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, errors.CreateAggregateFromMessageCountMap(errs)
 		}
 	}
 
@@ -550,9 +551,9 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 					klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
 						extender, err)
 					continue
-				} else {
-					return []*v1.Node{}, FailedPredicateMap{}, err
 				}
+
+				return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
 			}
 
 			for failedNodeName, failedMsg := range failedMap {
@@ -567,7 +568,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 			}
 		}
 	}
-	return filtered, failedPredicateMap, nil
+	return filtered, failedPredicateMap, filteredNodesStatuses, nil
 }
 
 // addNominatedPods adds pods with equal or greater priority which are nominated
@@ -781,6 +782,18 @@ func PrioritizeNodes(
 	scoresMap, scoreStatus := framework.RunScorePlugins(pluginContext, pod, nodes)
 	if !scoreStatus.IsSuccess() {
 		return schedulerapi.HostPriorityList{}, scoreStatus.AsError()
+	}
+
+	// Run the Normalize Score plugins.
+	status := framework.RunNormalizeScorePlugins(pluginContext, pod, scoresMap)
+	if !status.IsSuccess() {
+		return schedulerapi.HostPriorityList{}, status.AsError()
+	}
+
+	// Apply weights for scores.
+	status = framework.ApplyScoreWeights(pluginContext, pod, scoresMap)
+	if !status.IsSuccess() {
+		return schedulerapi.HostPriorityList{}, status.AsError()
 	}
 
 	// Summarize all scores.

@@ -293,7 +293,7 @@ func TestShouldCallHook(t *testing.T) {
 
 	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			invocation, err := a.ShouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), testcase.webhook), testcase.attrs, interfaces)
+			invocation, err := a.ShouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), fmt.Sprintf("webhook-cfg-%d", i), testcase.webhook), testcase.attrs, interfaces)
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)

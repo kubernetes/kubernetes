@@ -311,6 +311,8 @@ func getAllParentLinks(path string) ([]string, error) {
 
 type hostUtil struct{}
 
+// NewHostUtil returns a struct that implements the HostUtils interface on
+// windows platforms
 func NewHostUtil() HostUtils {
 	return &hostUtil{}
 }
@@ -401,10 +403,11 @@ func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return filepath.EvalSymlinks(pathname)
 }
 
-// Note that on windows, it always returns 0. We actually don't set FSGroup on
+// GetOwner returns the integer ID for the user and group of the given path
+// Note that on windows, it always returns 0. We actually don't set Group on
 // windows platform, see SetVolumeOwnership implementation.
-func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
-	return 0, nil
+func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
+	return -1, -1, nil
 }
 
 func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {

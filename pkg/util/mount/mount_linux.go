@@ -102,14 +102,14 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 }
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
-func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
+func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
 	mountArgs := MakeMountArgs(source, target, fstype, options)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountCmd = mounterPath
 	}
 
-	if m.withSystemd {
+	if mounter.withSystemd {
 		// Try to run mount via systemd-run --scope. This will escape the
 		// service where kubelet runs and any fuse daemons will be started in a
 		// specific scope. kubelet service than can be restarted without killing
@@ -145,7 +145,7 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 	if err != nil {
 		args := strings.Join(mountArgs, " ")
 		klog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
-		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s",
 			err, mountCmd, args, string(output))
 	}
 	return err
@@ -210,7 +210,7 @@ func (mounter *Mounter) Unmount(target string) error {
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
 	}
 	return nil
 }
@@ -220,6 +220,7 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
 }
 
+// IsMountPointMatch returns true if the path in mp is the same as dir
 func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
 	return ((mp.Path == dir) || (mp.Path == deletedDir))
@@ -231,7 +232,7 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 // It also can not distinguish between mountpoints and symbolic links.
 // mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
 // will return true. When in fact /tmp/b is a mount point. If this situation
-// if of interest to you, don't use this function...
+// is of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	stat, err := os.Stat(file)
 	if err != nil {
@@ -249,6 +250,9 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+// GetMountRefs finds all mount references to pathname, returns a
+// list of paths. Path could be a mountpoint path, device or a normal
+// directory (for bind mount).
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	pathExists, pathErr := PathExists(pathname)
 	if !pathExists {
@@ -291,7 +295,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
 				klog.Infof("Device %s has errors which were corrected by fsck.", source)
 			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s", source, string(out))
 			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
 				klog.Infof("`fsck` error %s", string(out))
 			}
@@ -337,16 +341,14 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 			klog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
-		} else {
-			// Disk is already formatted and failed to mount
-			if len(fstype) == 0 || fstype == existingFormat {
-				// This is mount error
-				return mountErr
-			} else {
-				// Block device is formatted with unexpected filesystem, let the user know
-				return fmt.Errorf("failed to mount the volume as %q, it already contains %s. Mount error: %v", fstype, existingFormat, mountErr)
-			}
 		}
+		// Disk is already formatted and failed to mount
+		if len(fstype) == 0 || fstype == existingFormat {
+			// This is mount error
+			return mountErr
+		}
+		// Block device is formatted with unexpected filesystem, let the user know
+		return fmt.Errorf("failed to mount the volume as %q, it already contains %s. Mount error: %v", fstype, existingFormat, mountErr)
 	}
 	return mountErr
 }
@@ -453,6 +455,8 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 type hostUtil struct {
 }
 
+// NewHostUtil returns a struct that implements the HostUtils interface on
+// linux platforms
 func NewHostUtil() HostUtils {
 	return &hostUtil{}
 }
@@ -668,7 +672,7 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 			info.optionalFields = append(info.optionalFields, fields[i])
 		}
 		// Parse the rest 3 fields.
-		i += 1
+		i++
 		if len(fields)-i < 3 {
 			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
 		}
@@ -754,26 +758,28 @@ func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return GetSELinux(pathname, procMountInfoPath)
 }
 
-func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
+// GetOwner returns the integer ID for the user and group of the given path
+func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
-		return 0, err
+		return -1, -1, err
 	}
-	return GetFSGroupLinux(realpath)
+	return GetOwnerLinux(realpath)
 }
 
 func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return GetModeLinux(pathname)
 }
 
-// GetFSGroupLinux is shared between Linux and NsEnterMounter
+// GetOwnerLinux is shared between Linux and NsEnterMounter
 // pathname must already be evaluated for symlinks
-func GetFSGroupLinux(pathname string) (int64, error) {
+func GetOwnerLinux(pathname string) (int64, int64, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {
-		return 0, err
+		return -1, -1, err
 	}
-	return int64(info.Sys().(*syscall.Stat_t).Gid), nil
+	stat := info.Sys().(*syscall.Stat_t)
+	return int64(stat.Uid), int64(stat.Gid), nil
 }
 
 // GetModeLinux is shared between Linux and NsEnterMounter

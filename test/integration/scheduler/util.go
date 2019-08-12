@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -61,19 +61,19 @@ import (
 )
 
 type testContext struct {
-	closeFn                framework.CloseFunc
-	httpServer             *httptest.Server
-	ns                     *v1.Namespace
-	clientSet              *clientset.Clientset
-	informerFactory        informers.SharedInformerFactory
-	schedulerConfigFactory factory.Configurator
-	schedulerConfig        *factory.Config
-	scheduler              *scheduler.Scheduler
-	stopCh                 chan struct{}
+	closeFn             framework.CloseFunc
+	httpServer          *httptest.Server
+	ns                  *v1.Namespace
+	clientSet           *clientset.Clientset
+	informerFactory     informers.SharedInformerFactory
+	schedulerConfigArgs *factory.ConfigFactoryArgs
+	schedulerConfig     *factory.Config
+	scheduler           *scheduler.Scheduler
+	stopCh              chan struct{}
 }
 
 // createConfiguratorWithPodInformer creates a configurator for scheduler.
-func createConfiguratorWithPodInformer(
+func createConfiguratorArgsWithPodInformer(
 	schedulerName string,
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
@@ -82,9 +82,8 @@ func createConfiguratorWithPodInformer(
 	plugins *schedulerconfig.Plugins,
 	pluginConfig []schedulerconfig.PluginConfig,
 	stopCh <-chan struct{},
-) factory.Configurator {
-	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  schedulerName,
+) *factory.ConfigFactoryArgs {
+	return &factory.ConfigFactoryArgs{
 		Client:                         clientSet,
 		NodeInformer:                   informerFactory.Core().V1().Nodes(),
 		PodInformer:                    podInformer,
@@ -105,7 +104,7 @@ func createConfiguratorWithPodInformer(
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		BindTimeoutSeconds:             600,
 		StopCh:                         stopCh,
-	})
+	}
 }
 
 // initTestMasterAndScheduler initializes a test environment and creates a master with default
@@ -186,16 +185,17 @@ func initTestSchedulerWithOptions(
 		podInformer = context.informerFactory.Core().V1().Pods()
 	}
 
-	context.schedulerConfigFactory = createConfiguratorWithPodInformer(
+	context.schedulerConfigArgs = createConfiguratorArgsWithPodInformer(
 		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, pluginRegistry, plugins,
 		pluginConfig, context.stopCh)
+	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs)
 
 	var err error
 
 	if policy != nil {
-		context.schedulerConfig, err = context.schedulerConfigFactory.CreateFromConfig(*policy)
+		context.schedulerConfig, err = configFactory.CreateFromConfig(*policy)
 	} else {
-		context.schedulerConfig, err = context.schedulerConfigFactory.Create()
+		context.schedulerConfig, err = configFactory.Create()
 	}
 
 	if err != nil {
@@ -333,9 +333,6 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 func nodeHasLabels(cs clientset.Interface, nodeName string, labels map[string]string) wait.ConditionFunc {
 	return func() (bool, error) {
 		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -427,6 +424,17 @@ func nodeTainted(cs clientset.Interface, nodeName string, taints []v1.Taint) wai
 
 		return true, nil
 	}
+}
+
+func addTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) error {
+	node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	copy := node.DeepCopy()
+	copy.Spec.Taints = append(copy.Spec.Taints, taint)
+	_, err = cs.CoreV1().Nodes().Update(copy)
+	return err
 }
 
 // waitForNodeTaints waits for a node to have the target taints and returns
@@ -601,9 +609,6 @@ func podIsGettingEvicted(c clientset.Interface, podNamespace, podName string) wa
 func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -615,14 +620,31 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 	}
 }
 
+// podScheduledIn returns true if a given pod is placed onto one of the expected nodes.
+func podScheduledIn(c clientset.Interface, podNamespace, podName string, nodeNames []string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		if pod.Spec.NodeName == "" {
+			return false, nil
+		}
+		for _, nodeName := range nodeNames {
+			if pod.Spec.NodeName == nodeName {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+}
+
 // podUnschedulable returns a condition function that returns true if the given pod
 // gets unschedulable status.
 func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -639,9 +661,6 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 func podSchedulingError(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil

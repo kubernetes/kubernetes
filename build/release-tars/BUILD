@@ -305,6 +305,11 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
+    symlinks = {
+        "kubernetes/cluster/gce/cos/": "gci",
+        "kubernetes/cluster/gce/custom/": "gci",
+        "kubernetes/cluster/gce/ubuntu/": "gci",
+    },
     tags = ["no-cache"],
     deps = [
         ":_full_server",

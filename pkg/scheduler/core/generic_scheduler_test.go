@@ -22,13 +22,15 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -139,6 +141,42 @@ func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[str
 var EmptyPluginRegistry = framework.Registry{}
 var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerconfig.PluginConfig{})
 
+// FakeFilterPlugin is a test filter plugin used by default scheduler.
+type FakeFilterPlugin struct {
+	numFilterCalled int32
+	failFilter      bool
+}
+
+var filterPlugin = &FakeFilterPlugin{}
+
+// Name returns name of the plugin.
+func (fp *FakeFilterPlugin) Name() string {
+	return "fake-filter-plugin"
+}
+
+// reset is used to reset filter plugin.
+func (fp *FakeFilterPlugin) reset() {
+	fp.numFilterCalled = 0
+	fp.failFilter = false
+}
+
+// Filter is a test function that returns an error or nil, depending on the
+// value of "failFilter".
+func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	atomic.AddInt32(&fp.numFilterCalled, 1)
+
+	if fp.failFilter {
+		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+
+	return nil
+}
+
+// NewFilterPlugin is the factory for filter plugin.
+func NewFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return filterPlugin, nil
+}
+
 func makeNodeList(nodeNames []string) []*v1.Node {
 	result := make([]*v1.Node, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {
@@ -219,6 +257,21 @@ func TestSelectHost(t *testing.T) {
 
 func TestGenericScheduler(t *testing.T) {
 	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
+
+	filterPluginRegistry := framework.Registry{filterPlugin.Name(): NewFilterPlugin}
+	filterFramework, err := framework.NewFramework(filterPluginRegistry, &schedulerconfig.Plugins{
+		Filter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: filterPlugin.Name(),
+				},
+			},
+		},
+	}, []schedulerconfig.PluginConfig{})
+	if err != nil {
+		t.Errorf("Unexpected error when initialize scheduling framework, err :%v", err.Error())
+	}
+
 	tests := []struct {
 		name                     string
 		predicates               map[string]algorithmpredicates.FitPredicate
@@ -228,6 +281,8 @@ func TestGenericScheduler(t *testing.T) {
 		pvcs                     []*v1.PersistentVolumeClaim
 		pod                      *v1.Pod
 		pods                     []*v1.Pod
+		buildPredMeta            bool // build predicates metadata or not
+		failFilter               bool
 		expectedHosts            sets.String
 		expectsErr               bool
 		wErr                     error
@@ -245,7 +300,9 @@ func TestGenericScheduler(t *testing.T) {
 				FailedPredicates: FailedPredicateMap{
 					"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
-				}},
+				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
+			},
 		},
 		{
 			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
@@ -308,6 +365,7 @@ func TestGenericScheduler(t *testing.T) {
 					"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
 			},
 		},
 		{
@@ -338,6 +396,7 @@ func TestGenericScheduler(t *testing.T) {
 					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
 			},
 		},
 		{
@@ -425,6 +484,7 @@ func TestGenericScheduler(t *testing.T) {
 				FailedPredicates: FailedPredicateMap{
 					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate, algorithmpredicates.ErrFakePredicate},
 				},
+				FilteredNodesStatuses: framework.NodeToStatusMap{},
 			},
 		},
 		{
@@ -435,29 +495,155 @@ func TestGenericScheduler(t *testing.T) {
 			name:         "test error with priority map",
 			wErr:         errors.NewAggregate([]error{errPrioritize, errPrioritize}),
 		},
+		{
+			name: "test even pods spread predicate - 2 nodes with maxskew=1",
+			predicates: map[string]algorithmpredicates.FitPredicate{
+				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
+			},
+			// prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes: []string{"machine1", "machine2"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
+				Spec: v1.PodSpec{
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+			},
+			buildPredMeta: true,
+			expectedHosts: sets.NewString("machine2"),
+			wErr:          nil,
+		},
+		{
+			name: "test even pods spread predicate - 3 nodes with maxskew=2",
+			predicates: map[string]algorithmpredicates.FitPredicate{
+				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
+			},
+			// prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			nodes: []string{"machine1", "machine2", "machine3"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
+				Spec: v1.PodSpec{
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           2,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1a", UID: types.UID("pod1a"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1b", UID: types.UID("pod1b"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID("pod2"), Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine2",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+			},
+			buildPredMeta: true,
+			expectedHosts: sets.NewString("machine2", "machine3"),
+			wErr:          nil,
+		},
+		{
+			name:          "test with failed filter plugin",
+			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			prioritizers:  []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			nodes:         []string{"3"},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			expectedHosts: nil,
+			failFilter:    true,
+			expectsErr:    true,
+			wErr: &FitError{
+				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				NumAllNodes:      1,
+				FailedPredicates: FailedPredicateMap{},
+				FilteredNodesStatuses: framework.NodeToStatusMap{
+					"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter"),
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			filterPlugin.failFilter = test.failFilter
+
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
 			for _, name := range test.nodes {
-				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
+				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}})
 			}
 			pvcs := []*v1.PersistentVolumeClaim{}
 			pvcs = append(pvcs, test.pvcs...)
 
 			pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
+			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
+			if test.buildPredMeta {
+				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
+			}
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil, nil),
 				test.predicates,
-				algorithmpredicates.EmptyPredicateMetadataProducer,
+				predMetaProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
-				emptyFramework,
+				filterFramework,
 				[]algorithm.SchedulerExtender{},
 				nil,
 				pvcLister,
@@ -468,11 +654,13 @@ func TestGenericScheduler(t *testing.T) {
 				false)
 			result, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)), framework.NewPluginContext())
 			if !reflect.DeepEqual(err, test.wErr) {
-				t.Errorf("Unexpected error: %v, expected: %v", err, test.wErr)
+				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
 			}
+
+			filterPlugin.reset()
 		})
 	}
 }
@@ -506,7 +694,7 @@ func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
-	_, predicateMap, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, nodes)
+	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, schedulertesting.FakeNodeLister(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -536,7 +724,7 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(predicates, nodes)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, predicateMap, err := scheduler.findNodesThatFit(nil, pod, nodes)
+	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, pod, schedulertesting.FakeNodeLister(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -974,7 +1162,83 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			expected:             map[string]map[string]bool{"machine1": {"a": true}, "machine2": {}},
 			addAffinityPredicate: true,
 		},
+		{
+			name: "preemption to resolve even pods spread FitError",
+			predicates: map[string]algorithmpredicates.FitPredicate{
+				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
+			},
+			nodes: []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "p",
+					Labels: map[string]string{"foo": ""},
+				},
+				Spec: v1.PodSpec{
+					Priority: &highPriority,
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "zone",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+						{
+							MaxSkew:           1,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a1", UID: types.UID("pod-a1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &midPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a2", UID: types.UID("pod-a2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &lowPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-b1", UID: types.UID("pod-b1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-b", Priority: &lowPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x1", UID: types.UID("pod-x1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x2", UID: types.UID("pod-x2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+			},
+			expected: map[string]map[string]bool{
+				"node-a": {"pod-a2": true},
+				"node-b": {"pod-b1": true},
+			},
+		},
 	}
+	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assignDefaultStartTime(test.pods)
@@ -982,7 +1246,13 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				node := makeNode(n, 1000*5, priorityutil.DefaultMemoryRequest*5)
-				node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
+				// if possible, split node name by '/' to form labels in a format of
+				// {"hostname": node.Name[0], "zone": node.Name[1], "region": node.Name[2]}
+				node.ObjectMeta.Labels = make(map[string]string)
+				for i, label := range strings.Split(node.Name, "/") {
+					node.ObjectMeta.Labels[labelKeys[i]] = label
+				}
+				node.Name = node.ObjectMeta.Labels["hostname"]
 				nodes = append(nodes, node)
 			}
 			if test.addAffinityPredicate {
@@ -1307,6 +1577,15 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			},
 			expected: map[string]bool{"machine4": true},
 		},
+		{
+			name: "ErrTopologySpreadConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+			},
+			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
+		},
 	}
 
 	for _, test := range tests {
@@ -1326,27 +1605,31 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 func TestPreempt(t *testing.T) {
 	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
-	failedPredMap := FailedPredicateMap{
+	defaultFailedPredMap := FailedPredicateMap{
 		"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
 		"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrDiskConflict},
 		"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 	}
 	// Prepare 3 node names.
-	nodeNames := []string{}
+	defaultNodeNames := []string{}
 	for i := 1; i < 4; i++ {
-		nodeNames = append(nodeNames, fmt.Sprintf("machine%d", i))
+		defaultNodeNames = append(defaultNodeNames, fmt.Sprintf("machine%d", i))
 	}
 	var (
 		preemptLowerPriority = v1.PreemptLowerPriority
 		preemptNever         = v1.PreemptNever
 	)
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		extenders    []*FakeExtender
-		expectedNode string
-		expectedPods []string // list of preempted pods
+		name          string
+		pod           *v1.Pod
+		pods          []*v1.Pod
+		extenders     []*FakeExtender
+		failedPredMap FailedPredicateMap
+		nodeNames     []string
+		predicate     algorithmpredicates.FitPredicate
+		buildPredMeta bool
+		expectedNode  string
+		expectedPods  []string // list of preempted pods
 	}{
 		{
 			name: "basic preemption logic",
@@ -1379,6 +1662,83 @@ func TestPreempt(t *testing.T) {
 			},
 			expectedNode: "machine3",
 			expectedPods: []string{},
+		},
+		{
+			name: "preemption for topology spread constraints",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "p",
+					Labels: map[string]string{"foo": ""},
+				},
+				Spec: v1.PodSpec{
+					Priority: &highPriority,
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "zone",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+						{
+							MaxSkew:           1,
+							TopologyKey:       "hostname",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a1", UID: types.UID("pod-a1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-a2", UID: types.UID("pod-a2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-a", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-b1", UID: types.UID("pod-b1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-b", Priority: &lowPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x1", UID: types.UID("pod-x1"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-x2", UID: types.UID("pod-x2"), Labels: map[string]string{"foo": ""}},
+					Spec:       v1.PodSpec{NodeName: "node-x", Priority: &highPriority},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+			},
+			failedPredMap: FailedPredicateMap{
+				"node-a": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+				"node-b": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+				"node-x": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+			},
+			predicate:     algorithmpredicates.EvenPodsSpreadPredicate,
+			buildPredMeta: true,
+			nodeNames:     []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
+			expectedNode:  "node-b",
+			expectedPods:  []string{"pod-b1"},
 		},
 		{
 			name: "Scheduler extenders allow only machine1, otherwise machine3 would have been chosen",
@@ -1509,6 +1869,7 @@ func TestPreempt(t *testing.T) {
 		},
 	}
 
+	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("===== Running test %v", t.Name())
@@ -1518,14 +1879,26 @@ func TestPreempt(t *testing.T) {
 				cache.AddPod(pod)
 			}
 			cachedNodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{}
-			for _, name := range nodeNames {
+			nodeNames := defaultNodeNames
+			if len(test.nodeNames) != 0 {
+				nodeNames = test.nodeNames
+			}
+			for i, name := range nodeNames {
 				node := makeNode(name, 1000*5, priorityutil.DefaultMemoryRequest*5)
+				// if possible, split node name by '/' to form labels in a format of
+				// {"hostname": node.Name[0], "zone": node.Name[1], "region": node.Name[2]}
+				node.ObjectMeta.Labels = make(map[string]string)
+				for i, label := range strings.Split(node.Name, "/") {
+					node.ObjectMeta.Labels[labelKeys[i]] = label
+				}
+				node.Name = node.ObjectMeta.Labels["hostname"]
 				cache.AddNode(node)
+				nodeNames[i] = node.Name
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
 				cachedNodeInfo := schedulernodeinfo.NewNodeInfo()
 				cachedNodeInfo.SetNode(node)
-				cachedNodeInfoMap[name] = cachedNodeInfo
+				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
 			extenders := []algorithm.SchedulerExtender{}
 			for _, extender := range test.extenders {
@@ -1533,11 +1906,19 @@ func TestPreempt(t *testing.T) {
 				extender.cachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
+			predicate := algorithmpredicates.PodFitsResources
+			if test.predicate != nil {
+				predicate = test.predicate
+			}
+			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
+			if test.buildPredMeta {
+				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
+			}
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil, nil),
-				map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
-				algorithmpredicates.EmptyPredicateMetadataProducer,
+				map[string]algorithmpredicates.FitPredicate{"matches": predicate},
+				predMetaProducer,
 				[]priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
 				priorities.EmptyPriorityMetadataProducer,
 				emptyFramework,
@@ -1551,6 +1932,10 @@ func TestPreempt(t *testing.T) {
 				true)
 			scheduler.(*genericScheduler).snapshot()
 			// Call Preempt and check the expected results.
+			failedPredMap := defaultFailedPredMap
+			if test.failedPredMap != nil {
+				failedPredMap = test.failedPredMap
+			}
 			node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)

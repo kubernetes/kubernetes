@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	// defaultRenewInterval is the default interval at which the lease is renewed
-	defaultRenewInterval = 10 * time.Second
+	// renewIntervalFraction is the fraction of lease duration to renew the lease
+	renewIntervalFraction = 0.25
 	// maxUpdateRetries is the number of immediate, successive retries the Kubelet will attempt
 	// when renewing the lease before it waits for the renewal interval before trying again,
 	// similar to what we do for node status retries
@@ -57,30 +57,24 @@ type controller struct {
 	renewInterval              time.Duration
 	clock                      clock.Clock
 	onRepeatedHeartbeatFailure func()
+
+	// latestLease is the latest node lease which Kubelet updated or created
+	latestLease *coordinationv1.Lease
 }
 
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, nodeStatusUpdateFrequency time.Duration, onRepeatedHeartbeatFailure func()) Controller {
+func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func()) Controller {
 	var leaseClient coordclientset.LeaseInterface
 	if client != nil {
 		leaseClient = client.CoordinationV1().Leases(corev1.NamespaceNodeLease)
 	}
-	renewInterval := defaultRenewInterval
-	// Users are able to decrease the timeout after which nodes are being
-	// marked as "Ready: Unknown" by NodeLifecycleController to values
-	// smaller than defaultRenewInterval. Until the knob to configure
-	// lease renew interval is exposed to user, we temporarily decrease
-	// renewInterval based on the NodeStatusUpdateFrequency.
-	if renewInterval > nodeStatusUpdateFrequency {
-		renewInterval = nodeStatusUpdateFrequency
-	}
-
+	leaseDuration := time.Duration(leaseDurationSeconds) * time.Second
 	return &controller{
 		client:                     client,
 		leaseClient:                leaseClient,
 		holderIdentity:             holderIdentity,
 		leaseDurationSeconds:       leaseDurationSeconds,
-		renewInterval:              renewInterval,
+		renewInterval:              time.Duration(float64(leaseDuration) * renewIntervalFraction),
 		clock:                      clock,
 		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
 	}
@@ -96,7 +90,25 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 }
 
 func (c *controller) sync() {
+	if c.latestLease != nil {
+		// As long as node lease is not (or very rarely) updated by any other agent than Kubelet,
+		// we can optimistically assume it didn't change since our last update and try updating
+		// based on the version from that time. Thanks to it we avoid GET call and reduce load
+		// on etcd and kube-apiserver.
+		// If at some point other agents will also be frequently updating the Lease object, this
+		// can result in performance degradation, because we will end up with calling additional
+		// GET/PUT - at this point this whole "if" should be removed.
+		lease, err := c.leaseClient.Update(c.newLease(c.latestLease))
+		if err == nil {
+			c.latestLease = lease
+			return
+		}
+
+		klog.Infof("failed to update lease using latest lease, fallback to ensure lease, err: %v", err)
+	}
+
 	lease, created := c.backoffEnsureLease()
+	c.latestLease = lease
 	// we don't need to update the lease if we just created it
 	if !created {
 		if err := c.retryUpdateLease(lease); err != nil {
@@ -152,8 +164,9 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
-		_, err := c.leaseClient.Update(c.newLease(base))
+		lease, err := c.leaseClient.Update(c.newLease(base))
 		if err == nil {
+			c.latestLease = lease
 			return nil
 		}
 		klog.Errorf("failed to update node lease, error: %v", err)

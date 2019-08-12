@@ -495,6 +495,16 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
+
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    mkdir -p "${pki_dir}/konnectivity-agent"
+    KONNECTIVITY_AGENT_CA_CERT_PATH="${pki_dir}/konnectivity-agent/ca.crt"
+    KONNECTIVITY_AGENT_CLIENT_KEY_PATH="${pki_dir}/konnectivity-agent/client.key"
+    KONNECTIVITY_AGENT_CLIENT_CERT_PATH="${pki_dir}/konnectivity-agent/client.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_CERT}" "${KONNECTIVITY_AGENT_CA_CERT_PATH}"
+    write-pki-data "${KONNECTIVITY_AGENT_CLIENT_KEY}" "${KONNECTIVITY_AGENT_CLIENT_KEY_PATH}"
+    write-pki-data "${KONNECTIVITY_AGENT_CLIENT_CERT}" "${KONNECTIVITY_AGENT_CLIENT_CERT_PATH}"
+  fi
 }
 
 function create-master-pki {
@@ -557,6 +567,42 @@ function create-master-pki {
 
     PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
     write-pki-data "${PROXY_CLIENT_CERT}" "${PROXY_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ ! -z "${KONNECTIVITY_SERVER_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/konnectivity-server
+    #KONNECTIVITY_SERVER_CA_KEY_PATH="${pki_dir}/konnectivity-server/ca.key"
+    #write-pki-data "${KONNECTIVITY_SERVER_CA_KEY}" "${KONNECTIVITY_SERVER_CA_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CA_CERT_PATH="${pki_dir}/konnectivity-server/ca.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CA_CERT}" "${KONNECTIVITY_SERVER_CA_CERT_PATH}"
+
+    KONNECTIVITY_SERVER_KEY_PATH="${pki_dir}/konnectivity-server/server.key"
+    write-pki-data "${KONNECTIVITY_SERVER_KEY}" "${KONNECTIVITY_SERVER_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CERT_PATH="${pki_dir}/konnectivity-server/server.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CERT}" "${KONNECTIVITY_SERVER_CERT_PATH}"
+
+    KONNECTIVITY_SERVER_CLIENT_KEY_PATH="${pki_dir}/konnectivity-server/client.key"
+    write-pki-data "${KONNECTIVITY_SERVER_CLIENT_KEY}" "${KONNECTIVITY_SERVER_CLIENT_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CLIENT_CERT_PATH="${pki_dir}/konnectivity-server/client.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CLIENT_CERT}" "${KONNECTIVITY_SERVER_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ ! -z "${KONNECTIVITY_AGENT_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/konnectivity-agent
+    KONNECTIVITY_AGENT_CA_KEY_PATH="${pki_dir}/konnectivity-agent/ca.key"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_KEY}" "${KONNECTIVITY_AGENT_CA_KEY_PATH}"
+
+    KONNECTIVITY_AGENT_CA_CERT_PATH="${pki_dir}/konnectivity-agent/ca.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_CERT}" "${KONNECTIVITY_AGENT_CA_CERT_PATH}"
+
+    KONNECTIVITY_AGENT_KEY_PATH="${pki_dir}/konnectivity-agent/server.key"
+    write-pki-data "${KONNECTIVITY_AGENT_KEY}" "${KONNECTIVITY_AGENT_KEY_PATH}"
+
+    KONNECTIVITY_AGENT_CERT_PATH="${pki_dir}/konnectivity-agent/server.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CERT}" "${KONNECTIVITY_AGENT_CERT_PATH}"
   fi
 }
 
@@ -755,6 +801,27 @@ contexts:
     cluster: gcp-authorization-server
     user: kube-apiserver
   name: webhook
+EOF
+  fi
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
+apiVersion: apiserver.k8s.io/v1alpha1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    type: http-connect
+    httpConnect:
+      url: https://127.0.0.1:8131
+      caBundle: /etc/srv/kubernetes/pki/konnectivity-server/ca.crt
+      clientKey: /etc/srv/kubernetes/pki/konnectivity-server/client.key
+      clientCert: /etc/srv/kubernetes/pki/konnectivity-server/client.crt
+- name: master
+  connection:
+    type: direct
+- name: etcd
+  connection:
+    type: direct
 EOF
   fi
 
@@ -1214,6 +1281,10 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+function create-master-konnectivity-server-apiserver-auth {
+  echo TODO: implement create-master-konnectivity-server-apiserver-auth
+}
+
 function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -1450,9 +1521,12 @@ function prepare-etcd-manifest {
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
+  local etcd_apiserver_protocol="http"
   local etcd_creds=""
   local etcd_apiserver_creds="${ETCD_APISERVER_CREDS:-}"
   local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
+  local suffix="$1"
+  local etcd_livenessprobe_port="$2"
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
@@ -1462,8 +1536,12 @@ function prepare-etcd-manifest {
     etcd_protocol="https"
   fi
 
-  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" ]]; then
+  # mTLS should only be enabled for etcd server but not etcd-events. if $1 suffix is empty, it's etcd server.
+  if [[ -z "${suffix}" && -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
+    etcd_apiserver_protocol="https"
+    etcd_livenessprobe_port="2382"
+    etcd_extra_args+=" --listen-metrics-urls=http://127.0.0.1:${etcd_livenessprobe_port} "
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
@@ -1511,9 +1589,11 @@ function prepare-etcd-manifest {
     sed -i -e "s@{{ *pillar\.get('etcd_docker_repository', '\(.*\)') *}}@\1@g" "${temp_file}"
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_apiserver_protocol *}}@$etcd_apiserver_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_livenessprobe_port *}}@$etcd_livenessprobe_port@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1551,6 +1631,49 @@ function start-etcd-servers {
 
   prepare-log-file /var/log/etcd-events.log
   prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
+}
+
+# Replaces the variables in the konnectivity-server manifest file with the real values, and then
+# copy the file to the manifest dir
+# $1: value for variable "server_port"
+# $2: value for variable "agent_port"
+# $3: value for bariable "admin_port"
+function prepare-konnectivity-server-manifest {
+  local -r temp_file="/tmp/konnectivity-server.yaml"
+  params=()
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/konnectivity-server.yaml" "${temp_file}"
+  params+=("--log-file=/var/log/konnectivity-server.log")
+  params+=("--logtostderr=false")
+  params+=("--log-file-max-size=0")
+  params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
+  params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
+  params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
+  params+=("--cluster-ca-cert=${KONNECTIVITY_AGENT_CA_CERT_PATH}")
+  params+=("--cluster-cert=${KONNECTIVITY_AGENT_CERT_PATH}")
+  params+=("--cluster-key=${KONNECTIVITY_AGENT_KEY_PATH}")
+  params+=("--mode=http-connect")
+  params+=("--server-port=$1")
+  params+=("--agent-port=$2")
+  params+=("--admin-port=$3")
+  konnectivity_args=""
+  for param in "${params[@]}"; do
+    konnectivity_args+=", \"${param}\""
+  done
+  sed -i -e "s@{{ *konnectivity_args *}}@${konnectivity_args}@g" "${temp_file}"
+  sed -i -e "s@{{ *server_port *}}@$1@g" "${temp_file}"
+  sed -i -e "s@{{ *agent_port *}}@$2@g" "${temp_file}"
+  sed -i -e "s@{{ *admin_port *}}@$3@g" "${temp_file}"
+  sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
+  mv "${temp_file}" /etc/kubernetes/manifests
+}
+
+# Starts konnectivity server pod.
+# More specifically, it prepares dirs and files, sets the variable value
+# in the manifests, and copies them to /etc/kubernetes/manifests.
+function start-konnectivity-server {
+  echo "Start konnectivity server pods"
+  prepare-log-file /var/log/konnectivity-server.log
+  prepare-konnectivity-server-manifest "8131" "8132" "8133"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -1623,16 +1746,22 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-  params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+      params+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
+      params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
+      params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
+      params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
+  elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+      params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+      echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
+  else
+      echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
+      exit 1
+  fi
   if [[ -z "${ETCD_SERVERS:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
-  fi
-  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-    params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
-    params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
-    params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   fi
   params+=" --secure-port=443"
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
@@ -1890,6 +2019,15 @@ function start-kube-apiserver {
   authorization_mode="Node,${authorization_mode}"
   params+=" --authorization-mode=${authorization_mode}"
 
+  local csc_config_mount=""
+  local csc_config_volume=""
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    # Create the EgressSelectorConfiguration yaml file to control the Egress Selector.
+    csc_config_mount="{\"name\": \"cscconfigmount\",\"mountPath\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"readOnly\": false},"
+    csc_config_volume="{\"name\": \"cscconfigmount\",\"hostPath\": {\"path\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"type\": \"FileOrCreate\"}},"
+    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
+  fi
+
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
     container_env+="{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}"
@@ -1928,6 +2066,8 @@ function start-kube-apiserver {
   sed -i -e "s@{{webhook_authn_config_volume}}@${webhook_authn_config_volume}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_mount}}@${webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_volume}}@${webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{csc_config_mount}}@${csc_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{csc_config_volume}}@${csc_config_volume}@g" "${src_file}"
   sed -i -e "s@{{audit_policy_config_mount}}@${audit_policy_config_mount}@g" "${src_file}"
   sed -i -e "s@{{audit_policy_config_volume}}@${audit_policy_config_volume}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_mount}}@${audit_webhook_config_mount}@g" "${src_file}"
@@ -2039,40 +2179,6 @@ function update-node-label() {
     fi
     (( retries-- ))
     sleep 3
-  done
-}
-
-# Applies encryption provider config.
-# This function may be triggered in two scenarios:
-# 1. Decryption of etcd
-# 2. Encryption of etcd is added after the cluster is deployed
-# Both cases require that the existing secrets in etcd be re-proceeded.
-#
-# Assumes vars (supplied via kube-env):
-# ENCRYPTION_PROVIDER_CONFIG_FORCE
-function apply-encryption-config() {
-  if [[ "${ENCRYPTION_PROVIDER_CONFIG_FORCE:-false}" == "false" ]]; then
-    return
-  fi
-
-  # need kube-apiserver to be ready
-  until kubectl get secret; do
-    sleep ${ENCRYPTION_PROVIDER_CONFIG_FORCE_DELAY:-5}
-  done
-
-  retries=${ENCRYPTION_PROVIDER_CONFIG_FORCE_RETRIES:-5}
-  # The command below may fail when a conflict is detected during an update on a secret (something
-  # else updated the secret in the middle of our update).
-  # TODO: Retry only on errors caused by a conflict.
-  until (( retries == 0 )); do
-    # forces all secrets to be re-written to etcd, and in the process either encrypting or decrypting them
-    # https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
-    if kubectl get secrets --all-namespaces -o json | kubectl replace -f -; then
-      break
-    fi
-
-    (( retries-- ))
-    sleep "${ENCRYPTION_PROVIDER_CONFIG_FORCE_RETRY_SLEEP:-3}"
   done
 }
 
@@ -2694,6 +2800,11 @@ EOF
       setup-addon-manifests "addons" "node-termination-handler"
       setup-node-termination-handler-manifest
   fi
+  # Setting up the konnectivity-agent daemonset
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    setup-addon-manifests "addons" "konnectivity-agent"
+    setup-konnectivity-agent-manifest
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     # Create a new directory for the DNS addon and prepend a "0" on the name.
     # Prepending "0" to the directory ensures that add-on manager
@@ -2790,6 +2901,11 @@ function setup-node-termination-handler-manifest {
     if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
         sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
     fi
+}
+
+function setup-konnectivity-agent-manifest {
+    local -r manifest="/etc/kubernetes/addons/konnectivity-agent/daemonset.yaml"
+    sed -i "s|__APISERVER_IP__|${KUBERNETES_MASTER_NAME}|g" "${manifest}"
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -3074,6 +3190,9 @@ function main() {
     create-master-pki
     create-master-auth
     ensure-master-bootstrap-kubectl-auth
+    if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+      create-master-konnectivity-server-apiserver-auth
+    fi
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -3107,6 +3226,9 @@ function main() {
       start-etcd-empty-dir-cleanup-pod
     fi
     start-kube-apiserver
+    if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+      start-konnectivity-server
+    fi
     start-kube-controller-manager
     start-kube-scheduler
     wait-till-apiserver-ready
@@ -3114,7 +3236,6 @@ function main() {
     start-cluster-autoscaler
     start-lb-controller
     update-legacy-addon-node-labels &
-    apply-encryption-config &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy

@@ -107,9 +107,11 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
 
-		claimSize := dDriver.GetClaimSize()
-		pvc := getClaim(claimSize, config.Framework.Namespace.Name)
-		pvc.Spec.StorageClassName = &class.Name
+		pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			ClaimSize:        dDriver.GetClaimSize(),
+			StorageClassName: &(class.Name),
+		}, config.Framework.Namespace.Name)
+
 		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)

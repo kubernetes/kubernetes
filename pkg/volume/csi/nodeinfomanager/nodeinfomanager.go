@@ -417,6 +417,8 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		// CreateCSINode will set the annotation
 		_, err = nim.CreateCSINode()
 		return err
+	} else if err != nil {
+		return err
 	}
 
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)

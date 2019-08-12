@@ -78,25 +78,47 @@ type PVCMap map[types.NamespacedName]pvcval
 //	 	},
 //	 }
 type PersistentVolumeConfig struct {
-	PVSource         v1.PersistentVolumeSource
-	Prebind          *v1.PersistentVolumeClaim
+	// [Optional] NamePrefix defaults to "pv-" if unset
+	NamePrefix string
+	// [Optional] Labels contains information used to organize and categorize
+	// objects
+	Labels labels.Set
+	// PVSource contains the details of the underlying volume and must be set
+	PVSource v1.PersistentVolumeSource
+	// [Optional] Prebind lets you specify a PVC to bind this PV to before
+	// creation
+	Prebind *v1.PersistentVolumeClaim
+	// [Optiona] ReclaimPolicy defaults to "Reclaim" if unset
 	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
-	NamePrefix       string
-	Labels           labels.Set
 	StorageClassName string
-	NodeAffinity     *v1.VolumeNodeAffinity
-	VolumeMode       *v1.PersistentVolumeMode
+	// [Optional] NodeAffinity defines constraints that limit what nodes this
+	// volume can be accessed from.
+	NodeAffinity *v1.VolumeNodeAffinity
+	// [Optional] VolumeMode defaults to "Filesystem" if unset
+	VolumeMode *v1.PersistentVolumeMode
+	// [Optional] AccessModes defaults to RWO if unset
+	AccessModes []v1.PersistentVolumeAccessMode
+	// [Optional] Capacity is the storage capacity in Quantity format. Defaults
+	// to "2Gi" if unset
+	Capacity string
 }
 
-// PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
-// AccessModes defaults to all modes (RWO, RWX, ROX) if left empty
-// (+optional) Annotations defines the PVC's annotations
+// PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to
+// generate a PVC object.
 type PersistentVolumeClaimConfig struct {
+	// NamePrefix defaults to "pvc-" if unspecified
+	NamePrefix string
+	// ClaimSize must be specified in the Quantity format. Defaults to 2Gi if
+	// unspecified
+	ClaimSize string
+	// AccessModes defaults to RWO if unspecified
 	AccessModes      []v1.PersistentVolumeAccessMode
 	Annotations      map[string]string
 	Selector         *metav1.LabelSelector
 	StorageClassName *string
-	VolumeMode       *v1.PersistentVolumeMode
+	// VolumeMode defaults to nil if unspecified or specified as the empty
+	// string
+	VolumeMode *v1.PersistentVolumeMode
 }
 
 // NodeSelection specifies where to run a pod, using a combination of fixed node name,
@@ -575,17 +597,33 @@ func makePvcKey(ns, name string) types.NamespacedName {
 //   is added later in CreatePVCPV.
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	var claimRef *v1.ObjectReference
-	// If the reclaimPolicy is not provided, assume Retain
+
+	if len(pvConfig.AccessModes) == 0 {
+		pvConfig.AccessModes = append(pvConfig.AccessModes, v1.ReadWriteOnce)
+	}
+
+	if len(pvConfig.NamePrefix) == 0 {
+		pvConfig.NamePrefix = "pv-"
+	}
+
 	if pvConfig.ReclaimPolicy == "" {
-		e2elog.Logf("PV ReclaimPolicy unspecified, default: Retain")
 		pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
+
+	if len(pvConfig.Capacity) == 0 {
+		pvConfig.Capacity = "2Gi"
+	}
+
 	if pvConfig.Prebind != nil {
 		claimRef = &v1.ObjectReference{
-			Name:      pvConfig.Prebind.Name,
-			Namespace: pvConfig.Prebind.Namespace,
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+			Name:       pvConfig.Prebind.Name,
+			Namespace:  pvConfig.Prebind.Namespace,
+			UID:        pvConfig.Prebind.UID,
 		}
 	}
+
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
@@ -597,37 +635,41 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: pvConfig.ReclaimPolicy,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+				v1.ResourceStorage: resource.MustParse(pvConfig.Capacity),
 			},
 			PersistentVolumeSource: pvConfig.PVSource,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
-			},
-			ClaimRef:         claimRef,
-			StorageClassName: pvConfig.StorageClassName,
-			NodeAffinity:     pvConfig.NodeAffinity,
-			VolumeMode:       pvConfig.VolumeMode,
+			AccessModes:            pvConfig.AccessModes,
+			ClaimRef:               claimRef,
+			StorageClassName:       pvConfig.StorageClassName,
+			NodeAffinity:           pvConfig.NodeAffinity,
+			VolumeMode:             pvConfig.VolumeMode,
 		},
 	}
 }
 
-// MakePersistentVolumeClaim returns a PVC definition based on the namespace.
-// Note: if this PVC is intended to be pre-bound to a PV, whose name is not
-//   known until the PV is instantiated, then the func CreatePVPVC will add
-//   pvc.Spec.VolumeName to this claim.
+// MakePersistentVolumeClaim returns a PVC API Object based on the PersistentVolumeClaimConfig.
 func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.PersistentVolumeClaim {
-	// Specs are expected to match this test's PersistentVolume
 
 	if len(cfg.AccessModes) == 0 {
-		e2elog.Logf("AccessModes unspecified, default: ReadWriteOnce (RWO).")
 		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce)
+	}
+
+	if len(cfg.ClaimSize) == 0 {
+		cfg.ClaimSize = "2Gi"
+	}
+
+	if len(cfg.NamePrefix) == 0 {
+		cfg.NamePrefix = "pvc-"
+	}
+
+	if cfg.VolumeMode != nil && *cfg.VolumeMode == "" {
+		e2elog.Logf("Warning: Making PVC: VolumeMode specified as invalid empty string, treating as nil")
+		cfg.VolumeMode = nil
 	}
 
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-",
+			GenerateName: cfg.NamePrefix,
 			Namespace:    ns,
 			Annotations:  cfg.Annotations,
 		},
@@ -636,7 +678,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 			AccessModes: cfg.AccessModes,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+					v1.ResourceStorage: resource.MustParse(cfg.ClaimSize),
 				},
 			},
 			StorageClassName: cfg.StorageClassName,
@@ -791,7 +833,7 @@ func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 // MakeSecPod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod.
 // SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
-func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
+func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
@@ -832,17 +874,27 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 	}
 	var volumeMounts = make([]v1.VolumeMount, 0)
 	var volumeDevices = make([]v1.VolumeDevice, 0)
-	var volumes = make([]v1.Volume, len(pvclaims))
-	for index, pvclaim := range pvclaims {
-		volumename := fmt.Sprintf("volume%v", index+1)
+	var volumes = make([]v1.Volume, len(pvclaims)+len(inlineVolumeSources))
+	volumeIndex := 0
+	for _, pvclaim := range pvclaims {
+		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
 			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
 		} else {
 			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
 		}
 
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumeIndex++
 	}
+	for _, src := range inlineVolumeSources {
+		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
+		// In-line volumes can be only filesystem, not block.
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
+		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: *src}
+		volumeIndex++
+	}
+
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Spec.Volumes = volumes
@@ -891,13 +943,13 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 }
 
 // CreateSecPod creates security pod with given claims
-func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
-	return CreateSecPodWithNodeSelection(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, NodeSelection{}, timeout)
+func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
+	return CreateSecPodWithNodeSelection(client, namespace, pvclaims, inlineVolumeSources, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, NodeSelection{}, timeout)
 }
 
 // CreateSecPodWithNodeSelection creates security pod with given claims
-func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
-	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
+func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
+	pod := MakeSecPod(namespace, pvclaims, inlineVolumeSources, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
 	// Setting node
 	pod.Spec.NodeName = node.Name
 	pod.Spec.NodeSelector = node.Selector
@@ -949,36 +1001,6 @@ func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
 // SetAntiAffinity sets anti-affinity to nodeName to nodeSelection
 func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
-}
-
-// SetNodeAffinityPreference sets affinity preference with specified operator to nodeName to nodeSelection
-func SetNodeAffinityPreference(nodeSelection *NodeSelection, operator v1.NodeSelectorOperator, nodeName string) {
-	// Add node-anti-affinity.
-	if nodeSelection.Affinity == nil {
-		nodeSelection.Affinity = &v1.Affinity{}
-	}
-	if nodeSelection.Affinity.NodeAffinity == nil {
-		nodeSelection.Affinity.NodeAffinity = &v1.NodeAffinity{}
-	}
-	nodeSelection.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(nodeSelection.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-		v1.PreferredSchedulingTerm{
-			Weight: int32(100),
-			Preference: v1.NodeSelectorTerm{
-				MatchFields: []v1.NodeSelectorRequirement{
-					{Key: "metadata.name", Operator: operator, Values: []string{nodeName}},
-				},
-			},
-		})
-}
-
-// SetAffinityPreference sets affinity preference to nodeName to nodeSelection
-func SetAffinityPreference(nodeSelection *NodeSelection, nodeName string) {
-	SetNodeAffinityPreference(nodeSelection, v1.NodeSelectorOpIn, nodeName)
-}
-
-// SetAntiAffinityPreference sets anti-affinity preference to nodeName to nodeSelection
-func SetAntiAffinityPreference(nodeSelection *NodeSelection, nodeName string) {
-	SetNodeAffinityPreference(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
 }
 
 // CreateClientPod defines and creates a pod with a mounted PV.  Pod runs infinite loop until killed.

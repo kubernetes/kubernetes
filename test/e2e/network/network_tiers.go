@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
@@ -50,7 +51,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			framework.DescribeSvc(f.Namespace.Name)
+			e2eservice.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
 			e2elog.Logf("cleaning gce resource for %s", lb)
@@ -60,12 +61,12 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		serviceLBNames = []string{}
 	})
 	ginkgo.It("should be able to create and tear down a standard-tier load balancer [Slow]", func() {
-		lagTimeout := framework.LoadBalancerLagTimeoutDefault
-		createTimeout := framework.GetServiceLoadBalancerCreationTimeout(cs)
+		lagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
+		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 
 		svcName := "net-tiers-svc"
 		ns := f.Namespace.Name
-		jig := framework.NewServiceTestJig(cs, svcName)
+		jig := e2eservice.NewTestJig(cs, svcName)
 
 		ginkgo.By("creating a pod to be part of the service " + svcName)
 		jig.RunOrFail(ns, nil)
@@ -134,7 +135,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 	})
 })
 
-func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existingIP string, waitTimeout, checkTimeout time.Duration) string {
+func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, ns, svcName, existingIP string, waitTimeout, checkTimeout time.Duration) string {
 	var svc *v1.Service
 	if existingIP == "" {
 		// Creating the LB for the first time; wait for any ingress IP to show
@@ -147,7 +148,7 @@ func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existin
 
 	svcPort := int(svc.Spec.Ports[0].Port)
 	lbIngress := &svc.Status.LoadBalancer.Ingress[0]
-	ingressIP := framework.GetIngressPoint(lbIngress)
+	ingressIP := e2eservice.GetIngressPoint(lbIngress)
 
 	ginkgo.By("running sanity and reachability checks")
 	if svc.Spec.LoadBalancerIP != "" {

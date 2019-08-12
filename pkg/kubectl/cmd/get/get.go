@@ -41,12 +41,12 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -581,8 +581,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		noResourcesFoundFormat := fmt.Sprintf("No resources found in %s namespace.", o.Namespace)
-		fmt.Fprintln(o.ErrOut, noResourcesFoundFormat)
+		if !o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
+		} else {
+			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -17,7 +17,9 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -39,28 +41,40 @@ func NewTestSocketMaskFull() socketmask.SocketMask {
 
 func TestNewManager(t *testing.T) {
 	tcases := []struct {
-		name       string
-		policyType string
+		description    string
+		policyName     string
+		expectedPolicy string
+		expectedError  error
 	}{
 		{
-			name:       "Policy is set preferred",
-			policyType: "preferred",
+			description:    "Policy is set to best-effort",
+			policyName:     "best-effort",
+			expectedPolicy: "best-effort",
 		},
 		{
-			name:       "Policy is set to strict",
-			policyType: "strict",
+			description:    "Policy is set to strict",
+			policyName:     "strict",
+			expectedPolicy: "strict",
 		},
 		{
-			name:       "Policy is set to unknown",
-			policyType: "unknown",
+			description:   "Policy is set to unknown",
+			policyName:    "unknown",
+			expectedError: fmt.Errorf("unknown policy: \"unknown\""),
 		},
 	}
 
 	for _, tc := range tcases {
-		mngr := NewManager(tc.policyType)
+		mngr, err := NewManager(tc.policyName)
 
-		if _, ok := mngr.(Manager); !ok {
-			t.Errorf("result is not Manager type")
+		if tc.expectedError != nil {
+			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
+				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
+			}
+		} else {
+			rawMgr := mngr.(*manager)
+			if rawMgr.policy.Name() != tc.expectedPolicy {
+				t.Errorf("Unexpected policy name. Have: %q wants %q", rawMgr.policy.Name(), tc.expectedPolicy)
+			}
 		}
 	}
 }
@@ -659,9 +673,9 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
 					[]TopologyHint{
@@ -679,9 +693,9 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. More than one Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
 					[]TopologyHint{
@@ -703,9 +717,9 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. No Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. No Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
 					[]TopologyHint{

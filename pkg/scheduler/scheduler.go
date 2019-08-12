@@ -144,7 +144,6 @@ func New(client clientset.Interface,
 	}
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  options.schedulerName,
 		Client:                         client,
 		NodeInformer:                   nodeInformer,
 		PodInformer:                    podInformer,
@@ -272,12 +271,14 @@ func (sched *Scheduler) Config() *factory.Config {
 func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason string, message string) {
 	sched.config.Error(pod, err)
 	sched.config.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", message)
-	sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+	if err := sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  reason,
 		Message: err.Error(),
-	})
+	}); err != nil {
+		klog.Errorf("Error updating the condition of the pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
 }
 
 // schedule implements the scheduling algorithm and returns the suggested result(host,
@@ -295,7 +296,7 @@ func (sched *Scheduler) schedule(pod *v1.Pod, pluginContext *framework.PluginCon
 // preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
 // If it succeeds, it adds the name of the node where preemption has happened to the pod spec.
 // It returns the node name and an error if any.
-func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
+func (sched *Scheduler) preempt(fwk framework.Framework, preemptor *v1.Pod, scheduleErr error) (string, error) {
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
 	if err != nil {
 		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
@@ -327,6 +328,10 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
 				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
 				return "", err
+			}
+			// If the victim is a WaitingPod, send a reject message to the PermitPlugin
+			if waitingPod := fwk.GetWaitingPod(victim.UID); waitingPod != nil {
+				waitingPod.Reject("preempted")
 			}
 			sched.config.Recorder.Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 
@@ -486,7 +491,7 @@ func (sched *Scheduler) scheduleOne() {
 					" No preemption is performed.")
 			} else {
 				preemptionStartTime := time.Now()
-				sched.preempt(pod, fitError)
+				sched.preempt(fwk, pod, fitError)
 				metrics.PreemptionAttempts.Inc()
 				metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
 				metrics.DeprecatedSchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
@@ -558,6 +563,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !permitStatus.IsSuccess() {
 			var reason string
 			if permitStatus.Code() == framework.Unschedulable {
+				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
 				metrics.PodScheduleErrors.Inc()
@@ -577,6 +583,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !prebindStatus.IsSuccess() {
 			var reason string
 			if prebindStatus.Code() == framework.Unschedulable {
+				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
 				metrics.PodScheduleErrors.Inc()
@@ -601,11 +608,28 @@ func (sched *Scheduler) scheduleOne() {
 			fwk.RunUnreservePlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 			sched.recordSchedulingFailure(assumedPod, err, SchedulerError, fmt.Sprintf("Binding rejected: %v", err))
 		} else {
-			klog.V(2).Infof("pod %v/%v is bound successfully on node %v, %d nodes evaluated, %d nodes were found feasible", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
+			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
+			if klog.V(2) {
+				node, _ := sched.Cache().GetNodeInfo(scheduleResult.SuggestedHost)
+				klog.Infof("pod %v/%v is bound successfully on node %q, %d nodes evaluated, %d nodes were found feasible. Bound node resource: %q.", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes, nodeResourceString(node))
+			}
+
 			metrics.PodScheduleSuccesses.Inc()
 
 			// Run "postbind" plugins.
 			fwk.RunPostbindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
+}
+
+// nodeResourceString returns a string representation of node resources.
+func nodeResourceString(n *v1.Node) string {
+	if n == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("Capacity: %s; Allocatable: %s.", resourceString(&n.Status.Capacity), resourceString(&n.Status.Allocatable))
+}
+
+func resourceString(r *v1.ResourceList) string {
+	return fmt.Sprintf("CPU<%s>|Memory<%s>|Pods<%s>|StorageEphemeral<%s>", r.Cpu().String(), r.Memory().String(), r.Pods().String(), r.StorageEphemeral().String())
 }

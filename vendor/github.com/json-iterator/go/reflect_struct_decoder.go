@@ -530,8 +530,8 @@ func (decoder *generalStructDecoder) decodeOneField(ptr unsafe.Pointer, iter *It
 		}
 	}
 	if fieldDecoder == nil {
-		msg := "found unknown field: " + field
 		if decoder.disallowUnknownFields {
+			msg := "found unknown field: " + field
 			iter.ReportError("ReadObject", msg)
 		}
 		c := iter.nextToken()

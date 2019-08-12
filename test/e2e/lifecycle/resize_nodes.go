@@ -116,7 +116,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			numNodes, err := e2enode.TotalRegistered(c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
-			common.NewRCByName(c, ns, name, originalNodeCount, nil)
+			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
 			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
@@ -147,7 +147,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			numNodes, err := e2enode.TotalRegistered(c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
-			common.NewRCByName(c, ns, name, originalNodeCount, nil)
+			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
 			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 

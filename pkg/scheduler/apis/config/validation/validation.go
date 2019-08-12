@@ -57,11 +57,5 @@ func ValidateKubeSchedulerLeaderElectionConfiguration(cc *config.KubeSchedulerLe
 		return allErrs
 	}
 	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, field.NewPath("leaderElectionConfiguration"))...)
-	if len(cc.LockObjectNamespace) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lockObjectNamespace"), ""))
-	}
-	if len(cc.LockObjectName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lockObjectName"), ""))
-	}
 	return allErrs
 }

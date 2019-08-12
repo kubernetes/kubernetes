@@ -14,7 +14,7 @@ spec:
   - name: kube-addon-manager
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: k8s.gcr.io/kube-addon-manager:v9.0.1
+    image: k8s.gcr.io/kube-addon-manager:v9.0.2
     command:
     - /bin/bash
     - -c

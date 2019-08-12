@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -279,6 +280,7 @@ var errorItemNotSupported = errors.New("not supported")
 var factories = map[What]ItemFactory{
 	{"ClusterRole"}:        &clusterRoleFactory{},
 	{"ClusterRoleBinding"}: &clusterRoleBindingFactory{},
+	{"CSIDriver"}:          &csiDriverFactory{},
 	{"DaemonSet"}:          &daemonSetFactory{},
 	{"Role"}:               &roleFactory{},
 	{"RoleBinding"}:        &roleBindingFactory{},
@@ -327,6 +329,8 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		// and therefore always renames, we have to do the same here.
 		f.PatchName(&item.Name)
 	case *storagev1.StorageClass:
+		f.PatchName(&item.Name)
+	case *storagev1beta1.CSIDriver:
 		f.PatchName(&item.Name)
 	case *v1.ServiceAccount:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
@@ -564,6 +568,27 @@ func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 	client := f.ClientSet.StorageV1().StorageClasses()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create StorageClass")
+	}
+	return func() error {
+		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
+	}, nil
+}
+
+type csiDriverFactory struct{}
+
+func (f *csiDriverFactory) New() runtime.Object {
+	return &storagev1beta1.CSIDriver{}
+}
+
+func (*csiDriverFactory) Create(f *Framework, i interface{}) (func() error, error) {
+	item, ok := i.(*storagev1beta1.CSIDriver)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.StorageV1beta1().CSIDrivers()
+	if _, err := client.Create(item); err != nil {
+		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})

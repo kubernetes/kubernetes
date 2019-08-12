@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -156,12 +155,7 @@ func waitForVSphereDiskToDetach(volumePath string, nodeName string) error {
 
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
 func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string) *v1.PersistentVolume {
-	var (
-		pvConfig framework.PersistentVolumeConfig
-		pv       *v1.PersistentVolume
-		claimRef *v1.ObjectReference
-	)
-	pvConfig = framework.PersistentVolumeConfig{
+	return framework.MakePersistentVolume(framework.PersistentVolumeConfig{
 		NamePrefix: "vspherepv-",
 		PVSource: v1.PersistentVolumeSource{
 			VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
@@ -169,32 +163,13 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 				FSType:     "ext4",
 			},
 		},
-		Prebind: nil,
-	}
-
-	pv = &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: pvConfig.NamePrefix,
-			Annotations: map[string]string{
-				util.VolumeGidAnnotationKey: "777",
-			},
+		ReclaimPolicy: persistentVolumeReclaimPolicy,
+		Capacity:      "2Gi",
+		AccessModes: []v1.PersistentVolumeAccessMode{
+			v1.ReadWriteOnce,
 		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: persistentVolumeReclaimPolicy,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
-			},
-			PersistentVolumeSource: pvConfig.PVSource,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			ClaimRef: claimRef,
-		},
-	}
-	if labels != nil {
-		pv.Labels = labels
-	}
-	return pv
+		Labels: labels,
+	})
 }
 
 // function to get vsphere persistent volume spec with given selector labels.

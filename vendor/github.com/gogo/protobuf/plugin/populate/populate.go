@@ -182,7 +182,7 @@ func negative(fieldType descriptor.FieldDescriptorProto_Type) bool {
 	return true
 }
 
-func (p *plugin) getFuncName(goTypName string) string {
+func (p *plugin) getFuncName(goTypName string, field *descriptor.FieldDescriptorProto) string {
 	funcName := "NewPopulated" + goTypName
 	goTypNames := strings.Split(goTypName, ".")
 	if len(goTypNames) == 2 {
@@ -190,23 +190,43 @@ func (p *plugin) getFuncName(goTypName string) string {
 	} else if len(goTypNames) != 1 {
 		panic(fmt.Errorf("unreachable: too many dots in %v", goTypName))
 	}
-	switch funcName {
-	case "time.NewPopulatedTime":
-		funcName = p.typesPkg.Use() + ".NewPopulatedStdTime"
-	case "time.NewPopulatedDuration":
-		funcName = p.typesPkg.Use() + ".NewPopulatedStdDuration"
+	if field != nil {
+		switch {
+		case gogoproto.IsStdTime(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdTime"
+		case gogoproto.IsStdDuration(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdDuration"
+		case gogoproto.IsStdDouble(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdDouble"
+		case gogoproto.IsStdFloat(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdFloat"
+		case gogoproto.IsStdInt64(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdInt64"
+		case gogoproto.IsStdUInt64(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdUInt64"
+		case gogoproto.IsStdInt32(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdInt32"
+		case gogoproto.IsStdUInt32(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdUInt32"
+		case gogoproto.IsStdBool(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdBool"
+		case gogoproto.IsStdString(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdString"
+		case gogoproto.IsStdBytes(field):
+			funcName = p.typesPkg.Use() + ".NewPopulatedStdBytes"
+		}
 	}
 	return funcName
 }
 
-func (p *plugin) getFuncCall(goTypName string) string {
-	funcName := p.getFuncName(goTypName)
+func (p *plugin) getFuncCall(goTypName string, field *descriptor.FieldDescriptorProto) string {
+	funcName := p.getFuncName(goTypName, field)
 	funcCall := funcName + "(r, easy)"
 	return funcCall
 }
 
 func (p *plugin) getCustomFuncCall(goTypName string) string {
-	funcName := p.getFuncName(goTypName)
+	funcName := p.getFuncName(goTypName, nil)
 	funcCall := funcName + "(r)"
 	return funcCall
 }
@@ -259,13 +279,13 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 		if m.ValueField.IsMessage() || p.IsGroup(field) ||
 			(m.ValueField.IsBytes() && gogoproto.IsCustomType(field)) {
 			s := `this.` + fieldname + `[` + keyval + `] = `
-			if gogoproto.IsStdTime(field) || gogoproto.IsStdDuration(field) {
+			if gogoproto.IsStdType(field) {
 				valuegoTyp = valuegoAliasTyp
 			}
 			funcCall := p.getCustomFuncCall(goTypName)
 			if !gogoproto.IsCustomType(field) {
 				goTypName = generator.GoTypeToName(valuegoTyp)
-				funcCall = p.getFuncCall(goTypName)
+				funcCall = p.getFuncCall(goTypName, m.ValueAliasField)
 			}
 			if !nullable {
 				funcCall = `*` + funcCall
@@ -322,7 +342,7 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 			p.P(`this.`, fieldname, ` = *`, p.varGen.Current())
 		}
 	} else if field.IsMessage() || p.IsGroup(field) {
-		funcCall := p.getFuncCall(goTypName)
+		funcCall := p.getFuncCall(goTypName, field)
 		if field.IsRepeated() {
 			p.P(p.varGen.Next(), ` := r.Intn(5)`)
 			p.P(`this.`, fieldname, ` = make(`, goTyp, `, `, p.varGen.Current(), `)`)
@@ -534,7 +554,7 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 		p.P(`func NewPopulated`, ccTypeName, `(r randy`, p.localName, `, easy bool) *`, ccTypeName, ` {`)
 		p.In()
 		p.P(`this := &`, ccTypeName, `{}`)
-		if gogoproto.IsUnion(message.File(), message.DescriptorProto) && len(message.Field) > 0 {
+		if gogoproto.IsUnion(message.File().FileDescriptorProto, message.DescriptorProto) && len(message.Field) > 0 {
 			p.P(`fieldNum := r.Intn(`, fmt.Sprintf("%d", ranTotal), `)`)
 			p.P(`switch fieldNum {`)
 			k := 0
@@ -564,9 +584,9 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 						p.GenerateField(file, message, field)
 					} else {
 						if loopLevels[fieldIndex] > 0 {
-							p.P(`if r.Intn(10) == 0 {`)
+							p.P(`if r.Intn(5) == 0 {`)
 						} else {
-							p.P(`if r.Intn(10) != 0 {`)
+							p.P(`if r.Intn(5) != 0 {`)
 						}
 						p.In()
 						p.GenerateField(file, message, field)

@@ -44,6 +44,8 @@ var (
 	PreprovisionedPV TestVolType = "PreprovisionedPV"
 	// DynamicPV represents a volume type for dynamic provisioned Persistent Volume
 	DynamicPV TestVolType = "DynamicPV"
+	// CSIInlineVolume represents a volume type that is defined inline and provided by a CSI driver.
+	CSIInlineVolume TestVolType = "CSIInlineVolume"
 )
 
 // TestSnapshotType represents a snapshot type to be tested in a TestSuite

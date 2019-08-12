@@ -33,7 +33,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -225,8 +224,11 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 		ginkgo.By(action)
 		var claims []*v1.PersistentVolumeClaim
 		for i := 0; i < pvcCount; i++ {
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &test.Class.Name
+			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:        test.ClaimSize,
+				StorageClassName: &test.Class.Name,
+				VolumeMode:       &test.VolumeMode,
+			}, ns)
 			claims = append(claims, claim)
 		}
 		pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
@@ -458,8 +460,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				suffix := fmt.Sprintf("%d", i)
 				test.Client = c
 				test.Class = newStorageClass(test, ns, suffix)
-				test.Claim = newClaim(test, ns, suffix)
-				test.Claim.Spec.StorageClassName = &test.Class.Name
+				test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+					ClaimSize:        test.ClaimSize,
+					StorageClassName: &test.Class.Name,
+					VolumeMode:       &test.VolumeMode,
+				}, ns)
 				test.TestDynamicProvisioning()
 			}
 
@@ -474,7 +479,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 				betaTest.Client = c
 				betaTest.Class = nil
-				betaTest.Claim = newClaim(*betaTest, ns, "beta")
+				betaTest.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+					ClaimSize:        betaTest.ClaimSize,
+					StorageClassName: &class.Name,
+					VolumeMode:       &betaTest.VolumeMode,
+				}, ns)
 				betaTest.Claim.Spec.StorageClassName = &(class.Name)
 				(*betaTest).TestDynamicProvisioning()
 			}
@@ -504,8 +513,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test.Class = newStorageClass(test, ns, "reclaimpolicy")
 			retain := v1.PersistentVolumeReclaimRetain
 			test.Class.ReclaimPolicy = &retain
-			test.Claim = newClaim(test, ns, "reclaimpolicy")
-			test.Claim.Spec.StorageClassName = &test.Class.Name
+			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:        test.ClaimSize,
+				StorageClassName: &test.Class.Name,
+				VolumeMode:       &test.VolumeMode,
+			}, ns)
 			pv := test.TestDynamicProvisioning()
 
 			ginkgo.By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
@@ -563,8 +575,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			defer deleteStorageClass(c, sc.Name)
 
 			ginkgo.By("Creating a claim and expecting it to timeout")
-			pvc := newClaim(test, ns, suffix)
-			pvc.Spec.StorageClassName = &sc.Name
+			pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:        test.ClaimSize,
+				StorageClassName: &sc.Name,
+				VolumeMode:       &test.VolumeMode,
+			}, ns)
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 			framework.ExpectNoError(err)
 			defer func() {
@@ -601,9 +616,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// To increase chance of detection, attempt multiple iterations
 			for i := 0; i < raceAttempts; i++ {
-				suffix := fmt.Sprintf("race-%d", i)
-				claim := newClaim(test, ns, suffix)
-				claim.Spec.StorageClassName = &class.Name
+				prefix := fmt.Sprintf("race-%d", i)
+				claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+					NamePrefix:       prefix,
+					ClaimSize:        test.ClaimSize,
+					StorageClassName: &class.Name,
+					VolumeMode:       &test.VolumeMode,
+				}, ns)
 				tmpClaim, err := framework.CreatePVC(c, ns, claim)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns))
@@ -638,31 +657,25 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("creating PV")
-			pv := &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "volume-idempotent-delete-",
+			pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
+				NamePrefix: "volume-idempotent-delete-",
+				// Use Retain to keep the PV, the test will change it to Delete
+				// when the time comes.
+				ReclaimPolicy: v1.PersistentVolumeReclaimRetain,
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
 				},
-				Spec: v1.PersistentVolumeSpec{
-					// Use Retain to keep the PV, the test will change it to Delete
-					// when the time comes.
-					PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
-					AccessModes: []v1.PersistentVolumeAccessMode{
-						v1.ReadWriteOnce,
-					},
-					Capacity: v1.ResourceList{
-						v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
-					},
-					// PV is bound to non-existing PVC, so it's reclaim policy is
-					// executed immediately
-					ClaimRef: &v1.ObjectReference{
-						Kind:       "PersistentVolumeClaim",
-						APIVersion: "v1",
-						UID:        types.UID("01234567890"),
-						Namespace:  ns,
-						Name:       "dummy-claim-name",
+				Capacity: "1Gi",
+				// PV is bound to non-existing PVC, so it's reclaim policy is
+				// executed immediately
+				Prebind: &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "dummy-claim-name",
+						Namespace: ns,
+						UID:       types.UID("01234567890"),
 					},
 				},
-			}
+			})
 			switch framework.TestContext.Provider {
 			case "aws":
 				pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
@@ -749,8 +762,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ExpectedSize: "1500Mi",
 			}
 			test.Class = newStorageClass(test, ns, "external")
-			test.Claim = newClaim(test, ns, "external")
-			test.Claim.Spec.StorageClassName = &test.Class.Name
+			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:        test.ClaimSize,
+				StorageClassName: &test.Class.Name,
+				VolumeMode:       &test.VolumeMode,
+			}, ns)
 
 			ginkgo.By("creating a claim with a external provisioning annotation")
 			test.TestDynamicProvisioning()
@@ -769,7 +785,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ExpectedSize: "2Gi",
 			}
 
-			test.Claim = newClaim(test, ns, "default")
+			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:  test.ClaimSize,
+				VolumeMode: &test.VolumeMode,
+			}, ns)
 			test.TestDynamicProvisioning()
 		})
 
@@ -791,7 +810,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			updateDefaultStorageClass(c, scName, "false")
 
 			ginkgo.By("creating a claim with default storageclass and expecting it to timeout")
-			claim := newClaim(test, ns, "default")
+			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:  test.ClaimSize,
+				VolumeMode: &test.VolumeMode,
+			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
@@ -825,7 +847,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			updateDefaultStorageClass(c, scName, "")
 
 			ginkgo.By("creating a claim with default storageclass and expecting it to timeout")
-			claim := newClaim(test, ns, "default")
+			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:  test.ClaimSize,
+				VolumeMode: &test.VolumeMode,
+			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
@@ -861,8 +886,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test.Class = newStorageClass(test, ns, suffix)
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
-			test.Claim = newClaim(test, ns, suffix)
-			test.Claim.Spec.StorageClassName = &test.Class.Name
+			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:        test.ClaimSize,
+				StorageClassName: &test.Class.Name,
+				VolumeMode:       &test.VolumeMode,
+			}, ns)
 
 			test.TestDynamicProvisioning()
 		})
@@ -889,8 +917,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
+			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				ClaimSize:        test.ClaimSize,
+				StorageClassName: &class.Name,
+				VolumeMode:       &test.VolumeMode,
+			}, ns)
 			claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
@@ -967,8 +998,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				test.Class = newStorageClass(test, ns, suffix)
 				zone := getRandomClusterZone(c)
 				addSingleZoneAllowedTopologyToStorageClass(c, test.Class, zone)
-				test.Claim = newClaim(test, ns, suffix)
-				test.Claim.Spec.StorageClassName = &test.Class.Name
+				test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+					ClaimSize:        test.ClaimSize,
+					StorageClassName: &test.Class.Name,
+					VolumeMode:       &test.VolumeMode,
+				}, ns)
 				pv := test.TestDynamicProvisioning()
 				checkZoneFromLabelAndAffinity(pv, zone, true)
 			}
@@ -1011,36 +1045,6 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 		expectedDefault = true
 	}
 	verifyDefaultStorageClass(c, scName, expectedDefault)
-}
-
-func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
-	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-",
-			Namespace:    ns,
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
-				},
-			},
-		},
-	}
-
-	return &claim
-}
-
-func newClaim(t testsuites.StorageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
-	claim := getClaim(t.ClaimSize, ns)
-	if t.VolumeMode == v1.PersistentVolumeBlock {
-		blockVolumeMode := v1.PersistentVolumeBlock
-		claim.Spec.VolumeMode = &blockVolumeMode
-	}
-	return claim
 }
 
 func getDefaultPluginName() string {

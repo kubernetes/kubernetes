@@ -158,7 +158,7 @@ func TestMutateConfigMapWithConflict(t *testing.T) {
 		update := action.(core.UpdateAction)
 		if conflict > 0 {
 			conflict--
-			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), configMapName, errors.New("Conflict"))
+			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), configMapName, errors.New("conflict"))
 		}
 		return false, update.GetObject(), nil
 	})

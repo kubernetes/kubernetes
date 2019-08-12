@@ -102,6 +102,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController DeploymentControllerConfiguration
+	// StatefulSetControllerConfiguration holds configuration for
+	// StatefulSetController related features.
+	StatefulSetController StatefulSetControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
@@ -260,6 +263,14 @@ type DeploymentControllerConfiguration struct {
 	DeploymentControllerSyncPeriod metav1.Duration
 }
 
+// StatefulSetControllerConfiguration contains elements describing StatefulSetController.
+type StatefulSetControllerConfiguration struct {
+	// concurrentStatefulSetSyncs is the number of statefulset objects that are
+	// allowed to sync concurrently. Larger number = more responsive statefulsets,
+	// but more CPU (and network) load.
+	ConcurrentStatefulSetSyncs int32
+}
+
 // DeprecatedControllerConfiguration contains elements be deprecated.
 type DeprecatedControllerConfiguration struct {
 	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
@@ -279,6 +290,11 @@ type EndpointControllerConfiguration struct {
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
 	ConcurrentEndpointSyncs int32
+
+	// EndpointUpdatesBatchPeriod describes the length of endpoint updates batching period.
+	// Processing of pod changes will be delayed by this duration to join them with potential
+	// upcoming updates and reduce the overall number of endpoints updates.
+	EndpointUpdatesBatchPeriod metav1.Duration
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.

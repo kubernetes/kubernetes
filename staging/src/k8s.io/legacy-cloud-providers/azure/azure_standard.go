@@ -127,6 +127,9 @@ func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (
 // So we'd have a separate name for internal load balancer.
 // This would be the name for Azure LoadBalancer resource.
 func (az *Cloud) getAzureLoadBalancerName(clusterName string, vmSetName string, isInternal bool) string {
+	if az.LoadBalancerName != "" {
+		clusterName = az.LoadBalancerName
+	}
 	lbNamePrefix := vmSetName
 	if strings.EqualFold(vmSetName, az.vmSet.GetPrimaryVMSetName()) || az.useStandardLoadBalancer() {
 		lbNamePrefix = clusterName
@@ -366,7 +369,9 @@ func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState str
 		}
 	}
 
-	return "", fmt.Errorf("failed to get power status for node %q", name)
+	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
+	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
+	return vmPowerStateStopped, nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.

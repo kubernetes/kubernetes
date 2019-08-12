@@ -138,10 +138,10 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 		Example: kubeletConfigEnableDynamicExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(nodeName) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --node-name argument is required"))
+				kubeadmutil.CheckErr(errors.New("the --node-name argument is required"))
 			}
 			if len(kubeletVersionStr) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --kubelet-version argument is required"))
+				kubeadmutil.CheckErr(errors.New("the --kubelet-version argument is required"))
 			}
 
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)

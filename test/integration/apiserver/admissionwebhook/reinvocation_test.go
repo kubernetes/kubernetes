@@ -49,8 +49,18 @@ const (
 	testReinvocationClientUsername = "webhook-reinvocation-integration-client"
 )
 
-// TestWebhookReinvocationPolicy ensures that the admission webhook reinvocation policy is applied correctly.
-func TestWebhookReinvocationPolicy(t *testing.T) {
+// TestWebhookReinvocationPolicyWithWatchCache ensures that the admission webhook reinvocation policy is applied correctly with the watch cache enabled.
+func TestWebhookReinvocationPolicyWithWatchCache(t *testing.T) {
+	testWebhookReinvocationPolicy(t, true)
+}
+
+// TestWebhookReinvocationPolicyWithoutWatchCache ensures that the admission webhook reinvocation policy is applied correctly without the watch cache enabled.
+func TestWebhookReinvocationPolicyWithoutWatchCache(t *testing.T) {
+	testWebhookReinvocationPolicy(t, false)
+}
+
+// testWebhookReinvocationPolicy ensures that the admission webhook reinvocation policy is applied correctly.
+func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	reinvokeNever := registrationv1beta1.NeverReinvocationPolicy
 	reinvokeIfNeeded := registrationv1beta1.IfNeededReinvocationPolicy
 
@@ -175,6 +185,7 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 
 	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount",
+		fmt.Sprintf("--watch-cache=%v", watchCache),
 	}, framework.SharedEtcd())
 	defer s.TearDownFn()
 

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -157,14 +154,6 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 		return nil, fmt.Errorf("Failed to list Pods of Deployment %q: %v", deployment.Name, err)
 	}
 	return podList, nil
-}
-
-// RunDeployment runs a delopyment with the specified config.
-func RunDeployment(config testutils.DeploymentConfig) error {
-	ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = framework.LogFailedContainers
-	return testutils.RunDeployment(config)
 }
 
 // testDeployment creates a deployment definition based on the namespace. The deployment references the PVC's

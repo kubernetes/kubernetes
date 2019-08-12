@@ -2614,11 +2614,6 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		return allErrs
 	}
 
-	// Return early if EphemeralContainers disabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		return append(allErrs, field.Forbidden(fldPath, "disabled by EphemeralContainers feature-gate"))
-	}
-
 	allNames := sets.String{}
 	for _, c := range containers {
 		allNames.Insert(c.Name)
@@ -3230,7 +3225,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, ValidatePreemptionPolicy(spec.PreemptionPolicy, fldPath.Child("preemptionPolicy"))...)
 	}
 
-	if spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if spec.Overhead != nil {
 		allErrs = append(allErrs, validateOverhead(spec.Overhead, fldPath.Child("overhead"))...)
 	}
 
@@ -4281,7 +4276,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path) fi
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && len(spec.Spec.EphemeralContainers) > 0 {
+	if len(spec.Spec.EphemeralContainers) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
 	}
 
@@ -5703,16 +5698,10 @@ var (
 	supportedScheduleActions = sets.NewString(string(core.DoNotSchedule), string(core.ScheduleAnyway))
 )
 
-type spreadConstraintPair struct {
-	topologyKey       string
-	whenUnsatisfiable core.UnsatisfiableConstraintAction
-}
-
 // validateTopologySpreadConstraints validates given TopologySpreadConstraints.
 func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstraint, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	var existingConstraintPairs []spreadConstraintPair
 	for i, constraint := range constraints {
 		subFldPath := fldPath.Index(i)
 		if err := ValidateMaxSkew(subFldPath.Child("maxSkew"), constraint.MaxSkew); err != nil {
@@ -5725,14 +5714,8 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 			allErrs = append(allErrs, err)
 		}
 		// tuple {topologyKey, whenUnsatisfiable} denotes one kind of spread constraint
-		pair := spreadConstraintPair{
-			topologyKey:       constraint.TopologyKey,
-			whenUnsatisfiable: constraint.WhenUnsatisfiable,
-		}
-		if err := ValidateSpreadConstraintPair(subFldPath.Child("{topologyKey, whenUnsatisfiable}"), pair, existingConstraintPairs); err != nil {
+		if err := ValidateSpreadConstraintNotRepeat(subFldPath.Child("{topologyKey, whenUnsatisfiable}"), constraint, constraints[i+1:]); err != nil {
 			allErrs = append(allErrs, err)
-		} else {
-			existingConstraintPairs = append(existingConstraintPairs, pair)
 		}
 	}
 
@@ -5763,12 +5746,13 @@ func ValidateWhenUnsatisfiable(fldPath *field.Path, action core.UnsatisfiableCon
 	return nil
 }
 
-// ValidateSpreadConstraintPair tests that if `pair` exists in `existingConstraintPairs`.
-func ValidateSpreadConstraintPair(fldPath *field.Path, pair spreadConstraintPair, existingConstraintPairs []spreadConstraintPair) *field.Error {
-	for _, existingPair := range existingConstraintPairs {
-		if pair.topologyKey == existingPair.topologyKey &&
-			pair.whenUnsatisfiable == existingPair.whenUnsatisfiable {
-			return field.Duplicate(fldPath, pair)
+// ValidateSpreadConstraintNotRepeat tests that if `constraint` duplicates with `existingConstraintPairs`
+// on TopologyKey and WhenUnsatisfiable fields.
+func ValidateSpreadConstraintNotRepeat(fldPath *field.Path, constraint core.TopologySpreadConstraint, restingConstraints []core.TopologySpreadConstraint) *field.Error {
+	for _, restingConstraint := range restingConstraints {
+		if constraint.TopologyKey == restingConstraint.TopologyKey &&
+			constraint.WhenUnsatisfiable == restingConstraint.WhenUnsatisfiable {
+			return field.Duplicate(fldPath, fmt.Sprintf("{%v, %v}", constraint.TopologyKey, constraint.WhenUnsatisfiable))
 		}
 	}
 	return nil

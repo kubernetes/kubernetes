@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"math"
 	"sync"
 	"time"
 
@@ -129,7 +130,7 @@ func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
 
 // getMinTolerationTime returns minimal toleration time from the given slice, or -1 if it's infinite.
 func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
-	minTolerationTime := int64(-1)
+	minTolerationTime := int64(math.MaxInt64)
 	if len(tolerations) == 0 {
 		return 0
 	}
@@ -139,12 +140,15 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 			tolerationSeconds := *(tolerations[i].TolerationSeconds)
 			if tolerationSeconds <= 0 {
 				return 0
-			} else if tolerationSeconds < minTolerationTime || minTolerationTime == -1 {
+			} else if tolerationSeconds < minTolerationTime {
 				minTolerationTime = tolerationSeconds
 			}
 		}
 	}
 
+	if minTolerationTime == int64(math.MaxInt64) {
+		return -1
+	}
 	return time.Duration(minTolerationTime) * time.Second
 }
 

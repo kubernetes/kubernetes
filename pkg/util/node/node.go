@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -107,17 +108,31 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 }
 
 // GetNodeIP returns the ip of node with the provided hostname
+// If required, wait for the node to be defined.
 func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
-	if err != nil {
-		klog.Warningf("Failed to retrieve node info: %v", err)
-		return nil
+	backoff := wait.Backoff{
+		Steps:    5,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.2,
 	}
-	nodeIP, err = GetNodeHostIP(node)
-	if err != nil {
-		klog.Warningf("Failed to retrieve node IP: %v", err)
-		return nil
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf("Failed to retrieve node info: %v", err)
+			return false, nil
+		}
+		nodeIP, err = GetNodeHostIP(node)
+		if err != nil {
+			klog.Errorf("Failed to retrieve node IP: %v", err)
+			return false, err
+		}
+		return true, nil
+	})
+	if err == nil {
+		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
 	}
 	return nodeIP
 }

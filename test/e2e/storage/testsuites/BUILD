@@ -4,7 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "base.go",
+        "disruptive.go",
         "driveroperations.go",
+        "ephemeral.go",
         "multivolume.go",
         "provisioning.go",
         "snapshottable.go",

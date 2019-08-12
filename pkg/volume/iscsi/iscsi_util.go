@@ -19,6 +19,7 @@ package iscsi
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,10 +27,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -58,6 +60,11 @@ const (
 	// 'iscsiadm' error code stating that a session is logged in
 	// See https://github.com/open-iscsi/open-iscsi/blob/7d121d12ad6ba7783308c25ffd338a9fa0cc402b/include/iscsi_err.h#L37-L38
 	iscsiadmErrorSessExists = 15
+
+	// iscsiadm exit code for "session could not be found"
+	exit_ISCSI_ERR_SESS_NOT_FOUND = 2
+	// iscsiadm exit code for "no records/targets/sessions/portals found to execute operation on."
+	exit_ISCSI_ERR_NO_OBJS_FOUND = 21
 )
 
 var (
@@ -160,30 +167,6 @@ func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransp
 		time.Sleep(time.Second)
 	}
 	return false
-}
-
-// getDevicePrefixRefCount: given a prefix of device path, find its reference count from /proc/mounts
-// returns the reference count to the device and error code
-// for services like iscsi construct multiple device paths with the same prefix pattern.
-// this function aggregates all references to a service based on the prefix pattern
-// More specifically, this prefix semantics is to aggregate disk paths that belong to the same iSCSI target/iqn pair.
-// an iSCSI target could expose multiple LUNs through the same IQN, and Linux iSCSI initiator creates disk paths that start the same prefix but end with different LUN number
-// When we decide whether it is time to logout a target, we have to see if none of the LUNs are used any more.
-// That's where the prefix based ref count kicks in. If we only count the disks using exact match, we could log other disks out.
-func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (int, error) {
-	mps, err := mounter.List()
-	if err != nil {
-		return -1, err
-	}
-
-	// Find the number of references to the device.
-	refCount := 0
-	for i := range mps {
-		if strings.HasPrefix(mps[i].Path, deviceNamePrefix) {
-			refCount++
-		}
-	}
-	return refCount, nil
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface_name/portal-some_iqn-lun-lun_id
@@ -612,7 +595,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	}
 
 	// if device is no longer used, see if need to logout the target
-	device, prefix, err := extractDeviceAndPrefix(mntPath)
+	device, _, err := extractDeviceAndPrefix(mntPath)
 	if err != nil {
 		return err
 	}
@@ -650,15 +633,14 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	c.plugin.targetLocks.LockKey(iqn)
 	defer c.plugin.targetLocks.UnlockKey(iqn)
 
-	// if device is no longer used, see if need to logout the target
-	refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
-	if err != nil || refCount != 0 {
-		return nil
-	}
-
 	portals := removeDuplicate(bkpPortal)
 	if len(portals) == 0 {
 		return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations")
+	}
+
+	// If device is no longer used, see if need to logout the target
+	if isSessionBusy(c.iscsiDisk.plugin.host, portals[0], iqn) {
+		return nil
 	}
 
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
@@ -718,10 +700,16 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if _, err = os.Stat(devicePath); err != nil {
 		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
 	}
-	// check if the dev is using mpio and if so mount it via the dm-XX device
-	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
-		devicePath = mappedDevicePath
+
+	// Lock the target while we determine if we can safely log out or not
+	c.plugin.targetLocks.LockKey(iqn)
+	defer c.plugin.targetLocks.UnlockKey(iqn)
+
+	// If device is no longer used, see if need to logout the target
+	if isSessionBusy(c.iscsiDisk.plugin.host, portals[0], iqn) {
+		return nil
 	}
+
 	// Detach a volume from kubelet node
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
 	if err != nil {
@@ -740,14 +728,18 @@ func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, i
 		}
 		klog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
 		out, err := exec.Run("iscsiadm", logoutArgs...)
+		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
+			return err
 		}
 		// Delete the node record
 		klog.Infof("iscsi: delete node record target %s iqn %s", portal, iqn)
 		out, err = exec.Run("iscsiadm", deleteArgs...)
+		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
+			return err
 		}
 	}
 	// Delete the iface after all sessions have logged out
@@ -755,8 +747,10 @@ func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, i
 	if initiatorName != "" && found && iface == (portals[0]+":"+volName) {
 		deleteArgs := []string{"-m", "iface", "-I", iface, "-o", "delete"}
 		out, err := exec.Run("iscsiadm", deleteArgs...)
+		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete iface Error: %s", string(out))
+			return err
 		}
 	}
 
@@ -896,4 +890,71 @@ func cloneIface(b iscsiDiskMounter) error {
 		}
 	}
 	return lastErr
+}
+
+// isSessionBusy determines if the iSCSI session is busy by counting both FS and block volumes in use.
+func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
+	fsDir := host.GetPluginDir(iscsiPluginName)
+	countFS, err := getVolCount(fsDir, portal, iqn)
+	if err != nil {
+		klog.Errorf("iscsi: could not determine FS volumes in use: %v", err)
+		return true
+	}
+
+	blockDir := host.GetVolumeDevicePluginDir(iscsiPluginName)
+	countBlock, err := getVolCount(blockDir, portal, iqn)
+	if err != nil {
+		klog.Errorf("iscsi: could not determine block volumes in use: %v", err)
+		return true
+	}
+
+	return countFS+countBlock > 1
+}
+
+// getVolCount returns the number of volumes in use by the kubelet.
+// It does so by counting the number of directories prefixed by the given portal and IQN.
+func getVolCount(dir, portal, iqn string) (int, error) {
+	// The topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0
+	contents, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return 0, err
+	}
+
+	// Inside each iface dir, we look for volume dirs prefixed by the given
+	// portal + iqn, e.g., 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
+	var counter int
+	for _, c := range contents {
+		if !c.IsDir() || c.Name() == config.DefaultKubeletVolumeDevicesDirName {
+			continue
+		}
+
+		mounts, err := ioutil.ReadDir(filepath.Join(dir, c.Name()))
+		if err != nil {
+			return 0, err
+		}
+
+		for _, m := range mounts {
+			volumeMount := m.Name()
+			prefix := portal + "-" + iqn
+			if strings.HasPrefix(volumeMount, prefix) {
+				counter++
+			}
+		}
+	}
+
+	return counter, nil
+}
+
+func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
+	exitError, ok := err.(utilexec.ExitError)
+	if !ok {
+		return err
+	}
+	for _, code := range ignoredExitCodes {
+		if exitError.ExitStatus() == code {
+			klog.V(4).Infof("ignored iscsiadm exit code %d", code)
+			return nil
+		}
+	}
+	return err
 }

@@ -136,7 +136,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	if cz, err := configz.New(ConfigzName); err == nil {
 		cz.Set(c.ComponentConfig)
 	} else {
-		klog.Errorf("unable to register configz: %c", err)
+		klog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Setup any healthz checks we will want to use.
@@ -186,8 +186,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	// Lock required for leader election
 	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"cloud-controller-manager",
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		c.LeaderElectionClient.CoreV1(),
 		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{

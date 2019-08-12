@@ -161,9 +161,6 @@ github.com/cloudflare/cfssl/signer
 github.com/cloudflare/cfssl/signer/local
 # github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 github.com/clusterhq/flocker-go
-# github.com/codedellemc/goscaleio v0.0.0-20170830184815-20e2ce2cf885 => github.com/codedellemc/goscaleio v0.0.0-20170830184815-20e2ce2cf885
-github.com/codedellemc/goscaleio
-github.com/codedellemc/goscaleio/types/v1
 # github.com/container-storage-interface/spec v1.1.0 => github.com/container-storage-interface/spec v1.1.0
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/console v0.0.0-20170925154832-84eeaae905fa => github.com/containerd/console v0.0.0-20170925154832-84eeaae905fa
@@ -283,7 +280,7 @@ github.com/davecgh/go-spew/spew
 github.com/daviddengcn/go-colortext
 # github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda => github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
 github.com/dgrijalva/jwt-go
-# github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff => github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff
+# github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1+incompatible
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
@@ -339,6 +336,8 @@ github.com/evanphx/json-patch
 github.com/exponent-io/jsonpath
 # github.com/fatih/camelcase v1.0.0 => github.com/fatih/camelcase v1.0.0
 github.com/fatih/camelcase
+# github.com/fatih/color v1.6.0 => github.com/fatih/color v1.6.0
+github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.4.7 => github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
 # github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 => github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4
@@ -375,7 +374,7 @@ github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
 # github.com/godbus/dbus v4.1.0+incompatible => github.com/godbus/dbus v4.1.0+incompatible
 github.com/godbus/dbus
-# github.com/gogo/protobuf v1.0.0 => github.com/gogo/protobuf v1.0.0
+# github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/plugin/compare
 github.com/gogo/protobuf/plugin/defaultcheck
@@ -396,6 +395,7 @@ github.com/gogo/protobuf/plugin/unmarshal
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/protoc-gen-gogo/generator
+github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap
 github.com/gogo/protobuf/protoc-gen-gogo/grpc
 github.com/gogo/protobuf/protoc-gen-gogo/plugin
 github.com/gogo/protobuf/sortkeys
@@ -559,17 +559,13 @@ github.com/inconshreveable/mousetrap
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0 => github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
-# github.com/json-iterator/go v1.1.6 => github.com/json-iterator/go v1.1.6
+# github.com/json-iterator/go v1.1.7 => github.com/json-iterator/go v1.1.7
 github.com/json-iterator/go
-# github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024 => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
-github.com/jstemmer/go-junit-report
-github.com/jstemmer/go-junit-report/formatter
-github.com/jstemmer/go-junit-report/parser
 # github.com/karrick/godirwalk v1.7.5 => github.com/karrick/godirwalk v1.7.5
 github.com/karrick/godirwalk
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1 => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 github.com/konsorten/go-windows-terminal-sequences
-# github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875 => github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
+# github.com/libopenstorage/openstorage v1.0.0 => github.com/libopenstorage/openstorage v1.0.0
 github.com/libopenstorage/openstorage/api
 github.com/libopenstorage/openstorage/api/client
 github.com/libopenstorage/openstorage/api/client/volume
@@ -589,6 +585,10 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
 github.com/marstr/guid
+# github.com/mattn/go-colorable v0.0.9 => github.com/mattn/go-colorable v0.0.9
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.3 => github.com/mattn/go-isatty v0.0.3
+github.com/mattn/go-isatty
 # github.com/mattn/go-shellwords v1.0.5 => github.com/mattn/go-shellwords v1.0.5
 github.com/mattn/go-shellwords
 # github.com/matttproud/golang_protobuf_extensions v1.0.1 => github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -761,6 +761,9 @@ github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
 # github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4 => github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4
 github.com/syndtr/gocapability/capability
+# github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
+github.com/thecodeteam/goscaleio
+github.com/thecodeteam/goscaleio/types/v1
 # github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8 => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
 github.com/tmc/grpc-websocket-proxy/wsproxy
 # github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e => github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
@@ -863,6 +866,8 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
+# golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
+golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -1017,7 +1022,14 @@ gopkg.in/tomb.v1
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.2 => gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
+# gotest.tools v2.2.0+incompatible => gotest.tools v2.2.0+incompatible
+gotest.tools
+# gotest.tools/gotestsum v0.3.5 => gotest.tools/gotestsum v0.3.5
+gotest.tools/gotestsum
+gotest.tools/gotestsum/internal/junitxml
+gotest.tools/gotestsum/testjson
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1
@@ -1058,6 +1070,7 @@ k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
 # k8s.io/apiextensions-apiserver v0.0.0 => ./staging/src/k8s.io/apiextensions-apiserver
+k8s.io/apiextensions-apiserver/pkg/apihelpers
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -1087,6 +1100,7 @@ k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion
 k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/cmd/server/options
 k8s.io/apiextensions-apiserver/pkg/cmd/server/testing
+k8s.io/apiextensions-apiserver/pkg/controller/apiapproval
 k8s.io/apiextensions-apiserver/pkg/controller/establish
 k8s.io/apiextensions-apiserver/pkg/controller/finalizer
 k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema
@@ -1121,8 +1135,6 @@ k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme
 k8s.io/apimachinery/pkg/apis/meta/v1/validation
 k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/apis/meta/v1beta1/validation
-k8s.io/apimachinery/pkg/apis/testapigroup
-k8s.io/apimachinery/pkg/apis/testapigroup/v1
 k8s.io/apimachinery/pkg/conversion
 k8s.io/apimachinery/pkg/conversion/queryparams
 k8s.io/apimachinery/pkg/fields
@@ -1158,7 +1170,6 @@ k8s.io/apimachinery/pkg/util/remotecommand
 k8s.io/apimachinery/pkg/util/runtime
 k8s.io/apimachinery/pkg/util/sets
 k8s.io/apimachinery/pkg/util/strategicpatch
-k8s.io/apimachinery/pkg/util/strategicpatch/testing
 k8s.io/apimachinery/pkg/util/uuid
 k8s.io/apimachinery/pkg/util/validation
 k8s.io/apimachinery/pkg/util/validation/field
@@ -1246,6 +1257,7 @@ k8s.io/apiserver/pkg/registry/generic/testing
 k8s.io/apiserver/pkg/registry/rest
 k8s.io/apiserver/pkg/registry/rest/resttest
 k8s.io/apiserver/pkg/server
+k8s.io/apiserver/pkg/server/egressselector
 k8s.io/apiserver/pkg/server/filters
 k8s.io/apiserver/pkg/server/healthz
 k8s.io/apiserver/pkg/server/httplog
@@ -1638,15 +1650,76 @@ k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
+k8s.io/kubectl/pkg/apps
+k8s.io/kubectl/pkg/cmd
+k8s.io/kubectl/pkg/cmd/annotate
+k8s.io/kubectl/pkg/cmd/apiresources
+k8s.io/kubectl/pkg/cmd/apply
+k8s.io/kubectl/pkg/cmd/attach
+k8s.io/kubectl/pkg/cmd/autoscale
+k8s.io/kubectl/pkg/cmd/certificates
+k8s.io/kubectl/pkg/cmd/clusterinfo
+k8s.io/kubectl/pkg/cmd/completion
+k8s.io/kubectl/pkg/cmd/config
+k8s.io/kubectl/pkg/cmd/cp
+k8s.io/kubectl/pkg/cmd/create
+k8s.io/kubectl/pkg/cmd/delete
+k8s.io/kubectl/pkg/cmd/describe
+k8s.io/kubectl/pkg/cmd/diff
+k8s.io/kubectl/pkg/cmd/drain
+k8s.io/kubectl/pkg/cmd/edit
+k8s.io/kubectl/pkg/cmd/exec
+k8s.io/kubectl/pkg/cmd/explain
+k8s.io/kubectl/pkg/cmd/expose
+k8s.io/kubectl/pkg/cmd/kustomize
+k8s.io/kubectl/pkg/cmd/label
+k8s.io/kubectl/pkg/cmd/logs
+k8s.io/kubectl/pkg/cmd/options
+k8s.io/kubectl/pkg/cmd/patch
+k8s.io/kubectl/pkg/cmd/plugin
+k8s.io/kubectl/pkg/cmd/portforward
+k8s.io/kubectl/pkg/cmd/proxy
+k8s.io/kubectl/pkg/cmd/replace
+k8s.io/kubectl/pkg/cmd/rollingupdate
+k8s.io/kubectl/pkg/cmd/rollout
+k8s.io/kubectl/pkg/cmd/run
+k8s.io/kubectl/pkg/cmd/scale
+k8s.io/kubectl/pkg/cmd/set
+k8s.io/kubectl/pkg/cmd/set/env
+k8s.io/kubectl/pkg/cmd/taint
+k8s.io/kubectl/pkg/cmd/testing
+k8s.io/kubectl/pkg/cmd/top
+k8s.io/kubectl/pkg/cmd/util
+k8s.io/kubectl/pkg/cmd/util/editor
+k8s.io/kubectl/pkg/cmd/util/editor/crlf
+k8s.io/kubectl/pkg/cmd/util/sanity
+k8s.io/kubectl/pkg/cmd/version
+k8s.io/kubectl/pkg/cmd/wait
+k8s.io/kubectl/pkg/describe
+k8s.io/kubectl/pkg/describe/versioned
+k8s.io/kubectl/pkg/drain
+k8s.io/kubectl/pkg/explain
+k8s.io/kubectl/pkg/generate
+k8s.io/kubectl/pkg/generate/versioned
+k8s.io/kubectl/pkg/generated
+k8s.io/kubectl/pkg/metricsutil
+k8s.io/kubectl/pkg/polymorphichelpers
+k8s.io/kubectl/pkg/proxy
 k8s.io/kubectl/pkg/rawhttp
+k8s.io/kubectl/pkg/scale
 k8s.io/kubectl/pkg/scheme
+k8s.io/kubectl/pkg/util
 k8s.io/kubectl/pkg/util/certificate
 k8s.io/kubectl/pkg/util/deployment
 k8s.io/kubectl/pkg/util/event
 k8s.io/kubectl/pkg/util/fieldpath
 k8s.io/kubectl/pkg/util/hash
+k8s.io/kubectl/pkg/util/i18n
 k8s.io/kubectl/pkg/util/interrupt
 k8s.io/kubectl/pkg/util/logs
+k8s.io/kubectl/pkg/util/openapi
+k8s.io/kubectl/pkg/util/openapi/testing
+k8s.io/kubectl/pkg/util/openapi/validation
 k8s.io/kubectl/pkg/util/podutils
 k8s.io/kubectl/pkg/util/printers
 k8s.io/kubectl/pkg/util/qos
@@ -1657,6 +1730,7 @@ k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 k8s.io/kubectl/pkg/validation
+k8s.io/kubectl/pkg/version
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
 k8s.io/kubelet/config/v1beta1
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
@@ -1716,11 +1790,12 @@ k8s.io/sample-apiserver/pkg/generated/openapi
 k8s.io/sample-apiserver/pkg/registry
 k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-# k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a => k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
+# k8s.io/utils v0.0.0-20190801114015-581e00157fb1 => k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec
 k8s.io/utils/exec/testing
+k8s.io/utils/inotify
 k8s.io/utils/integer
 k8s.io/utils/io
 k8s.io/utils/keymutex
@@ -1753,7 +1828,7 @@ sigs.k8s.io/kustomize/pkg/transformers
 sigs.k8s.io/kustomize/pkg/transformers/config
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 sigs.k8s.io/kustomize/pkg/types
-# sigs.k8s.io/structured-merge-diff v0.0.0-20190719182312-e94e05bfbbe3 => sigs.k8s.io/structured-merge-diff v0.0.0-20190719182312-e94e05bfbbe3
+# sigs.k8s.io/structured-merge-diff v0.0.0-20190724202554-0c1d754dd648 => sigs.k8s.io/structured-merge-diff v0.0.0-20190724202554-0c1d754dd648
 sigs.k8s.io/structured-merge-diff/fieldpath
 sigs.k8s.io/structured-merge-diff/merge
 sigs.k8s.io/structured-merge-diff/schema

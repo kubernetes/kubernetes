@@ -1519,7 +1519,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(ctx context.Context, clusterName
 	if lbaas.opts.ManageSecurityGroups {
 		err := lbaas.EnsureSecurityGroupDeleted(clusterName, service)
 		if err != nil {
-			return fmt.Errorf("Failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+			return fmt.Errorf("failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 		}
 	}
 
@@ -1536,7 +1536,7 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 			// It is OK when the security group has been deleted by others.
 			return nil
 		}
-		return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
+		return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
 	}
 
 	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
@@ -1567,7 +1567,7 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 			for _, rule := range secGroupRules {
 				res := rules.Delete(lbaas.network, rule.ID)
 				if res.Err != nil && !isNotFound(res.Err) {
-					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
+					return fmt.Errorf("error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
 				}
 			}
 		}

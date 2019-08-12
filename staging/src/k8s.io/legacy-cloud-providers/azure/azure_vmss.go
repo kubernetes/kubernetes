@@ -39,10 +39,11 @@ var (
 	// ErrorNotVmssInstance indicates an instance is not belongint to any vmss.
 	ErrorNotVmssInstance = errors.New("not a vmss instance")
 
-	scaleSetNameRE        = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
-	resourceGroupRE       = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(?:.*)/virtualMachines(?:.*)`)
-	vmssMachineIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s"
-	vmssIPConfigurationRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines/(.+)/networkInterfaces(?:.*)`)
+	scaleSetNameRE         = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
+	resourceGroupRE        = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(?:.*)/virtualMachines(?:.*)`)
+	vmssMachineIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s"
+	vmssIPConfigurationRE  = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines/(.+)/networkInterfaces(?:.*)`)
+	vmssPIPConfigurationRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines/(.+)/networkInterfaces/(.+)/ipConfigurations/(.+)/publicIPAddresses/(.+)`)
 )
 
 // scaleSet implements VMSet interface for Azure scale set.
@@ -144,7 +145,9 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 		}
 	}
 
-	return "", fmt.Errorf("failed to get power status for node %q", name)
+	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
+	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
+	return vmPowerStateStopped, nil
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
@@ -313,26 +316,47 @@ func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 	publicIP := ""
 	if ipConfig.PublicIPAddress != nil && ipConfig.PublicIPAddress.ID != nil {
 		pipID := *ipConfig.PublicIPAddress.ID
-		pipName, err := getLastSegment(pipID)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to get publicIP name for node %q with pipID %q", nodeName, pipID)
-		}
-
-		resourceGroup, err := ss.GetNodeResourceGroup(nodeName)
-		if err != nil {
-			return "", "", err
-		}
-
-		pip, existsPip, err := ss.getPublicIPAddress(resourceGroup, pipName)
-		if err != nil {
-			return "", "", err
-		}
-		if existsPip {
-			publicIP = *pip.IPAddress
+		matches := vmssPIPConfigurationRE.FindStringSubmatch(pipID)
+		if len(matches) == 7 {
+			resourceGroupName := matches[1]
+			virtualMachineScaleSetName := matches[2]
+			virtualmachineIndex := matches[3]
+			networkInterfaceName := matches[4]
+			IPConfigurationName := matches[5]
+			publicIPAddressName := matches[6]
+			pip, existsPip, err := ss.getVMSSPublicIPAddress(resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName)
+			if err != nil {
+				klog.Errorf("ss.getVMSSPublicIPAddress() failed with error: %v", err)
+				return "", "", err
+			}
+			if existsPip && pip.IPAddress != nil {
+				publicIP = *pip.IPAddress
+			}
+		} else {
+			klog.Warningf("Failed to get VMSS Public IP with ID %s", pipID)
 		}
 	}
 
 	return internalIP, publicIP, nil
+}
+
+func (ss *scaleSet) getVMSSPublicIPAddress(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string) (pip network.PublicIPAddress, exists bool, err error) {
+	var realErr error
+	var message string
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	pip, err = ss.PublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, "")
+	exists, message, realErr = checkResourceExistsFromError(err)
+	if realErr != nil {
+		return pip, false, realErr
+	}
+
+	if !exists {
+		klog.V(2).Infof("Public IP %q not found with message: %q", publicIPAddressName, message)
+		return pip, false, nil
+	}
+
+	return pip, exists, err
 }
 
 // returns a list of private ips assigned to node
@@ -589,8 +613,15 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 	defer cancel()
 	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroup, ssName, instanceID, nicName, "")
 	if err != nil {
-		klog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, resourceGroup, ssName, nicName, err)
-		return network.Interface{}, err
+		exists, _, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			klog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, resourceGroup, ssName, nicName, realErr)
+			return network.Interface{}, err
+		}
+
+		if !exists {
+			return network.Interface{}, cloudprovider.InstanceNotFound
+		}
 	}
 
 	// Fix interface's location, which is required when updating the interface.
@@ -767,20 +798,24 @@ func (ss *scaleSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, bac
 		}
 
 		f := func() error {
-			// VMAS nodes should also be added to the SLB backends.
-			if ss.useStandardLoadBalancer() {
-				// Check whether the node is VMAS virtual machine.
-				managedByAS, err := ss.isNodeManagedByAvailabilitySet(localNodeName)
-				if err != nil {
-					klog.Errorf("Failed to check isNodeManagedByAvailabilitySet(%s): %v", localNodeName, err)
-					return err
-				}
-				if managedByAS {
-					return ss.availabilitySet.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
-				}
+			// Check whether the node is VMAS virtual machine.
+			managedByAS, err := ss.isNodeManagedByAvailabilitySet(localNodeName)
+			if err != nil {
+				klog.Errorf("Failed to check isNodeManagedByAvailabilitySet(%s): %v", localNodeName, err)
+				return err
 			}
 
-			err := ss.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+			if managedByAS {
+				// VMAS nodes should also be added to the SLB backends.
+				if ss.useStandardLoadBalancer() {
+					return ss.availabilitySet.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+				}
+
+				klog.V(3).Infof("EnsureHostsInPool skips node %s because VMAS nodes couldn't be added to basic LB with VMSS backends", localNodeName)
+				return nil
+			}
+
+			err = ss.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
 			if err != nil {
 				return fmt.Errorf("EnsureHostInPool(%s): backendPoolID(%s) - failed to ensure host in pool: %q", getServiceName(service), backendPoolID, err)
 			}

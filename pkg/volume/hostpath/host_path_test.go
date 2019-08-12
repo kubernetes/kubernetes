@@ -97,13 +97,12 @@ func TestRecycler(t *testing.T) {
 
 func TestDeleter(t *testing.T) {
 	// Deleter has a hard-coded regex for "/tmp".
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
-	defer os.RemoveAll(tempPath)
+	tempPath := fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
 		t.Fatalf("Failed to create tmp directory for deleter: %v", err)
 	}
-
+	defer os.RemoveAll(tempPath)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
@@ -154,30 +153,32 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
-	defer os.RemoveAll(tempPath)
-	err := os.MkdirAll(tempPath, 0750)
-	if err != nil {
-		t.Errorf("Failed to create tempPath %s error:%v", tempPath, err)
-	}
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
 		nil,
 		volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
-	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: tempPath}}}}}
+	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{
+		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}}}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatalf("Can't find the plugin by name")
 	}
 	options := volume.VolumeOptions{
 		PVC:                           volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
-	creater, err := plug.NewProvisioner(options)
+	creator, err := plug.NewProvisioner(options)
 	if err != nil {
-		t.Errorf("Failed to make a new Provisioner: %v", err)
+		t.Fatalf("Failed to make a new Provisioner: %v", err)
 	}
-	pv, err := creater.Provision(nil, nil)
+
+	hostPathCreator, ok := creator.(*hostPathProvisioner)
+	if !ok {
+		t.Fatal("Not a hostPathProvisioner")
+	}
+	hostPathCreator.basePath = fmt.Sprintf("%s.%s", "hostPath_pv", uuid.NewUUID())
+
+	pv, err := hostPathCreator.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error creating volume: %v", err)
 	}
@@ -196,7 +197,8 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Expected reclaim policy %+v but got %+v", v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
 	}
 
-	os.RemoveAll(pv.Spec.HostPath.Path)
+	os.RemoveAll(hostPathCreator.basePath)
+
 }
 
 func TestInvalidHostPath(t *testing.T) {

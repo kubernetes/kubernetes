@@ -26,13 +26,13 @@ import (
 	"net"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
@@ -52,13 +52,12 @@ import (
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.scheme, o.master)
+	return newProxyServer(o.config, o.CleanupAndExit, o.master)
 }
 
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
 	cleanupAndExit bool,
-	scheme *runtime.Scheme,
 	master string) (*ProxyServer, error) {
 
 	if config == nil {
@@ -116,7 +115,7 @@ func newProxyServer(
 		return nil, err
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
+	recorder := eventBroadcaster.NewRecorder(proxyconfigscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -138,6 +137,9 @@ func newProxyServer(
 	nodeIP := net.ParseIP(config.BindAddress)
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
+		if nodeIP == nil {
+			return nil, fmt.Errorf("unable to get node IP for hostname %s", hostname)
+		}
 	}
 	if proxyMode == proxyModeIPTables {
 		klog.V(0).Info("Using iptables Proxier.")

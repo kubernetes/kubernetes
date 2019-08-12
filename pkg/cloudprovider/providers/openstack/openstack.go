@@ -41,7 +41,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/gcfg.v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -146,6 +146,11 @@ type OpenStack struct {
 }
 
 // Config is used to read and store information from the cloud configuration file
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type Config struct {
 	Global struct {
 		AuthURL         string `gcfg:"auth-url"`
@@ -262,6 +267,7 @@ func createKubernetesClient(kubeconfigPath string) (*kubernetes.Clientset, error
 	if err != nil {
 		return nil, err
 	}
+	cfg.DisableCompression = true
 
 	client, err := kubernetes.NewForConfig(cfg)
 	if err != nil {

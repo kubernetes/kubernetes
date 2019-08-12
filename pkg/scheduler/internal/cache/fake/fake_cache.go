@@ -109,3 +109,13 @@ func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
 func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return nil, nil
 }
+
+// ListNodes is a fake method for testing.
+func (c *Cache) ListNodes() []*v1.Node {
+	return nil
+}
+
+// GetCSINodeInfo is a fake method for testing.
+func (c *Cache) GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error) {
+	return nil, nil
+}

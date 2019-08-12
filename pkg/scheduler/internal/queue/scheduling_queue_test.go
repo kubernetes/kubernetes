@@ -24,7 +24,7 @@ import (
 	"time"
 
 	dto "github.com/prometheus/client_model/go"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -179,6 +179,14 @@ func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, 
 	return nil, nil
 }
 
+func (*fakeFramework) RunNormalizeScorePlugins(pc *framework.PluginContext, pod *v1.Pod, scores framework.PluginToNodeScoreMap) *framework.Status {
+	return nil
+}
+
+func (*fakeFramework) ApplyScoreWeights(pc *framework.PluginContext, pod *v1.Pod, scores framework.PluginToNodeScoreMap) *framework.Status {
+	return nil
+}
+
 func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
@@ -188,6 +196,10 @@ func (*fakeFramework) RunBindPlugins(pc *framework.PluginContext, pod *v1.Pod, n
 }
 
 func (*fakeFramework) RunPostbindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
+
+func (*fakeFramework) RunPostFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses framework.NodeToStatusMap) *framework.Status {
+	return nil
+}
 
 func (*fakeFramework) RunReservePlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
@@ -281,12 +293,12 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	}
 }
 
-// TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff tests scenario when
-// AddUnschedulableIfNotPresent is called asynchronously pods in and before
-// current scheduling cycle will be put back to activeQueue if we were trying
-// to schedule them when we received move request.
+// TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff tests the scenarios when
+// AddUnschedulableIfNotPresent is called asynchronously.
+// Pods in and before current scheduling cycle will be put back to activeQueue
+// if we were trying to schedule them when we received move request.
 func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueueWithClock(nil, clock.NewFakeClock(time.Now()), nil)
 	totalNum := 10
 	expectedPods := make([]v1.Pod, 0, totalNum)
 	for i := 0; i < totalNum; i++ {
@@ -336,7 +348,9 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 			},
 		}
 
-		q.AddUnschedulableIfNotPresent(unschedulablePod, oldCycle)
+		if err := q.AddUnschedulableIfNotPresent(unschedulablePod, oldCycle); err != nil {
+			t.Errorf("Failed to call AddUnschedulableIfNotPresent(%v): %v", unschedulablePod.Name, err)
+		}
 	}
 
 	// Since there was a move request at the same cycle as "oldCycle", these pods

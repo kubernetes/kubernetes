@@ -273,10 +273,10 @@ func TestPreemption(t *testing.T) {
 				}
 			}
 		}
-		// Also check that the preemptor pod gets the annotation for nominated node name.
+		// Also check that the preemptor pod gets the NominatedNodeName field set.
 		if len(test.preemptedPodIndexes) > 0 {
 			if err := waitForNominatedNodeName(cs, preemptor); err != nil {
-				t.Errorf("Test [%v]: NominatedNodeName annotation was not set for pod %v: %v", test.description, preemptor.Name, err)
+				t.Errorf("Test [%v]: NominatedNodeName field was not set for pod %v: %v", test.description, preemptor.Name, err)
 			}
 		}
 

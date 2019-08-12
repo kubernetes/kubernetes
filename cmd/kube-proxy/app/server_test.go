@@ -73,11 +73,16 @@ func (fake *fakeKernelCompatTester) IsCompatible() error {
 
 // fakeKernelHandler implements KernelHandler.
 type fakeKernelHandler struct {
-	modules []string
+	modules       []string
+	kernelVersion string
 }
 
 func (fake *fakeKernelHandler) GetModules() ([]string, error) {
 	return fake.modules, nil
+}
+
+func (fake *fakeKernelHandler) GetKernelVersion() (string, error) {
+	return fake.kernelVersion, nil
 }
 
 // This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
@@ -393,7 +398,7 @@ func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
 		tempDir, err := ioutil.TempDir("", "kubeproxy-config-change")
 		if err != nil {
-			return nil, "", fmt.Errorf("Unable to create temporary directory: %v", err)
+			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
 		}
 		fullPath := filepath.Join(tempDir, "kube-proxy-config")
 		file, err := os.Create(fullPath)

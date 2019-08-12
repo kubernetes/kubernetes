@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -58,8 +59,8 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 	fs.Float32Var(&cfg.ClientConnection.QPS, "kube-api-qps", cfg.ClientConnection.QPS, "DEPRECATED: QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&cfg.ClientConnection.Burst, "kube-api-burst", cfg.ClientConnection.Burst, "DEPRECATED: burst to use while talking with kubernetes apiserver")
 	fs.StringVar(&cfg.SchedulerName, "scheduler-name", cfg.SchedulerName, "DEPRECATED: name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.schedulerName\".")
-	fs.StringVar(&cfg.LeaderElection.LockObjectNamespace, "lock-object-namespace", cfg.LeaderElection.LockObjectNamespace, "DEPRECATED: define the namespace of the lock object.")
-	fs.StringVar(&cfg.LeaderElection.LockObjectName, "lock-object-name", cfg.LeaderElection.LockObjectName, "DEPRECATED: define the name of the lock object.")
+	fs.StringVar(&cfg.LeaderElection.ResourceNamespace, "lock-object-namespace", cfg.LeaderElection.ResourceNamespace, "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace.")
+	fs.StringVar(&cfg.LeaderElection.ResourceName, "lock-object-name", cfg.LeaderElection.ResourceName, "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name")
 
 	fs.Int32Var(&cfg.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", cfg.HardPodAffinitySymmetricWeight,
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+

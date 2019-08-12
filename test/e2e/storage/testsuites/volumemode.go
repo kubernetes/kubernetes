@@ -139,10 +139,11 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}
 				l.sc.VolumeBindingMode = &volBindMode
 
-				claimSize := dDriver.GetClaimSize()
-				l.pvc = getClaim(claimSize, l.ns.Name)
-				l.pvc.Spec.StorageClassName = &l.sc.Name
-				l.pvc.Spec.VolumeMode = &pattern.VolMode
+				l.pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+					ClaimSize:        dDriver.GetClaimSize(),
+					StorageClassName: &(l.sc.Name),
+					VolumeMode:       &pattern.VolMode,
+				}, l.ns.Name)
 			}
 		default:
 			e2elog.Failf("Volume mode test doesn't support: %s", pattern.VolType)
@@ -188,7 +189,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				ginkgo.By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
-					false, "", false, false, framework.SELinuxLabel,
+					nil, false, "", false, false, framework.SELinuxLabel,
 					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))

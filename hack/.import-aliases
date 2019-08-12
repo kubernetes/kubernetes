@@ -2,6 +2,7 @@
   "k8s.io/api/admissionregistration/v1": "admissionregistrationv1",
   "k8s.io/api/admissionregistration/v1beta1": "admissionregistrationv1beta1",
   "k8s.io/api/admission/v1beta1": "admissionv1beta1",
+  "k8s.io/api/admission/v1": "admissionv1",
   "k8s.io/api/apps/v1": "appsv1",
   "k8s.io/api/apps/v1beta1": "appsv1beta1",
   "k8s.io/api/apps/v1beta2": "appsv1beta2",
@@ -46,5 +47,6 @@
   "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1": "kubeletresourcemetricsv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1": "proxyconfigv1alpha1",
-  "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1": "schedulerconfigv1alpha1"
+  "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1": "schedulerconfigv1alpha1",
+  "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice"
 }

@@ -191,6 +191,7 @@ func testNvidiaGPUs(f *framework.Framework) {
 	// Wait for all pods to succeed
 	for _, pod := range podList {
 		f.PodClient().WaitForSuccess(pod.Name, 5*time.Minute)
+		logContainers(f, pod)
 	}
 
 	e2elog.Logf("Stopping ResourceUsageGather")
@@ -199,6 +200,14 @@ func testNvidiaGPUs(f *framework.Framework) {
 	summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
 	f.TestSummaries = append(f.TestSummaries, summary)
 	framework.ExpectNoError(err, "getting resource usage summary")
+}
+
+func logContainers(f *framework.Framework, pod *v1.Pod) {
+	for _, container := range pod.Spec.Containers {
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, container.Name)
+		framework.ExpectNoError(err, "Should be able to get container logs for container: %s", container.Name)
+		e2elog.Logf("Got container logs for %s:\n%v", container.Name, logs)
+	}
 }
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {

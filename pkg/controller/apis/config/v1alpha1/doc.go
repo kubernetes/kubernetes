@@ -33,6 +33,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/service/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1

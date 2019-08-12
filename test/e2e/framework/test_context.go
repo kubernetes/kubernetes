@@ -164,6 +164,9 @@ type TestContextType struct {
 
 	// The configuration of NodeKiller.
 	NodeKiller NodeKillerConfig
+
+	// The Default IP Family of the cluster ("ipv4" or "ipv6")
+	IPFamily string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -181,6 +184,8 @@ type NodeKillerConfig struct {
 	JitterFactor float64
 	// SimulatedDowntime is a duration between node is killed and recreated.
 	SimulatedDowntime time.Duration
+	// NodeKillerStopCh is a channel that is used to notify NodeKiller to stop killing nodes.
+	NodeKillerStopCh chan struct{}
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -371,7 +376,7 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	userNick := "user"
 	contextNick := "context"
 
-	config := clientcmdapi.NewConfig()
+	configCmd := clientcmdapi.NewConfig()
 
 	credentials := clientcmdapi.NewAuthInfo()
 	credentials.Token = clientCfg.BearerToken
@@ -384,7 +389,7 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	if len(credentials.ClientKey) == 0 {
 		credentials.ClientKeyData = clientCfg.TLSClientConfig.KeyData
 	}
-	config.AuthInfos[userNick] = credentials
+	configCmd.AuthInfos[userNick] = credentials
 
 	cluster := clientcmdapi.NewCluster()
 	cluster.Server = clientCfg.Host
@@ -393,15 +398,15 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 		cluster.CertificateAuthorityData = clientCfg.CAData
 	}
 	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	config.Clusters[clusterNick] = cluster
+	configCmd.Clusters[clusterNick] = cluster
 
 	context := clientcmdapi.NewContext()
 	context.Cluster = clusterNick
 	context.AuthInfo = userNick
-	config.Contexts[contextNick] = context
-	config.CurrentContext = contextNick
+	configCmd.Contexts[contextNick] = context
+	configCmd.CurrentContext = contextNick
 
-	return config
+	return configCmd
 }
 
 // AfterReadingAllFlags makes changes to the context after all flags

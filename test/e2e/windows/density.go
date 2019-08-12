@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -84,8 +85,8 @@ type densityTest struct {
 	// API QPS limit
 	APIQPSLimit int
 	// performance limits
-	cpuLimits            framework.ContainersCPUSummary
-	memLimits            framework.ResourceUsagePerContainer
+	cpuLimits            e2ekubelet.ContainersCPUSummary
+	memLimits            e2ekubelet.ResourceUsagePerContainer
 	podStartupLimits     e2emetrics.LatencyMetric
 	podBatchStartupLimit time.Duration
 }
@@ -272,8 +273,9 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
-			gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
+			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+				30*time.Second, 10*time.Minute)
+			framework.ExpectNoError(err)
 		}(pod)
 	}
 	wg.Wait()

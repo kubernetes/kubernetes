@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +72,7 @@ const (
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *EndpointController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
@@ -111,6 +111,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.triggerTimeTracker = NewTriggerTimeTracker()
 	e.eventBroadcaster = broadcaster
 	e.eventRecorder = recorder
+
+	e.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
 	return e
 }
@@ -155,6 +157,8 @@ type EndpointController struct {
 	// triggerTimeTracker is an util used to compute and export the EndpointsLastChangeTriggerTime
 	// annotation.
 	triggerTimeTracker *TriggerTimeTracker
+
+	endpointUpdatesBatchPeriod time.Duration
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -210,7 +214,7 @@ func (e *EndpointController) addPod(obj interface{}) {
 		return
 	}
 	for key := range services {
-		e.queue.Add(key)
+		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
 	}
 }
 
@@ -311,7 +315,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 	}
 
 	for key := range services {
-		e.queue.Add(key)
+		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
 	}
 }
 
@@ -407,6 +411,10 @@ func (e *EndpointController) syncService(key string) error {
 	}
 	service, err := e.serviceLister.Services(namespace).Get(name)
 	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+
 		// Delete the corresponding endpoint, as the service has been deleted.
 		// TODO: Please note that this will delete an endpoint when a
 		// service is deleted. However, if we're down at the time when

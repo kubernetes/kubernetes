@@ -281,27 +281,6 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) isDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
-	// When feature VolumeScheduling enabled,
-	// Scheduler signal to the PV controller to start dynamic
-	// provisioning by setting the "AnnSelectedNode" annotation
-	// in the PVC
-	_, ok := claim.Annotations[pvutil.AnnSelectedNode]
-	return ok
-}
-
-// shouldDelayBinding returns true if binding of claim should be delayed, false otherwise.
-// If binding of claim should be delayed, only claims pbound by scheduler
-func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentVolumeClaim) (bool, error) {
-	// If claim has already been assigned a node by scheduler for dynamic provisioning.
-	if ctrl.isDelayBindingProvisioning(claim) {
-		return false, nil
-	}
-
-	// If claim is in delay binding mode.
-	return pvutil.IsDelayBindingMode(claim, ctrl.classLister)
-}
-
 // syncUnboundClaim is the main controller method to decide what to do with an
 // unbound claim.
 func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVolumeClaim) error {
@@ -309,7 +288,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 	// OBSERVATION: pvc is "Pending"
 	if claim.Spec.VolumeName == "" {
 		// User did not care which PV they get.
-		delayBinding, err := ctrl.shouldDelayBinding(claim)
+		delayBinding, err := pvutil.IsDelayBindingMode(claim, ctrl.classLister)
 		if err != nil {
 			return err
 		}
@@ -325,7 +304,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
 			switch {
-			case delayBinding:
+			case delayBinding && !pvutil.IsDelayBindingProvisioning(claim):
 				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.WaitForFirstConsumer, "waiting for first consumer to be created before binding")
 			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
@@ -1003,7 +982,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 			volumeClone.Annotations = nil
 		}
 	} else {
-		// The volume was pre-bound by user. Clear only the binging UID.
+		// The volume was pre-bound by user. Clear only the binding UID.
 		volumeClone.Spec.ClaimRef.UID = ""
 	}
 

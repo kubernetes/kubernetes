@@ -39,8 +39,8 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const itDescription = "status and events should match expectations"
@@ -77,8 +77,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 	var localKC *kubeletconfig.KubeletConfiguration
 
 	// Dummy context to prevent framework's AfterEach from cleaning up before this test's AfterEach can run
-	Context("", func() {
-		BeforeEach(func() {
+	ginkgo.Context("", func() {
+		ginkgo.BeforeEach(func() {
 			// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to test
 			enabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
@@ -119,7 +119,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			}
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			// clean-slate the Node again (prevents last-known-good from any tests from leaking through)
 			(&nodeConfigTestCase{
 				desc:         "reset via nil config source",
@@ -135,8 +135,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			restore.run(f, setConfigSourceFunc, false, 0)
 		})
 
-		Context("update Node.Spec.ConfigSource: state transitions:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update Node.Spec.ConfigSource: state transitions:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
 				correctKC := beforeKC.DeepCopy()
@@ -300,8 +300,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			})
 		})
 
-		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
 				lkgKC := beforeKC.DeepCopy()
@@ -364,8 +364,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			})
 		})
 
-		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
+			ginkgo.It(itDescription, func() {
 				const badConfigKey = "bad"
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -419,8 +419,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 		})
 
 		// previously, we missed a panic because we were not exercising this path
-		Context("update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
 				lkgKC := beforeKC.DeepCopy()
@@ -475,16 +475,16 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 
 				// Manually actuate this to ensure we wait for each case to become the last-known-good
 				const lkgDuration = 12 * time.Minute
-				By(fmt.Sprintf("setting initial state %q", first.desc))
+				ginkgo.By(fmt.Sprintf("setting initial state %q", first.desc))
 				first.run(f, setConfigSourceFunc, true, lkgDuration)
-				By(fmt.Sprintf("from %q to %q", first.desc, second.desc))
+				ginkgo.By(fmt.Sprintf("from %q to %q", first.desc, second.desc))
 				second.run(f, setConfigSourceFunc, true, lkgDuration)
 			})
 		})
 
 		// exposes resource leaks across config changes
-		Context("update Node.Spec.ConfigSource: 100 update stress test:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update Node.Spec.ConfigSource: 100 update stress test:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 
 				// we just create two configmaps with the same config but different names and toggle between them
@@ -540,8 +540,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("update ConfigMap in-place: state transitions:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update ConfigMap in-place: state transitions:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
 				correctKC := beforeKC.DeepCopy()
@@ -620,8 +620,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("update ConfigMap in-place: recover to last-known-good version:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("update ConfigMap in-place: recover to last-known-good version:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
 				lkgKC := beforeKC.DeepCopy()
@@ -699,8 +699,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("delete and recreate ConfigMap: state transitions:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("delete and recreate ConfigMap: state transitions:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
 				correctKC := beforeKC.DeepCopy()
@@ -779,8 +779,8 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("delete and recreate ConfigMap: error while ConfigMap is absent:", func() {
-			It(itDescription, func() {
+		ginkgo.Context("delete and recreate ConfigMap: error while ConfigMap is absent:", func() {
+			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
 				correctKC := beforeKC.DeepCopy()
@@ -832,7 +832,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 func testBothDirections(f *framework.Framework, fn func(f *framework.Framework, tc *nodeConfigTestCase) error,
 	first *nodeConfigTestCase, cases []nodeConfigTestCase, waitAfterFirst time.Duration) {
 	// set to first and check that everything got set up properly
-	By(fmt.Sprintf("setting initial state %q", first.desc))
+	ginkgo.By(fmt.Sprintf("setting initial state %q", first.desc))
 	// we don't always expect an event here, because setting "first" might not represent
 	// a change from the current configuration
 	first.run(f, fn, false, waitAfterFirst)
@@ -840,11 +840,11 @@ func testBothDirections(f *framework.Framework, fn func(f *framework.Framework, 
 	// for each case, set up, check expectations, then reset to first and check again
 	for i := range cases {
 		tc := &cases[i]
-		By(fmt.Sprintf("from %q to %q", first.desc, tc.desc))
+		ginkgo.By(fmt.Sprintf("from %q to %q", first.desc, tc.desc))
 		// from first -> tc, tc.event fully describes whether we should get a config change event
 		tc.run(f, fn, tc.event, 0)
 
-		By(fmt.Sprintf("back to %q from %q", first.desc, tc.desc))
+		ginkgo.By(fmt.Sprintf("back to %q from %q", first.desc, tc.desc))
 		// whether first -> tc should have produced a config change event partially determines whether tc -> first should produce an event
 		first.run(f, fn, first.event && tc.event, 0)
 	}
@@ -855,7 +855,7 @@ func testBothDirections(f *framework.Framework, fn func(f *framework.Framework, 
 func (tc *nodeConfigTestCase) run(f *framework.Framework, fn func(f *framework.Framework, tc *nodeConfigTestCase) error,
 	expectEvent bool, wait time.Duration) {
 	// set the desired state, retry a few times in case we are competing with other editors
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		if err := fn(f, tc); err != nil {
 			if len(tc.apierr) == 0 {
 				return fmt.Errorf("case %s: expect nil error but got %q", tc.desc, err.Error())
@@ -866,7 +866,7 @@ func (tc *nodeConfigTestCase) run(f *framework.Framework, fn func(f *framework.F
 			return fmt.Errorf("case %s: expect error to contain %q but got nil error", tc.desc, tc.apierr)
 		}
 		return nil
-	}, time.Minute, time.Second).Should(BeNil())
+	}, time.Minute, time.Second).Should(gomega.BeNil())
 	// skip further checks if we expected an API error
 	if len(tc.apierr) > 0 {
 		return
@@ -952,7 +952,7 @@ func (tc *nodeConfigTestCase) checkNodeConfigSource(f *framework.Framework) {
 		timeout  = time.Minute
 		interval = time.Second
 	)
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("checkNodeConfigSource: case %s: %v", tc.desc, err)
@@ -962,7 +962,7 @@ func (tc *nodeConfigTestCase) checkNodeConfigSource(f *framework.Framework) {
 			return fmt.Errorf(spew.Sprintf("checkNodeConfigSource: case %s: expected %#v but got %#v", tc.desc, tc.configSource, actual))
 		}
 		return nil
-	}, timeout, interval).Should(BeNil())
+	}, timeout, interval).Should(gomega.BeNil())
 }
 
 // make sure the node status eventually matches what we expect
@@ -972,7 +972,7 @@ func (tc *nodeConfigTestCase) checkConfigStatus(f *framework.Framework) {
 		interval = time.Second
 	)
 	errFmt := fmt.Sprintf("checkConfigStatus: case %s:", tc.desc) + " %v"
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf(errFmt, err)
@@ -981,7 +981,7 @@ func (tc *nodeConfigTestCase) checkConfigStatus(f *framework.Framework) {
 			return fmt.Errorf(errFmt, err)
 		}
 		return nil
-	}, timeout, interval).Should(BeNil())
+	}, timeout, interval).Should(gomega.BeNil())
 }
 
 func expectConfigStatus(tc *nodeConfigTestCase, actual *v1.NodeConfigStatus) error {
@@ -1027,7 +1027,7 @@ func (tc *nodeConfigTestCase) checkConfig(f *framework.Framework) {
 		timeout  = time.Minute
 		interval = time.Second
 	)
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		actual, err := getCurrentKubeletConfig()
 		if err != nil {
 			return fmt.Errorf("checkConfig: case %s: %v", tc.desc, err)
@@ -1036,7 +1036,7 @@ func (tc *nodeConfigTestCase) checkConfig(f *framework.Framework) {
 			return fmt.Errorf(spew.Sprintf("checkConfig: case %s: expected %#v but got %#v", tc.desc, tc.expectConfig, actual))
 		}
 		return nil
-	}, timeout, interval).Should(BeNil())
+	}, timeout, interval).Should(gomega.BeNil())
 }
 
 // checkEvent makes sure an event was sent marking the Kubelet's restart to use new config,
@@ -1046,7 +1046,7 @@ func (tc *nodeConfigTestCase) checkEvent(f *framework.Framework) {
 		timeout  = time.Minute
 		interval = time.Second
 	)
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		events, err := f.ClientSet.CoreV1().Events("").List(metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("checkEvent: case %s: %v", tc.desc, err)
@@ -1083,7 +1083,7 @@ func (tc *nodeConfigTestCase) checkEvent(f *framework.Framework) {
 			return fmt.Errorf("checkEvent: case %s: expected event message %q but got %q", tc.desc, expectMessage, recent.Message)
 		}
 		return nil
-	}, timeout, interval).Should(BeNil())
+	}, timeout, interval).Should(gomega.BeNil())
 }
 
 // checkConfigMetrics makes sure the Kubelet's config related metrics are as we expect, given the test case
@@ -1167,7 +1167,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		configErrorKey:         errorSamples,
 	})
 	// wait for expected metrics to appear
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		actual, err := getKubeletMetrics(sets.NewString(
 			assignedConfigKey,
 			activeConfigKey,
@@ -1188,7 +1188,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, spew.Sprintf("%#v", expect), spew.Sprintf("%#v", actual))
 		}
 		return nil
-	}, timeout, interval).Should(BeNil())
+	}, timeout, interval).Should(gomega.BeNil())
 }
 
 // constructs the expected SelfLink for a config map

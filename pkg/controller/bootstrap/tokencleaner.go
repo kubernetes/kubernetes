@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -188,7 +188,8 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
-	if bootstrapsecretutil.HasExpired(secret, time.Now()) {
+	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
+	if alreadyExpired {
 		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
 		var options *metav1.DeleteOptions
 		if len(secret.UID) > 0 {
@@ -200,5 +201,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
+	} else if ttl > 0 {
+		tc.queue.AddAfter(o, ttl)
 	}
 }

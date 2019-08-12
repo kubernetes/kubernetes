@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	nodepkg "k8s.io/kubernetes/pkg/controller/nodelifecycle"
@@ -40,6 +40,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -245,7 +246,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
+			common.NewRCByName(c, ns, name, replicas, nil, nil)
 			err = e2epod.VerifyPods(c, ns, name, true, replicas)
 			framework.ExpectNoError(err, "Each pod should start running and responding")
 
@@ -312,7 +313,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
-			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
+			common.NewRCByName(c, ns, name, replicas, &gracePeriod, []string{"serve-hostname"})
 			err = e2epod.VerifyPods(c, ns, name, true, replicas)
 			framework.ExpectNoError(err, "Each pod should start running and responding")
 
@@ -360,7 +361,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
 			framework.SkipUnlessProviderIs("gke")
 			ginkgo.By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
-			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
+			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 			framework.ExpectNoError(err)
 			c = f.ClientSet

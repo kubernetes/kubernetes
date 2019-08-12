@@ -22,7 +22,7 @@ import (
 	"errors"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -35,6 +35,9 @@ type NodeScoreList []int
 
 // PluginToNodeScoreMap declares a map from plugin name to its NodeScoreList.
 type PluginToNodeScoreMap map[string]NodeScoreList
+
+// NodeToStatusMap declares map from node name to its status.
+type NodeToStatusMap map[string]*Status
 
 // These are predefined codes used in a Status.
 const (
@@ -71,15 +74,15 @@ func (s *Status) Code() Code {
 
 // Message returns message of the Status.
 func (s *Status) Message() string {
+	if s == nil {
+		return ""
+	}
 	return s.message
 }
 
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
 func (s *Status) IsSuccess() bool {
-	if s == nil || s.code == Success {
-		return true
-	}
-	return false
+	return s.Code() == Success
 }
 
 // AsError returns an "error" object with the same message as that of the Status.
@@ -160,6 +163,19 @@ type FilterPlugin interface {
 	Filter(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 }
 
+// PostFilterPlugin is an interface for Post-filter plugin. Post-filter is an
+// informational extension point. Plugins will be called with a list of nodes
+// that passed the filtering phase. A plugin may use this data to update internal
+// state or to generate logs/metrics.
+type PostFilterPlugin interface {
+	Plugin
+	// PostFilter is called by the scheduling framework after a list of nodes
+	// passed the filtering phase. All postfilter plugins must return success or
+	// the pod will be rejected. The filteredNodesStatuses is the set of filtered nodes
+	// and their filter status.
+	PostFilter(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+}
+
 // ScorePlugin is an interface that must be implemented by "score" plugins to rank
 // nodes that passed the filtering phase.
 type ScorePlugin interface {
@@ -168,6 +184,17 @@ type ScorePlugin interface {
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
 	Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status)
+}
+
+// ScoreWithNormalizePlugin is an interface that must be implemented by "score"
+// plugins that also need to normalize the node scoring results produced by the same
+// plugin's "Score" method.
+type ScoreWithNormalizePlugin interface {
+	ScorePlugin
+	// NormalizeScore is called for all node scores produced by the same plugin's "Score"
+	// method. A successful run of NormalizeScore will update the scores list and return
+	// a success status.
+	NormalizeScore(pc *PluginContext, p *v1.Pod, scores NodeScoreList) *Status
 }
 
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
@@ -258,11 +285,26 @@ type Framework interface {
 	// the given node is not suitable for running the pod.
 	RunFilterPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 
+	// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
+	// of these plugins returns any status other than "Success", the given node is
+	// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
+	RunPostFilterPlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+
 	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
 	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status)
+
+	// RunNormalizeScorePlugins runs the normalize score plugins. It should be called after
+	// RunScorePlugins with the PluginToNodeScoreMap result. It then modifies the map with
+	// normalized scores. It returns a non-success Status if any of the normalize score plugins
+	// returns a non-success status.
+	RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status
+
+	// ApplyScoreWeights applies weights to the score results. It should be called after
+	// RunNormalizeScorePlugins.
+	ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status
 
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
@@ -306,7 +348,10 @@ type FrameworkHandle interface {
 	// NodeInfoSnapshot return the latest NodeInfo snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Reserve" point. There is no guarantee that the information
-	// remains unchanged in the binding phase of scheduling.
+	// remains unchanged in the binding phase of scheduling, so plugins in the binding
+	// cycle(permit/pre-bind/bind/post-bind/un-reserve plugin) should not use it,
+	// otherwise a concurrent read/write error might occur, they should use scheduler
+	// cache instead.
 	NodeInfoSnapshot() *internalcache.NodeInfoSnapshot
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.

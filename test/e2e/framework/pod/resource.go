@@ -41,11 +41,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-)
-
 // TODO: Move to its own subpkg.
 // expectNoErrorWithRetries to their own subpackages within framework.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
@@ -516,19 +511,18 @@ func newExecPodSpec(ns, generateName string) *v1.Pod {
 	return pod
 }
 
-// CreateExecPodOrFail creates a simple busybox pod in a sleep loop used as a
-// vessel for kubectl exec commands.
-// Returns the name of the created pod.
-func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tweak func(*v1.Pod)) string {
+// CreateExecPodOrFail creates a agnhost pause pod used as a vessel for kubectl exec commands.
+// Pod name is uniquely generated.
+func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tweak func(*v1.Pod)) *v1.Pod {
 	e2elog.Logf("Creating new exec pod")
-	execPod := newExecPodSpec(ns, generateName)
+	pod := newExecPodSpec(ns, generateName)
 	if tweak != nil {
-		tweak(execPod)
+		tweak(pod)
 	}
-	created, err := client.CoreV1().Pods(ns).Create(execPod)
+	execPod, err := client.CoreV1().Pods(ns).Create(pod)
 	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	err = wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
+		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(execPod.Name, metav1.GetOptions{})
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -538,7 +532,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
 	expectNoError(err)
-	return created.Name
+	return execPod
 }
 
 // CreatePodOrFail creates a pod with the specified containerPorts.

@@ -101,6 +101,23 @@ type DynamicPVTestDriver interface {
 	GetClaimSize() string
 }
 
+// EphemeralTestDriver represents an interface for a TestDriver that supports ephemeral inline volumes.
+type EphemeralTestDriver interface {
+	TestDriver
+
+	// GetVolumeAttributes returns the volume attributes for a
+	// certain inline ephemeral volume, enumerated starting with
+	// #0. Some tests might require more than one volume. They can
+	// all be the same or different, depending what the driver supports
+	// and/or wants to test.
+	GetVolumeAttributes(config *PerTestConfig, volumeNumber int) map[string]string
+
+	// GetCSIDriverName returns the name that was used when registering with
+	// kubelet. Depending on how the driver was deployed, this can be different
+	// from DriverInfo.Name.
+	GetCSIDriverName(config *PerTestConfig) string
+}
+
 // SnapshottableTestDriver represents an interface for a TestDriver that supports DynamicSnapshot
 type SnapshottableTestDriver interface {
 	TestDriver
@@ -143,11 +160,19 @@ type DriverInfo struct {
 	InTreePluginName string
 	FeatureTag       string // FeatureTag for the driver
 
-	MaxFileSize          int64               // Max file size to be tested for this driver
-	SupportedFsType      sets.String         // Map of string for supported fs type
-	SupportedMountOption sets.String         // Map of string for supported mount option
-	RequiredMountOption  sets.String         // Map of string for required mount option (Optional)
-	Capabilities         map[Capability]bool // Map that represents plugin capabilities
+	// Max file size to be tested for this driver
+	MaxFileSize int64
+	// Map of string for supported fs type
+	SupportedFsType sets.String
+	// Map of string for supported mount option
+	SupportedMountOption sets.String
+	// [Optional] Map of string for required mount option
+	RequiredMountOption sets.String
+	// Map that represents plugin capabilities
+	Capabilities map[Capability]bool
+	// [Optional] List of access modes required for provisioning, defaults to
+	// RWO if unset
+	RequiredAccessModes []v1.PersistentVolumeAccessMode
 }
 
 // PerTestConfig represents parameters that control test execution.

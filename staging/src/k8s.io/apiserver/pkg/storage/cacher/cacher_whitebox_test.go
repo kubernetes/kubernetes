@@ -63,7 +63,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 		// forget() has to stop the watcher, as only stopping the watcher
 		// triggers stopping the process() goroutine which we are in the
 		// end waiting for in this test.
-		w.stop()
+		w.stopThreadUnsafe()
 	}
 	initEvents := []*watchCacheEvent{
 		{Object: &v1.Pod{}},
@@ -472,7 +472,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	done := make(chan struct{})
 	filter := func(string, labels.Set, fields.Set) bool { return true }
 	forget := func() {
-		w.stop()
+		w.stopThreadUnsafe()
 		done <- struct{}{}
 	}
 
@@ -584,6 +584,75 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	watchers2 := watchers.popExpiredWatchers()
 	if len(watchers2) != 1 || len(watchers2[0]) != 2 {
 		t.Errorf("unexpected bucket size: %#v", watchers2)
+	}
+}
+
+func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+
+	// run the collision test for 3 seconds to let ~2 buckets expire
+	stopCh := make(chan struct{})
+	time.AfterFunc(3*time.Second, func() { close(stopCh) })
+
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+				w, err := cacher.Watch(ctx, "pods/ns", "0", pred)
+				if err != nil {
+					t.Fatalf("Failed to create watch: %v", err)
+				}
+				w.Stop()
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				cacher.bookmarkWatchers.popExpiredWatchers()
+			}
+		}
+	}()
+
+	// wait for adding/removing watchers to end
+	wg.Wait()
+
+	// wait out the expiration period and pop expired watchers
+	time.Sleep(2 * time.Second)
+	cacher.bookmarkWatchers.popExpiredWatchers()
+	cacher.bookmarkWatchers.lock.Lock()
+	defer cacher.bookmarkWatchers.lock.Unlock()
+	if len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
+		numWatchers := 0
+		for bucketID, v := range cacher.bookmarkWatchers.watchersBuckets {
+			numWatchers += len(v)
+			t.Errorf("there are %v watchers at bucket Id %v with start Id %v", len(v), bucketID, cacher.bookmarkWatchers.startBucketID)
+		}
+		t.Errorf("unexpected bookmark watchers %v", numWatchers)
 	}
 }
 

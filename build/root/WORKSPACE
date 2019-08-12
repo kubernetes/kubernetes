@@ -37,9 +37,9 @@ versions.check(minimum_bazel_version = "0.23.0")
 
 http_archive(
     name = "io_k8s_repo_infra",
-    sha256 = "4a8384320fba401cbf21fef177aa113ed8fe35952ace98e00b796cac87ae7868",
-    strip_prefix = "repo-infra-df02ded38f9506e5bbcbf21702034b4fef815f2f",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/df02ded38f9506e5bbcbf21702034b4fef815f2f.tar.gz"),
+    sha256 = "f6d65480241ec0fd7a0d01f432938b97d7395aeb8eefbe859bb877c9b4eafa56",
+    strip_prefix = "repo-infra-9f4571ad7242bf3ec4b47365062498c2528f9a5f",
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/9f4571ad7242bf3ec4b47365062498c2528f9a5f.tar.gz"),
 )
 
 http_archive(

@@ -61,6 +61,10 @@ type ListMeta struct {
 	// selfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
+	//
+	// DEPRECATED
+	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
+	// to be removed in 1.21 release.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
@@ -148,6 +152,10 @@ type ObjectMeta struct {
 	// SelfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
+	//
+	// DEPRECATED
+	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
+	// to be removed in 1.21 release.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,4,opt,name=selfLink"`
 
@@ -1109,20 +1117,22 @@ const (
 )
 
 // Fields stores a set of fields in a data structure like a Trie.
-// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+//
+// Each key is either a '.' representing the field itself, and will always map to an empty set,
+// or a string representing a sub-field or item. The string will follow one of these four formats:
+// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
+// 'v:<value>', where <value> is the exact json formatted value of a list item
+// 'i:<index>', where <index> is position of a item in a list
+// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
+// If a key maps to an empty Fields value, the field that key represents is part of the set.
+//
+// The exact format is defined in sigs.k8s.io/structured-merge-diff
+// +protobuf.options.marshal=false
+// +protobuf.as=ProtoFields
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Fields struct {
-	// Map stores a set of fields in a data structure like a Trie.
-	//
-	// Each key is either a '.' representing the field itself, and will always map to an empty set,
-	// or a string representing a sub-field or item. The string will follow one of these four formats:
-	// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
-	// 'v:<value>', where <value> is the exact json formatted value of a list item
-	// 'i:<index>', where <index> is position of a item in a list
-	// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
-	// If a key maps to an empty Fields value, the field that key represents is part of the set.
-	//
-	// The exact format is defined in k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
-	Map map[string]Fields `json:",inline" protobuf:"bytes,1,rep,name=map"`
+	// Raw is the underlying serialization of this object.
+	Raw []byte `json:"-" protobuf:"-"`
 }
 
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf

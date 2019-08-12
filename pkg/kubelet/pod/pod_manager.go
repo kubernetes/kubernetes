@@ -307,7 +307,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	mirrorToPod = make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID, len(pm.translationByUID))
 	// Insert empty translation mapping for all static pods.
 	for uid, pod := range pm.podByUID {
-		if !IsStaticPod(pod) {
+		if !kubetypes.IsStaticPod(pod) {
 			continue
 		}
 		podToMirror[uid] = ""

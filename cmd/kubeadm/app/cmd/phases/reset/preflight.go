@@ -58,7 +58,7 @@ func runPreflight(c workflow.RunData) error {
 			return err
 		}
 		if strings.ToLower(s.Text()) != "y" {
-			return errors.New("Aborted reset operation")
+			return errors.New("aborted reset operation")
 		}
 	}
 

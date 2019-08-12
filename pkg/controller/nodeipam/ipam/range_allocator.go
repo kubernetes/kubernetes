@@ -276,12 +276,12 @@ func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 	for idx, cidr := range node.Spec.PodCIDRs {
 		_, podCIDR, err := net.ParseCIDR(cidr)
 		if err != nil {
-			return fmt.Errorf("Failed to parse CIDR %s on Node %v: %v", cidr, node.Name, err)
+			return fmt.Errorf("failed to parse CIDR %s on Node %v: %v", cidr, node.Name, err)
 		}
 
 		klog.V(4).Infof("release CIDR %s for node:%v", cidr, node.Name)
 		if err = r.cidrSets[idx].Release(podCIDR); err != nil {
-			return fmt.Errorf("Error when releasing CIDR %v: %v", cidr, err)
+			return fmt.Errorf("error when releasing CIDR %v: %v", cidr, err)
 		}
 	}
 	return nil

@@ -362,6 +362,10 @@ func CreateKubeAPIServerConfig(
 		// Use the nodeTunneler's dialer to connect to the kubelet
 		config.ExtraConfig.KubeletClientConfig.Dial = nodeTunneler.Dial
 	}
+	if config.GenericConfig.EgressSelector != nil {
+		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
+		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
+	}
 
 	return
 }
@@ -402,6 +406,9 @@ func buildGenericConfig(
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
 		return
 	}
+	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
+		return
+	}
 
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme))
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
@@ -433,6 +440,9 @@ func buildGenericConfig(
 	// cannot default to it in generic apiserver and need to explicitly
 	// set it in kube-apiserver.
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	// Disable compression for self-communication, since we are going to be
+	// on a fast local network
+	genericConfig.LoopbackClientConfig.DisableCompression = true
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)

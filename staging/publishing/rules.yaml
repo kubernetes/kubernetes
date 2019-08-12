@@ -626,15 +626,14 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: code-generator
+      branch: master
+    - repository: component-base
+      branch: master
+    - repository: metrics
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kubectl
     name: release-1.15
     go: 1.12.5
-    dependencies:
-    - repository: api
-      branch: release-1.15
-    - repository: apimachinery
-      branch: release-1.15
-    - repository: client-go
-      branch: release-12.0

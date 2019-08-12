@@ -32,7 +32,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-// DryRunGetter is an interface that must be supplied to the NewDryRunClient function in order to contstruct a fully functional fake dryrun clientset
+// DryRunGetter is an interface that must be supplied to the NewDryRunClient function in order to construct a fully functional fake dryrun clientset
 type DryRunGetter interface {
 	HandleGetAction(core.GetAction) (bool, runtime.Object, error)
 	HandleListAction(core.ListAction) (bool, runtime.Object, error)

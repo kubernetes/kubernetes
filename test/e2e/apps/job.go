@@ -83,8 +83,13 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 	})
 
-	// Pods sometimes fail, but eventually succeed.
-	ginkgo.It("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
+	/*
+		Release : v1.16
+		Testname: Jobs, completion after task failure
+		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
+		execute to completion.
+	*/
+	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach used by the
@@ -158,7 +163,14 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	})
 
-	ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
+	/*
+		Release : v1.16
+		Testname: Jobs, orphan pods, re-adoption
+		Description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
+		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
+		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
+	*/
+	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
 		ginkgo.By("Creating a job")
 		job := jobutil.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.

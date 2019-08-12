@@ -27,7 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,9 +39,10 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
+	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	utiltrace "k8s.io/utils/trace"
 )
 
 type mutatingDispatcher struct {
@@ -163,47 +164,52 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		}
 	}
 
-	// Currently dispatcher only supports `v1beta1` AdmissionReview
-	// TODO: Make the dispatcher capable of sending multiple AdmissionReview versions
-	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, invocation.Webhook) {
-		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReview")}
+	uid, request, response, err := webhookrequest.CreateAdmissionObjects(attr, invocation)
+	if err != nil {
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-
 	// Make the webhook request
-	request := request.CreateAdmissionReview(attr, invocation)
 	client, err := a.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
 	if err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	response := &admissionv1beta1.AdmissionReview{}
-	r := client.Post().Context(ctx).Body(&request)
+	trace := utiltrace.New("Call mutating webhook",
+		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
+		utiltrace.Field{"webhook", h.Name},
+		utiltrace.Field{"resource", attr.GetResource()},
+		utiltrace.Field{"subresource", attr.GetSubresource()},
+		utiltrace.Field{"operation", attr.GetOperation()},
+		utiltrace.Field{"UID", uid})
+	defer trace.LogIfLong(500 * time.Millisecond)
+	r := client.Post().Context(ctx).Body(request)
 	if h.TimeoutSeconds != nil {
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
 	}
 	if err := r.Do().Into(response); err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
+	trace.Step("Request completed")
 
-	if response.Response == nil {
-		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	result, err := webhookrequest.VerifyAdmissionResponse(uid, true, response)
+	if err != nil {
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
-	for k, v := range response.Response.AuditAnnotations {
+	for k, v := range result.AuditAnnotations {
 		key := h.Name + "/" + k
 		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
 			klog.Warningf("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
 		}
 	}
 
-	if !response.Response.Allowed {
-		return false, webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+	if !result.Allowed {
+		return false, webhookerrors.ToStatusErr(h.Name, result.Result)
 	}
 
-	patchJS := response.Response.Patch
-	if len(patchJS) == 0 {
+	if len(result.Patch) == 0 {
 		return false, nil
 	}
-	patchObj, err := jsonpatch.DecodePatch(patchJS)
+	patchObj, err := jsonpatch.DecodePatch(result.Patch)
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
 	}
@@ -216,14 +222,21 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		return false, apierrors.NewInternalError(fmt.Errorf("admission webhook %q attempted to modify the object, which is not supported for this operation", h.Name))
 	}
 
+	var patchedJS []byte
 	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, o.GetObjectCreater(), o.GetObjectTyper(), false)
-	objJS, err := runtime.Encode(jsonSerializer, attr.VersionedObject)
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
-	}
-	patchedJS, err := patchObj.Apply(objJS)
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
+	switch result.PatchType {
+	// VerifyAdmissionResponse normalizes to v1 patch types, regardless of the AdmissionReview version used
+	case admissionv1.PatchTypeJSONPatch:
+		objJS, err := runtime.Encode(jsonSerializer, attr.VersionedObject)
+		if err != nil {
+			return false, apierrors.NewInternalError(err)
+		}
+		patchedJS, err = patchObj.Apply(objJS)
+		if err != nil {
+			return false, apierrors.NewInternalError(err)
+		}
+	default:
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("unsupported patch type %q", result.PatchType)}
 	}
 
 	var newVersionedObject runtime.Object
@@ -245,7 +258,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	changed := !apiequality.Semantic.DeepEqual(attr.VersionedObject, newVersionedObject)
-
+	trace.Step("Patch applied")
 	attr.Dirty = true
 	attr.VersionedObject = newVersionedObject
 	o.GetObjectDefaulter().Default(attr.VersionedObject)

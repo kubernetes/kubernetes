@@ -15,7 +15,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/kubectl",
     deps = [
         "//pkg/controller:go_default_library",
-        "//pkg/kubectl/polymorphichelpers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/polymorphichelpers:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
@@ -37,6 +37,7 @@ go_library(
         "//test/e2e/framework/job:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
+        "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils:go_default_library",

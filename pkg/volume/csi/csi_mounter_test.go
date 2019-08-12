@@ -84,10 +84,10 @@ func TestMounterGetPath(t *testing.T) {
 		}
 		csiMounter := mounter.(*csiMountMgr)
 
-		path := csiMounter.GetPath()
+		mountPath := csiMounter.GetPath()
 
-		if tc.path != path {
-			t.Errorf("expecting path %s, got %s", tc.path, path)
+		if tc.path != mountPath {
+			t.Errorf("expecting path %s, got %s", tc.path, mountPath)
 		}
 	}
 }
@@ -99,6 +99,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 		driver                string
 		volumeContext         map[string]string
 		expectedVolumeContext map[string]string
+		csiInlineVolume       bool
 	}{
 		{
 			name:                  "no pod info",
@@ -136,6 +137,13 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			volumeContext:         map[string]string{"foo": "bar"},
 			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
 		},
+		{
+			name:                  "CSIInlineVolume pod info",
+			driver:                "info",
+			volumeContext:         nil,
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
+			csiInlineVolume:       true,
+		},
 	}
 
 	noPodMountInfo := false
@@ -143,6 +151,9 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			klog.Infof("Starting test %s", test.name)
+			if test.csiInlineVolume {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+			}
 			fakeClient := fakeclient.NewSimpleClientset(
 				getTestCSIDriver("no-info", &noPodMountInfo, nil),
 				getTestCSIDriver("info", &currentPodInfoMount, nil),
@@ -215,10 +226,10 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				t.Errorf("default value of file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
 			}
 
-			path := csiMounter.GetPath()
-			if _, err := os.Stat(path); err != nil {
+			mountPath := csiMounter.GetPath()
+			if _, err := os.Stat(mountPath); err != nil {
 				if os.IsNotExist(err) {
-					t.Errorf("SetUp() failed, volume path not created: %s", path)
+					t.Errorf("SetUp() failed, volume path not created: %s", mountPath)
 				} else {
 					t.Errorf("SetUp() failed: %v", err)
 				}
@@ -267,7 +278,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 	testCases := []struct {
 		name       string
 		podUID     types.UID
-		mode       driverMode
+		mode       csiVolumeMode
 		fsType     string
 		options    []string
 		spec       func(string, []string) *volume.Spec
@@ -276,7 +287,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 		{
 			name:       "setup with vol source",
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:       ephemeralDriverMode,
+			mode:       ephemeralVolumeMode,
 			fsType:     "ext4",
 			shouldFail: true,
 			spec: func(fsType string, options []string) *volume.Spec {
@@ -288,7 +299,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 		{
 			name:   "setup with persistent source",
 			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:   persistentDriverMode,
+			mode:   persistentVolumeMode,
 			fsType: "zfs",
 			spec: func(fsType string, options []string) *volume.Spec {
 				pvSrc := makeTestPV("pv1", 20, testDriver, "vol1")
@@ -300,7 +311,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 		{
 			name:   "setup with persistent source without unspecified fstype and options",
 			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:   persistentDriverMode,
+			mode:   persistentVolumeMode,
 			spec: func(fsType string, options []string) *volume.Spec {
 				return volume.NewSpecFromPersistentVolume(makeTestPV("pv1", 20, testDriver, "vol2"), false)
 			},
@@ -334,8 +345,8 @@ func TestMounterSetUpSimple(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			if csiMounter.driverMode != persistentDriverMode {
-				t.Fatal("unexpected driver mode: ", csiMounter.driverMode)
+			if csiMounter.csiVolumeMode != persistentVolumeMode {
+				t.Fatal("unexpected volume mode: ", csiMounter.csiVolumeMode)
 			}
 
 			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
@@ -393,7 +404,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 	testCases := []struct {
 		name       string
 		podUID     types.UID
-		mode       driverMode
+		mode       csiVolumeMode
 		fsType     string
 		options    []string
 		spec       func(string, []string) *volume.Spec
@@ -402,7 +413,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		{
 			name:   "setup with vol source",
 			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:   ephemeralDriverMode,
+			mode:   ephemeralVolumeMode,
 			fsType: "ext4",
 			spec: func(fsType string, options []string) *volume.Spec {
 				volSrc := makeTestVol("pv1", testDriver)
@@ -413,7 +424,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		{
 			name:   "setup with persistent source",
 			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:   persistentDriverMode,
+			mode:   persistentVolumeMode,
 			fsType: "zfs",
 			spec: func(fsType string, options []string) *volume.Spec {
 				pvSrc := makeTestPV("pv1", 20, testDriver, "vol1")
@@ -425,7 +436,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		{
 			name:   "setup with persistent source without unspecified fstype and options",
 			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:   persistentDriverMode,
+			mode:   persistentVolumeMode,
 			spec: func(fsType string, options []string) *volume.Spec {
 				return volume.NewSpecFromPersistentVolume(makeTestPV("pv1", 20, testDriver, "vol2"), false)
 			},
@@ -459,15 +470,15 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			if csiMounter.driverMode != tc.mode {
-				t.Fatal("unexpected driver mode: ", csiMounter.driverMode)
+			if csiMounter.csiVolumeMode != tc.mode {
+				t.Fatal("unexpected volume mode: ", csiMounter.csiVolumeMode)
 			}
 
-			if csiMounter.driverMode == ephemeralDriverMode && csiMounter.volumeID != makeVolumeHandle(string(tc.podUID), csiMounter.specVolumeID) {
+			if csiMounter.csiVolumeMode == ephemeralVolumeMode && csiMounter.volumeID != makeVolumeHandle(string(tc.podUID), csiMounter.specVolumeID) {
 				t.Fatal("unexpected generated volumeHandle:", csiMounter.volumeID)
 			}
 
-			if csiMounter.driverMode == persistentDriverMode {
+			if csiMounter.csiVolumeMode == persistentVolumeMode {
 				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
 				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
@@ -492,10 +503,10 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			// validate stagingTargetPath
-			if tc.mode == ephemeralDriverMode && vol.DeviceMountPath != "" {
+			if tc.mode == ephemeralVolumeMode && vol.DeviceMountPath != "" {
 				t.Errorf("unexpected devicePathTarget sent to driver: %s", vol.DeviceMountPath)
 			}
-			if tc.mode == persistentDriverMode {
+			if tc.mode == persistentVolumeMode {
 				devicePath, err := makeDeviceMountPath(plug, csiMounter.spec)
 				if err != nil {
 					t.Fatal(err)

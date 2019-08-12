@@ -6,8 +6,8 @@
     "generateName": "3",
     "namespace": "4",
     "selfLink": "5",
-    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
-    "resourceVersion": "16964250748386560239",
+    "uid": "7",
+    "resourceVersion": "11042405498087606203",
     "generation": 8071137005907523419,
     "creationTimestamp": null,
     "deletionGracePeriodSeconds": -4955867275792137171,
@@ -35,62 +35,58 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17",
-        "fields": {"18":{"19":null}}
+        "apiVersion": "17"
       }
     ]
   },
   "spec": {
     "accessModes": [
-      "脽ěĂ凗蓏Ŋ蛊ĉy緅縕"
+      "@Hr鯹)晿"
     ],
     "selector": {
       "matchLabels": {
-        "p-g8c2-k-912e5-c-e63-n-3n.c83-b-w7ld-6cs06xj-x5yv0wm-k1-87-3s-g3/9_-.-W._AAn---v_-5-_8LXP-o-9..1m": "JTrcd-2.-__E_Sv__26KX_R_.-N"
+        "h0-6pJ": "Hn7y-74.-0MUORQQ.N2.1L"
       },
       "matchExpressions": [
         {
-          "key": "g0d--o82-g50-u--25cu87--r7p-w1e67-8j/42M--n1-p5.3___47._49pIB_o61ISU4--N",
-          "operator": "In",
-          "values": [
-            "t_k-_v.6"
-          ]
+          "key": "PGg8-2_kS91.e5K-_e63_-_3n",
+          "operator": "DoesNotExist"
         }
       ]
     },
     "resources": {
       "limits": {
-        "p:籀帊": "219"
+        "Ď儇击3ƆìQ喞艋涽託仭w-檮Ǣ": "465"
       },
       "requests": {
-        "骀Šĸ": "986"
+        "Ł%ŨȈ\u003eŅ£趕ã/鈱$-议}ȧ外ĺ稥": "713"
       }
     },
-    "volumeName": "30",
-    "storageClassName": "31",
-    "volumeMode": "e0ɔȖ脵鴈Ōƾ焁yǠ/淹\\韲翁\u0026",
+    "volumeName": "24",
+    "storageClassName": "25",
+    "volumeMode": "娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^",
     "dataSource": {
-      "apiGroup": "32",
-      "kind": "33",
-      "name": "34"
+      "apiGroup": "26",
+      "kind": "27",
+      "name": "28"
     }
   },
   "status": {
-    "phase": "s",
+    "phase": "燴壩卄蓨MĮ?",
     "accessModes": [
-      "曢\\%枅:"
+      "ĭÐl恕ɍȇ廄裭4懙"
     ],
     "capacity": {
-      "ǛƓɥ踓Ǻǧ湬淊kŪ睴": "659"
+      "嵒ƫS捕ɷD¡轫n": "583"
     },
     "conditions": [
       {
-        "type": "3fƻfʣ繡楙¯ĦE",
-        "status": "ĪȸŹăȲĻ¤Ħʅ芝",
-        "lastProbeTime": "2197-07-19T07:02:22Z",
-        "lastTransitionTime": "2641-12-26T14:46:27Z",
-        "reason": "35",
-        "message": "36"
+        "type": "Ü郀",
+        "status": "ƣKʘńw:5塋",
+        "lastProbeTime": "2588-10-04T08:20:38Z",
+        "lastTransitionTime": "2095-10-31T02:52:44Z",
+        "reason": "29",
+        "message": "30"
       }
     ]
   }

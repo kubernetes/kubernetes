@@ -25,16 +25,16 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	utilsnet "k8s.io/utils/net"
 )
 
@@ -184,6 +184,12 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	}
 
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
+
 	if cfg.APIServer.ExtraArgs == nil {
 		cfg.APIServer.ExtraArgs = map[string]string{}
 	}
@@ -198,14 +204,14 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 // AlwaysAllow and AlwaysDeny is ignored as they are only for testing
 func getAuthzModes(authzModeExtraArgs string) string {
 	modes := []string{
-		authzmodes.ModeNode,
-		authzmodes.ModeRBAC,
+		kubeadmconstants.ModeNode,
+		kubeadmconstants.ModeRBAC,
 	}
-	if strings.Contains(authzModeExtraArgs, authzmodes.ModeABAC) {
-		modes = append(modes, authzmodes.ModeABAC)
+	if strings.Contains(authzModeExtraArgs, kubeadmconstants.ModeABAC) {
+		modes = append(modes, kubeadmconstants.ModeABAC)
 	}
-	if strings.Contains(authzModeExtraArgs, authzmodes.ModeWebhook) {
-		modes = append(modes, authzmodes.ModeWebhook)
+	if strings.Contains(authzModeExtraArgs, kubeadmconstants.ModeWebhook) {
+		modes = append(modes, kubeadmconstants.ModeWebhook)
 	}
 	return strings.Join(modes, ",")
 }
@@ -295,6 +301,12 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 		}
 	}
 
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
+
 	command := []string{"kube-controller-manager"}
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManager.ExtraArgs)...)
 
@@ -303,10 +315,19 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 
 // getSchedulerCommand builds the right scheduler command from the given config object and version
 func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
+	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	defaultArguments := map[string]string{
-		"bind-address": "127.0.0.1",
-		"leader-elect": "true",
-		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+		"bind-address":              "127.0.0.1",
+		"leader-elect":              "true",
+		"kubeconfig":                kubeconfigFile,
+		"authentication-kubeconfig": kubeconfigFile,
+		"authorization-kubeconfig":  kubeconfigFile,
+	}
+
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
 	}
 
 	command := []string{"kube-scheduler"}

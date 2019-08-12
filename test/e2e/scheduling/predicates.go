@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -98,7 +99,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		for _, node := range nodeList.Items {
 			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
-			framework.PrintAllKubeletPods(cs, node.Name)
+			e2ekubelet.PrintAllKubeletPods(cs, node.Name)
 		}
 
 	})
@@ -282,6 +283,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		fillerPods := []*v1.Pod{}
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
+			e2elog.Logf("Creating a pod which consumes cpu=%vm on Node %v", requestedCPU, nodeName)
 			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
 				Name: "filler-pod-" + string(uuid.NewUUID()),
 				Resources: &v1.ResourceRequirements{
@@ -743,17 +745,8 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
 
-	printed := false
-	printOnce := func(msg string) string {
-		if !printed {
-			printed = true
-			return msg
-		}
-		return ""
-	}
-
-	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	framework.ExpectEqual(len(scheduledPods), expectedScheduled, printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
+	framework.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
 }
 
 // verifyReplicasResult is wrapper of verifyResult for a group pods with same "name: labelName" label, which means they belong to same RC
@@ -761,17 +754,8 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 	allPods := getPodsByLabels(c, ns, map[string]string{"name": labelName})
 	scheduledPods, notScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
 
-	printed := false
-	printOnce := func(msg string) string {
-		if !printed {
-			printed = true
-			return msg
-		}
-		return ""
-	}
-
-	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	framework.ExpectEqual(len(scheduledPods), expectedScheduled, printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
+	framework.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
 }
 
 func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {
@@ -825,6 +809,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 
 // create pod which using hostport on the specified node according to the nodeSelector
 func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
+	hostIP = framework.TranslateIPv4ToIPv6(hostIP)
 	createPausePod(f, pausePodConfig{
 		Name: podName,
 		Ports: []v1.ContainerPort{

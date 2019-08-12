@@ -79,6 +79,7 @@ type controller struct {
 	clock          clock.Clock
 }
 
+// Controller is a generic controller framework.
 type Controller interface {
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
@@ -149,7 +150,7 @@ func (c *controller) processLoop() {
 	for {
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
-			if err == FIFOClosedError {
+			if err == ErrFIFOClosed {
 				return
 			}
 			if c.config.RetryOnError {
