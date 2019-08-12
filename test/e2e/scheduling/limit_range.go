@@ -44,26 +44,13 @@ const (
 	podName = "pfpod"
 )
 
+var (
+	f = framework.NewDefaultFramework("limitrange")
+)
+
 var _ = SIGDescribe("LimitRange", func() {
-	f := framework.NewDefaultFramework("limitrange")
-
 	ginkgo.It("should create a LimitRange with defaults and ensure pod has those defaults applied", func() {
-		limitRange, listCompleted, w, f, _, _, expected := setupLimitRangeTest(f)
-		ginkgo.By("Verifying LimitRange creation was observed")
-		select {
-		case <-listCompleted:
-			select {
-			case event, _ := <-w.ResultChan():
-				if event.Type != watch.Added {
-					e2elog.Failf("Failed to observe limitRange creation : %v", event)
-				}
-			case <-time.After(e2eservice.RespondingTimeout):
-				e2elog.Failf("Timeout while waiting for LimitRange creation")
-			}
-		case <-time.After(e2eservice.RespondingTimeout):
-			e2elog.Failf("Timeout while waiting for LimitRange list complete")
-		}
-
+		limitRange, expected := setupLimitRangeTest()
 		ginkgo.By("Fetching the LimitRange to ensure it has proper values")
 		limitRange, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -73,13 +60,18 @@ var _ = SIGDescribe("LimitRange", func() {
 	})
 
 	ginkgo.It("should create a Pod with no resource requirements", func() {
-		_, _, _, f, _, _, expected := setupLimitRangeTest(f)
 		ginkgo.By("Creating a Pod with no resource requirements")
 		pod := f.NewTestPod("pod-no-resources", v1.ResourceList{}, v1.ResourceList{})
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
+	})
 
+	ginkgo.It("should meet resource limit requirements", func() {
+		_, expected := setupLimitRangeTest()
 		ginkgo.By("Ensuring Pod has resource requirements applied from LimitRange")
+		pod := f.NewTestPod("pod-no-resources", v1.ResourceList{}, v1.ResourceList{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		for i := range pod.Spec.Containers {
@@ -93,7 +85,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	})
 
 	ginkgo.It("should create a Pod with partial resource requirements", func() {
-		_, _, _, f, _, _, expected := setupLimitRangeTest(f)
+		_, expected := setupLimitRangeTest()
 		ginkgo.By("Creating a Pod with partial resource requirements")
 		pod := f.NewTestPod("pod-partial-resources", getResourceList("", "150Mi", "150Gi"), getResourceList("300m", "", ""))
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
@@ -117,7 +109,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	})
 
 	ginkgo.It("should comply with resource limitations", func() {
-		limitRange, _, _, f, _, _, _ := setupLimitRangeTest(f)
+		limitRange, _ := setupLimitRangeTest()
 		ginkgo.By("Failing to create a Pod with less than min resources")
 		pod := f.NewTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
@@ -154,7 +146,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	})
 
 	ginkgo.It("should delete a LimitRange and validate it's deletion", func() {
-		limitRange, _, _, f, _, _, _ := setupLimitRangeTest(f)
+		limitRange, _ := setupLimitRangeTest()
 		ginkgo.By("Deleting a LimitRange")
 		err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(limitRange.Name, metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err)
@@ -191,7 +183,6 @@ var _ = SIGDescribe("LimitRange", func() {
 	})
 
 	ginkgo.It("should create a Pod with more than former max resource limitations", func() {
-		_, _, _, f, _, _, _ := setupLimitRangeTest(f)
 		ginkgo.By("Creating a Pod with more than former max resources")
 		pod := f.NewTestPod(podName+"2", getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
@@ -199,7 +190,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	})
 })
 
-func setupLimitRangeTest(f *framework.Framework) (*v1.LimitRange, chan bool, watch.Interface, *framework.Framework, v1.ResourceList, v1.ResourceList, v1.ResourceRequirements) {
+func setupLimitRangeTest() (*v1.LimitRange, v1.ResourceRequirements) {
 	ginkgo.By("Creating a LimitRange")
 	min := getResourceList("50m", "100Mi", "100Gi")
 	max := getResourceList("500m", "500Mi", "500Gi")
@@ -254,7 +245,7 @@ func setupLimitRangeTest(f *framework.Framework) (*v1.LimitRange, chan bool, wat
 	limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(limitRange)
 	framework.ExpectNoError(err)
 
-	return limitRange, listCompleted, w, f, defaultLimit, defaultRequest, expected
+	return limitRange, expected
 }
 
 func equalResourceRequirement(expected v1.ResourceRequirements, actual v1.ResourceRequirements) error {
