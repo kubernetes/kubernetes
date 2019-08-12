@@ -785,12 +785,12 @@ const EntryInvalidErr = "error adding entry %s to ipset %s"
 
 const ipvsSchedulerKey = "kube-proxy.kubernetes.io/ipvs-scheduler"
 
-var validScheduler = regexp.MustCompile("^(rr|wrr|lc|wlc|lblc|lblcr|dh|sh|sed|nq)$")
+var validSchedulers = sets.NewString("rr", "wrr", "lc", "wlc", "lblc", "lblcr", "dh", "sh", "sed", "nq")
 
 func (proxier *Proxier) getScheduler(sp proxy.ServicePort) string {
 	if v, ok := sp.GetAnnotations()[ipvsSchedulerKey]; ok {
 		// Check that the scheduler is valid
-		if validScheduler.MatchString(v) {
+		if validSchedulers.Has(v) {
 			return v
 		}
 		// Delete the entry to avoid unnecessary re-checks and log flooding
