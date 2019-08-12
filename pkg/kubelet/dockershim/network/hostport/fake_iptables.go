@@ -335,12 +335,6 @@ func (f *fakeIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, cou
 	return f.restore("", data, flush)
 }
 
-func (f *fakeIPTables) AddReloadFunc(reloadFunc func()) {
-}
-
-func (f *fakeIPTables) Destroy() {
-}
-
 func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName utiliptables.Chain) bool {
 	if builtinChains, ok := f.builtinChains[string(tableName)]; ok && builtinChains.Has(string(chainName)) {
 		return true

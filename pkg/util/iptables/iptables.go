@@ -25,11 +25,9 @@ import (
 	"sync"
 	"time"
 
-	godbus "github.com/godbus/dbus"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/utils/exec"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -65,10 +63,6 @@ type Interface interface {
 	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
 	// RestoreAll is the same as Restore except that no table is specified.
 	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
-	// AddReloadFunc adds a function to call on iptables reload
-	AddReloadFunc(reloadFunc func())
-	// Destroy cleans up resources used by the Interface
-	Destroy()
 	// HasRandomFully reveals whether `-j MASQUERADE` takes the
 	// `--random-fully` option.  This is helpful to work around a
 	// Linux kernel bug that sometimes causes multiple flows to get
@@ -143,22 +137,17 @@ const LockfilePath16x = "/run/xtables.lock"
 type runner struct {
 	mu              sync.Mutex
 	exec            utilexec.Interface
-	dbus            utildbus.Interface
 	protocol        Protocol
 	hasCheck        bool
-	hasListener     bool
 	hasRandomFully  bool
 	waitFlag        []string
 	restoreWaitFlag []string
 	lockfilePath    string
-
-	reloadFuncs []func()
-	signal      chan *godbus.Signal
 }
 
 // newInternal returns a new Interface which will exec iptables, and allows the
 // caller to change the iptables-restore lockfile path
-func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol, lockfilePath string) Interface {
+func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath string) Interface {
 	version, err := getIPTablesVersion(exec, protocol)
 	if err != nil {
 		klog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
@@ -171,10 +160,8 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 
 	runner := &runner{
 		exec:            exec,
-		dbus:            dbus,
 		protocol:        protocol,
 		hasCheck:        version.AtLeast(MinCheckVersion),
-		hasListener:     false,
 		hasRandomFully:  version.AtLeast(RandomFullyMinVersion),
 		waitFlag:        getIPTablesWaitFlag(version),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(version, exec, protocol),
@@ -184,44 +171,8 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 }
 
 // New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
-	return newInternal(exec, dbus, protocol, "")
-}
-
-// Destroy is part of Interface.
-func (runner *runner) Destroy() {
-	if runner.signal != nil {
-		runner.signal <- nil
-	}
-}
-
-const (
-	firewalldName      = "org.fedoraproject.FirewallD1"
-	firewalldPath      = "/org/fedoraproject/FirewallD1"
-	firewalldInterface = "org.fedoraproject.FirewallD1"
-)
-
-// Connects to D-Bus and listens for FirewallD start/restart. (On non-FirewallD-using
-// systems, this is effectively a no-op; we listen for the signals, but they will never be
-// emitted, so reload() will never be called.)
-func (runner *runner) connectToFirewallD() {
-	bus, err := runner.dbus.SystemBus()
-	if err != nil {
-		klog.V(1).Infof("Could not connect to D-Bus system bus: %s", err)
-		return
-	}
-	runner.hasListener = true
-
-	rule := fmt.Sprintf("type='signal',sender='%s',path='%s',interface='%s',member='Reloaded'", firewalldName, firewalldPath, firewalldInterface)
-	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
-
-	rule = fmt.Sprintf("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus',arg0='%s'", firewalldName)
-	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
-
-	runner.signal = make(chan *godbus.Signal, 10)
-	bus.Signal(runner.signal)
-
-	go runner.dbusSignalHandler(bus)
+func New(exec utilexec.Interface, protocol Protocol) Interface {
+	return newInternal(exec, protocol, "")
 }
 
 // EnsureChain is part of Interface.
@@ -618,62 +569,6 @@ func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol)
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
 	return match[1], nil
-}
-
-// goroutine to listen for D-Bus signals
-func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
-	firewalld := bus.Object(firewalldName, firewalldPath)
-
-	for s := range runner.signal {
-		if s == nil {
-			// Unregister
-			bus.Signal(runner.signal)
-			return
-		}
-
-		switch s.Name {
-		case "org.freedesktop.DBus.NameOwnerChanged":
-			name := s.Body[0].(string)
-			newOwner := s.Body[2].(string)
-
-			if name != firewalldName || len(newOwner) == 0 {
-				continue
-			}
-
-			// FirewallD startup (specifically the part where it deletes
-			// all existing iptables rules) may not yet be complete when
-			// we get this signal, so make a dummy request to it to
-			// synchronize.
-			firewalld.Call(firewalldInterface+".getDefaultZone", 0)
-
-			runner.reload()
-		case firewalldInterface + ".Reloaded":
-			runner.reload()
-		}
-	}
-}
-
-// AddReloadFunc is part of Interface
-func (runner *runner) AddReloadFunc(reloadFunc func()) {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// We only need to listen to firewalld if there are Reload functions, so lazy
-	// initialize the listener.
-	if !runner.hasListener {
-		runner.connectToFirewallD()
-	}
-
-	runner.reloadFuncs = append(runner.reloadFuncs, reloadFunc)
-}
-
-// runs all reload funcs to re-sync iptables rules
-func (runner *runner) reload() {
-	klog.V(1).Infof("reloading iptables rules")
-
-	for _, f := range runner.reloadFuncs {
-		f()
-	}
 }
 
 func (runner *runner) HasRandomFully() bool {
