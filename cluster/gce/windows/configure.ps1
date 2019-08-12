@@ -84,6 +84,20 @@ function FetchAndImport-ModuleFromMetadata {
   Import-Module -Force C:\$Filename
 }
 
+# Returns true if the ENABLE_NODE_LOGGING field in kube_env is true.
+# $KubeEnv is a hash table containing the kube-env metadata keys+values.
+function IsLoggingEnabled {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  if ($KubeEnv.Contains('ENABLE_NODE_LOGGING') -and `
+      ($KubeEnv['ENABLE_NODE_LOGGING'] -eq 'true')) {
+    return $true
+  }
+  return $false
+}
+
 try {
   # Don't use FetchAndImport-ModuleFromMetadata for common.psm1 - the common
   # module includes variables and functions that any other function may depend
@@ -106,6 +120,10 @@ try {
     FetchAndImport-ModuleFromMetadata 'install-ssh-psm1' 'install-ssh.psm1'
     InstallAndStart-OpenSsh
     StartProcess-WriteSshKeys
+  }
+
+  if (IsLoggingEnabled $kube_env) {
+    InstallAndStart-LoggingAgent
   }
 
   Set-EnvironmentVars
