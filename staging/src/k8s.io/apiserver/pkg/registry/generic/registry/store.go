@@ -1017,7 +1017,7 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 
 	wg.Add(workersNumber)
 	for i := 0; i < workersNumber; i++ {
-		go func() {
+		go func(options *metav1.DeleteOptions) {
 			// panics don't cross goroutine boundaries
 			defer utilruntime.HandleCrash(func(panicReason interface{}) {
 				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
@@ -1030,13 +1030,14 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 					errs <- err
 					return
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !kubeerr.IsNotFound(err) {
+				delOptions := options.DeepCopy()
+				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, delOptions); err != nil && !kubeerr.IsNotFound(err) {
 					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
 				}
 			}
-		}()
+		}(options)
 	}
 	wg.Wait()
 	select {
