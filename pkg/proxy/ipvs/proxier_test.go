@@ -3035,6 +3035,99 @@ func TestCleanLegacyService(t *testing.T) {
 
 }
 
+func TestCleanLegacyServiceWithRealServers(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
+
+	// all deleted expect ipvs2
+	activeServices := map[string]bool{"ipvs2": true}
+	// All ipvs services in the system.
+	currentServices := map[string]*utilipvs.VirtualServer{
+		"ipvs0": { // deleted with real servers
+			Address:   net.ParseIP("1.1.1.1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		"ipvs1": { // deleted no real server
+			Address:   net.ParseIP("2.2.2.2"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		"ipvs2": { // not deleted
+			Address:   net.ParseIP("3.3.3.3"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+	}
+
+	// "ipvs0" has a real server, but it should still be deleted since the Service is deleted
+	realServers := map[*utilipvs.VirtualServer]*utilipvs.RealServer{
+		{
+			Address:   net.ParseIP("1.1.1.1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		}: {
+			Address: net.ParseIP("10.180.0.1"),
+			Port:    uint16(53),
+			Weight:  1,
+		},
+	}
+
+	for v := range currentServices {
+		fp.ipvs.AddVirtualServer(currentServices[v])
+	}
+
+	for v, r := range realServers {
+		fp.ipvs.AddRealServer(v, r)
+	}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	activeBindAddrs := map[string]bool{"3.3.3.3": true}
+	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"}
+	for i := range currentBindAddrs {
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+	}
+
+	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"1.1.1.1": true, "2.2.2.2": true})
+	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
+	if len(remainingVirtualServers) != 1 {
+		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 1, len(remainingVirtualServers))
+	}
+
+	if remainingVirtualServers[0] != currentServices["ipvs2"] {
+		t.Logf("actual virtual server: %v", remainingVirtualServers[0])
+		t.Logf("expected virtual server: %v", currentServices["ipvs0"])
+		t.Errorf("unexpected IPVS service")
+	}
+
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	if len(remainingAddrs) != 1 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
+	}
+	// check that address is "3.3.3.3"
+	remainingAddrsMap := make(map[string]bool)
+	for _, a := range remainingAddrs {
+		if net.ParseIP(a).To4() == nil {
+			continue
+		}
+		remainingAddrsMap[a] = true
+	}
+	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
+		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
+	}
+
+}
+
 func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
