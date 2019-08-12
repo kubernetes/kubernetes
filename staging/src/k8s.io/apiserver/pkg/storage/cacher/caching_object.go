@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"k8s.io/klog"
 )
 
 var (
@@ -131,6 +133,7 @@ func newObjectWithSerializations(object runtime.Object) *ObjectWithSerialization
 func (o *ObjectWithSerializations) InterceptEncode(e runtime.WithVersionEncoder, w io.Writer) error {
 	gvks, isUnversioned, err := e.ObjectTyper.ObjectKinds(o.Object)
 	if err != nil {
+		klog.Errorf("AAAA: error: %v %v", err, o.Object)
 		return err
 	}
 	encodeVersion := e.Version
@@ -159,12 +162,14 @@ func (o *ObjectWithSerializations) InterceptEncode(e runtime.WithVersionEncoder,
 		} else {
 			versioned.Object, err = e.ObjectConvertor.ConvertToVersion(o.Object.DeepCopyObject(), encodeVersion)
 			if err != nil {
+				klog.Errorf("AAAA: conversion error: %v %v", err, o.Object)
 				return nil, err
 			}
 			// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 		}
 		if ne, ok := versioned.Object.(runtime.NestedObjectEncoder); ok {
 			if err := ne.EncodeNestedObjects(runtime.WithVersionEncoder{Version: encodeVersion, Encoder: e.Encoder, ObjectTyper: e.ObjectTyper}); err != nil {
+				klog.Errorf("AAAA: nested encoder: %v %v", err, o.Object)
 				return nil, err
 			}
 		}
@@ -188,3 +193,6 @@ func (o *ObjectWithSerializations) DeepCopyObject() runtime.Object {
 	// FIXME:
 	panic("ObjectWithSerializations shouldn't be deep-copied")
 }
+
+
+// FIXME: Setting SelfLinks doesn't seem to work now.
