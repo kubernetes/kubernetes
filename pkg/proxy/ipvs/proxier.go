@@ -499,7 +499,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
 	if err != nil {
-		return nil, fmt.Errorf("error parseing kernel version %q: %v", kernelVersionStr, err)
+		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
 	}
 	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
 
@@ -586,7 +586,7 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	}
 	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
 	if err != nil {
-		return false, fmt.Errorf("error parseing kernel version %q: %v", kernelVersionStr, err)
+		return false, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
 	}
 	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
 	wantModules := sets.NewString()
