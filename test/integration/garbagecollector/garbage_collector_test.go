@@ -786,6 +786,69 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	}
 }
 
+func TestDoubleDeletionWithFinalizer(t *testing.T) {
+	// test setup
+	ctx := setup(t, 5)
+	defer ctx.tearDown()
+	clientSet := ctx.clientSet
+	ns := createNamespaceOrDie("gc-double-foreground", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+
+	// step 1: creates a pod with a custom finalizer and deletes it, then waits until gc removes its finalizer
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	pod := newPod("lucy", ns.Name, nil)
+	pod.ObjectMeta.Finalizers = []string{"x/y"}
+	if _, err := podClient.Create(pod); err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+	if err := podClient.Delete(pod.Name, getForegroundOptions()); err != nil {
+		t.Fatalf("Failed to delete pod: %v", err)
+	}
+	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		returnedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(returnedPod.Finalizers) != 1 || returnedPod.Finalizers[0] != "x/y" {
+			t.Logf("waiting for pod %q to have only one finalizer %q at step 1, got %v", returnedPod.Name, "x/y", returnedPod.Finalizers)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for pod to have only one filanizer at step 1, error: %v", err)
+	}
+
+	// step 2: deletes the pod one more time and checks if there's only the custom finalizer left
+	if err := podClient.Delete(pod.Name, getForegroundOptions()); err != nil {
+		t.Fatalf("Failed to delete pod: %v", err)
+	}
+	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		returnedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(returnedPod.Finalizers) != 1 || returnedPod.Finalizers[0] != "x/y" {
+			t.Logf("waiting for pod %q to have only one finalizer %q at step 2, got %v", returnedPod.Name, "x/y", returnedPod.Finalizers)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for pod to have only one finalizer at step 2, gc hasn't removed its finalzier?, error: %v", err)
+	}
+
+	// step 3: removes the custom finalizer and checks if the pod was removed
+	patch := []byte(`[{"op":"remove","path":"/metadata/finalizers"}]`)
+	if _, err := podClient.Patch(pod.Name, types.JSONPatchType, patch); err != nil {
+		t.Fatalf("Failed to update pod: %v", err)
+	}
+	if err := wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
+		_, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		return errors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for pod %q to be deleted", pod.Name)
+	}
+}
+
 func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	ctx := setup(t, 0)
 	defer ctx.tearDown()
