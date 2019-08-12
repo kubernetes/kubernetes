@@ -3,6 +3,7 @@
 approvers:
 - piosz
 - brancz
+- logicalhan
 reviewers:
 - sig-instrumentation-pr-reviews
 labels:
