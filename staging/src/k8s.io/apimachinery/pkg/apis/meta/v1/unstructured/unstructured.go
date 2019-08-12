@@ -59,6 +59,25 @@ func (obj *Unstructured) IsList() bool {
 	_, ok = field.([]interface{})
 	return ok
 }
+
+func (u *Unstructured) Validate() error {
+	obj, found, _ := NestedFieldNoCopy(u.Object, "metadata", "annotations")
+	if found && obj != nil {
+		if _, _, err := NestedStringMap(u.Object, "metadata", "annotations"); err != nil {
+			return err
+		}
+	}
+
+	obj, found, _ = NestedFieldNoCopy(u.Object, "metadata", "labels")
+	if found && obj != nil {
+		if _, _, err := NestedStringMap(u.Object, "metadata", "labels"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (obj *Unstructured) ToList() (*UnstructuredList, error) {
 	if !obj.IsList() {
 		// return an empty list back
@@ -392,7 +411,10 @@ func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds 
 }
 
 func (u *Unstructured) GetLabels() map[string]string {
-	m, _, _ := NestedStringMap(u.Object, "metadata", "labels")
+	m, _, err := NestedStringMap(u.Object, "metadata", "labels")
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
 	return m
 }
 
@@ -405,7 +427,11 @@ func (u *Unstructured) SetLabels(labels map[string]string) {
 }
 
 func (u *Unstructured) GetAnnotations() map[string]string {
-	m, _, _ := NestedStringMap(u.Object, "metadata", "annotations")
+	m, _, err := NestedStringMap(u.Object, "metadata", "annotations")
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+
 	return m
 }
 

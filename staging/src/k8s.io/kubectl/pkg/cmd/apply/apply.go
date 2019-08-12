@@ -377,6 +377,12 @@ func (o *ApplyOptions) Run() error {
 			return err
 		}
 
+		if un, ok := info.Object.(*unstructured.Unstructured); ok {
+			if err := un.Validate(); err != nil {
+				return err
+			}
+		}
+
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
 		if o.ServerDryRun {
 			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
