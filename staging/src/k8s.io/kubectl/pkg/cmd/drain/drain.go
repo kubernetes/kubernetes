@@ -352,6 +352,13 @@ func (o *DrainCmdOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 
 func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	returnCh := make(chan error, 1)
+	// 0 timeout means infinite, we use MaxInt64 to represent it.
+	var globalTimeout time.Duration
+	if o.drainer.Timeout == 0 {
+		globalTimeout = time.Duration(math.MaxInt64)
+	} else {
+		globalTimeout = o.drainer.Timeout
+	}
 
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
@@ -371,7 +378,7 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 					return
 				}
 			}
-			_, err := o.waitForDelete([]corev1.Pod{pod}, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn)
+			_, err := o.waitForDelete([]corev1.Pod{pod}, 1*time.Second, globalTimeout, true, getPodFn)
 			if err == nil {
 				returnCh <- nil
 			} else {
@@ -383,13 +390,6 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 	doneCount := 0
 	var errors []error
 
-	// 0 timeout means infinite, we use MaxInt64 to represent it.
-	var globalTimeout time.Duration
-	if o.drainer.Timeout == 0 {
-		globalTimeout = time.Duration(math.MaxInt64)
-	} else {
-		globalTimeout = o.drainer.Timeout
-	}
 	globalTimeoutCh := time.After(globalTimeout)
 	numPods := len(pods)
 	for doneCount < numPods {
