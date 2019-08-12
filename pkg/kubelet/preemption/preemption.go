@@ -107,7 +107,9 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := c.killPodFunc(pod, status, nil)
 		if err != nil {
-			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			klog.Warningf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
+			continue
 		}
 		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
