@@ -33,7 +33,7 @@ import (
 // The value for timeout should effectively be "forever." Obviously we don't want our tests to truly lock up forever, but 30s
 // is long enough that it is effectively forever for the things that can slow down a run on a heavily contended machine
 // (GC, seeks, etc), but not so long as to make a developer ctrl-c a test run if they do happen to break that test.
-var ForeverTestTimeout = time.Second * 30
+var ForeverTestTimeout = time.Second * 40
 
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
