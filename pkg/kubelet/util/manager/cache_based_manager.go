@@ -63,7 +63,7 @@ type objectStore struct {
 	getObject GetObjectFunc
 	clock     clock.Clock
 
-	lock  sync.Mutex
+	lock  sync.RWMutex
 	items map[objectKey]*objectStoreItem
 
 	defaultTTL time.Duration
@@ -156,8 +156,8 @@ func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
 	key := objectKey{namespace: namespace, name: name}
 
 	data := func() *objectData {
-		s.lock.Lock()
-		defer s.lock.Unlock()
+		s.lock.RLock()
+		defer s.lock.RUnlock()
 		item, exists := s.items[key]
 		if !exists {
 			return nil
