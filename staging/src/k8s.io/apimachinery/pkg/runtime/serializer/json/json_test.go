@@ -17,6 +17,7 @@ limitations under the License.
 package json_test
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	serializertesting "k8s.io/apimachinery/pkg/runtime/serializer/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -453,6 +455,57 @@ func TestDecode(t *testing.T) {
 		if !reflect.DeepEqual(test.expectedObject, obj) {
 			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, obj))
 		}
+	}
+}
+
+func TestInterceptEncode(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		expectedResult string
+		expectedError  error
+	}{
+		{
+			desc:           "success",
+			expectedResult: "{}",
+			expectedError:  nil,
+		},
+		{
+			desc:           "failure",
+			expectedResult: "",
+			expectedError:  fmt.Errorf("failure"),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "MockCustomEncoder"}
+			creater := &mockCreater{obj: &serializertesting.MockCustomEncoder{}}
+			typer := &mockTyper{gvk: &gvk}
+			serializer := json.NewSerializer(json.DefaultMetaFactory, creater, typer, false)
+			writer := bytes.NewBuffer(nil)
+
+			obj := &serializertesting.MockCustomEncoder{
+				GVK:            gvk,
+				ExpectedResult: test.expectedResult,
+				ExpectedError:  test.expectedError,
+			}
+			if err := serializer.Encode(obj, writer); err != test.expectedError {
+				t.Errorf("unexpected error: %v, expected: %v", err, test.expectedError)
+			}
+			if result := writer.String(); result != test.expectedResult {
+				t.Errorf("unexpected result: %v, expected: %v", result, test.expectedResult)
+			}
+			intercepted := obj.InterceptedCalls()
+			if len(intercepted) != 1 {
+				t.Fatalf("unexpected number of intercepted calls: %v", intercepted)
+			}
+			if intercepted[0].Encoder != serializer ||
+				intercepted[0].ObjectConvertor != nil ||
+				intercepted[0].ObjectTyper != nil ||
+				intercepted[0].Version != nil {
+				t.Errorf("unexpected intercepted encoder: %v", intercepted[0])
+			}
+		})
 	}
 }
 

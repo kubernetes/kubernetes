@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "mock_objects.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],

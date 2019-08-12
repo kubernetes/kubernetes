@@ -17,14 +17,17 @@ limitations under the License.
 package versioning
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	serializertesting "k8s.io/apimachinery/pkg/runtime/serializer/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -295,6 +298,95 @@ func TestDecode(t *testing.T) {
 		case obj != nil:
 			t.Errorf("%d: unexpected object: %#v", i, obj)
 		}
+	}
+}
+
+func TestInterceptEncode(t *testing.T) {
+	gvk1 := schema.GroupVersionKind{Group: "group", Version: "version1", Kind: "MockCustomEncoder"}
+	gvk2 := schema.GroupVersionKind{Group: "group", Version: "version2", Kind: "MockCustomEncoder"}
+
+	unknown := &runtime.Unknown{
+		Raw:         []byte(`{"apiVersion":"test.group/testExternal","kind":"B","testString":"bar"}`),
+		ContentType: runtime.ContentTypeJSON,
+	}
+	unstructured := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "group/version",
+		"kind":       "TestType3",
+		"A":          "test",
+	}}
+
+	testCases := []struct {
+		desc           string
+		object         runtime.Object
+		expectedResult string
+		expectedError  error
+	}{
+		{
+			desc:           "success",
+			expectedResult: "{}",
+			expectedError:  nil,
+		},
+		{
+			desc:           "failure",
+			expectedResult: "",
+			expectedError:  fmt.Errorf("failure"),
+		},
+		{
+			desc:           "unknown",
+			object:         unknown,
+			expectedResult: "",
+			expectedError:  nil,
+		},
+		{
+			desc:           "unstructured",
+			object:         unstructured,
+			expectedResult: "",
+			expectedError:  nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			convertor := &mockConvertor{}
+			typer := &mockTyper{gvks: []schema.GroupVersionKind{gvk1, gvk2}}
+
+			encoder := &mockSerializer{}
+			var versioner runtime.GroupVersioner
+			versioner = gvk1.GroupVersion()
+			serializer := NewCodec(
+				encoder, nil,
+				convertor, nil, typer, nil,
+				versioner, nil,
+				"TestInterceptEncode")
+			writer := bytes.NewBuffer(nil)
+
+			obj := test.object
+			if obj == nil {
+				obj = &serializertesting.MockCustomEncoder{
+					GVK:            gvk1,
+					ExpectedResult: test.expectedResult,
+					ExpectedError:  test.expectedError,
+				}
+			}
+			if err := serializer.Encode(obj, writer); err != test.expectedError {
+				t.Errorf("unexpected error: %v, expected: %v", err, test.expectedError)
+			}
+			if result := writer.String(); result != test.expectedResult {
+				t.Errorf("unexpected result: %v, expected: %v", result, test.expectedResult)
+			}
+			if ce, ok := obj.(*serializertesting.MockCustomEncoder); ok {
+				intercepted := ce.InterceptedCalls()
+				if len(intercepted) != 1 {
+					t.Fatalf("unexpected number of intercepted calls: %v", intercepted)
+				}
+				if intercepted[0].Encoder != encoder ||
+					intercepted[0].ObjectConvertor != convertor ||
+					intercepted[0].ObjectTyper != typer ||
+					intercepted[0].Version != versioner {
+					t.Errorf("unexpected intercepted encoder: %#v", intercepted[0])
+				}
+			}
+		})
 	}
 }
 
