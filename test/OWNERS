@@ -6,6 +6,7 @@ reviewers:
   - stevesloka
   - johnSchnake
   - SataQiu
+  - draveness
 approvers:
   - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
