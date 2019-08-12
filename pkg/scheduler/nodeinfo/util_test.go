@@ -17,6 +17,7 @@ limitations under the License.
 package nodeinfo
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -29,11 +30,13 @@ const mb int64 = 1024 * 1024
 
 func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
+		name              string
 		node              *v1.Node
 		imageExistenceMap map[string]sets.String
 		expected          map[string]*ImageStateSummary
 	}{
 		{
+			name: "node-0",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
 				Status: v1.NodeStatus{
@@ -71,10 +74,12 @@ func TestGetNodeImageStates(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		imageStates := getNodeImageStates(test.node, test.imageExistenceMap)
-		if !reflect.DeepEqual(test.expected, imageStates) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, imageStates)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			imageStates := getNodeImageStates(test.node, test.imageExistenceMap)
+			if !reflect.DeepEqual(test.expected, imageStates) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, imageStates)
+			}
+		})
 	}
 }
 
@@ -125,10 +130,12 @@ func TestCreateImageExistenceMap(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		imageMap := createImageExistenceMap(test.nodes)
-		if !reflect.DeepEqual(test.expected, imageMap) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case:%d", i), func(t *testing.T) {
+			imageMap := createImageExistenceMap(test.nodes)
+			if !reflect.DeepEqual(test.expected, imageMap) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
+			}
+		})
 	}
 }
