@@ -28,8 +28,6 @@ import (
 // called instead of IsLikelyNotMountPoint. IsNotMountPoint is more expensive
 // but properly handles bind mounts within the same fs.
 func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
-	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
-	// the path in the kubelet container, not on the host.
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)

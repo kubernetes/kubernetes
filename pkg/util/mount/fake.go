@@ -247,8 +247,8 @@ func (hu *FakeHostUtil) MakeFile(pathname string) error {
 	return nil
 }
 
-// ExistsPath checks if pathname exists.
-func (hu *FakeHostUtil) ExistsPath(pathname string) (bool, error) {
+// PathExists checks if pathname exists.
+func (hu *FakeHostUtil) PathExists(pathname string) (bool, error) {
 	if _, ok := hu.Filesystem[pathname]; ok {
 		return true, nil
 	}

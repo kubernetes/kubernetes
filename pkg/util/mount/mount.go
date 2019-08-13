@@ -91,8 +91,9 @@ type HostUtils interface {
 	MakeFile(pathname string) error
 	// MakeDir creates a new directory.
 	MakeDir(pathname string) error
+	// PathExists tests if the given path already exists
 	// Error is returned on any other error than "file not found".
-	ExistsPath(pathname string) (bool, error)
+	PathExists(pathname string) (bool, error)
 	// EvalHostSymlinks returns the path name after evaluating symlinks.
 	EvalHostSymlinks(pathname string) (string, error)
 	// GetOwner returns the integer ID for the user and group of the given path

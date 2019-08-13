@@ -170,8 +170,8 @@ func TestNsenterExistsFile(t *testing.T) {
 
 				return path, nil
 			},
-			expectedOutput: isRoot,  // ExistsPath success when running as root
-			expectError:    !isRoot, // ExistsPath must fail when running as not-root
+			expectedOutput: isRoot,  // PathExists success when running as root
+			expectError:    !isRoot, // PathExists must fail when running as not-root
 		},
 		{
 			name: "relative symlink to existing file",
@@ -278,7 +278,7 @@ func TestNsenterExistsFile(t *testing.T) {
 			continue
 		}
 
-		out, err := hu.ExistsPath(path)
+		out, err := hu.PathExists(path)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error: %s", test.name, err)
 		}

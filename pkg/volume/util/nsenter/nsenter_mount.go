@@ -316,9 +316,9 @@ func (hu *hostUtil) MakeFile(pathname string) error {
 	return nil
 }
 
-// ExistsPath checks if pathname exists.
+// PathExists checks if pathname exists.
 // Error is returned on any other error than "file not found".
-func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+func (hu *hostUtil) PathExists(pathname string) (bool, error) {
 	// Resolve the symlinks but allow the target not to exist. EvalSymlinks
 	// would return an generic error when the target does not exist.
 	hostPath, err := hu.ne.EvalSymlinks(pathname, false /* mustExist */)
