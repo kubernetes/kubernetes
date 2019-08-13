@@ -151,6 +151,9 @@ type AttachedVolume struct {
 	// was previously set to zero (other wise its value remains the same).
 	// It is reset to zero on ResetDetachRequestTime(...) calls.
 	DetachRequestedTime time.Time
+
+	// AttachConfirmed returns whether volume was confirmed to be attached
+	AttachConfirmed bool
 }
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
@@ -262,10 +265,10 @@ func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 }
 
 func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName, attachConfirmed bool) error {
 	asw.Lock()
 	defer asw.Unlock()
-	return asw.removeVolumeFromReportAsAttached(volumeName, nodeName)
+	return asw.removeVolumeFromReportAsAttached(volumeName, nodeName, attachConfirmed)
 }
 
 func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
@@ -431,9 +434,10 @@ func (asw *actualStateOfWorld) getNodeAndVolume(
 // Remove the volumeName from the node's volumesToReportAsAttached list
 // This is an internal function and caller should acquire and release the lock
 func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName, attachConfirmed bool) error {
 
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
+
 	if nodeToUpdateExists {
 		_, nodeToUpdateVolumeExists :=
 			nodeToUpdate.volumesToReportAsAttached[volumeName]
@@ -444,10 +448,13 @@ func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 			return nil
 		}
 	}
-	return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
-		volumeName,
-		nodeName)
+	if attachConfirmed {
+		return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
+			volumeName,
+			nodeName)
+	}
 
+	return nil
 }
 
 // Add the volumeName to the node's volumesToReportAsAttached list
@@ -517,7 +524,7 @@ func (asw *actualStateOfWorld) DeleteVolumeNode(
 		return
 	}
 
-	_, nodeExists := volumeObj.nodesAttachedTo[nodeName]
+	nodeVolumeAttachment, nodeExists := volumeObj.nodesAttachedTo[nodeName]
 	if nodeExists {
 		delete(asw.attachedVolumes[volumeName].nodesAttachedTo, nodeName)
 	}
@@ -527,7 +534,7 @@ func (asw *actualStateOfWorld) DeleteVolumeNode(
 	}
 
 	// Remove volume from volumes to report as attached
-	asw.removeVolumeFromReportAsAttached(volumeName, nodeName)
+	asw.removeVolumeFromReportAsAttached(volumeName, nodeName, nodeVolumeAttachment.attachedConfirmed)
 }
 
 func (asw *actualStateOfWorld) IsVolumeAttachedToNode(
@@ -664,6 +671,7 @@ func getAttachedVolume(
 			DevicePath:         attachedVolume.devicePath,
 			PluginIsAttachable: true,
 		},
+		AttachConfirmed:     nodeAttachedTo.attachedConfirmed,
 		MountedByNode:       nodeAttachedTo.mountedByNode,
 		DetachRequestedTime: nodeAttachedTo.detachRequestedTime}
 }

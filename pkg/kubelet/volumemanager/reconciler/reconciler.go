@@ -303,7 +303,7 @@ func (rc *reconciler) reconcile() {
 					// Only detach if kubelet detach is enabled
 					klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
 					err := rc.operationExecutor.DetachVolume(
-						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
+						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld, true /*attachConfirmed*/)
 					if err != nil &&
 						!nestedpendingoperations.IsAlreadyExists(err) &&
 						!exponentialbackoff.IsExponentialBackoff(err) {

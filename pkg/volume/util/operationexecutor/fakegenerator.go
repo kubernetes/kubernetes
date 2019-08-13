@@ -56,7 +56,7 @@ func (f *fakeOGCounter) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, 
 	return f.recordFuncCall("GenerateAttachVolumeFunc")
 }
 
-func (f *fakeOGCounter) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater, attachConfirmed bool) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateDetachVolumeFunc"), nil
 }
 

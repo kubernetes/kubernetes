@@ -347,7 +347,7 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueV
 	// no operation for kubelet side
 }
 
-func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName, attachConfirmed bool) error {
 	// no operation for kubelet side
 	return nil
 }
