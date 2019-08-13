@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 	utiltrace "k8s.io/utils/trace"
@@ -63,6 +64,17 @@ type Interface interface {
 	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
 	// RestoreAll is the same as Restore except that no table is specified.
 	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
+	// Monitor detects when the given iptables tables have been flushed by an external
+	// tool (e.g. a firewall reload) by creating canary chains and polling to see if
+	// they have been deleted. (Specifically, it polls tables[0] every interval until
+	// the canary has been deleted from there, then waits a short additional time for
+	// the canaries to be deleted from the remaining tables as well. You can optimize
+	// the polling by listing a relatively empty table in tables[0]). When a flush is
+	// detected, this calls the reloadFunc so the caller can reload their own iptables
+	// rules. If it is unable to create the canary chains (either initially or after
+	// a reload) it will log an error and stop monitoring.
+	// (This function should be called from a goroutine.)
+	Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{})
 	// HasRandomFully reveals whether `-j MASQUERADE` takes the
 	// `--random-fully` option.  This is helpful to work around a
 	// Linux kernel bug that sometimes causes multiple flows to get
@@ -480,12 +492,78 @@ func (runner *runner) checkRuleUsingCheck(args []string) (bool, error) {
 	return false, fmt.Errorf("error checking rule: %v: %s", err, out)
 }
 
+const (
+	// Max time we wait for an iptables flush to complete after we notice it has started
+	iptablesFlushTimeout = 5 * time.Second
+	// How often we poll while waiting for an iptables flush to complete
+	iptablesFlushPollTime = 100 * time.Millisecond
+)
+
+// Monitor is part of Interface
+func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
+	for {
+		for _, table := range tables {
+			if _, err := runner.EnsureChain(table, canary); err != nil {
+				klog.Warningf("Could not set up iptables canary %s/%s: %v", string(table), string(canary), err)
+				return
+			}
+		}
+
+		// Poll until stopCh is closed or iptables is flushed
+		err := utilwait.PollUntil(interval, func() (bool, error) {
+			if runner.chainExists(tables[0], canary) {
+				return false, nil
+			}
+			klog.V(2).Infof("iptables canary %s/%s deleted", string(tables[0]), string(canary))
+
+			// Wait for the other canaries to be deleted too before returning
+			// so we don't start reloading too soon.
+			err := utilwait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
+				for i := 1; i < len(tables); i++ {
+					if runner.chainExists(tables[i], canary) {
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+			if err != nil {
+				klog.Warning("Inconsistent iptables state detected.")
+			}
+			return true, nil
+		}, stopCh)
+
+		if err != nil {
+			// stopCh was closed
+			for _, table := range tables {
+				_ = runner.DeleteChain(table, canary)
+			}
+			return
+		}
+
+		klog.V(2).Infof("Reloading after iptables flush")
+		reloadFunc()
+	}
+}
+
+// chainExists is used internally by Monitor; none of the public Interface methods can be
+// used to distinguish "chain exists" from "chain does not exist" with no side effects
+func (runner *runner) chainExists(table Table, chain Chain) bool {
+	fullArgs := makeFullArgs(table, chain)
+
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	_, err := runner.run(opListChain, fullArgs)
+	return err == nil
+}
+
 type operation string
 
 const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
 	opDeleteChain operation = "-X"
+	opListChain   operation = "-L"
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"

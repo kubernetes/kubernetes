@@ -1427,9 +1427,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
-	// Start loop to sync iptables util rules
+	// Set up iptables util rules
 	if kl.makeIPTablesUtilChains {
-		go wait.Until(kl.syncNetworkUtil, 1*time.Minute, wait.NeverStop)
+		kl.initNetworkUtil()
 	}
 
 	// Start a goroutine responsible for killing pods (that are not properly

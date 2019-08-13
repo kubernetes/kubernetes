@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -97,6 +98,9 @@ func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.F
 func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	f.Lines = data
 	return nil
+}
+
+func (f *FakeIPTables) Monitor(canary iptables.Chain, tables []iptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 }
 
 func getToken(line, separator string) string {

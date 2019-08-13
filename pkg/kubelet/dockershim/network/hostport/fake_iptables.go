@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -333,6 +334,9 @@ func (f *fakeIPTables) Restore(tableName utiliptables.Table, data []byte, flush 
 
 func (f *fakeIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, counters utiliptables.RestoreCountersFlag) error {
 	return f.restore("", data, flush)
+}
+
+func (f *fakeIPTables) Monitor(canary utiliptables.Chain, tables []utiliptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 }
 
 func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName utiliptables.Chain) bool {
