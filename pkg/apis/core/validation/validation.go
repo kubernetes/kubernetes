@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -208,11 +208,6 @@ func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath
 // this returns a list of descriptions of individual characteristics of the
 // value that were not valid.  Otherwise this returns an empty list or nil.
 type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
-
-// ValidatePodName can be used to check whether the given pod name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-var ValidatePodName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateReplicationControllerName can be used to check whether the given replication
 // controller name is valid.
@@ -3076,7 +3071,7 @@ func validateContainersOnlyForPod(containers []core.Container, fldPath *field.Pa
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *core.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
+	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, field.NewPath("spec"))...)
 
@@ -3879,7 +3874,7 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 
 // ValidatePodTemplate tests if required fields in the pod template are set.
 func ValidatePodTemplate(pod *core.PodTemplate) field.ErrorList {
-	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, field.NewPath("metadata"))
+	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, field.NewPath("template"))...)
 	return allErrs
 }
