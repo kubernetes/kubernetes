@@ -212,45 +212,46 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 		})
 
-		ginkgo.It("should resize volume when PVC is edited while pod is using it", func() {
-			init()
-			defer cleanup()
+		if pattern.VolMode == v1.PersistentVolumeFilesystem {
+			ginkgo.It("should resize volume when PVC is edited while pod is using it", func() {
+				init()
+				defer cleanup()
 
-			var err error
-			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = framework.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
-			defer func() {
-				err = framework.DeletePodWithWait(f, f.ClientSet, l.pod)
-				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
-			}()
-			framework.ExpectNoError(err, "While creating pods for resizing")
+				var err error
+				ginkgo.By("Creating a pod with dynamically provisioned volume")
+				l.pod, err = framework.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+				defer func() {
+					err = framework.DeletePodWithWait(f, f.ClientSet, l.pod)
+					framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
+				}()
+				framework.ExpectNoError(err, "While creating pods for resizing")
 
-			// We expand the PVC while no pod is using it to ensure offline expansion
-			ginkgo.By("Expanding current pvc")
-			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
-			newSize := currentPvcSize.DeepCopy()
-			newSize.Add(resource.MustParse("1Gi"))
-			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			l.resource.pvc, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
-			framework.ExpectNoError(err, "While updating pvc for more size")
-			gomega.Expect(l.resource.pvc).NotTo(gomega.BeNil())
+				ginkgo.By("Expanding current pvc")
+				currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+				newSize := currentPvcSize.DeepCopy()
+				newSize.Add(resource.MustParse("1Gi"))
+				e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
+				l.resource.pvc, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+				framework.ExpectNoError(err, "While updating pvc for more size")
+				gomega.Expect(l.resource.pvc).NotTo(gomega.BeNil())
 
-			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
-			if pvcSize.Cmp(newSize) != 0 {
-				e2elog.Failf("error updating pvc size %q", l.resource.pvc.Name)
-			}
+				pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+				if pvcSize.Cmp(newSize) != 0 {
+					e2elog.Failf("error updating pvc size %q", l.resource.pvc.Name)
+				}
 
-			ginkgo.By("Waiting for cloudprovider resize to finish")
-			err = WaitForControllerVolumeResize(l.resource.pvc, f.ClientSet, totalResizeWaitPeriod)
-			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
+				ginkgo.By("Waiting for cloudprovider resize to finish")
+				err = WaitForControllerVolumeResize(l.resource.pvc, f.ClientSet, totalResizeWaitPeriod)
+				framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
-			ginkgo.By("Waiting for file system resize to finish")
-			l.resource.pvc, err = WaitForFSResize(l.resource.pvc, f.ClientSet)
-			framework.ExpectNoError(err, "while waiting for fs resize to finish")
+				ginkgo.By("Waiting for file system resize to finish")
+				l.resource.pvc, err = WaitForFSResize(l.resource.pvc, f.ClientSet)
+				framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
-			pvcConditions := l.resource.pvc.Status.Conditions
-			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
-		})
+				pvcConditions := l.resource.pvc.Status.Conditions
+				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			})
+		}
 
 	}
 }
