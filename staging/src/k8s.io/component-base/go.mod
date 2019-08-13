@@ -13,7 +13,7 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/klog v0.3.1
+	k8s.io/klog v0.4.0
 	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 )
 
