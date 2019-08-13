@@ -402,7 +402,7 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 		} else {
 			_, hostSearch, _, err := parseResolvConf(f)
 			if err != nil {
-				klog.Errorf("Error for parsing the reslov.conf file: %v", err)
+				klog.Errorf("Error for parsing the resolv.conf file: %v", err)
 			} else {
 				dnsString = dnsString + "search"
 				for _, search := range hostSearch {
