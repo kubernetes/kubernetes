@@ -152,6 +152,7 @@ func TestStructInput(t *testing.T) {
 			"engieer":  10,
 			"web/html": 15,
 			"k8s-app":  20,
+			"foo.bar":  42,
 		},
 		Employees: map[empName]job{
 			"jason": "manager",
@@ -168,6 +169,7 @@ func TestStructInput(t *testing.T) {
 		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday", false},
 		{"variable", "hello {.Name}", storeData, "hello jsonpath", false},
 		{"dict/", "{$.Labels.web/html}", storeData, "15", false},
+		{"dict/", "{$.Labels['foo.bar']}", storeData, "42", false},
 		{"dict/", "{$.Employees.jason}", storeData, "manager", false},
 		{"dict/", "{$.Employees.dan}", storeData, "clerk", false},
 		{"dict-", "{.Labels.k8s-app}", storeData, "20", false},
@@ -287,6 +289,7 @@ func TestKubernetes(t *testing.T) {
 			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] ", false},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret", false},
 		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
+		{"hostname brackets", `{.items[0].metadata.labels['kubernetes.io/hostname']}`, &nodesData, "127.0.0.1", false},
 		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
 		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1", false},
 	}

@@ -271,31 +271,32 @@ Loop:
 		text = ":"
 	}
 
+	// dict key
+	value := dictKeyRex.FindStringSubmatch(text)
+	if value != nil {
+		cur.append(newField(value[1]))
+		return p.parseInsideAction(cur)
+
+	}
+
 	//union operator
 	strs := strings.Split(text, ",")
 	if len(strs) > 1 {
 		union := []*ListNode{}
 		for _, str := range strs {
-			parser, err := parseAction("union", fmt.Sprintf("[%s]", strings.Trim(str, " ")))
+			str = strings.Trim(str, " ")
+			if q := dictKeyRex.FindStringSubmatch(str); q != nil {
+				str = fmt.Sprintf(".%s", q[1])
+			} else {
+				str = fmt.Sprintf("[%s]", str)
+			}
+			parser, err := parseAction("union", str)
 			if err != nil {
 				return err
 			}
 			union = append(union, parser.Root)
 		}
 		cur.append(newUnion(union))
-		return p.parseInsideAction(cur)
-	}
-
-	// dict key
-	value := dictKeyRex.FindStringSubmatch(text)
-	if value != nil {
-		parser, err := parseAction("arraydict", fmt.Sprintf(".%s", value[1]))
-		if err != nil {
-			return err
-		}
-		for _, node := range parser.Root.Nodes {
-			cur.append(node)
-		}
 		return p.parseInsideAction(cur)
 	}
 
