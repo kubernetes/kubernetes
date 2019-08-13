@@ -31,7 +31,6 @@ import (
 	// import DefaultProvider
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -58,9 +57,8 @@ func StartApiserver() (string, ShutdownFunc) {
 }
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
-// and event broadcaster. It returns a handle to the configurator args for the running scheduler
-// and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (*factory.Config, ShutdownFunc) {
+// and event broadcaster. It returns the running scheduler and the shutdown function to stop it.
+func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	stopCh := make(chan struct{})
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
@@ -96,7 +94,7 @@ func StartScheduler(clientSet clientset.Interface) (*factory.Config, ShutdownFun
 		close(stopCh)
 		klog.Infof("destroyed scheduler")
 	}
-	return sched.Config(), shutdownFunc
+	return sched, shutdownFunc
 }
 
 // createScheduler create a scheduler with given informer factory and default name.

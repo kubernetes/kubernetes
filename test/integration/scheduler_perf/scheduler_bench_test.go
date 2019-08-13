@@ -31,6 +31,7 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -358,9 +359,10 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	_, finalFunc, clientset := mustSetupScheduler()
+	finalFunc, clientset := mustSetupScheduler()
 	defer finalFunc()
 
+	podInformer := factory.NewPodInformer(clientset, 0)
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: nodeStrategy}},
@@ -377,7 +379,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	podCreator.CreatePods()
 
 	for {
-		scheduled, err := getScheduledPods(clientset)
+		scheduled, err := getScheduledPods(podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -394,7 +396,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	podCreator.CreatePods()
 	for {
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := getScheduledPods(clientset)
+		scheduled, err := getScheduledPods(podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}

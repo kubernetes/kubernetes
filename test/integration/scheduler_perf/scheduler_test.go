@@ -26,7 +26,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog"
@@ -107,12 +109,13 @@ type testConfig struct {
 	mutatedNodeTemplate *v1.Node
 	mutatedPodTemplate  *v1.Pod
 	clientset           clientset.Interface
+	podInformer         coreinformers.PodInformer
 	destroyFunc         func()
 }
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	_, destroyFunc, clientset := mustSetupScheduler()
+	destroyFunc, clientset := mustSetupScheduler()
 	return &testConfig{
 		clientset:   clientset,
 		destroyFunc: destroyFunc,
@@ -133,10 +136,12 @@ func schedulePods(config *testConfig) int32 {
 	// We are interested in low scheduling rates (i.e. qps=2),
 	minQPS := int32(math.MaxInt32)
 	start := time.Now()
+
+	podInformer := factory.NewPodInformer(config.clientset, 0)
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
-		scheduled, err := getScheduledPods(config.clientset)
+		scheduled, err := getScheduledPods(podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -152,7 +157,7 @@ func schedulePods(config *testConfig) int32 {
 	// Now that scheduling has started, lets start taking the pulse on how many pods are happening per second.
 	for {
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := getScheduledPods(config.clientset)
+		scheduled, err := getScheduledPods(podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
