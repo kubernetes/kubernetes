@@ -147,7 +147,6 @@ test/integration/ttlcontroller
 test/integration/volume
 test/integration/volumescheduling
 test/utils
-vendor/k8s.io/api/events/v1beta1
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema
