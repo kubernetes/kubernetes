@@ -212,7 +212,7 @@ func TestOperationExecutor_DetachVolumeConcurrently(t *testing.T) {
 			VolumeName: v1.UniqueVolumeName(pdName),
 			NodeName:   "node",
 		}
-		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */)
+		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */, true /*attachConfirmed*/)
 	}
 
 	// Assert
@@ -415,7 +415,7 @@ func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach Volu
 		OperationFunc: opFunc,
 	}
 }
-func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater, attachConfirmed bool) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
