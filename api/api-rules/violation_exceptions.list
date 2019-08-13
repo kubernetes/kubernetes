@@ -115,6 +115,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Args
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Command
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Env
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,EnvFrom
+API rule violation: list_type_missing,k8s.io/api/core/v1,Container,ImageDecryptSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,VolumeDevices
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/core/v1,ContainerImage,Names
@@ -129,6 +130,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommo
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Command
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Env
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,EnvFrom
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,ImageDecryptSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Ports
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeDevices
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeMounts
@@ -141,6 +143,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,HTTPGetAction,HTTPHeade
 API rule violation: list_type_missing,k8s.io/api/core/v1,HostAlias,Hostnames
 API rule violation: list_type_missing,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,Portals
 API rule violation: list_type_missing,k8s.io/api/core/v1,ISCSIVolumeSource,Portals
+API rule violation: list_type_missing,k8s.io/api/core/v1,ImageDecryptServiceSecret,Images
 API rule violation: list_type_missing,k8s.io/api/core/v1,LimitRangeList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,LimitRangeSpec,Limits
 API rule violation: list_type_missing,k8s.io/api/core/v1,List,Items
@@ -207,6 +210,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,ScopedResourceSelectorR
 API rule violation: list_type_missing,k8s.io/api/core/v1,SecretList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,SecretProjection,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,SecretVolumeSource,Items
+API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,ImageDecryptSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,ImagePullSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,Secrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccountList,Items

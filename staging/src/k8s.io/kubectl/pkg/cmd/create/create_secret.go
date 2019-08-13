@@ -36,6 +36,7 @@ func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 		Run:   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateSecretDecryptImage(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateSecretTLS(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateSecretGeneric(f, ioStreams))
 
@@ -71,7 +72,81 @@ var (
 
 	  # Create a new secret named my-secret from an env file
 	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
+
+	secretForImageDecryptionLong = templates.LongDesc(i18n.T(`
+		Create a new secret for decrypting encrypted images.
+		The private keys to decrypt the images can be provided
+		by their base64 string version using --decrypt-secret or
+		in binary form using --from-file
+		kubectl create secret image-decrypt keysecret --decrypt-secret=<base64 of private key:passwd>
+		if the given private key doesn't have password,
+		kubectl create secret image-decrypt keysecret --decrypt-secret=<base64 of private key>
+		`))
+
+	secretForImageDecryptionExample = templates.Examples(i18n.T(`
+		kubectl create secret image-decrypt <secret name> --decrypt-secret=<private key>[:<password>]`))
 )
+
+type SecretImageDecryptionOpts struct {
+	CreateSubcommandOptions *CreateSubcommandOptions
+}
+
+// NewCmdCreateSecretDecryptImage is a macro command for creating secrets to decrypt an encrypted image
+func NewCmdCreateSecretDecryptImage(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := &SecretImageDecryptionOpts{
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+	}
+
+	cmd := &cobra.Command{
+		Use:                   "image-decrypt NAME --decrypt-secret=<private key>[:<password>]",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Create a secret to decrypt an encrypted image"),
+		Long:                  secretForImageDecryptionLong,
+		Example:               secretForImageDecryptionExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
+		},
+	}
+
+	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.SecretForImageDecryptionV1GeneratorName)
+	cmd.Flags().StringArray("decrypt-secret", []string{}, i18n.T("Base64 of the Private Key (optionally a password) for image decryption"))
+	cmd.MarkFlagRequired("decrypt-secret")
+	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
+
+	return cmd
+}
+
+func (o *SecretImageDecryptionOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	var generator generate.StructuredGenerator
+	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	case generateversioned.SecretForImageDecryptionV1GeneratorName:
+		keyPasswds := cmdutil.GetFlagStringArray(cmd, "decrypt-secret")
+		generator = &generateversioned.SecretForDecryptImageGeneratorV1{
+			Name:              name,
+			PrivateKeyPasswds: keyPasswds,
+			AppendHash:        cmdutil.GetFlagBool(cmd, "append-hash"),
+		}
+	default:
+		return errUnsupportedGenerator(cmd, generatorName)
+	}
+
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
+}
+
+// CreateSecretDockerRegistry is the implementation of the create secret image-decrypt command
+func (o *SecretImageDecryptionOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
+}
 
 // SecretGenericOpts holds the options for 'create secret' sub command
 type SecretGenericOpts struct {

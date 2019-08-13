@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/armon/circbuf"
 	"k8s.io/klog"
+	"k8s.io/kubectl/pkg/generate/versioned"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,7 +123,20 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		return grpc.ErrorDesc(err), ErrCreateContainerConfig
 	}
 
-	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
+	dcParams := &runtimeapi.DecryptParams{}
+
+	for _, secret := range pullSecrets {
+		if secret.Type == v1.SecretTypeDecryptKey {
+			dcConfig := versioned.DecryptConfigEntry{}
+			err = json.Unmarshal(secret.Data[v1.ImageDecryptionKey], &dcConfig)
+			if err != nil {
+				return "", err
+			}
+			dcParams.PrivateKeyPasswds = dcConfig.PrivateKeyPasswds
+		}
+	}
+
+	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig, dcParams)
 	if err != nil {
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), ErrCreateContainer

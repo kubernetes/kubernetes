@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -90,6 +90,21 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		for _, reference := range container.ImageDecryptSecrets {
+			if !visitor(reference.Name) {
+				return false
+			}
+		}
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		for _, reference := range container.ImageDecryptSecrets {
+			if !visitor(reference.Name) {
+				return false
+			}
 		}
 	}
 	VisitContainers(&pod.Spec, func(c *v1.Container) bool {

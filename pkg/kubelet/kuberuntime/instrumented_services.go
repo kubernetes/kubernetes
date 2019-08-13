@@ -80,11 +80,11 @@ func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig, dcParams *runtimeapi.DecryptParams) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.CreateContainer(podSandboxID, config, sandboxConfig)
+	out, err := in.service.CreateContainer(podSandboxID, config, sandboxConfig, dcParams)
 	recordError(operation, err)
 	return out, err
 }
@@ -283,11 +283,11 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, dcParams *runtimeapi.DecryptParams) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
-	imageRef, err := in.service.PullImage(image, auth, podSandboxConfig)
+	imageRef, err := in.service.PullImage(image, auth, podSandboxConfig, dcParams)
 	recordError(operation, err)
 	return imageRef, err
 }

@@ -187,7 +187,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 }
 
 // CreateContainer creates a new container in the specified PodSandbox.
-func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig, dcParams *runtimeapi.DecryptParams) (string, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -195,6 +195,7 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 		PodSandboxId:  podSandBoxID,
 		Config:        config,
 		SandboxConfig: sandboxConfig,
+		Dcparams:      dcParams,
 	})
 	if err != nil {
 		klog.Errorf("CreateContainer in sandbox %q from runtime service failed: %v", podSandBoxID, err)

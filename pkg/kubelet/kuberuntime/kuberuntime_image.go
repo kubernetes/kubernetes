@@ -17,10 +17,15 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"k8s.io/api/core/v1"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
+	"k8s.io/kubectl/pkg/generate/versioned"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -35,6 +40,36 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 		return "", err
 	}
 
+	dcParams := &runtimeapi.DecryptParams{}
+	pullImageSecrets := []v1.Secret{}
+	for _, secret := range pullSecrets {
+		if secret.Type == v1.SecretTypeDockerConfigJson {
+			pullImageSecrets = append(pullImageSecrets, secret)
+		} else if secret.Type == v1.SecretTypeDecryptKey {
+			if val, ok := secret.Labels["image"]; ok {
+				secretLabels := strings.Split(val, ",")
+				for _, imageName := range secretLabels {
+					if imageName == image.Image {
+						dcConfig := versioned.DecryptConfigEntry{}
+						err = json.Unmarshal(secret.Data[v1.ImageDecryptionKey], &dcConfig)
+						if err != nil {
+							return "", err
+						}
+						dcParams.PrivateKeyPasswds = dcConfig.PrivateKeyPasswds
+					}
+				}
+			} else {
+				err := fmt.Errorf("Decryption Secret %v must have image label", secret)
+				klog.Errorf("%v: ", err)
+				return "", err
+			}
+		}
+	}
+
+	if len(dcParams.PrivateKeyPasswds) == 0 {
+		dcParams = nil
+	}
+
 	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, m.keyring)
 	if err != nil {
 		return "", err
@@ -45,7 +80,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 	if !withCredentials {
 		klog.V(3).Infof("Pulling image %q without credentials", img)
 
-		imageRef, err := m.imageService.PullImage(imgSpec, nil, podSandboxConfig)
+		imageRef, err := m.imageService.PullImage(imgSpec, nil, podSandboxConfig, dcParams)
 		if err != nil {
 			klog.Errorf("Pull image %q failed: %v", img, err)
 			return "", err
@@ -65,7 +100,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 			RegistryToken: currentCreds.RegistryToken,
 		}
 
-		imageRef, err := m.imageService.PullImage(imgSpec, auth, podSandboxConfig)
+		imageRef, err := m.imageService.PullImage(imgSpec, auth, podSandboxConfig, dcParams)
 		// If there was no error, return success
 		if err == nil {
 			return imageRef, nil

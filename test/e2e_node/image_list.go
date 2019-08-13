@@ -112,7 +112,7 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 	if err == nil && imageStatus != nil {
 		return nil, nil
 	}
-	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)
+	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil, nil)
 	return nil, err
 }
 

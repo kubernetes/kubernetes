@@ -32,7 +32,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -836,6 +836,30 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 		return err
 	}
 	return nil
+}
+
+// getDecryptSecretesForImage retrieves the referenced decrypt secrets
+func (kl *Kubelet) getDecryptSecretesForImage(pod *v1.Pod) []v1.Secret {
+	decryptSecrets := []v1.Secret{}
+	for _, container := range pod.Spec.Containers {
+		for _, secretRef := range container.ImageDecryptSecrets {
+			secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
+			if secret.Labels == nil {
+				secret.Labels = make(map[string]string)
+				secret.Labels["image"] = ""
+			}
+			s := strings.Split(secret.Labels["images"], ",")
+			s = append(s, container.Image)
+			secret.Labels["image"] = strings.Join(s, ",")
+
+			if err != nil {
+				klog.Warningf("Unable to retrieve decrypt secret %s/%s for %s/%s due to %v.  The image decryption may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
+				continue
+			}
+			decryptSecrets = append(decryptSecrets, *secret)
+		}
+	}
+	return decryptSecrets
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull

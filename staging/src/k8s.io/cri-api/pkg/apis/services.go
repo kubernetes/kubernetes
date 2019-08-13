@@ -32,7 +32,7 @@ type RuntimeVersioner interface {
 // container runtime. The methods are thread-safe.
 type ContainerManager interface {
 	// CreateContainer creates a new container in specified PodSandbox.
-	CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig, dcParams *runtimeapi.DecryptParams) (string, error)
 	// StartContainer starts the container.
 	StartContainer(containerID string) error
 	// StopContainer stops a running container with a grace period (i.e., timeout).
@@ -111,7 +111,7 @@ type ImageManagerService interface {
 	// ImageStatus returns the status of the image.
 	ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error)
 	// PullImage pulls an image with the authentication config.
-	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, dcParams *runtimeapi.DecryptParams) (string, error)
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeapi.ImageSpec) error
 	// ImageFsInfo returns information of the filesystem that is used to store images.

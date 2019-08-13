@@ -192,6 +192,23 @@ func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (er
 		}
 	}
 
+	for i := 0; i < len(pod.Spec.Containers); i++ {
+		if len(pod.Spec.Containers[i].ImageDecryptSecrets) == 0 {
+			pod.Spec.Containers[i].ImageDecryptSecrets = []api.LocalObjectReference{}
+			for _, decryptServiceSecret := range serviceAccount.ImageDecryptSecrets {
+				imageSecretCache := sets.NewString()
+				for _, secretImage := range decryptServiceSecret.Images {
+					if pod.Spec.Containers[i].Image == secretImage {
+						if !imageSecretCache.Has(secretImage) {
+							pod.Spec.Containers[i].ImageDecryptSecrets = append(pod.Spec.Containers[i].ImageDecryptSecrets, api.LocalObjectReference{Name: decryptServiceSecret.Name})
+							imageSecretCache.Insert(secretImage)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return s.Validate(a, o)
 }
 
@@ -416,6 +433,20 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 			return fmt.Errorf(`imagePullSecrets[%d].name="%s" is not allowed because service account %s does not reference that imagePullSecret`, i, pullSecretRef.Name, serviceAccount.Name)
 		}
 	}
+
+	decryptSecrets := sets.NewString()
+	for _, s := range serviceAccount.ImageDecryptSecrets {
+		decryptSecrets.Insert(s.Name)
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for i, decryptSecretRef := range container.ImageDecryptSecrets {
+			if !decryptSecrets.Has(decryptSecretRef.Name) {
+				return fmt.Errorf(`imageDecryptSecrets[%d].name="%s" is not allowed because service account %s does not reference that imageDecryptSecret`, i, decryptSecretRef.Name, serviceAccount.Name)
+			}
+		}
+	}
+
 	return nil
 }
 

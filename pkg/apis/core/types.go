@@ -1999,6 +1999,10 @@ type Container struct {
 	Name string
 	// Required.
 	Image string
+	// ImageDecryptSecrets is an optional list of references to secrets in the same namespace to use for decrypting any of the images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
+	// +optional
+	ImageDecryptSecrets []LocalObjectReference
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
@@ -2888,6 +2892,10 @@ type EphemeralContainerCommon struct {
 	Name string
 	// Required.
 	Image string
+	// ImageDecryptSecrets is an optional list of references to secrets in the same namespace to use for decrypting any of the images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
+	// +optional
+	ImageDecryptSecrets []LocalObjectReference
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
@@ -3477,6 +3485,14 @@ type Service struct {
 	Status ServiceStatus
 }
 
+// ImageDecryptServiceSecret holds the decrypt secret and the corresponding image names
+type ImageDecryptServiceSecret struct {
+	// Required.
+	Name string
+	// Required.
+	Images []string
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
@@ -3496,6 +3512,12 @@ type ServiceAccount struct {
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
+
+	// ImageDecryptSecrets is a list of references to secrets in the same namespace to use for pulling any images
+	// in pods that reference this ServiceAccount.  ImagePullSecrets are distinct from Secrets because Secrets
+	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
+	// +optional
+	ImageDecryptSecrets []ImageDecryptServiceSecret
 
 	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
 	// Can be overridden at the pod level.

@@ -2113,6 +2113,12 @@ type Container struct {
 	// container images in workload controllers like Deployments and StatefulSets.
 	// +optional
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	// ImageDecryptSecrets is an optional list of references to secrets in the same namespace to use for decrypting any of the encrypted images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	ImageDecryptSecrets []LocalObjectReference `json:"imageDecryptSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,35,rep,name=imageDecryptSecrets"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
@@ -3227,6 +3233,12 @@ type EphemeralContainerCommon struct {
 	// Docker image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	// ImageDecryptSecrets is an optional list of references to secrets in the same namespace to use for decrypting any of the encrypted images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	ImageDecryptSecrets []LocalObjectReference `json:"imageDecryptSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,35,rep,name=imageDecryptSecrets"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
@@ -3995,6 +4007,15 @@ type ServiceList struct {
 	Items []Service `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// ImageDecryptServiceSecret holds the name of the decrypt secret and the corresponding list of
+// images that can be decrypted using that secret.
+type ImageDecryptServiceSecret struct {
+	// Required.
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// Required.
+	Images []string `json:"images,omitempty" protobuf:"bytes,8,rep,name=images"`
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -4022,6 +4043,12 @@ type ServiceAccount struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
 	// +optional
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" protobuf:"bytes,3,rep,name=imagePullSecrets"`
+
+	// ImageDecryptSecrets is a list of references to secrets in the same namespace to use for decrypting any encrypted images
+	// in pods that reference this ServiceAccount. ImageDecryptSecrets are distinct from Secrets because Secrets
+	// can be mounted in the pod, but ImageDecryptSecrets are only accessed by the kubelet.
+	// +optional
+	ImageDecryptSecrets []ImageDecryptServiceSecret `json:"imageDecryptSecrets,omitempty" protobuf:"bytes,5,rep,name=imageDecryptSecrets"`
 
 	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
 	// Can be overridden at the pod level.
@@ -5364,6 +5391,12 @@ const (
 
 	// DockerConfigJsonKey is the key of the required data for SecretTypeDockerConfigJson secrets
 	DockerConfigJsonKey = ".dockerconfigjson"
+
+	// SecretTypeDecryptKeys defines the type for the decrypt secrets
+	SecretTypeDecryptKey SecretType = "kubernetes.io/decryptionkey"
+
+	// ImageDecryptionKeys represent the key required to access secret data
+	ImageDecryptionKey = ".imagedecryptionkey"
 
 	// SecretTypeBasicAuth contains data needed for basic authentication.
 	//

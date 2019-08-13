@@ -100,7 +100,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 }
 
 // PullImage pulls an image with authentication config.
-func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, dcParams *runtimeapi.DecryptParams) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
@@ -108,6 +108,7 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 		Image:         image,
 		Auth:          auth,
 		SandboxConfig: podSandboxConfig,
+		Dcparams:      dcParams,
 	})
 	if err != nil {
 		klog.Errorf("PullImage %q from image service failed: %v", image.Image, err)
