@@ -86,6 +86,8 @@ const (
 
 	// EtcdListenClientPort defines the port etcd listen on for client traffic
 	EtcdListenClientPort = 2379
+	// EtcdMetricsPort is the port at which to obtain etcd metrics and health status
+	EtcdMetricsPort = 2381
 
 	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
 	EtcdPeerCertAndKeyBaseName = "etcd/peer"
