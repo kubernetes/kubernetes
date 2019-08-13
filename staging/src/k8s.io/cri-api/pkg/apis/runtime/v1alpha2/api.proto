@@ -772,6 +772,8 @@ message CreateContainerRequest {
     // here just for easy reference. The PodSandboxConfig is immutable and
     // remains the same throughout the lifetime of the pod.
     PodSandboxConfig sandbox_config = 3;
+    // DecryptParams for the images service of the CRI
+    DecryptParams dcparams = 4;
 }
 
 message CreateContainerResponse {
@@ -1078,6 +1080,10 @@ message AuthConfig {
     string registry_token = 6;
 }
 
+message DecryptParams {
+    repeated string privateKeyPasswds = 1;
+}
+
 message PullImageRequest {
     // Spec of the image.
     ImageSpec image = 1;
@@ -1085,6 +1091,8 @@ message PullImageRequest {
     AuthConfig auth = 2;
     // Config of the PodSandbox, which is used to pull image in PodSandbox context.
     PodSandboxConfig sandbox_config = 3;
+    // DecryptParams for the images service of the CRI
+    DecryptParams dcparams = 4;
 }
 
 message PullImageResponse {

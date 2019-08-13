@@ -62,6 +62,7 @@ const (
 	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
 	SecretV1GeneratorName                   = "secret/v1"
 	SecretForDockerRegistryV1GeneratorName  = "secret-for-docker-registry/v1"
+	SecretForImageDecryptionV1GeneratorName = "secret-for-decrypt-image/v1"
 	SecretForTLSV1GeneratorName             = "secret-for-tls/v1"
 	ConfigMapV1GeneratorName                = "configmap/v1"
 	ClusterRoleBindingV1GeneratorName       = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
@@ -128,6 +129,10 @@ func DefaultGenerators(cmdName string) map[string]generate.Generator {
 	case "secret-for-docker-registry":
 		generator = map[string]generate.Generator{
 			SecretForDockerRegistryV1GeneratorName: SecretForDockerRegistryGeneratorV1{},
+		}
+	case "secret-for-decrypt-image":
+		generator = map[string]generate.Generator{
+			SecretForImageDecryptionV1GeneratorName: SecretForDecryptImageGeneratorV1{},
 		}
 	case "secret-for-tls":
 		generator = map[string]generate.Generator{

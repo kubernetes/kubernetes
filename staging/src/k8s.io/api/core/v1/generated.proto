@@ -607,6 +607,13 @@ message Container {
   // +optional
   optional string image = 2;
 
+  // ImageDecryptSecrets is an optional list of references to secrets in the same namespace to use for decrypting any of the encrypted images used by this PodSpec.
+  // If specified, these secrets will be passed to individual puller implementations for them to use.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  repeated LocalObjectReference imageDecryptSecrets = 35;
+
   // Entrypoint array. Not executed within a shell.
   // The docker image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
@@ -1169,6 +1176,13 @@ message EphemeralContainerCommon {
   // Docker image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
   optional string image = 2;
+
+  // ImageDecryptSecrets is an optional list of references to secrets in the same namespace to use for decrypting any of the encrypted images used by this PodSpec.
+  // If specified, these secrets will be passed to individual puller implementations for them to use.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  repeated LocalObjectReference imageDecryptSecrets = 35;
 
   // Entrypoint array. Not executed within a shell.
   // The docker image's ENTRYPOINT is used if this is not provided.
@@ -1818,6 +1832,16 @@ message ISCSIVolumeSource {
   // <target portal>:<volume name> will be created for the connection.
   // +optional
   optional string initiatorName = 12;
+}
+
+// ImageDecryptServiceSecret holds the name of the decrypt secret and the corresponding list of
+// images that can be decrypted using that secret.
+message ImageDecryptServiceSecret {
+  // Required.
+  optional string name = 1;
+
+  // Required.
+  repeated string images = 8;
 }
 
 // Maps a string key to a path within a volume.
@@ -4447,6 +4471,12 @@ message ServiceAccount {
   // More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
   // +optional
   repeated LocalObjectReference imagePullSecrets = 3;
+
+  // ImageDecryptSecrets is a list of references to secrets in the same namespace to use for decrypting any encrypted images
+  // in pods that reference this ServiceAccount. ImageDecryptSecrets are distinct from Secrets because Secrets
+  // can be mounted in the pod, but ImageDecryptSecrets are only accessed by the kubelet.
+  // +optional
+  repeated ImageDecryptServiceSecret imageDecryptSecrets = 5;
 
   // AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
   // Can be overridden at the pod level.

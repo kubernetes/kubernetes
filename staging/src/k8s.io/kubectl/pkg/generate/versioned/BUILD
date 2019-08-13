@@ -17,6 +17,7 @@ go_library(
         "run.go",
         "secret.go",
         "secret_for_docker_registry.go",
+        "secret_for_decrypt_image.go",
         "secret_for_tls.go",
         "service.go",
         "service_basic.go",

@@ -2633,6 +2633,11 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 				missingSecrets.Insert(s.Name)
 			}
 		}
+		for _, s := range serviceAccount.ImageDecryptSecrets {
+			if !existingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
+			}
+		}
 	}
 
 	var events *corev1.EventList
@@ -2652,18 +2657,23 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 		printAnnotationsMultiline(w, "Annotations", serviceAccount.Annotations)
 
 		var (
-			emptyHeader = "                   "
-			pullHeader  = "Image pull secrets:"
-			mountHeader = "Mountable secrets: "
-			tokenHeader = "Tokens:            "
+			emptyHeader   = "                   "
+			pullHeader    = "Image pull secrets:"
+			decryptHeader = "Image decrypt secrets:"
+			mountHeader   = "Mountable secrets: "
+			tokenHeader   = "Tokens:            "
 
 			pullSecretNames  = []string{}
+			decryptSecretNames = []string{}
 			mountSecretNames = []string{}
 			tokenSecretNames = []string{}
 		)
 
 		for _, s := range serviceAccount.ImagePullSecrets {
 			pullSecretNames = append(pullSecretNames, s.Name)
+		}
+		for _, s := range serviceAccount.ImageDecryptSecrets {
+			decryptSecretNames = append(decryptSecretNames, s.Name)
 		}
 		for _, s := range serviceAccount.Secrets {
 			mountSecretNames = append(mountSecretNames, s.Name)
@@ -2674,6 +2684,7 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 
 		types := map[string][]string{
 			pullHeader:  pullSecretNames,
+			decryptHeader: decryptSecretNames,
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
