@@ -503,6 +503,9 @@ var _ = SIGDescribe("Density", func() {
 	f.NamespaceDeletionTimeout = time.Hour
 
 	ginkgo.BeforeEach(func() {
+		// Gathering the metrics currently uses a path which uses SSH.
+		framework.SkipUnlessSSHKeyPresent()
+
 		var err error
 		c = f.ClientSet
 		ns = f.Namespace.Name

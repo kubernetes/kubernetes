@@ -81,6 +81,8 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 	})
 
 	ginkgo.It("verify volume remains attached after master kubelet restart", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		// Create pod on each node
 		for i := 0; i < numNodes; i++ {
 			ginkgo.By(fmt.Sprintf("%d: Creating a test vsphere volume", i))

@@ -109,6 +109,10 @@ var _ = SIGDescribe("Load capacity", func() {
 	var testPhaseDurations *timer.TestPhaseTimer
 	var profileGathererStopCh chan struct{}
 
+	ginkgo.BeforeEach(func() {
+		framework.SkipUnlessSSHKeyPresent()
+	})
+
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	ginkgo.AfterEach(func() {

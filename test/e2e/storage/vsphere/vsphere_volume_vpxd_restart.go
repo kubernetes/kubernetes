@@ -99,6 +99,8 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 	})
 
 	ginkgo.It("verify volume remains attached through vpxd restart", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		for vcHost, nodes := range vcNodesMap {
 			var (
 				volumePaths  []string

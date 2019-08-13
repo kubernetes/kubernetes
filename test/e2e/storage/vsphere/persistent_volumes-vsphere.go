@@ -179,6 +179,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		3. Verify that written file is accessible after kubelet restart
 	*/
 	ginkgo.It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
+		framework.SkipUnlessSSHKeyPresent()
 		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod)
 	})
 
@@ -194,6 +195,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		5. Verify that volume mount not to be found.
 	*/
 	ginkgo.It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
+		framework.SkipUnlessSSHKeyPresent()
 		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod)
 	})
 

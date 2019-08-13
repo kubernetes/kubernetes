@@ -408,6 +408,7 @@ var _ = SIGDescribe("Services", func() {
 	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {
 		// TODO: use the ServiceTestJig here
 		framework.SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -464,6 +465,7 @@ var _ = SIGDescribe("Services", func() {
 	ginkgo.It("should work after restarting apiserver [Disruptive]", func() {
 		// TODO: use the ServiceTestJig here
 		framework.SkipUnlessProviderIs("gce", "gke")
+		framework.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
@@ -1666,6 +1668,8 @@ var _ = SIGDescribe("Services", func() {
 		// This test is for clusters on GCE.
 		// (It restarts kube-controller-manager, which we don't support on GKE)
 		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessSSHKeyPresent()
+
 		clusterID, err := gce.GetClusterID(cs)
 		if err != nil {
 			e2elog.Failf("framework.GetClusterID(cs) = _, %v; want nil", err)

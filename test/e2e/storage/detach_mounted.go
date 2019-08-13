@@ -64,6 +64,8 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 	})
 
 	ginkgo.It("should not work when mount is in progress [Slow]", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
 

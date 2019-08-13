@@ -175,6 +175,8 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		})
 
 		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
+			framework.SkipUnlessSSHKeyPresent()
+
 			ginkgo.By("Deleting PVC for volume 2")
 			err = framework.DeletePersistentVolumeClaim(c, pvc2.Name, ns)
 			framework.ExpectNoError(err)
