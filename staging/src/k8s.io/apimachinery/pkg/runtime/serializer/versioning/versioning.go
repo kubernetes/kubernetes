@@ -199,6 +199,11 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 
 	if customEncoder, ok := obj.(runtime.CustomEncoder); ok {
 		klog.Errorf("DDDD: %#v %#v", obj, c.typer)
+
+		_, _, err := c.typer.ObjectKinds(obj)
+		if err != nil {
+			klog.Errorf("EEEE: WTF? %#v #%v", obj, c.typer)
+		}
 		encoder := runtime.WithVersionEncoder{
 			Version:         c.encodeVersion,
 			Encoder:         c.encoder,
