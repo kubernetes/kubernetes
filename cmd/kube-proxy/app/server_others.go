@@ -29,7 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -46,8 +48,6 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/utils/exec"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/klog"
 )
@@ -172,7 +172,7 @@ func newProxyServer(
 		metrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
-		mainProxier, err := ipvs.NewProxier(
+		proxier, err = ipvs.NewProxier(
 			iptInterface,
 			ipvsInterface,
 			ipsetInterface,
@@ -196,14 +196,12 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-			klog.V(0).Info("IPv6DualStack; Creating ipvs MetaProxier.")
-			proxier, err = ipvs.NewMetaProxier(
-				mainProxier, config, cleanupAndExit, scheme, master)
+			klog.V(0).Info("IPv6DualStack; Creating MetaProxier for ipvs.")
+			ipv6Proxier, err := ipvs.NewOtherProxyServer(config)
 			if err != nil {
-				return nil, fmt.Errorf("unable to create meta-proxier: %v", err)
+				return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 			}
-		} else {
-			proxier = mainProxier
+			proxier = proxy.NewMetaProxier(proxier, ipv6Proxier, proxy.FamilyIpv4)
 		}
 		metrics.RegisterMetrics()
 	} else {

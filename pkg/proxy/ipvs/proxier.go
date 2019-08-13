@@ -38,15 +38,19 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
+	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/utils/exec"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )
@@ -450,6 +454,63 @@ func NewProxier(ipt utiliptables.Interface,
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
+	return proxier, nil
+}
+
+// Create the "other" proxier for dual-stack
+func NewOtherProxyServer(
+	config *proxyconfigapi.KubeProxyConfiguration) (*Proxier, error) {
+
+	// TODO: Remove hard-coded ipv6
+	nodeIP := net.ParseIP("::1")
+	protocol := utiliptables.ProtocolIpv6
+	clusterCIDR := os.Getenv("CLUSTER_IPV6_CIDR")
+	if clusterCIDR == "" {
+		clusterCIDR = "1100::/16"
+	}
+
+	var iptInterface utiliptables.Interface
+	var ipvsInterface utilipvs.Interface
+	var ipsetInterface utilipset.Interface
+	var dbus utildbus.Interface
+
+	// Create a iptables utils.
+	execer := exec.New()
+
+	dbus = utildbus.New()
+	iptInterface = utiliptables.New(execer, dbus, protocol)
+	ipsetInterface = utilipset.New(execer)
+	ipvsInterface = utilipvs.New(execer)
+
+	// Create event recorder
+	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	proxier, err := NewProxier(
+		iptInterface,
+		ipvsInterface,
+		ipsetInterface,
+		utilsysctl.New(),
+		execer,
+		config.IPVS.SyncPeriod.Duration,
+		config.IPVS.MinSyncPeriod.Duration,
+		config.IPVS.ExcludeCIDRs,
+		config.IPVS.StrictARP,
+		config.IPTables.MasqueradeAll,
+		int(*config.IPTables.MasqueradeBit),
+		clusterCIDR,
+		hostname,
+		nodeIP,
+		nil, // recorder
+		nil, // healthzServer
+		config.IPVS.Scheduler,
+		config.NodePortAddresses,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
 	return proxier, nil
 }
 
