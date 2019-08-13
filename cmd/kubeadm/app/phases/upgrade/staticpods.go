@@ -314,7 +314,11 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
 	// has occurred in any aspects.
-	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+
+	// TODO: this should be replaced by a value from a flag in subsequent PR. see the POC https://github.com/kubernetes/kubernetes/pull/80580
+	kustomizeDir := ""
+
+	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), kustomizeDir, cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
@@ -460,7 +464,11 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 
 	// Write the updated static Pod manifests into the temporary directory
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
-	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
+
+	// TODO: this should be replaced by a value from a flag in subsequent PR. see the POC https://github.com/kubernetes/kubernetes/pull/80580
+	kustomizeDir := ""
+
+	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), kustomizeDir, cfg)
 	if err != nil {
 		return errors.Wrap(err, "error creating init static pod manifest files")
 	}
@@ -612,7 +620,10 @@ func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
 	}
 	defer os.RemoveAll(dryRunManifestDir)
 
-	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, internalcfg); err != nil {
+	// TODO: this should be replaced by a value from a flag in subsequent PR. see the POC https://github.com/kubernetes/kubernetes/pull/80580
+	kustomizeDir := ""
+
+	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, kustomizeDir, internalcfg); err != nil {
 		return err
 	}
 

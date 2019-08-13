@@ -39,9 +39,9 @@ import (
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infoln("[control-plane] creating static Pod files")
-	return CreateStaticPodFiles(manifestDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return CreateStaticPodFiles(manifestDir, kustomizeDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
@@ -103,7 +103,7 @@ func livenessProbe(host string, port int, scheme v1.URIScheme) *v1.Probe {
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
+func CreateStaticPodFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, endpoint)
@@ -114,6 +114,15 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfigurati
 		spec, exists := specs[componentName]
 		if !exists {
 			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
+		}
+
+		// if kustomizeDir is defined, customize the static pod manifest
+		if kustomizeDir != "" {
+			kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
+			if err != nil {
+				return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", componentName)
+			}
+			spec = *kustomizedSpec
 		}
 
 		// writes the StaticPodSpec to disk

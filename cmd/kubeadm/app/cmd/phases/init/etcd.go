@@ -92,7 +92,11 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
 			}
 			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
-			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+
+			// TODO: this should be replaced by a value from a flag in subsequent PR. see the POC https://github.com/kubernetes/kubernetes/pull/80580
+			kustomizeDir := ""
+
+			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), kustomizeDir, cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {
