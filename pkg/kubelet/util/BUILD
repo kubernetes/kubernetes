@@ -16,14 +16,18 @@ go_test(
     deps = select({
         "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
+            "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
+            "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
+            "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/Microsoft/go-winio:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
