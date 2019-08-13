@@ -418,7 +418,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v0.0.0-20160524151835-7d79101e329e => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
 github.com/google/btree
-# github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a => github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
+# github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966 => github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -728,8 +728,6 @@ github.com/russross/blackfriday
 github.com/satori/go.uuid
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
-# github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
-github.com/sigma/go-inotify
 # github.com/sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.3 => github.com/soheilhy/cmux v0.1.3

@@ -329,7 +329,6 @@ filegroup(
         "//vendor/github.com/russross/blackfriday:all-srcs",
         "//vendor/github.com/satori/go.uuid:all-srcs",
         "//vendor/github.com/seccomp/libseccomp-golang:all-srcs",
-        "//vendor/github.com/sigma/go-inotify:all-srcs",
         "//vendor/github.com/sirupsen/logrus:all-srcs",
         "//vendor/github.com/soheilhy/cmux:all-srcs",
         "//vendor/github.com/spf13/afero:all-srcs",
