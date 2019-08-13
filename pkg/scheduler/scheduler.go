@@ -142,6 +142,10 @@ func New(client clientset.Interface,
 	for _, opt := range opts {
 		opt(&options)
 	}
+	framework, err := framework.NewFramework(registry, plugins, pluginConfig)
+	if err != nil {
+		klog.Fatalf("error initializing the scheduling framework: %v", err)
+	}
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		Client:                         client,
@@ -160,16 +164,13 @@ func New(client clientset.Interface,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
-		Registry:                       registry,
-		Plugins:                        plugins,
-		PluginConfig:                   pluginConfig,
-	})
+	}, framework)
 	var config *factory.Config
 	source := schedulerAlgorithmSource
 	switch {
 	case source.Provider != nil:
 		// Create the config from a named algorithm provider.
-		sc, err := configurator.CreateFromProvider(*source.Provider)
+		sc, err := configurator.CreateFromProvider(*source.Provider, framework)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
@@ -187,7 +188,7 @@ func New(client clientset.Interface,
 				return nil, err
 			}
 		}
-		sc, err := configurator.CreateFromConfig(*policy)
+		sc, err := configurator.CreateFromConfig(*policy, framework)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
@@ -199,6 +200,7 @@ func New(client clientset.Interface,
 	config.Recorder = recorder
 	config.DisablePreemption = options.disablePreemption
 	config.StopEverything = stopCh
+	config.Framework = framework
 
 	// Create the scheduler.
 	sched := NewFromConfig(config)

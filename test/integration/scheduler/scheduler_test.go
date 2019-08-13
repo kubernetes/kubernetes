@@ -605,9 +605,12 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(),
-		nil, []kubeschedulerconfig.PluginConfig{}, stopCh))
-	schedulerConfig2, err := schedulerConfigFactory2.Create()
+	framework, err := schedulerframework.NewFramework(schedulerframework.NewRegistry(), nil, []kubeschedulerconfig.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, stopCh), framework)
+	schedulerConfig2, err := schedulerConfigFactory2.Create(framework)
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}

@@ -78,9 +78,6 @@ func createConfiguratorArgsWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
-	pluginRegistry schedulerframework.Registry,
-	plugins *schedulerconfig.Plugins,
-	pluginConfig []schedulerconfig.PluginConfig,
 	stopCh <-chan struct{},
 ) *factory.ConfigFactoryArgs {
 	return &factory.ConfigFactoryArgs{
@@ -96,9 +93,6 @@ func createConfiguratorArgsWithPodInformer(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
-		Registry:                       pluginRegistry,
-		Plugins:                        plugins,
-		PluginConfig:                   pluginConfig,
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
@@ -185,17 +179,19 @@ func initTestSchedulerWithOptions(
 		podInformer = context.informerFactory.Core().V1().Pods()
 	}
 
-	context.schedulerConfigArgs = createConfiguratorArgsWithPodInformer(
-		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, pluginRegistry, plugins,
-		pluginConfig, context.stopCh)
-	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs)
-
 	var err error
+	context.schedulerConfigArgs = createConfiguratorArgsWithPodInformer(
+		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, context.stopCh)
+	framework, err := schedulerframework.NewFramework(pluginRegistry, plugins, pluginConfig)
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs, framework)
 
 	if policy != nil {
-		context.schedulerConfig, err = configFactory.CreateFromConfig(*policy)
+		context.schedulerConfig, err = configFactory.CreateFromConfig(*policy, framework)
 	} else {
-		context.schedulerConfig, err = configFactory.Create()
+		context.schedulerConfig, err = configFactory.Create(framework)
 	}
 
 	if err != nil {

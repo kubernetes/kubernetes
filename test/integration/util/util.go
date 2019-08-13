@@ -32,6 +32,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -68,9 +69,13 @@ func StartScheduler(clientSet clientset.Interface) (*factory.ConfigFactoryArgs, 
 	evtBroadcaster.StartRecordingToSink(stopCh)
 
 	configuratorArgs := createSchedulerConfiguratorArgs(clientSet, informerFactory, stopCh)
-	configurator := factory.NewConfigFactory(configuratorArgs)
+	framework, err := schedulerframework.NewFramework(nil, nil, nil)
+	if err != nil {
+		klog.Fatalf("error initializing the scheduling framework: %v", err)
+	}
+	configurator := factory.NewConfigFactory(configuratorArgs, framework)
 
-	config, err := configurator.CreateFromConfig(schedulerapi.Policy{})
+	config, err := configurator.CreateFromConfig(schedulerapi.Policy{}, framework)
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}

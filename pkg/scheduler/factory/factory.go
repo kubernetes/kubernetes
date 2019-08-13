@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -160,8 +159,6 @@ type Configurator struct {
 	storageClassLister storagelistersv1.StorageClassLister
 	// a means to list all CSINodes
 	csiNodeLister storagelistersv1beta1.CSINodeLister
-	// framework has a set of plugins and the context used for running them.
-	framework framework.Framework
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -213,24 +210,16 @@ type ConfigFactoryArgs struct {
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
-	Registry                       framework.Registry
-	Plugins                        *config.Plugins
-	PluginConfig                   []config.PluginConfig
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
 // return the interface.
-func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
+func NewConfigFactory(args *ConfigFactoryArgs, framework framework.Framework) *Configurator {
 	stopEverything := args.StopCh
 	if stopEverything == nil {
 		stopEverything = wait.NeverStop
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-
-	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
-	if err != nil {
-		klog.Fatalf("error initializing the scheduling framework: %v", err)
-	}
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelistersv1.StorageClassLister
@@ -255,7 +244,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
 		csiNodeLister:                  csiNodeLister,
-		framework:                      framework,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
@@ -290,22 +278,22 @@ func (c *Configurator) GetHardPodAffinitySymmetricWeight() int32 {
 }
 
 // Create creates a scheduler with the default algorithm provider.
-func (c *Configurator) Create() (*Config, error) {
-	return c.CreateFromProvider(DefaultProvider)
+func (c *Configurator) Create(framework framework.Framework) (*Config, error) {
+	return c.CreateFromProvider(DefaultProvider, framework)
 }
 
 // CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
-func (c *Configurator) CreateFromProvider(providerName string) (*Config, error) {
+func (c *Configurator) CreateFromProvider(providerName string, framework framework.Framework) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
 		return nil, err
 	}
-	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
+	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{}, framework)
 }
 
 // CreateFromConfig creates a scheduler from the configuration file
-func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, error) {
+func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy, framework framework.Framework) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
@@ -379,11 +367,11 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
 	}
 
-	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
+	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders, framework)
 }
 
 // CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error) {
+func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender, framework framework.Framework) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
 	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
@@ -417,7 +405,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
-		c.framework,
+		framework,
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
@@ -436,7 +424,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		GetBinder:           getBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
-		Framework:           c.framework,
+		Framework:           framework,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},

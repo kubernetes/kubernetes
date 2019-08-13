@@ -35,6 +35,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -1096,6 +1097,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
+		framework, err := framework.NewFramework(nil, nil, nil)
+		if err != nil {
+			t.Errorf("error initializing the scheduling framework: %v", err)
+		}
 		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 			Client:                         client,
 			NodeInformer:                   informerFactory.Core().V1().Nodes(),
@@ -1112,7 +1117,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			DisablePreemption:              false,
 			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		}).CreateFromConfig(policy); err != nil {
+		}, framework).CreateFromConfig(policy, framework); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}

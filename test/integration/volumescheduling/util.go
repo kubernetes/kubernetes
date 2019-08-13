@@ -111,12 +111,15 @@ func initTestSchedulerWithOptions(
 	podInformer := context.informerFactory.Core().V1().Pods()
 
 	context.schedulerConfigArgs = createConfiguratorArgsWithPodInformer(
-		context.clientSet, podInformer, context.informerFactory, schedulerframework.NewRegistry(), nil,
-		[]schedulerconfig.PluginConfig{}, context.stopCh)
-	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs)
-
+		context.clientSet, podInformer, context.informerFactory, context.stopCh)
 	var err error
-	context.schedulerConfig, err = configFactory.Create()
+	framework, err := schedulerframework.NewFramework(schedulerframework.NewRegistry(), nil, []schedulerconfig.PluginConfig{})
+	if err != nil {
+		t.Fatalf("error initializing the scheduling framework: %v", err)
+	}
+	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs, framework)
+
+	context.schedulerConfig, err = configFactory.Create(framework)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
@@ -159,9 +162,6 @@ func createConfiguratorArgsWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
-	pluginRegistry schedulerframework.Registry,
-	plugins *schedulerconfig.Plugins,
-	pluginConfig []schedulerconfig.PluginConfig,
 	stopCh <-chan struct{},
 ) *factory.ConfigFactoryArgs {
 	return &factory.ConfigFactoryArgs{
@@ -177,9 +177,6 @@ func createConfiguratorArgsWithPodInformer(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
-		Registry:                       pluginRegistry,
-		Plugins:                        plugins,
-		PluginConfig:                   pluginConfig,
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,

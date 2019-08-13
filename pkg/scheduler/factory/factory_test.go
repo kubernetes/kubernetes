@@ -55,8 +55,12 @@ func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
-	factory.Create()
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
+	factory.Create(framework)
 }
 
 // Test configures a scheduler from a policies defined in a file
@@ -68,7 +72,11 @@ func TestCreateFromConfig(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -94,7 +102,7 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	factory.CreateFromConfig(policy, framework)
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
@@ -108,7 +116,11 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -135,7 +147,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
-	factory.CreateFromConfig(policy)
+	factory.CreateFromConfig(policy, framework)
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
 	if hpa != 10 {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
@@ -149,14 +161,18 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	factory.CreateFromConfig(policy, framework)
 }
 
 // Test configures a scheduler from a policy that does not specify any
@@ -166,7 +182,11 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
@@ -182,7 +202,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
-	config, err := factory.CreateFromConfig(policy)
+	config, err := factory.CreateFromConfig(policy, framework)
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
@@ -201,7 +221,11 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
@@ -219,7 +243,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
-	config, err := factory.CreateFromConfig(policy)
+	config, err := factory.CreateFromConfig(policy, framework)
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
@@ -434,9 +458,13 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	// factory of "default-scheduler"
 	stopCh := make(chan struct{})
-	factory := newConfigFactory(client, -1, stopCh)
+	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+	if err != nil {
+		t.Errorf("error initializing the scheduling framework: %v", err)
+	}
+	factory := newConfigFactory(client, -1, stopCh, framework)
 	defer close(stopCh)
-	_, err := factory.Create()
+	_, err = factory.Create(framework)
 	if err == nil {
 		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
 	}
@@ -465,9 +493,13 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			stopCh := make(chan struct{})
-			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
+			framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
+			if err != nil {
+				t.Errorf("error initializing the scheduling framework: %v", err)
+			}
+			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh, framework)
 			defer close(stopCh)
-			_, err := factory.Create()
+			_, err = factory.Create(framework)
 			if err == nil {
 				t.Errorf("expected err: %s, got nothing", test.expectErr)
 			}
@@ -476,7 +508,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 }
 
-func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
+func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}, framework framework.Framework) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
 		client,
@@ -496,10 +528,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
 		stopCh,
-		framework.NewRegistry(),
-		nil,
-		[]config.PluginConfig{},
-	})
+	}, framework)
 }
 
 type fakeExtender struct {
