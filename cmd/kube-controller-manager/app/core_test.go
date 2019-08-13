@@ -45,9 +45,9 @@ func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
 	return m.clientset
 }
 
-// FakeDiscoveryWithError inherits DiscoveryInterface(via FakeDiscovery) with some methods accepting testing data.
+// FakeDiscoveryWithError inherits DiscoveryInterface(via Discovery) with some methods accepting testing data.
 type FakeDiscoveryWithError struct {
-	fakediscovery.FakeDiscovery
+	fakediscovery.Discovery
 	PossibleResources []*metav1.APIResourceList
 	Err               error
 }

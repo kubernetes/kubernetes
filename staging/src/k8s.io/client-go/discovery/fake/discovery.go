@@ -29,16 +29,16 @@ import (
 	"k8s.io/client-go/testing"
 )
 
-// FakeDiscovery implements discovery.DiscoveryInterface and sometimes calls testing.Fake.Invoke with an action,
+// Discovery implements discovery.DiscoveryInterface and sometimes calls testing.Fake.Invoke with an action,
 // but doesn't respect the return value if any. There is a way to fake static values like ServerVersion by using the Faked... fields on the struct.
-type FakeDiscovery struct {
+type Discovery struct {
 	*testing.Fake
 	FakedServerVersion *version.Info
 }
 
 // ServerResourcesForGroupVersion returns the supported resources for a group
 // and version.
-func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (c *Discovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},
@@ -54,13 +54,13 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 
 // ServerResources returns the supported resources for all groups and versions.
 // Deprecated: use ServerGroupsAndResources instead.
-func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
+func (c *Discovery) ServerResources() ([]*metav1.APIResourceList, error) {
 	_, rs, err := c.ServerGroupsAndResources()
 	return rs, err
 }
 
 // ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
-func (c *FakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+func (c *Discovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	sgs, err := c.ServerGroups()
 	if err != nil {
 		return nil, nil, err
@@ -80,19 +80,19 @@ func (c *FakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav
 
 // ServerPreferredResources returns the supported resources with the version
 // preferred by the server.
-func (c *FakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+func (c *Discovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
 // ServerPreferredNamespacedResources returns the supported namespaced resources
 // with the version preferred by the server.
-func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+func (c *Discovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
 // ServerGroups returns the supported groups, with information like supported
 // versions and the preferred version.
-func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
+func (c *Discovery) ServerGroups() (*metav1.APIGroupList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "group"},
@@ -134,7 +134,7 @@ func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 }
 
 // ServerVersion retrieves and parses the server's version.
-func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
+func (c *Discovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
@@ -149,12 +149,12 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 }
 
 // OpenAPISchema retrieves and parses the swagger API schema the server supports.
-func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
+func (c *Discovery) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
 }
 
 // RESTClient returns a RESTClient that is used to communicate with API server
 // by this client implementation.
-func (c *FakeDiscovery) RESTClient() restclient.Interface {
+func (c *Discovery) RESTClient() restclient.Interface {
 	return nil
 }

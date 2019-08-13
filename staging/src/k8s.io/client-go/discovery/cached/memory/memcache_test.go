@@ -34,7 +34,7 @@ type resourceMapEntry struct {
 }
 
 type fakeDiscovery struct {
-	*fake.FakeDiscovery
+	*fake.Discovery
 
 	lock         sync.Mutex
 	groupList    *metav1.APIGroupList

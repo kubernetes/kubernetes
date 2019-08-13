@@ -432,7 +432,6 @@ staging/src/k8s.io/cli-runtime/pkg/printers
 staging/src/k8s.io/cli-runtime/pkg/resource
 staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery
-staging/src/k8s.io/client-go/discovery/fake
 staging/src/k8s.io/client-go/dynamic
 staging/src/k8s.io/client-go/dynamic/fake
 staging/src/k8s.io/client-go/examples/workqueue

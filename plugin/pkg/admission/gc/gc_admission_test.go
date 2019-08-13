@@ -101,7 +101,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	}
 
 	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{})
-	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
+	fakeDiscoveryClient := &fakediscovery.Discovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{
 			GroupVersion: corev1.SchemeGroupVersion.String(),

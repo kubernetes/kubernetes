@@ -55,7 +55,7 @@ func defaultHeaders() http.Header {
 }
 
 func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
-	fakeDiscoveryClient := &fakedisco.FakeDiscovery{Fake: &coretesting.Fake{}}
+	fakeDiscoveryClient := &fakedisco.Discovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{
 			GroupVersion: corev1.SchemeGroupVersion.String(),

@@ -204,9 +204,9 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		// Print GET and LIST requests
 		dryRunOpts.PrintGETAndLIST = true
 		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
-		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
+		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.Discovery
 		// we can convert it to that struct.
-		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
+		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.Discovery)
 		if !ok {
 			return nil, errors.New("couldn't set fake discovery's server version")
 		}

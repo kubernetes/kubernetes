@@ -26,9 +26,9 @@ import (
 
 func TestFakingServerVersion(t *testing.T) {
 	client := fakeclientset.NewSimpleClientset()
-	fakeDiscovery, ok := client.Discovery().(*fakediscovery.FakeDiscovery)
+	fakeDiscovery, ok := client.Discovery().(*fakediscovery.Discovery)
 	if !ok {
-		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
+		t.Fatalf("couldn't convert Discovery() to *Discovery")
 	}
 
 	testGitCommit := "v1.0.0"
