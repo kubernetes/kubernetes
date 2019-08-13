@@ -18,6 +18,7 @@ package socketmask
 
 import (
 	"fmt"
+	"math/bits"
 )
 
 // SocketMask interface allows hint providers to create SocketMasks for TopologyHints
@@ -139,26 +140,12 @@ func (s *socketMask) IsNarrowerThan(mask SocketMask) bool {
 
 // String converts mask to string
 func (s *socketMask) String() string {
-	str := ""
-	for i := uint64(0); i < 64; i++ {
-		if (*s & (1 << i)) > 0 {
-			str += "1"
-		} else {
-			str += "0"
-		}
-	}
-	return str
+	return fmt.Sprintf("%064b", *s)
 }
 
 // Count counts number of bits in mask set to one
 func (s *socketMask) Count() int {
-	count := 0
-	for i := uint64(0); i < 64; i++ {
-		if (*s & (1 << i)) > 0 {
-			count++
-		}
-	}
-	return count
+	return bits.OnesCount64(uint64(*s))
 }
 
 // GetSockets returns each socket number with bits set to one

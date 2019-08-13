@@ -29,8 +29,8 @@ func TestNewSocketMask(t *testing.T) {
 	}{
 		{
 			name:         "New SocketMask with socket 0 set",
-			socket:       int(0),
-			expectedMask: "1000000000000000000000000000000000000000000000000000000000000000",
+			socket:       0,
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
 		},
 	}
 	for _, tc := range tcases {
@@ -52,7 +52,7 @@ func TestAdd(t *testing.T) {
 			name:         "New SocketMask with sockets 0 and 1 set",
 			firstSocket:  0,
 			secondSocket: 1,
-			expectedMask: "1100000000000000000000000000000000000000000000000000000000000000",
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000011",
 		},
 	}
 	for _, tc := range tcases {
@@ -77,7 +77,7 @@ func TestRemove(t *testing.T) {
 			firstSocketSet:    0,
 			secondSocketSet:   1,
 			firstSocketRemove: 0,
-			expectedMask:      "0100000000000000000000000000000000000000000000000000000000000000",
+			expectedMask:      "0000000000000000000000000000000000000000000000000000000000000010",
 		},
 	}
 	for _, tc := range tcases {
@@ -100,7 +100,7 @@ func TestAnd(t *testing.T) {
 			name:          "And socket masks",
 			firstMaskBit:  0,
 			secondMaskBit: 0,
-			andMask:       "1000000000000000000000000000000000000000000000000000000000000000",
+			andMask:       "0000000000000000000000000000000000000000000000000000000000000001",
 		},
 	}
 	for _, tc := range tcases {
@@ -128,9 +128,9 @@ func TestOr(t *testing.T) {
 	}{
 		{
 			name:          "Or socket masks",
-			firstMaskBit:  int(0),
-			secondMaskBit: int(1),
-			orMask:        "1100000000000000000000000000000000000000000000000000000000000000",
+			firstMaskBit:  0,
+			secondMaskBit: 1,
+			orMask:        "0000000000000000000000000000000000000000000000000000000000000011",
 		},
 	}
 	for _, tc := range tcases {
@@ -158,8 +158,8 @@ func TestClear(t *testing.T) {
 	}{
 		{
 			name:        "Clear socket masks",
-			firstBit:    int(0),
-			secondBit:   int(1),
+			firstBit:    0,
+			secondBit:   1,
 			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
@@ -199,7 +199,7 @@ func TestIsEmpty(t *testing.T) {
 	}{
 		{
 			name:          "Check if mask is empty",
-			maskBit:       int(0),
+			maskBit:       0,
 			expectedEmpty: false,
 		},
 	}
@@ -220,7 +220,7 @@ func TestIsSet(t *testing.T) {
 	}{
 		{
 			name:        "Check if mask bit is set",
-			maskBit:     int(0),
+			maskBit:     0,
 			expectedSet: true,
 		},
 	}
@@ -242,8 +242,8 @@ func TestIsEqual(t *testing.T) {
 	}{
 		{
 			name:          "Check if two socket masks are equal",
-			firstMaskBit:  int(0),
-			secondMaskBit: int(0),
+			firstMaskBit:  0,
+			secondMaskBit: 0,
 			isEqual:       true,
 		},
 	}
@@ -265,7 +265,7 @@ func TestCount(t *testing.T) {
 	}{
 		{
 			name:          "Count number of bits set in full mask",
-			maskBit:       0,
+			maskBit:       42,
 			expectedCount: 1,
 		},
 	}
