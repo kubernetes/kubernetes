@@ -33,14 +33,17 @@ import (
 
 func TestNewResource(t *testing.T) {
 	tests := []struct {
+		name         string
 		resourceList v1.ResourceList
 		expected     *Resource
 	}{
 		{
+			name:         "empty resource set",
 			resourceList: map[v1.ResourceName]resource.Quantity{},
 			expected:     &Resource{},
 		},
 		{
+			name: "has resources set",
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
 				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
@@ -59,8 +62,8 @@ func TestNewResource(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			r := NewResource(test.resourceList)
 			if !reflect.DeepEqual(test.expected, r) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, r)
@@ -71,10 +74,12 @@ func TestNewResource(t *testing.T) {
 
 func TestResourceList(t *testing.T) {
 	tests := []struct {
+		name     string
 		resource *Resource
 		expected v1.ResourceList
 	}{
 		{
+			name:     "empty resource list",
 			resource: &Resource{},
 			expected: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:              *resource.NewScaledQuantity(0, -3),
@@ -84,6 +89,7 @@ func TestResourceList(t *testing.T) {
 			},
 		},
 		{
+			name: "has resource list set",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
@@ -107,8 +113,8 @@ func TestResourceList(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			rl := test.resource.ResourceList()
 			if !reflect.DeepEqual(test.expected, rl) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, rl)
@@ -119,14 +125,17 @@ func TestResourceList(t *testing.T) {
 
 func TestResourceClone(t *testing.T) {
 	tests := []struct {
+		name     string
 		resource *Resource
 		expected *Resource
 	}{
 		{
+			name:     "no resource to clone",
 			resource: &Resource{},
 			expected: &Resource{},
 		},
 		{
+			name: "has resource to clone",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
@@ -144,8 +153,8 @@ func TestResourceClone(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			r := test.resource.Clone()
 			// Modify the field to check if the result is a clone of the origin one.
 			test.resource.MilliCPU += 1000
@@ -158,12 +167,14 @@ func TestResourceClone(t *testing.T) {
 
 func TestResourceAddScalar(t *testing.T) {
 	tests := []struct {
+		name           string
 		resource       *Resource
 		scalarName     v1.ResourceName
 		scalarQuantity int64
 		expected       *Resource
 	}{
 		{
+			name:           "add scalar value to empty set",
 			resource:       &Resource{},
 			scalarName:     "scalar1",
 			scalarQuantity: 100,
@@ -172,6 +183,7 @@ func TestResourceAddScalar(t *testing.T) {
 			},
 		},
 		{
+			name: "add scalar value to existing set",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
@@ -192,7 +204,7 @@ func TestResourceAddScalar(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("scalarName: %s, scalarQuantity: %d", test.scalarName, test.scalarQuantity), func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			test.resource.AddScalar(test.scalarName, test.scalarQuantity)
 			if !reflect.DeepEqual(test.expected, test.resource) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
@@ -203,11 +215,13 @@ func TestResourceAddScalar(t *testing.T) {
 
 func TestSetMaxResource(t *testing.T) {
 	tests := []struct {
+		name         string
 		resource     *Resource
 		resourceList v1.ResourceList
 		expected     *Resource
 	}{
 		{
+			name:     "set max for empty resource",
 			resource: &Resource{},
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:              *resource.NewScaledQuantity(4, -3),
@@ -221,6 +235,7 @@ func TestSetMaxResource(t *testing.T) {
 			},
 		},
 		{
+			name: "set max for non-empty resource",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           4000,
@@ -243,8 +258,8 @@ func TestSetMaxResource(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			test.resource.SetMaxResource(test.resourceList)
 			if !reflect.DeepEqual(test.expected, test.resource) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
