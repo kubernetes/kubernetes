@@ -168,17 +168,17 @@ func TestEventSeriesf(t *testing.T) {
 		if item.expectUpdate {
 			actualEvent := <-patchEvent
 			t.Logf("%v - validating event affected by patch request", index)
-			validateEventSeries(strconv.Itoa(index), true, actualEvent, item.expect, t)
+			validateEvent(strconv.Itoa(index), true, actualEvent, item.expect, t)
 		} else {
 			actualEvent := <-createEvent
 			t.Logf("%v - validating event affected by a create request", index)
-			validateEventSeries(strconv.Itoa(index), false, actualEvent, item.expect, t)
+			validateEvent(strconv.Itoa(index), false, actualEvent, item.expect, t)
 		}
 	}
 	close(stopCh)
 }
 
-func validateEventSeries(messagePrefix string, expectedUpdate bool, actualEvent *v1beta1.Event, expectedEvent *v1beta1.Event, t *testing.T) {
+func validateEvent(messagePrefix string, expectedUpdate bool, actualEvent *v1beta1.Event, expectedEvent *v1beta1.Event, t *testing.T) {
 	recvEvent := *actualEvent
 
 	// Just check that the timestamp was set.
