@@ -300,9 +300,13 @@ var _ = SIGDescribe("Services", func() {
 			framework.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
 		}
 
-		ginkgo.By("Creating a webserver pod be part of the TCP service which echoes back source ip")
-		serverPodName := "echoserver-sourceip"
-		jig.LaunchEchoserverPodOnNode(f, "", serverPodName)
+		ginkgo.By("Creating a webserver pod to be part of the TCP service which echoes back source ip")
+		serverPodName := "echo-sourceip"
+		pod := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		pod.Labels = jig.Labels
+		_, err := cs.CoreV1().Pods(ns).Create(pod)
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 		defer func() {
 			e2elog.Logf("Cleaning up the echo server pod")
 			err := cs.CoreV1().Pods(ns).Delete(serverPodName, nil)
@@ -310,7 +314,7 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		// Waiting for service to expose endpoint.
-		err := e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By("Creating pause pod deployment")

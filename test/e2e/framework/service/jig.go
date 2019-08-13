@@ -879,34 +879,6 @@ func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, po
 	}
 }
 
-// LaunchNetexecPodOnNode launches a netexec pod on the given node.
-func (j *TestJig) LaunchNetexecPodOnNode(f *framework.Framework, nodeName, podName string, httpPort, udpPort int32, hostNetwork bool) {
-	e2elog.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
-	pod := newNetexecPodSpec(podName, httpPort, udpPort, hostNetwork)
-	pod.Spec.NodeName = nodeName
-	pod.ObjectMeta.Labels = j.Labels
-	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(f.WaitForPodRunning(podName))
-	e2elog.Logf("Netexec pod  %q in namespace %q running", pod.Name, f.Namespace.Name)
-}
-
-// LaunchEchoserverPodOnNode launches a pod serving http on port 8080 to act
-// as the target for source IP preservation test. The client's source ip would
-// be echoed back by the web server.
-func (j *TestJig) LaunchEchoserverPodOnNode(f *framework.Framework, nodeName, podName string) {
-	e2elog.Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
-	pod := newEchoServerPodSpec(podName)
-	pod.Spec.NodeName = nodeName
-	pod.ObjectMeta.Labels = j.Labels
-	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(f.WaitForPodRunning(podName))
-	e2elog.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
-}
-
 // TestReachableHTTP tests that the given host serves HTTP on the given port.
 func (j *TestJig) TestReachableHTTP(host string, port int, timeout time.Duration) {
 	j.TestReachableHTTPWithRetriableErrorCodes(host, port, []int{}, timeout)

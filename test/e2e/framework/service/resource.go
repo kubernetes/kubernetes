@@ -27,7 +27,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // GetServicesProxyRequest returns a request for a service proxy.
@@ -108,62 +107,6 @@ func DescribeSvc(ns string) {
 	desc, _ := framework.RunKubectl(
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	e2elog.Logf(desc)
-}
-
-// newNetexecPodSpec returns the pod spec of netexec pod
-func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool) *v1.Pod {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "netexec",
-					Image: framework.NetexecImageName,
-					Args: []string{
-						"netexec",
-						fmt.Sprintf("--http-port=%d", httpPort),
-						fmt.Sprintf("--udp-port=%d", udpPort),
-					},
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: httpPort,
-						},
-						{
-							Name:          "udp",
-							ContainerPort: udpPort,
-						},
-					},
-				},
-			},
-			HostNetwork: hostNetwork,
-		},
-	}
-	return pod
-}
-
-// newEchoServerPodSpec returns the pod spec of echo server pod
-func newEchoServerPodSpec(podName string) *v1.Pod {
-	port := 8080
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "echoserver",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
-					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-	return pod
 }
 
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.

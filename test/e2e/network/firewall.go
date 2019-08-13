@@ -135,7 +135,20 @@ var _ = SIGDescribe("Firewall rule", func() {
 		ginkgo.By(fmt.Sprintf("Creating netexec pods on at most %v nodes", e2eservice.MaxNodesForEndpointsTests))
 		for i, nodeName := range nodesNames {
 			podName := fmt.Sprintf("netexec%v", i)
-			jig.LaunchNetexecPodOnNode(f, nodeName, podName, firewallTestHTTPPort, firewallTestUDPPort, true)
+
+			e2elog.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
+			pod := f.NewAgnhostPod(podName,
+				"netexec",
+				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
+				fmt.Sprintf("--udp-port=%d", firewallTestUDPPort))
+			pod.ObjectMeta.Labels = jig.Labels
+			pod.Spec.NodeName = nodeName
+			pod.Spec.HostNetwork = true
+			_, err := cs.CoreV1().Pods(ns).Create(pod)
+			framework.ExpectNoError(err)
+			framework.ExpectNoError(f.WaitForPodRunning(podName))
+			e2elog.Logf("Netexec pod %q in namespace %q running", podName, ns)
+
 			defer func() {
 				e2elog.Logf("Cleaning up the netexec pod: %v", podName)
 				err = cs.CoreV1().Pods(ns).Delete(podName, nil)
