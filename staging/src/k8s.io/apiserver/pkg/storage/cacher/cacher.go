@@ -822,7 +822,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		}
 	} else {
 		// Cache serializations of the object across all watchers.
-		event.Object = newObjectWithSerializations(event.Object)
+//		event.Object = newObjectWithSerializations(event.Object)
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
