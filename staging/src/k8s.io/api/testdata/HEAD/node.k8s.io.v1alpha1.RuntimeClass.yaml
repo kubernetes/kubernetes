@@ -33,3 +33,11 @@ spec:
     podFixed:
       qJ枊a8衍`Ĩ: "652"
   runtimeHandler: "18"
+  scheduling:
+    nodeSelector:
+      "19": "20"
+    tolerations:
+    - effect: 6ċ
+      key: "21"
+      tolerationSeconds: -5658031457286093454
+      value: "22"
