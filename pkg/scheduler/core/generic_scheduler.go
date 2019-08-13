@@ -132,12 +132,12 @@ func (f *FitError) Error() string {
 // onto machines.
 // TODO: Rename this type.
 type ScheduleAlgorithm interface {
-	Schedule(*v1.Pod, algorithm.NodeLister, *framework.PluginContext) (scheduleResult ScheduleResult, err error)
+	Schedule(*v1.Pod, *framework.PluginContext) (scheduleResult ScheduleResult, err error)
 	// Preempt receives scheduling errors for a pod and tries to create room for
 	// the pod by preempting lower priority pods if possible.
 	// It returns the node where preemption happened, a list of preempted pods, a
 	// list of pods whose nominated node name should be removed, and error if any.
-	Preempt(*v1.Pod, algorithm.NodeLister, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
+	Preempt(*v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Predicates() returns a pointer to a map of predicate functions. This is
 	// exposed for testing.
 	Predicates() map[string]predicates.FitPredicate
@@ -186,7 +186,7 @@ func (g *genericScheduler) snapshot() error {
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister, pluginContext *framework.PluginContext) (result ScheduleResult, err error) {
+func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
@@ -211,7 +211,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Basic checks done")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod, nodeLister)
+	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod)
 	if err != nil {
 		return result, err
 	}
@@ -317,7 +317,7 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // other pods with the same priority. The nominated pod prevents other pods from
 // using the nominated resources and the nominated pod could take a long time
 // before it is retried after many other pending pods.
-func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+func (g *genericScheduler) Preempt(pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.
 	fitError, ok := scheduleErr.(*FitError)
@@ -328,7 +328,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
-	allNodes := nodeLister.ListNodes()
+	allNodes := g.cache.ListNodes()
 	if len(allNodes) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
@@ -461,13 +461,13 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod, nodeLister algorithm.NodeLister) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
+func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 	filteredNodesStatuses := framework.NodeToStatusMap{}
 
 	if len(g.predicates) == 0 {
-		filtered = nodeLister.ListNodes()
+		filtered = g.cache.ListNodes()
 	} else {
 		allNodes := int32(g.cache.NodeTree().NumNodes())
 		numNodesToFind := g.numFeasibleNodesToFind(allNodes)

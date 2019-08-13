@@ -80,13 +80,10 @@ type PodConditionUpdater interface {
 // Config is an implementation of the Scheduler's configured input data.
 // TODO over time we should make this struct a hidden implementation detail of the scheduler.
 type Config struct {
-	// It is expected that changes made via SchedulerCache will be observed
-	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
 
-	NodeLister algorithm.NodeLister
-	Algorithm  core.ScheduleAlgorithm
-	GetBinder  func(pod *v1.Pod) Binder
+	Algorithm core.ScheduleAlgorithm
+	GetBinder func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -140,8 +137,6 @@ type PodPreemptor interface {
 // construct a new scheduler.
 type Configurator struct {
 	client clientset.Interface
-	// a means to list all known scheduled pods.
-	scheduledPodLister corelisters.PodLister
 	// a means to list all PersistentVolumes
 	pVLister corelisters.PersistentVolumeLister
 	// a means to list all PersistentVolumeClaims
@@ -429,9 +424,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 	)
 
 	return &Config{
-		SchedulerCache: c.schedulerCache,
-		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          c.schedulerCache,
+		SchedulerCache:      c.schedulerCache,
 		Algorithm:           algo,
 		GetBinder:           getBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},

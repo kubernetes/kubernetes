@@ -284,7 +284,7 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 // schedule implements the scheduling algorithm and returns the suggested result(host,
 // evaluated nodes number,feasible nodes number).
 func (sched *Scheduler) schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (core.ScheduleResult, error) {
-	result, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister, pluginContext)
+	result, err := sched.config.Algorithm.Schedule(pod, pluginContext)
 	if err != nil {
 		pod = pod.DeepCopy()
 		sched.recordSchedulingFailure(pod, err, v1.PodReasonUnschedulable, err.Error())
@@ -303,7 +303,7 @@ func (sched *Scheduler) preempt(fwk framework.Framework, preemptor *v1.Pod, sche
 		return "", err
 	}
 
-	node, victims, nominatedPodsToClear, err := sched.config.Algorithm.Preempt(preemptor, sched.config.NodeLister, scheduleErr)
+	node, victims, nominatedPodsToClear, err := sched.config.Algorithm.Preempt(preemptor, scheduleErr)
 	if err != nil {
 		klog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
 		return "", err
