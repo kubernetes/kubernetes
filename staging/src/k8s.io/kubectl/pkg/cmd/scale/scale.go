@@ -227,7 +227,7 @@ func (o *ScaleOptions) RunScale() error {
 		}
 
 		mapping := info.ResourceMapping()
-		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource.GroupResource()); err != nil {
+		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource); err != nil {
 			return err
 		}
 
