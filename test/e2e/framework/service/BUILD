@@ -9,6 +9,7 @@ go_library(
         "hostname.go",
         "jig.go",
         "resource.go",
+        "util.go",
         "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/service",
