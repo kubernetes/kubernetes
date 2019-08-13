@@ -61,6 +61,8 @@ type TestSuite interface {
 	// Called inside a Ginkgo context that reflects the current driver and test pattern,
 	// so the test suite can define tests directly with ginkgo.It.
 	defineTests(TestDriver, testpatterns.TestPattern)
+	// skipRedundantSuite will skip the test suite based on the given TestPattern and TestDriver
+	skipRedundantSuite(TestDriver, testpatterns.TestPattern)
 }
 
 // TestSuiteInfo represents a set of parameters for TestSuite
@@ -90,6 +92,7 @@ func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 			ginkgo.Context(getTestNameStr(suite, p), func() {
 				ginkgo.BeforeEach(func() {
 					// Skip unsupported tests to avoid unnecessary resource initialization
+					suite.skipRedundantSuite(driver, p)
 					skipUnsupportedTest(driver, p)
 				})
 				suite.defineTests(driver, p)
@@ -612,5 +615,13 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 		// and native CSI Driver metrics. This way we can check the counts for
 		// migrated version of the driver for stronger negative test case
 		// guarantees (as well as more informative metrics).
+	}
+}
+
+// Skip skipVolTypes patterns if the driver supports dynamic provisioning
+func skipVolTypePatterns(pattern testpatterns.TestPattern, driver TestDriver, skipVolTypes map[testpatterns.TestVolType]bool) {
+	_, supportsProvisioning := driver.(DynamicPVTestDriver)
+	if supportsProvisioning && skipVolTypes[pattern.VolType] {
+		framework.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
 	}
 }

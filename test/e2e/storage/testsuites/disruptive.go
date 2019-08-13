@@ -18,7 +18,7 @@ package testsuites
 
 import (
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -38,18 +38,19 @@ func InitDisruptiveTestSuite() TestSuite {
 			name:       "disruptive",
 			featureTag: "[Disruptive]",
 			testPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.FsVolModePreprovisionedPV,
-				testpatterns.FsVolModeDynamicPV,
+				// FSVolMode is already covered in subpath testsuite
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
 		},
 	}
 }
-
 func (s *disruptiveTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
+}
+
+func (s *disruptiveTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
 }
 
 func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {

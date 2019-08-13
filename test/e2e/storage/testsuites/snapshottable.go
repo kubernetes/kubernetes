@@ -66,6 +66,9 @@ func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
+func (s *snapshottableTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+}
+
 func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		sDriver SnapshottableTestDriver

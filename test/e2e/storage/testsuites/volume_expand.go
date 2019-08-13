@@ -64,6 +64,9 @@ func (v *volumeExpandTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return v.tsInfo
 }
 
+func (v *volumeExpandTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+}
+
 func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config      *PerTestConfig
