@@ -60,7 +60,7 @@ type StorageClass struct {
 
 	// AllowVolumeExpansion shows whether the storage class allow volume expand
 	// If the field is nil or not set, it would amount to expansion disabled
-	// for all PVs created from this storageclass.
+	// for all PVs created from this storage class.
 	// +optional
 	AllowVolumeExpansion *bool
 
@@ -214,8 +214,8 @@ const (
 
 	// VolumeBindingWaitForFirstConsumer indicates that PersistentVolumeClaims
 	// should not be provisioned and bound until the first Pod is created that
-	// references the PeristentVolumeClaim.  The volume provisioning and
-	// binding will occur during Pod scheduing.
+	// references the PersistentVolumeClaim.  The volume provisioning and
+	// binding will occur during Pod scheduling.
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
@@ -286,7 +286,7 @@ type CSIDriverSpec struct {
 	// NodePublishVolume() calls.
 	// The CSI driver is responsible for parsing and validating the information
 	// passed in as VolumeContext.
-	// The following VolumeConext will be passed if podInfoOnMount is set to true.
+	// The following VolumeContext will be passed if podInfoOnMount is set to true.
 	// This list might grow, but the prefix will be used.
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
@@ -299,9 +299,9 @@ type CSIDriverSpec struct {
 
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as
-// they use the node-driver-registrar sidecar container, the kubelet will
+// they use the node-driver-registrar sidecar container, the Kubelet will
 // automatically populate the CSINode object for the CSI driver as part of
-// kubelet plugin registration.
+// Kubelet plugin registration.
 // CSINode has the same name as a node. If the object is missing, it means either
 // there are no CSI Drivers available on the node, or the Kubelet version is low
 // enough that it doesn't create this object.
