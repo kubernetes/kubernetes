@@ -282,8 +282,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	klog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
 	if deviceMountPath == "" {
-		err = fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
-		return err
+		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
 	}
 
 	mounted, err := isDirMounted(c.plugin, deviceMountPath)
@@ -299,7 +298,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Setup
 	if spec == nil {
-		return fmt.Errorf("attacher.MountDevice failed, spec is nil")
+		return errors.New(log("attacher.MountDevice failed, spec is nil"))
 	}
 	csiSource, err := getPVSourceFromSpec(spec)
 	if err != nil {
@@ -479,7 +478,7 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 
 	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
 	if err != nil {
-		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
+		return errors.New(log("watch error:%v for volume %v", err, volumeHandle))
 	}
 	var watcherClosed bool
 	ch := watcher.ResultChan()
@@ -565,7 +564,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		klog.Infof(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
 		// Just	delete the global directory + json file
 		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-			return fmt.Errorf("failed to clean up global mount %s: %s", dataDir, err)
+			return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
 		}
 
 		return nil
@@ -582,10 +581,10 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 
 	// Delete the global directory + json file
 	if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-		return fmt.Errorf("failed to clean up global mount %s: %s", dataDir, err)
+		return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
 	}
 
-	klog.V(4).Infof(log("attacher.UnmountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
+	klog.V(4).Infof(log("attacher.UnmountDevice successfully requested NodeUnStageVolume [%s]", deviceMountPath))
 	return nil
 }
 
@@ -607,12 +606,12 @@ func isAttachmentName(unknownString string) bool {
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
 	if spec == nil {
-		return "", fmt.Errorf("makeDeviceMountPath failed, spec is nil")
+		return "", errors.New(log("makeDeviceMountPath failed, spec is nil"))
 	}
 
 	pvName := spec.PersistentVolume.Name
 	if pvName == "" {
-		return "", fmt.Errorf("makeDeviceMountPath failed, pv name empty")
+		return "", errors.New(log("makeDeviceMountPath failed, pv name empty"))
 	}
 
 	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, pvName, globalMountInGlobalPath), nil
@@ -622,7 +621,7 @@ func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMoun
 	// deviceMountPath structure: /var/lib/kubelet/plugins/kubernetes.io/csi/pv/{pvname}/globalmount
 	dir := filepath.Dir(deviceMountPath)
 	if file := filepath.Base(deviceMountPath); file != globalMountInGlobalPath {
-		return "", "", fmt.Errorf("getDriverAndVolNameFromDeviceMountPath failed, path did not end in %s", globalMountInGlobalPath)
+		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath failed, path did not end in %s", globalMountInGlobalPath))
 	}
 	// dir is now /var/lib/kubelet/plugins/kubernetes.io/csi/pv/{pvname}
 	pvName := filepath.Base(dir)
@@ -633,16 +632,16 @@ func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMoun
 		return "", "", err
 	}
 	if pv == nil || pv.Spec.CSI == nil {
-		return "", "", fmt.Errorf("getDriverAndVolNameFromDeviceMountPath could not find CSI Persistent Volume Source for pv: %s", pvName)
+		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath could not find CSI Persistent Volume Source for pv: %s", pvName))
 	}
 
 	// Get VolumeHandle and PluginName from pv
 	csiSource := pv.Spec.CSI
 	if csiSource.Driver == "" {
-		return "", "", fmt.Errorf("getDriverAndVolNameFromDeviceMountPath failed, driver name empty")
+		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath failed, driver name empty"))
 	}
 	if csiSource.VolumeHandle == "" {
-		return "", "", fmt.Errorf("getDriverAndVolNameFromDeviceMountPath failed, VolumeHandle empty")
+		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath failed, VolumeHandle empty"))
 	}
 
 	return csiSource.Driver, csiSource.VolumeHandle, nil
