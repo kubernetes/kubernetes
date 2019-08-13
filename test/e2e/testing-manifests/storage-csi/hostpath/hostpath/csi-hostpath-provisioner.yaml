@@ -30,7 +30,8 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.3.0
+          # TODO: replace with official 1.4.0 release when ready
+          image: quay.io/k8scsi/csi-provisioner:v1.4.0-rc1
           args:
             - "--provisioner=csi-hostpath"
             - "--csi-address=$(ADDRESS)"
