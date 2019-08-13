@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/klog"
 )
 
@@ -192,6 +194,9 @@ func (o *ObjectWithSerializations) InterceptEncode(e runtime.WithVersionEncoder,
 			}
 			// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 		}
+		setSelfLink(versioned.Object)
+
+
 		if ne, ok := versioned.Object.(runtime.NestedObjectEncoder); ok {
 			if err := ne.EncodeNestedObjects(runtime.WithVersionEncoder{Version: encodeVersion, Encoder: e.Encoder, ObjectTyper: e.ObjectTyper}); err != nil {
 				klog.Errorf("AAAA: nested encoder: %v %v", err, o.Object)
@@ -206,6 +211,27 @@ func (o *ObjectWithSerializations) InterceptEncode(e runtime.WithVersionEncoder,
 		return err
 	}
 	return e.Encoder.Encode(versioned, w)
+}
+
+func setSelfLink(obj runtime.Object) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	selfLink := ""
+	if len(gvk.Group) == 0 {
+		selfLink = fmt.Sprintf("/api/%s/", gvk.Version)
+	} else {
+		selfLink = fmt.Sprintf("/apis/%s/%s/", gvk.Group, gvk.Version)
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		panic("something went wrong")
+	}
+	// FIXME: This is completely wrong now.
+	if len(accessor.GetNamespace()) == 0 {
+		selfLink += "resource/" + accessor.GetName()
+	} else {
+		selfLink += "namespaces/" + accessor.GetNamespace() + "/resource/" + accessor.GetName()
+	}
+	accessor.SetSelfLink(selfLink)
 }
 
 // GetObjectKind implements runtime.Object.
