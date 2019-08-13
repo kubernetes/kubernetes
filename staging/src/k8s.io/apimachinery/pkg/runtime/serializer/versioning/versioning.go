@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"k8s.io/klog"
 )
 
 // NewDefaultingCodecForScheme is a convenience method for callers that are using a scheme.
@@ -196,6 +198,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if customEncoder, ok := obj.(runtime.CustomEncoder); ok {
+		klog.Errorf("DDDD: %#v %#v", obj, c.typer)
 		encoder := runtime.WithVersionEncoder{
 			Version:         c.encodeVersion,
 			Encoder:         c.encoder,
@@ -203,6 +206,12 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 			ObjectTyper:     c.typer,
 		}
 		return customEncoder.InterceptEncode(encoder, w)
+	}
+
+	if reflect.TypeOf(obj).String() == "apiextensions.CustomResourceDefinition" ||
+		reflect.TypeOf(obj).String() == "*apiextensions.CustomResourceDefinition" {
+		klog.Errorf("BBBB: %#v", obj)
+		klog.Errorf("CCCC: %#v", c.typer)
 	}
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
