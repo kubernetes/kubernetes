@@ -5,9 +5,9 @@ go_library(
     srcs = [
         "compute.go",
         "health.go",
-        "migrate.go",
         "policy.go",
         "postupgrade.go",
+        "preflight.go",
         "prepull.go",
         "staticpods.go",
         "versiongetter.go",
@@ -41,7 +41,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",

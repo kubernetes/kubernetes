@@ -52,12 +52,8 @@ func (c CoreDNSCheck) Check() (warnings, errors []error) {
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.String) error {
-	currentDNSType, _, err := dns.DeployedDNSAddon(client)
-	if err != nil {
-		return err
-	}
-	if currentDNSType != kubeadmapi.CoreDNS {
+func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.String, dnsType kubeadmapi.DNSAddOnType) error {
+	if dnsType != kubeadmapi.CoreDNS {
 		return nil
 	}
 	migrationChecks := []preflight.Checker{
@@ -77,7 +73,7 @@ func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors 
 }
 
 // checkUnsupportedPlugins checks if there are any plugins included in the current configuration
-// that is unsupported for migration.
+// that are unsupported for migration.
 func checkUnsupportedPlugins(client clientset.Interface) error {
 	klog.V(1).Infoln("validating if there are any unsupported CoreDNS plugins in the Corefile")
 	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(client)
@@ -114,6 +110,5 @@ func checkMigration(client clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

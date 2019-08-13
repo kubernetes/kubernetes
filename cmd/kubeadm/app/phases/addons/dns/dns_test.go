@@ -681,7 +681,7 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to fetch CoreDNS current installed version and ConfigMap.")
 			}
-			err = migrateCoreDNSConfigMap(client, cm, corefile, currentInstalledCoreDNSVersion)
+			err = migrateCoreDNSCorefile(client, cm, corefile, currentInstalledCoreDNSVersion)
 			if err != nil {
 				t.Fatalf("error creating the CoreDNS ConfigMap: %v", err)
 			}

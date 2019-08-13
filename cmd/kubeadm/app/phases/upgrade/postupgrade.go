@@ -17,16 +17,13 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
@@ -97,17 +94,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	coreDNSConfigMap, corefile, _, err := dns.GetCoreDNSInfo(client)
-	if err != nil {
-		errs = append(errs, err)
-	}
-	isMigrationRequired := dns.IsCoreDNSConfigMapMigrationRequired(corefile)
-	if isMigrationRequired {
-		if err := prepareCoreDNSForCorefileMigration(client, coreDNSConfigMap, corefile); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
 	// Upgrade kube-dns/CoreDNS and kube-proxy
 	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, err)
@@ -121,47 +107,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 	return errorsutil.NewAggregate(errs)
-}
-
-func prepareCoreDNSForCorefileMigration(client clientset.Interface, coreDNSConfigMap *v1.ConfigMap, corefile string) error {
-	existingCoreDNSConfigMapName := kubeadmconstants.CoreDNSConfigMap + "-previous"
-	if _, err := client.CoreV1().ConfigMaps(coreDNSConfigMap.ObjectMeta.Namespace).Get(existingCoreDNSConfigMapName, metav1.GetOptions{}); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		if err := client.CoreV1().ConfigMaps(coreDNSConfigMap.ObjectMeta.Namespace).Delete(existingCoreDNSConfigMapName, nil); err != nil {
-			return errors.Wrap(err, "failed to delete previous CoreDNS ConfigMap")
-		}
-
-		if _, err := client.CoreV1().ConfigMaps(coreDNSConfigMap.ObjectMeta.Namespace).Create(&v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      existingCoreDNSConfigMapName,
-				Namespace: metav1.NamespaceSystem,
-			},
-			Data: map[string]string{
-				"Corefile": corefile,
-			},
-		}); err != nil {
-			return errors.Wrap(err, "unable to create the migrated CoreDNS ConfigMap")
-		}
-	}
-
-	if err := patchCoreDNSDeployment(client, existingCoreDNSConfigMapName); err != nil {
-		return err
-	}
-	return nil
-}
-
-func patchCoreDNSDeployment(client clientset.Interface, coreDNSConfigMapName string) error {
-	dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNSDeploymentName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	patch := fmt.Sprintf(`{"spec":{"template": {"spec":{"volumes":[{"name": "config-volume","configMap":{"name": "%s"}}]}}}}`, coreDNSConfigMapName)
-	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(dnsDeployment.Name, types.StrategicMergePatchType, []byte(patch)); err != nil {
-		return errors.Wrap(err, "unable to patch the CoreDNS deployment")
-	}
-	return nil
 }
 
 func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
