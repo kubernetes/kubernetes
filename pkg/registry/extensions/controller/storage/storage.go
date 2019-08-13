@@ -40,14 +40,17 @@ type ContainerStorage struct {
 	Scale                 *ScaleREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter) (ContainerStorage, error) {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := controllerstore.NewREST(optsGetter)
+	controllerREST, _, err := controllerstore.NewREST(optsGetter)
+	if err != nil {
+		return ContainerStorage{}, err
+	}
 
 	return ContainerStorage{
 		ReplicationController: &RcREST{},
 		Scale:                 &ScaleREST{store: controllerREST.Store},
-	}
+	}, nil
 }
 
 type ScaleREST struct {

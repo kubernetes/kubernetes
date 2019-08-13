@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +38,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against priority classes.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &scheduling.PriorityClass{} },
 		NewListFunc:              func() runtime.Object { return &scheduling.PriorityClassList{} },
@@ -53,10 +52,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
-	return &REST{store}
+	return &REST{store}, nil
 }
 
 // Implement ShortNamesProvider

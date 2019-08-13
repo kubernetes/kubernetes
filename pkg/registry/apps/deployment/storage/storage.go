@@ -53,15 +53,18 @@ type DeploymentStorage struct {
 	Rollback   *RollbackREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
-	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(optsGetter)
+func NewStorage(optsGetter generic.RESTOptionsGetter) (DeploymentStorage, error) {
+	deploymentRest, deploymentStatusRest, deploymentRollbackRest, err := NewREST(optsGetter)
+	if err != nil {
+		return DeploymentStorage{}, err
+	}
 
 	return DeploymentStorage{
 		Deployment: deploymentRest,
 		Status:     deploymentStatusRest,
 		Scale:      &ScaleREST{store: deploymentRest.Store},
 		Rollback:   deploymentRollbackRest,
-	}
+	}, nil
 }
 
 type REST struct {
@@ -70,7 +73,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
 		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
@@ -84,12 +87,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}, nil
 }
 
 // Implement ShortNamesProvider
