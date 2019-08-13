@@ -17,7 +17,6 @@ limitations under the License.
 package compatibility
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"reflect"
 	"testing"
@@ -1069,53 +1068,51 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	seenPriorities := sets.NewString()
 
 	for v, tc := range schedulerFiles {
-		fmt.Printf("%s: Testing scheduler config\n", v)
+		t.Run(v, func(t *testing.T) {
+			policy := schedulerapi.Policy{}
+			if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy); err != nil {
+				t.Errorf("%s: Error decoding: %v", v, err)
+			}
+			for _, predicate := range policy.Predicates {
+				seenPredicates.Insert(predicate.Name)
+			}
+			for _, priority := range policy.Priorities {
+				seenPriorities.Insert(priority.Name)
+			}
+			if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
+				t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
+			}
 
-		policy := schedulerapi.Policy{}
-		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy); err != nil {
-			t.Errorf("%s: Error decoding: %v", v, err)
-			continue
-		}
-		for _, predicate := range policy.Predicates {
-			seenPredicates.Insert(predicate.Name)
-		}
-		for _, priority := range policy.Priorities {
-			seenPriorities.Insert(priority.Name)
-		}
-		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
-		}
+			handler := utiltesting.FakeHandler{
+				StatusCode:   500,
+				ResponseBody: "",
+				T:            t,
+			}
+			server := httptest.NewServer(&handler)
+			defer server.Close()
+			client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		handler := utiltesting.FakeHandler{
-			StatusCode:   500,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-			Client:                         client,
-			NodeInformer:                   informerFactory.Core().V1().Nodes(),
-			PodInformer:                    informerFactory.Core().V1().Pods(),
-			PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-			PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-			ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-			ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-			StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-			ServiceInformer:                informerFactory.Core().V1().Services(),
-			PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-			CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
-			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			DisablePreemption:              false,
-			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		}).CreateFromConfig(policy); err != nil {
-			t.Errorf("%s: Error constructing: %v", v, err)
-			continue
-		}
+			if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+				Client:                         client,
+				NodeInformer:                   informerFactory.Core().V1().Nodes(),
+				PodInformer:                    informerFactory.Core().V1().Pods(),
+				PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+				PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+				ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+				ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+				StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+				ServiceInformer:                informerFactory.Core().V1().Services(),
+				PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+				StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+				CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
+				HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+				DisablePreemption:              false,
+				PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+			}).CreateFromConfig(policy); err != nil {
+				t.Errorf("%s: Error constructing: %v", v, err)
+			}
+		})
 	}
 
 	if !seenPredicates.HasAll(registeredPredicates.List()...) {
