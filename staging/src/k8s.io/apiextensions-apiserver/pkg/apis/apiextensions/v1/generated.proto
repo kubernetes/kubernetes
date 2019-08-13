@@ -221,6 +221,7 @@ message CustomResourceDefinitionSpec {
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
 message CustomResourceDefinitionStatus {
   // Conditions indicate state for particular aspects of a CustomResourceDefinition
+  // +optional
   repeated CustomResourceDefinitionCondition conditions = 1;
 
   // AcceptedNames are the names that are actually being used to serve discovery
