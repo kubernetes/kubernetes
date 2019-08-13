@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/user"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	kubeinformers "k8s.io/client-go/informers"
 	cache "k8s.io/client-go/tools/cache"
@@ -166,8 +168,8 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 	if nameOfDefault == "" {
 		nameOfDefault = newRMState.generateDefaultPL(&shareSum)
 	}
-	fsSeq = append(fsSeq, newFSAllObj(nameOfExempt, true, "system:masters"))
-	fsSeq = append(fsSeq, newFSAllObj(nameOfDefault, false, "system:authenticated", "system:unauthenticated"))
+	fsSeq = append(fsSeq, newFSAllObj("backstop to "+nameOfExempt, nameOfExempt, 9999, true, groups(user.SystemPrivilegedGroup)))
+	fsSeq = append(fsSeq, newFSAllObj("backstop to "+nameOfDefault, nameOfDefault, 9999, false, groups(user.AllAuthenticated, user.AllUnauthenticated)))
 	newRMState.flowSchemas = fsSeq
 	for _, fs := range fsSeq {
 		klog.V(5).Infof("Using FlowSchema %s: %#+v", fs.Name, fs.Spec)
@@ -230,42 +232,33 @@ func warnFlowSchemaSpec(fsName string, spec *rmtypesv1a1.FlowSchemaSpec, newPrio
 	return true
 }
 
-func (newRMState *requestManagementState) generateExemptPL() (nameOfExempt string) {
-	if newRMState.priorityLevelStates["system-top"] == nil {
-		nameOfExempt = "system-top"
-	} else {
-		for i := 2; true; i++ {
-			nameOfExempt = fmt.Sprintf("system-top-%d", i)
-			if newRMState.priorityLevelStates[nameOfExempt] == nil {
-				break
-			}
-		}
-	}
-	klog.Warningf("No Exempt PriorityLevelConfiguration found, inventing one named %q", nameOfExempt)
+func (newRMState *requestManagementState) generateExemptPL() string {
+	nameOfExempt := newRMState.genName("system-top")
+	klog.Warningf("No Exempt PriorityLevelConfiguration found, imagining one named %q", nameOfExempt)
 	newRMState.priorityLevelStates[nameOfExempt] = &priorityLevelState{
 		config: DefaultPriorityLevelConfigurationObjects()[0].Spec,
 	}
-	return
+	return nameOfExempt
 }
 
-func (newRMState *requestManagementState) generateDefaultPL(shareSum *float64) (nameOfDefault string) {
-	if newRMState.priorityLevelStates["workload-low"] == nil {
-		nameOfDefault = "workload-low"
-	} else {
-		for i := 2; true; i++ {
-			nameOfDefault = fmt.Sprintf("workload-low-%d", i)
-			if newRMState.priorityLevelStates[nameOfDefault] == nil {
-				break
-			}
-
-		}
-	}
-	klog.Warningf("No GlobalDefault PriorityLevelConfiguration found, inventing one named %q", nameOfDefault)
+func (newRMState *requestManagementState) generateDefaultPL(shareSum *float64) string {
+	nameOfDefault := newRMState.genName("workload-low")
+	klog.Warningf("No GlobalDefault PriorityLevelConfiguration found, imagining one named %q", nameOfDefault)
 	newRMState.priorityLevelStates[nameOfDefault] = &priorityLevelState{
 		config: DefaultPriorityLevelConfigurationObjects()[1].Spec,
 	}
 	*shareSum += float64(newRMState.priorityLevelStates[nameOfDefault].config.AssuredConcurrencyShares)
-	return
+	return nameOfDefault
+}
+
+func (newRMState *requestManagementState) genName(base string) string {
+	for i := 1; true; i++ {
+		extended := strings.TrimSuffix(fmt.Sprintf("%s-%d", base, i), "-1")
+		if newRMState.priorityLevelStates[extended] == nil {
+			return extended
+		}
+	}
+	return "from an impossible place"
 }
 
 type emptyRelay struct {

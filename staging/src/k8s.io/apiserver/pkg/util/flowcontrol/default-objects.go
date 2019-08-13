@@ -19,7 +19,7 @@ package flowcontrol
 import (
 	rmv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
- 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // DefaultPriorityLevelConfigurationObjects returns the instances of
@@ -100,14 +100,7 @@ func DefaultFlowSchemaObjects() []*rmv1a1.FlowSchema {
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: svcAccount("*"),
 				Rule:     ruleRscAll}),
-		fs("workload-high", 7500,
-			rmv1a1.FlowDistinguisherMethodByNamespaceType,
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: subjectsAll,
-				Rule:     ruleRscAll},
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: subjectsAll,
-				Rule:     ruleNonRscAll}),
+		newFSAllObj("workload-high", "workload-high", 7500, false, subjectsAll),
 	}
 }
 
@@ -137,7 +130,7 @@ func fs2(name, plName string, matchingPrecedence int32, dmType rmv1a1.FlowDistin
 
 }
 
-func newFSAllObj(plName string, exempt bool, grps ...string) *rmv1a1.FlowSchema {
+func newFSAllObj(fsName, plName string, matchingPrecedence int32, exempt bool, subjects []rmv1a1.Subject) *rmv1a1.FlowSchema {
 	verbAll := []string{rmv1a1.VerbAll}
 	apiGroupAll := []string{rmv1a1.APIGroupAll}
 	resourceAll := []string{rmv1a1.ResourceAll}
@@ -145,12 +138,12 @@ func newFSAllObj(plName string, exempt bool, grps ...string) *rmv1a1.FlowSchema 
 	if exempt {
 		dmType = rmv1a1.FlowDistinguisherMethodByUserType
 	}
-	return fs2("backstop to "+plName, plName, 9999, dmType,
+	return fs2(fsName, plName, matchingPrecedence, dmType,
 		rmv1a1.PolicyRuleWithSubjects{
-			Subjects: groups(grps...),
+			Subjects: subjects,
 			Rule:     rule(verbAll, apiGroupAll, resourceAll)},
 		rmv1a1.PolicyRuleWithSubjects{
-			Subjects: groups(grps...),
+			Subjects: subjects,
 			Rule: rmv1a1.PolicyRule{
 				Verbs:           verbAll,
 				NonResourceURLs: []string{rmv1a1.NonResourceAll}}},
