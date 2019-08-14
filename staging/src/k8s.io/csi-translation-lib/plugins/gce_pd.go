@@ -73,13 +73,16 @@ func translateAllowedTopologies(terms []v1.TopologySelectorTerm) ([]v1.TopologyS
 	newTopologies := []v1.TopologySelectorTerm{}
 	for _, term := range terms {
 		newTerm := v1.TopologySelectorTerm{}
+		zoneFound := false
 		for _, exp := range term.MatchLabelExpressions {
 			var newExp v1.TopologySelectorLabelRequirement
-			if exp.Key == v1.LabelZoneFailureDomain {
+			if !zoneFound && (exp.Key == v1.LabelZoneFailureDomain || exp.Key == v1.LabelZoneFailureDomainStable) {
 				newExp = v1.TopologySelectorLabelRequirement{
 					Key:    GCEPDTopologyKey,
 					Values: exp.Values,
 				}
+
+				zoneFound = true
 			} else if exp.Key == GCEPDTopologyKey {
 				newExp = exp
 			} else {
@@ -240,7 +243,11 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
-	zonesLabel := pv.Labels[v1.LabelZoneFailureDomain]
+	zonesLabel, ok := pv.Labels[v1.LabelZoneFailureDomain]
+	if !ok {
+		zonesLabel = pv.Labels[v1.LabelZoneFailureDomainStable]
+	}
+
 	zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal

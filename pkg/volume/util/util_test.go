@@ -223,6 +223,231 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 	}
 }
 
+func Test_CheckNodeAffinityWithTopology(t *testing.T) {
+	tests := []struct {
+		name          string
+		pv            *v1.PersistentVolume
+		nodeLabels    map[string]string
+		expectSuccess bool
+	}{
+		{
+			name: "PV has only beta label, node has beta/GA label -- zone only",
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+							},
+						},
+					},
+				},
+			}),
+			nodeLabels: map[string]string{
+				v1.LabelZoneFailureDomain:       "zone",
+				v1.LabelZoneFailureDomainStable: "zone",
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "PV has only beta label, node has beta/GA label -- zone and region",
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+								{
+									Key:      v1.LabelZoneRegion,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"region"},
+								},
+							},
+						},
+					},
+				},
+			}),
+			nodeLabels: map[string]string{
+				v1.LabelZoneFailureDomain:       "zone",
+				v1.LabelZoneFailureDomainStable: "zone",
+				v1.LabelZoneRegion:              "region",
+				v1.LabelZoneRegionStable:        "region",
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "PV has both beta/GA label, node has only beta -- zone only",
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomainStable,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+							},
+						},
+					},
+				},
+			}),
+			nodeLabels: map[string]string{
+				v1.LabelZoneFailureDomain: "zone",
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "PV has both beta/GA label, node has only beta -- zone and region",
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+								{
+									Key:      v1.LabelZoneRegion,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"region"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomainStable,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+								{
+									Key:      v1.LabelZoneRegionStable,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"region"},
+								},
+							},
+						},
+					},
+				},
+			}),
+			nodeLabels: map[string]string{
+				v1.LabelZoneFailureDomain: "zone",
+				v1.LabelZoneRegion:        "region",
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "PV has both beta/GA label, node has both beta/GA label -- zone only",
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomainStable,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+							},
+						},
+					},
+				},
+			}),
+			nodeLabels: map[string]string{
+				v1.LabelZoneFailureDomain:       "zone",
+				v1.LabelZoneFailureDomainStable: "zone",
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "PV has both beta/GA label, node has both beta/GA label -- zone and region",
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+								{
+									Key:      v1.LabelZoneRegion,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"region"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomainStable,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone"},
+								},
+								{
+									Key:      v1.LabelZoneRegionStable,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"region"},
+								},
+							},
+						},
+					},
+				},
+			}),
+			nodeLabels: map[string]string{
+				v1.LabelZoneFailureDomain:       "zone",
+				v1.LabelZoneRegion:              "region",
+				v1.LabelZoneFailureDomainStable: "zone",
+				v1.LabelZoneRegionStable:        "region",
+			},
+			expectSuccess: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := CheckNodeAffinity(test.pv, test.nodeLabels)
+
+			if err != nil && test.expectSuccess {
+				t.Errorf("CheckTopology returned error: %v", err)
+			}
+			if err == nil && !test.expectSuccess {
+				t.Error("CheckTopology returned success, expected error")
+			}
+		})
+	}
+}
+
 func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.VolumeNodeAffinity) *v1.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: "test-constraints"}
 	return &v1.PersistentVolume{

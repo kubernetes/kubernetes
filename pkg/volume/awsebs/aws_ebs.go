@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -519,7 +520,7 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   c.options.PVName,
-			Labels: map[string]string{},
+			Labels: labels,
 			Annotations: map[string]string{
 				util.VolumeDynamicallyCreatedByKey: "aws-ebs-dynamic-provisioner",
 			},
@@ -547,21 +548,9 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
-	requirements := make([]v1.NodeSelectorRequirement, 0)
-	if len(labels) != 0 {
-		if pv.Labels == nil {
-			pv.Labels = make(map[string]string)
-		}
-		for k, v := range labels {
-			pv.Labels[k] = v
-			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-		}
-	}
-
 	pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
 	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
-	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
-	pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = volumehelpers.TranslateZoneRegionLabelsToNodeSelectorTerms(labels)
 
 	return pv, nil
 }

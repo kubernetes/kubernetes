@@ -322,22 +322,16 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	if zoned {
 		// Set node affinity labels based on availability zone labels.
 		if len(labels) > 0 {
-			requirements := make([]v1.NodeSelectorRequirement, 0)
-			for k, v := range labels {
-				requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-			}
-
-			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-				MatchExpressions: requirements,
-			})
+			nodeSelectorTerms = volumehelpers.TranslateZoneRegionLabelsToNodeSelectorTerms(labels)
 		}
+
 	} else {
 		// Set node affinity labels based on fault domains.
 		// This is required because unzoned AzureDisk can't be attached to zoned nodes.
 		// There are at most 3 fault domains available in each region.
 		// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
 		for i := 0; i < 3; i++ {
-			requirements := []v1.NodeSelectorRequirement{
+			deprecatedTopologyReqs := []v1.NodeSelectorRequirement{
 				{
 					Key:      v1.LabelZoneRegion,
 					Operator: v1.NodeSelectorOpIn,
@@ -349,8 +343,25 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 					Values:   []string{strconv.Itoa(i)},
 				},
 			}
+
+			topologyReqs := []v1.NodeSelectorRequirement{
+				{
+					Key:      v1.LabelZoneRegionStable,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{diskController.GetLocation()},
+				},
+				{
+					Key:      v1.LabelZoneFailureDomainStable,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{strconv.Itoa(i)},
+				},
+			}
+
 			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-				MatchExpressions: requirements,
+				MatchExpressions: deprecatedTopologyReqs,
+			})
+			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+				MatchExpressions: topologyReqs,
 			})
 		}
 	}

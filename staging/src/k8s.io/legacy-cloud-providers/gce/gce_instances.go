@@ -60,12 +60,20 @@ func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {
 	return zones
 }
 
+// getZone checks the deprecated beta zone label first and falls back to GA label if the beta label does not exist
+// if both don't exist, returns the default zone which is ""
 func getZone(n *v1.Node) string {
 	zone, ok := n.Labels[v1.LabelZoneFailureDomain]
-	if !ok {
-		return defaultZone
+	if ok {
+		return zone
 	}
-	return zone
+
+	zone, ok = n.Labels[v1.LabelZoneFailureDomainStable]
+	if ok {
+		return zone
+	}
+
+	return defaultZone
 }
 
 func makeHostURL(projectsAPIEndpoint, projectID, zone, host string) string {

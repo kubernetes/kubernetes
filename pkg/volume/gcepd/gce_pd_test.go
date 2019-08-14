@@ -86,6 +86,7 @@ func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
 	labels[v1.LabelZoneFailureDomain] = "zone1__zone2"
+	labels[v1.LabelZoneFailureDomainStable] = "zone1__zone2"
 	return "test-gce-volume-name", 100, labels, "", nil
 }
 
@@ -203,10 +204,14 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelZoneFailureDomain, persistentSpec.Labels[v1.LabelZoneFailureDomain])
 	}
 
+	if persistentSpec.Labels[v1.LabelZoneFailureDomainStable] != "zone1__zone2" {
+		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelZoneFailureDomainStable, persistentSpec.Labels[v1.LabelZoneFailureDomainStable])
+	}
+
 	if persistentSpec.Spec.NodeAffinity == nil {
 		t.Errorf("Unexpected nil NodeAffinity found")
 	}
-	if len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms) != 1 {
+	if len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms) != 2 {
 		t.Errorf("Unexpected number of NodeSelectorTerms")
 	}
 	term := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0]
@@ -221,6 +226,24 @@ func TestPlugin(t *testing.T) {
 	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
 	if r == nil {
 		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
+	}
+	sort.Strings(r.Values)
+	if !reflect.DeepEqual(r.Values, zones.List()) {
+		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+	}
+
+	term = persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[1]
+	if len(term.MatchExpressions) != 2 {
+		t.Errorf("Unexpected number of NodeSelectorRequirements in volume NodeAffinity: %d", len(term.MatchExpressions))
+	}
+	r, _ = getNodeSelectorRequirementWithKey("fakepdmanager", term)
+	if r == nil || r.Values[0] != "yes" || r.Operator != v1.NodeSelectorOpIn {
+		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
+	}
+	zones, _ = volumehelpers.ZonesToSet("zone1,zone2")
+	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomainStable, term)
+	if r == nil {
+		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomainStable, zones)
 	}
 	sort.Strings(r.Values)
 	if !reflect.DeepEqual(r.Values, zones.List()) {

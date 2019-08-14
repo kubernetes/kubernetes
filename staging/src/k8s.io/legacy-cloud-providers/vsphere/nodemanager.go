@@ -203,8 +203,8 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 						node.Name, vm, res.vc, res.datacenter.Name())
 
 					// Get the node zone information
-					nodeFd := node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-					nodeRegion := node.ObjectMeta.Labels[v1.LabelZoneRegion]
+					nodeFd := getNodeZoneFailureDomain(node)
+					nodeRegion := getNodeRegion(node)
 					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
@@ -228,6 +228,34 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 	klog.V(4).Infof("Discovery Node: %q vm not found", node.Name)
 	return vclib.ErrNoVMFound
+}
+
+func getNodeZoneFailureDomain(node *v1.Node) string {
+	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
+	if ok {
+		return zone
+	}
+
+	zone, ok = node.Labels[v1.LabelZoneFailureDomainStable]
+	if ok {
+		return zone
+	}
+
+	return ""
+}
+
+func getNodeRegion(node *v1.Node) string {
+	region, ok := node.Labels[v1.LabelZoneRegion]
+	if ok {
+		return region
+	}
+
+	region, ok = node.Labels[v1.LabelZoneRegionStable]
+	if ok {
+		return region
+	}
+
+	return ""
 }
 
 func (nm *NodeManager) RegisterNode(node *v1.Node) error {

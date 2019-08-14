@@ -457,7 +457,8 @@ func createPVSpec(name string, readOnly bool, zones []string) *volume.Spec {
 	if zones != nil {
 		zonesLabel := strings.Join(zones, cloudvolume.LabelMultiZoneDelimiter)
 		spec.PersistentVolume.ObjectMeta.Labels = map[string]string{
-			v1.LabelZoneFailureDomain: zonesLabel,
+			v1.LabelZoneFailureDomain:       zonesLabel,
+			v1.LabelZoneFailureDomainStable: zonesLabel,
 		}
 	}
 

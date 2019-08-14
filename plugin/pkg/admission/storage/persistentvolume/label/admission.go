@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -117,11 +118,13 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 		return admission.NewForbidden(a, err)
 	}
 
-	requirements := make([]api.NodeSelectorRequirement, 0)
 	if len(volumeLabels) != 0 {
 		if volume.Labels == nil {
 			volume.Labels = make(map[string]string)
 		}
+
+		deprecatedTopologyReqs := make([]api.NodeSelectorRequirement, 0)
+		topologyReqs := make([]api.NodeSelectorRequirement, 0)
 		for k, v := range volumeLabels {
 			// We (silently) replace labels if they are provided.
 			// This should be OK because they are in the kubernetes.io namespace
@@ -129,8 +132,11 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 			volume.Labels[k] = v
 
 			// Set NodeSelectorRequirements based on the labels
+			//
+			// we currently set both beta (failure-domain.beta.kubernetes.io/zone) and
+			// GA (topology.kubernetes.io/zone) topology labels for volumes
 			var values []string
-			if k == v1.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain || k == v1.LabelZoneFailureDomainStable {
 				zones, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
@@ -140,7 +146,17 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 			} else {
 				values = []string{v}
 			}
-			requirements = append(requirements, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
+
+			// separate topology requirements based on deprecated vs stable zone/region labels
+			// all other labels apply to both requirements
+			if k == v1.LabelZoneFailureDomain || k == v1.LabelZoneRegion {
+				deprecatedTopologyReqs = append(deprecatedTopologyReqs, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
+			} else if k == v1.LabelZoneFailureDomainStable || k == v1.LabelZoneRegionStable {
+				topologyReqs = append(topologyReqs, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
+			} else {
+				deprecatedTopologyReqs = append(deprecatedTopologyReqs, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
+				topologyReqs = append(topologyReqs, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
+			}
 		}
 
 		if volume.Spec.NodeAffinity == nil {
@@ -153,16 +169,44 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 			// Need at least one term pre-allocated whose MatchExpressions can be appended to
 			volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
 		}
-		if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-			klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
-				requirements, volume.Spec.NodeAffinity)
-		} else {
-			for _, req := range requirements {
-				for i := range volume.Spec.NodeAffinity.Required.NodeSelectorTerms {
-					volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions = append(volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions, req)
-				}
+
+		deprecatedNodeTerms := volume.DeepCopy().Spec.NodeAffinity.Required.NodeSelectorTerms
+		stableNodeTerms := volume.DeepCopy().Spec.NodeAffinity.Required.NodeSelectorTerms
+
+		// only attempt to rewrite beta/stable topology labels if there are no conflicting labels on the PV at all
+		if nodeSelectorRequirementKeysExistInNodeSelectorTerms(deprecatedTopologyReqs, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) ||
+			nodeSelectorRequirementKeysExistInNodeSelectorTerms(topologyReqs, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
+			klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v or %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+				deprecatedTopologyReqs, topologyReqs, volume.Spec.NodeAffinity)
+
+			return nil
+		}
+
+		for _, req := range deprecatedTopologyReqs {
+			for i := range deprecatedNodeTerms {
+				deprecatedNodeTerms[i].MatchExpressions = append(deprecatedNodeTerms[i].MatchExpressions, req)
 			}
 		}
+
+		for _, req := range topologyReqs {
+			for i := range stableNodeTerms {
+				stableNodeTerms[i].MatchExpressions = append(stableNodeTerms[i].MatchExpressions, req)
+			}
+		}
+
+		// Deprecated and stable node selector terms are the same, i.e. the cloud provider
+		// didn't specify eithr zone/region labels. In the case set either one without
+		// expanding the set of selector terms
+		if reflect.DeepEqual(deprecatedTopologyReqs, topologyReqs) {
+			volume.Spec.NodeAffinity.Required.NodeSelectorTerms = stableNodeTerms
+			return nil
+		}
+
+		// for deprecated topology labels, we overwrite existing terms directly with the deprecated topology reqs appended
+		volume.Spec.NodeAffinity.Required.NodeSelectorTerms = deprecatedNodeTerms
+
+		// for new stable topology labels, we expand node selector requirements by copying existing selector terms but using stable topology labels
+		volume.Spec.NodeAffinity.Required.NodeSelectorTerms = append(volume.Spec.NodeAffinity.Required.NodeSelectorTerms, stableNodeTerms...)
 	}
 
 	return nil
@@ -171,15 +215,17 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	existingLabels := volume.Labels
 
-	// All cloud providers set only these two labels.
+	// deprecated zone/region labels are still the source of truth
 	domain, domainOK := existingLabels[v1.LabelZoneFailureDomain]
 	region, regionOK := existingLabels[v1.LabelZoneRegion]
 	isDynamicallyProvisioned := metav1.HasAnnotation(volume.ObjectMeta, persistentvolume.AnnDynamicallyProvisioned)
 	if isDynamicallyProvisioned && domainOK && regionOK {
 		// PV already has all the labels and we can trust the dynamic provisioning that it provided correct values.
 		return map[string]string{
-			v1.LabelZoneFailureDomain: domain,
-			v1.LabelZoneRegion:        region,
+			v1.LabelZoneFailureDomain:       domain,
+			v1.LabelZoneRegion:              region,
+			v1.LabelZoneFailureDomainStable: domain,
+			v1.LabelZoneRegionStable:        region,
 		}, nil
 	}
 

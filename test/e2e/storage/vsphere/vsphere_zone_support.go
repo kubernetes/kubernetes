@@ -497,7 +497,7 @@ func verifyPVZoneLabels(client clientset.Interface, namespace string, scParamete
 	ginkgo.By("Verify zone information is present in the volume labels")
 	for _, pv := range persistentvolumes {
 		// Multiple zones are separated with "__"
-		pvZoneLabels := strings.Split(pv.ObjectMeta.Labels["failure-domain.beta.kubernetes.io/zone"], "__")
+		pvZoneLabels := strings.Split(pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain], "__")
 		for _, zone := range zones {
 			gomega.Expect(pvZoneLabels).Should(gomega.ContainElement(zone), "Incorrect or missing zone labels in pv.")
 		}
