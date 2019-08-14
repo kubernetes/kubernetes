@@ -20,6 +20,9 @@ filters:
       - thockin
       - wojtek-t
       - liggitt
+      - yue9944882      # for feature-rate-limiting only
+      - MikeSpreitzer   # for feature-rate-limiting only
+      - aaron-prindle   # for feature-rate-limiting only
 
   # Bazel build infrastructure changes often touch files throughout the tree
   "\\.bzl$":

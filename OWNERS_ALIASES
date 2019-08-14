@@ -278,6 +278,9 @@ aliases:
     - smarterclayton
     - thockin
     - liggitt
+    - yue9944882      # for feature-rate-limiting only
+    - MikeSpreitzer   # for feature-rate-limiting only
+    - aaron-prindle   # for feature-rate-limiting only
     # - bgrant0607 # manual escalations only
 
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge

@@ -40,6 +40,7 @@ filegroup(
         "//pkg/apis/core:all-srcs",
         "//pkg/apis/events:all-srcs",
         "//pkg/apis/extensions:all-srcs",
+        "//pkg/apis/flowcontrol:all-srcs",
         "//pkg/apis/imagepolicy:all-srcs",
         "//pkg/apis/networking:all-srcs",
         "//pkg/apis/node:all-srcs",

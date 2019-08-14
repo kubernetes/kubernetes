@@ -46,6 +46,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -96,6 +97,7 @@ import (
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -350,6 +352,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		certificatesrest.RESTStorageProvider{},
 		coordinationrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
@@ -545,6 +548,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		schedulingv1alpha1.SchemeGroupVersion,
 		settingsv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
+		flowcontrolv1alpha1.SchemeGroupVersion,
 	)
 
 	return ret

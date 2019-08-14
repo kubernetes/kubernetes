@@ -137,6 +137,8 @@ var missingHanlders = sets.NewString(
 	"AuditSink",
 	"CSINode",
 	"CSIDriver",
+	"FlowSchema",
+	"PriorityLevelConfiguration",
 )
 
 func TestServerSidePrint(t *testing.T) {
@@ -153,6 +155,7 @@ func TestServerSidePrint(t *testing.T) {
 			appsv1beta2.SchemeGroupVersion,
 			extensionsv1beta1.SchemeGroupVersion,
 			nodev1alpha1.SchemeGroupVersion,
+			//flowcontrolv1alph1.SchemeGroupVersion,
 		},
 		[]schema.GroupVersionResource{
 			extensionsv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
