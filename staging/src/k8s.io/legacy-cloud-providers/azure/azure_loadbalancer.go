@@ -874,6 +874,8 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	if wantLb && nodes != nil {
 		// Add the machines to the backend pool if they're not already
 		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
+		// Etag would be changed when updating backend pools, so invalidate lbCache after it.
+		defer az.lbCache.Delete(lbName)
 		err := az.vmSet.EnsureHostsInPool(service, nodes, lbBackendPoolID, vmSetName, isInternal)
 		if err != nil {
 			return nil, err

@@ -19,6 +19,7 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
@@ -30,6 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+)
+
+const (
+	// operationCancledErrorMessage means the operation is canceled by another new operation.
+	operationCancledErrorMessage = "canceledandsupersededduetoanotheroperation"
 )
 
 // requestBackoff if backoff is disabled in cloud provider it
@@ -162,6 +168,12 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.nsgCache.Delete(*sg.Name)
 		}
+
+		// Invalidate the cache because another new operation has canceled the current request.
+		if strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.nsgCache.Delete(*sg.Name)
+		}
+
 		return err
 	}
 
@@ -187,6 +199,13 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.Secur
 			az.nsgCache.Delete(*sg.Name)
 			return true, err
 		}
+
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.nsgCache.Delete(*sg.Name)
+			return true, err
+		}
+
 		return done, retryError
 	})
 }
@@ -212,6 +231,10 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.lbCache.Delete(*lb.Name)
 		}
+		// Invalidate the cache because another new operation has canceled the current request.
+		if strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.lbCache.Delete(*lb.Name)
+		}
 		return err
 	}
 
@@ -234,7 +257,12 @@ func (az *Cloud) createOrUpdateLBWithRetry(service *v1.Service, lb network.LoadB
 
 		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
-			az.nsgCache.Delete(*lb.Name)
+			az.lbCache.Delete(*lb.Name)
+			return true, err
+		}
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.lbCache.Delete(*lb.Name)
 			return true, err
 		}
 		return done, retryError
@@ -456,6 +484,10 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.rtCache.Delete(*routeTable.Name)
 		}
+		// Invalidate the cache because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.rtCache.Delete(*routeTable.Name)
+		}
 		return az.processHTTPResponse(nil, "", resp, err)
 	}
 
@@ -480,6 +512,11 @@ func (az *Cloud) createOrUpdateRouteTableWithRetry(routeTable network.RouteTable
 			az.rtCache.Delete(*routeTable.Name)
 			return true, err
 		}
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.rtCache.Delete(*routeTable.Name)
+			return true, err
+		}
 		return done, retryError
 	})
 }
@@ -493,6 +530,10 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, *route.Name, route, to.String(route.Etag))
 		klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
+			az.rtCache.Delete(az.RouteTableName)
+		}
+		// Invalidate the cache because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
 			az.rtCache.Delete(az.RouteTableName)
 		}
 		return az.processHTTPResponse(nil, "", resp, err)
@@ -520,6 +561,13 @@ func (az *Cloud) createOrUpdateRouteWithRetry(route network.Route) error {
 			az.rtCache.Delete(az.RouteTableName)
 			return true, err
 		}
+
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.rtCache.Delete(az.RouteTableName)
+			return true, err
+		}
+
 		return done, retryError
 	})
 }
