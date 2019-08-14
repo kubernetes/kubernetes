@@ -67,7 +67,7 @@ kubectl cluster-info
 {% endmethod %}
 
 {% panel style="info", title="Kube Proxy" %}
-The URLs printed by `cluster-info` can be access at `127.0.0.1:8001` by
+The URLs printed by `cluster-info` can be accessed at `127.0.0.1:8001` by
 running `kubectl proxy`. 
 {% endpanel %}
 
