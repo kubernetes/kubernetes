@@ -104,8 +104,15 @@ type NoopEncoder struct {
 
 var _ Serializer = NoopEncoder{}
 
+const noopEncoderIdentifier Identifier = "noop"
+
 func (n NoopEncoder) Encode(obj Object, w io.Writer) error {
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
+}
+
+// Identifier implements runtime.Encoder interface.
+func (n NoopEncoder) Identifier() Identifier {
+	return noopEncoderIdentifier
 }
 
 // NoopDecoder converts an Encoder to a Serializer or Codec for code that expects them but only uses encoding.
@@ -197,10 +204,30 @@ func (c *parameterCodec) EncodeParameters(obj Object, to schema.GroupVersion) (u
 type base64Serializer struct {
 	Encoder
 	Decoder
+
+	identifier Identifier
 }
 
 func NewBase64Serializer(e Encoder, d Decoder) Serializer {
-	return &base64Serializer{e, d}
+	return &base64Serializer{
+		Encoder:    e,
+		Decoder:    d,
+		identifier: identifier(e),
+	}
+}
+
+func identifier(e Encoder) Identifier {
+	result := map[string]string{
+		"name": "base64",
+	}
+	if e != nil {
+		result["encoder"] = string(e.Identifier())
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for base64Serializer: %v", err)
+	}
+	return Identifier(identifier)
 }
 
 func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
@@ -208,6 +235,11 @@ func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
 	err := s.Encoder.Encode(obj, e)
 	e.Close()
 	return err
+}
+
+// Identifier implements runtime.Encoder interface.
+func (s base64Serializer) Identifier() Identifier {
+	return s.identifier
 }
 
 func (s base64Serializer) Decode(data []byte, defaults *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
