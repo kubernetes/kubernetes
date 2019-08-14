@@ -106,9 +106,6 @@ func (proxier *MetaProxier) OnServiceSynced() {
 }
 
 func (proxier *MetaProxier) serviceFamily(service *v1.Service) IpFamily {
-	// This method shall check `service.ServiceIPFamily` when PR
-	// #79386 is merged. It checks the address family for now to keep
-	// in line with "master" while still have the function.
 	if service.Spec.ClusterIP == "" {
 		return FamilyUnknown
 	}
