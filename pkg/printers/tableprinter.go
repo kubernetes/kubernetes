@@ -128,8 +128,6 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			h.printedHeaders = true
 		}
 
-		// TODO(seans3): Remove the following decorateTable call. Table modification
-		// (and creation) should only happen in table generation (tablegenerator.go).
 		if err := decorateTable(table, localOptions); err != nil {
 			return err
 		}
@@ -286,9 +284,6 @@ func addColumns(pos columnAddPosition, table *metav1beta1.Table, columns []metav
 	return nil
 }
 
-// TODO(seans3): This method modifies the table, to it should only happen
-// during table generation (tablegenerator.go), and not during table printing.
-//
 // decorateTable takes a table and attempts to add label columns and the
 // namespace column. It will fill empty columns with nil (if the object
 // does not expose metadata). It returns an error if the table cannot
