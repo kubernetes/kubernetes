@@ -78,4 +78,7 @@ const (
 
 	// ServiceEndpointsTimeout is the maximum time in which endpoints for the service should be created.
 	ServiceEndpointsTimeout = 2 * time.Minute
+
+	// ServiceReachabilityShortPollTimeout is the maximum time in which service must be reachable during polling.
+	ServiceReachabilityShortPollTimeout = 2 * time.Minute
 )
