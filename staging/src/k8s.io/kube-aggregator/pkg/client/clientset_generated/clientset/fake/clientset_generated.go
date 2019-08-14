@@ -44,7 +44,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	cs := &Clientset{tracker: o}
-	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.discovery = &fakediscovery.Discovery{Fake: &cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -64,7 +64,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // you want to test easier.
 type Clientset struct {
 	testing.Fake
-	discovery *fakediscovery.FakeDiscovery
+	discovery *fakediscovery.Discovery
 	tracker   testing.ObjectTracker
 }
 
