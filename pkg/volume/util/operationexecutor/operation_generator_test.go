@@ -117,7 +117,7 @@ func TestOperationGenerator_GenerateMountVolumeFunc_PluginName(t *testing.T) {
 
 			mountVolumeFunc := operationGenerator.GenerateMountVolumeFunc(operationTimeout, volumeToMount, nil, false)
 
-			executeOperationTestMetrics(t, mountVolumeFunc, tc.name, mountVolumeFunc.OperationName, expectedPluginName)
+			executeOperationTestMetrics(t, mountVolumeFunc, tc.name, expectedPluginName)
 		})
 	}
 }
@@ -153,17 +153,41 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 				t.Fatalf("Error occurred while generating unmapVolumeFunc: %v", e)
 			}
 
-			executeOperationTestMetrics(t, unmapVolumeFunc, tc.name, unmapVolumeFunc.OperationName, expectedPluginName)
+			executeOperationTestMetrics(t, unmapVolumeFunc, tc.name, expectedPluginName)
+		})
+	}
+}
+
+func TestOperationGenerator_GenerateAttachVolumeVolumeFunc_PluginName(t *testing.T) {
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			operationGenerator, _, expectedPluginName, cleanup := initTest(t, tc.probVolumePlugins, tc.pluginName, tc.isCsiMigrationEnabled, tc.csiDriverName, tc.csiMigrationFeature)
+			defer cleanup()
+
+			volumeSpec := &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: tc.pvSpec,
+				},
+			}
+			volumeToAttach := VolumeToAttach{
+				VolumeName: v1.UniqueVolumeName("pd-volume"),
+				VolumeSpec: volumeSpec,
+				NodeName:   "fakeNode",
+			}
+
+			attachVolumeFunc := operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, nil)
+
+			executeOperationTestMetrics(t, attachVolumeFunc, tc.name, expectedPluginName)
 		})
 	}
 }
 
 // executeOperationTestMetrics executes the operation generated and checks that metrics have the expected values before and after
-func executeOperationTestMetrics(t *testing.T, volumeFunc volumetypes.GeneratedOperations, tcName, operationName, expectedPluginName string) {
+func executeOperationTestMetrics(t *testing.T, volumeFunc volumetypes.GeneratedOperations, tcName, expectedPluginName string) {
 	metricFamilyName := "storage_operation_status_count"
 	labelFilter := map[string]string{
 		"status":         "success",
-		"operation_name": operationName,
+		"operation_name": volumeFunc.OperationName,
 		"volume_plugin":  expectedPluginName,
 	}
 	// compare the relative change of the metric because of the global state of the prometheus.DefaultGatherer.Gather()
@@ -177,7 +201,12 @@ func executeOperationTestMetrics(t *testing.T, volumeFunc volumetypes.GeneratedO
 	}
 	storageOperationStatusCountMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
 	if storageOperationStatusCountMetricAfter == nil {
-		t.Fatalf("Couldn't find the metric with name(%s) and labels(%v)", metricFamilyName, labelFilter)
+		// see if we can find a failure
+		labelFilter["status"] = "failure"
+		storageOperationStatusCountMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
+		if storageOperationStatusCountMetricAfter != nil {
+			t.Fatalf("operation failed %s", labelFilter)
+		}
 	}
 
 	if storageOperationStatusCountMetricBefore == nil {
