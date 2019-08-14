@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -140,10 +140,11 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		change.previous = ect.endpointsToEndpointsMap(previous)
 		ect.items[namespacedName] = change
 	}
-	if t := getLastChangeTriggerTime(endpoints); !t.IsZero() {
+	if t := getLastChangeTriggerTime(current); !t.IsZero() {
 		ect.lastChangeTriggerTimes[namespacedName] =
 			append(ect.lastChangeTriggerTimes[namespacedName], t)
 	}
+
 	change.current = ect.endpointsToEndpointsMap(current)
 	// if change.previous equal to change.current, it means no change
 	if reflect.DeepEqual(change.previous, change.current) {
@@ -165,6 +166,10 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 // annotation stored in the given endpoints object or the "zero" time if the annotation wasn't set
 // or was set incorrectly.
 func getLastChangeTriggerTime(endpoints *v1.Endpoints) time.Time {
+	// TODO(#81360): ignore case when Endpoint is deleted.
+	if endpoints == nil {
+		return time.Time{}
+	}
 	if _, ok := endpoints.Annotations[v1.EndpointsLastChangeTriggerTime]; !ok {
 		// It's possible that the Endpoints object won't have the EndpointsLastChangeTriggerTime
 		// annotation set. In that case return the 'zero value', which is ignored in the upstream code.
