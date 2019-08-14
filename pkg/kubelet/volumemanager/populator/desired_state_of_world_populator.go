@@ -383,16 +383,6 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		// or online resize in subsequent loop(after we confirm it has been mounted).
 		return
 	}
-	fsVolume, err := util.CheckVolumeModeFilesystem(volumeSpec)
-	if err != nil {
-		klog.Errorf("Check volume mode failed for volume %s(OuterVolumeSpecName %s): %v",
-			uniqueVolumeName, podVolume.Name, err)
-		return
-	}
-	if !fsVolume {
-		klog.V(5).Infof("Block mode volume needn't to check file system resize request")
-		return
-	}
 	if processedVolumesForFSResize.Has(string(uniqueVolumeName)) {
 		// File system resize operation is a global operation for volume,
 		// so we only need to check it once if more than one pod use it.
@@ -414,26 +404,7 @@ func mountedReadOnlyByPod(podVolume v1.Volume, pod *v1.Pod) bool {
 	if podVolume.PersistentVolumeClaim.ReadOnly {
 		return true
 	}
-	for _, container := range pod.Spec.InitContainers {
-		if !mountedReadOnlyByContainer(podVolume.Name, &container) {
-			return false
-		}
-	}
-	for _, container := range pod.Spec.Containers {
-		if !mountedReadOnlyByContainer(podVolume.Name, &container) {
-			return false
-		}
-	}
-	return true
-}
-
-func mountedReadOnlyByContainer(volumeName string, container *v1.Container) bool {
-	for _, volumeMount := range container.VolumeMounts {
-		if volumeMount.Name == volumeName && !volumeMount.ReadOnly {
-			return false
-		}
-	}
-	return true
+	return false
 }
 
 func getUniqueVolumeName(
