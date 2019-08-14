@@ -24,6 +24,7 @@ go_library(
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/devicemanager/checkpoint:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
+        "//pkg/kubelet/cm/topologymanager/socketmask:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
