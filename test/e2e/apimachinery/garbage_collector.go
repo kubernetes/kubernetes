@@ -250,7 +250,7 @@ func gatherMetrics(f *framework.Framework) {
 		if err != nil {
 			e2elog.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 		} else {
-			summary = (*e2emetrics.MetricsForE2E)(&received)
+			summary = (*e2emetrics.ComponentCollection)(&received)
 			e2elog.Logf(summary.PrintHumanReadable())
 		}
 	}
