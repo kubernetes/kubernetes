@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -654,7 +656,17 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
+
+	// By default, pull devices from the unsorted list of available devices.
 	allocated := available.UnsortedList()[:needed]
+
+	// If topology alignment is desired, update allocated to the set of devices
+	// with the best alignment.
+	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	if m.deviceHasTopologyAlignment(resource) && hint.NUMANodeAffinity != nil {
+		klog.Infof("Topology Affinities for pod %v container %v are: %v", podUID, contName, hint.NUMANodeAffinity)
+		allocated = m.takeByTopology(resource, available, hint.NUMANodeAffinity, needed)
+	}
 	// Updates m.allocatedDevices with allocated devices to prevent them
 	// from being allocated to other pods/containers, given that we are
 	// not holding lock during the rpc call.
@@ -663,6 +675,75 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		devices.Insert(device)
 	}
 	return devices, nil
+}
+
+func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity socketmask.SocketMask, needed int) []string {
+	// Build a map of of NUMA Nodes to the devices associated with them. A
+	// device may be associated to multiple NUMA nodes at the same time.  If an
+	// available device does not have any NUMA Nodes associated with it, add it
+	// to a list of NUMA Nodes for the fake NUMANode -1.
+	perNodeDevices := make(map[int]sets.String)
+	for d := range available {
+		var nodes []int
+		if m.allDevices[resource][d].Topology != nil {
+			for _, node := range m.allDevices[resource][d].Topology.Nodes {
+				nodes = append(nodes, int(node.ID))
+			}
+		}
+
+		if len(nodes) == 0 {
+			nodes = []int{-1}
+		}
+
+		for _, node := range nodes {
+			if _, ok := perNodeDevices[node]; !ok {
+				perNodeDevices[node] = sets.NewString()
+			}
+			perNodeDevices[node].Insert(d)
+		}
+	}
+
+	// Get a flat list of all of the nodes associated with available devices.
+	var nodes []int
+	for node := range perNodeDevices {
+		nodes = append(nodes, node)
+	}
+
+	// Sort the list of nodes by how many devices they contain.
+	sort.Slice(nodes, func(i, j int) bool {
+		return perNodeDevices[i].Len() < perNodeDevices[j].Len()
+	})
+
+	// Generate three sorted lists of devices. Devices in the first list come
+	// from valid NUMA Nodes contained in the affinity mask. Devices in the
+	// second list come from valid NUMA Nodes not in the affinity mask. Devices
+	// in the third list come from devices with no NUMA Node association (i.e.
+	// those mapped to the fake NUMA Node -1). Because we loop through the
+	// sorted list of NUMA nodes in order, within each list, devices are sorted
+	// by their connection to NUMA Nodes with more devices on them.
+	var fromAffinity []string
+	var notFromAffinity []string
+	var withoutTopology []string
+	for _, n := range nodes {
+		// Since the same device may be associated with multiple NUMA Nodes. We
+		// need to be careful not to add each device to multiple lists. The
+		// logic below ensures this by looping through each available device
+		// only once and double checking its existence in perNodeDevices[n].
+		for d := range available {
+			if perNodeDevices[n].Has(d) {
+				if n == -1 {
+					withoutTopology = append(withoutTopology, d)
+				} else if affinity.IsSet(n) {
+					fromAffinity = append(fromAffinity, d)
+				} else {
+					notFromAffinity = append(notFromAffinity, d)
+				}
+			}
+		}
+	}
+
+	// Concatenate the lists above return the first 'needed' devices from it..
+	return append(append(fromAffinity, notFromAffinity...), withoutTopology...)[:needed]
 }
 
 // allocateContainerResources attempts to allocate all of required device
