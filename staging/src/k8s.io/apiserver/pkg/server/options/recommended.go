@@ -109,13 +109,13 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
+	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+		config.RequestManagement = utilflowcontrol.NewRequestManagementSystem(config.SharedInformerFactory, config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight, config.RequestTimeout/4, clock.RealClock{})
+	}
 	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
 		return err
 	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, initializers...); err != nil {
 		return err
-	}
-	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) {
-		config.RequestManagement = utilflowcontrol.NewRequestManagementSystem(config.SharedInformerFactory, config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight, config.RequestTimeout/4, clock.RealClock{})
 	}
 
 	return nil
