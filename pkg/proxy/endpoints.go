@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -197,14 +197,15 @@ type UpdateEndpointMapResult struct {
 	StaleServiceNames []ServicePortName
 	// List of the trigger times for all endpoints objects that changed. It's used to export the
 	// network programming latency.
-	LastChangeTriggerTimes []time.Time
+	// NOTE(oxddr): this can be simplified to []time.Time if memory consumption becomes an issue.
+	LastChangeTriggerTimes map[types.NamespacedName][]time.Time
 }
 
 // UpdateEndpointsMap updates endpointsMap base on the given changes.
 func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
 	result.StaleEndpoints = make([]ServiceEndpoint, 0)
 	result.StaleServiceNames = make([]ServicePortName, 0)
-	result.LastChangeTriggerTimes = make([]time.Time, 0)
+	result.LastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
 
 	em.apply(
 		changes, &result.StaleEndpoints, &result.StaleServiceNames, &result.LastChangeTriggerTimes)
@@ -287,7 +288,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 // In addition it returns (via argument) and resets the lastChangeTriggerTimes for all endpoints
 // that were changed and will result in syncing the proxy rules.
 func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
-	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *[]time.Time) {
+	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
 	if changes == nil {
 		return
 	}
@@ -300,8 +301,13 @@ func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]S
 	}
 	changes.items = make(map[types.NamespacedName]*endpointsChange)
 	metrics.EndpointChangesPending.Set(0)
-	for _, lastChangeTriggerTime := range changes.lastChangeTriggerTimes {
-		*lastChangeTriggerTimes = append(*lastChangeTriggerTimes, lastChangeTriggerTime...)
+	for k, v := range changes.lastChangeTriggerTimes {
+		prev, ok := (*lastChangeTriggerTimes)[k]
+		if !ok {
+			(*lastChangeTriggerTimes)[k] = v
+		} else {
+			(*lastChangeTriggerTimes)[k] = append(prev, v...)
+		}
 	}
 	changes.lastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
 }
