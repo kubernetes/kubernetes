@@ -27,9 +27,12 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
-	"k8s.io/klog"
-
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
+)
+
+const (
+	virtualMachineScaleSetsDeallocating = "Deallocating"
 )
 
 // Helpers for rate limiting error/error channel creation
@@ -92,6 +95,7 @@ type SecurityGroupsClient interface {
 type VirtualMachineScaleSetsClient interface {
 	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
 	List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error)
 }
 
 // VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
@@ -879,6 +883,28 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 	return result, nil
 }
 
+func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, vmScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error) {
+	/* Write rate limiting */
+	if !az.rateLimiterWriter.TryAccept() {
+		err = createRateLimitErr(true, "NiCreateOrUpdate")
+		return
+	}
+
+	klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, vmScaleSetName)
+	defer func() {
+		klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, vmScaleSetName)
+	}()
+
+	mc := newMetricContext("vmss", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, vmScaleSetName, parameters)
+	if err != nil {
+		return future.Response(), mc.Observe(err)
+	}
+
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
+	return future.Response(), mc.Observe(err)
+}
+
 // azVirtualMachineScaleSetVMsClient implements VirtualMachineScaleSetVMsClient.
 type azVirtualMachineScaleSetVMsClient struct {
 	client            compute.VirtualMachineScaleSetVMsClient
@@ -970,7 +996,7 @@ func (az *azVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceG
 
 func (az *azVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM) (resp *http.Response, err error) {
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createRateLimitErr(true, "VMSSUpdate")
+		err = createRateLimitErr(true, "VMSSVMUpdate")
 		return
 	}
 
