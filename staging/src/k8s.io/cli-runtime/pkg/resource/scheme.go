@@ -58,6 +58,11 @@ func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 
+// Identifier implements runtime.Encoder interface.
+func (dynamicCodec) Identifier() runtime.Identifier {
+	return unstructured.UnstructuredJSONScheme.Identifier()
+}
+
 // UnstructuredPlusDefaultContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"
 // serializer for the rest.client with options, status and the like.
 func UnstructuredPlusDefaultContentConfig() rest.ContentConfig {
