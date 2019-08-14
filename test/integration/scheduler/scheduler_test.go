@@ -607,7 +607,7 @@ func TestMultiScheduler(t *testing.T) {
 
 	framework, err := schedulerframework.NewFramework(schedulerframework.NewRegistry(), nil, []kubeschedulerconfig.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, stopCh), framework)
 	schedulerConfig2, err := schedulerConfigFactory2.Create(framework)

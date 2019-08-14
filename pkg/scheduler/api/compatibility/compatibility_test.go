@@ -1099,7 +1099,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 		framework, err := framework.NewFramework(nil, nil, nil)
 		if err != nil {
-			t.Errorf("error initializing the scheduling framework: %v", err)
+			t.Fatalf("error initializing the scheduling framework: %v", err)
 		}
 		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 			Client:                         client,

@@ -57,7 +57,7 @@ func TestCreate(t *testing.T) {
 	defer close(stopCh)
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 	factory.Create(framework)
@@ -74,7 +74,7 @@ func TestCreateFromConfig(t *testing.T) {
 	defer close(stopCh)
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
@@ -118,7 +118,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	defer close(stopCh)
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
@@ -163,7 +163,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	defer close(stopCh)
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
@@ -184,7 +184,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	defer close(stopCh)
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
@@ -223,7 +223,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	defer close(stopCh)
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, framework)
 
@@ -460,7 +460,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	stopCh := make(chan struct{})
 	framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	factory := newConfigFactory(client, -1, stopCh, framework)
 	defer close(stopCh)
@@ -495,7 +495,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			stopCh := make(chan struct{})
 			framework, err := framework.NewFramework(framework.NewRegistry(), nil, []config.PluginConfig{})
 			if err != nil {
-				t.Errorf("error initializing the scheduling framework: %v", err)
+				t.Fatalf("error initializing the scheduling framework: %v", err)
 			}
 			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh, framework)
 			defer close(stopCh)

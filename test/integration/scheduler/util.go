@@ -184,7 +184,7 @@ func initTestSchedulerWithOptions(
 		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, context.stopCh)
 	framework, err := schedulerframework.NewFramework(pluginRegistry, plugins, pluginConfig)
 	if err != nil {
-		t.Errorf("error initializing the scheduling framework: %v", err)
+		t.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs, framework)
 
