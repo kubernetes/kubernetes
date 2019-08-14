@@ -29,6 +29,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 )
 
+type mockAffinityStore struct {
+	hint topologymanager.TopologyHint
+}
+
+func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
+	return m.hint
+}
+
 func makeNUMADevice(id string, numa int) pluginapi.Device {
 	return pluginapi.Device{
 		ID:       id,
@@ -258,6 +266,214 @@ func TestGetTopologyHints(t *testing.T) {
 			if !reflect.DeepEqual(hints[r], tc.expectedHints[r]) {
 				t.Errorf("%v: Expected result to be %v, got %v", tc.description, tc.expectedHints[r], hints[r])
 			}
+		}
+	}
+}
+
+func TestTopologyAlignedAllocation(t *testing.T) {
+	tcases := []struct {
+		description        string
+		resource           string
+		request            int
+		devices            []pluginapi.Device
+		hint               topologymanager.TopologyHint
+		expectedAllocation int
+		expectedAlignment  map[int]int
+	}{
+		{
+			description: "Single Request, no alignment",
+			resource:    "resource",
+			request:     1,
+			devices: []pluginapi.Device{
+				{ID: "Dev1"},
+				{ID: "Dev2"},
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0, 1),
+				Preferred:        true,
+			},
+			expectedAllocation: 1,
+			expectedAlignment:  map[int]int{},
+		},
+		{
+			description: "Request for 1, partial alignment",
+			resource:    "resource",
+			request:     1,
+			devices: []pluginapi.Device{
+				{ID: "Dev1"},
+				makeNUMADevice("Dev2", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(1),
+				Preferred:        true,
+			},
+			expectedAllocation: 1,
+			expectedAlignment:  map[int]int{1: 1},
+		},
+		{
+			description: "Single Request, socket 0",
+			resource:    "resource",
+			request:     1,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAllocation: 1,
+			expectedAlignment:  map[int]int{0: 1},
+		},
+		{
+			description: "Single Request, socket 1",
+			resource:    "resource",
+			request:     1,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(1),
+				Preferred:        true,
+			},
+			expectedAllocation: 1,
+			expectedAlignment:  map[int]int{1: 1},
+		},
+		{
+			description: "Request for 2, socket 0",
+			resource:    "resource",
+			request:     2,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAllocation: 2,
+			expectedAlignment:  map[int]int{0: 2},
+		},
+		{
+			description: "Request for 2, socket 1",
+			resource:    "resource",
+			request:     2,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(1),
+				Preferred:        true,
+			},
+			expectedAllocation: 2,
+			expectedAlignment:  map[int]int{1: 2},
+		},
+		{
+			description: "Request for 4, unsatisfiable, prefer socket 0",
+			resource:    "resource",
+			request:     4,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 1),
+				makeNUMADevice("Dev5", 0),
+				makeNUMADevice("Dev6", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAllocation: 4,
+			expectedAlignment:  map[int]int{0: 3, 1: 1},
+		},
+		{
+			description: "Request for 4, unsatisfiable, prefer socket 1",
+			resource:    "resource",
+			request:     4,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 1),
+				makeNUMADevice("Dev5", 0),
+				makeNUMADevice("Dev6", 1),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(1),
+				Preferred:        true,
+			},
+			expectedAllocation: 4,
+			expectedAlignment:  map[int]int{0: 1, 1: 3},
+		},
+		{
+			description: "Request for 4, multisocket",
+			resource:    "resource",
+			request:     4,
+			devices: []pluginapi.Device{
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 1),
+				makeNUMADevice("Dev3", 2),
+				makeNUMADevice("Dev4", 3),
+				makeNUMADevice("Dev5", 0),
+				makeNUMADevice("Dev6", 1),
+				makeNUMADevice("Dev7", 2),
+				makeNUMADevice("Dev8", 3),
+			},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(1, 3),
+				Preferred:        true,
+			},
+			expectedAllocation: 4,
+			expectedAlignment:  map[int]int{1: 2, 3: 2},
+		},
+	}
+	for _, tc := range tcases {
+		m := ManagerImpl{
+			allDevices:            make(map[string]map[string]pluginapi.Device),
+			healthyDevices:        make(map[string]sets.String),
+			allocatedDevices:      make(map[string]sets.String),
+			podDevices:            make(podDevices),
+			sourcesReady:          &sourcesReadyStub{},
+			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+			topologyAffinityStore: &mockAffinityStore{tc.hint},
+		}
+
+		m.allDevices[tc.resource] = make(map[string]pluginapi.Device)
+		m.healthyDevices[tc.resource] = sets.NewString()
+
+		for _, d := range tc.devices {
+			m.allDevices[tc.resource][d.ID] = d
+			m.healthyDevices[tc.resource].Insert(d.ID)
+		}
+
+		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.NewString())
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+
+		if len(allocated) != tc.expectedAllocation {
+			t.Errorf("%v. expected allocation: %v but got: %v", tc.description, tc.expectedAllocation, len(allocated))
+		}
+
+		alignment := make(map[int]int)
+		if m.deviceHasTopologyAlignment(tc.resource) {
+			for d := range allocated {
+				if m.allDevices[tc.resource][d].Topology != nil {
+					alignment[int(m.allDevices[tc.resource][d].Topology.Nodes[0].ID)]++
+				}
+			}
+		}
+
+		if !reflect.DeepEqual(alignment, tc.expectedAlignment) {
+			t.Errorf("%v. expected alignment: %v but got: %v", tc.description, tc.expectedAlignment, alignment)
 		}
 	}
 }
