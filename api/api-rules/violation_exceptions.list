@@ -253,6 +253,16 @@ API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RunAsGroupSt
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RunAsUserStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RuntimeClassStrategyOptions,AllowedRuntimeClassNames
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,SupplementalGroupsStrategyOptions,Ranges
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,FlowSchemaList,Items
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,FlowSchemaSpec,Rules
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,FlowSchemaStatus,Conditions
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PolicyRule,APIGroups
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PolicyRule,NonResourceURLs
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PolicyRule,Resources
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PolicyRule,Verbs
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PolicyRuleWithSubjects,Subjects
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PriorityLevelConfigurationList,Items
+API rule violation: list_type_missing,k8s.io/api/flowcontrol/v1alpha1,PriorityLevelConfigurationStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/imagepolicy/v1alpha1,ImageReviewSpec,Containers
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IPBlock,Except
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyEgressRule,Ports
