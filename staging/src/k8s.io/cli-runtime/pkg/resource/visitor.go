@@ -372,10 +372,12 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 
 // FlattenListVisitor flattens any objects that runtime.ExtractList recognizes as a list
 // - has an "Items" public field that is a slice of runtime.Objects or objects satisfying
-// that interface - into multiple Infos. An error on any sub item (for instance, if a List
-// contains an object that does not have a registered client or resource) will terminate
-// the visit.
-// TODO: allow errors to be aggregated?
+// that interface - into multiple Infos. Returns nil in the case of no errors.
+// When an error is hit on sub items (for instance, if a List contains an object that does
+// not have a registered client or resource), traversal of the list will continue and errors
+// found will be returned after traversal. In the event of a single error, the singleton error
+// will be returned, for multiple errors an aggregate will be returned.
+
 type FlattenListVisitor struct {
 	visitor Visitor
 	typer   runtime.ObjectTyper
@@ -425,18 +427,25 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
-
+		errs := []error{}
 		for i := range items {
 			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
-				return err
+				errs = append(errs, err)
 			}
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion
 			}
 			if err := fn(item, nil); err != nil {
-				return err
+				errs = append(errs, err)
 			}
+		}
+
+		if len(errs) != 0 {
+			if len(errs) == 1 {
+				return errs[0]
+			}
+			return utilerrors.NewAggregate(errs)
 		}
 		return nil
 	})
