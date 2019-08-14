@@ -143,7 +143,7 @@ func getPodTriggerTime(pod *v1.Pod) (triggerTime time.Time) {
 	if readyCondition := podutil.GetPodReadyCondition(pod.Status); readyCondition != nil {
 		triggerTime = readyCondition.LastTransitionTime.Time
 	}
-	// TODO(mm4tt): Implement missing cases: deletionTime set, pod label change
+	// TODO(#81360): Implement missing cases: deletionTime set, pod label change
 	return triggerTime
 }
 
