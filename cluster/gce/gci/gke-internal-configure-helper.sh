@@ -363,10 +363,9 @@ function gke-configure-node-problem-detector {
   local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
 
   local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
-  local -r custom_dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
   local -r custom_sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json"
 
-  local custom_plugin_monitors="${custom_km_config},${custom_dm_config},${custom_sm_config}"
+  local custom_plugin_monitors="${custom_km_config},${custom_sm_config}"
 
   gke-configure-npd-custom-plugins
   if [[ -n "${GKE_NPD_CUSTOM_PLUGINS_CONFIG}" ]]; then
