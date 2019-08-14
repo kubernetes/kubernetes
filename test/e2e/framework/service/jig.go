@@ -812,8 +812,14 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 		e2elog.Failf("Service reachablity check is not supported for %v", protocol)
 	}
 	if cmd != "" {
-		_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
-		framework.ExpectNoError(err, "Service is not reachable on following endpoint %s over %s protocol", ep, protocol)
+		err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
+			if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+				e2elog.Logf("Service reachability failing with error: %v\nRetrying...", err)
+				return false, nil
+			}
+			return true, nil
+		})
+		framework.ExpectNoError(err, "Service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
 	}
 }
 
