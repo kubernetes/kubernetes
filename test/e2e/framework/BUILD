@@ -12,6 +12,7 @@ go_library(
         "framework.go",
         "get-kubemark-resource-usage.go",
         "google_compute.go",
+        "log.go",
         "log_size_monitoring.go",
         "networking_utils.go",
         "nodes_util.go",

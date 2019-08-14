@@ -14,25 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package log should be removed after switching to use core framework log.
-package log
+package framework
 
 import (
 	"fmt"
-	"time"
-
-	"github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
-
-func nowStamp() string {
-	return time.Now().Format(time.StampMilli)
-}
-
-func log(level string, format string, args ...interface{}) {
-	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
-}
 
 // Logf logs the info.
 func Logf(format string, args ...interface{}) {
