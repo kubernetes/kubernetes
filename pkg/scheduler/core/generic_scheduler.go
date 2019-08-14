@@ -804,11 +804,9 @@ func PrioritizeNodes(
 		for j := range priorityConfigs {
 			result[i].Score += results[j][i].Score * priorityConfigs[j].Weight
 		}
-	}
 
-	for _, scoreList := range scoresMap {
-		for i := range nodes {
-			result[i].Score += scoreList[i]
+		for j := range scoresMap {
+			result[i].Score += scoresMap[j][i].Score
 		}
 	}
 
