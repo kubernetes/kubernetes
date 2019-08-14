@@ -19,7 +19,6 @@ package metrics
 import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
 )
 
 // Histogram is our internal representation for our wrapping struct around prometheus
@@ -55,7 +54,7 @@ func (h *Histogram) setPrometheusHistogram(histogram prometheus.Histogram) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (h *Histogram) DeprecatedVersion() *semver.Version {
-	return h.HistogramOpts.DeprecatedVersion
+	return parseSemver(h.HistogramOpts.DeprecatedVersion)
 }
 
 // initializeMetric invokes the actual prometheus.Histogram object instantiation
@@ -87,11 +86,9 @@ type HistogramVec struct {
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	// todo: handle defaulting better
-	klog.Errorf("---%v---\n", opts)
 	if opts.StabilityLevel == "" {
 		opts.StabilityLevel = ALPHA
 	}
-	klog.Errorf("---%v---\n", opts)
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
@@ -104,7 +101,7 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *HistogramVec) DeprecatedVersion() *semver.Version {
-	return v.HistogramOpts.DeprecatedVersion
+	return parseSemver(v.HistogramOpts.DeprecatedVersion)
 }
 
 func (v *HistogramVec) initializeMetric() {

@@ -55,7 +55,7 @@ func (g *Gauge) setPrometheusGauge(gauge prometheus.Gauge) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (g *Gauge) DeprecatedVersion() *semver.Version {
-	return g.GaugeOpts.DeprecatedVersion
+	return parseSemver(g.GaugeOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying Gauge. Until this method is called
@@ -102,7 +102,7 @@ func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *GaugeVec) DeprecatedVersion() *semver.Version {
-	return v.GaugeOpts.DeprecatedVersion
+	return parseSemver(v.GaugeOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying GaugeVec. Until this method is called

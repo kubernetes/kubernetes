@@ -44,7 +44,7 @@ var (
 			Subsystem:         "subsystem",
 			StabilityLevel:    ALPHA,
 			Help:              "counter help",
-			DeprecatedVersion: &v115,
+			DeprecatedVersion: "1.15.0",
 		},
 	)
 	alphaHiddenCounter = NewCounter(
@@ -54,7 +54,7 @@ var (
 			Subsystem:         "subsystem",
 			StabilityLevel:    ALPHA,
 			Help:              "counter help",
-			DeprecatedVersion: &v114,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 )
@@ -221,7 +221,7 @@ func TestShowHiddenMetric(t *testing.T) {
 			Subsystem:         "subsystem",
 			StabilityLevel:    ALPHA,
 			Help:              "counter help",
-			DeprecatedVersion: &v114,
+			DeprecatedVersion: "1.14.0",
 		},
 	))
 	expectedMetricCount = 1
