@@ -119,15 +119,16 @@ items:
     name: system:controller:clusterrole-aggregation-controller
   rules:
   - apiGroups:
-    - '*'
+    - rbac.authorization.k8s.io
     resources:
-    - '*'
+    - clusterroles
     verbs:
-    - '*'
-  - nonResourceURLs:
-    - '*'
-    verbs:
-    - '*'
+    - escalate
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
