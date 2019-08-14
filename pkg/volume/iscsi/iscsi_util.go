@@ -96,7 +96,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 		if len(v) > 0 {
 			out, err := b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
 			if err != nil {
-				return fmt.Errorf("iscsi: failed to update discoverydb key %q with value %q error: %v", k, v, string(out))
+				return fmt.Errorf("iscsi: failed to update discoverydb key %q error: %v", k, string(out))
 			}
 		}
 	}
@@ -118,7 +118,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 		if len(v) > 0 {
 			out, err := b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
 			if err != nil {
-				return fmt.Errorf("iscsi: failed to update node session key %q with value %q error: %v", k, v, string(out))
+				return fmt.Errorf("iscsi: failed to update node session key %q error: %v", k, string(out))
 			}
 		}
 	}
