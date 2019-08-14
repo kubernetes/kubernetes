@@ -16,5 +16,4 @@
 ./cluster/test-e2e.sh
 ./cluster/validate-cluster.sh
 ./hack/lib/test.sh
-./hack/test-integration.sh
 ./test/images/image-util.sh
