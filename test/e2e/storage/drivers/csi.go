@@ -235,9 +235,10 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: false,
-				testsuites.CapFsGroup:     false,
-				testsuites.CapExec:        false,
+				testsuites.CapPersistence:  false,
+				testsuites.CapFsGroup:      false,
+				testsuites.CapExec:         false,
+				testsuites.CapVolumeLimits: true,
 			},
 		},
 		manifests:           driverManifests,
@@ -367,6 +368,9 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
+				// GCE supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},

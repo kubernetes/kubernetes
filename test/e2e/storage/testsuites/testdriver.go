@@ -17,7 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -150,6 +150,7 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
+	CapVolumeLimits                   = "volumeLimits"        // support volume limits (can be *very* slow)
 )
 
 // DriverInfo represents static information about a TestDriver.
