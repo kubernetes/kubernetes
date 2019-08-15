@@ -741,18 +741,24 @@ func PrioritizeNodes(
 
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
+		wg := sync.WaitGroup{}
 		for i := range priorityConfigs {
-			if priorityConfigs[i].Function != nil {
-				continue
-			}
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				if priorityConfigs[i].Function != nil {
+					return
+				}
 
-			var err error
-			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
-			if err != nil {
-				appendError(err)
-				results[i][index].Host = nodes[index].Name
-			}
+				var err error
+				results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
+				if err != nil {
+					appendError(err)
+					results[i][index].Host = nodes[index].Name
+				}
+			}(i)
 		}
+		wg.Wait()
 	})
 
 	for i := range priorityConfigs {
