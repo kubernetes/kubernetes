@@ -20,13 +20,15 @@ package gce
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -35,7 +37,8 @@ import (
 )
 
 const (
-	allInstances = "ALL"
+	allInstances     = "ALL"
+	apiVersionString = "apiVersion"
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -49,6 +52,14 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
 	}
 	scheme := cloud.SchemeInternal
+	options := getILBOptions(svc)
+	if options != nil {
+		klog.Infof("Internal LoadBalancer options specified %v", options)
+		if g.isLegacyNetwork {
+			klog.Warningf("Internal LoadBalancer options are not supported with Legacy Networks.")
+		}
+	}
+
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
@@ -100,7 +111,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		// external LBs have an empty Subnetwork field.
 		subnetworkURL = existingFwdRule.Subnetwork
 	}
-
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !g.IsLegacyNetwork() {
@@ -117,46 +127,28 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
-	expectedFwdRule := &compute.ForwardingRule{
-		Name:                loadBalancerName,
-		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String()),
-		IPAddress:           ipToUse,
-		BackendService:      backendServiceLink,
-		Ports:               ports,
-		IPProtocol:          string(protocol),
-		LoadBalancingScheme: string(scheme),
-	}
-
-	// Given that CreateGCECloud will attempt to determine the subnet based off the network,
-	// the subnetwork should rarely be unknown.
-	if subnetworkURL != "" {
-		expectedFwdRule.Subnetwork = subnetworkURL
-	} else {
-		expectedFwdRule.Network = g.networkURL
-	}
-
-	fwdRuleDeleted := false
-	if existingFwdRule != nil && !fwdRuleEqual(existingFwdRule, expectedFwdRule) {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
-		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
-			return nil, err
-		}
-		fwdRuleDeleted = true
-	}
-
 	bsDescription := makeBackendServiceDescription(nm, sharedBackend)
 	err = g.ensureInternalBackendService(backendServiceName, bsDescription, svc.Spec.SessionAffinity, scheme, protocol, igLinks, hc.SelfLink)
 	if err != nil {
 		return nil, err
 	}
 
-	// If we previously deleted the forwarding rule or it never existed, finally create it.
-	if fwdRuleDeleted || existingFwdRule == nil {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating forwarding rule", loadBalancerName)
-		if err = g.CreateRegionForwardingRule(expectedFwdRule, g.region); err != nil {
-			return nil, err
-		}
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", loadBalancerName)
+	expectedforwardingRuleIntf := &forwardingRuleIntf{
+		name:            loadBalancerName,
+		gaDescription:   fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String()),
+		betaDescription: fmt.Sprintf(`{"kubernetes.io/service-name":"%s", "%s":"%s"}`, nm.String(), apiVersionString, computeBetaVersion),
+		ipAddress:       ipToUse,
+		backendService:  backendServiceLink,
+		ports:           ports,
+		ipProtocol:      string(protocol),
+		lbScheme:        string(scheme),
+		// Given that CreateGCECloud will attempt to determine the subnet based off the network,
+		// the subnetwork should rarely be unknown.
+		subnetwork: subnetworkURL,
+		network:    g.networkURL,
+	}
+	if err := g.ensureInternalForwardingRule(existingFwdRule, expectedforwardingRuleIntf, options); err != nil {
+		return nil, err
 	}
 
 	// Delete the previous internal load balancer resources if necessary
@@ -702,12 +694,20 @@ func backendSvcEqual(a, b *compute.BackendService) bool {
 		backendsListEqual(a.Backends, b.Backends)
 }
 
-func fwdRuleEqual(a, b *compute.ForwardingRule) bool {
+func fwdRuleGAEqual(a, b *compute.ForwardingRule) bool {
 	return (a.IPAddress == "" || b.IPAddress == "" || a.IPAddress == b.IPAddress) &&
 		a.IPProtocol == b.IPProtocol &&
 		a.LoadBalancingScheme == b.LoadBalancingScheme &&
 		equalStringSets(a.Ports, b.Ports) &&
 		a.BackendService == b.BackendService
+}
+
+func fwdRuleBetaEqual(a, b *computebeta.ForwardingRule) bool {
+	return (a.IPAddress == "" || b.IPAddress == "" || a.IPAddress == b.IPAddress) &&
+		a.IPProtocol == b.IPProtocol &&
+		a.LoadBalancingScheme == b.LoadBalancingScheme &&
+		equalStringSets(a.Ports, b.Ports) &&
+		a.BackendService == b.BackendService && a.AllowGlobalAccess == b.AllowGlobalAccess
 }
 
 func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1.Protocol) {
@@ -746,4 +746,130 @@ func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) stri
 	}
 
 	return ""
+}
+
+func getILBOptions(svc *v1.Service) *ILBOptions {
+	if GetLoadBalancerAnnotationGlobalAccess(svc) {
+		return &ILBOptions{EnableGlobalAccess: true}
+	}
+	return nil
+}
+
+type forwardingRuleIntf struct {
+	name            string
+	betaDescription string
+	gaDescription   string
+	ipAddress       string
+	backendService  string
+	ports           []string
+	ipProtocol      string
+	lbScheme        string
+	subnetwork      string
+	network         string
+	gaRule          *compute.ForwardingRule
+	betaRule        *computebeta.ForwardingRule
+}
+
+func (f *forwardingRuleIntf) GACompute() {
+	f.gaRule = &compute.ForwardingRule{
+		Name:                f.name,
+		Description:         f.gaDescription,
+		IPAddress:           f.ipAddress,
+		BackendService:      f.backendService,
+		Ports:               f.ports,
+		IPProtocol:          f.ipProtocol,
+		LoadBalancingScheme: f.lbScheme,
+	}
+	f.gaRule.Subnetwork = f.subnetwork
+	f.gaRule.Network = f.network
+}
+
+func (f *forwardingRuleIntf) BetaCompute(options *ILBOptions) {
+	f.betaRule = &computebeta.ForwardingRule{
+		Name:                f.name,
+		Description:         f.betaDescription,
+		IPAddress:           f.ipAddress,
+		BackendService:      f.backendService,
+		Ports:               f.ports,
+		IPProtocol:          f.ipProtocol,
+		LoadBalancingScheme: f.lbScheme,
+	}
+	f.betaRule.Subnetwork = f.subnetwork
+	f.betaRule.Network = f.network
+	if options != nil {
+		f.betaRule.AllowGlobalAccess = options.EnableGlobalAccess
+	}
+
+}
+
+func getFwdRuleAPIVersions(rule *compute.ForwardingRule, options *ILBOptions) (oldVersion, newVersion string) {
+	if options != nil && options.EnableGlobalAccess {
+		newVersion = computeBetaVersion
+	}
+	values := make(map[string]string)
+	if rule != nil {
+		json.Unmarshal([]byte(rule.Description), &values)
+		oldVersion = values[apiVersionString]
+	}
+	return oldVersion, newVersion
+}
+
+// fwdRuleCompare returns true if the rules are different, returns false if the rules are identical.
+func (g *Cloud) fwdRuleCompare(existingRule *compute.ForwardingRule, expectedRule *forwardingRuleIntf, options *ILBOptions, version string) (bool, error) {
+	if version == "" {
+		expectedRule.GACompute()
+		return !fwdRuleGAEqual(existingRule, expectedRule.gaRule), nil
+	}
+	existingBetaRule, err := g.GetBetaRegionForwardingRule(existingRule.Name, g.region)
+	if err != nil {
+		// cannot fetch rule, assume the rules are different
+		klog.Errorf("ensureInternalLoadBalancer(%s): failed to retrieve existing forwarding rule - %s", existingRule.Name, err)
+		return true, err
+	}
+	expectedRule.BetaCompute(options)
+	return !fwdRuleBetaEqual(existingBetaRule, expectedRule.betaRule), nil
+}
+
+func (g *Cloud) ensureInternalForwardingRule(existingFwdRule *compute.ForwardingRule, expectedRuleIntf *forwardingRuleIntf, options *ILBOptions) (err error) {
+	// Handle forwarding rules
+	// Get api version of existing fwd rule, get api version of rule to be created
+	// both beta or one of them is beta - use beta compare
+	// both ga - use ga compare
+	existingAPIVersion, newAPIVersion := getFwdRuleAPIVersions(existingFwdRule, options)
+	if existingFwdRule != nil {
+		needsDelete := false
+		if existingAPIVersion == computeBetaVersion || newAPIVersion == computeBetaVersion {
+			// beta API compare
+			needsDelete, err = g.fwdRuleCompare(existingFwdRule, expectedRuleIntf, options, computeBetaVersion)
+		} else {
+			// both are GA versions
+			needsDelete, err = g.fwdRuleCompare(existingFwdRule, expectedRuleIntf, options, newAPIVersion)
+		}
+		if err != nil || !needsDelete {
+			// either we hit an error or the rules don't require delete and recreate
+			return err
+		}
+		// delete forwarding rule
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", expectedRuleIntf.name, existingFwdRule.IPAddress)
+		if err = ignoreNotFound(g.DeleteRegionForwardingRule(expectedRuleIntf.name, g.region)); err != nil {
+			return err
+		}
+	}
+	// At this point, the existing rule has been deleted if required.
+	// Create the rule based on the api version determined
+	if newAPIVersion == computeBetaVersion {
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating beta forwarding rule", expectedRuleIntf.name)
+		if expectedRuleIntf.betaRule == nil {
+			expectedRuleIntf.BetaCompute(options)
+		}
+		err = g.CreateBetaRegionForwardingRule(expectedRuleIntf.betaRule, g.region)
+	} else {
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating ga forwarding rule", expectedRuleIntf.name)
+		if expectedRuleIntf.gaRule == nil {
+			expectedRuleIntf.GACompute()
+		}
+		err = g.CreateRegionForwardingRule(expectedRuleIntf.gaRule, g.region)
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule, err : %s", expectedRuleIntf.name, err)
+	return err
 }

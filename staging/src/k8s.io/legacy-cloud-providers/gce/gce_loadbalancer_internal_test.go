@@ -160,6 +160,38 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 	assertInternalLbResources(t, gce, svc, vals, nodeNames)
 }
 
+func TestEnsureInternalLoadBalancerDeprecatedAnnotation(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	nodeNames := []string{"test-node-1"}
+
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+
+	svc := fakeLoadBalancerServiceDeprecatedAnnotation(string(LBTypeInternal))
+	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	assertInternalLbResources(t, gce, svc, vals, nodeNames)
+
+	// Now add the latest annotation and change scheme to external
+	svc.Annotations[ServiceAnnotationLoadBalancerType] = ""
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, false)
+	assertExternalLbResources(t, gce, svc, vals, nodeNames)
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	assert.NoError(t, err)
+	assertExternalLbResourcesDeleted(t, gce, svc, vals, true)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
 func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	t.Parallel()
 
@@ -915,5 +947,110 @@ func TestEnsureInternalLoadBalancerDeletedSubsetting(t *testing.T) {
 	// Invoked when service is deleted.
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
 	assert.NoError(t, err)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+
+	// Change service to include the global access annotation
+	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "true"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.EqualValues(t, fwdRule.AllowGlobalAccess, true)
+	assert.NoError(t, err)
+	// remove the annotation
+	delete(svc.Annotations, ServiceAnnotationILBGlobalAccess)
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.EqualValues(t, fwdRule.AllowGlobalAccess, false)
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	assert.NoError(t, err)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestEnsureInternalLoadBalancerDisableGlobalAccess(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "true"
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.EqualValues(t, fwdRule.AllowGlobalAccess, true)
+
+	// disable global access - setting the annotation to false or removing annotation will disabld it
+	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "false"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.EqualValues(t, fwdRule.AllowGlobalAccess, false)
+
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	assert.NoError(t, err)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestGlobalAccessChangeScheme(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	// Change service to include the global access annotation
+	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "true"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.EqualValues(t, fwdRule.AllowGlobalAccess, true)
+	assert.NoError(t, err)
+	// change the scheme to externalLoadBalancer
+	delete(svc.Annotations, ServiceAnnotationLoadBalancerType)
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	// Firewall is deleted when the service is deleted
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, false)
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.EqualValues(t, fwdRule.AllowGlobalAccess, false)
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	assert.NoError(t, err)
+	assertExternalLbResourcesDeleted(t, gce, svc, vals, true)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
 }

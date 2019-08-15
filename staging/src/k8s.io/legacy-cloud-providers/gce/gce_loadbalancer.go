@@ -199,7 +199,7 @@ func (g *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 }
 
 func getSvcScheme(svc *v1.Service) cloud.LbScheme {
-	if typ, ok := GetLoadBalancerAnnotationType(svc); ok && typ == LBTypeInternal {
+	if typ := GetLoadBalancerAnnotationType(svc); typ == LBTypeInternal {
 		return cloud.SchemeInternal
 	}
 	return cloud.SchemeExternal
