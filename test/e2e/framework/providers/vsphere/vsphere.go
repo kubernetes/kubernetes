@@ -18,12 +18,13 @@ package vsphere
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 func init() {
-	framework.RegisterProvider("vsphere", newProvider)
+	e2eproviders.RegisterProvider("vsphere", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
-	return &framework.NullProvider{}, nil
+func newProvider() (e2eproviders.ProviderInterface, error) {
+	return &e2eproviders.NullProvider{}, nil
 }

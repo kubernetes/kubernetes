@@ -25,14 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
 func init() {
-	framework.RegisterProvider("azure", newProvider)
+	e2eproviders.RegisterProvider("azure", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
+func newProvider() (e2eproviders.ProviderInterface, error) {
 	if framework.TestContext.CloudConfig.ConfigFile == "" {
 		return nil, fmt.Errorf("config-file must be specified for Azure")
 	}
@@ -50,7 +51,7 @@ func newProvider() (framework.ProviderInterface, error) {
 
 //Provider is a structure to handle Azure clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	e2eproviders.NullProvider
 
 	azureCloud *azure.Cloud
 }

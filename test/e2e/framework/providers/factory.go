@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package providers
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // Factory is a func which operates provider specific behavior.
@@ -88,8 +89,8 @@ func SetupProviderConfig(providerName string) (ProviderInterface, error) {
 // ProviderInterface contains the implementation for certain
 // provider-specific functionality.
 type ProviderInterface interface {
-	FrameworkBeforeEach(f *Framework)
-	FrameworkAfterEach(f *Framework)
+	FrameworkBeforeEach(f *framework.Framework)
+	FrameworkAfterEach(f *framework.Framework)
 
 	ResizeGroup(group string, size int32) error
 	GetGroupNodes(group string) ([]string, error)
@@ -114,10 +115,10 @@ type ProviderInterface interface {
 type NullProvider struct{}
 
 // FrameworkBeforeEach is a base implementation which does BeforeEach.
-func (n NullProvider) FrameworkBeforeEach(f *Framework) {}
+func (n NullProvider) FrameworkBeforeEach(f *framework.Framework) {}
 
 // FrameworkAfterEach is a base implementation which does AfterEach.
-func (n NullProvider) FrameworkAfterEach(f *Framework) {}
+func (n NullProvider) FrameworkAfterEach(f *framework.Framework) {}
 
 // ResizeGroup is a base implementation which resizes group.
 func (n NullProvider) ResizeGroup(string, int32) error {

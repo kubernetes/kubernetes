@@ -5,7 +5,10 @@ go_library(
     srcs = ["openstack.go"],
     importpath = "k8s.io/kubernetes/test/e2e/framework/providers/openstack",
     visibility = ["//visibility:public"],
-    deps = ["//test/e2e/framework:go_default_library"],
+    deps = [
+        "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/providers:go_default_library",
+    ],
 )
 
 filegroup(

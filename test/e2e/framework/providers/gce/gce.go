@@ -33,16 +33,17 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
 func init() {
-	framework.RegisterProvider("gce", factory)
-	framework.RegisterProvider("gke", factory)
+	e2eproviders.RegisterProvider("gce", factory)
+	e2eproviders.RegisterProvider("gke", factory)
 }
 
-func factory() (framework.ProviderInterface, error) {
+func factory() (e2eproviders.ProviderInterface, error) {
 	e2elog.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
 	zone := framework.TestContext.CloudConfig.Zone
 	region := framework.TestContext.CloudConfig.Region
@@ -92,7 +93,7 @@ func factory() (framework.ProviderInterface, error) {
 }
 
 // NewProvider returns a cloud provider interface for GCE
-func NewProvider(gceCloud *gcecloud.Cloud) framework.ProviderInterface {
+func NewProvider(gceCloud *gcecloud.Cloud) e2eproviders.ProviderInterface {
 	return &Provider{
 		gceCloud: gceCloud,
 	}
@@ -100,7 +101,7 @@ func NewProvider(gceCloud *gcecloud.Cloud) framework.ProviderInterface {
 
 // Provider is a structure to handle GCE clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	e2eproviders.NullProvider
 	gceCloud *gcecloud.Cloud
 }
 

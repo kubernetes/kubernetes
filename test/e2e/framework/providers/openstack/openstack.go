@@ -18,17 +18,18 @@ package openstack
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 func init() {
-	framework.RegisterProvider("openstack", newProvider)
+	e2eproviders.RegisterProvider("openstack", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
+func newProvider() (e2eproviders.ProviderInterface, error) {
 	return &Provider{}, nil
 }
 
 // Provider is a structure to handle OpenStack clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	e2eproviders.NullProvider
 }

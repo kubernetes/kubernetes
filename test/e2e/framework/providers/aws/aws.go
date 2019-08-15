@@ -29,14 +29,15 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
 func init() {
-	framework.RegisterProvider("aws", newProvider)
+	e2eproviders.RegisterProvider("aws", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
+func newProvider() (e2eproviders.ProviderInterface, error) {
 	if framework.TestContext.CloudConfig.Zone == "" {
 		return nil, fmt.Errorf("gce-zone must be specified for AWS")
 	}
@@ -45,7 +46,7 @@ func newProvider() (framework.ProviderInterface, error) {
 
 // Provider is a structure to handle AWS clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	e2eproviders.NullProvider
 }
 
 // ResizeGroup resizes an instance group
