@@ -229,7 +229,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		conditions = rs.Status.Conditions
 
 		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
-		return cond != nil, nil
+		return cond.Status == "True", nil
 
 	})
 	if err == wait.ErrWaitTimeout {
