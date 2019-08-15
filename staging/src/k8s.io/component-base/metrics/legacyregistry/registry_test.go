@@ -35,8 +35,6 @@ func init() {
 }
 
 var (
-	v115         = semver.MustParse("1.15.0")
-	v114         = semver.MustParse("1.14.0")
 	alphaCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Namespace:      "some_namespace",
@@ -53,7 +51,7 @@ var (
 			Subsystem:         "subsystem",
 			StabilityLevel:    metrics.ALPHA,
 			Help:              "counter help",
-			DeprecatedVersion: &v115,
+			DeprecatedVersion: "1.15.0",
 		},
 	)
 	alphaHiddenCounter = metrics.NewCounter(
@@ -63,7 +61,7 @@ var (
 			Subsystem:         "subsystem",
 			StabilityLevel:    metrics.ALPHA,
 			Help:              "counter help",
-			DeprecatedVersion: &v114,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 )

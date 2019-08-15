@@ -55,7 +55,7 @@ func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (c *Counter) DeprecatedVersion() *semver.Version {
-	return c.CounterOpts.DeprecatedVersion
+	return parseSemver(c.CounterOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying Counter. Until this method is called
@@ -102,7 +102,8 @@ func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *CounterVec) DeprecatedVersion() *semver.Version {
-	return v.CounterOpts.DeprecatedVersion
+	return parseSemver(v.CounterOpts.DeprecatedVersion)
+
 }
 
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called
