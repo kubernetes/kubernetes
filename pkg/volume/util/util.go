@@ -548,3 +548,31 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 		(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
 		volume.ConfigMap != nil || volume.DownwardAPI != nil
 }
+
+// GetPodVolumeNames returns names of volumes that are used in a pod,
+// either as filesystem mount or raw block device.
+func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
+	mounts = sets.NewString()
+	devices = sets.NewString()
+
+	addContainerVolumes(pod.Spec.Containers, mounts, devices)
+	addContainerVolumes(pod.Spec.InitContainers, mounts, devices)
+	return
+}
+
+func addContainerVolumes(containers []v1.Container, mounts, devices sets.String) {
+	for _, container := range containers {
+		if container.VolumeMounts != nil {
+			for _, mount := range container.VolumeMounts {
+				mounts.Insert(mount.Name)
+			}
+		}
+		// TODO: remove feature gate check after no longer needed
+		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) &&
+			container.VolumeDevices != nil {
+			for _, device := range container.VolumeDevices {
+				devices.Insert(device.Name)
+			}
+		}
+	}
+}
