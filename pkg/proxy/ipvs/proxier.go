@@ -1202,42 +1202,57 @@ func (proxier *Proxier) syncProxyRules() {
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
 
-			var nodePortSet *IPSet
+			var (
+				nodePortSet *IPSet
+				entries     []*utilipset.Entry
+			)
+
 			switch protocol {
 			case "tcp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
-				entry = &utilipset.Entry{
+				entries = []*utilipset.Entry{{
 					// No need to provide ip info
 					Port:     svcInfo.NodePort(),
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
-				}
+				}}
 			case "udp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
-				entry = &utilipset.Entry{
+				entries = []*utilipset.Entry{{
 					// No need to provide ip info
 					Port:     svcInfo.NodePort(),
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
-				}
+				}}
 			case "sctp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
-				entry = &utilipset.Entry{
-					IP:       proxier.nodeIP.String(),
-					Port:     svcInfo.NodePort(),
-					Protocol: protocol,
-					SetType:  utilipset.HashIPPort,
+				// Since hash ip:port is used for SCTP, all the nodeIPs to be used in the SCTP ipset entries.
+				entries = []*utilipset.Entry{}
+				for _, nodeIP := range nodeIPs {
+					entries = append(entries, &utilipset.Entry{
+						IP:       nodeIP.String(),
+						Port:     svcInfo.NodePort(),
+						Protocol: protocol,
+						SetType:  utilipset.HashIPPort,
+					})
 				}
 			default:
 				// It should never hit
 				klog.Errorf("Unsupported protocol type: %s", protocol)
 			}
 			if nodePortSet != nil {
-				if valid := nodePortSet.validateEntry(entry); !valid {
-					klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, nodePortSet.Name))
+				entryInvalidErr := false
+				for _, entry := range entries {
+					if valid := nodePortSet.validateEntry(entry); !valid {
+						klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, nodePortSet.Name))
+						entryInvalidErr = true
+						break
+					}
+					nodePortSet.activeEntries.Insert(entry.String())
+				}
+				if entryInvalidErr {
 					continue
 				}
-				nodePortSet.activeEntries.Insert(entry.String())
 			}
 
 			// Add externaltrafficpolicy=local type nodeport entry
