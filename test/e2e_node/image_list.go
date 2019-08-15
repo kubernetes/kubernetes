@@ -53,7 +53,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Perl),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
-	gpu.GetGPUDevicePluginImage(),
+	getGPUDevicePluginImage(),
 	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-is:1.0",
 	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep:1.0",
 	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
@@ -166,4 +166,22 @@ func PrePullAllImages() error {
 		}
 	}
 	return nil
+}
+
+// getGPUDevicePluginImage returns the image of GPU device plugin.
+func getGPUDevicePluginImage() string {
+	ds, err := framework.DsFromManifest(gpu.GPUDevicePluginDSYAML)
+	if err != nil {
+		klog.Errorf("Failed to parse the device plugin image: %v", err)
+		return ""
+	}
+	if ds == nil {
+		klog.Errorf("Failed to parse the device plugin image: the extracted DaemonSet is nil")
+		return ""
+	}
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		klog.Errorf("Failed to parse the device plugin image: cannot extract the container from YAML")
+		return ""
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image
 }
