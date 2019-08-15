@@ -39,6 +39,10 @@ func InitDisruptiveTestSuite() TestSuite {
 			featureTag: "[Disruptive]",
 			testPatterns: []testpatterns.TestPattern{
 				// FSVolMode is already covered in subpath testsuite
+				testpatterns.DefaultFsInlineVolume,
+				testpatterns.FsVolModePreprovisionedPV,
+				testpatterns.FsVolModeDynamicPV,
+				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
@@ -122,41 +126,43 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			runTestBlock: utils.TestKubeletRestartsAndRestoresMap,
 		},
 		{
-			testItStmt:   "Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.",
-			runTestFile:  utils.TestVolumeUnmountsFromDeletedPod,
+			testItStmt: "Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.",
+			// File test is covered by subpath testsuite
 			runTestBlock: utils.TestVolumeUnmapsFromDeletedPod,
 		},
 		{
-			testItStmt:   "Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.",
-			runTestFile:  utils.TestVolumeUnmountsFromForceDeletedPod,
+			testItStmt: "Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.",
+			// File test is covered by subpath testsuite
 			runTestBlock: utils.TestVolumeUnmapsFromForceDeletedPod,
 		},
 	}
 
 	for _, test := range disruptiveTestTable {
-		func(t disruptiveTest) {
-			ginkgo.It(t.testItStmt, func() {
-				init()
-				defer cleanup()
+		if test.runTestFile != nil {
+			func(t disruptiveTest) {
+				ginkgo.It(t.testItStmt, func() {
+					init()
+					defer cleanup()
 
-				var err error
-				var pvcs []*v1.PersistentVolumeClaim
-				var inlineSources []*v1.VolumeSource
-				if pattern.VolType == testpatterns.InlineVolume {
-					inlineSources = append(inlineSources, l.resource.volSource)
-				} else {
-					pvcs = append(pvcs, l.resource.pvc)
-				}
-				ginkgo.By("Creating a pod with pvc")
-				l.pod, err = framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
-				framework.ExpectNoError(err, "While creating pods for kubelet restart test")
+					var err error
+					var pvcs []*v1.PersistentVolumeClaim
+					var inlineSources []*v1.VolumeSource
+					if pattern.VolType == testpatterns.InlineVolume {
+						inlineSources = append(inlineSources, l.resource.volSource)
+					} else {
+						pvcs = append(pvcs, l.resource.pvc)
+					}
+					ginkgo.By("Creating a pod with pvc")
+					l.pod, err = framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
-				if pattern.VolMode == v1.PersistentVolumeBlock {
-					t.runTestBlock(l.cs, l.config.Framework, l.pod)
-				} else {
-					t.runTestFile(l.cs, l.config.Framework, l.pod)
-				}
-			})
-		}(test)
+					if pattern.VolMode == v1.PersistentVolumeBlock {
+						t.runTestBlock(l.cs, l.config.Framework, l.pod)
+					} else {
+						t.runTestFile(l.cs, l.config.Framework, l.pod)
+					}
+				})
+			}(test)
+		}
 	}
 }
