@@ -202,7 +202,7 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 		}
 
 		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
 			az.nsgCache.Delete(*sg.Name)
 		}
 
@@ -265,7 +265,7 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 			az.lbCache.Delete(*lb.Name)
 		}
 		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
 			az.lbCache.Delete(*lb.Name)
 		}
 		return err
@@ -645,7 +645,7 @@ func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName 
 		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source)
 		klog.V(10).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s): end", VMScaleSetName, instanceID)
 
-		if strings.Contains(err.Error(), vmssVMNotActiveErrorMessage) {
+		if err != nil && strings.Contains(err.Error(), vmssVMNotActiveErrorMessage) {
 			// When instances are under deleting, updating API would report "not an active Virtual Machine Scale Set VM instanceId" error.
 			// Since they're under deleting, we shouldn't send more update requests for it.
 			klog.V(3).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s) gets error message %q, abort backoff because it's probably under deleting", VMScaleSetName, instanceID, vmssVMNotActiveErrorMessage)
