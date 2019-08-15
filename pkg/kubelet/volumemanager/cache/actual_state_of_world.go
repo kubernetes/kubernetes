@@ -398,7 +398,7 @@ func (asw *actualStateOfWorld) addVolume(
 	}
 
 	pluginIsAttachable := false
-	if _, ok := volumePlugin.(volume.AttachableVolumePlugin); ok {
+	if thePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err != nil && thePlugin != nil {
 		pluginIsAttachable = true
 	}
 
