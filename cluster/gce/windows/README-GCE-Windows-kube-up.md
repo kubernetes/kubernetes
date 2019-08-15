@@ -23,6 +23,15 @@ rm -rf ./kubernetes/; rm -f kubernetes.tar.gz; rm -f ~/.kube/config
 # if you're working with multiple projects and don't want to repeatedly switch
 # between gcloud config configurations.
 export CLOUDSDK_CORE_PROJECT=<your_project_name>
+
+# To run e2e test locally, make sure "Application Default Credentials" is set in any of the places:
+# References: https://cloud.google.com/sdk/docs/authorizing#authorizing_with_a_service_account
+#             https://cloud.google.com/sdk/gcloud/reference/auth/application-default/
+#    1. $HOME/.config/gcloud/application_default_credentials.json, if doesn't exist, run this command:
+gcloud auth application-default login
+# Or 2. Create a json format credential file as per http://cloud/docs/authentication/production,
+#       then export to environment variable
+export GOOGLE_APPLICATION_CREDENTIAL=[path_to_the_json_file]
 ```
 
 ### 1. Build Kubernetes
