@@ -426,6 +426,19 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any
 // instance is not found
 func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
+	foundInstances, err := g.getFoundInstanceByNames(names)
+	if err != nil {
+		return nil, err
+	}
+	if len(foundInstances) != len(names) {
+		return nil, cloudprovider.InstanceNotFound
+	}
+	return foundInstances, nil
+}
+
+// Gets the named instances, returning a list of gceInstances it was able to find from the provided
+// list of names.
+func (g *Cloud) getFoundInstanceByNames(names []string) ([]*gceInstance, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
@@ -472,20 +485,17 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 		}
 	}
 
-	if remaining > 0 {
-		var failed []string
-		for k := range found {
-			if found[k] == nil {
-				failed = append(failed, k)
-			}
-		}
-		klog.Errorf("Failed to retrieve instances: %v", failed)
-		return nil, cloudprovider.InstanceNotFound
-	}
-
 	var ret []*gceInstance
-	for _, instance := range found {
-		ret = append(ret, instance)
+	var failed []string
+	for name, instance := range found {
+		if instance != nil {
+			ret = append(ret, instance)
+		} else {
+			failed = append(failed, name)
+		}
+	}
+	if len(failed) > 0 {
+		klog.Errorf("Failed to retrieve instances: %v", failed)
 	}
 
 	return ret, nil
