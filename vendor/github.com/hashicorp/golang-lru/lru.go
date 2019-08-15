@@ -40,31 +40,35 @@ func (c *Cache) Purge() {
 // Add adds a value to the cache.  Returns true if an eviction occurred.
 func (c *Cache) Add(key, value interface{}) (evicted bool) {
 	c.lock.Lock()
-	defer c.lock.Unlock()
-	return c.lru.Add(key, value)
+	evicted = c.lru.Add(key, value)
+	c.lock.Unlock()
+	return evicted
 }
 
 // Get looks up a key's value from the cache.
 func (c *Cache) Get(key interface{}) (value interface{}, ok bool) {
 	c.lock.Lock()
-	defer c.lock.Unlock()
-	return c.lru.Get(key)
+	value, ok = c.lru.Get(key)
+	c.lock.Unlock()
+	return value, ok
 }
 
 // Contains checks if a key is in the cache, without updating the
 // recent-ness or deleting it for being stale.
 func (c *Cache) Contains(key interface{}) bool {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.lru.Contains(key)
+	containKey := c.lru.Contains(key)
+	c.lock.RUnlock()
+	return containKey
 }
 
 // Peek returns the key value (or undefined if not found) without updating
 // the "recently used"-ness of the key.
 func (c *Cache) Peek(key interface{}) (value interface{}, ok bool) {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.lru.Peek(key)
+	value, ok = c.lru.Peek(key)
+	c.lock.RUnlock()
+	return value, ok
 }
 
 // ContainsOrAdd checks if a key is in the cache  without updating the
@@ -98,13 +102,15 @@ func (c *Cache) RemoveOldest() {
 // Keys returns a slice of the keys in the cache, from oldest to newest.
 func (c *Cache) Keys() []interface{} {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.lru.Keys()
+	keys := c.lru.Keys()
+	c.lock.RUnlock()
+	return keys
 }
 
 // Len returns the number of items in the cache.
 func (c *Cache) Len() int {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.lru.Len()
+	length := c.lru.Len()
+	c.lock.RUnlock()
+	return length
 }

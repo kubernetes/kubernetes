@@ -12,7 +12,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/adal v0.5.0
 	github.com/Azure/go-autorest/autorest/to v0.2.0
-	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
+	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/Microsoft/hcsshim v0.8.6
@@ -65,7 +65,7 @@ require (
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
-	github.com/golang/protobuf v1.2.0
+	github.com/golang/protobuf v1.3.1
 	github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/go-cmp v0.3.0
@@ -74,7 +74,7 @@ require (
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.0 // indirect
-	github.com/hashicorp/golang-lru v0.5.0
+	github.com/hashicorp/golang-lru v0.5.1
 	github.com/heketi/heketi v9.0.0+incompatible
 	github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413 // indirect
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
@@ -130,14 +130,14 @@ require (
 	github.com/vmware/govmomi v0.20.1
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
+	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
-	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
+	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
-	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c
 	golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
-	google.golang.org/api v0.0.0-20181220000619-583d854617af
+	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.23.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
@@ -179,7 +179,7 @@ require (
 
 replace (
 	bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
-	cloud.google.com/go => cloud.google.com/go v0.34.0
+	cloud.google.com/go => cloud.google.com/go v0.38.0
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.9.0
@@ -192,7 +192,7 @@ replace (
 	github.com/Azure/go-autorest/tracing => github.com/Azure/go-autorest/tracing v0.5.0
 	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.1
 	github.com/BurntSushi/xgb => github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
-	github.com/GoogleCloudPlatform/k8s-cloud-provider => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
+	github.com/GoogleCloudPlatform/k8s-cloud-provider => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
 	github.com/JeffAshton/win_pdh => github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.11
@@ -279,17 +279,20 @@ replace (
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock => github.com/golang/mock v1.2.0
-	github.com/golang/protobuf => github.com/golang/protobuf v1.2.0
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.1
 	github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
-	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
+	github.com/google/btree => github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c
 	github.com/google/cadvisor => github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966
 	github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.0.21
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz => github.com/google/gofuzz v1.0.0
+	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
+	github.com/google/pprof => github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
 	github.com/google/renameio => github.com/google/renameio v0.1.0
 	github.com/google/uuid => github.com/google/uuid v1.1.1
+	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.4
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
@@ -301,7 +304,7 @@ replace (
 	github.com/grpc-ecosystem/go-grpc-prometheus => github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway => github.com/grpc-ecosystem/grpc-gateway v1.3.0
 	github.com/hashicorp/go-syslog => github.com/hashicorp/go-syslog v1.0.0
-	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.0
+	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.1
 	github.com/hashicorp/hcl => github.com/hashicorp/hcl v1.0.0
 	github.com/heketi/heketi => github.com/heketi/heketi v9.0.0+incompatible
 	github.com/heketi/rest => github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413
@@ -314,6 +317,7 @@ replace (
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.7
+	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
@@ -407,6 +411,7 @@ replace (
 	github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18
 	github.com/xlab/handysort => github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1
 	github.com/xordataexchange/crypt => github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77
+	go.opencensus.io => go.opencensus.io v0.21.0
 	go.uber.org/atomic => go.uber.org/atomic v0.0.0-20181018215023-8dc6146f7569
 	go.uber.org/multierr => go.uber.org/multierr v0.0.0-20180122172545-ddea229ff1df
 	go.uber.org/zap => go.uber.org/zap v0.0.0-20180814183419-67bc79d13d15
@@ -425,9 +430,9 @@ replace (
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
-	google.golang.org/api => google.golang.org/api v0.0.0-20181220000619-583d854617af
+	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
 	google.golang.org/grpc => google.golang.org/grpc v1.23.0
 	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127

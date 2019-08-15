@@ -21,7 +21,7 @@
   "baseUrl": "https://monitoring.googleapis.com/",
   "batchPath": "batch",
   "canonicalName": "Monitoring",
-  "description": "Manages your Stackdriver Monitoring data and configurations. Most projects must be associated with a Stackdriver account, with a few exceptions as noted on the individual method pages.",
+  "description": "Manages your Stackdriver Monitoring data and configurations. Most projects must be associated with a Stackdriver account, with a few exceptions as noted on the individual method pages. The table entries below are presented in alphabetical order, not in order of common use. For explanations of the concepts found in the table entries, read the Stackdriver Monitoring documentation.",
   "discoveryVersion": "v1",
   "documentationLink": "https://cloud.google.com/monitoring/api/",
   "fullyEncodeReservedExpansion": true,
@@ -369,6 +369,11 @@
                   "pattern": "^projects/[^/]+/groups/[^/]+$",
                   "required": true,
                   "type": "string"
+                },
+                "recursive": {
+                  "description": "If this field is true, then the request means to delete a group with all its descendants. Otherwise, the request means to delete a group only when it has no descendants. The default value is false.",
+                  "location": "query",
+                  "type": "boolean"
                 }
               },
               "path": "v3/{+name}",
@@ -1196,7 +1201,7 @@
                   "type": "string"
                 },
                 "filter": {
-                  "description": "A monitoring filter that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.label.instance_name = \"my-instance-name\"\n",
+                  "description": "A monitoring filter that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.labels.instance_name = \"my-instance-name\"\n",
                   "location": "query",
                   "type": "string"
                 },
@@ -1452,7 +1457,7 @@
       }
     }
   },
-  "revision": "20181211",
+  "revision": "20190604",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -1946,7 +1951,7 @@
       "id": "Exemplar",
       "properties": {
         "attachments": {
-          "description": "Contextual information about the example value. Examples are:Trace ID: type.googleapis.com/google.devtools.cloudtrace.v1.TraceLiteral string: type.googleapis.com/google.protobuf.StringValueLabels dropped during aggregation:  type.googleapis.com/google.monitoring.v3.DroppedLabelsThere may be only a single attachment of any given message type in a single exemplar, and this is enforced by the system.",
+          "description": "Contextual information about the example value. Examples are:Trace: type.googleapis.com/google.monitoring.v3.SpanContextLiteral string: type.googleapis.com/google.protobuf.StringValueLabels dropped during aggregation:  type.googleapis.com/google.monitoring.v3.DroppedLabelsThere may be only a single attachment of any given message type in a single exemplar, and this is enforced by the system.",
           "items": {
             "additionalProperties": {
               "description": "Properties of the object. Contains field @type with type URL.",
@@ -2187,7 +2192,7 @@
           "type": "boolean"
         },
         "path": {
-          "description": "The path to the page to run the check against. Will be combined with the host (specified within the MonitoredResource) and port to construct the full URL. Optional (defaults to \"/\").",
+          "description": "The path to the page to run the check against. Will be combined with the host (specified within the MonitoredResource) and port to construct the full URL. Optional (defaults to \"/\"). If the provided path does not begin with \"/\", it will be prepended automatically.",
           "type": "string"
         },
         "port": {
@@ -2555,6 +2560,26 @@
           },
           "type": "array"
         },
+        "launchStage": {
+          "description": "Optional. The launch stage of the metric definition.",
+          "enum": [
+            "LAUNCH_STAGE_UNSPECIFIED",
+            "EARLY_ACCESS",
+            "ALPHA",
+            "BETA",
+            "GA",
+            "DEPRECATED"
+          ],
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects whitelisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
+            "GA features are open to all developers and are considered stable and fully qualified for production use.",
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+          ],
+          "type": "string"
+        },
         "metadata": {
           "$ref": "MetricDescriptorMetadata",
           "description": "Optional. Metadata which can be used to guide usage of the metric."
@@ -2622,7 +2647,7 @@
           "type": "string"
         },
         "launchStage": {
-          "description": "The launch stage of the metric definition.",
+          "description": "Deprecated. Please use the MetricDescriptor.launch_stage instead. The launch stage of the metric definition.",
           "enum": [
             "LAUNCH_STAGE_UNSPECIFIED",
             "EARLY_ACCESS",
@@ -2733,7 +2758,7 @@
       "type": "object"
     },
     "MonitoredResourceDescriptor": {
-      "description": "An object that describes the schema of a MonitoredResource object using a type name and a set of labels. For example, the monitored resource descriptor for Google Compute Engine VM instances has a type of \"gce_instance\" and specifies the use of the labels \"instance_id\" and \"zone\" to identify particular VM instances.Different APIs can support different monitored resource types. APIs generally provide a list method that returns the monitored resource descriptors used by the API.",
+      "description": "An object that describes the schema of a MonitoredResource object using a type name and a set of labels. For example, the monitored resource descriptor for Google Compute Engine VM instances has a type of \"gce_instance\" and specifies the use of the labels \"instance_id\" and \"zone\" to identify particular VM instances.Different APIs can support different monitored resource types. APIs generally provide a list method that returns the monitored resource descriptors used by the API.Next ID: 10",
       "id": "MonitoredResourceDescriptor",
       "properties": {
         "description": {
@@ -2750,6 +2775,26 @@
             "$ref": "LabelDescriptor"
           },
           "type": "array"
+        },
+        "launchStage": {
+          "description": "Optional. The launch stage of the monitored resource definition.",
+          "enum": [
+            "LAUNCH_STAGE_UNSPECIFIED",
+            "EARLY_ACCESS",
+            "ALPHA",
+            "BETA",
+            "GA",
+            "DEPRECATED"
+          ],
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "Early Access features are limited to a closed group of testers. To use these features, you must sign up in advance and sign a Trusted Tester agreement (which includes confidentiality provisions). These features may be unstable, changed in backward-incompatible ways, and are not guaranteed to be released.",
+            "Alpha is a limited availability test for releases before they are cleared for widespread use. By Alpha, all significant design issues are resolved and we are in the process of verifying functionality. Alpha customers need to apply for access, agree to applicable terms, and have their projects whitelisted. Alpha releases don’t have to be feature complete, no SLAs are provided, and there are no technical support obligations, but they will be far enough along that customers can actually use them in test environments or for limited-use tests -- just like they would in normal production cases.",
+            "Beta is the point at which we are ready to open a release for any customer to use. There are no SLA or technical support obligations in a Beta release. Products will be complete from a feature perspective, but may have some open outstanding issues. Beta releases are suitable for limited production use cases.",
+            "GA features are open to all developers and are considered stable and fully qualified for production use.",
+            "Deprecated features are scheduled to be shut down and removed. For more information, see the “Deprecation Policy” section of our Terms of Service (https://cloud.google.com/terms/) and the Google Cloud Platform Subject to the Deprecation Policy (https://cloud.google.com/terms/deprecation) documentation."
+          ],
+          "type": "string"
         },
         "name": {
           "description": "Optional. The resource name of the monitored resource descriptor: \"projects/{project_id}/monitoredResourceDescriptors/{type}\" where {type} is the value of the type field in this object and {project_id} is a project ID that provides API-specific context for accessing the type. APIs that do not use project information can use the resource name format \"monitoredResourceDescriptors/{type}\".",
@@ -2805,7 +2850,7 @@
       "id": "NotificationChannel",
       "properties": {
         "description": {
-          "description": "An optional human-readable description of this notification channel. This description may provide additional details, beyond the display name, for the channel. This may not exceeed 1024 Unicode characters.",
+          "description": "An optional human-readable description of this notification channel. This description may provide additional details, beyond the display name, for the channel. This may not exceed 1024 Unicode characters.",
           "type": "string"
         },
         "displayName": {
@@ -3007,7 +3052,7 @@
       "type": "object"
     },
     "Status": {
-      "description": "The Status type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by gRPC (https://github.com/grpc). The error model is designed to be:\nSimple to use and understand for most users\nFlexible enough to meet unexpected needsOverviewThe Status message contains three pieces of data: error code, error message, and error details. The error code should be an enum value of google.rpc.Code, but it may accept additional error codes if needed. The error message should be a developer-facing English message that helps developers understand and resolve the error. If a localized user-facing error message is needed, put the localized message in the error details or localize it in the client. The optional error details may contain arbitrary information about the error. There is a predefined set of error detail types in the package google.rpc that can be used for common error conditions.Language mappingThe Status message is the logical representation of the error model, but it is not necessarily the actual wire format. When the Status message is exposed in different client libraries and different wire protocols, it can be mapped differently. For example, it will likely be mapped to some exceptions in Java, but more likely mapped to some error codes in C.Other usesThe error model and the Status message can be used in a variety of environments, either with or without APIs, to provide a consistent developer experience across different environments.Example uses of this error model include:\nPartial errors. If a service needs to return partial errors to the client, it may embed the Status in the normal response to indicate the partial errors.\nWorkflow errors. A typical workflow has multiple steps. Each step may have a Status message for error reporting.\nBatch operations. If a client uses batch request and batch response, the Status message should be used directly inside batch response, one for each error sub-response.\nAsynchronous operations. If an API call embeds asynchronous operation results in its response, the status of those operations should be represented directly using the Status message.\nLogging. If some API errors are stored in logs, the message Status could be used directly after any stripping needed for security/privacy reasons.",
+      "description": "The Status type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by gRPC (https://github.com/grpc). Each Status message contains three pieces of data: error code, error message, and error details.You can find out more about this error model and how to work with it in the API Design Guide (https://cloud.google.com/apis/design/errors).",
       "id": "Status",
       "properties": {
         "code": {
@@ -3246,10 +3291,6 @@
           },
           "type": "array"
         },
-        "isInternal": {
-          "description": "If this is true, then checks are made only from the 'internal_checkers'. If it is false, then checks are made only from the 'selected_regions'. It is an error to provide 'selected_regions' when is_internal is true, or to provide 'internal_checkers' when is_internal is false.",
-          "type": "boolean"
-        },
         "monitoredResource": {
           "$ref": "MonitoredResource",
           "description": "The monitored resource (https://cloud.google.com/monitoring/api/resources) associated with the configuration. The following monitored resource types are supported for uptime checks:  uptime_url  gce_instance  gae_app  aws_ec2_instance  aws_elb_load_balancer"
@@ -3259,7 +3300,7 @@
           "type": "string"
         },
         "period": {
-          "description": "How often, in seconds, the uptime check is performed. Currently, the only supported values are 60s (1 minute), 300s (5 minutes), 600s (10 minutes), and 900s (15 minutes). Optional, defaults to 300s.",
+          "description": "How often, in seconds, the uptime check is performed. Currently, the only supported values are 60s (1 minute), 300s (5 minutes), 600s (10 minutes), and 900s (15 minutes). Optional, defaults to 60s.",
           "format": "google-duration",
           "type": "string"
         },
