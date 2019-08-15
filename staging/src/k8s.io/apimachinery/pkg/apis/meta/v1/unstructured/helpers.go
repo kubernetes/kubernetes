@@ -352,7 +352,14 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, 
 	return obj, &gvk, nil
 }
 
-func (unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
+func (s unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), s.doEncode, w)
+	}
+	return s.doEncode(obj, w)
+}
+
+func (unstructuredJSONScheme) doEncode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *Unstructured:
 		return json.NewEncoder(w).Encode(t.Object)

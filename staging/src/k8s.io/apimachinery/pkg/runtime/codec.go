@@ -107,6 +107,8 @@ var _ Serializer = NoopEncoder{}
 const noopEncoderIdentifier Identifier = "noop"
 
 func (n NoopEncoder) Encode(obj Object, w io.Writer) error {
+	// There is no need to handle runtime.CacheableObject, as we don't
+	// process the obj at all.
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
 }
 
@@ -231,6 +233,13 @@ func identifier(e Encoder) Identifier {
 }
 
 func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
+	if co, ok := obj.(CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), s.doEncode, stream)
+	}
+	return s.doEncode(obj, stream)
+}
+
+func (s base64Serializer) doEncode(obj Object, stream io.Writer) error {
 	e := base64.NewEncoder(base64.StdEncoding, stream)
 	err := s.Encoder.Encode(obj, e)
 	e.Close()

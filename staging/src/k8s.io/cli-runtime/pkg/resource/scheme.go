@@ -55,6 +55,8 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 }
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+	// There is no need to handle runtime.CacheableObject, as we only
+	// fallback to other encoders here.
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 

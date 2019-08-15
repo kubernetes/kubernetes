@@ -14,12 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package runtime_test
 
 import (
+	"io"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 )
 
 func gv(group, version string) schema.GroupVersion {
@@ -69,7 +72,7 @@ func TestCoercingMultiGroupVersioner(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			v := NewCoercingMultiGroupVersioner(tc.target, tc.preferredKinds...)
+			v := runtime.NewCoercingMultiGroupVersioner(tc.target, tc.preferredKinds...)
 			kind, ok := v.KindForGroupVersionKinds(tc.kinds)
 			if !ok {
 				t.Error("got no kind")
@@ -82,4 +85,20 @@ func TestCoercingMultiGroupVersioner(t *testing.T) {
 			}
 		})
 	}
+}
+
+type mockEncoder struct{}
+
+func (m *mockEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	_, err := w.Write([]byte("mock-result"))
+	return err
+}
+
+func (m *mockEncoder) Identifier() runtime.Identifier {
+	return runtime.Identifier("mock-identifier")
+}
+
+func TestCacheableObject(t *testing.T) {
+	serializer := runtime.NewBase64Serializer(&mockEncoder{}, nil)
+	runtimetesting.CacheableObjectTest(t, serializer)
 }

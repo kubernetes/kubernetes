@@ -64,6 +64,13 @@ func identifier(e runtime.Encoder) runtime.Identifier {
 }
 
 func (c stripVersionEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(c.Identifier(), c.doEncode, w)
+	}
+	return c.doEncode(obj, w)
+}
+
+func (c stripVersionEncoder) doEncode(obj runtime.Object, w io.Writer) error {
 	buf := bytes.NewBuffer([]byte{})
 	err := c.encoder.Encode(obj, buf)
 	if err != nil {
