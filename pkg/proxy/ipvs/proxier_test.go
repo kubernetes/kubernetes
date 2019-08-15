@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -692,6 +693,236 @@ func TestNodePort(t *testing.T) {
 						Port:     3001,
 						Protocol: "TCP",
 					}: {}, // no real servers corresponding to no endpoints
+				},
+			},
+		},
+		{
+			name: "node port service with protocol sctp on a node with multiple nodeIPs",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolSCTP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name: "p80",
+							Port: int32(80),
+						}},
+					}}
+				}),
+			},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+				net.ParseIP("100.101.102.104"),
+				net.ParseIP("100.101.102.105"),
+				net.ParseIP("2001:db8::1:1"),
+				net.ParseIP("2001:db8::1:2"),
+				net.ParseIP("2001:db8::1:3"),
+			},
+			nodePortAddresses: []string{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "SCTP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("100.101.102.103"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "100.101.102.104",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("100.101.102.104"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "100.101.102.105",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("100.101.102.105"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:1"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2001:db8::1:2",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:2"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2001:db8::1:3",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:3"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "100.101.102.104",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "100.101.102.105",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "2001:db8::1:2",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "2001:db8::1:3",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+				},
+			},
+			expectedIPSets: netlinktest.ExpectedIPSet{
+				kubeNodePortSetSCTP: {
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+					{
+						IP:       "100.101.102.104",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+					{
+						IP:       "100.101.102.105",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+					{
+						IP:       "2001:db8::1:2",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+					{
+						IP:       "2001:db8::1:3",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
 				},
 			},
 		},
@@ -2897,10 +3128,14 @@ func checkIPSet(t *testing.T, fp *Proxier, ipSet netlinktest.ExpectedIPSet) {
 			t.Errorf("Check ipset entries failed for ipset: %q, expect %d, got %d", set, len(entries), len(ents))
 			continue
 		}
-		if len(entries) == 1 {
-			if ents[0] != entries[0].String() {
-				t.Errorf("Check ipset entries failed for ipset: %q", set)
-			}
+		expectedEntries := []string{}
+		for _, entry := range entries {
+			expectedEntries = append(expectedEntries, entry.String())
+		}
+		sort.Strings(ents)
+		sort.Strings(expectedEntries)
+		if !reflect.DeepEqual(ents, expectedEntries) {
+			t.Errorf("Check ipset entries failed for ipset: %q", set)
 		}
 	}
 }
