@@ -65,7 +65,7 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 		expectedActions []string
 	}{
 		{
-			"no delete approved not passed deadline",
+			"no delete issued not passed deadline",
 			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			[]byte(unexpiredCert),
 			[]capi.CertificateSigningRequestCondition{
@@ -77,7 +77,7 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			[]string{},
 		},
 		{
-			"no delete approved passed deadline not issued",
+			"no delete approved not passed deadline not issued",
 			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			nil,
 			[]capi.CertificateSigningRequestCondition{
@@ -89,7 +89,7 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			[]string{},
 		},
 		{
-			"delete approved passed deadline",
+			"delete issued passed deadline",
 			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			[]byte(unexpiredCert),
 			[]capi.CertificateSigningRequestCondition{
@@ -139,7 +139,19 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			[]string{"delete"},
 		},
 		{
-			"no delete approved not passed deadline unexpired",
+			"delete approved passed deadline not issued",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			nil,
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-25 * time.Hour)),
+				},
+			},
+			[]string{"delete"},
+		},
+		{
+			"no delete issued not passed deadline unexpired",
 			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			[]byte(unexpiredCert),
 			[]capi.CertificateSigningRequestCondition{
@@ -151,7 +163,7 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			[]string{},
 		},
 		{
-			"delete approved not passed deadline expired",
+			"delete issued not passed deadline expired",
 			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			[]byte(expiredCert),
 			[]capi.CertificateSigningRequestCondition{

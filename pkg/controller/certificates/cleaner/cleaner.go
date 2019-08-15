@@ -44,9 +44,10 @@ const (
 	pollingInterval = 1 * time.Hour
 	// The time periods after which these different CSR statuses should be
 	// cleaned up.
-	approvedExpiration = 1 * time.Hour
+	issuedExpiration   = 1 * time.Hour
 	deniedExpiration   = 1 * time.Hour
 	pendingExpiration  = 24 * time.Hour
+	approvedExpiration = 24 * time.Hour
 )
 
 // CSRCleanerController is a controller that garbage collects old certificate
@@ -57,7 +58,9 @@ const (
 // with a certificate and is old enough to be past the GC issued deadline, the
 // CSR is denied and is old enough to be past the GC denied deadline, the CSR
 // is Pending and is old enough to be past the GC pending deadline, the CSR is
-// approved with a certificate and the certificate is expired.
+// approved with a certificate and the certificate is expired, the CSR is
+// approved without a certificate and is old enough to be past the GC approved
+// deadline.
 type CSRCleanerController struct {
 	csrClient csrclient.CertificateSigningRequestInterface
 	csrLister certificateslisters.CertificateSigningRequestLister
@@ -107,7 +110,7 @@ func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) err
 	if err != nil {
 		return err
 	}
-	if isIssuedPastDeadline(csr) || isDeniedPastDeadline(csr) || isPendingPastDeadline(csr) || isIssuedExpired {
+	if isIssuedPastDeadline(csr) || isApprovedPastDeadline(csr) || isDeniedPastDeadline(csr) || isPendingPastDeadline(csr) || isIssuedExpired {
 		if err := ccc.csrClient.Delete(csr.Name, nil); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
@@ -157,13 +160,26 @@ func isDeniedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	return false
 }
 
+// isApprovedPastDeadline checks if the certificate has an Approved status and the
+// creation time of the CSR is past the deadline that approved requests are
+// maintained for.
+func isApprovedPastDeadline(csr *capi.CertificateSigningRequest) bool {
+	for _, c := range csr.Status.Conditions {
+		if c.Type == capi.CertificateApproved && !isIssued(csr) && isOlderThan(c.LastUpdateTime, approvedExpiration) {
+			klog.Infof("Cleaning CSR %q as it is more than %v old and approved.", csr.Name, approvedExpiration)
+			return true
+		}
+	}
+	return false
+}
+
 // isIssuedPastDeadline checks if the certificate has an Issued status and the
 // creation time of the CSR is passed the deadline that issued requests are
 // maintained for.
 func isIssuedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateApproved && isIssued(csr) && isOlderThan(c.LastUpdateTime, approvedExpiration) {
-			klog.Infof("Cleaning CSR %q as it is more than %v old and approved.", csr.Name, approvedExpiration)
+		if c.Type == capi.CertificateApproved && isIssued(csr) && isOlderThan(c.LastUpdateTime, issuedExpiration) {
+			klog.Infof("Cleaning CSR %q as it is more than %v old and approved & issued.", csr.Name, issuedExpiration)
 			return true
 		}
 	}
