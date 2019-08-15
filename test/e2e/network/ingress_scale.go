@@ -18,6 +18,7 @@ package network
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 
@@ -43,7 +44,7 @@ var _ = SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		ginkgo.BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 
-			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, framework.TestContext.CloudConfig)
+			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, e2econtext.TestContext.CloudConfig)
 			if err := scaleFramework.PrepareScaleTest(); err != nil {
 				e2elog.Failf("Unexpected error while preparing ingress scale test: %v", err)
 			}

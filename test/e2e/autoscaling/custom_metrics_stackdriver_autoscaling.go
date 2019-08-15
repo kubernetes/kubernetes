@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
@@ -229,7 +230,7 @@ type CustomMetricTestCase struct {
 
 // Run starts test case.
 func (tc *CustomMetricTestCase) Run() {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econtext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)

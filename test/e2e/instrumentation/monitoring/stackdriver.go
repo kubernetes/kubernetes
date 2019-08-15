@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
@@ -73,7 +74,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econtext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)

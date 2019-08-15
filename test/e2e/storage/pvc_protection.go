@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -44,7 +45,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, e2econtext.TestContext.NodeSchedulableTimeout))
 
 		ginkgo.By("Creating a PVC")
 		prefix := "pvc-protection"

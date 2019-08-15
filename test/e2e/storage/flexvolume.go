@@ -29,6 +29,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -136,7 +137,7 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 }
 
 func sshAndLog(cmd, host string, failOnError bool) {
-	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+	result, err := e2essh.SSH(cmd, host, e2econtext.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err)
 	if result.Code != 0 && failOnError {

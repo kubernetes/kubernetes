@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
@@ -388,17 +389,17 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					ginkgo.By("getting gce instances")
 					gceCloud, err := gce.GetGCECloud()
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
-					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
+					output, err := gceCloud.ListInstanceNames(e2econtext.TestContext.CloudConfig.ProjectID, e2econtext.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 					gomega.Expect(true, strings.Contains(string(output), string(host0Name)))
 
 					ginkgo.By("deleting host0")
-					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
+					err = gceCloud.DeleteInstance(e2econtext.TestContext.CloudConfig.ProjectID, e2econtext.TestContext.CloudConfig.Zone, string(host0Name))
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
 					ginkgo.By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(cs, host0Name)
 					framework.ExpectEqual(numNodes, origNodeCnt, fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
-					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
+					output, err = gceCloud.ListInstanceNames(e2econtext.TestContext.CloudConfig.ProjectID, e2econtext.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 					gomega.Expect(false, strings.Contains(string(output), string(host0Name)))
 
@@ -475,7 +476,7 @@ func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName
 }
 
 func detachPD(nodeName types.NodeName, pdName string) error {
-	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+	if e2econtext.TestContext.Provider == "gce" || e2econtext.TestContext.Provider == "gke" {
 		gceCloud, err := gce.GetGCECloud()
 		if err != nil {
 			return err
@@ -490,7 +491,7 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		}
 		return err
 
-	} else if framework.TestContext.Provider == "aws" {
+	} else if e2econtext.TestContext.Provider == "aws" {
 		client := ec2.New(session.New())
 		tokens := strings.Split(pdName, "/")
 		awsVolumeID := tokens[len(tokens)-1]
@@ -516,9 +517,9 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 // Container's volumeMounts are hard-coded to "/testpd<number>" where <number> is 1..len(diskNames).
 func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, numContainers int) *v1.Pod {
 	// escape if not a supported provider
-	if !(framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" ||
-		framework.TestContext.Provider == "aws") {
-		e2elog.Failf(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", framework.TestContext.Provider))
+	if !(e2econtext.TestContext.Provider == "gce" || e2econtext.TestContext.Provider == "gke" ||
+		e2econtext.TestContext.Provider == "aws") {
+		e2elog.Failf(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", e2econtext.TestContext.Provider))
 	}
 
 	containers := make([]v1.Container, numContainers)
@@ -555,7 +556,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	pod.Spec.Volumes = make([]v1.Volume, len(diskNames))
 	for k, diskName := range diskNames {
 		pod.Spec.Volumes[k].Name = fmt.Sprintf("testpd%v", k+1)
-		if framework.TestContext.Provider == "aws" {
+		if e2econtext.TestContext.Provider == "aws" {
 			pod.Spec.Volumes[k].VolumeSource = v1.VolumeSource{
 				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 					VolumeID: diskName,
@@ -578,7 +579,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 
 // Waits for specified PD to detach from specified hostName
 func waitForPDDetach(diskName string, nodeName types.NodeName) error {
-	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+	if e2econtext.TestContext.Provider == "gce" || e2econtext.TestContext.Provider == "gke" {
 		e2elog.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
 		gceCloud, err := gce.GetGCECloud()
 		if err != nil {

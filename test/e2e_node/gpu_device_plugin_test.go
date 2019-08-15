@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -94,7 +95,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 			ginkgo.By("Restarting Kubelet and creating another pod")
 			restartKubelet()
-			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, e2econtext.TestContext.NodeSchedulableTimeout)
 			gomega.Eventually(func() bool {
 				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
@@ -109,7 +110,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
 			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return gpu.NumberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
@@ -150,7 +151,7 @@ func checkIfNvidiaGPUsExistOnNode() bool {
 }
 
 func logDevicePluginMetrics() {
-	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(e2econtext.TestContext.NodeName+":10255", "/metrics")
 	framework.ExpectNoError(err)
 	for msKey, samples := range ms {
 		switch msKey {

@@ -51,6 +51,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -163,7 +164,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	controllerMem = math.MaxUint64
 	schedulerCPU := math.MaxFloat32
 	schedulerMem = math.MaxUint64
-	e2elog.Logf("Setting resource constraints for provider: %s", framework.TestContext.Provider)
+	e2elog.Logf("Setting resource constraints for provider: %s", e2econtext.TestContext.Provider)
 	if framework.ProviderIs("kubemark") {
 		if numNodes <= 5 {
 			apiserverCPU = 0.35
@@ -460,7 +461,7 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		// Summarize scheduler metrics.
-		latency, err := e2emetrics.VerifySchedulerLatency(c, framework.TestContext.Provider, framework.TestContext.CloudConfig.MasterName, framework.GetMasterHost())
+		latency, err := e2emetrics.VerifySchedulerLatency(c, e2econtext.TestContext.Provider, e2econtext.TestContext.CloudConfig.MasterName, framework.GetMasterHost())
 		framework.ExpectNoError(err)
 		if err == nil {
 			// Compute avg and quantiles of throughput (excluding last element, that's usually an outlier).
@@ -477,7 +478,7 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		// Summarize etcd metrics.
-		err = etcdMetricsCollector.StopAndSummarize(framework.TestContext.Provider, framework.GetMasterHost())
+		err = etcdMetricsCollector.StopAndSummarize(e2econtext.TestContext.Provider, framework.GetMasterHost())
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, etcdMetricsCollector.GetMetrics())
@@ -544,9 +545,9 @@ var _ = SIGDescribe("Density", func() {
 
 		uuid = string(utiluuid.NewUUID())
 
-		framework.ExpectNoError(e2emetrics.ResetSchedulerMetrics(c, framework.TestContext.Provider, framework.TestContext.CloudConfig.MasterName, framework.GetMasterHost()))
+		framework.ExpectNoError(e2emetrics.ResetSchedulerMetrics(c, e2econtext.TestContext.Provider, e2econtext.TestContext.CloudConfig.MasterName, framework.GetMasterHost()))
 		framework.ExpectNoError(e2emetrics.ResetMetrics(c))
-		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
+		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(e2econtext.TestContext.OutputDir+"/%s", uuid), 0777))
 
 		e2elog.Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
@@ -568,7 +569,7 @@ var _ = SIGDescribe("Density", func() {
 
 		// Start etcs metrics collection.
 		etcdMetricsCollector = e2emetrics.NewEtcdMetricsCollector()
-		etcdMetricsCollector.StartCollecting(time.Minute, framework.TestContext.Provider, framework.GetMasterHost())
+		etcdMetricsCollector.StartCollecting(time.Minute, e2econtext.TestContext.Provider, framework.GetMasterHost())
 	})
 
 	type Density struct {
@@ -651,7 +652,7 @@ var _ = SIGDescribe("Density", func() {
 				f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
 			}
 			totalPods = (podsPerNode - itArg.daemonsPerNode) * nodeCount
-			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
+			fileHndl, err := os.Create(fmt.Sprintf(e2econtext.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
 			framework.ExpectNoError(err)
 			defer fileHndl.Close()
 			nodePrepPhase.End()

@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -226,12 +227,9 @@ var (
 // Beware that this ID is not the same for all tests in the e2e run, because each Ginkgo node creates it separately.
 var RunID = uuid.NewUUID()
 
-// CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
-type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
-
 // GetMasterHost returns a hostname of a master.
 func GetMasterHost() string {
-	masterURL, err := url.Parse(TestContext.Host)
+	masterURL, err := url.Parse(e2econtext.TestContext.Host)
 	ExpectNoError(err)
 	return masterURL.Hostname()
 }
@@ -257,15 +255,15 @@ func Skipf(format string, args ...interface{}) {
 
 // SkipUnlessNodeCountIsAtLeast skips if the number of nodes is less than the minNodeCount.
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
-	if TestContext.CloudConfig.NumNodes < minNodeCount {
-		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
+	if e2econtext.TestContext.CloudConfig.NumNodes < minNodeCount {
+		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, e2econtext.TestContext.CloudConfig.NumNodes)
 	}
 }
 
 // SkipUnlessNodeCountIsAtMost skips if the number of nodes is greater than the maxNodeCount.
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
-	if TestContext.CloudConfig.NumNodes > maxNodeCount {
-		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
+	if e2econtext.TestContext.CloudConfig.NumNodes > maxNodeCount {
+		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, e2econtext.TestContext.CloudConfig.NumNodes)
 	}
 }
 
@@ -279,7 +277,7 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 // SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
+		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, e2econtext.TestContext.Provider)
 	}
 }
 
@@ -292,15 +290,15 @@ func SkipUnlessLocalEphemeralStorageEnabled() {
 
 // SkipUnlessSSHKeyPresent skips if no SSH key is found.
 func SkipUnlessSSHKeyPresent() {
-	if _, err := e2essh.GetSigner(TestContext.Provider); err != nil {
-		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
+	if _, err := e2essh.GetSigner(e2econtext.TestContext.Provider); err != nil {
+		skipInternalf(1, "No SSH Key for provider %s: '%v'", e2econtext.TestContext.Provider, err)
 	}
 }
 
 // SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !ProviderIs(supportedProviders...) {
-		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
+		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, e2econtext.TestContext.Provider)
 	}
 }
 
@@ -328,7 +326,7 @@ func SkipIfMultizone(c clientset.Interface) {
 
 // SkipUnlessPrometheusMonitoringIsEnabled skips if the prometheus monitoring is not enabled.
 func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
-	if !TestContext.EnablePrometheusMonitoring {
+	if !e2econtext.TestContext.EnablePrometheusMonitoring {
 		skipInternalf(1, "Skipped because prometheus monitoring is not enabled")
 	}
 }
@@ -336,14 +334,14 @@ func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
 // SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {
-		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
+		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, e2econtext.TestContext.MasterOSDistro)
 	}
 }
 
 // SkipUnlessNodeOSDistroIs skips if the node OS distro is not included in the supportedNodeOsDistros.
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !NodeOSDistroIs(supportedNodeOsDistros...) {
-		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
+		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, e2econtext.TestContext.NodeOSDistro)
 	}
 }
 
@@ -357,7 +355,7 @@ func SkipUnlessTaintBasedEvictionsEnabled() {
 // SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, containerRuntime := range runtimes {
-		if containerRuntime == TestContext.ContainerRuntime {
+		if containerRuntime == e2econtext.TestContext.ContainerRuntime {
 			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
 		}
 	}
@@ -366,21 +364,21 @@ func SkipIfContainerRuntimeIs(runtimes ...string) {
 // RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
 func RunIfContainerRuntimeIs(runtimes ...string) {
 	for _, containerRuntime := range runtimes {
-		if containerRuntime == TestContext.ContainerRuntime {
+		if containerRuntime == e2econtext.TestContext.ContainerRuntime {
 			return
 		}
 	}
-	skipInternalf(1, "Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
+	skipInternalf(1, "Skipped because container runtime %q is not in %s", e2econtext.TestContext.ContainerRuntime, runtimes)
 }
 
 // RunIfSystemSpecNameIs runs if the system spec name is included in the names.
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {
-		if name == TestContext.SystemSpecName {
+		if name == e2econtext.TestContext.SystemSpecName {
 			return
 		}
 	}
-	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
+	skipInternalf(1, "Skipped because system spec name %q is not in %v", e2econtext.TestContext.SystemSpecName, names)
 }
 
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
@@ -435,7 +433,7 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
-		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
+		if strings.ToLower(provider) == strings.ToLower(e2econtext.TestContext.Provider) {
 			return true
 		}
 	}
@@ -445,7 +443,7 @@ func ProviderIs(providers ...string) bool {
 // MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
 func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
-		if strings.ToLower(distro) == strings.ToLower(TestContext.MasterOSDistro) {
+		if strings.ToLower(distro) == strings.ToLower(e2econtext.TestContext.MasterOSDistro) {
 			return true
 		}
 	}
@@ -455,7 +453,7 @@ func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 // NodeOSDistroIs returns true if the node OS distro is included in the supportedNodeOsDistros. Otherwise false.
 func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	for _, distro := range supportedNodeOsDistros {
-		if strings.ToLower(distro) == strings.ToLower(TestContext.NodeOSDistro) {
+		if strings.ToLower(distro) == strings.ToLower(e2econtext.TestContext.NodeOSDistro) {
 			return true
 		}
 	}
@@ -843,7 +841,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		return nil, err
 	}
 
-	if TestContext.VerifyServiceAccount {
+	if e2econtext.TestContext.VerifyServiceAccount {
 		if err := WaitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
 			// Even if we fail to create serviceAccount in the namespace,
 			// we have successfully create a namespace.
@@ -1301,11 +1299,11 @@ func KubectlVersion() (*utilversion.Version, error) {
 
 // RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
-	e2elog.Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
-	if TestContext.KubeConfig == "" {
+	e2elog.Logf(">>> kubeConfig: %s", e2econtext.TestContext.KubeConfig)
+	if e2econtext.TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
-	c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
+	c, err := clientcmd.LoadFromFile(e2econtext.TestContext.KubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 	}
@@ -1321,19 +1319,19 @@ type ClientConfigGetter func() (*restclient.Config, error)
 
 // LoadConfig returns a config for a rest client.
 func LoadConfig() (*restclient.Config, error) {
-	if TestContext.NodeE2E {
+	if e2econtext.TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
-		return &restclient.Config{Host: TestContext.Host}, nil
+		return &restclient.Config{Host: e2econtext.TestContext.Host}, nil
 	}
-	c, err := RestclientConfig(TestContext.KubeContext)
+	c, err := RestclientConfig(e2econtext.TestContext.KubeContext)
 	if err != nil {
-		if TestContext.KubeConfig == "" {
+		if e2econtext.TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
 		}
 		return nil, err
 	}
 
-	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
+	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: e2econtext.TestContext.Host}}).ClientConfig()
 }
 
 // LoadClientset returns clientset for connecting to kubernetes clusters.
@@ -1442,30 +1440,30 @@ func KubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 
 	// Reference a --server option so tests can run anywhere.
-	if TestContext.Host != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+TestContext.Host)
+	if e2econtext.TestContext.Host != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+e2econtext.TestContext.Host)
 	}
-	if TestContext.KubeConfig != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	if e2econtext.TestContext.KubeConfig != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+e2econtext.TestContext.KubeConfig)
 
 		// Reference the KubeContext
-		if TestContext.KubeContext != "" {
-			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+TestContext.KubeContext)
+		if e2econtext.TestContext.KubeContext != "" {
+			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+e2econtext.TestContext.KubeContext)
 		}
 
 	} else {
-		if TestContext.CertDir != "" {
+		if e2econtext.TestContext.CertDir != "" {
 			defaultArgs = append(defaultArgs,
-				fmt.Sprintf("--certificate-authority=%s", filepath.Join(TestContext.CertDir, "ca.crt")),
-				fmt.Sprintf("--client-certificate=%s", filepath.Join(TestContext.CertDir, "kubecfg.crt")),
-				fmt.Sprintf("--client-key=%s", filepath.Join(TestContext.CertDir, "kubecfg.key")))
+				fmt.Sprintf("--certificate-authority=%s", filepath.Join(e2econtext.TestContext.CertDir, "ca.crt")),
+				fmt.Sprintf("--client-certificate=%s", filepath.Join(e2econtext.TestContext.CertDir, "kubecfg.crt")),
+				fmt.Sprintf("--client-key=%s", filepath.Join(e2econtext.TestContext.CertDir, "kubecfg.key")))
 		}
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
 	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
 	//and so on.
-	cmd := exec.Command(TestContext.KubectlPath, kubectlArgs...)
+	cmd := exec.Command(e2econtext.TestContext.KubectlPath, kubectlArgs...)
 
 	//caller will invoke this and wait on it.
 	return cmd
@@ -1624,8 +1622,8 @@ func RunKubectlInput(data string, args ...string) (string, error) {
 
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
 func RunKubemciWithKubeconfig(args ...string) (string, error) {
-	if TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	if e2econtext.TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+e2econtext.TestContext.KubeConfig)
 	}
 	return RunKubemciCmd(args...)
 }
@@ -1636,7 +1634,7 @@ func RunKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
 	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
+	args = append(args, "--gcp-project="+e2econtext.TestContext.CloudConfig.ProjectID)
 
 	b.cmd = exec.Command(kubemci, args...)
 	return b.Exec()
@@ -1780,7 +1778,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	// 1. it takes tens of minutes or hours to grab all of them
 	// 2. there are so many of them that working with them are mostly impossible
 	// So we dump them only if the cluster is relatively small.
-	maxNodesForDump := TestContext.MaxNodesToGather
+	maxNodesForDump := e2econtext.TestContext.MaxNodesToGather
 	if nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{}); err == nil {
 		if len(nodes.Items) <= maxNodesForDump {
 			dumpAllNodeInfo(c)
@@ -1962,9 +1960,9 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 }
 
 // WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become scheduable.
+// (but e2econtext.TestContext.AllowedNotReadyNodes) to become scheduable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
+	e2elog.Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, e2econtext.TestContext.AllowedNotReadyNodes)
 
 	var notSchedulable []*v1.Node
 	attempt := 0
@@ -2016,7 +2014,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 				e2elog.Logf("================================")
 			}
 		}
-		return len(notSchedulable) <= TestContext.AllowedNotReadyNodes, nil
+		return len(notSchedulable) <= e2econtext.TestContext.AllowedNotReadyNodes, nil
 	})
 }
 
@@ -2349,7 +2347,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
+	e2elog.Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, e2econtext.TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -2373,14 +2371,14 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// of nodes (which we allow in cluster validation). Some nodes that are not
 		// provisioned correctly at startup will never become ready (e.g. when something
 		// won't install correctly), so we can't expect them to be ready at any point.
-		return len(notReady) <= TestContext.AllowedNotReadyNodes, nil
+		return len(notReady) <= e2econtext.TestContext.AllowedNotReadyNodes, nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
 		return err
 	}
 
-	if len(notReady) > TestContext.AllowedNotReadyNodes {
+	if len(notReady) > e2econtext.TestContext.AllowedNotReadyNodes {
 		msg := ""
 		for _, node := range notReady {
 			msg = fmt.Sprintf("%s, %s", msg, node.Name)
@@ -2412,11 +2410,11 @@ func ParseKVLines(output, key string) string {
 func RestartKubeProxy(host string) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider for RestartKubeProxy: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartKubeProxy: %s", e2econtext.TestContext.Provider)
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
 	e2elog.Logf("Killing kube-proxy on node %v", host)
-	result, err := e2essh.SSH("sudo pkill kube-proxy", host, TestContext.Provider)
+	result, err := e2essh.SSH("sudo pkill kube-proxy", host, e2econtext.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
@@ -2425,7 +2423,7 @@ func RestartKubeProxy(host string) error {
 	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
 	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 		e2elog.Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
-		result, err := e2essh.SSH(sshCmd, host, TestContext.Provider)
+		result, err := e2essh.SSH(sshCmd, host, e2econtext.TestContext.Provider)
 		if err != nil {
 			return false, err
 		}
@@ -2450,10 +2448,10 @@ func RestartKubelet(host string) error {
 	// TODO: Make it work for all providers and distros.
 	supportedProviders := []string{"gce", "aws", "vsphere"}
 	if !ProviderIs(supportedProviders...) {
-		return fmt.Errorf("unsupported provider for RestartKubelet: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
+		return fmt.Errorf("unsupported provider for RestartKubelet: %s, supported providers are: %v", e2econtext.TestContext.Provider, supportedProviders)
 	}
 	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
-		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
+		return fmt.Errorf("unsupported node OS distro: %s", e2econtext.TestContext.NodeOSDistro)
 	}
 	var cmd string
 
@@ -2461,14 +2459,14 @@ func RestartKubelet(host string) error {
 		cmd = "sudo /etc/init.d/kubelet restart"
 	} else if ProviderIs("vsphere") {
 		var sudoPresent bool
-		sshResult, err := e2essh.SSH("sudo --version", host, TestContext.Provider)
+		sshResult, err := e2essh.SSH("sudo --version", host, e2econtext.TestContext.Provider)
 		if err != nil {
 			return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
 		}
 		if !strings.Contains(sshResult.Stderr, "command not found") {
 			sudoPresent = true
 		}
-		sshResult, err = e2essh.SSH("systemctl --version", host, TestContext.Provider)
+		sshResult, err = e2essh.SSH("systemctl --version", host, e2econtext.TestContext.Provider)
 		if !strings.Contains(sshResult.Stderr, "command not found") {
 			cmd = "systemctl restart kubelet"
 		} else {
@@ -2481,7 +2479,7 @@ func RestartKubelet(host string) error {
 		cmd = "sudo systemctl restart kubelet"
 	}
 	e2elog.Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
-	result, err := e2essh.SSH(cmd, host, TestContext.Provider)
+	result, err := e2essh.SSH(cmd, host, e2econtext.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart kubelet: %v", err)
@@ -2493,7 +2491,7 @@ func RestartKubelet(host string) error {
 func WaitForKubeletUp(host string) error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, host, TestContext.Provider)
+		result, err := e2essh.SSH(cmd, host, e2econtext.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}
@@ -2508,7 +2506,7 @@ func WaitForKubeletUp(host string) error {
 func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider for RestartApiserver: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartApiserver: %s", e2econtext.TestContext.Provider)
 	}
 	if ProviderIs("gce", "aws") {
 		initialRestartCount, err := getApiserverRestartCount(cs)
@@ -2531,7 +2529,7 @@ func RestartApiserver(cs clientset.Interface) error {
 
 func sshRestartMaster() error {
 	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for sshRestartMaster: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for sshRestartMaster: %s", e2econtext.TestContext.Provider)
 	}
 	var command string
 	if ProviderIs("gce") {
@@ -2540,7 +2538,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	e2elog.Logf("Restarting master via ssh, running: %v", command)
-	result, err := e2essh.SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+	result, err := e2essh.SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), e2econtext.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
@@ -2599,14 +2597,14 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
 	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", e2econtext.TestContext.Provider)
 	}
 	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
-		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
+		return fmt.Errorf("unsupported master OS distro: %s", e2econtext.TestContext.MasterOSDistro)
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	e2elog.Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+	result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), e2econtext.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -2618,7 +2616,7 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), e2econtext.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}
@@ -2634,7 +2632,7 @@ func CheckForControllerManagerHealthy(duration time.Duration) error {
 	var PID string
 	cmd := "pidof kube-controller-manager"
 	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), e2econtext.TestContext.Provider)
 		if err != nil {
 			// We don't necessarily know that it crashed, pipe could just be broken
 			e2essh.LogResult(result)
@@ -2817,7 +2815,7 @@ func LookForStringInFile(ns, podName, container, file, expectedString string, ti
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
-	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
+	return e2econtext.TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
 // BlockNetwork blocks network between the given from value and the given to value.
@@ -2842,7 +2840,7 @@ func BlockNetwork(from string, to string) {
 	e2elog.Logf("block network traffic from %s to %s", from, to)
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(dropCmd, from, TestContext.Provider); result.Code != 0 || err != nil {
+	if result, err := e2essh.SSH(dropCmd, from, e2econtext.TestContext.Provider); result.Code != 0 || err != nil {
 		e2essh.LogResult(result)
 		e2elog.Failf("Unexpected error: %v", err)
 	}
@@ -2860,7 +2858,7 @@ func UnblockNetwork(from string, to string) {
 	// may fail). Manual intervention is required in such case (recreating the
 	// cluster solves the problem too).
 	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-		result, err := e2essh.SSH(undropCmd, from, TestContext.Provider)
+		result, err := e2essh.SSH(undropCmd, from, e2econtext.TestContext.Provider)
 		if result.Code == 0 && err == nil {
 			return true, nil
 		}
@@ -2939,20 +2937,20 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, pingC
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
-	if TestContext.DisableLogDump {
+	if e2econtext.TestContext.DisableLogDump {
 		e2elog.Logf("Skipping dumping logs from cluster")
 		return
 	}
 	var cmd *exec.Cmd
-	if TestContext.LogexporterGCSPath != "" {
-		e2elog.Logf("Dumping logs from nodes to GCS directly at path: %s", TestContext.LogexporterGCSPath)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, TestContext.LogexporterGCSPath)
+	if e2econtext.TestContext.LogexporterGCSPath != "" {
+		e2elog.Logf("Dumping logs from nodes to GCS directly at path: %s", e2econtext.TestContext.LogexporterGCSPath)
+		cmd = exec.Command(path.Join(e2econtext.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, e2econtext.TestContext.LogexporterGCSPath)
 	} else {
 		e2elog.Logf("Dumping logs locally to: %s", dir)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+		cmd = exec.Command(path.Join(e2econtext.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(e2econtext.TestContext.SystemdServices)))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", e2econtext.TestContext.DumpSystemdJournal))
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -3135,7 +3133,7 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
-	hostURL, err := url.Parse(TestContext.Host)
+	hostURL, err := url.Parse(e2econtext.TestContext.Host)
 	if err != nil {
 		e2elog.Failf("Failed to parse hostname: %v", err)
 	}
@@ -3156,7 +3154,7 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 	externalIP, internalIP, _ := getMasterAddresses(c)
 
 	ips := sets.NewString()
-	switch TestContext.Provider {
+	switch e2econtext.TestContext.Provider {
 	case "gce", "gke":
 		if externalIP != "" {
 			ips.Insert(externalIP)
@@ -3167,7 +3165,7 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 	case "aws":
 		ips.Insert(awsMasterIP)
 	default:
-		e2elog.Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
+		e2elog.Failf("This test is not supported for provider %s and should be disabled", e2econtext.TestContext.Provider)
 	}
 	return ips.List()
 }
@@ -3277,13 +3275,13 @@ func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
 	now := time.Now()
 	for i := range summaries {
 		e2elog.Logf("Printing summary: %v", summaries[i].SummaryKind())
-		switch TestContext.OutputPrintType {
+		switch e2econtext.TestContext.OutputPrintType {
 		case "hr":
-			if TestContext.ReportDir == "" {
+			if e2econtext.TestContext.ReportDir == "" {
 				e2elog.Logf(summaries[i].PrintHumanReadable())
 			} else {
 				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				filePath := path.Join(e2econtext.TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
 				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
 					e2elog.Logf("Failed to write file %v with test performance data: %v", filePath, err)
 				}
@@ -3291,15 +3289,15 @@ func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
 		case "json":
 			fallthrough
 		default:
-			if TestContext.OutputPrintType != "json" {
-				e2elog.Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
+			if e2econtext.TestContext.OutputPrintType != "json" {
+				e2elog.Logf("Unknown output type: %v. Printing JSON", e2econtext.TestContext.OutputPrintType)
 			}
-			if TestContext.ReportDir == "" {
+			if e2econtext.TestContext.ReportDir == "" {
 				e2elog.Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
 				e2elog.Logf("Finished")
 			} else {
 				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				filePath := path.Join(e2econtext.TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
 				e2elog.Logf("Writing to %s", filePath)
 				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
 					e2elog.Logf("Failed to write file %v with test performance data: %v", filePath, err)

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -45,7 +46,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	f := framework.NewDefaultFramework("performancedns")
 
 	ginkgo.BeforeEach(func() {
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, e2econtext.TestContext.NodeSchedulableTimeout))
 		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(f.ClientSet, f.Namespace.Name)
@@ -85,7 +86,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			s := services[i]
 			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(s.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			qname := fmt.Sprintf("%v.%v.svc.%v", s.Name, s.Namespace, framework.TestContext.ClusterDNSDomain)
+			qname := fmt.Sprintf("%v.%v.svc.%v", s.Name, s.Namespace, e2econtext.TestContext.ClusterDNSDomain)
 			e2elog.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)
 			dnsTest.checkDNSRecordFrom(
 				qname,

@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
@@ -154,7 +155,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 			framework.Skipf("Distro doesn't support xfs -- skipping")
 		}
 		if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
-			framework.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
+			framework.Skipf("Distro %s doesn't support ntfs -- skipping", e2econtext.TestContext.NodeOSDistro)
 		}
 	}
 
@@ -450,7 +451,7 @@ func StartPodLogs(f *framework.Framework) func() {
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,
 	}
-	if framework.TestContext.ReportDir == "" {
+	if e2econtext.TestContext.ReportDir == "" {
 		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
 		test := ginkgo.CurrentGinkgoTestDescription()
@@ -460,7 +461,7 @@ func StartPodLogs(f *framework.Framework) func() {
 		//
 		// TODO: use a deeper directory hierarchy once gubernator
 		// supports that (https://github.com/kubernetes/test-infra/issues/10289).
-		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
+		to.LogPathPrefix = e2econtext.TestContext.ReportDir + "/" +
 			reg.ReplaceAllString(test.FullTestText, "_") + "/"
 	}
 	podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
@@ -468,7 +469,7 @@ func StartPodLogs(f *framework.Framework) func() {
 	// pod events are something that the framework already collects itself
 	// after a failed test. Logging them live is only useful for interactive
 	// debugging, not when we collect reports.
-	if framework.TestContext.ReportDir == "" {
+	if e2econtext.TestContext.ReportDir == "" {
 		podlogs.WatchPods(ctx, cs, ns.Name, ginkgo.GinkgoWriter)
 	}
 

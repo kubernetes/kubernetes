@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -36,7 +37,7 @@ const (
 )
 
 func getProfilesDirectoryPath() string {
-	return path.Join(TestContext.ReportDir, "profiles")
+	return path.Join(e2econtext.TestContext.ReportDir, "profiles")
 }
 
 func createProfilesDirectoryIfNeeded() error {
@@ -52,10 +53,10 @@ func createProfilesDirectoryIfNeeded() error {
 }
 
 func checkProfileGatheringPrerequisites() error {
-	if !TestContext.AllowGatheringProfiles {
+	if !e2econtext.TestContext.AllowGatheringProfiles {
 		return fmt.Errorf("Can't gather profiles as --allow-gathering-profiles is false")
 	}
-	if TestContext.ReportDir == "" {
+	if e2econtext.TestContext.ReportDir == "" {
 		return fmt.Errorf("Can't gather profiles as --report-dir is empty")
 	}
 	if err := createProfilesDirectoryIfNeeded(); err != nil {
@@ -96,7 +97,7 @@ func gatherProfile(componentName, profileBaseName, profileKind string) error {
 
 	// Get the profile data over SSH.
 	getCommand := fmt.Sprintf("curl -s localhost:%v/debug/pprof/%s", profilePort, profileKind)
-	sshResult, err := e2essh.SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(getCommand, GetMasterHost()+":22", e2econtext.TestContext.Provider)
 	if err != nil {
 		return fmt.Errorf("Failed to execute curl command on master through SSH: %v", err)
 	}

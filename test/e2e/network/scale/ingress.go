@@ -30,7 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
@@ -65,7 +65,7 @@ type IngressScaleFramework struct {
 	Clientset     clientset.Interface
 	Jig           *ingress.TestJig
 	GCEController *gce.IngressController
-	CloudConfig   framework.CloudConfig
+	CloudConfig   e2econtext.CloudConfig
 	Logger        ingress.TestLogger
 
 	Namespace        string
@@ -91,7 +91,7 @@ type IngressScaleFramework struct {
 }
 
 // NewIngressScaleFramework returns a new framework for ingress scale testing.
-func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig framework.CloudConfig) *IngressScaleFramework {
+func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig e2econtext.CloudConfig) *IngressScaleFramework {
 	return &IngressScaleFramework{
 		Namespace:   ns,
 		Clientset:   cs,

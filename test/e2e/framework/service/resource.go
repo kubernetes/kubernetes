@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -83,7 +84,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 
 // CleanupServiceResources cleans up service Type=LoadBalancer resources.
 func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
-	framework.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
+	e2econtext.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
 }
 
 // GetIngressPoint returns a host on which ingress serves.
@@ -98,7 +99,7 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 // EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
 // setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
 func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
+	return e2econtext.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
 // DescribeSvc logs the output of kubectl describe svc for the given namespace

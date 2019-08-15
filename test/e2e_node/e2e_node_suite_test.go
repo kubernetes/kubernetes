@@ -42,6 +42,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -64,8 +65,8 @@ var systemSpecFile = flag.String("system-spec-file", "", "The name of the system
 
 func init() {
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterNodeFlags(flag.CommandLine)
+	e2econtext.RegisterCommonFlags(flag.CommandLine)
+	e2econtext.RegisterNodeFlags(flag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Mark the run-services-mode flag as hidden to prevent user from using it.
 	pflag.CommandLine.MarkHidden("run-services-mode")
@@ -86,7 +87,7 @@ func init() {
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	e2econtext.AfterReadingAllFlags(&e2econtext.TestContext)
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -116,7 +117,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("Failed to load system spec: %v", err)
 			}
 		}
-		if framework.TestContext.NodeConformance {
+		if e2econtext.TestContext.NodeConformance {
 			// Chroot to /rootfs to make system validation can check system
 			// as in the root filesystem.
 			// TODO(random-liu): Consider to chroot the whole test process to make writing
@@ -125,7 +126,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); err != nil {
+		if _, err := system.ValidateSpec(*spec, e2econtext.TestContext.ContainerRuntime); err != nil {
 			klog.Exitf("system validation failed: %v", err)
 		}
 		return
@@ -133,14 +134,14 @@ func TestE2eNode(t *testing.T) {
 	// If run-services-mode is not specified, run test.
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	reporters := []ginkgo.Reporter{}
-	reportDir := framework.TestContext.ReportDir
+	reportDir := e2econtext.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", e2econtext.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := path.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
@@ -155,7 +156,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
-	if framework.TestContext.PrepullImages {
+	if e2econtext.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
 		updateImageWhiteList()
 		err := PrePullAllImages()
@@ -268,7 +269,7 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get node: %v", err)
 	}
-	framework.TestContext.NodeName = node.Name // Set node name.
+	e2econtext.TestContext.NodeName = node.Name // Set node name.
 	// Update test context with current kubelet configuration.
 	// This assumes all tests which dynamically change kubelet configuration
 	// must: 1) run in serial; 2) restore kubelet configuration after test.
@@ -276,7 +277,7 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get kubelet configuration: %v", err)
 	}
-	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
+	e2econtext.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
 }
 
@@ -336,7 +337,7 @@ func isNodeReady(node *v1.Node) bool {
 }
 
 func setExtraEnvs() {
-	for name, value := range framework.TestContext.ExtraEnvs {
+	for name, value := range e2econtext.TestContext.ExtraEnvs {
 		os.Setenv(name, value)
 	}
 }

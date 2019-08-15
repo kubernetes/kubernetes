@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
@@ -362,9 +363,9 @@ func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, 
 // differently.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := e2essh.GetSigner(framework.TestContext.Provider)
+	signer, err := e2essh.GetSigner(e2econtext.TestContext.Provider)
 	if err != nil {
-		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
+		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", e2econtext.TestContext.Provider, err)
 	}
 
 	sshUser := os.Getenv("KUBE_SSH_USER")

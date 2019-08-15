@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
@@ -46,10 +47,10 @@ var _ = framework.KubeDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 
 func createNodePoolWithLocalSsds(nodePoolName string) {
 	e2elog.Logf("Create node pool: %s with local SSDs in cluster: %s ",
-		nodePoolName, framework.TestContext.CloudConfig.Cluster)
+		nodePoolName, e2econtext.TestContext.CloudConfig.Cluster)
 	out, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create",
 		nodePoolName,
-		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
+		fmt.Sprintf("--cluster=%s", e2econtext.TestContext.CloudConfig.Cluster),
 		"--local-ssd-count=1").CombinedOutput()
 	if err != nil {
 		e2elog.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))

@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
@@ -187,7 +188,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 // logAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
 func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits e2ekubelet.ContainersCPUSummary,
 	memLimits e2ekubelet.ResourceUsagePerContainer, testInfo map[string]string, isVerify bool) {
-	nodeName := framework.TestContext.NodeName
+	nodeName := e2econtext.TestContext.NodeName
 
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
@@ -286,7 +287,7 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 }
 
 func logPods(c clientset.Interface) {
-	nodeName := framework.TestContext.NodeName
+	nodeName := e2econtext.TestContext.NodeName
 	podList, err := e2ekubelet.GetKubeletRunningPods(c, nodeName)
 	if err != nil {
 		e2elog.Logf("Unable to retrieve kubelet pods for node %v", nodeName)

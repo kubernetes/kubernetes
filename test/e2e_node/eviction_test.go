@@ -36,6 +36,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -527,7 +528,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
 			}
 			reduceAllocatableMemoryUsage()
-			if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
+			if expectedNodeCondition == v1.NodeDiskPressure && e2econtext.TestContext.PrepullImages {
 				// The disk eviction test may cause the prepulled images to be evicted,
 				// prepull those images again to ensure this test not affect following tests.
 				PrePullAllImages()
@@ -550,7 +551,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			})
 
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				if framework.TestContext.DumpLogsOnFailure {
+				if e2econtext.TestContext.DumpLogsOnFailure {
 					logPodEvents(f)
 					logNodeEvents(f)
 				}

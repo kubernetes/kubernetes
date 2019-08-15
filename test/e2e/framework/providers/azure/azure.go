@@ -23,7 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -34,13 +34,13 @@ func init() {
 }
 
 func newProvider() (e2eproviders.ProviderInterface, error) {
-	if framework.TestContext.CloudConfig.ConfigFile == "" {
+	if e2econtext.TestContext.CloudConfig.ConfigFile == "" {
 		return nil, fmt.Errorf("config-file must be specified for Azure")
 	}
-	config, err := os.Open(framework.TestContext.CloudConfig.ConfigFile)
+	config, err := os.Open(e2econtext.TestContext.CloudConfig.ConfigFile)
 	if err != nil {
 		e2elog.Logf("Couldn't open cloud provider configuration %s: %#v",
-			framework.TestContext.CloudConfig.ConfigFile, err)
+			e2econtext.TestContext.CloudConfig.ConfigFile, err)
 	}
 	defer config.Close()
 	azureCloud, err := azure.NewCloud(config)
@@ -63,7 +63,7 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
-	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
+	pdName := fmt.Sprintf("%s-%s", e2econtext.TestContext.Prefix, string(uuid.NewUUID()))
 	_, diskURI, _, err := p.azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
 	if err != nil {
 		return "", err

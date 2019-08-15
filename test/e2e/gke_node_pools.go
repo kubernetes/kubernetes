@@ -21,6 +21,7 @@ import (
 	"os/exec"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
@@ -41,9 +42,9 @@ var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
 })
 
 func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
-	e2elog.Logf("Create node pool: %q in cluster: %q", poolName, framework.TestContext.CloudConfig.Cluster)
+	e2elog.Logf("Create node pool: %q in cluster: %q", poolName, e2econtext.TestContext.CloudConfig.Cluster)
 
-	clusterStr := fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster)
+	clusterStr := fmt.Sprintf("--cluster=%s", e2econtext.TestContext.CloudConfig.Cluster)
 
 	out, err := exec.Command("gcloud", "container", "node-pools", "create",
 		poolName,
@@ -58,7 +59,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		e2elog.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		e2elog.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", e2econtext.TestContext.CloudConfig.Cluster, err, string(out))
 	}
 	e2elog.Logf("Node pools:\n%s", string(out))
 
@@ -69,7 +70,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 	}
 	e2elog.Logf("Success, found 2 nodes with correct node pool labels.")
 
-	e2elog.Logf("Deleting node pool: %q in cluster: %q", poolName, framework.TestContext.CloudConfig.Cluster)
+	e2elog.Logf("Deleting node pool: %q in cluster: %q", poolName, e2econtext.TestContext.CloudConfig.Cluster)
 	out, err = exec.Command("gcloud", "container", "node-pools", "delete",
 		poolName,
 		clusterStr,
@@ -83,7 +84,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		e2elog.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		e2elog.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", e2econtext.TestContext.CloudConfig.Cluster, err, string(out))
 	}
 	e2elog.Logf("\nNode pools:\n%s", string(out))
 

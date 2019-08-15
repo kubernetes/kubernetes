@@ -27,6 +27,7 @@ import (
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -44,7 +45,7 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 	f := framework.NewDefaultFramework("container-log-rotation-test")
 	ginkgo.Context("when a container generates a lot of log", func() {
 		ginkgo.BeforeEach(func() {
-			if framework.TestContext.ContainerRuntime != kubetypes.RemoteContainerRuntime {
+			if e2econtext.TestContext.ContainerRuntime != kubetypes.RemoteContainerRuntime {
 				framework.Skipf("Skipping ContainerLogRotation test since the container runtime is not remote")
 			}
 		})

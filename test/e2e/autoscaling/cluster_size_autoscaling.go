@@ -43,6 +43,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -101,7 +102,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		originalSizes = make(map[string]int)
 		sum := 0
-		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
+		for _, mig := range strings.Split(e2econtext.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			size, err := framework.GroupSize(mig)
 			framework.ExpectNoError(err)
 			ginkgo.By(fmt.Sprintf("Initial size of %s: %d", mig, size))
@@ -591,8 +592,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			klog.Infof("Usually only 1 new node is expected, investigating")
 			klog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
 			if output, err := exec.Command("gcloud", "compute", "instances", "list",
-				"--project="+framework.TestContext.CloudConfig.ProjectID,
-				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
+				"--project="+e2econtext.TestContext.CloudConfig.ProjectID,
+				"--zone="+e2econtext.TestContext.CloudConfig.Zone).Output(); err == nil {
 				klog.Infof("Gcloud compute instances list: %s", output)
 			} else {
 				klog.Errorf("Failed to get instances list: %v", err)
@@ -601,8 +602,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			for newNode := range newNodesSet {
 				if output, err := execCmd("gcloud", "compute", "instances", "describe",
 					newNode,
-					"--project="+framework.TestContext.CloudConfig.ProjectID,
-					"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
+					"--project="+e2econtext.TestContext.CloudConfig.ProjectID,
+					"--zone="+e2econtext.TestContext.CloudConfig.Zone).Output(); err == nil {
 					klog.Infof("Gcloud compute instances describe: %s", output)
 				} else {
 					klog.Errorf("Failed to get instances describe: %v", err)
@@ -1065,14 +1066,14 @@ func getGKEClusterURL(apiVersion string) string {
 	if isRegionalCluster() {
 		// TODO(bskiba): Use locations API for all clusters once it's graduated to v1.
 		return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/locations/%s/clusters/%s",
-			framework.TestContext.CloudConfig.ProjectID,
-			framework.TestContext.CloudConfig.Region,
-			framework.TestContext.CloudConfig.Cluster))
+			e2econtext.TestContext.CloudConfig.ProjectID,
+			e2econtext.TestContext.CloudConfig.Region,
+			e2econtext.TestContext.CloudConfig.Cluster))
 	}
 	return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/zones/%s/clusters/%s",
-		framework.TestContext.CloudConfig.ProjectID,
-		framework.TestContext.CloudConfig.Zone,
-		framework.TestContext.CloudConfig.Cluster))
+		e2econtext.TestContext.CloudConfig.ProjectID,
+		e2econtext.TestContext.CloudConfig.Zone,
+		e2econtext.TestContext.CloudConfig.Cluster))
 }
 
 func getCluster(apiVersion string) (string, error) {
@@ -1109,9 +1110,9 @@ func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
 
 func getClusterLocation() string {
 	if isRegionalCluster() {
-		return "--region=" + framework.TestContext.CloudConfig.Region
+		return "--region=" + e2econtext.TestContext.CloudConfig.Region
 	}
-	return "--zone=" + framework.TestContext.CloudConfig.Zone
+	return "--zone=" + e2econtext.TestContext.CloudConfig.Zone
 }
 
 func getGcloudCommandFromTrack(commandTrack string, args []string) []string {
@@ -1121,7 +1122,7 @@ func getGcloudCommandFromTrack(commandTrack string, args []string) []string {
 	}
 	command = append(command, args...)
 	command = append(command, getClusterLocation())
-	command = append(command, "--project="+framework.TestContext.CloudConfig.ProjectID)
+	command = append(command, "--project="+e2econtext.TestContext.CloudConfig.ProjectID)
 	return command
 }
 
@@ -1135,13 +1136,13 @@ func getGcloudCommand(args []string) []string {
 
 func isRegionalCluster() bool {
 	// TODO(bskiba): Use an appropriate indicator that the cluster is regional.
-	return framework.TestContext.CloudConfig.MultiZone
+	return e2econtext.TestContext.CloudConfig.MultiZone
 }
 
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 	klog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
-	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+	args := []string{"container", "clusters", "update", e2econtext.TestContext.CloudConfig.Cluster,
 		"--enable-autoscaling",
 		"--min-nodes=" + strconv.Itoa(minCount),
 		"--max-nodes=" + strconv.Itoa(maxCount),
@@ -1167,7 +1168,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	klog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
-	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+	args := []string{"container", "clusters", "update", e2econtext.TestContext.CloudConfig.Cluster,
 		"--no-enable-autoscaling",
 		"--node-pool=" + nodePool}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
@@ -1193,7 +1194,7 @@ func addNodePool(name string, machineType string, numNodes int) {
 	args := []string{"container", "node-pools", "create", name, "--quiet",
 		"--machine-type=" + machineType,
 		"--num-nodes=" + strconv.Itoa(numNodes),
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+		"--cluster=" + e2econtext.TestContext.CloudConfig.Cluster}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	klog.Infof("Creating node-pool %s: %s", name, output)
 	framework.ExpectNoError(err, string(output))
@@ -1203,7 +1204,7 @@ func addGpuNodePool(name string, gpuType string, gpuCount int, numNodes int) {
 	args := []string{"beta", "container", "node-pools", "create", name, "--quiet",
 		"--accelerator", "type=" + gpuType + ",count=" + strconv.Itoa(gpuCount),
 		"--num-nodes=" + strconv.Itoa(numNodes),
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+		"--cluster=" + e2econtext.TestContext.CloudConfig.Cluster}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	klog.Infof("Creating node-pool %s: %s", name, output)
 	framework.ExpectNoError(err, string(output))
@@ -1212,7 +1213,7 @@ func addGpuNodePool(name string, gpuType string, gpuCount int, numNodes int) {
 func deleteNodePool(name string) {
 	klog.Infof("Deleting node pool %s", name)
 	args := []string{"container", "node-pools", "delete", name, "--quiet",
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+		"--cluster=" + e2econtext.TestContext.CloudConfig.Cluster}
 	err := wait.ExponentialBackoff(
 		wait.Backoff{Duration: 1 * time.Minute, Factor: float64(3), Steps: 3},
 		func() (bool, error) {
@@ -1249,7 +1250,7 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 func getPoolInitialSize(poolName string) int {
 	// get initial node count
 	args := []string{"container", "node-pools", "describe", poolName, "--quiet",
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+		"--cluster=" + e2econtext.TestContext.CloudConfig.Cluster,
 		"--format=value(initialNodeCount)"}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	klog.Infof("Node-pool initial size: %s", output)
@@ -1261,7 +1262,7 @@ func getPoolInitialSize(poolName string) int {
 
 	// get number of node pools
 	args = []string{"container", "node-pools", "describe", poolName, "--quiet",
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+		"--cluster=" + e2econtext.TestContext.CloudConfig.Cluster,
 		"--format=value(instanceGroupUrls)"}
 	output, err = execCmd(getGcloudCommand(args)...).CombinedOutput()
 	framework.ExpectNoError(err, string(output))

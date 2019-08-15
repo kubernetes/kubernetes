@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
@@ -38,7 +39,7 @@ func init() {
 }
 
 func newProvider() (e2eproviders.ProviderInterface, error) {
-	if framework.TestContext.CloudConfig.Zone == "" {
+	if e2econtext.TestContext.CloudConfig.Zone == "" {
 		return nil, fmt.Errorf("gce-zone must be specified for AWS")
 	}
 	return &Provider{}, nil
@@ -143,7 +144,7 @@ func newAWSClient(zone string) *ec2.EC2 {
 	var cfg *aws.Config
 
 	if zone == "" {
-		zone = framework.TestContext.CloudConfig.Zone
+		zone = e2econtext.TestContext.CloudConfig.Zone
 	}
 	if zone == "" {
 		e2elog.Logf("Warning: No AWS zone configured!")

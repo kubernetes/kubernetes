@@ -64,6 +64,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
+        "//test/e2e/framework/context:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",

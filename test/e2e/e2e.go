@@ -32,6 +32,7 @@ import (
 	"k8s.io/component-base/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 
 	// ensure auth plugins are loaded
@@ -79,13 +80,13 @@ func RunE2ETests(t *testing.T) {
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
-	if framework.TestContext.ReportDir != "" {
+	if e2econtext.TestContext.ReportDir != "" {
 		// TODO: we should probably only be trying to create this directory once
 		// rather than once-per-Ginkgo-node.
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
+		if err := os.MkdirAll(e2econtext.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			r = append(r, reporters.NewJUnitReporter(path.Join(e2econtext.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", e2econtext.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)

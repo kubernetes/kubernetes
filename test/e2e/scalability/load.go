@@ -58,6 +58,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
@@ -364,8 +365,8 @@ func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.Sc
 		framework.ExpectNoError(err)
 		config.QPS = 100
 		config.Burst = 200
-		if framework.TestContext.KubeAPIContentType != "" {
-			config.ContentType = framework.TestContext.KubeAPIContentType
+		if e2econtext.TestContext.KubeAPIContentType != "" {
+			config.ContentType = e2econtext.TestContext.KubeAPIContentType
 		}
 
 		// For the purpose of this test, we want to force that clients

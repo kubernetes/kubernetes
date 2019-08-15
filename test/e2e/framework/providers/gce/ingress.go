@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	utilexec "k8s.io/utils/exec"
@@ -76,7 +77,7 @@ type IngressController struct {
 	rc           *v1.ReplicationController
 	svc          *v1.Service
 	Client       clientset.Interface
-	Cloud        framework.CloudConfig
+	Cloud        e2econtext.CloudConfig
 }
 
 // CleanupIngressController calls cont.CleanupIngressControllerWithTimeout with hard-coded timeout

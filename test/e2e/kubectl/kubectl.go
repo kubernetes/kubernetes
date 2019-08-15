@@ -63,6 +63,7 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -428,7 +429,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.It("should support exec through an HTTP proxy", func() {
 			// Fail if the variable isn't set
-			if framework.TestContext.Host == "" {
+			if e2econtext.TestContext.Host == "" {
 				e2elog.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
@@ -451,7 +452,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				}
 
 				// Verify the proxy server logs saw the connection
-				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(framework.TestContext.Host, "https://"), "/api"))
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(e2econtext.TestContext.Host, "https://"), "/api"))
 
 				proxyLog := proxyLogs.String()
 				if !strings.Contains(proxyLog, expectedProxyLog) {
@@ -462,7 +463,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.It("should support exec through kubectl proxy", func() {
 			// Fail if the variable isn't set
-			if framework.TestContext.Host == "" {
+			if e2econtext.TestContext.Host == "" {
 				e2elog.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
@@ -635,7 +636,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("overriding icc with values provided by flags")
-			kubectlPath := framework.TestContext.KubectlPath
+			kubectlPath := e2econtext.TestContext.KubectlPath
 			// we need the actual kubectl binary, not the script wrapper
 			kubectlPathNormalizer := exec.Command("which", kubectlPath)
 			if strings.HasSuffix(kubectlPath, "kubectl.sh") {

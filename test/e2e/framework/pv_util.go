@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -729,13 +730,13 @@ func DeletePDWithRetry(diskName string) error {
 
 func createPD(zone string) (string, error) {
 	if zone == "" {
-		zone = TestContext.CloudConfig.Zone
+		zone = e2econtext.TestContext.CloudConfig.Zone
 	}
-	return TestContext.CloudConfig.Provider.CreatePD(zone)
+	return e2econtext.TestContext.CloudConfig.Provider.CreatePD(zone)
 }
 
 func deletePD(pdName string) error {
-	return TestContext.CloudConfig.Provider.DeletePD(pdName)
+	return e2econtext.TestContext.CloudConfig.Provider.DeletePD(pdName)
 }
 
 // MakeWritePod returns a pod definition based on the namespace. The pod references the PVC's
@@ -1057,12 +1058,12 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
+	return e2econtext.TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
 }
 
 // DeletePVSource deletes a PV source.
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
+	return e2econtext.TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
 }
 
 // GetBoundPV returns a PV details.

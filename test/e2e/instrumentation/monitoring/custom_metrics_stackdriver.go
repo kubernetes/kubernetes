@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -96,7 +97,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, customMetricsClient customclient.CustomMetricsClient, discoveryClient *discovery.DiscoveryClient, adapterDeployment string) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econtext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
@@ -142,7 +143,7 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 
 // TODO(kawych): migrate this test to new resource model
 func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface, externalMetricsClient externalclient.ExternalMetricsClient) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econtext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)

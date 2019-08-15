@@ -28,7 +28,7 @@ import (
 // ViperizeFlags checks whether a configuration file was specified,
 // reads it, and updates the configuration variables in the specified
 // flag set accordingly. Must be called after framework.HandleFlags()
-// and before framework.AfterReadingAllFlags().
+// and before e2econtext.AfterReadingAllFlags().
 //
 // The logic is so that a required configuration file must be present. If empty,
 // the optional configuration file is used instead, unless also empty.

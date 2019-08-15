@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -139,7 +140,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	if hook != nil {
 		defer func() {
 			e2elog.Logf("Executing termination hook on nodes")
-			hook(framework.TestContext.Provider, nodelist)
+			hook(e2econtext.TestContext.Provider, nodelist)
 		}()
 	}
 	result := make([]bool, len(nodelist.Items))
@@ -151,7 +152,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 		go func(ix int) {
 			defer wg.Done()
 			n := nodelist.Items[ix]
-			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			result[ix] = rebootNode(c, e2econtext.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
 			if !result[ix] {
 				failed = true
 			}

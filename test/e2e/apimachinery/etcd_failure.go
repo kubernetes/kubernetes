@@ -25,6 +25,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/apps"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -98,8 +99,8 @@ func doEtcdFailure(failCommand, fixCommand string) {
 
 func masterExec(cmd string) {
 	host := framework.GetMasterHost() + ":22"
-	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
+	result, err := e2essh.SSH(cmd, host, e2econtext.TestContext.Provider)
+	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, e2econtext.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)
 		e2elog.Failf("master exec command returned non-zero")

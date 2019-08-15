@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -34,7 +35,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, e2econtext.TestContext.NodeSchedulableTimeout))
 	})
 
 	ginkgo.It("should verify that all nodes have volume limits", func() {

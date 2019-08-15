@@ -37,6 +37,7 @@ go_library(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/config:go_default_library",
+        "//test/e2e/framework/context:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",

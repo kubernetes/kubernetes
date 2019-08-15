@@ -61,21 +61,22 @@ func (p *Provider) GetGroupNodes(group string) ([]string, error) {
 }
 
 // FrameworkBeforeEach prepares clients, configurations etc. for e2e testing
-func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
+func (p *Provider) FrameworkBeforeEach(client clientset.Interface, clientQPS float32, clientBurst int, callback func(clientset.Interface)) {
 	if *kubemarkExternalKubeConfig != "" && p.controller == nil {
 		externalConfig, err := clientcmd.BuildConfigFromFlags("", *kubemarkExternalKubeConfig)
-		externalConfig.QPS = f.Options.ClientQPS
-		externalConfig.Burst = f.Options.ClientBurst
+		externalConfig.QPS = clientQPS
+		externalConfig.Burst = clientBurst
 		framework.ExpectNoError(err)
 		externalClient, err := clientset.NewForConfig(externalConfig)
 		framework.ExpectNoError(err)
-		f.KubemarkExternalClusterClientSet = externalClient
+		callback(externalClient)
+		//f.KubemarkExternalClusterClientSet = externalClient
 		p.closeChannel = make(chan struct{})
 		externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
-		kubemarkInformerFactory := informers.NewSharedInformerFactory(f.ClientSet, 0)
+		kubemarkInformerFactory := informers.NewSharedInformerFactory(client, 0)
 		kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
 		go kubemarkNodeInformer.Informer().Run(p.closeChannel)
-		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
+		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, client, kubemarkNodeInformer)
 		framework.ExpectNoError(err)
 		externalInformerFactory.Start(p.closeChannel)
 		gomega.Expect(p.controller.WaitForCacheSync(p.closeChannel)).To(gomega.BeTrue())
@@ -84,7 +85,7 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 }
 
 // FrameworkAfterEach cleans up after e2e testing
-func (p *Provider) FrameworkAfterEach(f *framework.Framework) {
+func (p *Provider) FrameworkAfterEach() {
 	if p.closeChannel != nil {
 		close(p.closeChannel)
 		p.controller = nil

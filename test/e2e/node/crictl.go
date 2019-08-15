@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
@@ -57,7 +58,7 @@ var _ = SIGDescribe("crictl", func() {
 			host := hosts[0]
 			ginkgo.By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
 
-			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
+			result, err := e2essh.SSH(testCase.cmd, host, e2econtext.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
 				e2elog.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)

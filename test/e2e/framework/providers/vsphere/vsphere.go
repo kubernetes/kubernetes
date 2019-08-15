@@ -17,7 +17,6 @@ limitations under the License.
 package vsphere
 
 import (
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 )
 

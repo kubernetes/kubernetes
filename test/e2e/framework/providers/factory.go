@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // Factory is a func which operates provider specific behavior.
@@ -89,8 +88,10 @@ func SetupProviderConfig(providerName string) (ProviderInterface, error) {
 // ProviderInterface contains the implementation for certain
 // provider-specific functionality.
 type ProviderInterface interface {
-	FrameworkBeforeEach(f *framework.Framework)
-	FrameworkAfterEach(f *framework.Framework)
+	// TODO(WanLinghao): Revert this function, use Framework directly
+	// see: https://github.com/kubernetes/kubernetes/pull/81464
+	FrameworkBeforeEach(client clientset.Interface, clientQPS float32, clientBurst int, callback func(clientset.Interface))
+	FrameworkAfterEach()
 
 	ResizeGroup(group string, size int32) error
 	GetGroupNodes(group string) ([]string, error)
@@ -115,10 +116,11 @@ type ProviderInterface interface {
 type NullProvider struct{}
 
 // FrameworkBeforeEach is a base implementation which does BeforeEach.
-func (n NullProvider) FrameworkBeforeEach(f *framework.Framework) {}
+func (n NullProvider) FrameworkBeforeEach(client clientset.Interface, clientQPS float32, clientBurst int, callback func(clientset.Interface)) {
+}
 
 // FrameworkAfterEach is a base implementation which does AfterEach.
-func (n NullProvider) FrameworkAfterEach(f *framework.Framework) {}
+func (n NullProvider) FrameworkAfterEach() {}
 
 // ResizeGroup is a base implementation which resizes group.
 func (n NullProvider) ResizeGroup(string, int32) error {

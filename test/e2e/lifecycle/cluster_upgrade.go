@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2elifecycle "k8s.io/kubernetes/test/e2e/framework/lifecycle"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -203,7 +204,7 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 			upgradeFunc := func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, etcdTest)
-				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
+				framework.ExpectNoError(framework.EtcdUpgrade(e2econtext.TestContext.EtcdUpgradeStorage, e2econtext.TestContext.EtcdUpgradeVersion))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.EtcdUpgrade, upgradeFunc)
 		})
@@ -470,8 +471,8 @@ func runUpgradeSuite(
 	defer func() {
 		testSuite.Update()
 		testSuite.Time = time.Since(start).Seconds()
-		if framework.TestContext.ReportDir != "" {
-			fname := filepath.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%supgrades.xml", framework.TestContext.ReportPrefix))
+		if e2econtext.TestContext.ReportDir != "" {
+			fname := filepath.Join(e2econtext.TestContext.ReportDir, fmt.Sprintf("junit_%supgrades.xml", e2econtext.TestContext.ReportPrefix))
 			f, err := os.Create(fname)
 			if err != nil {
 				return
@@ -498,7 +499,7 @@ func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*u
 		Versions: []upgrades.VersionContext{
 			{
 				Version:   *curVer,
-				NodeImage: framework.TestContext.NodeOSDistro,
+				NodeImage: e2econtext.TestContext.NodeOSDistro,
 			},
 		},
 	}

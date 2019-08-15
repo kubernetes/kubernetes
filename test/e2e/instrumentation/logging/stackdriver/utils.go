@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -90,7 +91,7 @@ func newSdLogProvider(f *framework.Framework, scope logProviderScope) (*sdLogPro
 	if err != nil {
 		return nil, err
 	}
-	err = ensureProjectHasSinkCapacity(sdService.Projects.Sinks, framework.TestContext.CloudConfig.ProjectID)
+	err = ensureProjectHasSinkCapacity(sdService.Projects.Sinks, e2econtext.TestContext.CloudConfig.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +144,7 @@ func deleteSinks(sinksService *sd.ProjectsSinksService, projectID string, sinks 
 }
 
 func (p *sdLogProvider) Init() error {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econtext.TestContext.CloudConfig.ProjectID
 	nsName := p.framework.Namespace.Name
 
 	topic, err := p.createPubSubTopic(projectID, nsName)
@@ -182,7 +183,7 @@ func (p *sdLogProvider) Cleanup() {
 	p.pollingWG.Wait()
 
 	if p.logSink != nil {
-		projectID := framework.TestContext.CloudConfig.ProjectID
+		projectID := e2econtext.TestContext.CloudConfig.ProjectID
 		sinkNameID := fmt.Sprintf("projects/%s/sinks/%s", projectID, p.logSink.Name)
 		sinksService := p.sdService.Projects.Sinks
 		if _, err := sinksService.Delete(sinkNameID).Do(); err != nil {

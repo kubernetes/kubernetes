@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -444,7 +445,7 @@ func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Create(ing)
 	}
 	// Use kubemci to create a multicluster ingress.
-	filePath := framework.TestContext.OutputDir + "/mci.yaml"
+	filePath := e2econtext.TestContext.OutputDir + "/mci.yaml"
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
@@ -459,7 +460,7 @@ func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
-	filePath := framework.TestContext.OutputDir + "/mci.yaml"
+	filePath := e2econtext.TestContext.OutputDir + "/mci.yaml"
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
@@ -566,7 +567,7 @@ func (j *TestJig) runDelete(ing *networkingv1beta1.Ingress) error {
 		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
 	}
 	// Use kubemci to delete a multicluster ingress.
-	filePath := framework.TestContext.OutputDir + "/mci.yaml"
+	filePath := e2econtext.TestContext.OutputDir + "/mci.yaml"
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return err
 	}
@@ -799,7 +800,7 @@ func (j *TestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags 
 
 	fw := compute.Firewall{}
 	fw.Name = firewallRuleName
-	fw.SourceRanges = framework.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
+	fw.SourceRanges = e2econtext.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
 	fw.TargetTags = nodeTags
 	fw.Allowed = []*compute.FirewallAllowed{
 		{

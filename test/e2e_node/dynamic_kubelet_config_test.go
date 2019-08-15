@@ -33,6 +33,7 @@ import (
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -89,7 +90,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			}
 			// record before state so we can restore it after the test
 			if beforeNode == nil {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				beforeNode = node
 			}
@@ -953,7 +954,7 @@ func (tc *nodeConfigTestCase) checkNodeConfigSource(f *framework.Framework) {
 		interval = time.Second
 	)
 	gomega.Eventually(func() error {
-		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+		node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("checkNodeConfigSource: case %s: %v", tc.desc, err)
 		}
@@ -973,7 +974,7 @@ func (tc *nodeConfigTestCase) checkConfigStatus(f *framework.Framework) {
 	)
 	errFmt := fmt.Sprintf("checkConfigStatus: case %s:", tc.desc) + " %v"
 	gomega.Eventually(func() error {
-		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+		node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf(errFmt, err)
 		}

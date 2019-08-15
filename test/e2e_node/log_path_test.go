@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -107,7 +108,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 
 			var logPodName string
 			ginkgo.BeforeEach(func() {
-				if framework.TestContext.ContainerRuntime == "docker" {
+				if e2econtext.TestContext.ContainerRuntime == "docker" {
 					// Container Log Path support requires JSON logging driver.
 					// It does not work when Docker daemon is logging to journald.
 					d, err := getDockerLoggingDriver()

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -54,7 +55,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, e2econtext.TestContext.NodeSchedulableTimeout))
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty(), "Unable to find ready and schedulable Node")
 		gomega.Expect(len(nodeList.Items) > 1).To(gomega.BeTrue(), "At least 2 nodes are required for this test")

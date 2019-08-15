@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletresourcemetricsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -101,7 +102,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
-			if framework.TestContext.DumpLogsOnFailure {
+			if e2econtext.TestContext.DumpLogsOnFailure {
 				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
@@ -111,7 +112,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 })
 
 func getV1alpha1ResourceMetrics() (metrics.KubeletMetrics, error) {
-	return metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+kubeletresourcemetricsv1alpha1.Version)
+	return metrics.GrabKubeletMetricsWithoutProxy(e2econtext.TestContext.NodeName+":10255", "/metrics/resource/"+kubeletresourcemetricsv1alpha1.Version)
 }
 
 func nodeId(element interface{}) string {

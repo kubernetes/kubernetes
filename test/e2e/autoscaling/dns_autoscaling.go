@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -125,7 +126,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		framework.ExpectNoError(err)
 
 		originalSizes := make(map[string]int)
-		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
+		for _, mig := range strings.Split(e2econtext.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			size, err := framework.GroupSize(mig)
 			framework.ExpectNoError(err)
 			ginkgo.By(fmt.Sprintf("Initial size of %s: %d", mig, size))

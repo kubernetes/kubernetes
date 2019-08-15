@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
@@ -61,7 +61,7 @@ func (t *dnsFederationsConfigMapTest) run() {
 	originalConfigMapData := t.fetchDNSConfigMapData()
 	defer t.restoreDNSConfigMap(originalConfigMapData)
 
-	t.validate(framework.TestContext.ClusterDNSDomain)
+	t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 	if t.name == "coredns" {
 		t.labels = []string{"abc", "ghi"}
@@ -78,7 +78,7 @@ func (t *dnsFederationsConfigMapTest) run() {
            abc def.com
         }
         forward . /etc/resolv.conf
-    }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
+    }`, e2econtext.TestContext.ClusterDNSDomain, e2econtext.TestContext.ClusterDNSDomain)}
 		valid1m := map[string]string{t.labels[0]: "def.com"}
 
 		valid2 := map[string]string{
@@ -94,23 +94,23 @@ func (t *dnsFederationsConfigMapTest) run() {
            ghi xyz.com
         }
         forward . /etc/resolv.conf
-    }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
+    }`, e2econtext.TestContext.ClusterDNSDomain, e2econtext.TestContext.ClusterDNSDomain)}
 		valid2m := map[string]string{t.labels[1]: "xyz.com"}
 
 		ginkgo.By("default -> valid1")
 		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
 		t.deleteCoreDNSPods()
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("valid1 -> valid2")
 		t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
 		t.deleteCoreDNSPods()
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("valid2 -> default")
 		t.setConfigMap(&v1.ConfigMap{Data: originalConfigMapData}, nil, false)
 		t.deleteCoreDNSPods()
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		t.restoreDNSConfigMap(originalConfigMapData)
 
@@ -124,27 +124,27 @@ func (t *dnsFederationsConfigMapTest) run() {
 
 		ginkgo.By("empty -> valid1")
 		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("valid1 -> valid2")
 		t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("valid2 -> invalid")
 		t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("invalid -> valid1")
 		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("valid1 -> deleted")
 		t.deleteConfigMap()
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 
 		ginkgo.By("deleted -> invalid")
 		t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
-		t.validate(framework.TestContext.ClusterDNSDomain)
+		t.validate(e2econtext.TestContext.ClusterDNSDomain)
 	}
 }
 
@@ -156,7 +156,7 @@ func (t *dnsFederationsConfigMapTest) validate(dnsDomain string) {
 
 		for _, label := range t.labels {
 			var federationDNS = fmt.Sprintf("e2e-dns-configmap.%s.%s.svc.%s.",
-				t.f.Namespace.Name, label, framework.TestContext.ClusterDNSDomain)
+				t.f.Namespace.Name, label, e2econtext.TestContext.ClusterDNSDomain)
 			predicate := func(actual []string) bool {
 				return len(actual) == 0
 			}
@@ -165,9 +165,9 @@ func (t *dnsFederationsConfigMapTest) validate(dnsDomain string) {
 	} else {
 		for label := range federations {
 			var federationDNS = fmt.Sprintf("%s.%s.%s.svc.%s.",
-				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, label, framework.TestContext.ClusterDNSDomain)
+				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, label, e2econtext.TestContext.ClusterDNSDomain)
 			var localDNS = fmt.Sprintf("%s.%s.svc.%s.",
-				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 			if t.name == "coredns" {
 				localDNS = t.utilService.Spec.ClusterIP
 			}
@@ -244,7 +244,7 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
     }
      acme.local:53 {
        forward . %v
-    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
+    }`, e2econtext.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -340,7 +340,7 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
            ttl 30
         }
         forward . %v
-    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
+    }`, e2econtext.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -424,7 +424,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
 			},
@@ -432,7 +432,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
 			},
@@ -451,7 +451,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
            ttl 30
         }
         forward . %v
-    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
+    }`, e2econtext.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -462,7 +462,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	}
 	if isIPv6 {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
 			},
@@ -470,7 +470,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) == 2 && actual[0] == fooHostname+"." && actual[1] == "192.0.2.123"
 			},

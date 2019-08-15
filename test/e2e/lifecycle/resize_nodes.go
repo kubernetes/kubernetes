@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -55,10 +56,10 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
 		framework.ExpectNoError(err)
 		systemPodsNo = int32(len(systemPods))
-		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+		if strings.Index(e2econtext.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", e2econtext.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
-			group = framework.TestContext.CloudConfig.NodeInstanceGroup
+			group = e2econtext.TestContext.CloudConfig.NodeInstanceGroup
 		}
 	})
 
@@ -80,7 +81,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			}
 
 			ginkgo.By("restoring the original node instance group size")
-			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := framework.ResizeGroup(group, int32(e2econtext.TestContext.CloudConfig.NumNodes)); err != nil {
 				e2elog.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -95,7 +96,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 				ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := framework.WaitForGroupSize(group, int32(e2econtext.TestContext.CloudConfig.NumNodes)); err != nil {
 				e2elog.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
@@ -120,7 +121,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
-			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
+			targetNumNodes := int32(e2econtext.TestContext.CloudConfig.NumNodes - 1)
 			ginkgo.By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
 			framework.ExpectNoError(err)
@@ -151,7 +152,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
-			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
+			targetNumNodes := int32(e2econtext.TestContext.CloudConfig.NumNodes + 1)
 			ginkgo.By(fmt.Sprintf("increasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
 			framework.ExpectNoError(err)

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -82,7 +83,7 @@ var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 // adding the well known prefix "0::ffff:" https://tools.ietf.org/html/rfc2765
 // if the ip is IPv4 and the cluster IPFamily is IPv6, otherwise returns the same ip
 func TranslateIPv4ToIPv6(ip string) string {
-	if TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
+	if e2econtext.TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
 		ip = "0::ffff:" + ip
 	}
 	return ip

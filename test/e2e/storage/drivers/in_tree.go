@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -1239,10 +1240,10 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 
 func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	if volType == testpatterns.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// PD will be created in e2econtext.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelector = map[string]string{
-			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+			v1.LabelZoneFailureDomain: e2econtext.TestContext.CloudConfig.Zone,
 		}
 	}
 	ginkgo.By("creating a test gce pd volume")

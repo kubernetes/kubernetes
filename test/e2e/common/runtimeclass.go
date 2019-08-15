@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
@@ -64,7 +65,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
 		// The built-in docker runtime does not support configuring runtime handlers.
 		handler := PreconfiguredRuntimeHandler
-		if framework.TestContext.ContainerRuntime == "docker" {
+		if e2econtext.TestContext.ContainerRuntime == "docker" {
 			handler = DockerRuntimeHandler
 		}
 

@@ -36,6 +36,7 @@ import (
 	nodepkg "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -121,8 +122,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
 		framework.SkipUnlessProviderIs("gke", "aws")
-		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+		if strings.Index(e2econtext.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", e2econtext.TestContext.CloudConfig.NodeInstanceGroup)
 		}
 	})
 

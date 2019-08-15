@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -33,7 +34,7 @@ type KubemarkResourceUsage struct {
 }
 
 func getMasterUsageByPrefix(prefix string) (string, error) {
-	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), GetMasterHost()+":22", e2econtext.TestContext.Provider)
 	if err != nil {
 		return "", err
 	}

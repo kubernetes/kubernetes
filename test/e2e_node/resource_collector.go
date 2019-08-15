@@ -43,6 +43,7 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -90,7 +91,7 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
 	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
-	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+	runtimeContainer, err2 := getContainerNameForProcess(e2econtext.TestContext.ContainerRuntimeProcessName, e2econtext.TestContext.ContainerRuntimePidFile)
 	if err1 == nil && err2 == nil {
 		systemContainers = map[string]string{
 			kubeletstatsv1alpha1.SystemContainerKubelet: kubeletContainer,

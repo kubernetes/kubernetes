@@ -26,6 +26,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 	f := framework.NewDefaultFramework(firewallTestName)
 
 	var cs clientset.Interface
-	var cloudConfig framework.CloudConfig
+	var cloudConfig e2econtext.CloudConfig
 	var gceCloud *gcecloud.Cloud
 
 	ginkgo.BeforeEach(func() {
@@ -56,7 +57,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		var err error
 		cs = f.ClientSet
-		cloudConfig = framework.TestContext.CloudConfig
+		cloudConfig = e2econtext.TestContext.CloudConfig
 		gceCloud, err = gce.GetGCECloud()
 		framework.ExpectNoError(err)
 	})

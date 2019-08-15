@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -37,11 +38,11 @@ func lookupClusterImageSources() (string, string, error) {
 	gcloudf := func(argv ...string) ([]string, error) {
 		args := []string{"compute"}
 		args = append(args, argv...)
-		args = append(args, "--project", TestContext.CloudConfig.ProjectID)
-		if TestContext.CloudConfig.MultiMaster {
-			args = append(args, "--region", TestContext.CloudConfig.Region)
+		args = append(args, "--project", e2econtext.TestContext.CloudConfig.ProjectID)
+		if e2econtext.TestContext.CloudConfig.MultiMaster {
+			args = append(args, "--region", e2econtext.TestContext.CloudConfig.Region)
 		} else {
-			args = append(args, "--zone", TestContext.CloudConfig.Zone)
+			args = append(args, "--zone", e2econtext.TestContext.CloudConfig.Zone)
 		}
 		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
 		str := strings.Replace(string(outputBytes), ",", "\n", -1)
@@ -80,7 +81,7 @@ func lookupClusterImageSources() (string, string, error) {
 
 	// gcloud compute instance-groups list-instances {GROUPNAME} --format="get(instance)"
 	nodeName := ""
-	instGroupName := strings.Split(TestContext.CloudConfig.NodeInstanceGroup, ",")[0]
+	instGroupName := strings.Split(e2econtext.TestContext.CloudConfig.NodeInstanceGroup, ",")[0]
 	if lines, err := gcloudf("instance-groups", "list-instances", instGroupName, "--format=get(instance)"); err != nil {
 		return "", "", err
 	} else if len(lines) == 0 {
@@ -98,7 +99,7 @@ func lookupClusterImageSources() (string, string, error) {
 
 	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
 	masterImg := ""
-	if masterName := TestContext.CloudConfig.MasterName; masterName != "" {
+	if masterName := e2econtext.TestContext.CloudConfig.MasterName; masterName != "" {
 		img, err := host2image(masterName)
 		if err != nil {
 			return "", "", err
@@ -126,7 +127,7 @@ func LogClusterImageSources() {
 	}
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
-	filePath := filepath.Join(TestContext.ReportDir, "images.json")
+	filePath := filepath.Join(e2econtext.TestContext.ReportDir, "images.json")
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
 		e2elog.Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
@@ -138,9 +139,9 @@ func CreateManagedInstanceGroup(size int64, zone, template string) error {
 	// shelling out to gcloud.
 	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
 		"create",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%s", e2econtext.TestContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zone=%s", zone),
-		TestContext.CloudConfig.NodeInstanceGroup,
+		e2econtext.TestContext.CloudConfig.NodeInstanceGroup,
 		fmt.Sprintf("--size=%d", size),
 		fmt.Sprintf("--template=%s", template))
 	if err != nil {
@@ -156,8 +157,8 @@ func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
 
 	stdout, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
 		"list",
-		fmt.Sprintf("--filter=name:%s", TestContext.CloudConfig.NodeInstanceGroup),
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--filter=name:%s", e2econtext.TestContext.CloudConfig.NodeInstanceGroup),
+		fmt.Sprintf("--project=%s", e2econtext.TestContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zones=%s", zone),
 	)
 
@@ -178,9 +179,9 @@ func DeleteManagedInstanceGroup(zone string) error {
 	// shelling out to gcloud.
 	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
 		"delete",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%s", e2econtext.TestContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zone=%s", zone),
-		TestContext.CloudConfig.NodeInstanceGroup)
+		e2econtext.TestContext.CloudConfig.NodeInstanceGroup)
 	if err != nil {
 		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
 	}

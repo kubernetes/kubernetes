@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -44,9 +45,9 @@ func init() {
 }
 
 func factory() (e2eproviders.ProviderInterface, error) {
-	e2elog.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
-	zone := framework.TestContext.CloudConfig.Zone
-	region := framework.TestContext.CloudConfig.Region
+	e2elog.Logf("Fetching cloud provider for %q\r", e2econtext.TestContext.Provider)
+	zone := e2econtext.TestContext.CloudConfig.Zone
+	region := e2econtext.TestContext.CloudConfig.Region
 
 	var err error
 	if region == "" {
@@ -56,17 +57,17 @@ func factory() (e2eproviders.ProviderInterface, error) {
 		}
 	}
 	managedZones := []string{} // Manage all zones in the region
-	if !framework.TestContext.CloudConfig.MultiZone {
+	if !e2econtext.TestContext.CloudConfig.MultiZone {
 		managedZones = []string{zone}
 	}
 
 	gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
-		APIEndpoint:        framework.TestContext.CloudConfig.APIEndpoint,
-		ProjectID:          framework.TestContext.CloudConfig.ProjectID,
+		APIEndpoint:        e2econtext.TestContext.CloudConfig.APIEndpoint,
+		ProjectID:          e2econtext.TestContext.CloudConfig.ProjectID,
 		Region:             region,
 		Zone:               zone,
 		ManagedZones:       managedZones,
-		NetworkName:        "", // TODO: Change this to use framework.TestContext.CloudConfig.Network?
+		NetworkName:        "", // TODO: Change this to use e2econtext.TestContext.CloudConfig.Network?
 		SubnetworkName:     "",
 		NodeTags:           nil,
 		NodeInstancePrefix: "",
@@ -80,13 +81,13 @@ func factory() (e2eproviders.ProviderInterface, error) {
 	}
 
 	// Arbitrarily pick one of the zones we have nodes in
-	if framework.TestContext.CloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
+	if e2econtext.TestContext.CloudConfig.Zone == "" && e2econtext.TestContext.CloudConfig.MultiZone {
 		zones, err := gceCloud.GetAllZonesFromCloudProvider()
 		if err != nil {
 			return nil, err
 		}
 
-		framework.TestContext.CloudConfig.Zone, _ = zones.PopAny()
+		e2econtext.TestContext.CloudConfig.Zone, _ = zones.PopAny()
 	}
 
 	return NewProvider(gceCloud), nil
@@ -115,7 +116,7 @@ func (p *Provider) ResizeGroup(group string, size int32) error {
 	}
 	output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
 		group, fmt.Sprintf("--size=%v", size),
-		"--project="+framework.TestContext.CloudConfig.ProjectID, "--zone="+zone).CombinedOutput()
+		"--project="+e2econtext.TestContext.CloudConfig.ProjectID, "--zone="+zone).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Failed to resize node instance group %s: %s", group, output)
 	}
@@ -131,7 +132,7 @@ func (p *Provider) GetGroupNodes(group string) ([]string, error) {
 		return nil, err
 	}
 	output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
-		"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
+		"list-instances", group, "--project="+e2econtext.TestContext.CloudConfig.ProjectID,
 		"--zone="+zone).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get nodes in instance group %s: %s", group, output)
@@ -153,7 +154,7 @@ func (p *Provider) GroupSize(group string) (int, error) {
 		return -1, err
 	}
 	output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
-		"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
+		"list-instances", group, "--project="+e2econtext.TestContext.CloudConfig.ProjectID,
 		"--zone="+zone).CombinedOutput()
 	if err != nil {
 		return -1, fmt.Errorf("Failed to get group size for group %s: %s", group, output)
@@ -164,10 +165,10 @@ func (p *Provider) GroupSize(group string) (int, error) {
 
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
-	project := framework.TestContext.CloudConfig.ProjectID
-	region, err := gcecloud.GetGCERegion(framework.TestContext.CloudConfig.Zone)
+	project := e2econtext.TestContext.CloudConfig.ProjectID
+	region, err := gcecloud.GetGCERegion(e2econtext.TestContext.CloudConfig.Zone)
 	if err != nil {
-		return fmt.Errorf("could not get region for zone %q: %v", framework.TestContext.CloudConfig.Zone, err)
+		return fmt.Errorf("could not get region for zone %q: %v", e2econtext.TestContext.CloudConfig.Zone, err)
 	}
 
 	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
@@ -188,7 +189,7 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) erro
 
 func getGCEZoneForGroup(group string) (string, error) {
 	output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "list",
-		"--project="+framework.TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).CombinedOutput()
+		"--project="+e2econtext.TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("Failed to get zone for node group %s: %s", group, output)
 	}
@@ -197,17 +198,17 @@ func getGCEZoneForGroup(group string) (string, error) {
 
 // DeleteNode deletes a node which is specified as the argument
 func (p *Provider) DeleteNode(node *v1.Node) error {
-	zone := framework.TestContext.CloudConfig.Zone
-	project := framework.TestContext.CloudConfig.ProjectID
+	zone := e2econtext.TestContext.CloudConfig.Zone
+	project := e2econtext.TestContext.CloudConfig.ProjectID
 
 	return p.gceCloud.DeleteInstance(project, zone, node.Name)
 }
 
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
-	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
+	pdName := fmt.Sprintf("%s-%s", e2econtext.TestContext.Prefix, string(uuid.NewUUID()))
 
-	if zone == "" && framework.TestContext.CloudConfig.MultiZone {
+	if zone == "" && e2econtext.TestContext.CloudConfig.MultiZone {
 		zones, err := p.gceCloud.GetAllZonesFromCloudProvider()
 		if err != nil {
 			return "", err
@@ -329,7 +330,7 @@ func (p *Provider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Se
 }
 
 // GetInstanceTags gets tags from GCE instance with given name.
-func GetInstanceTags(cloudConfig framework.CloudConfig, instanceName string) *compute.Tags {
+func GetInstanceTags(cloudConfig e2econtext.CloudConfig, instanceName string) *compute.Tags {
 	gceCloud := cloudConfig.Provider.(*Provider).gceCloud
 	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
 		instanceName).Do()
@@ -340,7 +341,7 @@ func GetInstanceTags(cloudConfig framework.CloudConfig, instanceName string) *co
 }
 
 // SetInstanceTags sets tags on GCE instance with given name.
-func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone string, tags []string) []string {
+func SetInstanceTags(cloudConfig e2econtext.CloudConfig, instanceName, zone string, tags []string) []string {
 	gceCloud := cloudConfig.Provider.(*Provider).gceCloud
 	// Re-get instance everytime because we need the latest fingerprint for updating metadata
 	resTags := GetInstanceTags(cloudConfig, instanceName)
@@ -355,7 +356,7 @@ func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone strin
 }
 
 // GetNodeTags gets k8s node tag from one of the nodes
-func GetNodeTags(c clientset.Interface, cloudConfig framework.CloudConfig) []string {
+func GetNodeTags(c clientset.Interface, cloudConfig e2econtext.CloudConfig) []string {
 	nodes := framework.GetReadySchedulableNodesOrDie(c)
 	if len(nodes.Items) == 0 {
 		e2elog.Logf("GetNodeTags: Found 0 node.")
@@ -373,9 +374,9 @@ func IsGoogleAPIHTTPErrorCode(err error, code int) bool {
 
 // GetGCECloud returns GCE cloud provider
 func GetGCECloud() (*gcecloud.Cloud, error) {
-	p, ok := framework.TestContext.CloudConfig.Provider.(*Provider)
+	p, ok := e2econtext.TestContext.CloudConfig.Provider.(*Provider)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCE provider: %#v", framework.TestContext.CloudConfig.Provider)
+		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCE provider: %#v", e2econtext.TestContext.CloudConfig.Provider)
 	}
 	return p.gceCloud, nil
 }

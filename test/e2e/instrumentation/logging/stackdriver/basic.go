@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
@@ -163,9 +164,9 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			}()
 
 			ginkgo.By("Waiting for events to ingest")
-			location := framework.TestContext.CloudConfig.Zone
-			if framework.TestContext.CloudConfig.MultiMaster {
-				location = framework.TestContext.CloudConfig.Region
+			location := e2econtext.TestContext.CloudConfig.Zone
+			if e2econtext.TestContext.CloudConfig.MultiMaster {
+				location = e2econtext.TestContext.CloudConfig.Region
 			}
 			c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLocation(location), utils.JustTimeout, "")
 			err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
@@ -177,7 +178,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		withLogProviderForScope(f, systemScope, func(p *sdLogProvider) {
 			ginkgo.By("Waiting for some kubelet logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)
-				log := fmt.Sprintf("projects/%s/logs/kubelet", framework.TestContext.CloudConfig.ProjectID)
+				log := fmt.Sprintf("projects/%s/logs/kubelet", e2econtext.TestContext.CloudConfig.ProjectID)
 				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
 				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)
@@ -185,7 +186,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 
 			ginkgo.By("Waiting for some container runtime logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)
-				log := fmt.Sprintf("projects/%s/logs/container-runtime", framework.TestContext.CloudConfig.ProjectID)
+				log := fmt.Sprintf("projects/%s/logs/container-runtime", e2econtext.TestContext.CloudConfig.ProjectID)
 				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
 				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)

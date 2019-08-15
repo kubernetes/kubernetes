@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -34,7 +35,7 @@ import (
 // GKE.  See hack/get-build.sh for more information.
 func RealVersion(s string) (string, error) {
 	e2elog.Logf("Getting real version for %q", s)
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
+	v, _, err := framework.RunCmd(path.Join(e2econtext.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
 		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
 	}

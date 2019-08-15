@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -43,7 +44,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if e2econtext.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()
@@ -121,7 +122,7 @@ func isHugePageSupported() bool {
 
 // pollResourceAsString polls for a specified resource and capacity from node
 func pollResourceAsString(f *framework.Framework, resourceName string) string {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	amount := amountOfResourceAsString(node, resourceName)
 	e2elog.Logf("amount of %v: %v", resourceName, amount)

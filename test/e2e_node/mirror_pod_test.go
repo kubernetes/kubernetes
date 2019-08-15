@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -43,9 +44,9 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
-			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+			mirrorPodName = staticPodName + "-" + e2econtext.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = e2econtext.TestContext.KubeletConfig.StaticPodPath
 
 			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,

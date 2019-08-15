@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -178,8 +179,8 @@ func (f *Framework) BeforeEach() {
 		if f.Options.GroupVersion != nil {
 			config.GroupVersion = f.Options.GroupVersion
 		}
-		if TestContext.KubeAPIContentType != "" {
-			config.ContentType = TestContext.KubeAPIContentType
+		if e2econtext.TestContext.KubeAPIContentType != "" {
+			config.ContentType = e2econtext.TestContext.KubeAPIContentType
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
 		ExpectNoError(err)
@@ -208,7 +209,10 @@ func (f *Framework) BeforeEach() {
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 
-		TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
+		callback := func(externalClient clientset.Interface) {
+			f.KubemarkExternalClusterClientSet = externalClient
+		}
+		e2econtext.TestContext.CloudConfig.Provider.FrameworkBeforeEach(f.ClientSet, f.Options.ClientQPS, f.Options.ClientBurst, callback)
 	}
 
 	if !f.SkipNamespaceCreation {
@@ -220,7 +224,7 @@ func (f *Framework) BeforeEach() {
 
 		f.Namespace = namespace
 
-		if TestContext.VerifyServiceAccount {
+		if e2econtext.TestContext.VerifyServiceAccount {
 			ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
 			ExpectNoError(err)
@@ -233,10 +237,10 @@ func (f *Framework) BeforeEach() {
 		f.UniqueName = fmt.Sprintf("%s-%08x", f.BaseName, rand.Int31())
 	}
 
-	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
+	if e2econtext.TestContext.GatherKubeSystemResourceUsageData != "false" && e2econtext.TestContext.GatherKubeSystemResourceUsageData != "none" {
 		var err error
 		var nodeMode NodesSet
-		switch TestContext.GatherKubeSystemResourceUsageData {
+		switch e2econtext.TestContext.GatherKubeSystemResourceUsageData {
 		case "master":
 			nodeMode = MasterNodes
 		case "masteranddns":
@@ -259,7 +263,7 @@ func (f *Framework) BeforeEach() {
 		}
 	}
 
-	if TestContext.GatherLogsSizes {
+	if e2econtext.TestContext.GatherLogsSizes {
 		f.logsSizeWaitGroup = sync.WaitGroup{}
 		f.logsSizeWaitGroup.Add(1)
 		f.logsSizeCloseChannel = make(chan bool)
@@ -270,9 +274,9 @@ func (f *Framework) BeforeEach() {
 		}()
 	}
 
-	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "master"
-	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics)
+	gatherMetricsAfterTest := e2econtext.TestContext.GatherMetricsAfterTest == "true" || e2econtext.TestContext.GatherMetricsAfterTest == "master"
+	if gatherMetricsAfterTest && e2econtext.TestContext.IncludeClusterAutoscalerMetrics {
+		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, e2econtext.TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
 			e2elog.Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
 		} else {
@@ -300,7 +304,7 @@ func (f *Framework) AfterEach() {
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
+		if e2econtext.TestContext.DeleteNamespace && (e2econtext.TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 				timeout := DefaultNamespaceDeletionTimeout
@@ -316,7 +320,7 @@ func (f *Framework) AfterEach() {
 				}
 			}
 		} else {
-			if !TestContext.DeleteNamespace {
+			if !e2econtext.TestContext.DeleteNamespace {
 				e2elog.Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 			} else {
 				e2elog.Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
@@ -339,32 +343,32 @@ func (f *Framework) AfterEach() {
 	}()
 
 	// Print events if the test failed.
-	if ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+	if ginkgo.CurrentGinkgoTestDescription().Failed && e2econtext.TestContext.DumpLogsOnFailure {
 		// Pass both unversioned client and versioned clientset, till we have removed all uses of the unversioned client.
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
 	}
 
-	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
+	if e2econtext.TestContext.GatherKubeSystemResourceUsageData != "false" && e2econtext.TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		ginkgo.By("Collecting resource usage data")
 		summary, resourceViolationError := f.gatherer.StopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
 		f.TestSummaries = append(f.TestSummaries, summary)
 	}
 
-	if TestContext.GatherLogsSizes {
+	if e2econtext.TestContext.GatherLogsSizes {
 		ginkgo.By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
 	}
 
-	if TestContext.GatherMetricsAfterTest != "false" {
+	if e2econtext.TestContext.GatherMetricsAfterTest != "false" {
 		ginkgo.By("Gathering metrics")
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
-		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
+		grabMetricsFromKubelets := e2econtext.TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
+		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, e2econtext.TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
 			e2elog.Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
@@ -377,7 +381,7 @@ func (f *Framework) AfterEach() {
 		}
 	}
 
-	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
+	e2econtext.TestContext.CloudConfig.Provider.FrameworkAfterEach()
 
 	// Report any flakes that were observed in the e2e test and reset.
 	if f.flakeReport != nil && f.flakeReport.GetFlakeCount() > 0 {
@@ -397,7 +401,7 @@ func (f *Framework) AfterEach() {
 
 // CreateNamespace creates a namespace for e2e testing.
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*v1.Namespace, error) {
-	createTestingNS := TestContext.CreateTestingNS
+	createTestingNS := e2econtext.TestContext.CreateTestingNS
 	if createTestingNS == nil {
 		createTestingNS = CreateTestingNS
 	}

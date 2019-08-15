@@ -38,6 +38,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -99,7 +100,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 		for _, lb := range serviceLBNames {
 			e2elog.Logf("cleaning load balancer resource for %s", lb)
-			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			e2eservice.CleanupServiceResources(cs, lb, e2econtext.TestContext.CloudConfig.Region, e2econtext.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -297,7 +298,7 @@ var _ = SIGDescribe("Services", func() {
 		nodes := jig.GetNodes(2)
 		nodeCounts := len(nodes.Items)
 		if nodeCounts < 2 {
-			framework.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
+			framework.Skipf("The test requires at least two ready nodes on %s, but found %v", e2econtext.TestContext.Provider, nodeCounts)
 		}
 
 		ginkgo.By("Creating a webserver pod to be part of the TCP service which echoes back source ip")
@@ -453,7 +454,7 @@ var _ = SIGDescribe("Services", func() {
 		result, err := e2essh.SSH(`
 			sudo iptables -t nat -F KUBE-SERVICES || true;
 			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, framework.TestContext.Provider)
+			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, e2econtext.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 			e2elog.Failf("couldn't remove iptable rules: %v", err)
@@ -1377,7 +1378,7 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("Verifying pods for RC " + t.Name)
 		framework.ExpectNoError(e2epod.VerifyPods(t.Client, t.Namespace, t.Name, false, 1))
 
-		svcName := fmt.Sprintf("%v.%v.svc.%v", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		svcName := fmt.Sprintf("%v.%v.svc.%v", serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Waiting for endpoints of Service with DNS name " + svcName)
 
 		execPod := e2epod.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-", nil)
@@ -2046,7 +2047,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			e2elog.Logf("cleaning load balancer resource for %s", lb)
-			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			e2eservice.CleanupServiceResources(cs, lb, e2econtext.TestContext.CloudConfig.Region, e2econtext.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -2470,7 +2471,7 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 		e2eservice.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.DefaultLoadBalancerName(svc)
 		e2elog.Logf("cleaning load balancer resource for %s", lb)
-		e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+		e2eservice.CleanupServiceResources(cs, lb, e2econtext.TestContext.CloudConfig.Region, e2econtext.TestContext.CloudConfig.Zone)
 	}()
 	ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 	port := int(svc.Spec.Ports[0].Port)
@@ -2493,5 +2494,5 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 func createAndGetExternalServiceFQDN(cs clientset.Interface, ns, serviceName string) string {
 	_, _, err := e2eservice.StartServeHostnameService(cs, getServeHostnameService(serviceName), ns, 2)
 	framework.ExpectNoError(err, "Expected Service %s to be running", serviceName)
-	return fmt.Sprintf("%s.%s.svc.%s", serviceName, ns, framework.TestContext.ClusterDNSDomain)
+	return fmt.Sprintf("%s.%s.svc.%s", serviceName, ns, e2econtext.TestContext.ClusterDNSDomain)
 }

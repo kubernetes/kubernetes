@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package context
 
 import (
 	"flag"
@@ -27,6 +27,8 @@ import (
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/pkg/errors"
+	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -44,6 +46,9 @@ const (
 	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
 	DefaultNumNodes = -1
 )
+
+// CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
+type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
 // TestContextType contains test settings and global state. Due to
 // historic reasons, it is a mixture of items managed by the test

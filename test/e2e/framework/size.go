@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -30,21 +31,21 @@ const (
 
 // ResizeGroup resizes an instance group
 func ResizeGroup(group string, size int32) error {
-	if TestContext.ReportDir != "" {
-		CoreDump(TestContext.ReportDir)
-		defer CoreDump(TestContext.ReportDir)
+	if e2econtext.TestContext.ReportDir != "" {
+		CoreDump(e2econtext.TestContext.ReportDir)
+		defer CoreDump(e2econtext.TestContext.ReportDir)
 	}
-	return TestContext.CloudConfig.Provider.ResizeGroup(group, size)
+	return e2econtext.TestContext.CloudConfig.Provider.ResizeGroup(group, size)
 }
 
 // GetGroupNodes returns a node name for the specified node group
 func GetGroupNodes(group string) ([]string, error) {
-	return TestContext.CloudConfig.Provider.GetGroupNodes(group)
+	return e2econtext.TestContext.CloudConfig.Provider.GetGroupNodes(group)
 }
 
 // GroupSize returns the size of an instance group
 func GroupSize(group string) (int, error) {
-	return TestContext.CloudConfig.Provider.GroupSize(group)
+	return e2econtext.TestContext.CloudConfig.Provider.GroupSize(group)
 }
 
 // WaitForGroupSize waits for node instance group reached the desired size

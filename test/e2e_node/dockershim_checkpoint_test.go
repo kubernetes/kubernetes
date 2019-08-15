@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -63,7 +64,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 
 	ginkgo.It("should remove dangling checkpoint file", func() {
 		filename := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s/%s", testCheckpoint, f.Namespace.Name))))
-		fullpath := path.Join(framework.TestContext.DockershimCheckpointDir, filename)
+		fullpath := path.Join(e2econtext.TestContext.DockershimCheckpointDir, filename)
 
 		ginkgo.By(fmt.Sprintf("Write a file at %q", fullpath))
 		err := writeFileAndSync(fullpath, []byte(testCheckpointContent))
@@ -211,7 +212,7 @@ func writeFileAndSync(path string, data []byte) error {
 func findCheckpoints(match string) []string {
 	ginkgo.By(fmt.Sprintf("Search checkpoints containing %q", match))
 	checkpoints := []string{}
-	stdout, err := exec.Command("sudo", "grep", "-rl", match, framework.TestContext.DockershimCheckpointDir).CombinedOutput()
+	stdout, err := exec.Command("sudo", "grep", "-rl", match, e2econtext.TestContext.DockershimCheckpointDir).CombinedOutput()
 	if err != nil {
 		e2elog.Logf("grep from dockershim checkpoint directory returns error: %v", err)
 	}

@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -37,17 +38,17 @@ const etcdImage = "3.3.10-1"
 
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {
-	switch TestContext.Provider {
+	switch e2econtext.TestContext.Provider {
 	case "gce":
 		return etcdUpgradeGCE(targetStorage, targetVersion)
 	default:
-		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
+		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", e2econtext.TestContext.Provider)
 	}
 }
 
 // MasterUpgrade upgrades master node on GCE/GKE.
 func MasterUpgrade(v string) error {
-	switch TestContext.Provider {
+	switch e2econtext.TestContext.Provider {
 	case "gce":
 		return masterUpgradeGCE(v, false)
 	case "gke":
@@ -55,7 +56,7 @@ func MasterUpgrade(v string) error {
 	case "kubernetes-anywhere":
 		return masterUpgradeKubernetesAnywhere(v)
 	default:
-		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
+		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", e2econtext.TestContext.Provider)
 	}
 }
 
@@ -80,10 +81,10 @@ func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet b
 func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	// TODO: Remove these variables when they're no longer needed for downgrades.
-	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+	if e2econtext.TestContext.EtcdUpgradeVersion != "" && e2econtext.TestContext.EtcdUpgradeStorage != "" {
 		env = append(env,
-			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
-			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_VERSION="+e2econtext.TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+e2econtext.TestContext.EtcdUpgradeStorage,
 			"TEST_ETCD_IMAGE="+etcdImage)
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
@@ -97,15 +98,15 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 }
 
 func locationParamGKE() string {
-	if TestContext.CloudConfig.MultiMaster {
+	if e2econtext.TestContext.CloudConfig.MultiMaster {
 		// GKE Regional Clusters are being tested.
-		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+		return fmt.Sprintf("--region=%s", e2econtext.TestContext.CloudConfig.Region)
 	}
-	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	return fmt.Sprintf("--zone=%s", e2econtext.TestContext.CloudConfig.Zone)
 }
 
 func appendContainerCommandGroupIfNeeded(args []string) []string {
-	if TestContext.CloudConfig.Region != "" {
+	if e2econtext.TestContext.CloudConfig.Region != "" {
 		// TODO(wojtek-t): Get rid of it once Regional Clusters go to GA.
 		return append([]string{"beta"}, args...)
 	}
@@ -117,10 +118,10 @@ func masterUpgradeGKE(v string) error {
 	args := []string{
 		"container",
 		"clusters",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%s", e2econtext.TestContext.CloudConfig.ProjectID),
 		locationParamGKE(),
 		"upgrade",
-		TestContext.CloudConfig.Cluster,
+		e2econtext.TestContext.CloudConfig.Cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
@@ -138,7 +139,7 @@ func masterUpgradeGKE(v string) error {
 func masterUpgradeKubernetesAnywhere(v string) error {
 	e2elog.Logf("Upgrading master to %q", v)
 
-	kaPath := TestContext.KubernetesAnywherePath
+	kaPath := e2econtext.TestContext.KubernetesAnywherePath
 	originalConfigPath := filepath.Join(kaPath, ".config")
 	backupConfigPath := filepath.Join(kaPath, ".config.bak")
 	updatedConfigPath := filepath.Join(kaPath, fmt.Sprintf(".config-%s", v))
@@ -159,7 +160,7 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 	}()
 
 	// invoke ka upgrade
-	if _, _, err := RunCmd("make", "-C", TestContext.KubernetesAnywherePath,
+	if _, _, err := RunCmd("make", "-C", e2econtext.TestContext.KubernetesAnywherePath,
 		"WAIT_FOR_KUBECONFIG=y", "upgrade-master"); err != nil {
 		return err
 	}
@@ -176,13 +177,13 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 func NodeUpgrade(f *Framework, v string, img string) error {
 	// Perform the upgrade.
 	var err error
-	switch TestContext.Provider {
+	switch e2econtext.TestContext.Provider {
 	case "gce":
 		err = nodeUpgradeGCE(v, img, false)
 	case "gke":
 		err = nodeUpgradeGKE(v, img)
 	default:
-		err = fmt.Errorf("NodeUpgrade() is not implemented for provider %s", TestContext.Provider)
+		err = fmt.Errorf("NodeUpgrade() is not implemented for provider %s", e2econtext.TestContext.Provider)
 	}
 	if err != nil {
 		return err
@@ -234,10 +235,10 @@ func nodeUpgradeGKE(v string, img string) error {
 	args := []string{
 		"container",
 		"clusters",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%s", e2econtext.TestContext.CloudConfig.ProjectID),
 		locationParamGKE(),
 		"upgrade",
-		TestContext.CloudConfig.Cluster,
+		e2econtext.TestContext.CloudConfig.Cluster,
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
 	}
@@ -266,10 +267,10 @@ func MigTemplate() (string, error) {
 		// shelling out to gcloud.
 		// An `instance-groups managed describe` call outputs what we want to stdout.
 		output, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-			fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--project=%s", e2econtext.TestContext.CloudConfig.ProjectID),
 			"describe",
-			fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
-			TestContext.CloudConfig.NodeInstanceGroup)
+			fmt.Sprintf("--zone=%s", e2econtext.TestContext.CloudConfig.Zone),
+			e2econtext.TestContext.CloudConfig.NodeInstanceGroup)
 		if err != nil {
 			errLast = fmt.Errorf("gcloud compute instance-groups managed describe call failed with err: %v", err)
 			return false, nil
@@ -281,7 +282,7 @@ func MigTemplate() (string, error) {
 		if val := ParseKVLines(output, key); len(val) > 0 {
 			url := strings.Split(val, "/")
 			templ = url[len(url)-1]
-			e2elog.Logf("MIG group %s using template: %s", TestContext.CloudConfig.NodeInstanceGroup, templ)
+			e2elog.Logf("MIG group %s using template: %s", e2econtext.TestContext.CloudConfig.NodeInstanceGroup, templ)
 			return true, nil
 		}
 		errLast = fmt.Errorf("couldn't find %s in output to get MIG template. Output: %s", key, output)
@@ -293,10 +294,10 @@ func MigTemplate() (string, error) {
 }
 
 func gceUpgradeScript() string {
-	if len(TestContext.GCEUpgradeScript) == 0 {
-		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
+	if len(e2econtext.TestContext.GCEUpgradeScript) == 0 {
+		return path.Join(e2econtext.TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
-	return TestContext.GCEUpgradeScript
+	return e2econtext.TestContext.GCEUpgradeScript
 }
 
 func waitForSSHTunnels() {
@@ -317,13 +318,13 @@ func waitForSSHTunnels() {
 
 // NodeKiller is a utility to simulate node failures.
 type NodeKiller struct {
-	config   NodeKillerConfig
+	config   e2econtext.NodeKillerConfig
 	client   clientset.Interface
 	provider string
 }
 
 // NewNodeKiller creates new NodeKiller.
-func NewNodeKiller(config NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
+func NewNodeKiller(config e2econtext.NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
 	config.NodeKillerStopCh = make(chan struct{})
 	return &NodeKiller{config, client, provider}
 }
@@ -378,5 +379,5 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 
 // DeleteNodeOnCloudProvider deletes the specified node.
 func DeleteNodeOnCloudProvider(node *v1.Node) error {
-	return TestContext.CloudConfig.Provider.DeleteNode(node)
+	return e2econtext.TestContext.CloudConfig.Provider.DeleteNode(node)
 }

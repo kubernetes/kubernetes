@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"fmt"
@@ -99,7 +100,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 					// Wait for container runtime to be running
 					var pid int
 					gomega.Eventually(func() error {
-						runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+						runtimePids, err := getPidsForProcess(e2econtext.TestContext.ContainerRuntimeProcessName, e2econtext.TestContext.ContainerRuntimePidFile)
 						if err != nil {
 							return err
 						}

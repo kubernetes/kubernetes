@@ -45,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/context:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/job:go_default_library",
         "//test/e2e/framework/kubelet:go_default_library",

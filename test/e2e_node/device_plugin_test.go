@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	dputil "k8s.io/kubernetes/test/e2e/framework/deviceplugin"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -64,7 +65,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		})
 		ginkgo.It("Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")
-			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+			e2enode.WaitForNodeToBeReady(f.ClientSet, e2econtext.TestContext.NodeName, 5*time.Minute)
 			dp := dputil.GetSampleDevicePluginPod()
 			for i := range dp.Spec.Containers[0].Env {
 				if dp.Spec.Containers[0].Env[i].Name == envVarNamePluginSockDir {
@@ -72,7 +73,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				}
 			}
 			e2elog.Logf("env %v", dp.Spec.Containers[0].Env)
-			dp.Spec.NodeName = framework.TestContext.NodeName
+			dp.Spec.NodeName = e2econtext.TestContext.NodeName
 			ginkgo.By("Create sample device plugin pod")
 			devicePluginPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)
 			framework.ExpectNoError(err)
@@ -88,7 +89,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// and then use the same here
 			devsLen := int64(2)
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
@@ -138,7 +139,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// Otherwise, Kubelet DeviceManager may remove the re-registered sockets after it starts.
 			ginkgo.By("Wait for node is ready")
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				for _, cond := range node.Status.Conditions {
 					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
@@ -171,7 +172,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for resource to become available on the local node after re-registration")
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
@@ -192,7 +193,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for stub device plugin to become unhealthy on the local node")
 			gomega.Eventually(func() int64 {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(gomega.Equal(int64(0)))
@@ -212,7 +213,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")
 			gomega.Eventually(func() int64 {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(gomega.Equal(devsLen))
@@ -224,7 +225,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for stub device plugin to become unavailable on the local node")
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(e2econtext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) <= 0
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())

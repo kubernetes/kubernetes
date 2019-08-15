@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -83,7 +84,7 @@ var _ = SIGDescribe("Network", func() {
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
 		_, err := e2essh.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
-			framework.TestContext.Provider,
+			e2econtext.TestContext.Provider,
 			clientNodeInfo.node)
 		if err != nil && strings.Contains(err.Error(), "No such file or directory") {
 			framework.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
@@ -186,7 +187,7 @@ var _ = SIGDescribe("Network", func() {
 		e2essh.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTCPPort),
-			framework.TestContext.Provider,
+			e2econtext.TestContext.Provider,
 			clientNodeInfo.node)
 
 		// Timeout in seconds is available as the fifth column from
@@ -199,7 +200,7 @@ var _ = SIGDescribe("Network", func() {
 					"| awk '{print $5}' ",
 				serverNodeInfo.nodeIP,
 				testDaemonTCPPort),
-			framework.TestContext.Provider,
+			e2econtext.TestContext.Provider,
 			clientNodeInfo.node)
 		framework.ExpectNoError(err)
 

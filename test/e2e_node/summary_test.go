@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
@@ -45,7 +46,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
-			if framework.TestContext.DumpLogsOnFailure {
+			if e2econtext.TestContext.DumpLogsOnFailure {
 				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
@@ -122,7 +123,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				"MajorPageFaults": bounded(0, 10),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
-			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
+			if systemdutil.IsRunningSystemd() && e2econtext.TestContext.ContainerRuntime == "docker" {
 				// Some Linux distributions still ship a docker.service that is missing
 				// a `Delegate=yes` setting (or equivalent CPUAccounting= and MemoryAccounting=)
 				// that allows us to monitor the container runtime resource usage through
@@ -264,7 +265,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 
 			matchExpectations := ptrMatchAllFields(gstruct.Fields{
 				"Node": gstruct.MatchAllFields(gstruct.Fields{
-					"NodeName":         gomega.Equal(framework.TestContext.NodeName),
+					"NodeName":         gomega.Equal(e2econtext.TestContext.NodeName),
 					"StartTime":        recent(maxStartAge),
 					"SystemContainers": gstruct.MatchAllElements(summaryObjectID, systemContainers),
 					"CPU": ptrMatchAllFields(gstruct.Fields{

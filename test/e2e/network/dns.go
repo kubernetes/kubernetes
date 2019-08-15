@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
@@ -47,7 +48,7 @@ var _ = SIGDescribe("DNS", func() {
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
 		namesToResolve := []string{
-			fmt.Sprintf("kubernetes.default.svc.%s", framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("kubernetes.default.svc.%s", e2econtext.TestContext.ClusterDNSDomain),
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
@@ -58,8 +59,8 @@ var _ = SIGDescribe("DNS", func() {
 				namesToResolve = append(namesToResolve, "metadata")
 			}
 		}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -86,10 +87,10 @@ var _ = SIGDescribe("DNS", func() {
 				namesToResolve = append(namesToResolve, "metadata")
 			}
 		}
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -105,10 +106,10 @@ var _ = SIGDescribe("DNS", func() {
 		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via /etc/hosts.
 	*/
 	framework.ConformanceIt("should provide /etc/hosts entries for the cluster [LinuxOnly]", func() {
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -154,13 +155,13 @@ var _ = SIGDescribe("DNS", func() {
 		// TODO: Create more endpoints and ensure that multiple A records are returned
 		// for headless service.
 		namesToResolve := []string{
-			fmt.Sprintf("%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
-			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
-			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", regularService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", regularService.Name, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -209,8 +210,8 @@ var _ = SIGDescribe("DNS", func() {
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -246,10 +247,10 @@ var _ = SIGDescribe("DNS", func() {
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		hostNames := []string{hostFQDN, podHostname}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -287,11 +288,11 @@ var _ = SIGDescribe("DNS", func() {
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		subdomain := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		subdomain := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		namesToResolve := []string{hostFQDN, subdomain}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -324,7 +325,7 @@ var _ = SIGDescribe("DNS", func() {
 			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
 		}()
-		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, e2econtext.TestContext.ClusterDNSDomain)
 		wheezyProbeCmd, wheezyFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
 		jessieProbeCmd, jessieFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")

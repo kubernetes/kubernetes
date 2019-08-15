@@ -26,13 +26,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/version"
+	e2econtext "k8s.io/kubernetes/test/e2e/framework/context"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 var (
-	cloudConfig = &TestContext.CloudConfig
+	cloudConfig = &e2econtext.TestContext.CloudConfig
 )
 
 // SetupSuite is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
@@ -47,7 +48,7 @@ var (
 func SetupSuite() {
 	// Run only on Ginkgo node 1
 
-	switch TestContext.Provider {
+	switch e2econtext.TestContext.Provider {
 	case "gce", "gke":
 		LogClusterImageSources()
 	}
@@ -59,7 +60,7 @@ func SetupSuite() {
 
 	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
-	if TestContext.CleanStart {
+	if e2econtext.TestContext.CleanStart {
 		deleted, err := DeleteNamespaces(c, nil, /* deleteFilter */
 			[]string{
 				metav1.NamespaceSystem,
@@ -78,30 +79,30 @@ func SetupSuite() {
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	ExpectNoError(WaitForAllNodesSchedulable(c, TestContext.NodeSchedulableTimeout))
+	ExpectNoError(WaitForAllNodesSchedulable(c, e2econtext.TestContext.NodeSchedulableTimeout))
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
-	if TestContext.CloudConfig.NumNodes == DefaultNumNodes {
-		TestContext.CloudConfig.NumNodes = len(GetReadySchedulableNodesOrDie(c).Items)
+	if e2econtext.TestContext.CloudConfig.NumNodes == e2econtext.DefaultNumNodes {
+		e2econtext.TestContext.CloudConfig.NumNodes = len(GetReadySchedulableNodesOrDie(c).Items)
 	}
 
 	// Ensure all pods are running and ready before starting tests (otherwise,
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	podStartupTimeout := TestContext.SystemPodsStartupTimeout
+	podStartupTimeout := e2econtext.TestContext.SystemPodsStartupTimeout
 	// TODO: In large clusters, we often observe a non-starting pods due to
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(TestContext.MinStartupPods), int32(TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
+	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(e2econtext.TestContext.MinStartupPods), int32(e2econtext.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
 		e2elog.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := WaitForDaemonSets(c, metav1.NamespaceSystem, int32(TestContext.AllowedNotReadyNodes), TestContext.SystemDaemonsetStartupTimeout); err != nil {
+	if err := WaitForDaemonSets(c, metav1.NamespaceSystem, int32(e2econtext.TestContext.AllowedNotReadyNodes), e2econtext.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		e2elog.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
@@ -126,12 +127,12 @@ func SetupSuite() {
 	// and services use the primary IP family by default
 	// If we´ll need to provide additional context for dual-stack, we can detect it
 	// because pods have two addresses (one per family)
-	TestContext.IPFamily = getDefaultClusterIPFamily(c)
-	e2elog.Logf("Cluster IP family: %s", TestContext.IPFamily)
+	e2econtext.TestContext.IPFamily = getDefaultClusterIPFamily(c)
+	e2elog.Logf("Cluster IP family: %s", e2econtext.TestContext.IPFamily)
 
-	if TestContext.NodeKiller.Enabled {
-		nodeKiller := NewNodeKiller(TestContext.NodeKiller, c, TestContext.Provider)
-		go nodeKiller.Run(TestContext.NodeKiller.NodeKillerStopCh)
+	if e2econtext.TestContext.NodeKiller.Enabled {
+		nodeKiller := NewNodeKiller(e2econtext.TestContext.NodeKiller, c, e2econtext.TestContext.Provider)
+		go nodeKiller.Run(e2econtext.TestContext.NodeKiller.NodeKillerStopCh)
 	}
 }
 
@@ -149,16 +150,16 @@ func CleanupSuite() {
 func AfterSuiteActions() {
 	// Run only Ginkgo on node 1
 	e2elog.Logf("Running AfterSuite actions on node 1")
-	if TestContext.ReportDir != "" {
-		CoreDump(TestContext.ReportDir)
+	if e2econtext.TestContext.ReportDir != "" {
+		CoreDump(e2econtext.TestContext.ReportDir)
 	}
-	if TestContext.GatherSuiteMetricsAfterTest {
+	if e2econtext.TestContext.GatherSuiteMetricsAfterTest {
 		if err := gatherTestSuiteMetrics(); err != nil {
 			e2elog.Logf("Error gathering metrics: %v", err)
 		}
 	}
-	if TestContext.NodeKiller.Enabled {
-		close(TestContext.NodeKiller.NodeKillerStopCh)
+	if e2econtext.TestContext.NodeKiller.Enabled {
+		close(e2econtext.TestContext.NodeKiller.NodeKillerStopCh)
 	}
 }
 
@@ -170,7 +171,7 @@ func gatherTestSuiteMetrics() error {
 	}
 
 	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
-	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, !ProviderIs("kubemark"), true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
+	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, !ProviderIs("kubemark"), true, true, true, e2econtext.TestContext.IncludeClusterAutoscalerMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}
@@ -182,8 +183,8 @@ func gatherTestSuiteMetrics() error {
 
 	metricsForE2E := (*e2emetrics.ComponentCollection)(&received)
 	metricsJSON := metricsForE2E.PrintJSON()
-	if TestContext.ReportDir != "" {
-		filePath := path.Join(TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
+	if e2econtext.TestContext.ReportDir != "" {
+		filePath := path.Join(e2econtext.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
 		if err := ioutil.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
