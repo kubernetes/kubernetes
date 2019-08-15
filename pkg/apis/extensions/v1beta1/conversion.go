@@ -18,7 +18,6 @@ package v1beta1
 
 import (
 	"fmt"
-
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 
 	v1 "k8s.io/api/core/v1"
@@ -457,6 +456,32 @@ func Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *netwo
 	out.Items = make([]extensionsv1beta1.NetworkPolicy, len(in.Items))
 	for i := range in.Items {
 		if err := Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(&in.Items[i], &out.Items[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *extensionsv1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+	if err := autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in, out, s); err != nil {
+		return nil
+	}
+	if in.Backend != nil {
+		out.DefaultBackend = &networking.IngressBackend{}
+		if err := Convert_v1beta1_IngressBackend_To_networking_IngressBackend(in.Backend, out.DefaultBackend, s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *extensionsv1beta1.IngressSpec, s conversion.Scope) error {
+	if err := autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in, out, s); err != nil {
+		return nil
+	}
+	if in.DefaultBackend != nil {
+		out.Backend = &extensionsv1beta1.IngressBackend{}
+		if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in.DefaultBackend, out.Backend, s); err != nil {
 			return err
 		}
 	}

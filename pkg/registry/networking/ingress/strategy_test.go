@@ -37,7 +37,7 @@ func newIngress() networking.Ingress {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: networking.IngressSpec{
-			Backend: &networking.IngressBackend{
+			DefaultBackend: &networking.IngressBackend{
 				ServiceName: "default-backend",
 				ServicePort: intstr.FromInt(80),
 			},
@@ -110,7 +110,7 @@ func TestIngressStatusStrategy(t *testing.T) {
 	newIngress := newIngress()
 	oldIngress.ResourceVersion = "4"
 	newIngress.ResourceVersion = "4"
-	newIngress.Spec.Backend.ServiceName = "ignore"
+	newIngress.Spec.DefaultBackend.ServiceName = "ignore"
 	newIngress.Status = networking.IngressStatus{
 		LoadBalancer: api.LoadBalancerStatus{
 			Ingress: []api.LoadBalancerIngress{
@@ -122,7 +122,7 @@ func TestIngressStatusStrategy(t *testing.T) {
 	if newIngress.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Ingress status updates should allow change of status fields")
 	}
-	if newIngress.Spec.Backend.ServiceName != "default-backend" {
+	if newIngress.Spec.DefaultBackend.ServiceName != "default-backend" {
 		t.Errorf("PrepareForUpdate should have preserved old spec")
 	}
 	errs := StatusStrategy.ValidateUpdate(ctx, &newIngress, &oldIngress)
