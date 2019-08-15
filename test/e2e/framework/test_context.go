@@ -33,7 +33,6 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -361,14 +360,6 @@ func RegisterNodeFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
 	flags.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
 	flags.Var(cliflag.NewMapStringString(&TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-}
-
-// HandleFlags sets up all flags and parses the command line.
-func HandleFlags() {
-	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
-	RegisterCommonFlags(flag.CommandLine)
-	RegisterClusterFlags(flag.CommandLine)
-	flag.Parse()
 }
 
 func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
