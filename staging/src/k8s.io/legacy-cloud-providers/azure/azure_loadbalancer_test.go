@@ -1833,6 +1833,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 		existingPIPs  []network.PublicIPAddress
 		expectedPIP   *network.PublicIPAddress
 		expectedID    string
+		expectedDNS   string
 		expectedError bool
 	}{
 		{
@@ -1849,6 +1850,28 @@ func TestEnsurePublicIPExists(t *testing.T) {
 			expectedID: "/subscriptions/subscription/resourceGroups/rg/providers/" +
 				"Microsoft.Network/publicIPAddresses/pip1",
 		},
+		{
+			desc: "ensurePublicIPExists shall update existed PIP's dns label",
+			existingPIPs: []network.PublicIPAddress{{
+				Name: to.StringPtr("pip1"),
+				PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+					DNSSettings: &network.PublicIPAddressDNSSettings{
+						DomainNameLabel: to.StringPtr("previousdns"),
+					},
+				},
+			}},
+			expectedPIP: &network.PublicIPAddress{
+				Name: to.StringPtr("pip1"),
+				ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg" +
+					"/providers/Microsoft.Network/publicIPAddresses/pip1"),
+				PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+					DNSSettings: &network.PublicIPAddressDNSSettings{
+						DomainNameLabel: to.StringPtr("newdns"),
+					},
+				},
+			},
+			expectedDNS: "newdns",
+		},
 	}
 
 	for i, test := range testCases {
@@ -1860,7 +1883,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
 		}
-		pip, err := az.ensurePublicIPExists(&service, "pip1", "", "", false)
+		pip, err := az.ensurePublicIPExists(&service, "pip1", test.expectedDNS, "", false)
 		if test.expectedID != "" {
 			assert.Equal(t, test.expectedID, to.String(pip.ID), "TestCase[%d]: %s", i, test.desc)
 		} else {

@@ -492,41 +492,52 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	if err != nil {
 		return nil, err
 	}
-	if existsPip {
-		return &pip, nil
-	}
 
 	serviceName := getServiceName(service)
 
-	if shouldPIPExisted {
-		return nil, fmt.Errorf("PublicIP from annotation azure-pip-name=%s for service %s doesn't exist", pipName, serviceName)
+	if existsPip {
+		// return if pip exist and dns label is the same
+		if getDomainNameLabel(&pip) == domainNameLabel {
+			return &pip, nil
+		}
+		klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - updating", serviceName, *pip.Name)
+		if pip.PublicIPAddressPropertiesFormat == nil {
+			pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
+				PublicIPAllocationMethod: network.Static,
+			}
+		}
+	} else {
+		if shouldPIPExisted {
+			return nil, fmt.Errorf("PublicIP from annotation azure-pip-name=%s for service %s doesn't exist", pipName, serviceName)
+		}
+		pip.Name = to.StringPtr(pipName)
+		pip.Location = to.StringPtr(az.Location)
+		pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
+			PublicIPAllocationMethod: network.Static,
+		}
+		pip.Tags = map[string]*string{
+			serviceTagKey:  &serviceName,
+			clusterNameKey: &clusterName,
+		}
+		if az.useStandardLoadBalancer() {
+			pip.Sku = &network.PublicIPAddressSku{
+				Name: network.PublicIPAddressSkuNameStandard,
+			}
+		}
+		klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	}
-
-	pip.Name = to.StringPtr(pipName)
-	pip.Location = to.StringPtr(az.Location)
-	pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
-		PublicIPAllocationMethod: network.Static,
-	}
-	if len(domainNameLabel) > 0 {
+	if len(domainNameLabel) == 0 {
+		pip.PublicIPAddressPropertiesFormat.DNSSettings = nil
+	} else {
 		pip.PublicIPAddressPropertiesFormat.DNSSettings = &network.PublicIPAddressDNSSettings{
 			DomainNameLabel: &domainNameLabel,
 		}
 	}
-	pip.Tags = map[string]*string{
-		serviceTagKey:  &serviceName,
-		clusterNameKey: &clusterName,
-	}
-	if az.useStandardLoadBalancer() {
-		pip.Sku = &network.PublicIPAddressSku{
-			Name: network.PublicIPAddressSkuNameStandard,
-		}
-	}
 
-	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIP(service, pipResourceGroup, pip)
 	if err != nil {
-		klog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
+		klog.V(2).Infof("ensure(%s) abort backoff: pip(%s)", serviceName, *pip.Name)
 		return nil, err
 	}
 	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): end", pipResourceGroup, *pip.Name)
@@ -538,6 +549,13 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		return nil, err
 	}
 	return &pip, nil
+}
+
+func getDomainNameLabel(pip *network.PublicIPAddress) string {
+	if pip == nil || pip.PublicIPAddressPropertiesFormat == nil || pip.PublicIPAddressPropertiesFormat.DNSSettings == nil {
+		return ""
+	}
+	return to.String(pip.PublicIPAddressPropertiesFormat.DNSSettings.DomainNameLabel)
 }
 
 func getIdleTimeout(s *v1.Service) (*int32, error) {
