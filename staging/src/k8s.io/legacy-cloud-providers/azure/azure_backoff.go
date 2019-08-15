@@ -170,7 +170,7 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 		}
 
 		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
 			az.nsgCache.Delete(*sg.Name)
 		}
 
@@ -232,7 +232,7 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 			az.lbCache.Delete(*lb.Name)
 		}
 		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
 			az.lbCache.Delete(*lb.Name)
 		}
 		return err
