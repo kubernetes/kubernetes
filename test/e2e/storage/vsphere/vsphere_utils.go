@@ -212,7 +212,7 @@ func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolu
 	e2elog.Logf("Successfully verified content of the volume")
 }
 
-func getVSphereStorageClassSpec(name string, scParameters map[string]string, zones []string) *storagev1.StorageClass {
+func getVSphereStorageClassSpec(name string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) *storagev1.StorageClass {
 	var sc *storagev1.StorageClass
 
 	sc = &storagev1.StorageClass{
@@ -237,6 +237,10 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string, zon
 			},
 		}
 		sc.AllowedTopologies = append(sc.AllowedTopologies, term)
+	}
+	if volumeBindingMode != "" {
+		mode := storagev1.VolumeBindingMode(string(volumeBindingMode))
+		sc.VolumeBindingMode = &mode
 	}
 	return sc
 }

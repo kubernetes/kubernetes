@@ -39,6 +39,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/vsphere",
     deps = [
+        "//pkg/controller/volume/events:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
