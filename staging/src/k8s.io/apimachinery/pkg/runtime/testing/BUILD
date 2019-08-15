@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cacheable_object.go",
         "doc.go",
         "types.go",
         "zz_generated.deepcopy.go",
