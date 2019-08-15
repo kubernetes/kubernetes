@@ -48,15 +48,6 @@ const (
 	// SYS_TIME). This should only be enabled if user namespace remapping is enabled in the docker daemon.
 	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
 
-	// owner: @vishh
-	// alpha: v1.5
-	//
-	// DEPRECATED - This feature is deprecated by Pod Priority and Preemption as of Kubernetes 1.13.
-	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
-	// and also prevents them from being evicted from a node.
-	// Note: This feature is not supported for `BestEffort` pods.
-	ExperimentalCriticalPodAnnotation featuregate.Feature = "ExperimentalCriticalPodAnnotation"
-
 	// owner: @jiayingz
 	// beta: v1.10
 	//
@@ -491,7 +482,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DynamicKubeletConfig: {Default: true, PreRelease: featuregate.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 	DevicePlugins:                       {Default: true, PreRelease: featuregate.Beta},
-	ExperimentalCriticalPodAnnotation:   {Default: false, PreRelease: featuregate.Alpha},
 	TaintBasedEvictions:                 {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate:      {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletClientCertificate:      {Default: true, PreRelease: featuregate.Beta},
