@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -59,6 +60,14 @@ const (
 	Wait
 	// Skip is used when a bind plugin chooses to skip binding.
 	Skip
+)
+
+const (
+	// MaxNodeScore is the maximum score a Score plugin is expected to return.
+	MaxNodeScore int = schedulerapi.MaxPriority
+
+	// MinNodeScore is the minimum score a Score plugin is expected to return.
+	MinNodeScore int = 0
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
