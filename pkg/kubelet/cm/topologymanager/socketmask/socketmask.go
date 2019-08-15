@@ -172,3 +172,23 @@ func Or(first SocketMask, masks ...SocketMask) SocketMask {
 	s.Or(masks...)
 	return &s
 }
+
+// IterateSocketMasks iterates all possible masks from a list of sockets,
+// issuing a callback on each mask.
+func IterateSocketMasks(sockets []int, callback func(SocketMask)) {
+	var iterate func(sockets, accum []int, size int)
+	iterate = func(sockets, accum []int, size int) {
+		if len(accum) == size {
+			mask, _ := NewSocketMask(accum...)
+			callback(mask)
+			return
+		}
+		for i := range sockets {
+			iterate(sockets[i+1:], append(accum, sockets[i]), size)
+		}
+	}
+
+	for i := 1; i <= len(sockets); i++ {
+		iterate(sockets, []int{}, i)
+	}
+}
