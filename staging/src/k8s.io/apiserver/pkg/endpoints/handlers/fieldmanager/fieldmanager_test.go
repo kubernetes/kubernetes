@@ -468,3 +468,75 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 		}
 	}
 }
+
+func TestApplyFailsWithManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	obj := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{
+					Manager: "test",
+				},
+			},
+		},
+	}
+
+	_, err := f.Apply(obj, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), "fieldmanager_test", false)
+
+	if err == nil {
+		t.Fatalf("successfully applied with set managed fields")
+	}
+}
+
+func TestApplySuccessWithEmptyManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	obj := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			ManagedFields: []metav1.ManagedFieldsEntry{},
+		},
+	}
+
+	_, err := f.Apply(obj, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), "fieldmanager_test", false)
+
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+}
+
+func TestApplySuccessWithNilManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	obj := &corev1.Pod{}
+
+	_, err := f.Apply(obj, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), "fieldmanager_test", false)
+
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+}

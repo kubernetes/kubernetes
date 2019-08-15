@@ -175,10 +175,11 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 // Apply is used when server-side apply is called, as it merges the
 // object and update the managed fields.
 func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
-	// If the object doesn't have metadata, apply isn't allowed.
-	accessor, err := meta.Accessor(liveObj)
-	if err != nil {
+	// If the object doesn't have metadata or managed fields is not empty, apply isn't allowed.
+	if objMeta, err := meta.Accessor(liveObj); err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
+	} else if objMeta.GetManagedFields() != nil && len(objMeta.GetManagedFields()) != 0 {
+		return nil, fmt.Errorf("apply is not allowed with managed fields set but was: %v", objMeta.GetManagedFields())
 	}
 	missingManagedFields := (len(accessor.GetManagedFields()) == 0)
 
