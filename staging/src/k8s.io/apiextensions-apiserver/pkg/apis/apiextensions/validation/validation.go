@@ -311,15 +311,14 @@ func validateEnumStrings(fldPath *field.Path, value string, accepted []string, r
 	return field.ErrorList{field.NotSupported(fldPath, value, accepted)}
 }
 
-var acceptedConversionReviewVersion = []string{v1beta1.SchemeGroupVersion.Version}
+// AcceptedConversionReviewVersions contains the list of ConversionReview versions the *prior* version of the API server understands.
+// 1.15: server understands v1beta1; accepted versions are ["v1beta1"]
+// 1.16: server understands v1, v1beta1; accepted versions are ["v1beta1"]
+// TODO(liggitt): 1.17: server understands v1, v1beta1; accepted versions are ["v1","v1beta1"]
+var acceptedConversionReviewVersions = sets.NewString(v1beta1.SchemeGroupVersion.Version)
 
 func isAcceptedConversionReviewVersion(v string) bool {
-	for _, version := range acceptedConversionReviewVersion {
-		if v == version {
-			return true
-		}
-	}
-	return false
+	return acceptedConversionReviewVersions.Has(v)
 }
 
 func validateConversionReviewVersions(versions []string, requireRecognizedVersion bool, fldPath *field.Path) field.ErrorList {
@@ -346,7 +345,7 @@ func validateConversionReviewVersions(versions []string, requireRecognizedVersio
 			allErrs = append(allErrs, field.Invalid(
 				fldPath, versions,
 				fmt.Sprintf("must include at least one of %v",
-					strings.Join(acceptedConversionReviewVersion, ", "))))
+					strings.Join(acceptedConversionReviewVersions.List(), ", "))))
 		}
 	}
 	return allErrs
