@@ -130,9 +130,9 @@ such as those that they create and delete.
 cluster state to the observed cluster state at the time Reconcile is run.**
 
 1. Deployment Controller creates/deletes ReplicaSets
-1. ReplicaSet Controller creates/delete Pods
+1. ReplicaSet Controller creates/deletes Pods
 1. Scheduler (Controller) writes Nodes to Pods
-1. Node (Controller) runs Containers specifid in Pods on the Node
+1. Node (Controller) runs Containers specified in Pods on the Node
 
 **Watch**
 
