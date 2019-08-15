@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewInterfaceIPConfigurationsClientWithBaseURI(baseURI string, subscriptionI
 // networkInterfaceName - the name of the network interface.
 // IPConfigurationName - the name of the ip configuration name.
 func (client InterfaceIPConfigurationsClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, IPConfigurationName string) (result InterfaceIPConfiguration, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceIPConfigurationsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkInterfaceName, IPConfigurationName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfaceIPConfigurationsClient", "Get", nil, "Failure preparing request")
@@ -91,8 +102,8 @@ func (client InterfaceIPConfigurationsClient) GetPreparer(ctx context.Context, r
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceIPConfigurationsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -113,6 +124,16 @@ func (client InterfaceIPConfigurationsClient) GetResponder(resp *http.Response) 
 // resourceGroupName - the name of the resource group.
 // networkInterfaceName - the name of the network interface.
 func (client InterfaceIPConfigurationsClient) List(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfaceIPConfigurationListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceIPConfigurationsClient.List")
+		defer func() {
+			sc := -1
+			if result.iiclr.Response.Response != nil {
+				sc = result.iiclr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkInterfaceName)
 	if err != nil {
@@ -159,8 +180,8 @@ func (client InterfaceIPConfigurationsClient) ListPreparer(ctx context.Context, 
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceIPConfigurationsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -177,8 +198,8 @@ func (client InterfaceIPConfigurationsClient) ListResponder(resp *http.Response)
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client InterfaceIPConfigurationsClient) listNextResults(lastResults InterfaceIPConfigurationListResult) (result InterfaceIPConfigurationListResult, err error) {
-	req, err := lastResults.interfaceIPConfigurationListResultPreparer()
+func (client InterfaceIPConfigurationsClient) listNextResults(ctx context.Context, lastResults InterfaceIPConfigurationListResult) (result InterfaceIPConfigurationListResult, err error) {
+	req, err := lastResults.interfaceIPConfigurationListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfaceIPConfigurationsClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -199,6 +220,16 @@ func (client InterfaceIPConfigurationsClient) listNextResults(lastResults Interf
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfaceIPConfigurationsClient) ListComplete(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfaceIPConfigurationListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceIPConfigurationsClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName, networkInterfaceName)
 	return
 }

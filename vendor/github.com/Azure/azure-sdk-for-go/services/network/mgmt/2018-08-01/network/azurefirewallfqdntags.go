@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -41,6 +42,16 @@ func NewAzureFirewallFqdnTagsClientWithBaseURI(baseURI string, subscriptionID st
 
 // ListAll gets all the Azure Firewall FQDN Tags in a subscription.
 func (client AzureFirewallFqdnTagsClient) ListAll(ctx context.Context) (result AzureFirewallFqdnTagListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/AzureFirewallFqdnTagsClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.afftlr.Response.Response != nil {
+				sc = result.afftlr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listAllNextResults
 	req, err := client.ListAllPreparer(ctx)
 	if err != nil {
@@ -85,8 +96,8 @@ func (client AzureFirewallFqdnTagsClient) ListAllPreparer(ctx context.Context) (
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client AzureFirewallFqdnTagsClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -103,8 +114,8 @@ func (client AzureFirewallFqdnTagsClient) ListAllResponder(resp *http.Response) 
 }
 
 // listAllNextResults retrieves the next set of results, if any.
-func (client AzureFirewallFqdnTagsClient) listAllNextResults(lastResults AzureFirewallFqdnTagListResult) (result AzureFirewallFqdnTagListResult, err error) {
-	req, err := lastResults.azureFirewallFqdnTagListResultPreparer()
+func (client AzureFirewallFqdnTagsClient) listAllNextResults(ctx context.Context, lastResults AzureFirewallFqdnTagListResult) (result AzureFirewallFqdnTagListResult, err error) {
+	req, err := lastResults.azureFirewallFqdnTagListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.AzureFirewallFqdnTagsClient", "listAllNextResults", nil, "Failure preparing next results request")
 	}
@@ -125,6 +136,16 @@ func (client AzureFirewallFqdnTagsClient) listAllNextResults(lastResults AzureFi
 
 // ListAllComplete enumerates all values, automatically crossing page boundaries as required.
 func (client AzureFirewallFqdnTagsClient) ListAllComplete(ctx context.Context) (result AzureFirewallFqdnTagListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/AzureFirewallFqdnTagsClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListAll(ctx)
 	return
 }

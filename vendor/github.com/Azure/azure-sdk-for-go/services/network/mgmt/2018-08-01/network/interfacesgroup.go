@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewInterfacesClientWithBaseURI(baseURI string, subscriptionID string) Inter
 // networkInterfaceName - the name of the network interface.
 // parameters - parameters supplied to the create or update network interface operation.
 func (client InterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters Interface) (result InterfacesCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, networkInterfaceName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -86,9 +97,9 @@ func (client InterfacesClient) CreateOrUpdatePreparer(ctx context.Context, resou
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) CreateOrUpdateSender(req *http.Request) (future InterfacesCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -114,6 +125,16 @@ func (client InterfacesClient) CreateOrUpdateResponder(resp *http.Response) (res
 // resourceGroupName - the name of the resource group.
 // networkInterfaceName - the name of the network interface.
 func (client InterfacesClient) Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfacesDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, networkInterfaceName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "Delete", nil, "Failure preparing request")
@@ -153,9 +174,9 @@ func (client InterfacesClient) DeletePreparer(ctx context.Context, resourceGroup
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) DeleteSender(req *http.Request) (future InterfacesDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -181,6 +202,16 @@ func (client InterfacesClient) DeleteResponder(resp *http.Response) (result auto
 // networkInterfaceName - the name of the network interface.
 // expand - expands referenced resources.
 func (client InterfacesClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result Interface, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkInterfaceName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "Get", nil, "Failure preparing request")
@@ -229,8 +260,8 @@ func (client InterfacesClient) GetPreparer(ctx context.Context, resourceGroupNam
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -251,6 +282,16 @@ func (client InterfacesClient) GetResponder(resp *http.Response) (result Interfa
 // resourceGroupName - the name of the resource group.
 // networkInterfaceName - the name of the network interface.
 func (client InterfacesClient) GetEffectiveRouteTable(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfacesGetEffectiveRouteTableFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.GetEffectiveRouteTable")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetEffectiveRouteTablePreparer(ctx, resourceGroupName, networkInterfaceName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "GetEffectiveRouteTable", nil, "Failure preparing request")
@@ -290,9 +331,9 @@ func (client InterfacesClient) GetEffectiveRouteTablePreparer(ctx context.Contex
 // GetEffectiveRouteTableSender sends the GetEffectiveRouteTable request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetEffectiveRouteTableSender(req *http.Request) (future InterfacesGetEffectiveRouteTableFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -323,6 +364,16 @@ func (client InterfacesClient) GetEffectiveRouteTableResponder(resp *http.Respon
 // IPConfigurationName - the name of the ip configuration.
 // expand - expands referenced resources.
 func (client InterfacesClient) GetVirtualMachineScaleSetIPConfiguration(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, expand string) (result InterfaceIPConfiguration, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.GetVirtualMachineScaleSetIPConfiguration")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetVirtualMachineScaleSetIPConfigurationPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "GetVirtualMachineScaleSetIPConfiguration", nil, "Failure preparing request")
@@ -374,8 +425,8 @@ func (client InterfacesClient) GetVirtualMachineScaleSetIPConfigurationPreparer(
 // GetVirtualMachineScaleSetIPConfigurationSender sends the GetVirtualMachineScaleSetIPConfiguration request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetVirtualMachineScaleSetIPConfigurationSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetVirtualMachineScaleSetIPConfigurationResponder handles the response to the GetVirtualMachineScaleSetIPConfiguration request. The method always
@@ -399,6 +450,16 @@ func (client InterfacesClient) GetVirtualMachineScaleSetIPConfigurationResponder
 // networkInterfaceName - the name of the network interface.
 // expand - expands referenced resources.
 func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result Interface, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.GetVirtualMachineScaleSetNetworkInterface")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetVirtualMachineScaleSetNetworkInterfacePreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "GetVirtualMachineScaleSetNetworkInterface", nil, "Failure preparing request")
@@ -449,8 +510,8 @@ func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterfacePreparer
 // GetVirtualMachineScaleSetNetworkInterfaceSender sends the GetVirtualMachineScaleSetNetworkInterface request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterfaceSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetVirtualMachineScaleSetNetworkInterfaceResponder handles the response to the GetVirtualMachineScaleSetNetworkInterface request. The method always
@@ -470,6 +531,16 @@ func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterfaceResponde
 // Parameters:
 // resourceGroupName - the name of the resource group.
 func (client InterfacesClient) List(ctx context.Context, resourceGroupName string) (result InterfaceListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.List")
+		defer func() {
+			sc := -1
+			if result.ilr.Response.Response != nil {
+				sc = result.ilr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -515,8 +586,8 @@ func (client InterfacesClient) ListPreparer(ctx context.Context, resourceGroupNa
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -533,8 +604,8 @@ func (client InterfacesClient) ListResponder(resp *http.Response) (result Interf
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client InterfacesClient) listNextResults(lastResults InterfaceListResult) (result InterfaceListResult, err error) {
-	req, err := lastResults.interfaceListResultPreparer()
+func (client InterfacesClient) listNextResults(ctx context.Context, lastResults InterfaceListResult) (result InterfaceListResult, err error) {
+	req, err := lastResults.interfaceListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -555,12 +626,32 @@ func (client InterfacesClient) listNextResults(lastResults InterfaceListResult) 
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfacesClient) ListComplete(ctx context.Context, resourceGroupName string) (result InterfaceListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName)
 	return
 }
 
 // ListAll gets all network interfaces in a subscription.
 func (client InterfacesClient) ListAll(ctx context.Context) (result InterfaceListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.ilr.Response.Response != nil {
+				sc = result.ilr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listAllNextResults
 	req, err := client.ListAllPreparer(ctx)
 	if err != nil {
@@ -605,8 +696,8 @@ func (client InterfacesClient) ListAllPreparer(ctx context.Context) (*http.Reque
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -623,8 +714,8 @@ func (client InterfacesClient) ListAllResponder(resp *http.Response) (result Int
 }
 
 // listAllNextResults retrieves the next set of results, if any.
-func (client InterfacesClient) listAllNextResults(lastResults InterfaceListResult) (result InterfaceListResult, err error) {
-	req, err := lastResults.interfaceListResultPreparer()
+func (client InterfacesClient) listAllNextResults(ctx context.Context, lastResults InterfaceListResult) (result InterfaceListResult, err error) {
+	req, err := lastResults.interfaceListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "listAllNextResults", nil, "Failure preparing next results request")
 	}
@@ -645,6 +736,16 @@ func (client InterfacesClient) listAllNextResults(lastResults InterfaceListResul
 
 // ListAllComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfacesClient) ListAllComplete(ctx context.Context) (result InterfaceListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListAll(ctx)
 	return
 }
@@ -654,6 +755,16 @@ func (client InterfacesClient) ListAllComplete(ctx context.Context) (result Inte
 // resourceGroupName - the name of the resource group.
 // networkInterfaceName - the name of the network interface.
 func (client InterfacesClient) ListEffectiveNetworkSecurityGroups(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfacesListEffectiveNetworkSecurityGroupsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListEffectiveNetworkSecurityGroups")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.ListEffectiveNetworkSecurityGroupsPreparer(ctx, resourceGroupName, networkInterfaceName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "ListEffectiveNetworkSecurityGroups", nil, "Failure preparing request")
@@ -693,9 +804,9 @@ func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsPreparer(ctx co
 // ListEffectiveNetworkSecurityGroupsSender sends the ListEffectiveNetworkSecurityGroups request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsSender(req *http.Request) (future InterfacesListEffectiveNetworkSecurityGroupsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -725,6 +836,16 @@ func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsResponder(resp 
 // networkInterfaceName - the name of the network interface.
 // expand - expands referenced resources.
 func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurations(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result InterfaceIPConfigurationListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListVirtualMachineScaleSetIPConfigurations")
+		defer func() {
+			sc := -1
+			if result.iiclr.Response.Response != nil {
+				sc = result.iiclr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listVirtualMachineScaleSetIPConfigurationsNextResults
 	req, err := client.ListVirtualMachineScaleSetIPConfigurationsPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
 	if err != nil {
@@ -776,8 +897,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurationsPrepare
 // ListVirtualMachineScaleSetIPConfigurationsSender sends the ListVirtualMachineScaleSetIPConfigurations request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurationsSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListVirtualMachineScaleSetIPConfigurationsResponder handles the response to the ListVirtualMachineScaleSetIPConfigurations request. The method always
@@ -794,8 +915,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurationsRespond
 }
 
 // listVirtualMachineScaleSetIPConfigurationsNextResults retrieves the next set of results, if any.
-func (client InterfacesClient) listVirtualMachineScaleSetIPConfigurationsNextResults(lastResults InterfaceIPConfigurationListResult) (result InterfaceIPConfigurationListResult, err error) {
-	req, err := lastResults.interfaceIPConfigurationListResultPreparer()
+func (client InterfacesClient) listVirtualMachineScaleSetIPConfigurationsNextResults(ctx context.Context, lastResults InterfaceIPConfigurationListResult) (result InterfaceIPConfigurationListResult, err error) {
+	req, err := lastResults.interfaceIPConfigurationListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "listVirtualMachineScaleSetIPConfigurationsNextResults", nil, "Failure preparing next results request")
 	}
@@ -816,6 +937,16 @@ func (client InterfacesClient) listVirtualMachineScaleSetIPConfigurationsNextRes
 
 // ListVirtualMachineScaleSetIPConfigurationsComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurationsComplete(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result InterfaceIPConfigurationListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListVirtualMachineScaleSetIPConfigurations")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListVirtualMachineScaleSetIPConfigurations(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
 	return
 }
@@ -825,6 +956,16 @@ func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurationsComplet
 // resourceGroupName - the name of the resource group.
 // virtualMachineScaleSetName - the name of the virtual machine scale set.
 func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfaces(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string) (result InterfaceListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListVirtualMachineScaleSetNetworkInterfaces")
+		defer func() {
+			sc := -1
+			if result.ilr.Response.Response != nil {
+				sc = result.ilr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listVirtualMachineScaleSetNetworkInterfacesNextResults
 	req, err := client.ListVirtualMachineScaleSetNetworkInterfacesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName)
 	if err != nil {
@@ -871,8 +1012,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesPrepar
 // ListVirtualMachineScaleSetNetworkInterfacesSender sends the ListVirtualMachineScaleSetNetworkInterfaces request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListVirtualMachineScaleSetNetworkInterfacesResponder handles the response to the ListVirtualMachineScaleSetNetworkInterfaces request. The method always
@@ -889,8 +1030,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesRespon
 }
 
 // listVirtualMachineScaleSetNetworkInterfacesNextResults retrieves the next set of results, if any.
-func (client InterfacesClient) listVirtualMachineScaleSetNetworkInterfacesNextResults(lastResults InterfaceListResult) (result InterfaceListResult, err error) {
-	req, err := lastResults.interfaceListResultPreparer()
+func (client InterfacesClient) listVirtualMachineScaleSetNetworkInterfacesNextResults(ctx context.Context, lastResults InterfaceListResult) (result InterfaceListResult, err error) {
+	req, err := lastResults.interfaceListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "listVirtualMachineScaleSetNetworkInterfacesNextResults", nil, "Failure preparing next results request")
 	}
@@ -911,6 +1052,16 @@ func (client InterfacesClient) listVirtualMachineScaleSetNetworkInterfacesNextRe
 
 // ListVirtualMachineScaleSetNetworkInterfacesComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesComplete(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string) (result InterfaceListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListVirtualMachineScaleSetNetworkInterfaces")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListVirtualMachineScaleSetNetworkInterfaces(ctx, resourceGroupName, virtualMachineScaleSetName)
 	return
 }
@@ -922,6 +1073,16 @@ func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesComple
 // virtualMachineScaleSetName - the name of the virtual machine scale set.
 // virtualmachineIndex - the virtual machine index.
 func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfaces(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string) (result InterfaceListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListVirtualMachineScaleSetVMNetworkInterfaces")
+		defer func() {
+			sc := -1
+			if result.ilr.Response.Response != nil {
+				sc = result.ilr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listVirtualMachineScaleSetVMNetworkInterfacesNextResults
 	req, err := client.ListVirtualMachineScaleSetVMNetworkInterfacesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex)
 	if err != nil {
@@ -969,8 +1130,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesPrep
 // ListVirtualMachineScaleSetVMNetworkInterfacesSender sends the ListVirtualMachineScaleSetVMNetworkInterfaces request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListVirtualMachineScaleSetVMNetworkInterfacesResponder handles the response to the ListVirtualMachineScaleSetVMNetworkInterfaces request. The method always
@@ -987,8 +1148,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesResp
 }
 
 // listVirtualMachineScaleSetVMNetworkInterfacesNextResults retrieves the next set of results, if any.
-func (client InterfacesClient) listVirtualMachineScaleSetVMNetworkInterfacesNextResults(lastResults InterfaceListResult) (result InterfaceListResult, err error) {
-	req, err := lastResults.interfaceListResultPreparer()
+func (client InterfacesClient) listVirtualMachineScaleSetVMNetworkInterfacesNextResults(ctx context.Context, lastResults InterfaceListResult) (result InterfaceListResult, err error) {
+	req, err := lastResults.interfaceListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "listVirtualMachineScaleSetVMNetworkInterfacesNextResults", nil, "Failure preparing next results request")
 	}
@@ -1009,6 +1170,16 @@ func (client InterfacesClient) listVirtualMachineScaleSetVMNetworkInterfacesNext
 
 // ListVirtualMachineScaleSetVMNetworkInterfacesComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesComplete(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string) (result InterfaceListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.ListVirtualMachineScaleSetVMNetworkInterfaces")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListVirtualMachineScaleSetVMNetworkInterfaces(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex)
 	return
 }
@@ -1019,6 +1190,16 @@ func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesComp
 // networkInterfaceName - the name of the network interface.
 // parameters - parameters supplied to update network interface tags.
 func (client InterfacesClient) UpdateTags(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters TagsObject) (result InterfacesUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfacesClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, networkInterfaceName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "UpdateTags", nil, "Failure preparing request")
@@ -1060,9 +1241,9 @@ func (client InterfacesClient) UpdateTagsPreparer(ctx context.Context, resourceG
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) UpdateTagsSender(req *http.Request) (future InterfacesUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

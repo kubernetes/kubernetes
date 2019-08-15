@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -47,6 +48,16 @@ func NewInboundNatRulesClientWithBaseURI(baseURI string, subscriptionID string) 
 // inboundNatRuleName - the name of the inbound nat rule.
 // inboundNatRuleParameters - parameters supplied to the create or update inbound nat rule operation.
 func (client InboundNatRulesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, inboundNatRuleName string, inboundNatRuleParameters InboundNatRule) (result InboundNatRulesCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InboundNatRulesClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: inboundNatRuleParameters,
 			Constraints: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat", Name: validation.Null, Rule: false,
@@ -108,9 +119,9 @@ func (client InboundNatRulesClient) CreateOrUpdatePreparer(ctx context.Context, 
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client InboundNatRulesClient) CreateOrUpdateSender(req *http.Request) (future InboundNatRulesCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -137,6 +148,16 @@ func (client InboundNatRulesClient) CreateOrUpdateResponder(resp *http.Response)
 // loadBalancerName - the name of the load balancer.
 // inboundNatRuleName - the name of the inbound nat rule.
 func (client InboundNatRulesClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string, inboundNatRuleName string) (result InboundNatRulesDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InboundNatRulesClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, loadBalancerName, inboundNatRuleName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InboundNatRulesClient", "Delete", nil, "Failure preparing request")
@@ -177,9 +198,9 @@ func (client InboundNatRulesClient) DeletePreparer(ctx context.Context, resource
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client InboundNatRulesClient) DeleteSender(req *http.Request) (future InboundNatRulesDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -206,6 +227,16 @@ func (client InboundNatRulesClient) DeleteResponder(resp *http.Response) (result
 // inboundNatRuleName - the name of the inbound nat rule.
 // expand - expands referenced resources.
 func (client InboundNatRulesClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, inboundNatRuleName string, expand string) (result InboundNatRule, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InboundNatRulesClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, inboundNatRuleName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InboundNatRulesClient", "Get", nil, "Failure preparing request")
@@ -255,8 +286,8 @@ func (client InboundNatRulesClient) GetPreparer(ctx context.Context, resourceGro
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client InboundNatRulesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -277,6 +308,16 @@ func (client InboundNatRulesClient) GetResponder(resp *http.Response) (result In
 // resourceGroupName - the name of the resource group.
 // loadBalancerName - the name of the load balancer.
 func (client InboundNatRulesClient) List(ctx context.Context, resourceGroupName string, loadBalancerName string) (result InboundNatRuleListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InboundNatRulesClient.List")
+		defer func() {
+			sc := -1
+			if result.inrlr.Response.Response != nil {
+				sc = result.inrlr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, loadBalancerName)
 	if err != nil {
@@ -323,8 +364,8 @@ func (client InboundNatRulesClient) ListPreparer(ctx context.Context, resourceGr
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client InboundNatRulesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -341,8 +382,8 @@ func (client InboundNatRulesClient) ListResponder(resp *http.Response) (result I
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client InboundNatRulesClient) listNextResults(lastResults InboundNatRuleListResult) (result InboundNatRuleListResult, err error) {
-	req, err := lastResults.inboundNatRuleListResultPreparer()
+func (client InboundNatRulesClient) listNextResults(ctx context.Context, lastResults InboundNatRuleListResult) (result InboundNatRuleListResult, err error) {
+	req, err := lastResults.inboundNatRuleListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InboundNatRulesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -363,6 +404,16 @@ func (client InboundNatRulesClient) listNextResults(lastResults InboundNatRuleLi
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InboundNatRulesClient) ListComplete(ctx context.Context, resourceGroupName string, loadBalancerName string) (result InboundNatRuleListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InboundNatRulesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName, loadBalancerName)
 	return
 }
