@@ -65,8 +65,20 @@ var definitions map[string]common.OpenAPIDefinition
 var buildDefinitions sync.Once
 var namer *openapi.DefinitionNamer
 
+// Options contains builder options.
+type Options struct {
+	// Convert to OpenAPI v2.
+	V2 bool
+
+	// Strip defaults.
+	StripDefaults bool
+
+	// Strip value validation.
+	StripValueValidation bool
+}
+
 // BuildSwagger builds swagger for the given crd in the given version
-func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (*spec.Swagger, error) {
+func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
 	var schema *structuralschema.Structural
 	s, err := apiextensions.GetSchemaForVersion(crd, version)
 	if err != nil {
@@ -76,7 +88,17 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (
 	if s != nil && s.OpenAPIV3Schema != nil {
 		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
 			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
-				schema = ss.Unfold()
+				// skip non-structural schemas
+				schema = ss
+
+				if opts.StripDefaults {
+					schema = schema.StripDefaults()
+				}
+				if opts.StripValueValidation {
+					schema = schema.StripValueValidations()
+				}
+
+				schema = schema.Unfold()
 			}
 		}
 	}
@@ -85,7 +107,7 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (
 	// comes from function registerResourceHandlers() in k8s.io/apiserver.
 	// Alternatives are either (ideally) refactoring registerResourceHandlers() to
 	// reuse the code, or faking an APIInstaller for CR to feed to registerResourceHandlers().
-	b := newBuilder(crd, version, schema, true)
+	b := newBuilder(crd, version, schema, opts.V2)
 
 	// Sample response types for building web service
 	sample := &CRDCanonicalTypeNamer{

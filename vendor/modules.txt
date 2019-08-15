@@ -1163,6 +1163,8 @@ k8s.io/apiextensions-apiserver/pkg/controller/establish
 k8s.io/apiextensions-apiserver/pkg/controller/finalizer
 k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema
 k8s.io/apiextensions-apiserver/pkg/controller/openapi
+k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder
+k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2
 k8s.io/apiextensions-apiserver/pkg/controller/status
 k8s.io/apiextensions-apiserver/pkg/crdserverscheme
 k8s.io/apiextensions-apiserver/pkg/features

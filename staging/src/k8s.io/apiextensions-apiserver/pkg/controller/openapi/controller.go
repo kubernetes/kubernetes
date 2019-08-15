@@ -193,7 +193,7 @@ func buildVersionSpecs(crd *apiextensions.CustomResourceDefinition, oldSpecs map
 		if !v.Served {
 			continue
 		}
-		spec, err := builder.BuildSwagger(crd, v.Name)
+		spec, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: true, StripDefaults: true})
 		if err != nil {
 			return nil, false, err
 		}
