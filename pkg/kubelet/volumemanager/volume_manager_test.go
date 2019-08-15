@@ -27,10 +27,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -51,45 +54,103 @@ const (
 )
 
 func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
+	tests := []struct {
+		name                string
+		pvMode, podMode     v1.PersistentVolumeMode
+		disableBlockFeature bool
+		expectMount         bool
+		expectError         bool
+	}{
+		{
+			name:        "filesystem volume",
+			pvMode:      v1.PersistentVolumeFilesystem,
+			podMode:     v1.PersistentVolumeFilesystem,
+			expectMount: true,
+			expectError: false,
+		},
+		{
+			name:        "block volume",
+			pvMode:      v1.PersistentVolumeBlock,
+			podMode:     v1.PersistentVolumeBlock,
+			expectMount: true,
+			expectError: false,
+		},
+		{
+			name:                "block volume with block feature off",
+			pvMode:              v1.PersistentVolumeBlock,
+			podMode:             v1.PersistentVolumeBlock,
+			disableBlockFeature: true,
+			expectMount:         false,
+			expectError:         false,
+		},
+		{
+			name:        "mismatched volume",
+			pvMode:      v1.PersistentVolumeBlock,
+			podMode:     v1.PersistentVolumeFilesystem,
+			expectMount: false,
+			expectError: true,
+		},
 	}
-	defer os.RemoveAll(tmpDir)
-	cpm := podtest.NewMockCheckpointManager()
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
-	node, pod, pv, claim := createObjects()
-	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.disableBlockFeature {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
+			}
 
-	manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
+			tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+			if err != nil {
+				t.Fatalf("can't make a temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+			cpm := podtest.NewMockCheckpointManager()
+			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
-	stopCh := runVolumeManager(manager)
-	defer close(stopCh)
+			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
+			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-	podManager.SetPods([]*v1.Pod{pod})
+			manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
-	// Fake node status update
-	go simulateVolumeInUseUpdate(
-		v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-		stopCh,
-		manager)
+			stopCh := runVolumeManager(manager)
+			defer close(stopCh)
 
-	err = manager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
-	}
+			podManager.SetPods([]*v1.Pod{pod})
 
-	expectedMounted := pod.Spec.Volumes[0].Name
-	actualMounted := manager.GetMountedVolumesForPod(types.UniquePodName(pod.ObjectMeta.UID))
-	if _, ok := actualMounted[expectedMounted]; !ok || (len(actualMounted) != 1) {
-		t.Errorf("Expected %v to be mounted to pod but got %v", expectedMounted, actualMounted)
-	}
+			// Fake node status update
+			go simulateVolumeInUseUpdate(
+				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
+				stopCh,
+				manager)
 
-	expectedInUse := []v1.UniqueVolumeName{v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name)}
-	actualInUse := manager.GetVolumesInUse()
-	if !reflect.DeepEqual(expectedInUse, actualInUse) {
-		t.Errorf("Expected %v to be in use but got %v", expectedInUse, actualInUse)
+			err = manager.WaitForAttachAndMount(pod)
+			if err != nil && !test.expectError {
+				t.Errorf("Expected success: %v", err)
+			}
+			if err == nil && test.expectError {
+				t.Errorf("Expected error, got none")
+			}
+
+			expectedMounted := pod.Spec.Volumes[0].Name
+			actualMounted := manager.GetMountedVolumesForPod(types.UniquePodName(pod.ObjectMeta.UID))
+			if test.expectMount {
+				if _, ok := actualMounted[expectedMounted]; !ok || (len(actualMounted) != 1) {
+					t.Errorf("Expected %v to be mounted to pod but got %v", expectedMounted, actualMounted)
+				}
+			} else {
+				if _, ok := actualMounted[expectedMounted]; ok || (len(actualMounted) != 0) {
+					t.Errorf("Expected %v not to be mounted to pod but got %v", expectedMounted, actualMounted)
+				}
+			}
+
+			expectedInUse := []v1.UniqueVolumeName{}
+			if test.expectMount {
+				expectedInUse = []v1.UniqueVolumeName{v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name)}
+			}
+			actualInUse := manager.GetVolumesInUse()
+			if !reflect.DeepEqual(expectedInUse, actualInUse) {
+				t.Errorf("Expected %v to be in use but got %v", expectedInUse, actualInUse)
+			}
+		})
 	}
 }
 
@@ -102,7 +163,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	cpm := podtest.NewMockCheckpointManager()
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
-	node, pod, pv, claim := createObjects()
+	node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 	claim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimPending,
 	}
@@ -148,7 +209,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	cpm := podtest.NewMockCheckpointManager()
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
-	node, pod, _, claim := createObjects()
+	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 
 	existingGid := pod.Spec.SecurityContext.SupplementalGroups[0]
 
@@ -230,7 +291,7 @@ func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient 
 	// TODO (#51147) inject mock prober
 	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, kubeClient, nil))
 	statusManager := status.NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{})
-
+	fakePathHandler := volumetest.NewBlockVolumePathHandler()
 	vm := NewVolumeManager(
 		true,
 		testHostname,
@@ -244,14 +305,15 @@ func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient 
 		"",
 		fakeRecorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
-		false /* keepTerminatedPodVolumes */)
+		false, /* keepTerminatedPodVolumes */
+		fakePathHandler)
 
 	return vm
 }
 
 // createObjects returns objects for making a fake clientset. The pv is
 // already attached to the node and bound to the claim used by the pod.
-func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testHostname},
 		Status: v1.NodeStatus{
@@ -269,6 +331,11 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 			UID:       "1234",
 		},
 		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+				},
+			},
 			Volumes: []v1.Volume{
 				{
 					Name: "vol1",
@@ -284,7 +351,24 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 			},
 		},
 	}
-	fs := v1.PersistentVolumeFilesystem
+	switch podMode {
+	case v1.PersistentVolumeBlock:
+		pod.Spec.Containers[0].VolumeDevices = []v1.VolumeDevice{
+			{
+				Name:       "vol1",
+				DevicePath: "/dev/vol1",
+			},
+		}
+	case v1.PersistentVolumeFilesystem:
+		pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+			{
+				Name:      "vol1",
+				MountPath: "/mnt/vol1",
+			},
+		}
+	default:
+		// The volume is not mounted nor mapped
+	}
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvA",
@@ -298,7 +382,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
 			},
-			VolumeMode: &fs,
+			VolumeMode: &pvMode,
 		},
 	}
 	claim := &v1.PersistentVolumeClaim{
@@ -308,6 +392,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "pvA",
+			VolumeMode: &pvMode,
 		},
 		Status: v1.PersistentVolumeClaimStatus{
 			Phase: v1.ClaimBound,

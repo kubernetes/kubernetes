@@ -300,6 +300,12 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
+		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
+			// Volume is not used in the pod, ignore it.
+			klog.V(4).Infof("Skipping unused volume %q for pod %q", podVolume.Name, format.Pod(pod))
+			continue
+		}
+
 		pvc, volumeSpec, volumeGidValue, err :=
 			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, mounts, devices)
 		if err != nil {
@@ -481,7 +487,7 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	delete(dswp.pods.processedPods, podName)
 }
 
-// createVolumeSpec creates and returns a mutatable volume.Spec object for the
+// createVolumeSpec creates and returns a mutable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
