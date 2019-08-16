@@ -49,9 +49,11 @@ type Exists struct {
 	namespaceLister corev1listers.NamespaceLister
 }
 
-var _ admission.ValidationInterface = &Exists{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Exists{})
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Exists{})
+var (
+	_ admission.ValidationInterface = &Exists{}
+	_ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Exists{})
+	_ = genericadmissioninitializer.WantsExternalKubeClientSet(&Exists{})
+)
 
 // Validate makes an admission decision based on the request attributes
 func (e *Exists) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
