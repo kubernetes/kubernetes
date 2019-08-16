@@ -8,7 +8,7 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/flowcontrol:go_default_library",
-        "//pkg/apis/flowcontrol/bootstrap:go_default_library",
+        "//pkg/registry/flowcontrol/bootstrap:go_default_library",
         "//pkg/registry/flowcontrol/flowschema/storage:go_default_library",
         "//pkg/registry/flowcontrol/prioritylevelconfiguration/storage:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",

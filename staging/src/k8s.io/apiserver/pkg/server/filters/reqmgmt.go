@@ -60,13 +60,14 @@ func WithRequestManagement(
 
 		// Skip tracking long running events.
 		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
+			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v as longrunning\n", requestInfo, user)
 			handler.ServeHTTP(w, r)
 			return
 		}
 
 		execute, afterExecute := reqMgmt.Wait(requestDigest)
 		if execute {
-			klog.V(5).Infof("Serving %v after queuing\n", r)
+			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v after queuing\n", requestInfo, user)
 			timedOut := ctx.Done()
 			finished := make(chan struct{})
 			go func() {
@@ -75,12 +76,12 @@ func WithRequestManagement(
 			}()
 			select {
 			case <-timedOut:
-				klog.V(5).Infof("Timed out waiting for %v to finish\n", r)
+				klog.V(6).Infof("Timed out waiting for RequestInfo=%#+v, user.Info=%#+v to finish\n", requestInfo, user)
 			case <-finished:
 			}
 			afterExecute()
 		} else {
-			klog.V(5).Infof("Rejecting %v\n", r)
+			klog.V(6).Infof("Rejecting RequestInfo=%#+v, user.Info=%#+v\n", requestInfo, user)
 
 			tooManyRequests(r, w)
 		}

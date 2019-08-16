@@ -18,17 +18,15 @@ package storage
 
 import (
 	"context"
-	"errors"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
-	flowcontrolbootstrap "k8s.io/kubernetes/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration"
 )
 
@@ -63,8 +61,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: prioritylevelconfiguration.Strategy,
 		DeleteStrategy: prioritylevelconfiguration.Strategy,
 
-		// TODO: develop printer handler for prioritylevelconfiguration resource
-		// TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -72,20 +69,16 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = flowschema.StatusStrategy
+	statusStore.UpdateStrategy = prioritylevelconfiguration.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
-// Delete ensures that system priority classes are not deleted.
-func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	for _, pl := range flowcontrolbootstrap.SystemPriorityLevelConfigurations() {
-		if name == pl.Name {
-			return nil, false, apierrors.NewForbidden(flowcontrol.Resource("prioritylevelconfigurations"), pl.Name, errors.New("this is a system priority level and cannot be deleted"))
-		}
-	}
+var _ rest.ShortNamesProvider = &REST{}
 
-	return r.Store.Delete(ctx, name, deleteValidation, options)
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"pl"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.
@@ -95,7 +88,7 @@ type StatusREST struct {
 
 // New creates a new Job object.
 func (r *StatusREST) New() runtime.Object {
-	return &flowcontrol.FlowSchema{}
+	return &flowcontrol.PriorityLevelConfiguration{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
