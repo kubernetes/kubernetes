@@ -45,6 +45,7 @@ import (
 	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/group"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -433,6 +434,9 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 	}
 
 	AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
+	if c.Authentication.Authenticator != nil {
+		c.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(c.Authentication.Authenticator)
+	}
 
 	if c.RequestInfoResolver == nil {
 		c.RequestInfoResolver = NewRequestInfoResolver(c)

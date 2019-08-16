@@ -14,7 +14,6 @@ go_library(
         "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/group:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/anonymous:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/headerrequest:go_default_library",

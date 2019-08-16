@@ -90,6 +90,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/audit/policy:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/group:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
