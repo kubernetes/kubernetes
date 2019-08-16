@@ -418,7 +418,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 	}
 	if volume.Status != volumeAvailableStatus {
 		// cinder volume can not be expanded if its status is not available
-		return oldSize, fmt.Errorf("volume status is not available")
+		return oldSize, fmt.Errorf("volume in %s status can not be expanded, it must be available and not attached to a node", volume.Status)
 	}
 
 	// Cinder works with gigabytes, convert to GiB with rounding up
