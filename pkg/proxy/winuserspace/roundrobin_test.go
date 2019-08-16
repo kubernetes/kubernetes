@@ -26,45 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 )
 
-func TestValidateWorks(t *testing.T) {
-	if isValidEndpoint(&hostPortPair{}) {
-		t.Errorf("Didn't fail for empty set")
-	}
-	if isValidEndpoint(&hostPortPair{host: "foobar"}) {
-		t.Errorf("Didn't fail with invalid port")
-	}
-	if isValidEndpoint(&hostPortPair{host: "foobar", port: -1}) {
-		t.Errorf("Didn't fail with a negative port")
-	}
-	if !isValidEndpoint(&hostPortPair{host: "foobar", port: 8080}) {
-		t.Errorf("Failed a valid config.")
-	}
-}
-
-func TestFilterWorks(t *testing.T) {
-	endpoints := []hostPortPair{
-		{host: "foobar", port: 1},
-		{host: "foobar", port: 2},
-		{host: "foobar", port: -1},
-		{host: "foobar", port: 3},
-		{host: "foobar", port: -2},
-	}
-	filtered := flattenValidEndpoints(endpoints)
-
-	if len(filtered) != 3 {
-		t.Errorf("Failed to filter to the correct size")
-	}
-	if filtered[0] != "foobar:1" {
-		t.Errorf("Index zero is not foobar:1")
-	}
-	if filtered[1] != "foobar:2" {
-		t.Errorf("Index one is not foobar:2")
-	}
-	if filtered[2] != "foobar:3" {
-		t.Errorf("Index two is not foobar:3")
-	}
-}
-
 func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "does-not-exist"}
