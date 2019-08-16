@@ -542,6 +542,20 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc2",
 		},
 		// --
+
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"): {
+			Stub:             `{"metadata": {"name": "fs1"}, "spec": {"priorityLevelConfiguration": {"name":"fs1"}, "rules":[{"subjects":[{"apiGroup":"flowcontrol.apiserver.k8s.io","kind":"Group","name":"system:masters"}],"rule":{"nonResourceURLs":["*"], "verbs":["*"]}}]}}`,
+			ExpectedEtcdPath: "/registry/flowschemas/fs1",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/settings/v1alpha1
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"): {
+			Stub:             `{"metadata": {"name": "pl1"}, "spec": {"exempt": true}}`,
+			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/pl1",
+		},
+		// --
 	}
 
 	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
