@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"net"
 	"net/url"
+	"os"
 	"reflect"
 	"sync"
 	"syscall"
@@ -287,9 +288,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// If that's the case wait and resend watch request.
 			if urlError, ok := err.(*url.Error); ok {
 				if opError, ok := urlError.Err.(*net.OpError); ok {
-					if errno, ok := opError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
-						time.Sleep(time.Second)
-						continue
+					if osSyscallError, ok := opError.Err.(*os.SyscallError); ok {
+						if errno, ok := osSyscallError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
+							time.Sleep(time.Second)
+							continue
+						}
 					}
 				}
 			}
