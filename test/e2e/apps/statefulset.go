@@ -571,7 +571,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForRunningAndNotReady(c, *ss.Spec.Replicas, ss)
 			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
 			e2esset.UpdateReplicas(c, ss, 3)
-			e2esset.ConfirmStatefulPodCount(c, 1, ss, 10*time.Second, true)
+			confirmStatefulPodCount(c, 1, ss, 10*time.Second, true)
 
 			ginkgo.By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
 			e2esset.RestoreHTTPProbe(c, ss)
@@ -604,7 +604,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
 			e2esset.WaitForRunningAndNotReady(c, 3, ss)
 			e2esset.UpdateReplicas(c, ss, 0)
-			e2esset.ConfirmStatefulPodCount(c, 3, ss, 10*time.Second, true)
+			confirmStatefulPodCount(c, 3, ss, 10*time.Second, true)
 
 			ginkgo.By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			e2esset.RestoreHTTPProbe(c, ss)
@@ -651,7 +651,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForRunningAndNotReady(c, *ss.Spec.Replicas, ss)
 			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
 			e2esset.UpdateReplicas(c, ss, 3)
-			e2esset.ConfirmStatefulPodCount(c, 3, ss, 10*time.Second, false)
+			confirmStatefulPodCount(c, 3, ss, 10*time.Second, false)
 
 			ginkgo.By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
 			e2esset.RestoreHTTPProbe(c, ss)
@@ -662,7 +662,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
 			e2esset.WaitForRunningAndNotReady(c, 3, ss)
 			e2esset.UpdateReplicas(c, ss, 0)
-			e2esset.ConfirmStatefulPodCount(c, 0, ss, 10*time.Second, false)
+			confirmStatefulPodCount(c, 0, ss, 10*time.Second, false)
 
 			ginkgo.By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			e2esset.RestoreHTTPProbe(c, ss)
@@ -1161,5 +1161,28 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 			pods.Items[i].Name,
 			pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 			priorRevision))
+	}
+}
+
+// confirmStatefulPodCount asserts that the current number of Pods in ss is count, waiting up to timeout for ss to
+// to scale to count.
+func confirmStatefulPodCount(c clientset.Interface, count int, ss *appsv1.StatefulSet, timeout time.Duration, hard bool) {
+	start := time.Now()
+	deadline := start.Add(timeout)
+	for t := time.Now(); t.Before(deadline); t = time.Now() {
+		podList := e2esset.GetPodList(c, ss)
+		statefulPodCount := len(podList.Items)
+		if statefulPodCount != count {
+			e2epod.LogPodStates(podList.Items)
+			if hard {
+				e2elog.Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
+			} else {
+				e2elog.Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
+			}
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		e2elog.Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
+		time.Sleep(1 * time.Second)
 	}
 }
