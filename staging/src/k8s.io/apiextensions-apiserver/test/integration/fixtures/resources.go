@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/utils/pointer"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -69,6 +71,36 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 			Group:   "mygroup.example.com",
 			Version: "v1beta1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     "noxus",
+				Singular:   "nonenglishnoxu",
+				Kind:       "WishIHadChosenNoxu",
+				ShortNames: []string{"foo", "bar", "abc", "def"},
+				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
+			},
+			Scope: scope,
+		},
+	}
+}
+
+// NewNoxuV1CustomResourceDefinition returns a WishIHadChosenNoxu CRD.
+func NewNoxuV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    "v1beta1",
+				Served:  true,
+				Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						XPreserveUnknownFields: pointer.BoolPtr(true),
+						Type:                   "object",
+					},
+				},
+			}},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
 				Singular:   "nonenglishnoxu",
 				Kind:       "WishIHadChosenNoxu",
@@ -211,7 +243,36 @@ func servedVersions(crd *apiextensionsv1beta1.CustomResourceDefinition) []string
 	return versions
 }
 
+func servedV1Versions(crd *apiextensionsv1.CustomResourceDefinition) []string {
+	if len(crd.Spec.Versions) == 0 {
+		return []string{}
+	}
+	var versions []string
+	for _, v := range crd.Spec.Versions {
+		if v.Served {
+			versions = append(versions, v.Name)
+		}
+	}
+	return versions
+}
+
 func existsInDiscovery(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, version string) (bool, error) {
+	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, g := range groupResource.APIResources {
+		if g.Name == crd.Spec.Names.Plural {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func existsInDiscoveryV1(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, version string) (bool, error) {
 	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -428,6 +489,23 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 	return nil
 }
 
+// DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
+func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
+	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+		return err
+	}
+	for _, version := range servedV1Versions(crd) {
+		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			exists, err := existsInDiscoveryV1(crd, apiExtensionsClient, version)
+			return !exists, err
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // DeleteCustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
 func DeleteCustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
 	list, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(deleteListOpts)
@@ -441,6 +519,29 @@ func DeleteCustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExten
 		for _, version := range servedVersions(&crd) {
 			err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
 				exists, err := existsInDiscovery(&crd, apiExtensionsClient, version)
+				return !exists, err
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// DeleteV1CustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
+func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
+	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(deleteListOpts)
+	if err != nil {
+		return err
+	}
+	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(nil, deleteListOpts); err != nil {
+		return err
+	}
+	for _, crd := range list.Items {
+		for _, version := range servedV1Versions(&crd) {
+			err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+				exists, err := existsInDiscoveryV1(&crd, apiExtensionsClient, version)
 				return !exists, err
 			})
 			if err != nil {
