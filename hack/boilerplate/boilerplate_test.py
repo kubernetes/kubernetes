@@ -16,7 +16,7 @@
 
 import boilerplate
 import unittest
-import StringIO
+from io import StringIO
 import os
 import sys
 
