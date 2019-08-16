@@ -369,6 +369,7 @@ const (
 
 	// owner: @davidz627
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables the in-tree storage to CSI Plugin migration feature.
 	CSIMigration featuregate.Feature = "CSIMigration"
@@ -518,13 +519,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	BoundServiceAccountTokenVolume:      {Default: false, PreRelease: featuregate.Alpha},
 	CRIContainerLogRotation:             {Default: true, PreRelease: featuregate.Beta},
 	deprecatedGCERegionalPersistentDisk: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
-	CSIMigration:                        {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigration:                        {Default: false, PreRelease: featuregate.Beta},
 	CSIMigrationGCE:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDisk:               {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFile:               {Default: false, PreRelease: featuregate.Alpha},
-	RunAsGroup:                          {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:               {Default: false, PreRelease: featuregate.Alpha},
+	RunAsGroup:                          {Default: true, PreRelease: featuregate.Beta},
 	VolumeSubpath:                       {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:          {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpathEnvExpansion:           {Default: true, PreRelease: featuregate.Beta},
