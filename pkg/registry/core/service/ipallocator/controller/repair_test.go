@@ -77,11 +77,14 @@ func TestRepair(t *testing.T) {
 
 func TestRepairLeak(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewCIDRRange(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	previous.Allocate(net.ParseIP("192.168.1.10"))
 
 	var dst api.RangeAllocation
-	err := previous.Snapshot(&dst)
+	err = previous.Snapshot(&dst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,10 +129,13 @@ func TestRepairLeak(t *testing.T) {
 
 func TestRepairWithExisting(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewCIDRRange(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var dst api.RangeAllocation
-	err := previous.Snapshot(&dst)
+	err = previous.Snapshot(&dst)
 	if err != nil {
 		t.Fatal(err)
 	}
