@@ -190,27 +190,27 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pv")
 
 				// Prebind pv
 				l.pvc.Spec.VolumeName = l.pv.Name
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pvc")
 
-				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
+				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc), "Failed to bind pv and pvc")
 
 				ginkgo.By("Creating pod")
 				pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
 				// Setting node
 				pod.Spec.NodeName = l.config.ClientNodeName
 				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pod")
 				defer func() {
-					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod), "Failed to delete pod")
 				}()
 
 				eventSelector := fields.Set{
@@ -230,7 +230,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				// Check the pod is still not running
 				p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-				framework.ExpectEqual(p.Status.Phase, v1.PodPending)
+				framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 			})
 		}
 
@@ -244,11 +244,11 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pvc")
 
 				eventSelector := fields.Set{
 					"involvedObject.kind":      "PersistentVolumeClaim",
@@ -267,7 +267,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				// Check the pvc is still pending
 				pvc, err := l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Get(l.pvc.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "Failed to re-read the pvc after event (or timeout)")
-				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending)
+				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending, "PVC phase isn't pending")
 			})
 		}
 	default:
@@ -288,9 +288,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 		// Run the pod
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Failed to create pod")
 		defer func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod), "Failed to delete pod")
 		}()
 
 		ginkgo.By("Waiting for the pod to fail")
@@ -317,7 +317,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		// Check the pod is still not running
 		p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-		framework.ExpectEqual(p.Status.Phase, v1.PodPending)
+		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
 	ginkgo.It("should not mount / map unused volumes in a pod", func() {
