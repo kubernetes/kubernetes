@@ -94,6 +94,7 @@ if [ "${remote}" = true ] ; then
   instance_prefix=${INSTANCE_PREFIX:-"test"}
   cleanup=${CLEANUP:-"true"}
   delete_instances=${DELETE_INSTANCES:-"false"}
+  preemptible_instances=${PREEMPTIBLE_INSTANCES:-"false"}
   test_suite=${TEST_SUITE:-"default"}
 
   # Get the compute zone
@@ -149,7 +150,7 @@ if [ "${remote}" = true ] ; then
     --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
-    --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
+    --preemptible-instances="${preemptible_instances}" --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
