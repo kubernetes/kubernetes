@@ -239,7 +239,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 	})
 
-	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {
+	ginkgo.It("should recreate its iptables rules if they are deleted", func() {
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		framework.SkipUnlessSSHKeyPresent()
 
@@ -271,6 +271,7 @@ var _ = SIGDescribe("Networking", func() {
 			e2essh.LogResult(result)
 			e2elog.Failf("couldn't dump iptable rules: %v", err)
 		}
+		e2essh.LogResult(result)
 
 		// All the commands that delete rules have to come before all the commands
 		// that delete chains, since the chains can't be deleted while there are
@@ -303,12 +304,23 @@ var _ = SIGDescribe("Networking", func() {
 			e2essh.LogResult(result)
 			e2elog.Failf("couldn't delete iptable rules: %v", err)
 		}
+		e2essh.LogResult(result)
+
+		ginkgo.By("dumping iptables rules on a node")
+		result, err = e2essh.SSH("sudo iptables-save", host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			e2essh.LogResult(result)
+			e2elog.Failf("couldn't dump iptable rules: %v", err)
+		}
+		e2essh.LogResult(result)
 
 		ginkgo.By("verifying that kube-proxy rules are eventually recreated")
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(f.ClientSet, ns, host, podNames, svcIP, servicePort))
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
+		e2elog.Logf("PollImmediate(%s, %s)", string(framework.Poll), string(framework.RestartNodeReadyAgainTimeout))
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
+			e2elog.Logf("polling...")
 			result, err = e2essh.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
 			if err != nil || result.Code != 0 {
 				e2essh.LogResult(result)
@@ -316,8 +328,10 @@ var _ = SIGDescribe("Networking", func() {
 			}
 
 			if strings.Contains(result.Stdout, "\n-A KUBE-MARK-DROP ") {
+				e2essh.LogResult(result)
 				return true, nil
 			}
+			e2elog.Logf("not yet...")
 			return false, nil
 		})
 		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
