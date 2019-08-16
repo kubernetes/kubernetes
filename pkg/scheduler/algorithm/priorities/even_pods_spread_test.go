@@ -31,8 +31,8 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 		name                string
 		pod                 *v1.Pod
 		nodes               []*v1.Node
-		wantNodeNameMap     map[string]int64
-		wantTopologyPairMap map[topologyPair]*int64
+		wantNodeNameMap     map[string]int32
+		wantTopologyPairMap map[topologyPair]*int32
 	}{
 		{
 			name: "normal case",
@@ -45,17 +45,17 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int64{
+			wantNodeNameMap: map[string]int32{
 				"node-a": 0,
 				"node-b": 0,
 				"node-x": 0,
 			},
-			wantTopologyPairMap: map[topologyPair]*int64{
-				{key: "zone", value: "zone1"}:  new(int64),
-				{key: "zone", value: "zone2"}:  new(int64),
-				{key: "node", value: "node-a"}: new(int64),
-				{key: "node", value: "node-b"}: new(int64),
-				{key: "node", value: "node-x"}: new(int64),
+			wantTopologyPairMap: map[topologyPair]*int32{
+				{key: "zone", value: "zone1"}:  new(int32),
+				{key: "zone", value: "zone2"}:  new(int32),
+				{key: "node", value: "node-a"}: new(int32),
+				{key: "node", value: "node-b"}: new(int32),
+				{key: "node", value: "node-x"}: new(int32),
 			},
 		},
 		{
@@ -69,14 +69,14 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int64{
+			wantNodeNameMap: map[string]int32{
 				"node-a": 0,
 				"node-b": 0,
 			},
-			wantTopologyPairMap: map[topologyPair]*int64{
-				{key: "zone", value: "zone1"}:  new(int64),
-				{key: "node", value: "node-a"}: new(int64),
-				{key: "node", value: "node-b"}: new(int64),
+			wantTopologyPairMap: map[topologyPair]*int32{
+				{key: "zone", value: "zone1"}:  new(int32),
+				{key: "node", value: "node-a"}: new(int32),
+				{key: "node", value: "node-b"}: new(int32),
 			},
 		},
 	}
