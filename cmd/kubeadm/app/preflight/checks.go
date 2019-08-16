@@ -134,11 +134,8 @@ func (sc ServiceCheck) Check() (warnings, errorList []error) {
 		return []error{err}, nil
 	}
 
-	warnings = []error{}
-
 	if !initSystem.ServiceExists(sc.Service) {
-		warnings = append(warnings, errors.Errorf("%s service does not exist", sc.Service))
-		return warnings, nil
+		return []error{errors.Errorf("%s service does not exist", sc.Service)}, nil
 	}
 
 	if !initSystem.ServiceIsEnabled(sc.Service) {
@@ -175,19 +172,17 @@ func (fc FirewalldCheck) Check() (warnings, errorList []error) {
 		return []error{err}, nil
 	}
 
-	warnings = []error{}
-
 	if !initSystem.ServiceExists("firewalld") {
 		return nil, nil
 	}
 
 	if initSystem.ServiceIsActive("firewalld") {
-		warnings = append(warnings,
-			errors.Errorf("firewalld is active, please ensure ports %v are open or your cluster may not function correctly",
-				fc.ports))
+		err := errors.Errorf("firewalld is active, please ensure ports %v are open or your cluster may not function correctly",
+			fc.ports)
+		return []error{err}, nil
 	}
 
-	return warnings, errorList
+	return nil, nil
 }
 
 // PortOpenCheck ensures the given port is available for use.
@@ -207,10 +202,10 @@ func (poc PortOpenCheck) Name() string {
 // Check validates if the particular port is available.
 func (poc PortOpenCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating availability of port %d", poc.port)
-	errorList = []error{}
+
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
-		errorList = append(errorList, errors.Errorf("Port %d is in use", poc.port))
+		errorList = []error{errors.Errorf("Port %d is in use", poc.port)}
 	}
 	if ln != nil {
 		ln.Close()
@@ -252,7 +247,7 @@ func (dac DirAvailableCheck) Name() string {
 // Check validates if a directory does not exist or empty.
 func (dac DirAvailableCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence and emptiness of directory %s", dac.Path)
-	errorList = []error{}
+
 	// If it doesn't exist we are good:
 	if _, err := os.Stat(dac.Path); os.IsNotExist(err) {
 		return nil, nil
@@ -260,17 +255,16 @@ func (dac DirAvailableCheck) Check() (warnings, errorList []error) {
 
 	f, err := os.Open(dac.Path)
 	if err != nil {
-		errorList = append(errorList, errors.Wrapf(err, "unable to check if %s is empty", dac.Path))
-		return nil, errorList
+		return nil, []error{errors.Wrapf(err, "unable to check if %s is empty", dac.Path)}
 	}
 	defer f.Close()
 
 	_, err = f.Readdirnames(1)
 	if err != io.EOF {
-		errorList = append(errorList, errors.Errorf("%s is not empty", dac.Path))
+		return nil, []error{errors.Errorf("%s is not empty", dac.Path)}
 	}
 
-	return nil, errorList
+	return nil, nil
 }
 
 // FileAvailableCheck checks that the given file does not already exist.
@@ -290,11 +284,11 @@ func (fac FileAvailableCheck) Name() string {
 // Check validates if the given file does not already exist.
 func (fac FileAvailableCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence of file %s", fac.Path)
-	errorList = []error{}
+
 	if _, err := os.Stat(fac.Path); err == nil {
-		errorList = append(errorList, errors.Errorf("%s already exists", fac.Path))
+		return nil, []error{errors.Errorf("%s already exists", fac.Path)}
 	}
-	return nil, errorList
+	return nil, nil
 }
 
 // FileExistingCheck checks that the given file does not already exist.
@@ -314,11 +308,11 @@ func (fac FileExistingCheck) Name() string {
 // Check validates if the given file already exists.
 func (fac FileExistingCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence of file %s", fac.Path)
-	errorList = []error{}
+
 	if _, err := os.Stat(fac.Path); err != nil {
-		errorList = append(errorList, errors.Errorf("%s doesn't exist", fac.Path))
+		return nil, []error{errors.Errorf("%s doesn't exist", fac.Path)}
 	}
-	return nil, errorList
+	return nil, nil
 }
 
 // FileContentCheck checks that the given file contains the string Content.
@@ -410,8 +404,7 @@ func (HostnameCheck) Name() string {
 // Check validates if hostname match dns sub domain regex.
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("checking whether the given node name is reachable using net.LookupHost")
-	errorList = []error{}
-	warnings = []error{}
+
 	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
 		warnings = append(warnings, errors.Errorf("hostname \"%s\" could not be reached", hc.nodeName))

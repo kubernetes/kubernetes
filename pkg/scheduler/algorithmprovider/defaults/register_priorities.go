@@ -70,7 +70,7 @@ func init() {
 		priorities.InterPodAffinityPriority,
 		factory.PriorityConfigFactory{
 			Function: func(args factory.PluginFactoryArgs) priorities.PriorityFunction {
-				return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight)
+				return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.HardPodAffinitySymmetricWeight)
 			},
 			Weight: 1,
 		},

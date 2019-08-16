@@ -171,7 +171,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 // Abstract interface to disk operations.
 type vdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *vsphereVolumeProvisioner, selectedZone []string) (volSpec *VolumeSpec, err error)
+	CreateVolume(provisioner *vsphereVolumeProvisioner, selectedNode *v1.Node, selectedZone []string) (volSpec *VolumeSpec, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *vsphereVolumeDeleter) error
 }
@@ -368,14 +368,14 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
 	}
-	klog.V(1).Infof("Provision with allowedTopologies : %s", allowedTopologies)
+	klog.V(1).Infof("Provision with selectedNode: %s and allowedTopologies : %s", getNodeName(selectedNode), allowedTopologies)
 	selectedZones, err := volumehelpers.ZonesFromAllowedTopologies(allowedTopologies)
 	if err != nil {
 		return nil, err
 	}
 
 	klog.V(4).Infof("Selected zones for volume : %s", selectedZones)
-	volSpec, err := v.manager.CreateVolume(v, selectedZones.List())
+	volSpec, err := v.manager.CreateVolume(v, selectedNode, selectedZones.List())
 	if err != nil {
 		return nil, err
 	}
@@ -464,4 +464,11 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
+}
+
+func getNodeName(node *v1.Node) string {
+	if node == nil {
+		return ""
+	}
+	return node.Name
 }

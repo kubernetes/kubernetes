@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewVirtualWansClientWithBaseURI(baseURI string, subscriptionID string) Virt
 // virtualWANName - the name of the VirtualWAN being created or updated.
 // wANParameters - parameters supplied to create or update VirtualWAN.
 func (client VirtualWansClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualWANName string, wANParameters VirtualWAN) (result VirtualWansCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, virtualWANName, wANParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualWansClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -73,6 +84,7 @@ func (client VirtualWansClient) CreateOrUpdatePreparer(ctx context.Context, reso
 		"api-version": APIVersion,
 	}
 
+	wANParameters.Etag = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -86,9 +98,9 @@ func (client VirtualWansClient) CreateOrUpdatePreparer(ctx context.Context, reso
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualWansClient) CreateOrUpdateSender(req *http.Request) (future VirtualWansCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -114,6 +126,16 @@ func (client VirtualWansClient) CreateOrUpdateResponder(resp *http.Response) (re
 // resourceGroupName - the resource group name of the VirtualWan.
 // virtualWANName - the name of the VirtualWAN being deleted.
 func (client VirtualWansClient) Delete(ctx context.Context, resourceGroupName string, virtualWANName string) (result VirtualWansDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, virtualWANName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualWansClient", "Delete", nil, "Failure preparing request")
@@ -153,9 +175,9 @@ func (client VirtualWansClient) DeletePreparer(ctx context.Context, resourceGrou
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualWansClient) DeleteSender(req *http.Request) (future VirtualWansDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -180,6 +202,16 @@ func (client VirtualWansClient) DeleteResponder(resp *http.Response) (result aut
 // resourceGroupName - the resource group name of the VirtualWan.
 // virtualWANName - the name of the VirtualWAN being retrieved.
 func (client VirtualWansClient) Get(ctx context.Context, resourceGroupName string, virtualWANName string) (result VirtualWAN, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualWANName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualWansClient", "Get", nil, "Failure preparing request")
@@ -225,8 +257,8 @@ func (client VirtualWansClient) GetPreparer(ctx context.Context, resourceGroupNa
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualWansClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -244,6 +276,16 @@ func (client VirtualWansClient) GetResponder(resp *http.Response) (result Virtua
 
 // List lists all the VirtualWANs in a subscription.
 func (client VirtualWansClient) List(ctx context.Context) (result ListVirtualWANsResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.List")
+		defer func() {
+			sc := -1
+			if result.lvwnr.Response.Response != nil {
+				sc = result.lvwnr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx)
 	if err != nil {
@@ -288,8 +330,8 @@ func (client VirtualWansClient) ListPreparer(ctx context.Context) (*http.Request
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualWansClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -306,8 +348,8 @@ func (client VirtualWansClient) ListResponder(resp *http.Response) (result ListV
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client VirtualWansClient) listNextResults(lastResults ListVirtualWANsResult) (result ListVirtualWANsResult, err error) {
-	req, err := lastResults.listVirtualWANsResultPreparer()
+func (client VirtualWansClient) listNextResults(ctx context.Context, lastResults ListVirtualWANsResult) (result ListVirtualWANsResult, err error) {
+	req, err := lastResults.listVirtualWANsResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualWansClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -328,6 +370,16 @@ func (client VirtualWansClient) listNextResults(lastResults ListVirtualWANsResul
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VirtualWansClient) ListComplete(ctx context.Context) (result ListVirtualWANsResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx)
 	return
 }
@@ -336,6 +388,16 @@ func (client VirtualWansClient) ListComplete(ctx context.Context) (result ListVi
 // Parameters:
 // resourceGroupName - the resource group name of the VirtualWan.
 func (client VirtualWansClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result ListVirtualWANsResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.lvwnr.Response.Response != nil {
+				sc = result.lvwnr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listByResourceGroupNextResults
 	req, err := client.ListByResourceGroupPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -381,8 +443,8 @@ func (client VirtualWansClient) ListByResourceGroupPreparer(ctx context.Context,
 // ListByResourceGroupSender sends the ListByResourceGroup request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualWansClient) ListByResourceGroupSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListByResourceGroupResponder handles the response to the ListByResourceGroup request. The method always
@@ -399,8 +461,8 @@ func (client VirtualWansClient) ListByResourceGroupResponder(resp *http.Response
 }
 
 // listByResourceGroupNextResults retrieves the next set of results, if any.
-func (client VirtualWansClient) listByResourceGroupNextResults(lastResults ListVirtualWANsResult) (result ListVirtualWANsResult, err error) {
-	req, err := lastResults.listVirtualWANsResultPreparer()
+func (client VirtualWansClient) listByResourceGroupNextResults(ctx context.Context, lastResults ListVirtualWANsResult) (result ListVirtualWANsResult, err error) {
+	req, err := lastResults.listVirtualWANsResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualWansClient", "listByResourceGroupNextResults", nil, "Failure preparing next results request")
 	}
@@ -421,6 +483,16 @@ func (client VirtualWansClient) listByResourceGroupNextResults(lastResults ListV
 
 // ListByResourceGroupComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VirtualWansClient) ListByResourceGroupComplete(ctx context.Context, resourceGroupName string) (result ListVirtualWANsResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListByResourceGroup(ctx, resourceGroupName)
 	return
 }
@@ -431,6 +503,16 @@ func (client VirtualWansClient) ListByResourceGroupComplete(ctx context.Context,
 // virtualWANName - the name of the VirtualWAN being updated.
 // wANParameters - parameters supplied to Update VirtualWAN tags.
 func (client VirtualWansClient) UpdateTags(ctx context.Context, resourceGroupName string, virtualWANName string, wANParameters TagsObject) (result VirtualWansUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualWansClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, virtualWANName, wANParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualWansClient", "UpdateTags", nil, "Failure preparing request")
@@ -472,9 +554,9 @@ func (client VirtualWansClient) UpdateTagsPreparer(ctx context.Context, resource
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualWansClient) UpdateTagsSender(req *http.Request) (future VirtualWansUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

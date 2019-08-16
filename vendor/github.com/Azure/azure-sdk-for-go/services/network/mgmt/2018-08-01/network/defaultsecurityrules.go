@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewDefaultSecurityRulesClientWithBaseURI(baseURI string, subscriptionID str
 // networkSecurityGroupName - the name of the network security group.
 // defaultSecurityRuleName - the name of the default security rule.
 func (client DefaultSecurityRulesClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, defaultSecurityRuleName string) (result SecurityRule, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/DefaultSecurityRulesClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkSecurityGroupName, defaultSecurityRuleName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.DefaultSecurityRulesClient", "Get", nil, "Failure preparing request")
@@ -91,8 +102,8 @@ func (client DefaultSecurityRulesClient) GetPreparer(ctx context.Context, resour
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client DefaultSecurityRulesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -113,6 +124,16 @@ func (client DefaultSecurityRulesClient) GetResponder(resp *http.Response) (resu
 // resourceGroupName - the name of the resource group.
 // networkSecurityGroupName - the name of the network security group.
 func (client DefaultSecurityRulesClient) List(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (result SecurityRuleListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/DefaultSecurityRulesClient.List")
+		defer func() {
+			sc := -1
+			if result.srlr.Response.Response != nil {
+				sc = result.srlr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkSecurityGroupName)
 	if err != nil {
@@ -159,8 +180,8 @@ func (client DefaultSecurityRulesClient) ListPreparer(ctx context.Context, resou
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client DefaultSecurityRulesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -177,8 +198,8 @@ func (client DefaultSecurityRulesClient) ListResponder(resp *http.Response) (res
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client DefaultSecurityRulesClient) listNextResults(lastResults SecurityRuleListResult) (result SecurityRuleListResult, err error) {
-	req, err := lastResults.securityRuleListResultPreparer()
+func (client DefaultSecurityRulesClient) listNextResults(ctx context.Context, lastResults SecurityRuleListResult) (result SecurityRuleListResult, err error) {
+	req, err := lastResults.securityRuleListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.DefaultSecurityRulesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -199,6 +220,16 @@ func (client DefaultSecurityRulesClient) listNextResults(lastResults SecurityRul
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client DefaultSecurityRulesClient) ListComplete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (result SecurityRuleListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/DefaultSecurityRulesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName, networkSecurityGroupName)
 	return
 }

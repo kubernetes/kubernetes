@@ -349,25 +349,29 @@ func (f *framework) RunPostFilterPlugins(
 	return nil
 }
 
-// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
+// RunScorePlugins runs the set of configured scoring plugins. It returns a list that
 // stores for each scoring plugin name the corresponding NodeScoreList(s).
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
-func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScoreMap, *Status) {
-	pluginToNodeScoreMap := make(PluginToNodeScoreMap, len(f.scorePlugins))
+func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScores, *Status) {
+	pluginToNodeScores := make(PluginToNodeScores, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
-		pluginToNodeScoreMap[pl.Name()] = make(NodeScoreList, len(nodes))
+		pluginToNodeScores[pl.Name()] = make(NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := schedutil.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
-			score, status := pl.Score(pc, pod, nodes[index].Name)
+			nodeName := nodes[index].Name
+			score, status := pl.Score(pc, pod, nodeName)
 			if !status.IsSuccess() {
 				errCh.SendErrorWithCancel(fmt.Errorf(status.Message()), cancel)
 				return
 			}
-			pluginToNodeScoreMap[pl.Name()][index] = score
+			pluginToNodeScores[pl.Name()][index] = NodeScore{
+				Name:  nodeName,
+				Score: score,
+			}
 		}
 	})
 
@@ -377,21 +381,21 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 		return nil, NewStatus(Error, msg)
 	}
 
-	return pluginToNodeScoreMap, nil
+	return pluginToNodeScores, nil
 }
 
 // RunNormalizeScorePlugins runs the NormalizeScore function of Score plugins.
-// It should be called after RunScorePlugins with the PluginToNodeScoreMap result.
-// It then modifies the map with normalized scores. It returns a non-success Status
+// It should be called after RunScorePlugins with the PluginToNodeScores result.
+// It then modifies the list with normalized scores. It returns a non-success Status
 // if any of the NormalizeScore functions returns a non-success status.
-func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status {
+func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := schedutil.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(f.scoreWithNormalizePlugins), func(index int) {
 		pl := f.scoreWithNormalizePlugins[index]
 		nodeScoreList, ok := scores[pl.Name()]
 		if !ok {
-			err := fmt.Errorf("normalize score plugin %q has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
+			err := fmt.Errorf("normalize score plugin %q has no corresponding scores in the PluginToNodeScores", pl.Name())
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
@@ -414,7 +418,7 @@ func (f *framework) RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, sco
 
 // ApplyScoreWeights applies weights to the score results. It should be called after
 // RunNormalizeScorePlugins.
-func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScoreMap) *Status {
+func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := schedutil.NewErrorChannel()
 	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
@@ -423,12 +427,20 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 		weight := f.pluginNameToWeightMap[pl.Name()]
 		nodeScoreList, ok := scores[pl.Name()]
 		if !ok {
-			err := fmt.Errorf("score plugin %q has no corresponding scores in the PluginToNodeScoreMap", pl.Name())
+			err := fmt.Errorf("score plugin %q has no corresponding scores in the PluginToNodeScores", pl.Name())
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
-		for i := range nodeScoreList {
-			nodeScoreList[i] = nodeScoreList[i] * weight
+
+		for i, nodeScore := range nodeScoreList {
+			// return error if score plugin returns invalid score.
+			if nodeScore.Score > MaxNodeScore || nodeScore.Score < MinNodeScore {
+				err := fmt.Errorf("score plugin %q returns an invalid score %q, it should in the range of [MinNodeScore, MaxNodeScore] after normalizing", pl.Name(), nodeScore.Score)
+				errCh.SendErrorWithCancel(err, cancel)
+				return
+			}
+
+			nodeScoreList[i].Score = nodeScore.Score * weight
 		}
 	})
 

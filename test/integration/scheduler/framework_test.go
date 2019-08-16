@@ -152,11 +152,11 @@ func (sp *ScorePlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName st
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
 	}
 
-	score := 10
+	score := 1
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
 		sp.highScoreNode = nodeName
-		score = 100
+		score = framework.MaxNodeScore
 	}
 	return score, nil
 }
@@ -419,8 +419,6 @@ func NewUnreservePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framew
 	return unresPlugin, nil
 }
 
-var perPlugin = &PermitPlugin{}
-
 // Name returns name of the plugin.
 func (pp *PermitPlugin) Name() string {
 	return permitPluginName
@@ -476,10 +474,12 @@ func (pp *PermitPlugin) reset() {
 	pp.allowPermit = false
 }
 
-// NewPermitPlugin is the factory for permit plugin.
-func NewPermitPlugin(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
-	perPlugin.fh = fh
-	return perPlugin, nil
+// NewPermitPlugin returns a factory for permit plugin with specified PermitPlugin.
+func NewPermitPlugin(permitPlugin *PermitPlugin) framework.PluginFactory {
+	return func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+		permitPlugin.fh = fh
+		return permitPlugin, nil
+	}
 }
 
 // TestPrefilterPlugin tests invocation of prefilter plugins.
@@ -1221,7 +1221,8 @@ func TestPostbindPlugin(t *testing.T) {
 // TestPermitPlugin tests invocation of permit plugins.
 func TestPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
-	registry := framework.Registry{permitPluginName: NewPermitPlugin}
+	perPlugin := &PermitPlugin{}
+	registry := framework.Registry{permitPluginName: NewPermitPlugin(perPlugin)}
 
 	// Setup initial permit plugin for testing.
 	plugins := &schedulerconfig.Plugins{
@@ -1332,7 +1333,8 @@ func TestPermitPlugin(t *testing.T) {
 // TestCoSchedulingWithPermitPlugin tests invocation of permit plugins.
 func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
-	registry := framework.Registry{permitPluginName: NewPermitPlugin}
+	perPlugin := &PermitPlugin{}
+	registry := framework.Registry{permitPluginName: NewPermitPlugin(perPlugin)}
 
 	// Setup initial permit plugin for testing.
 	plugins := &schedulerconfig.Plugins{
@@ -1544,7 +1546,8 @@ func TestPostFilterPlugin(t *testing.T) {
 // TestPreemptWithPermitPlugin tests preempt with permit plugins.
 func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
-	registry := framework.Registry{permitPluginName: NewPermitPlugin}
+	perPlugin := &PermitPlugin{}
+	registry := framework.Registry{permitPluginName: NewPermitPlugin(perPlugin)}
 
 	// Setup initial permit plugin for testing.
 	plugins := &schedulerconfig.Plugins{

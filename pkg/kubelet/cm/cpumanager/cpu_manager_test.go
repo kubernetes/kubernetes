@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 type mockState struct {
@@ -195,7 +196,7 @@ func TestCPUManagerAdd(t *testing.T) {
 				2: {CoreID: 2, SocketID: 0},
 				3: {CoreID: 3, SocketID: 0},
 			},
-		}, 0)
+		}, 0, topologymanager.NewFakeManager())
 	testCases := []struct {
 		description string
 		updateErr   error
@@ -342,7 +343,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, testCase.nodeAllocatableReservation, sDir)
+			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())

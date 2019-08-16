@@ -557,8 +557,8 @@ func (r *VolumeReactor) AddClaimBoundToVolume(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
-// MarkVolumeAvaiable marks a PV available by name.
-func (r *VolumeReactor) MarkVolumeAvaiable(name string) {
+// MarkVolumeAvailable marks a PV available by name.
+func (r *VolumeReactor) MarkVolumeAvailable(name string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if volume, ok := r.volumes[name]; ok {

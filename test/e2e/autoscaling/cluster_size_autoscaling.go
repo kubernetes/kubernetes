@@ -685,6 +685,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	ginkgo.It("should correctly scale down after a node is not needed and one node is broken [Feature:ClusterSizeAutoscalingScaleDown]",
 		func() {
+			framework.SkipUnlessSSHKeyPresent()
 			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
 		})
 
@@ -876,6 +877,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		clusterSize := nodeCount
 		for clusterSize < unhealthyClusterThreshold+1 {
 			clusterSize = manuallyIncreaseClusterSize(f, originalSizes)

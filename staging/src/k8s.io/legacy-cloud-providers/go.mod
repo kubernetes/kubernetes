@@ -6,12 +6,14 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.34.0
-	github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
-	github.com/Azure/go-autorest v11.1.2+incompatible
+	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.0
+	github.com/Azure/go-autorest/autorest/adal v0.5.0
+	github.com/Azure/go-autorest/autorest/to v0.2.0
+	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 	github.com/aws/aws-sdk-go v1.16.26
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
-	github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c // indirect
 	github.com/prometheus/client_golang v0.9.2
 	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/satori/go.uuid v1.2.0 // indirect
@@ -29,14 +31,13 @@ require (
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
-	k8s.io/klog v0.3.1
+	k8s.io/klog v0.4.0
 	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 	sigs.k8s.io/yaml v1.1.0
 )
 
 replace (
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
-	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db

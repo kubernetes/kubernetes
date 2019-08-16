@@ -42,6 +42,7 @@ const (
 	PLEGRelistDurationKey                = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey                 = "pleg_discard_events"
 	PLEGRelistIntervalKey                = "pleg_relist_interval_seconds"
+	EvictionsKey                         = "evictions"
 	EvictionStatsAgeKey                  = "eviction_stats_age_seconds"
 	DeprecatedPodWorkerLatencyKey        = "pod_worker_latency_microseconds"
 	DeprecatedPodStartLatencyKey         = "pod_start_latency_microseconds"
@@ -204,6 +205,16 @@ var (
 			Help:      "Cumulative number of runtime operation errors by operation type.",
 		},
 		[]string{"operation_type"},
+	)
+	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
+	// Broken down by eviction signal.
+	Evictions = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      EvictionsKey,
+			Help:      "Cumulative number of pod evictions by eviction signal",
+		},
+		[]string{"eviction_signal"},
 	)
 	// EvictionStatsAge is a Histogram that tracks the time (in seconds) between when stats are collected and when a pod is evicted
 	// based on those stats. Broken down by eviction signal.
@@ -435,6 +446,7 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheu
 		prometheus.MustRegister(RuntimeOperations)
 		prometheus.MustRegister(RuntimeOperationsDuration)
 		prometheus.MustRegister(RuntimeOperationsErrors)
+		prometheus.MustRegister(Evictions)
 		prometheus.MustRegister(EvictionStatsAge)
 		prometheus.MustRegister(DevicePluginRegistrationCount)
 		prometheus.MustRegister(DevicePluginAllocationDuration)

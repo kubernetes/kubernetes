@@ -480,8 +480,7 @@ func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
 	}
 
 	if block.Type != certutil.CertificateRequestBlockType {
-		var block *pem.Block
-		return nil, errors.Errorf("expected block type %q, but PEM had type %v", certutil.CertificateRequestBlockType, block.Type)
+		return nil, errors.Errorf("expected block type %q, but PEM had type %q", certutil.CertificateRequestBlockType, block.Type)
 	}
 
 	return x509.ParseCertificateRequest(block.Bytes)

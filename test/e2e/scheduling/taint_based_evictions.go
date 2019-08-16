@@ -76,6 +76,8 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 	// 5. node lifecycle manager generate a status change: [NodeReady=true, status=ConditionTrue]
 	// 6. node.kubernetes.io/unreachable=:NoExecute taint is taken off the node
 	ginkgo.It("Checks that the node becomes unreachable", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		// find an available node
 		nodeName := GetNodeThatCanRunPod(f)
 		ginkgo.By("Finding an available node " + nodeName)

@@ -19,14 +19,14 @@ package azure
 import (
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/legacy-cloud-providers/azure/auth"
 	"sigs.k8s.io/yaml"
-
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/stretchr/testify/assert"
 )
 
 func getTestConfig() *Config {

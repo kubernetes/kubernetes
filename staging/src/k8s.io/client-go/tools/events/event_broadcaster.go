@@ -203,9 +203,9 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 	var err error
 	isEventSeries := event.Series != nil
 	if isEventSeries {
-		patch, err := createPatchBytesForSeries(event)
-		if err != nil {
-			klog.Errorf("Unable to calculate diff, no merge is possible: %v", err)
+		patch, patchBytesErr := createPatchBytesForSeries(event)
+		if patchBytesErr != nil {
+			klog.Errorf("Unable to calculate diff, no merge is possible: %v", patchBytesErr)
 			return nil, false
 		}
 		newEvent, err = sink.Patch(event, patch)

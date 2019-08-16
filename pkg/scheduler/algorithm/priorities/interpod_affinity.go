@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -37,21 +36,15 @@ import (
 // InterPodAffinity contains information to calculate inter pod affinity.
 type InterPodAffinity struct {
 	info                  predicates.NodeInfo
-	nodeLister            algorithm.NodeLister
-	podLister             algorithm.PodLister
 	hardPodAffinityWeight int32
 }
 
 // NewInterPodAffinityPriority creates an InterPodAffinity.
 func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
-	nodeLister algorithm.NodeLister,
-	podLister algorithm.PodLister,
 	hardPodAffinityWeight int32) PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
-		nodeLister:            nodeLister,
-		podLister:             podLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority

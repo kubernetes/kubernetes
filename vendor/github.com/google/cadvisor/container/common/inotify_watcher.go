@@ -17,7 +17,7 @@ package common
 import (
 	"sync"
 
-	inotify "github.com/sigma/go-inotify"
+	inotify "k8s.io/utils/inotify"
 )
 
 // Watcher for container-related inotify events in the cgroup hierarchy.
@@ -55,7 +55,7 @@ func (iw *InotifyWatcher) AddWatch(containerName, dir string) (bool, error) {
 
 	// Register an inotify notification.
 	if !cgroupsWatched[dir] {
-		err := iw.watcher.AddWatch(dir, inotify.IN_CREATE|inotify.IN_DELETE|inotify.IN_MOVE)
+		err := iw.watcher.AddWatch(dir, inotify.InCreate|inotify.InDelete|inotify.InMove)
 		if err != nil {
 			return alreadyWatched, err
 		}

@@ -17,8 +17,6 @@ spec:
     metadata:
       labels:
         k8s-app: konnectivity-agent
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-cluster-critical
       tolerations:

@@ -25,7 +25,7 @@ require (
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v0.0.0-20190222133341-cfaf5686ec79 // indirect
-	github.com/grpc-ecosystem/go-grpc-prometheus v0.0.0-20170330212424-2500245aa611
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway v1.3.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
@@ -45,7 +45,7 @@ require (
 	go.uber.org/multierr v0.0.0-20180122172545-ddea229ff1df // indirect
 	go.uber.org/zap v0.0.0-20180814183419-67bc79d13d15 // indirect
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
+	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6 // indirect
 	google.golang.org/grpc v1.13.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -56,7 +56,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog v0.3.1
+	k8s.io/klog v0.4.0
 	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
 	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 	sigs.k8s.io/structured-merge-diff v0.0.0-20190724202554-0c1d754dd648
@@ -65,7 +65,6 @@ require (
 
 replace (
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
-	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db

@@ -142,8 +142,6 @@ spec:
     metadata:
       labels:
         k8s-app: proxy-agent
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-cluster-critical
       # Necessary to reboot node

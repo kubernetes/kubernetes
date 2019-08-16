@@ -30,28 +30,23 @@ const administratorSID = "S-1-5-32-544"
 
 // Check validates if a user has elevated (administrator) privileges.
 func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
-	errorList = []error{}
-
 	currUser, err := user.Current()
 	if err != nil {
-		errorList = append(errorList, errors.New("cannot get current user"))
-		return nil, errorList
+		return nil, []error{errors.New("cannot get current user")}
 	}
 
 	groupIds, err := currUser.GroupIds()
 	if err != nil {
-		errorList = append(errorList, errors.New("cannot get group IDs for current user"))
-		return nil, errorList
+		return nil, []error{errors.New("cannot get group IDs for current user")}
 	}
 
 	for _, sid := range groupIds {
 		if sid == administratorSID {
-			return nil, errorList
+			return nil, nil
 		}
 	}
 
-	errorList = append(errorList, errors.New("user is not running as administrator"))
-	return nil, errorList
+	return nil, []error{errors.New("user is not running as administrator")}
 }
 
 // Check validates if Docker is setup to use systemd as the cgroup driver.

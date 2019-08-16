@@ -342,3 +342,54 @@ func TestIsNarrowerThan(t *testing.T) {
 		}
 	}
 }
+
+func TestIterateSocketMasks(t *testing.T) {
+	tcases := []struct {
+		name       string
+		numSockets int
+	}{
+		{
+			name:       "1 Socket",
+			numSockets: 1,
+		},
+		{
+			name:       "2 Sockets",
+			numSockets: 2,
+		},
+		{
+			name:       "4 Sockets",
+			numSockets: 4,
+		},
+		{
+			name:       "8 Sockets",
+			numSockets: 8,
+		},
+		{
+			name:       "16 Sockets",
+			numSockets: 16,
+		},
+	}
+	for _, tc := range tcases {
+		// Generate a list of sockets from tc.numSockets.
+		var sockets []int
+		for i := 0; i < tc.numSockets; i++ {
+			sockets = append(sockets, i)
+		}
+
+		// Calculate the expected number of masks. Since we always have masks
+		// with sockets from 0..n, this is just (2^n - 1) since we want 1 mask
+		// represented by each integer between 1 and 2^n-1.
+		expectedNumMasks := (1 << uint(tc.numSockets)) - 1
+
+		// Iterate all masks and count them.
+		numMasks := 0
+		IterateSocketMasks(sockets, func(SocketMask) {
+			numMasks++
+		})
+
+		// Compare the number of masks generated to the expected amount.
+		if expectedNumMasks != numMasks {
+			t.Errorf("Expected to iterate %v masks, got %v", expectedNumMasks, numMasks)
+		}
+	}
+}

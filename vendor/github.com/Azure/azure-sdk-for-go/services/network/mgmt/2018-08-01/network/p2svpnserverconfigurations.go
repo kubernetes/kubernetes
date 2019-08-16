@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -47,6 +48,16 @@ func NewP2sVpnServerConfigurationsClientWithBaseURI(baseURI string, subscription
 // p2SVpnServerConfigurationName - the name of the P2SVpnServerConfiguration.
 // p2SVpnServerConfigurationParameters - parameters supplied to create or Update a P2SVpnServerConfiguration.
 func (client P2sVpnServerConfigurationsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualWanName string, p2SVpnServerConfigurationName string, p2SVpnServerConfigurationParameters P2SVpnServerConfiguration) (result P2sVpnServerConfigurationsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/P2sVpnServerConfigurationsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, virtualWanName, p2SVpnServerConfigurationName, p2SVpnServerConfigurationParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.P2sVpnServerConfigurationsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -76,6 +87,7 @@ func (client P2sVpnServerConfigurationsClient) CreateOrUpdatePreparer(ctx contex
 		"api-version": APIVersion,
 	}
 
+	p2SVpnServerConfigurationParameters.Etag = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -89,9 +101,9 @@ func (client P2sVpnServerConfigurationsClient) CreateOrUpdatePreparer(ctx contex
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client P2sVpnServerConfigurationsClient) CreateOrUpdateSender(req *http.Request) (future P2sVpnServerConfigurationsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -118,6 +130,16 @@ func (client P2sVpnServerConfigurationsClient) CreateOrUpdateResponder(resp *htt
 // virtualWanName - the name of the VirtualWan.
 // p2SVpnServerConfigurationName - the name of the P2SVpnServerConfiguration.
 func (client P2sVpnServerConfigurationsClient) Delete(ctx context.Context, resourceGroupName string, virtualWanName string, p2SVpnServerConfigurationName string) (result P2sVpnServerConfigurationsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/P2sVpnServerConfigurationsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, virtualWanName, p2SVpnServerConfigurationName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.P2sVpnServerConfigurationsClient", "Delete", nil, "Failure preparing request")
@@ -158,9 +180,9 @@ func (client P2sVpnServerConfigurationsClient) DeletePreparer(ctx context.Contex
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client P2sVpnServerConfigurationsClient) DeleteSender(req *http.Request) (future P2sVpnServerConfigurationsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -186,6 +208,16 @@ func (client P2sVpnServerConfigurationsClient) DeleteResponder(resp *http.Respon
 // virtualWanName - the name of the VirtualWan.
 // p2SVpnServerConfigurationName - the name of the P2SVpnServerConfiguration.
 func (client P2sVpnServerConfigurationsClient) Get(ctx context.Context, resourceGroupName string, virtualWanName string, p2SVpnServerConfigurationName string) (result P2SVpnServerConfiguration, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/P2sVpnServerConfigurationsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualWanName, p2SVpnServerConfigurationName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.P2sVpnServerConfigurationsClient", "Get", nil, "Failure preparing request")
@@ -232,8 +264,8 @@ func (client P2sVpnServerConfigurationsClient) GetPreparer(ctx context.Context, 
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client P2sVpnServerConfigurationsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -254,6 +286,16 @@ func (client P2sVpnServerConfigurationsClient) GetResponder(resp *http.Response)
 // resourceGroupName - the resource group name of the VirtualWan.
 // virtualWanName - the name of the VirtualWan.
 func (client P2sVpnServerConfigurationsClient) ListByVirtualWan(ctx context.Context, resourceGroupName string, virtualWanName string) (result ListP2SVpnServerConfigurationsResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/P2sVpnServerConfigurationsClient.ListByVirtualWan")
+		defer func() {
+			sc := -1
+			if result.lpvscr.Response.Response != nil {
+				sc = result.lpvscr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listByVirtualWanNextResults
 	req, err := client.ListByVirtualWanPreparer(ctx, resourceGroupName, virtualWanName)
 	if err != nil {
@@ -300,8 +342,8 @@ func (client P2sVpnServerConfigurationsClient) ListByVirtualWanPreparer(ctx cont
 // ListByVirtualWanSender sends the ListByVirtualWan request. The method will close the
 // http.Response Body if it receives an error.
 func (client P2sVpnServerConfigurationsClient) ListByVirtualWanSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListByVirtualWanResponder handles the response to the ListByVirtualWan request. The method always
@@ -318,8 +360,8 @@ func (client P2sVpnServerConfigurationsClient) ListByVirtualWanResponder(resp *h
 }
 
 // listByVirtualWanNextResults retrieves the next set of results, if any.
-func (client P2sVpnServerConfigurationsClient) listByVirtualWanNextResults(lastResults ListP2SVpnServerConfigurationsResult) (result ListP2SVpnServerConfigurationsResult, err error) {
-	req, err := lastResults.listP2SVpnServerConfigurationsResultPreparer()
+func (client P2sVpnServerConfigurationsClient) listByVirtualWanNextResults(ctx context.Context, lastResults ListP2SVpnServerConfigurationsResult) (result ListP2SVpnServerConfigurationsResult, err error) {
+	req, err := lastResults.listP2SVpnServerConfigurationsResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.P2sVpnServerConfigurationsClient", "listByVirtualWanNextResults", nil, "Failure preparing next results request")
 	}
@@ -340,6 +382,16 @@ func (client P2sVpnServerConfigurationsClient) listByVirtualWanNextResults(lastR
 
 // ListByVirtualWanComplete enumerates all values, automatically crossing page boundaries as required.
 func (client P2sVpnServerConfigurationsClient) ListByVirtualWanComplete(ctx context.Context, resourceGroupName string, virtualWanName string) (result ListP2SVpnServerConfigurationsResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/P2sVpnServerConfigurationsClient.ListByVirtualWan")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListByVirtualWan(ctx, resourceGroupName, virtualWanName)
 	return
 }

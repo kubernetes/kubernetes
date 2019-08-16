@@ -24,14 +24,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
+
 	v1 "k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 const (
@@ -71,6 +72,9 @@ const (
 	// ServiceAnnotationLoadBalancerResourceGroup is the annotation used on the service
 	// to specify the resource group of load balancer objects that are not in the same resource group as the cluster.
 	ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+
+	// ServiceAnnotationPIPName specifies the pip that will be applied to load balancer
+	ServiceAnnotationPIPName = "service.beta.kubernetes.io/azure-pip-name"
 
 	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
 	// to specify a list of allowed service tags separated by comma
@@ -410,26 +414,32 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 	return nil, nil
 }
 
-func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, error) {
+func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, bool, error) {
+	var shouldPIPExisted bool
+	if name, found := service.Annotations[ServiceAnnotationPIPName]; found && name != "" {
+		shouldPIPExisted = true
+		return name, shouldPIPExisted, nil
+	}
+
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
-		return az.getPublicIPName(clusterName, service), nil
+		return az.getPublicIPName(clusterName, service), shouldPIPExisted, nil
 	}
 
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 
 	pips, err := az.ListPIP(service, pipResourceGroup)
 	if err != nil {
-		return "", err
+		return "", shouldPIPExisted, err
 	}
 
 	for _, pip := range pips {
 		if pip.PublicIPAddressPropertiesFormat.IPAddress != nil &&
 			*pip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
-			return *pip.Name, nil
+			return *pip.Name, shouldPIPExisted, nil
 		}
 	}
-	return "", fmt.Errorf("user supplied IP Address %s was not found in resource group %s", loadBalancerIP, pipResourceGroup)
+	return "", shouldPIPExisted, fmt.Errorf("user supplied IP Address %s was not found in resource group %s", loadBalancerIP, pipResourceGroup)
 }
 
 func flipServiceInternalAnnotation(service *v1.Service) *v1.Service {
@@ -476,42 +486,58 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 	return lbStatus.Ingress[0].IP, nil
 }
 
-func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel, clusterName string) (*network.PublicIPAddress, error) {
+func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel, clusterName string, shouldPIPExisted bool) (*network.PublicIPAddress, error) {
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 	pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 	if err != nil {
 		return nil, err
 	}
-	if existsPip {
-		return &pip, nil
-	}
 
 	serviceName := getServiceName(service)
-	pip.Name = to.StringPtr(pipName)
-	pip.Location = to.StringPtr(az.Location)
-	pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
-		PublicIPAllocationMethod: network.Static,
+
+	if existsPip {
+		// return if pip exist and dns label is the same
+		if getDomainNameLabel(&pip) == domainNameLabel {
+			return &pip, nil
+		}
+		klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - updating", serviceName, *pip.Name)
+		if pip.PublicIPAddressPropertiesFormat == nil {
+			pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
+				PublicIPAllocationMethod: network.Static,
+			}
+		}
+	} else {
+		if shouldPIPExisted {
+			return nil, fmt.Errorf("PublicIP from annotation azure-pip-name=%s for service %s doesn't exist", pipName, serviceName)
+		}
+		pip.Name = to.StringPtr(pipName)
+		pip.Location = to.StringPtr(az.Location)
+		pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
+			PublicIPAllocationMethod: network.Static,
+		}
+		pip.Tags = map[string]*string{
+			serviceTagKey:  &serviceName,
+			clusterNameKey: &clusterName,
+		}
+		if az.useStandardLoadBalancer() {
+			pip.Sku = &network.PublicIPAddressSku{
+				Name: network.PublicIPAddressSkuNameStandard,
+			}
+		}
+		klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	}
-	if len(domainNameLabel) > 0 {
+	if len(domainNameLabel) == 0 {
+		pip.PublicIPAddressPropertiesFormat.DNSSettings = nil
+	} else {
 		pip.PublicIPAddressPropertiesFormat.DNSSettings = &network.PublicIPAddressDNSSettings{
 			DomainNameLabel: &domainNameLabel,
 		}
 	}
-	pip.Tags = map[string]*string{
-		serviceTagKey:  &serviceName,
-		clusterNameKey: &clusterName,
-	}
-	if az.useStandardLoadBalancer() {
-		pip.Sku = &network.PublicIPAddressSku{
-			Name: network.PublicIPAddressSkuNameStandard,
-		}
-	}
 
-	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIP(service, pipResourceGroup, pip)
 	if err != nil {
-		klog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
+		klog.V(2).Infof("ensure(%s) abort backoff: pip(%s)", serviceName, *pip.Name)
 		return nil, err
 	}
 	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): end", pipResourceGroup, *pip.Name)
@@ -523,6 +549,13 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		return nil, err
 	}
 	return &pip, nil
+}
+
+func getDomainNameLabel(pip *network.PublicIPAddress) string {
+	if pip == nil || pip.PublicIPAddressPropertiesFormat == nil || pip.PublicIPAddressPropertiesFormat.DNSSettings == nil {
+		return ""
+	}
+	return to.String(pip.PublicIPAddressPropertiesFormat.DNSSettings.DomainNameLabel)
 }
 
 func getIdleTimeout(s *v1.Service) (*int32, error) {
@@ -582,7 +615,7 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 	if loadBalancerIP == "" {
 		return false, nil
 	}
-	pipName, err := az.determinePublicIPName(clusterName, service)
+	pipName, _, err := az.determinePublicIPName(clusterName, service)
 	if err != nil {
 		return false, err
 	}
@@ -720,12 +753,12 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 				fipConfigurationProperties = &configProperties
 			} else {
-				pipName, err := az.determinePublicIPName(clusterName, service)
+				pipName, shouldPIPExisted, err := az.determinePublicIPName(clusterName, service)
 				if err != nil {
 					return nil, err
 				}
 				domainNameLabel := getPublicIPDomainNameLabel(service)
-				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel, clusterName)
+				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel, clusterName, shouldPIPExisted)
 				if err != nil {
 					return nil, err
 				}
@@ -1355,8 +1388,9 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	var lb *network.LoadBalancer
 	var desiredPipName string
 	var err error
+	var shouldPIPExisted bool
 	if !isInternal && wantLb {
-		desiredPipName, err = az.determinePublicIPName(clusterName, service)
+		desiredPipName, shouldPIPExisted, err = az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, err
 		}
@@ -1377,32 +1411,45 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 		return nil, err
 	}
 
+	var found bool
+	var pipsToBeDeleted []*network.PublicIPAddress
 	for i := range pips {
 		pip := pips[i]
+		pipName := *pip.Name
 		if serviceOwnsPublicIP(&pip, clusterName, serviceName) {
 			// We need to process for pips belong to this service
-			pipName := *pip.Name
 			if wantLb && !isInternal && pipName == desiredPipName {
 				// This is the only case we should preserve the
 				// Public ip resource with match service tag
+				found = true
 			} else {
-				klog.V(2).Infof("reconcilePublicIP for service(%s): pip(%s) - deleting", serviceName, pipName)
-				err := az.safeDeletePublicIP(service, pipResourceGroup, &pip, lb)
-				if err != nil {
-					klog.Errorf("safeDeletePublicIP(%s) failed with error: %v", pipName, err)
-					return nil, err
-				}
-				klog.V(2).Infof("reconcilePublicIP for service(%s): pip(%s) - finished", serviceName, pipName)
+				pipsToBeDeleted = append(pipsToBeDeleted, &pip)
 			}
+		} else if wantLb && !isInternal && pipName == desiredPipName {
+			found = true
 		}
-
+	}
+	if !isInternal && shouldPIPExisted && !found && wantLb {
+		return nil, fmt.Errorf("reconcilePublicIP for service(%s): pip(%s) not found", serviceName, desiredPipName)
+	}
+	var deleteFuncs []func() error
+	for _, pip := range pipsToBeDeleted {
+		pipCopy := *pip
+		deleteFuncs = append(deleteFuncs, func() error {
+			klog.V(2).Infof("reconcilePublicIP for service(%s): pip(%s) - deleting", serviceName, *pip.Name)
+			return az.safeDeletePublicIP(service, pipResourceGroup, &pipCopy, lb)
+		})
+	}
+	errs := utilerrors.AggregateGoroutines(deleteFuncs...)
+	if errs != nil {
+		return nil, utilerrors.Flatten(errs)
 	}
 
 	if !isInternal && wantLb {
 		// Confirm desired public ip resource exists
 		var pip *network.PublicIPAddress
 		domainNameLabel := getPublicIPDomainNameLabel(service)
-		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel, clusterName); err != nil {
+		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel, clusterName, shouldPIPExisted); err != nil {
 			return nil, err
 		}
 		return pip, nil

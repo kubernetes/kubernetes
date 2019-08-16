@@ -77,6 +77,9 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 	pid := 0
 	if isRootCgroup(name) {
 		pid = 1
+
+		// delete pids from cgroup paths because /sys/fs/cgroup/pids/pids.current not exist
+		delete(cgroupPaths, "pids")
 	}
 
 	handler := libcontainer.NewHandler(cgroupManager, rootFs, pid, includedMetrics)

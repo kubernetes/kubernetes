@@ -414,365 +414,474 @@ func TestGetNodeIPs(t *testing.T) {
 	}
 }
 
-func TestNodePortUDP(t *testing.T) {
-	nodeIP := net.ParseIP("100.101.102.103")
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil)
-
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolUDP,
-				NodePort: int32(svcNodePort),
-			}}
-		}),
-	)
-	epIP := "10.180.0.1"
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIP,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
-				}},
-			}}
-		}),
-	)
-
-	fp.nodePortAddresses = []string{"0.0.0.0/0"}
-	fp.syncProxyRules()
-
-	// Check ipvs service and destinations
-	epVS := &netlinktest.ExpectedVirtualServer{
-		VSNum: 2, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
-		RS: []netlinktest.ExpectedRealServer{{
-			IP: epIP, Port: uint16(svcPort),
-		}}}
-	checkIPVS(t, fp, epVS)
-
-	// check ipSet rules
-	epIPSet := netlinktest.ExpectedIPSet{
-		kubeNodePortSetUDP: {{
-			Port:     svcNodePort,
-			Protocol: strings.ToLower(string(v1.ProtocolUDP)),
-			SetType:  utilipset.BitmapPort,
-		}},
-	}
-	checkIPSet(t, fp, epIPSet)
-
-	// Check iptables chain and rules
-	epIpt := netlinktest.ExpectedIptablesChain{
-		string(KubeNodePortChain): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
-		}},
-		string(kubeServicesChain): {{
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
-		}},
-	}
-	checkIptables(t, ipt, epIpt)
-}
-
 func TestNodePort(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	nodeIPv4 := net.ParseIP("100.101.102.103")
-	nodeIPv6 := net.ParseIP("2001:db8::1:1")
-	nodeIPs := sets.NewString(nodeIPv4.String(), nodeIPv6.String())
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIPv4, nodeIPv6}, nil)
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolTCP,
-				NodePort: int32(svcNodePort),
-			}}
-		}),
-	)
-	epIPv4 := "10.180.0.1"
-	epIPv6 := "1002:ab8::2:10"
-	epIPs := sets.NewString(epIPv4, epIPv6)
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIPv4,
-				}, {
-					IP: epIPv6,
+	tests := []struct {
+		name                   string
+		services               []*v1.Service
+		endpoints              []*v1.Endpoints
+		nodeIPs                []net.IP
+		nodePortAddresses      []string
+		expectedIPVS           *ipvstest.FakeIPVS
+		expectedIPSets         netlinktest.ExpectedIPSet
+		expectedIptablesChains netlinktest.ExpectedIptablesChain
+	}{
+		{
+			name: "1 service with node port, has 2 endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}, {
+							IP: "1002:ab8::2:10",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name: "p80",
+							Port: int32(80),
+						}},
+					}}
+				}),
+			},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+				net.ParseIP("2001:db8::1:1"),
+			},
+			nodePortAddresses: []string{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("100.101.102.103"),
+						Protocol:  "TCP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:1"),
+						Protocol:  "TCP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+						{
+							Address: net.ParseIP("1002:ab8::2:10"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+						{
+							Address: net.ParseIP("1002:ab8::2:10"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+						{
+							Address: net.ParseIP("1002:ab8::2:10"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "1 UDP service with node port, has endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolUDP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name: "p80",
+							Port: int32(80),
+						}},
+					}}
+				}),
+			},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+			},
+			nodePortAddresses: []string{"0.0.0.0/0"},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "UDP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "UDP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "UDP",
+					}: {
+						Address:   net.ParseIP("100.101.102.103"),
+						Protocol:  "UDP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "UDP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "UDP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+				},
+			},
+			expectedIPSets: netlinktest.ExpectedIPSet{
+				kubeNodePortSetUDP: {{
+					Port:     3001,
+					Protocol: strings.ToLower(string(v1.ProtocolUDP)),
+					SetType:  utilipset.BitmapPort,
 				}},
-				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
+			},
+			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
+				string(KubeNodePortChain): {{
+					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
 				}},
-			}}
-		}),
-	)
-
-	fp.nodePortAddresses = []string{"0.0.0.0/0"}
-
-	fp.syncProxyRules()
-
-	// Check ipvs service and destinations
-	services, err := ipvs.GetVirtualServers()
-	if err != nil {
-		t.Errorf("Failed to get ipvs services, err: %v", err)
+				string(kubeServicesChain): {{
+					JumpChain: string(KubeNodePortChain), MatchSet: "",
+				}},
+			},
+		},
+		{
+			name: "service has node port but no endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+			},
+			nodePortAddresses: []string{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("100.101.102.103"),
+						Protocol:  "TCP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {}, // no real servers corresponding to no endpoints
+					{
+						IP:       "100.101.102.103",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {}, // no real servers corresponding to no endpoints
+				},
+			},
+		},
 	}
-	if len(services) != 3 {
-		t.Errorf("Expect 3 ipvs services, got %d", len(services))
-	}
-	found := false
-	for _, svc := range services {
-		if nodeIPs.Has(svc.Address.String()) && svc.Port == uint16(svcNodePort) && svc.Protocol == string(v1.ProtocolTCP) {
-			found = true
-			destinations, err := ipvs.GetRealServers(svc)
-			if err != nil {
-				t.Errorf("Failed to get ipvs destinations, err: %v", err)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil)
+			fp.nodePortAddresses = test.nodePortAddresses
+
+			makeServiceMap(fp, test.services...)
+			makeEndpointsMap(fp, test.endpoints...)
+
+			fp.syncProxyRules()
+
+			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
+				t.Logf("actual ipvs state: %v", ipvs)
+				t.Logf("expected ipvs state: %v", test.expectedIPVS)
+				t.Errorf("unexpected IPVS state")
 			}
-			for _, dest := range destinations {
-				if !epIPs.Has(dest.Address.String()) || dest.Port != uint16(svcPort) {
-					t.Errorf("service Endpoint mismatch ipvs service destination")
-				}
+
+			if test.expectedIPSets != nil {
+				checkIPSet(t, fp, test.expectedIPSets)
 			}
-			break
-		}
-	}
-	if !found {
-		t.Errorf("Expect node port type service, got none")
-	}
-}
 
-func TestNodePortNoEndpoint(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil)
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolTCP,
-				NodePort: int32(svcNodePort),
-			}}
-		}),
-	)
-	makeEndpointsMap(fp)
-
-	fp.nodePortAddresses = []string{"0.0.0.0/0"}
-
-	fp.syncProxyRules()
-
-	// Check ipvs service and destinations
-	services, err := ipvs.GetVirtualServers()
-	if err != nil {
-		t.Errorf("Failed to get ipvs services, err: %v", err)
-	}
-	if len(services) != 2 {
-		t.Errorf("Expect 2 ipvs services, got %d", len(services))
-	}
-	found := false
-	for _, svc := range services {
-		if svc.Address.Equal(nodeIP) && svc.Port == uint16(svcNodePort) && svc.Protocol == string(v1.ProtocolTCP) {
-			found = true
-			destinations, _ := ipvs.GetRealServers(svc)
-			if len(destinations) != 0 {
-				t.Errorf("Unexpected %d destinations, expect 0 destinations", len(destinations))
+			if test.expectedIptablesChains != nil {
+				checkIptables(t, ipt, test.expectedIptablesChains)
 			}
-			break
-		}
-	}
-	if !found {
-		t.Errorf("Expect node port type service, got none")
-	}
-}
-
-func TestClusterIPNoEndpoint(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Namespace, func(svc *v1.Service) {
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolTCP,
-			}}
-		}),
-	)
-	makeEndpointsMap(fp)
-	fp.syncProxyRules()
-
-	// check ipvs service and destinations
-	services, err := ipvs.GetVirtualServers()
-	if err != nil {
-		t.Errorf("Failed to get ipvs services, err: %v", err)
-	}
-	if len(services) != 1 {
-		t.Errorf("Expect 1 ipvs services, got %d", len(services))
-	} else {
-		if services[0].Address.String() != svcIP || services[0].Port != uint16(svcPort) || services[0].Protocol != string(v1.ProtocolTCP) {
-			t.Errorf("Unexpected mismatch service")
-		} else {
-			destinations, _ := ipvs.GetRealServers(services[0])
-			if len(destinations) != 0 {
-				t.Errorf("Unexpected %d destinations, expect 0 destinations", len(destinations))
-			}
-		}
+		})
 	}
 }
 
 func TestClusterIP(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
-
-	svcIPv4 := "10.20.30.41"
-	svcPortV4 := 80
-	svcPortNameV4 := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
+	tests := []struct {
+		name         string
+		services     []*v1.Service
+		endpoints    []*v1.Endpoints
+		expectedIPVS *ipvstest.FakeIPVS
+	}{
+		{
+			name: "2 services with Cluster IP, each with endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+				makeTestService("ns2", "svc2", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "1002:ab8::2:1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p8080",
+						Port:     int32(8080),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name: "p80",
+							Port: int32(80),
+						}},
+					}}
+				}),
+				makeTestEndpoints("ns2", "svc2", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "1009:ab8::5:6",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name: "p8080",
+							Port: int32(8080),
+						}},
+					}}
+				}),
+			},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "1002:ab8::2:1",
+						Port:     8080,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("1002:ab8::2:1"),
+						Protocol:  "TCP",
+						Port:      uint16(8080),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "1002:ab8::2:1",
+						Port:     8080,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("1009:ab8::5:6"),
+							Port:    uint16(8080),
+							Weight:  1,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "cluster IP service with no endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {},
+				},
+			},
+		},
 	}
-	svcIPv6 := "1002:ab8::2:1"
-	svcPortV6 := 8080
-	svcPortNameV6 := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns2", "svc2"),
-		Port:           "p8080",
-	}
-	makeServiceMap(fp,
-		makeTestService(svcPortNameV4.Namespace, svcPortNameV4.Name, func(svc *v1.Service) {
-			svc.Spec.ClusterIP = svcIPv4
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortNameV4.Port,
-				Port:     int32(svcPortV4),
-				Protocol: v1.ProtocolTCP,
-			}}
-		}),
-		makeTestService(svcPortNameV6.Namespace, svcPortNameV6.Name, func(svc *v1.Service) {
-			svc.Spec.ClusterIP = svcIPv6
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortNameV6.Port,
-				Port:     int32(svcPortV6),
-				Protocol: v1.ProtocolTCP,
-			}}
-		}),
-	)
 
-	epIPv4 := "10.180.0.1"
-	epIPv6 := "1009:ab8::5:6"
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortNameV4.Namespace, svcPortNameV4.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIPv4,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name: svcPortNameV4.Port,
-					Port: int32(svcPortV4),
-				}},
-			}}
-		}),
-		makeTestEndpoints(svcPortNameV6.Namespace, svcPortNameV6.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIPv6,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name: svcPortNameV6.Port,
-					Port: int32(svcPortV6),
-				}},
-			}}
-		}),
-	)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
-	fp.syncProxyRules()
+			makeServiceMap(fp, test.services...)
+			makeEndpointsMap(fp, test.endpoints...)
 
-	// check ipvs service and destinations
-	services, err := ipvs.GetVirtualServers()
-	if err != nil {
-		t.Errorf("Failed to get ipvs services, err: %v", err)
-	}
-	if len(services) != 2 {
-		t.Errorf("Expect 2 ipvs services, got %d", len(services))
-	}
-	for i := range services {
-		// Check services
-		if services[i].Address.String() == svcIPv4 {
-			if services[i].Port != uint16(svcPortV4) || services[i].Protocol != string(v1.ProtocolTCP) {
-				t.Errorf("Unexpected mismatch service")
+			fp.syncProxyRules()
+
+			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
+				t.Logf("actual ipvs state: %v", ipvs)
+				t.Logf("expected ipvs state: %v", test.expectedIPVS)
+				t.Errorf("unexpected IPVS state")
 			}
-			// Check destinations
-			destinations, _ := ipvs.GetRealServers(services[i])
-			if len(destinations) != 1 {
-				t.Errorf("Expected 1 destinations, got %d destinations", len(destinations))
-				continue
-			}
-			if destinations[0].Address.String() != epIPv4 || destinations[0].Port != uint16(svcPortV4) {
-				t.Errorf("Unexpected mismatch destinations")
-			}
-		}
-		if services[i].Address.String() == svcIPv6 {
-			if services[i].Port != uint16(svcPortV6) || services[i].Protocol != string(v1.ProtocolTCP) {
-				t.Errorf("Unexpected mismatch service")
-			}
-			// Check destinations
-			destinations, _ := ipvs.GetRealServers(services[i])
-			if len(destinations) != 1 {
-				t.Errorf("Expected 1 destinations, got %d destinations", len(destinations))
-				continue
-			}
-			if destinations[0].Address.String() != epIPv6 || destinations[0].Port != uint16(svcPortV6) {
-				t.Errorf("Unexpected mismatch destinations")
-			}
-		}
+		})
 	}
 }
 
@@ -2913,6 +3022,99 @@ func TestCleanLegacyService(t *testing.T) {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
 	}
 	// check that address "1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4" are bound, ignore ipv6 addresses
+	remainingAddrsMap := make(map[string]bool)
+	for _, a := range remainingAddrs {
+		if net.ParseIP(a).To4() == nil {
+			continue
+		}
+		remainingAddrsMap[a] = true
+	}
+	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
+		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
+	}
+
+}
+
+func TestCleanLegacyServiceWithRealServers(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
+
+	// all deleted expect ipvs2
+	activeServices := map[string]bool{"ipvs2": true}
+	// All ipvs services in the system.
+	currentServices := map[string]*utilipvs.VirtualServer{
+		"ipvs0": { // deleted with real servers
+			Address:   net.ParseIP("1.1.1.1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		"ipvs1": { // deleted no real server
+			Address:   net.ParseIP("2.2.2.2"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		"ipvs2": { // not deleted
+			Address:   net.ParseIP("3.3.3.3"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+	}
+
+	// "ipvs0" has a real server, but it should still be deleted since the Service is deleted
+	realServers := map[*utilipvs.VirtualServer]*utilipvs.RealServer{
+		{
+			Address:   net.ParseIP("1.1.1.1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		}: {
+			Address: net.ParseIP("10.180.0.1"),
+			Port:    uint16(53),
+			Weight:  1,
+		},
+	}
+
+	for v := range currentServices {
+		fp.ipvs.AddVirtualServer(currentServices[v])
+	}
+
+	for v, r := range realServers {
+		fp.ipvs.AddRealServer(v, r)
+	}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	activeBindAddrs := map[string]bool{"3.3.3.3": true}
+	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"}
+	for i := range currentBindAddrs {
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+	}
+
+	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"1.1.1.1": true, "2.2.2.2": true})
+	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
+	if len(remainingVirtualServers) != 1 {
+		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 1, len(remainingVirtualServers))
+	}
+
+	if remainingVirtualServers[0] != currentServices["ipvs2"] {
+		t.Logf("actual virtual server: %v", remainingVirtualServers[0])
+		t.Logf("expected virtual server: %v", currentServices["ipvs0"])
+		t.Errorf("unexpected IPVS service")
+	}
+
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	if len(remainingAddrs) != 1 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
+	}
+	// check that address is "3.3.3.3"
 	remainingAddrsMap := make(map[string]bool)
 	for _, a := range remainingAddrs {
 		if net.ParseIP(a).To4() == nil {

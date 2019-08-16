@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -67,7 +67,7 @@ func (pl *TestScorePlugin1) NormalizeScore(pc *PluginContext, pod *v1.Pod, score
 	}
 	// Simply decrease each node score by 1.
 	for i := range scores {
-		scores[i] = scores[i] - 1
+		scores[i].Score = scores[i].Score - 1
 	}
 	return nil
 }
@@ -91,7 +91,7 @@ func (pl *TestScorePlugin2) Name() string {
 func (pl *TestScorePlugin2) NormalizeScore(pc *PluginContext, pod *v1.Pod, scores NodeScoreList) *Status {
 	// Simply force each node score to 5.
 	for i := range scores {
-		scores[i] = 5
+		scores[i].Score = 5
 	}
 	return nil
 }
@@ -256,8 +256,8 @@ func TestRunNormalizeScorePlugins(t *testing.T) {
 		name     string
 		registry Registry
 		plugins  *config.Plugins
-		input    PluginToNodeScoreMap
-		want     PluginToNodeScoreMap
+		input    PluginToNodeScores
+		want     PluginToNodeScores
 		// If err is true, we expect RunNormalizeScorePlugin to fail.
 		err bool
 	}{
@@ -265,54 +265,162 @@ func TestRunNormalizeScorePlugins(t *testing.T) {
 			name:     "no NormalizeScore plugins",
 			plugins:  plugin3,
 			registry: registry,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
 			},
 			// No NormalizeScore plugin, map should be untouched.
-			want: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
+			want: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
 			},
 		},
 		{
 			name:     "single Score plugin, single NormalizeScore plugin",
 			registry: registry,
 			plugins:  plugin1,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
 			},
-			want: PluginToNodeScoreMap{
+			want: PluginToNodeScores{
 				// For plugin1, want=input-1.
-				scorePlugin1: {1, 2},
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 1,
+					},
+					{
+						Name:  "node2",
+						Score: 2,
+					},
+				},
 			},
 		},
 		{
 			name:     "2 Score plugins, 2 NormalizeScore plugins",
 			registry: registry,
 			plugins:  plugin1And2,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
-				scorePlugin2: {2, 4},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 4,
+					},
+				},
 			},
-			want: PluginToNodeScoreMap{
+			want: PluginToNodeScores{
 				// For plugin1, want=input-1.
-				scorePlugin1: {1, 2},
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 1,
+					},
+					{
+						Name:  "node2",
+						Score: 2,
+					},
+				},
 				// For plugin2, want=5.
-				scorePlugin2: {5, 5},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 5,
+					},
+					{
+						Name:  "node2",
+						Score: 5,
+					},
+				},
 			},
 		},
 		{
 			name:     "2 Score plugins, 1 NormalizeScore plugin",
 			registry: registry,
 			plugins:  plugin1And3,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
-				scorePlugin3: {2, 4},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 4,
+					},
+				},
 			},
-			want: PluginToNodeScoreMap{
+			want: PluginToNodeScores{
 				// For plugin1, want=input-1.
-				scorePlugin1: {1, 2},
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 1,
+					},
+					{
+						Name:  "node2",
+						Score: 2,
+					},
+				},
 				// No NormalizeScore for plugin 3. The node scores are untouched.
-				scorePlugin3: {2, 4},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 4,
+					},
+				},
 			},
 		},
 		{
@@ -322,9 +430,27 @@ func TestRunNormalizeScorePlugins(t *testing.T) {
 				scorePlugin2: NewScorePlugin2,
 			},
 			plugins: plugin1And2,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
-				scorePlugin2: {2, 4},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 4,
+					},
+				},
 			},
 			err: true,
 		},
@@ -332,8 +458,17 @@ func TestRunNormalizeScorePlugins(t *testing.T) {
 			name:     "2 plugins but score map only contains plugin1",
 			registry: registry,
 			plugins:  plugin1And2,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
 			},
 			err: true,
 		},
@@ -368,41 +503,158 @@ func TestApplyScoreWeights(t *testing.T) {
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
-		input   PluginToNodeScoreMap
-		want    PluginToNodeScoreMap
+		input   PluginToNodeScores
+		want    PluginToNodeScores
 		// If err is true, we expect ApplyScoreWeights to fail.
 		err bool
 	}{
 		{
 			name:    "single Score plugin, single nodeScoreList",
 			plugins: plugin1,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
 			},
-			want: PluginToNodeScoreMap{
+			want: PluginToNodeScores{
 				// For plugin1, want=input*weight1.
-				scorePlugin1: {4, 6},
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 4,
+					},
+					{
+						Name:  "node2",
+						Score: 6,
+					},
+				},
 			},
 		},
 		{
 			name:    "2 Score plugins, 2 nodeScoreLists in scoreMap",
 			plugins: plugin1And2,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
-				scorePlugin2: {2, 4},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 4,
+					},
+				},
 			},
-			want: PluginToNodeScoreMap{
+			want: PluginToNodeScores{
 				// For plugin1, want=input*weight1.
-				scorePlugin1: {4, 6},
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 4,
+					},
+					{
+						Name:  "node2",
+						Score: 6,
+					},
+				},
 				// For plugin2, want=input*weight2.
-				scorePlugin2: {6, 12},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: 6,
+					},
+					{
+						Name:  "node2",
+						Score: 12,
+					},
+				},
 			},
 		},
 		{
 			name:    "2 Score plugins, 1 without corresponding nodeScoreList in the score map",
 			plugins: plugin1And2,
-			input: PluginToNodeScoreMap{
-				scorePlugin1: {2, 3},
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: 2,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+			},
+			err: true,
+		},
+		{
+			name:    "Score plugin return score greater than MaxNodeScore",
+			plugins: plugin1And2,
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: MaxNodeScore + 1,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: MinNodeScore,
+					},
+					{
+						Name:  "node2",
+						Score: 5,
+					},
+				},
+			},
+			err: true,
+		},
+		{
+			name:    "Score plugin return score less than MinNodeScore",
+			plugins: plugin1And2,
+			input: PluginToNodeScores{
+				scorePlugin1: {
+					{
+						Name:  "node1",
+						Score: MaxNodeScore,
+					},
+					{
+						Name:  "node2",
+						Score: 3,
+					},
+				},
+				scorePlugin2: {
+					{
+						Name:  "node1",
+						Score: MinNodeScore - 1,
+					},
+					{
+						Name:  "node2",
+						Score: 5,
+					},
+				},
 			},
 			err: true,
 		},

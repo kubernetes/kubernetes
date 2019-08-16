@@ -117,8 +117,8 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
 }
 
-// RunServer listens on the given port if listener is not given,
-// then spawns a go-routine continuously serving until the stopCh is closed.
+// RunServer spawns a go-routine continuously serving until the stopCh is
+// closed.
 // It returns a stoppedCh that is closed when all non-hijacked active requests
 // have been processed.
 // This function does not block

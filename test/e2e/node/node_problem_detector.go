@@ -56,6 +56,8 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 	})
 
 	ginkgo.It("should run without error", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())

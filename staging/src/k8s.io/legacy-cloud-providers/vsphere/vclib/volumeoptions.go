@@ -19,6 +19,7 @@ package vclib
 import (
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 )
 
@@ -34,6 +35,7 @@ type VolumeOptions struct {
 	StoragePolicyID        string
 	SCSIControllerType     string
 	Zone                   []string
+	SelectedNode           *v1.Node
 }
 
 var (

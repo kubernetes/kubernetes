@@ -2,7 +2,7 @@
 bitbucket.org/bertimus9/systemstat
 # cloud.google.com/go v0.34.0 => cloud.google.com/go v0.34.0
 cloud.google.com/go/compute/metadata
-# github.com/Azure/azure-sdk-for-go v21.4.0+incompatible => github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
+# github.com/Azure/azure-sdk-for-go v32.5.0+incompatible => github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2018-09-01/containerregistry
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network
@@ -12,15 +12,21 @@ github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/Azure/go-autorest v11.1.2+incompatible => github.com/Azure/go-autorest v11.1.2+incompatible
+# github.com/Azure/go-autorest/autorest v0.9.0 => github.com/Azure/go-autorest/autorest v0.9.0
 github.com/Azure/go-autorest/autorest
+# github.com/Azure/go-autorest/autorest/adal v0.5.0 => github.com/Azure/go-autorest/autorest/adal v0.5.0
 github.com/Azure/go-autorest/autorest/adal
 github.com/Azure/go-autorest/autorest/azure
+# github.com/Azure/go-autorest/autorest/date v0.1.0 => github.com/Azure/go-autorest/autorest/date v0.1.0
 github.com/Azure/go-autorest/autorest/date
+# github.com/Azure/go-autorest/autorest/to v0.2.0 => github.com/Azure/go-autorest/autorest/to v0.2.0
 github.com/Azure/go-autorest/autorest/to
+# github.com/Azure/go-autorest/autorest/validation v0.1.0 => github.com/Azure/go-autorest/autorest/validation v0.1.0
 github.com/Azure/go-autorest/autorest/validation
+# github.com/Azure/go-autorest/logger v0.1.0 => github.com/Azure/go-autorest/logger v0.1.0
 github.com/Azure/go-autorest/logger
-github.com/Azure/go-autorest/version
+# github.com/Azure/go-autorest/tracing v0.5.0 => github.com/Azure/go-autorest/tracing v0.5.0
+github.com/Azure/go-autorest/tracing
 # github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100 => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter
@@ -278,7 +284,7 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
-# github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda => github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
+# github.com/dgrijalva/jwt-go v3.2.0+incompatible => github.com/dgrijalva/jwt-go v3.2.0+incompatible
 github.com/dgrijalva/jwt-go
 # github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1+incompatible
 github.com/docker/distribution/digestset
@@ -418,7 +424,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v0.0.0-20160524151835-7d79101e329e => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
 github.com/google/btree
-# github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a => github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
+# github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966 => github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -521,7 +527,7 @@ github.com/gregjones/httpcache
 github.com/gregjones/httpcache/diskcache
 # github.com/grpc-ecosystem/go-grpc-middleware v0.0.0-20190222133341-cfaf5686ec79 => github.com/grpc-ecosystem/go-grpc-middleware v0.0.0-20190222133341-cfaf5686ec79
 github.com/grpc-ecosystem/go-grpc-middleware
-# github.com/grpc-ecosystem/go-grpc-prometheus v0.0.0-20170330212424-2500245aa611 => github.com/grpc-ecosystem/go-grpc-prometheus v0.0.0-20170330212424-2500245aa611
+# github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 => github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 github.com/grpc-ecosystem/go-grpc-prometheus
 # github.com/grpc-ecosystem/grpc-gateway v1.3.0 => github.com/grpc-ecosystem/grpc-gateway v1.3.0
 github.com/grpc-ecosystem/grpc-gateway/runtime
@@ -583,8 +589,6 @@ github.com/magiconair/properties
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
-github.com/marstr/guid
 # github.com/mattn/go-colorable v0.0.9 => github.com/mattn/go-colorable v0.0.9
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.3 => github.com/mattn/go-isatty v0.0.3
@@ -728,8 +732,6 @@ github.com/russross/blackfriday
 github.com/satori/go.uuid
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
-# github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
-github.com/sigma/go-inotify
 # github.com/sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.3 => github.com/soheilhy/cmux v0.1.3
@@ -840,7 +842,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1 => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20190613194153-d28f0bde5980 => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
+# golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc => golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -1584,7 +1586,7 @@ k8s.io/cri-api/pkg/apis/testing
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20190128074634-0689ccc1d7d6 => k8s.io/gengo v0.0.0-20190128074634-0689ccc1d7d6
+# k8s.io/gengo v0.0.0-20190813173942-955ffa8fcfc9 => k8s.io/gengo v0.0.0-20190813173942-955ffa8fcfc9
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/defaulter-gen/generators
@@ -1597,7 +1599,7 @@ k8s.io/gengo/parser
 k8s.io/gengo/types
 # k8s.io/heapster v1.2.0-beta.1 => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog v0.3.1 => k8s.io/klog v0.3.1
+# k8s.io/klog v0.4.0 => k8s.io/klog v0.4.0
 k8s.io/klog
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration

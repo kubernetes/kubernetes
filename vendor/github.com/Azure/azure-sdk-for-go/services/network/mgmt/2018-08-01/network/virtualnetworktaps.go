@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -46,6 +47,16 @@ func NewVirtualNetworkTapsClientWithBaseURI(baseURI string, subscriptionID strin
 // tapName - the name of the virtual network tap.
 // parameters - parameters supplied to the create or update virtual network tap operation.
 func (client VirtualNetworkTapsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, tapName string, parameters VirtualNetworkTap) (result VirtualNetworkTapsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat", Name: validation.Null, Rule: false,
@@ -118,9 +129,9 @@ func (client VirtualNetworkTapsClient) CreateOrUpdatePreparer(ctx context.Contex
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkTapsClient) CreateOrUpdateSender(req *http.Request) (future VirtualNetworkTapsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -146,6 +157,16 @@ func (client VirtualNetworkTapsClient) CreateOrUpdateResponder(resp *http.Respon
 // resourceGroupName - the name of the resource group.
 // tapName - the name of the virtual network tap.
 func (client VirtualNetworkTapsClient) Delete(ctx context.Context, resourceGroupName string, tapName string) (result VirtualNetworkTapsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, tapName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualNetworkTapsClient", "Delete", nil, "Failure preparing request")
@@ -185,9 +206,9 @@ func (client VirtualNetworkTapsClient) DeletePreparer(ctx context.Context, resou
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkTapsClient) DeleteSender(req *http.Request) (future VirtualNetworkTapsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -212,6 +233,16 @@ func (client VirtualNetworkTapsClient) DeleteResponder(resp *http.Response) (res
 // resourceGroupName - the name of the resource group.
 // tapName - the name of virtual network tap.
 func (client VirtualNetworkTapsClient) Get(ctx context.Context, resourceGroupName string, tapName string) (result VirtualNetworkTap, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, tapName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualNetworkTapsClient", "Get", nil, "Failure preparing request")
@@ -257,8 +288,8 @@ func (client VirtualNetworkTapsClient) GetPreparer(ctx context.Context, resource
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkTapsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -276,6 +307,16 @@ func (client VirtualNetworkTapsClient) GetResponder(resp *http.Response) (result
 
 // ListAll gets all the VirtualNetworkTaps in a subscription.
 func (client VirtualNetworkTapsClient) ListAll(ctx context.Context) (result VirtualNetworkTapListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.vntlr.Response.Response != nil {
+				sc = result.vntlr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listAllNextResults
 	req, err := client.ListAllPreparer(ctx)
 	if err != nil {
@@ -320,8 +361,8 @@ func (client VirtualNetworkTapsClient) ListAllPreparer(ctx context.Context) (*ht
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkTapsClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -338,8 +379,8 @@ func (client VirtualNetworkTapsClient) ListAllResponder(resp *http.Response) (re
 }
 
 // listAllNextResults retrieves the next set of results, if any.
-func (client VirtualNetworkTapsClient) listAllNextResults(lastResults VirtualNetworkTapListResult) (result VirtualNetworkTapListResult, err error) {
-	req, err := lastResults.virtualNetworkTapListResultPreparer()
+func (client VirtualNetworkTapsClient) listAllNextResults(ctx context.Context, lastResults VirtualNetworkTapListResult) (result VirtualNetworkTapListResult, err error) {
+	req, err := lastResults.virtualNetworkTapListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkTapsClient", "listAllNextResults", nil, "Failure preparing next results request")
 	}
@@ -360,6 +401,16 @@ func (client VirtualNetworkTapsClient) listAllNextResults(lastResults VirtualNet
 
 // ListAllComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VirtualNetworkTapsClient) ListAllComplete(ctx context.Context) (result VirtualNetworkTapListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListAll(ctx)
 	return
 }
@@ -368,6 +419,16 @@ func (client VirtualNetworkTapsClient) ListAllComplete(ctx context.Context) (res
 // Parameters:
 // resourceGroupName - the name of the resource group.
 func (client VirtualNetworkTapsClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result VirtualNetworkTapListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.vntlr.Response.Response != nil {
+				sc = result.vntlr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listByResourceGroupNextResults
 	req, err := client.ListByResourceGroupPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -413,8 +474,8 @@ func (client VirtualNetworkTapsClient) ListByResourceGroupPreparer(ctx context.C
 // ListByResourceGroupSender sends the ListByResourceGroup request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkTapsClient) ListByResourceGroupSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListByResourceGroupResponder handles the response to the ListByResourceGroup request. The method always
@@ -431,8 +492,8 @@ func (client VirtualNetworkTapsClient) ListByResourceGroupResponder(resp *http.R
 }
 
 // listByResourceGroupNextResults retrieves the next set of results, if any.
-func (client VirtualNetworkTapsClient) listByResourceGroupNextResults(lastResults VirtualNetworkTapListResult) (result VirtualNetworkTapListResult, err error) {
-	req, err := lastResults.virtualNetworkTapListResultPreparer()
+func (client VirtualNetworkTapsClient) listByResourceGroupNextResults(ctx context.Context, lastResults VirtualNetworkTapListResult) (result VirtualNetworkTapListResult, err error) {
+	req, err := lastResults.virtualNetworkTapListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkTapsClient", "listByResourceGroupNextResults", nil, "Failure preparing next results request")
 	}
@@ -453,6 +514,16 @@ func (client VirtualNetworkTapsClient) listByResourceGroupNextResults(lastResult
 
 // ListByResourceGroupComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VirtualNetworkTapsClient) ListByResourceGroupComplete(ctx context.Context, resourceGroupName string) (result VirtualNetworkTapListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListByResourceGroup(ctx, resourceGroupName)
 	return
 }
@@ -463,6 +534,16 @@ func (client VirtualNetworkTapsClient) ListByResourceGroupComplete(ctx context.C
 // tapName - the name of the tap.
 // tapParameters - parameters supplied to update VirtualNetworkTap tags.
 func (client VirtualNetworkTapsClient) UpdateTags(ctx context.Context, resourceGroupName string, tapName string, tapParameters TagsObject) (result VirtualNetworkTapsUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualNetworkTapsClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, tapName, tapParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualNetworkTapsClient", "UpdateTags", nil, "Failure preparing request")
@@ -504,9 +585,9 @@ func (client VirtualNetworkTapsClient) UpdateTagsPreparer(ctx context.Context, r
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkTapsClient) UpdateTagsSender(req *http.Request) (future VirtualNetworkTapsUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

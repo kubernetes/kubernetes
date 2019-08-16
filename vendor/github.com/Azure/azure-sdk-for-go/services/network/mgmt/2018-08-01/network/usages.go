@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -44,6 +45,16 @@ func NewUsagesClientWithBaseURI(baseURI string, subscriptionID string) UsagesCli
 // Parameters:
 // location - the location where resource usage is queried.
 func (client UsagesClient) List(ctx context.Context, location string) (result UsagesListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/UsagesClient.List")
+		defer func() {
+			sc := -1
+			if result.ulr.Response.Response != nil {
+				sc = result.ulr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: location,
 			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._ ]+$`, Chain: nil}}}}); err != nil {
@@ -95,8 +106,8 @@ func (client UsagesClient) ListPreparer(ctx context.Context, location string) (*
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client UsagesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -113,8 +124,8 @@ func (client UsagesClient) ListResponder(resp *http.Response) (result UsagesList
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client UsagesClient) listNextResults(lastResults UsagesListResult) (result UsagesListResult, err error) {
-	req, err := lastResults.usagesListResultPreparer()
+func (client UsagesClient) listNextResults(ctx context.Context, lastResults UsagesListResult) (result UsagesListResult, err error) {
+	req, err := lastResults.usagesListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.UsagesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -135,6 +146,16 @@ func (client UsagesClient) listNextResults(lastResults UsagesListResult) (result
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client UsagesClient) ListComplete(ctx context.Context, location string) (result UsagesListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/UsagesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, location)
 	return
 }

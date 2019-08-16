@@ -1306,6 +1306,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	goldClassName := "gold"
 	now := time.Now()
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
+	snapshotAPIGroup := "snapshot.storage.k8s.io"
 	testCases := []struct {
 		name               string
 		pvc                *corev1.PersistentVolumeClaim
@@ -1468,6 +1469,45 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
 			expectedElements: []string{"Terminating (lasts 10y)"},
+		},
+		{
+			name: "pvc-datasource",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume10",
+					StorageClassName: &goldClassName,
+					DataSource: &corev1.TypedLocalObjectReference{
+						Name: "srcpvc",
+						Kind: "PersistentVolumeClaim",
+					},
+				},
+				Status: corev1.PersistentVolumeClaimStatus{},
+			},
+			expectedElements: []string{"\nDataSource:\n  Name:      srcpvc\n  Kind:      PersistentVolumeClaim"},
+		},
+		{
+			name: "snapshot-datasource",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume10",
+					StorageClassName: &goldClassName,
+					DataSource: &corev1.TypedLocalObjectReference{
+						Name:     "src-snapshot",
+						Kind:     "VolumeSnapshot",
+						APIGroup: &snapshotAPIGroup,
+					},
+				},
+				Status: corev1.PersistentVolumeClaimStatus{},
+			},
+			expectedElements: []string{"DataSource:\n  Name:      src-snapshot\n  Kind:      VolumeSnapshot\n"},
 		},
 	}
 
@@ -3088,6 +3128,12 @@ func TestDescribeStatefulSet(t *testing.T) {
 			break
 		}
 	}
+}
+
+// boolPtr returns a pointer to a bool
+func boolPtr(b bool) *bool {
+	o := b
+	return &o
 }
 
 func TestControllerRef(t *testing.T) {

@@ -19,11 +19,11 @@ package e2e_node
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -48,7 +48,6 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
 			}
-			initialConfig.FeatureGates[string(features.ExperimentalCriticalPodAnnotation)] = true
 		})
 
 		ginkgo.It("should be able to create and delete a critical pod", func() {
@@ -143,11 +142,14 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 	if critical {
 		pod.ObjectMeta.Namespace = kubeapi.NamespaceSystem
 		pod.ObjectMeta.Annotations = map[string]string{
-			kubelettypes.CriticalPodAnnotationKey: "",
+			kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 		}
-		gomega.Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(gomega.BeTrue(), "pod should be a critical pod")
+		podPriority := scheduling.SystemCriticalPriority
+		pod.Spec.Priority = &podPriority
+
+		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeTrue(), "pod should be a critical pod")
 	} else {
-		gomega.Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(gomega.BeFalse(), "pod should not be a critical pod")
+		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeFalse(), "pod should not be a critical pod")
 	}
 	return pod
 }

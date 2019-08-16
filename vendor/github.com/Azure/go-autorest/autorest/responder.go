@@ -153,6 +153,25 @@ func ByClosingIfError() RespondDecorator {
 	}
 }
 
+// ByUnmarshallingBytes returns a RespondDecorator that copies the Bytes returned in the
+// response Body into the value pointed to by v.
+func ByUnmarshallingBytes(v *[]byte) RespondDecorator {
+	return func(r Responder) Responder {
+		return ResponderFunc(func(resp *http.Response) error {
+			err := r.Respond(resp)
+			if err == nil {
+				bytes, errInner := ioutil.ReadAll(resp.Body)
+				if errInner != nil {
+					err = fmt.Errorf("Error occurred reading http.Response#Body - Error = '%v'", errInner)
+				} else {
+					*v = bytes
+				}
+			}
+			return err
+		})
+	}
+}
+
 // ByUnmarshallingJSON returns a RespondDecorator that decodes a JSON document returned in the
 // response Body into the value pointed to by v.
 func ByUnmarshallingJSON(v interface{}) RespondDecorator {

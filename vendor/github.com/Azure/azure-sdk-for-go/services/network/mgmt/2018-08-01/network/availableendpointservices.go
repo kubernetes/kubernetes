@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -43,6 +44,16 @@ func NewAvailableEndpointServicesClientWithBaseURI(baseURI string, subscriptionI
 // Parameters:
 // location - the location to check available endpoint services.
 func (client AvailableEndpointServicesClient) List(ctx context.Context, location string) (result EndpointServicesListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/AvailableEndpointServicesClient.List")
+		defer func() {
+			sc := -1
+			if result.eslr.Response.Response != nil {
+				sc = result.eslr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, location)
 	if err != nil {
@@ -88,8 +99,8 @@ func (client AvailableEndpointServicesClient) ListPreparer(ctx context.Context, 
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client AvailableEndpointServicesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -106,8 +117,8 @@ func (client AvailableEndpointServicesClient) ListResponder(resp *http.Response)
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client AvailableEndpointServicesClient) listNextResults(lastResults EndpointServicesListResult) (result EndpointServicesListResult, err error) {
-	req, err := lastResults.endpointServicesListResultPreparer()
+func (client AvailableEndpointServicesClient) listNextResults(ctx context.Context, lastResults EndpointServicesListResult) (result EndpointServicesListResult, err error) {
+	req, err := lastResults.endpointServicesListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.AvailableEndpointServicesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -128,6 +139,16 @@ func (client AvailableEndpointServicesClient) listNextResults(lastResults Endpoi
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client AvailableEndpointServicesClient) ListComplete(ctx context.Context, location string) (result EndpointServicesListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/AvailableEndpointServicesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, location)
 	return
 }

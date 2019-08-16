@@ -521,11 +521,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	// track if we write any output
 	trackingWriter := &trackingWriterWrapper{Delegate: o.Out}
+	// output an empty line separating output
+	separatorWriter := &separatorWriterWrapper{Delegate: trackingWriter}
 
-	// remember how much we've written
-	written := 0
-
-	w := utilprinters.GetNewTabWriter(trackingWriter)
+	w := utilprinters.GetNewTabWriter(separatorWriter)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
@@ -547,14 +546,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			w.Flush()
 			w.SetRememberedWidths(nil)
 
-			// add linebreak between resource groups (if there is more than one)
-			// skip linebreak above first resource group
-			if lastMapping != nil && !o.NoHeaders {
-				// If we've written output since the last time we started a new set of headers, write an empty line to separate object types
-				if written != trackingWriter.Written {
-					fmt.Fprintln(w)
-					written = trackingWriter.Written
-				}
+			// add linebreaks between resource groups (if there is more than one)
+			// when it satisfies all following 3 conditions:
+			// 1) it's not the first resource group
+			// 2) it has row header
+			// 3) we've written output since the last time we started a new set of headers
+			if lastMapping != nil && !o.NoHeaders && trackingWriter.Written > 0 {
+				separatorWriter.SetReady(true)
 			}
 
 			printer, err = o.ToPrinter(mapping, nil, printWithNamespace, printWithKind)
@@ -598,6 +596,25 @@ type trackingWriterWrapper struct {
 func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
 	t.Written += len(p)
 	return t.Delegate.Write(p)
+}
+
+type separatorWriterWrapper struct {
+	Delegate io.Writer
+	Ready    bool
+}
+
+func (s *separatorWriterWrapper) Write(p []byte) (n int, err error) {
+	// If we're about to write non-empty bytes and `s` is ready,
+	// we prepend an empty line to `p` and reset `s.Read`.
+	if len(p) != 0 && s.Ready {
+		fmt.Fprintln(s.Delegate)
+		s.Ready = false
+	}
+	return s.Delegate.Write(p)
+}
+
+func (s *separatorWriterWrapper) SetReady(state bool) {
+	s.Ready = state
 }
 
 // watch starts a client-side watch of one or more resources.

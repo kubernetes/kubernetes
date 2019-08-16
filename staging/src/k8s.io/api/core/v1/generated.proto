@@ -1001,7 +1001,8 @@ message EndpointAddress {
 
 // EndpointPort is a tuple that describes a single port.
 message EndpointPort {
-  // The name of this port (corresponds to ServicePort.Name).
+  // The name of this port.  This must match the 'name' field in the
+  // corresponding ServicePort.
   // Must be a DNS_LABEL.
   // Optional only if one port is defined.
   // +optional
@@ -4506,8 +4507,9 @@ message ServiceList {
 // ServicePort contains information on service's port.
 message ServicePort {
   // The name of this port within the service. This must be a DNS_LABEL.
-  // All ports within a ServiceSpec must have unique names. This maps to
-  // the 'Name' field in EndpointPort objects.
+  // All ports within a ServiceSpec must have unique names. When considering
+  // the endpoints for a Service, this must match the 'name' field in the
+  // EndpointPort.
   // Optional if only one ServicePort is defined on this service.
   // +optional
   optional string name = 1;

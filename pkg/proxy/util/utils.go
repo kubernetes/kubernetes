@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,6 +48,30 @@ var (
 	// ErrNoAddresses indicates there are no addresses for the hostname
 	ErrNoAddresses = errors.New("No addresses for hostname")
 )
+
+// isValidEndpoint checks that the given host / port pair are valid endpoint
+func isValidEndpoint(host string, port int) bool {
+	return host != "" && port > 0
+}
+
+// BuildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
+// portname. Explode Endpoints.Subsets[*] into this structure.
+func BuildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]string {
+	portsToEndpoints := map[string][]string{}
+	for i := range endpoints.Subsets {
+		ss := &endpoints.Subsets[i]
+		for i := range ss.Ports {
+			port := &ss.Ports[i]
+			for i := range ss.Addresses {
+				addr := &ss.Addresses[i]
+				if isValidEndpoint(addr.IP, int(port.Port)) {
+					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))))
+				}
+			}
+		}
+	}
+	return portsToEndpoints
+}
 
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR

@@ -1534,6 +1534,11 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 		if pvc.Spec.VolumeMode != nil {
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
 		}
+		if pvc.Spec.DataSource != nil {
+			w.Write(LEVEL_0, "DataSource:\n")
+			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
+			w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
+		}
 		printPodsMultiline(w, "Mounted By", mountPods)
 
 		if len(pvc.Status.Conditions) > 0 {

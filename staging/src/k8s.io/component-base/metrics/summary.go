@@ -58,7 +58,7 @@ func (s *Summary) setPrometheusSummary(summary prometheus.Summary) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (s *Summary) DeprecatedVersion() *semver.Version {
-	return s.SummaryOpts.DeprecatedVersion
+	return parseSemver(s.SummaryOpts.DeprecatedVersion)
 }
 
 // initializeMetric invokes the actual prometheus.Summary object instantiation
@@ -108,7 +108,7 @@ func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *SummaryVec) DeprecatedVersion() *semver.Version {
-	return v.SummaryOpts.DeprecatedVersion
+	return parseSemver(v.SummaryOpts.DeprecatedVersion)
 }
 
 func (v *SummaryVec) initializeMetric() {

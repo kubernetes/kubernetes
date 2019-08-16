@@ -4,10 +4,10 @@ metadata:
   name: konnectivity-server
   namespace: kube-system
   annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
     seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   component: konnectivity-server
 spec:
+  priorityClassName: system-cluster-critical
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
