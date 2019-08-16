@@ -852,7 +852,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1 => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20190206173232-65e2d4e15006 => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
+# golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc => golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
