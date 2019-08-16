@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -47,6 +48,16 @@ func NewInterfaceTapConfigurationsClientWithBaseURI(baseURI string, subscription
 // tapConfigurationName - the name of the tap configuration.
 // tapConfigurationParameters - parameters supplied to the create or update tap configuration operation.
 func (client InterfaceTapConfigurationsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, tapConfigurationName string, tapConfigurationParameters InterfaceTapConfiguration) (result InterfaceTapConfigurationsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceTapConfigurationsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: tapConfigurationParameters,
 			Constraints: []validation.Constraint{{Target: "tapConfigurationParameters.InterfaceTapConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
@@ -111,6 +122,7 @@ func (client InterfaceTapConfigurationsClient) CreateOrUpdatePreparer(ctx contex
 		"api-version": APIVersion,
 	}
 
+	tapConfigurationParameters.Type = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -124,9 +136,9 @@ func (client InterfaceTapConfigurationsClient) CreateOrUpdatePreparer(ctx contex
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceTapConfigurationsClient) CreateOrUpdateSender(req *http.Request) (future InterfaceTapConfigurationsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -153,6 +165,16 @@ func (client InterfaceTapConfigurationsClient) CreateOrUpdateResponder(resp *htt
 // networkInterfaceName - the name of the network interface.
 // tapConfigurationName - the name of the tap configuration.
 func (client InterfaceTapConfigurationsClient) Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string, tapConfigurationName string) (result InterfaceTapConfigurationsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceTapConfigurationsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, networkInterfaceName, tapConfigurationName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "Delete", nil, "Failure preparing request")
@@ -193,9 +215,9 @@ func (client InterfaceTapConfigurationsClient) DeletePreparer(ctx context.Contex
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceTapConfigurationsClient) DeleteSender(req *http.Request) (future InterfaceTapConfigurationsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -221,6 +243,16 @@ func (client InterfaceTapConfigurationsClient) DeleteResponder(resp *http.Respon
 // networkInterfaceName - the name of the network interface.
 // tapConfigurationName - the name of the tap configuration.
 func (client InterfaceTapConfigurationsClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, tapConfigurationName string) (result InterfaceTapConfiguration, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceTapConfigurationsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkInterfaceName, tapConfigurationName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "Get", nil, "Failure preparing request")
@@ -267,8 +299,8 @@ func (client InterfaceTapConfigurationsClient) GetPreparer(ctx context.Context, 
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceTapConfigurationsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -289,6 +321,16 @@ func (client InterfaceTapConfigurationsClient) GetResponder(resp *http.Response)
 // resourceGroupName - the name of the resource group.
 // networkInterfaceName - the name of the network interface.
 func (client InterfaceTapConfigurationsClient) List(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfaceTapConfigurationListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceTapConfigurationsClient.List")
+		defer func() {
+			sc := -1
+			if result.itclr.Response.Response != nil {
+				sc = result.itclr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkInterfaceName)
 	if err != nil {
@@ -335,8 +377,8 @@ func (client InterfaceTapConfigurationsClient) ListPreparer(ctx context.Context,
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceTapConfigurationsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -353,8 +395,8 @@ func (client InterfaceTapConfigurationsClient) ListResponder(resp *http.Response
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client InterfaceTapConfigurationsClient) listNextResults(lastResults InterfaceTapConfigurationListResult) (result InterfaceTapConfigurationListResult, err error) {
-	req, err := lastResults.interfaceTapConfigurationListResultPreparer()
+func (client InterfaceTapConfigurationsClient) listNextResults(ctx context.Context, lastResults InterfaceTapConfigurationListResult) (result InterfaceTapConfigurationListResult, err error) {
+	req, err := lastResults.interfaceTapConfigurationListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -375,6 +417,16 @@ func (client InterfaceTapConfigurationsClient) listNextResults(lastResults Inter
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfaceTapConfigurationsClient) ListComplete(ctx context.Context, resourceGroupName string, networkInterfaceName string) (result InterfaceTapConfigurationListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceTapConfigurationsClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName, networkInterfaceName)
 	return
 }

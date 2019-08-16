@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewSecurityGroupsClientWithBaseURI(baseURI string, subscriptionID string) S
 // networkSecurityGroupName - the name of the network security group.
 // parameters - parameters supplied to the create or update network security group operation.
 func (client SecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters SecurityGroup) (result SecurityGroupsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, networkSecurityGroupName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -86,9 +97,9 @@ func (client SecurityGroupsClient) CreateOrUpdatePreparer(ctx context.Context, r
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client SecurityGroupsClient) CreateOrUpdateSender(req *http.Request) (future SecurityGroupsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -114,6 +125,16 @@ func (client SecurityGroupsClient) CreateOrUpdateResponder(resp *http.Response) 
 // resourceGroupName - the name of the resource group.
 // networkSecurityGroupName - the name of the network security group.
 func (client SecurityGroupsClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (result SecurityGroupsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, networkSecurityGroupName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "Delete", nil, "Failure preparing request")
@@ -153,9 +174,9 @@ func (client SecurityGroupsClient) DeletePreparer(ctx context.Context, resourceG
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client SecurityGroupsClient) DeleteSender(req *http.Request) (future SecurityGroupsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -181,6 +202,16 @@ func (client SecurityGroupsClient) DeleteResponder(resp *http.Response) (result 
 // networkSecurityGroupName - the name of the network security group.
 // expand - expands referenced resources.
 func (client SecurityGroupsClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result SecurityGroup, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkSecurityGroupName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "Get", nil, "Failure preparing request")
@@ -229,8 +260,8 @@ func (client SecurityGroupsClient) GetPreparer(ctx context.Context, resourceGrou
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client SecurityGroupsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -250,6 +281,16 @@ func (client SecurityGroupsClient) GetResponder(resp *http.Response) (result Sec
 // Parameters:
 // resourceGroupName - the name of the resource group.
 func (client SecurityGroupsClient) List(ctx context.Context, resourceGroupName string) (result SecurityGroupListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.List")
+		defer func() {
+			sc := -1
+			if result.sglr.Response.Response != nil {
+				sc = result.sglr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -295,8 +336,8 @@ func (client SecurityGroupsClient) ListPreparer(ctx context.Context, resourceGro
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client SecurityGroupsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -313,8 +354,8 @@ func (client SecurityGroupsClient) ListResponder(resp *http.Response) (result Se
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client SecurityGroupsClient) listNextResults(lastResults SecurityGroupListResult) (result SecurityGroupListResult, err error) {
-	req, err := lastResults.securityGroupListResultPreparer()
+func (client SecurityGroupsClient) listNextResults(ctx context.Context, lastResults SecurityGroupListResult) (result SecurityGroupListResult, err error) {
+	req, err := lastResults.securityGroupListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -335,12 +376,32 @@ func (client SecurityGroupsClient) listNextResults(lastResults SecurityGroupList
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client SecurityGroupsClient) ListComplete(ctx context.Context, resourceGroupName string) (result SecurityGroupListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName)
 	return
 }
 
 // ListAll gets all network security groups in a subscription.
 func (client SecurityGroupsClient) ListAll(ctx context.Context) (result SecurityGroupListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.sglr.Response.Response != nil {
+				sc = result.sglr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listAllNextResults
 	req, err := client.ListAllPreparer(ctx)
 	if err != nil {
@@ -385,8 +446,8 @@ func (client SecurityGroupsClient) ListAllPreparer(ctx context.Context) (*http.R
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client SecurityGroupsClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -403,8 +464,8 @@ func (client SecurityGroupsClient) ListAllResponder(resp *http.Response) (result
 }
 
 // listAllNextResults retrieves the next set of results, if any.
-func (client SecurityGroupsClient) listAllNextResults(lastResults SecurityGroupListResult) (result SecurityGroupListResult, err error) {
-	req, err := lastResults.securityGroupListResultPreparer()
+func (client SecurityGroupsClient) listAllNextResults(ctx context.Context, lastResults SecurityGroupListResult) (result SecurityGroupListResult, err error) {
+	req, err := lastResults.securityGroupListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "listAllNextResults", nil, "Failure preparing next results request")
 	}
@@ -425,6 +486,16 @@ func (client SecurityGroupsClient) listAllNextResults(lastResults SecurityGroupL
 
 // ListAllComplete enumerates all values, automatically crossing page boundaries as required.
 func (client SecurityGroupsClient) ListAllComplete(ctx context.Context) (result SecurityGroupListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListAll(ctx)
 	return
 }
@@ -435,6 +506,16 @@ func (client SecurityGroupsClient) ListAllComplete(ctx context.Context) (result 
 // networkSecurityGroupName - the name of the network security group.
 // parameters - parameters supplied to update network security group tags.
 func (client SecurityGroupsClient) UpdateTags(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters TagsObject) (result SecurityGroupsUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SecurityGroupsClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, networkSecurityGroupName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "UpdateTags", nil, "Failure preparing request")
@@ -476,9 +557,9 @@ func (client SecurityGroupsClient) UpdateTagsPreparer(ctx context.Context, resou
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client SecurityGroupsClient) UpdateTagsSender(req *http.Request) (future SecurityGroupsUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

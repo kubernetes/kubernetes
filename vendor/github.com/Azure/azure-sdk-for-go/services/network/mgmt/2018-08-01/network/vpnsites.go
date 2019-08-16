@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewVpnSitesClientWithBaseURI(baseURI string, subscriptionID string) VpnSite
 // vpnSiteName - the name of the VpnSite being created or updated.
 // vpnSiteParameters - parameters supplied to create or update VpnSite.
 func (client VpnSitesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, vpnSiteName string, vpnSiteParameters VpnSite) (result VpnSitesCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, vpnSiteName, vpnSiteParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnSitesClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -73,6 +84,7 @@ func (client VpnSitesClient) CreateOrUpdatePreparer(ctx context.Context, resourc
 		"api-version": APIVersion,
 	}
 
+	vpnSiteParameters.Etag = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -86,9 +98,9 @@ func (client VpnSitesClient) CreateOrUpdatePreparer(ctx context.Context, resourc
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesClient) CreateOrUpdateSender(req *http.Request) (future VpnSitesCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -114,6 +126,16 @@ func (client VpnSitesClient) CreateOrUpdateResponder(resp *http.Response) (resul
 // resourceGroupName - the resource group name of the VpnSite.
 // vpnSiteName - the name of the VpnSite being deleted.
 func (client VpnSitesClient) Delete(ctx context.Context, resourceGroupName string, vpnSiteName string) (result VpnSitesDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, vpnSiteName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnSitesClient", "Delete", nil, "Failure preparing request")
@@ -153,9 +175,9 @@ func (client VpnSitesClient) DeletePreparer(ctx context.Context, resourceGroupNa
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesClient) DeleteSender(req *http.Request) (future VpnSitesDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -175,11 +197,21 @@ func (client VpnSitesClient) DeleteResponder(resp *http.Response) (result autore
 	return
 }
 
-// Get retrieves the details of a VPNsite.
+// Get retrieves the details of a VPN site.
 // Parameters:
 // resourceGroupName - the resource group name of the VpnSite.
 // vpnSiteName - the name of the VpnSite being retrieved.
 func (client VpnSitesClient) Get(ctx context.Context, resourceGroupName string, vpnSiteName string) (result VpnSite, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, vpnSiteName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnSitesClient", "Get", nil, "Failure preparing request")
@@ -225,8 +257,8 @@ func (client VpnSitesClient) GetPreparer(ctx context.Context, resourceGroupName 
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -244,6 +276,16 @@ func (client VpnSitesClient) GetResponder(resp *http.Response) (result VpnSite, 
 
 // List lists all the VpnSites in a subscription.
 func (client VpnSitesClient) List(ctx context.Context) (result ListVpnSitesResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.List")
+		defer func() {
+			sc := -1
+			if result.lvsr.Response.Response != nil {
+				sc = result.lvsr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx)
 	if err != nil {
@@ -288,8 +330,8 @@ func (client VpnSitesClient) ListPreparer(ctx context.Context) (*http.Request, e
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -306,8 +348,8 @@ func (client VpnSitesClient) ListResponder(resp *http.Response) (result ListVpnS
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client VpnSitesClient) listNextResults(lastResults ListVpnSitesResult) (result ListVpnSitesResult, err error) {
-	req, err := lastResults.listVpnSitesResultPreparer()
+func (client VpnSitesClient) listNextResults(ctx context.Context, lastResults ListVpnSitesResult) (result ListVpnSitesResult, err error) {
+	req, err := lastResults.listVpnSitesResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VpnSitesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -328,6 +370,16 @@ func (client VpnSitesClient) listNextResults(lastResults ListVpnSitesResult) (re
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VpnSitesClient) ListComplete(ctx context.Context) (result ListVpnSitesResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx)
 	return
 }
@@ -336,6 +388,16 @@ func (client VpnSitesClient) ListComplete(ctx context.Context) (result ListVpnSi
 // Parameters:
 // resourceGroupName - the resource group name of the VpnSite.
 func (client VpnSitesClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result ListVpnSitesResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.lvsr.Response.Response != nil {
+				sc = result.lvsr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listByResourceGroupNextResults
 	req, err := client.ListByResourceGroupPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -381,8 +443,8 @@ func (client VpnSitesClient) ListByResourceGroupPreparer(ctx context.Context, re
 // ListByResourceGroupSender sends the ListByResourceGroup request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesClient) ListByResourceGroupSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListByResourceGroupResponder handles the response to the ListByResourceGroup request. The method always
@@ -399,8 +461,8 @@ func (client VpnSitesClient) ListByResourceGroupResponder(resp *http.Response) (
 }
 
 // listByResourceGroupNextResults retrieves the next set of results, if any.
-func (client VpnSitesClient) listByResourceGroupNextResults(lastResults ListVpnSitesResult) (result ListVpnSitesResult, err error) {
-	req, err := lastResults.listVpnSitesResultPreparer()
+func (client VpnSitesClient) listByResourceGroupNextResults(ctx context.Context, lastResults ListVpnSitesResult) (result ListVpnSitesResult, err error) {
+	req, err := lastResults.listVpnSitesResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VpnSitesClient", "listByResourceGroupNextResults", nil, "Failure preparing next results request")
 	}
@@ -421,6 +483,16 @@ func (client VpnSitesClient) listByResourceGroupNextResults(lastResults ListVpnS
 
 // ListByResourceGroupComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VpnSitesClient) ListByResourceGroupComplete(ctx context.Context, resourceGroupName string) (result ListVpnSitesResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListByResourceGroup(ctx, resourceGroupName)
 	return
 }
@@ -431,6 +503,16 @@ func (client VpnSitesClient) ListByResourceGroupComplete(ctx context.Context, re
 // vpnSiteName - the name of the VpnSite being updated.
 // vpnSiteParameters - parameters supplied to update VpnSite tags.
 func (client VpnSitesClient) UpdateTags(ctx context.Context, resourceGroupName string, vpnSiteName string, vpnSiteParameters TagsObject) (result VpnSitesUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, vpnSiteName, vpnSiteParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnSitesClient", "UpdateTags", nil, "Failure preparing request")
@@ -472,9 +554,9 @@ func (client VpnSitesClient) UpdateTagsPreparer(ctx context.Context, resourceGro
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesClient) UpdateTagsSender(req *http.Request) (future VpnSitesUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

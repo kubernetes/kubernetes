@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -47,6 +48,16 @@ func NewVpnConnectionsClientWithBaseURI(baseURI string, subscriptionID string) V
 // connectionName - the name of the connection.
 // vpnConnectionParameters - parameters supplied to create or Update a VPN Connection.
 func (client VpnConnectionsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, gatewayName string, connectionName string, vpnConnectionParameters VpnConnection) (result VpnConnectionsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnConnectionsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, gatewayName, connectionName, vpnConnectionParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnConnectionsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -76,6 +87,7 @@ func (client VpnConnectionsClient) CreateOrUpdatePreparer(ctx context.Context, r
 		"api-version": APIVersion,
 	}
 
+	vpnConnectionParameters.Etag = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -89,9 +101,9 @@ func (client VpnConnectionsClient) CreateOrUpdatePreparer(ctx context.Context, r
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) CreateOrUpdateSender(req *http.Request) (future VpnConnectionsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -118,6 +130,16 @@ func (client VpnConnectionsClient) CreateOrUpdateResponder(resp *http.Response) 
 // gatewayName - the name of the gateway.
 // connectionName - the name of the connection.
 func (client VpnConnectionsClient) Delete(ctx context.Context, resourceGroupName string, gatewayName string, connectionName string) (result VpnConnectionsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnConnectionsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, gatewayName, connectionName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnConnectionsClient", "Delete", nil, "Failure preparing request")
@@ -158,9 +180,9 @@ func (client VpnConnectionsClient) DeletePreparer(ctx context.Context, resourceG
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) DeleteSender(req *http.Request) (future VpnConnectionsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -186,6 +208,16 @@ func (client VpnConnectionsClient) DeleteResponder(resp *http.Response) (result 
 // gatewayName - the name of the gateway.
 // connectionName - the name of the vpn connection.
 func (client VpnConnectionsClient) Get(ctx context.Context, resourceGroupName string, gatewayName string, connectionName string) (result VpnConnection, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnConnectionsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, gatewayName, connectionName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnConnectionsClient", "Get", nil, "Failure preparing request")
@@ -232,8 +264,8 @@ func (client VpnConnectionsClient) GetPreparer(ctx context.Context, resourceGrou
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -254,6 +286,16 @@ func (client VpnConnectionsClient) GetResponder(resp *http.Response) (result Vpn
 // resourceGroupName - the resource group name of the VpnGateway.
 // gatewayName - the name of the gateway.
 func (client VpnConnectionsClient) ListByVpnGateway(ctx context.Context, resourceGroupName string, gatewayName string) (result ListVpnConnectionsResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnConnectionsClient.ListByVpnGateway")
+		defer func() {
+			sc := -1
+			if result.lvcr.Response.Response != nil {
+				sc = result.lvcr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listByVpnGatewayNextResults
 	req, err := client.ListByVpnGatewayPreparer(ctx, resourceGroupName, gatewayName)
 	if err != nil {
@@ -300,8 +342,8 @@ func (client VpnConnectionsClient) ListByVpnGatewayPreparer(ctx context.Context,
 // ListByVpnGatewaySender sends the ListByVpnGateway request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) ListByVpnGatewaySender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListByVpnGatewayResponder handles the response to the ListByVpnGateway request. The method always
@@ -318,8 +360,8 @@ func (client VpnConnectionsClient) ListByVpnGatewayResponder(resp *http.Response
 }
 
 // listByVpnGatewayNextResults retrieves the next set of results, if any.
-func (client VpnConnectionsClient) listByVpnGatewayNextResults(lastResults ListVpnConnectionsResult) (result ListVpnConnectionsResult, err error) {
-	req, err := lastResults.listVpnConnectionsResultPreparer()
+func (client VpnConnectionsClient) listByVpnGatewayNextResults(ctx context.Context, lastResults ListVpnConnectionsResult) (result ListVpnConnectionsResult, err error) {
+	req, err := lastResults.listVpnConnectionsResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VpnConnectionsClient", "listByVpnGatewayNextResults", nil, "Failure preparing next results request")
 	}
@@ -340,6 +382,16 @@ func (client VpnConnectionsClient) listByVpnGatewayNextResults(lastResults ListV
 
 // ListByVpnGatewayComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VpnConnectionsClient) ListByVpnGatewayComplete(ctx context.Context, resourceGroupName string, gatewayName string) (result ListVpnConnectionsResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnConnectionsClient.ListByVpnGateway")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListByVpnGateway(ctx, resourceGroupName, gatewayName)
 	return
 }

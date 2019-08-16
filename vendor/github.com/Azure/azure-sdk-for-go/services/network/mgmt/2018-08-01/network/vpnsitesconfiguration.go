@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewVpnSitesConfigurationClientWithBaseURI(baseURI string, subscriptionID st
 // virtualWANName - the name of the VirtualWAN for which configuration of all vpn-sites is needed.
 // request - parameters supplied to download vpn-sites configuration.
 func (client VpnSitesConfigurationClient) Download(ctx context.Context, resourceGroupName string, virtualWANName string, request GetVpnSitesConfigurationRequest) (result VpnSitesConfigurationDownloadFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VpnSitesConfigurationClient.Download")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DownloadPreparer(ctx, resourceGroupName, virtualWANName, request)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VpnSitesConfigurationClient", "Download", nil, "Failure preparing request")
@@ -86,9 +97,9 @@ func (client VpnSitesConfigurationClient) DownloadPreparer(ctx context.Context, 
 // DownloadSender sends the Download request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSitesConfigurationClient) DownloadSender(req *http.Request) (future VpnSitesConfigurationDownloadFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

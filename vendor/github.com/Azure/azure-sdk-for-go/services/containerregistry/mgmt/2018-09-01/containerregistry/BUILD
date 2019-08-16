@@ -23,6 +23,7 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/validation:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/tracing:go_default_library",
     ],
 )
 

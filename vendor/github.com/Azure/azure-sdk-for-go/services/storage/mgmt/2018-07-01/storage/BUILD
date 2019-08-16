@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "accounts.go",
         "blobcontainers.go",
+        "blobservices.go",
         "client.go",
         "managementpolicies.go",
         "models.go",
@@ -22,6 +23,7 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/validation:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/tracing:go_default_library",
     ],
 )
 

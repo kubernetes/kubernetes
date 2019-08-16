@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewProfilesClientWithBaseURI(baseURI string, subscriptionID string) Profile
 // networkProfileName - the name of the network profile.
 // parameters - parameters supplied to the create or update network profile operation.
 func (client ProfilesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkProfileName string, parameters Profile) (result Profile, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, networkProfileName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -92,8 +103,8 @@ func (client ProfilesClient) CreateOrUpdatePreparer(ctx context.Context, resourc
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client ProfilesClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // CreateOrUpdateResponder handles the response to the CreateOrUpdate request. The method always
@@ -113,23 +124,27 @@ func (client ProfilesClient) CreateOrUpdateResponder(resp *http.Response) (resul
 // Parameters:
 // resourceGroupName - the name of the resource group.
 // networkProfileName - the name of the NetworkProfile.
-func (client ProfilesClient) Delete(ctx context.Context, resourceGroupName string, networkProfileName string) (result autorest.Response, err error) {
+func (client ProfilesClient) Delete(ctx context.Context, resourceGroupName string, networkProfileName string) (result ProfilesDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, networkProfileName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "Delete", nil, "Failure preparing request")
 		return
 	}
 
-	resp, err := client.DeleteSender(req)
+	result, err = client.DeleteSender(req)
 	if err != nil {
-		result.Response = resp
-		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "Delete", resp, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "Delete", result.Response(), "Failure sending request")
 		return
-	}
-
-	result, err = client.DeleteResponder(resp)
-	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "Delete", resp, "Failure responding to request")
 	}
 
 	return
@@ -158,9 +173,15 @@ func (client ProfilesClient) DeletePreparer(ctx context.Context, resourceGroupNa
 
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
-func (client ProfilesClient) DeleteSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+func (client ProfilesClient) DeleteSender(req *http.Request) (future ProfilesDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req, sd...)
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
+	return
 }
 
 // DeleteResponder handles the response to the Delete request. The method always
@@ -178,9 +199,19 @@ func (client ProfilesClient) DeleteResponder(resp *http.Response) (result autore
 // Get gets the specified network profile in a specified resource group.
 // Parameters:
 // resourceGroupName - the name of the resource group.
-// networkProfileName - the name of the PublicIPPrefx.
+// networkProfileName - the name of the Public IP Prefix.
 // expand - expands referenced resources.
 func (client ProfilesClient) Get(ctx context.Context, resourceGroupName string, networkProfileName string, expand string) (result Profile, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkProfileName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "Get", nil, "Failure preparing request")
@@ -229,8 +260,8 @@ func (client ProfilesClient) GetPreparer(ctx context.Context, resourceGroupName 
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client ProfilesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -250,6 +281,16 @@ func (client ProfilesClient) GetResponder(resp *http.Response) (result Profile, 
 // Parameters:
 // resourceGroupName - the name of the resource group.
 func (client ProfilesClient) List(ctx context.Context, resourceGroupName string) (result ProfileListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.List")
+		defer func() {
+			sc := -1
+			if result.plr.Response.Response != nil {
+				sc = result.plr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -295,8 +336,8 @@ func (client ProfilesClient) ListPreparer(ctx context.Context, resourceGroupName
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client ProfilesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -313,8 +354,8 @@ func (client ProfilesClient) ListResponder(resp *http.Response) (result ProfileL
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client ProfilesClient) listNextResults(lastResults ProfileListResult) (result ProfileListResult, err error) {
-	req, err := lastResults.profileListResultPreparer()
+func (client ProfilesClient) listNextResults(ctx context.Context, lastResults ProfileListResult) (result ProfileListResult, err error) {
+	req, err := lastResults.profileListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.ProfilesClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -335,12 +376,32 @@ func (client ProfilesClient) listNextResults(lastResults ProfileListResult) (res
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client ProfilesClient) ListComplete(ctx context.Context, resourceGroupName string) (result ProfileListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName)
 	return
 }
 
 // ListAll gets all the network profiles in a subscription.
 func (client ProfilesClient) ListAll(ctx context.Context) (result ProfileListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.plr.Response.Response != nil {
+				sc = result.plr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listAllNextResults
 	req, err := client.ListAllPreparer(ctx)
 	if err != nil {
@@ -385,8 +446,8 @@ func (client ProfilesClient) ListAllPreparer(ctx context.Context) (*http.Request
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client ProfilesClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -403,8 +464,8 @@ func (client ProfilesClient) ListAllResponder(resp *http.Response) (result Profi
 }
 
 // listAllNextResults retrieves the next set of results, if any.
-func (client ProfilesClient) listAllNextResults(lastResults ProfileListResult) (result ProfileListResult, err error) {
-	req, err := lastResults.profileListResultPreparer()
+func (client ProfilesClient) listAllNextResults(ctx context.Context, lastResults ProfileListResult) (result ProfileListResult, err error) {
+	req, err := lastResults.profileListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.ProfilesClient", "listAllNextResults", nil, "Failure preparing next results request")
 	}
@@ -425,6 +486,16 @@ func (client ProfilesClient) listAllNextResults(lastResults ProfileListResult) (
 
 // ListAllComplete enumerates all values, automatically crossing page boundaries as required.
 func (client ProfilesClient) ListAllComplete(ctx context.Context) (result ProfileListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.ListAll")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListAll(ctx)
 	return
 }
@@ -435,6 +506,16 @@ func (client ProfilesClient) ListAllComplete(ctx context.Context) (result Profil
 // networkProfileName - the name of the network profile.
 // parameters - parameters supplied to update network profile tags.
 func (client ProfilesClient) UpdateTags(ctx context.Context, resourceGroupName string, networkProfileName string, parameters TagsObject) (result Profile, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ProfilesClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, networkProfileName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.ProfilesClient", "UpdateTags", nil, "Failure preparing request")
@@ -482,8 +563,8 @@ func (client ProfilesClient) UpdateTagsPreparer(ctx context.Context, resourceGro
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client ProfilesClient) UpdateTagsSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // UpdateTagsResponder handles the response to the UpdateTags request. The method always

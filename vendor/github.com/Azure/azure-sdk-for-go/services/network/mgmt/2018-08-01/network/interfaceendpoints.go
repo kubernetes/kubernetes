@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewInterfaceEndpointsClientWithBaseURI(baseURI string, subscriptionID strin
 // interfaceEndpointName - the name of the interface endpoint.
 // parameters - parameters supplied to the create or update interface endpoint operation
 func (client InterfaceEndpointsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, interfaceEndpointName string, parameters InterfaceEndpoint) (result InterfaceEndpointsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, interfaceEndpointName, parameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfaceEndpointsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -86,9 +97,9 @@ func (client InterfaceEndpointsClient) CreateOrUpdatePreparer(ctx context.Contex
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceEndpointsClient) CreateOrUpdateSender(req *http.Request) (future InterfaceEndpointsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -114,6 +125,16 @@ func (client InterfaceEndpointsClient) CreateOrUpdateResponder(resp *http.Respon
 // resourceGroupName - the name of the resource group.
 // interfaceEndpointName - the name of the interface endpoint.
 func (client InterfaceEndpointsClient) Delete(ctx context.Context, resourceGroupName string, interfaceEndpointName string) (result InterfaceEndpointsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, interfaceEndpointName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfaceEndpointsClient", "Delete", nil, "Failure preparing request")
@@ -153,9 +174,9 @@ func (client InterfaceEndpointsClient) DeletePreparer(ctx context.Context, resou
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceEndpointsClient) DeleteSender(req *http.Request) (future InterfaceEndpointsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -181,6 +202,16 @@ func (client InterfaceEndpointsClient) DeleteResponder(resp *http.Response) (res
 // interfaceEndpointName - the name of the interface endpoint.
 // expand - expands referenced resources.
 func (client InterfaceEndpointsClient) Get(ctx context.Context, resourceGroupName string, interfaceEndpointName string, expand string) (result InterfaceEndpoint, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, interfaceEndpointName, expand)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.InterfaceEndpointsClient", "Get", nil, "Failure preparing request")
@@ -229,8 +260,8 @@ func (client InterfaceEndpointsClient) GetPreparer(ctx context.Context, resource
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceEndpointsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -250,6 +281,16 @@ func (client InterfaceEndpointsClient) GetResponder(resp *http.Response) (result
 // Parameters:
 // resourceGroupName - the name of the resource group.
 func (client InterfaceEndpointsClient) List(ctx context.Context, resourceGroupName string) (result InterfaceEndpointListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.List")
+		defer func() {
+			sc := -1
+			if result.ielr.Response.Response != nil {
+				sc = result.ielr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -295,8 +336,8 @@ func (client InterfaceEndpointsClient) ListPreparer(ctx context.Context, resourc
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceEndpointsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -313,8 +354,8 @@ func (client InterfaceEndpointsClient) ListResponder(resp *http.Response) (resul
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client InterfaceEndpointsClient) listNextResults(lastResults InterfaceEndpointListResult) (result InterfaceEndpointListResult, err error) {
-	req, err := lastResults.interfaceEndpointListResultPreparer()
+func (client InterfaceEndpointsClient) listNextResults(ctx context.Context, lastResults InterfaceEndpointListResult) (result InterfaceEndpointListResult, err error) {
+	req, err := lastResults.interfaceEndpointListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfaceEndpointsClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -335,12 +376,32 @@ func (client InterfaceEndpointsClient) listNextResults(lastResults InterfaceEndp
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfaceEndpointsClient) ListComplete(ctx context.Context, resourceGroupName string) (result InterfaceEndpointListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx, resourceGroupName)
 	return
 }
 
 // ListBySubscription gets all interface endpoints in a subscription.
 func (client InterfaceEndpointsClient) ListBySubscription(ctx context.Context) (result InterfaceEndpointListResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.ListBySubscription")
+		defer func() {
+			sc := -1
+			if result.ielr.Response.Response != nil {
+				sc = result.ielr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listBySubscriptionNextResults
 	req, err := client.ListBySubscriptionPreparer(ctx)
 	if err != nil {
@@ -385,8 +446,8 @@ func (client InterfaceEndpointsClient) ListBySubscriptionPreparer(ctx context.Co
 // ListBySubscriptionSender sends the ListBySubscription request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfaceEndpointsClient) ListBySubscriptionSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListBySubscriptionResponder handles the response to the ListBySubscription request. The method always
@@ -403,8 +464,8 @@ func (client InterfaceEndpointsClient) ListBySubscriptionResponder(resp *http.Re
 }
 
 // listBySubscriptionNextResults retrieves the next set of results, if any.
-func (client InterfaceEndpointsClient) listBySubscriptionNextResults(lastResults InterfaceEndpointListResult) (result InterfaceEndpointListResult, err error) {
-	req, err := lastResults.interfaceEndpointListResultPreparer()
+func (client InterfaceEndpointsClient) listBySubscriptionNextResults(ctx context.Context, lastResults InterfaceEndpointListResult) (result InterfaceEndpointListResult, err error) {
+	req, err := lastResults.interfaceEndpointListResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.InterfaceEndpointsClient", "listBySubscriptionNextResults", nil, "Failure preparing next results request")
 	}
@@ -425,6 +486,16 @@ func (client InterfaceEndpointsClient) listBySubscriptionNextResults(lastResults
 
 // ListBySubscriptionComplete enumerates all values, automatically crossing page boundaries as required.
 func (client InterfaceEndpointsClient) ListBySubscriptionComplete(ctx context.Context) (result InterfaceEndpointListResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/InterfaceEndpointsClient.ListBySubscription")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListBySubscription(ctx)
 	return
 }

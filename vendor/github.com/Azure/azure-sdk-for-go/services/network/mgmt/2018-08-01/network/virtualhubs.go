@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -45,6 +46,16 @@ func NewVirtualHubsClientWithBaseURI(baseURI string, subscriptionID string) Virt
 // virtualHubName - the name of the VirtualHub.
 // virtualHubParameters - parameters supplied to create or update VirtualHub.
 func (client VirtualHubsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualHubName string, virtualHubParameters VirtualHub) (result VirtualHubsCreateOrUpdateFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.CreateOrUpdate")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, virtualHubName, virtualHubParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualHubsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -73,6 +84,7 @@ func (client VirtualHubsClient) CreateOrUpdatePreparer(ctx context.Context, reso
 		"api-version": APIVersion,
 	}
 
+	virtualHubParameters.Etag = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -86,9 +98,9 @@ func (client VirtualHubsClient) CreateOrUpdatePreparer(ctx context.Context, reso
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualHubsClient) CreateOrUpdateSender(req *http.Request) (future VirtualHubsCreateOrUpdateFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -114,6 +126,16 @@ func (client VirtualHubsClient) CreateOrUpdateResponder(resp *http.Response) (re
 // resourceGroupName - the resource group name of the VirtualHub.
 // virtualHubName - the name of the VirtualHub.
 func (client VirtualHubsClient) Delete(ctx context.Context, resourceGroupName string, virtualHubName string) (result VirtualHubsDeleteFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.Delete")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.DeletePreparer(ctx, resourceGroupName, virtualHubName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualHubsClient", "Delete", nil, "Failure preparing request")
@@ -153,9 +175,9 @@ func (client VirtualHubsClient) DeletePreparer(ctx context.Context, resourceGrou
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualHubsClient) DeleteSender(req *http.Request) (future VirtualHubsDeleteFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}
@@ -180,6 +202,16 @@ func (client VirtualHubsClient) DeleteResponder(resp *http.Response) (result aut
 // resourceGroupName - the resource group name of the VirtualHub.
 // virtualHubName - the name of the VirtualHub.
 func (client VirtualHubsClient) Get(ctx context.Context, resourceGroupName string, virtualHubName string) (result VirtualHub, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualHubName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualHubsClient", "Get", nil, "Failure preparing request")
@@ -225,8 +257,8 @@ func (client VirtualHubsClient) GetPreparer(ctx context.Context, resourceGroupNa
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualHubsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -244,6 +276,16 @@ func (client VirtualHubsClient) GetResponder(resp *http.Response) (result Virtua
 
 // List lists all the VirtualHubs in a subscription.
 func (client VirtualHubsClient) List(ctx context.Context) (result ListVirtualHubsResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.List")
+		defer func() {
+			sc := -1
+			if result.lvhr.Response.Response != nil {
+				sc = result.lvhr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx)
 	if err != nil {
@@ -288,8 +330,8 @@ func (client VirtualHubsClient) ListPreparer(ctx context.Context) (*http.Request
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualHubsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -306,8 +348,8 @@ func (client VirtualHubsClient) ListResponder(resp *http.Response) (result ListV
 }
 
 // listNextResults retrieves the next set of results, if any.
-func (client VirtualHubsClient) listNextResults(lastResults ListVirtualHubsResult) (result ListVirtualHubsResult, err error) {
-	req, err := lastResults.listVirtualHubsResultPreparer()
+func (client VirtualHubsClient) listNextResults(ctx context.Context, lastResults ListVirtualHubsResult) (result ListVirtualHubsResult, err error) {
+	req, err := lastResults.listVirtualHubsResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualHubsClient", "listNextResults", nil, "Failure preparing next results request")
 	}
@@ -328,6 +370,16 @@ func (client VirtualHubsClient) listNextResults(lastResults ListVirtualHubsResul
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VirtualHubsClient) ListComplete(ctx context.Context) (result ListVirtualHubsResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.List")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.List(ctx)
 	return
 }
@@ -336,6 +388,16 @@ func (client VirtualHubsClient) ListComplete(ctx context.Context) (result ListVi
 // Parameters:
 // resourceGroupName - the resource group name of the VirtualHub.
 func (client VirtualHubsClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result ListVirtualHubsResultPage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.lvhr.Response.Response != nil {
+				sc = result.lvhr.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.fn = client.listByResourceGroupNextResults
 	req, err := client.ListByResourceGroupPreparer(ctx, resourceGroupName)
 	if err != nil {
@@ -381,8 +443,8 @@ func (client VirtualHubsClient) ListByResourceGroupPreparer(ctx context.Context,
 // ListByResourceGroupSender sends the ListByResourceGroup request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualHubsClient) ListByResourceGroupSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	return autorest.SendWithSender(client, req, sd...)
 }
 
 // ListByResourceGroupResponder handles the response to the ListByResourceGroup request. The method always
@@ -399,8 +461,8 @@ func (client VirtualHubsClient) ListByResourceGroupResponder(resp *http.Response
 }
 
 // listByResourceGroupNextResults retrieves the next set of results, if any.
-func (client VirtualHubsClient) listByResourceGroupNextResults(lastResults ListVirtualHubsResult) (result ListVirtualHubsResult, err error) {
-	req, err := lastResults.listVirtualHubsResultPreparer()
+func (client VirtualHubsClient) listByResourceGroupNextResults(ctx context.Context, lastResults ListVirtualHubsResult) (result ListVirtualHubsResult, err error) {
+	req, err := lastResults.listVirtualHubsResultPreparer(ctx)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualHubsClient", "listByResourceGroupNextResults", nil, "Failure preparing next results request")
 	}
@@ -421,6 +483,16 @@ func (client VirtualHubsClient) listByResourceGroupNextResults(lastResults ListV
 
 // ListByResourceGroupComplete enumerates all values, automatically crossing page boundaries as required.
 func (client VirtualHubsClient) ListByResourceGroupComplete(ctx context.Context, resourceGroupName string) (result ListVirtualHubsResultIterator, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.ListByResourceGroup")
+		defer func() {
+			sc := -1
+			if result.Response().Response.Response != nil {
+				sc = result.page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	result.page, err = client.ListByResourceGroup(ctx, resourceGroupName)
 	return
 }
@@ -431,6 +503,16 @@ func (client VirtualHubsClient) ListByResourceGroupComplete(ctx context.Context,
 // virtualHubName - the name of the VirtualHub.
 // virtualHubParameters - parameters supplied to update VirtualHub tags.
 func (client VirtualHubsClient) UpdateTags(ctx context.Context, resourceGroupName string, virtualHubName string, virtualHubParameters TagsObject) (result VirtualHubsUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualHubsClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, virtualHubName, virtualHubParameters)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "network.VirtualHubsClient", "UpdateTags", nil, "Failure preparing request")
@@ -472,9 +554,9 @@ func (client VirtualHubsClient) UpdateTagsPreparer(ctx context.Context, resource
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualHubsClient) UpdateTagsSender(req *http.Request) (future VirtualHubsUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	resp, err = autorest.SendWithSender(client, req, sd...)
 	if err != nil {
 		return
 	}

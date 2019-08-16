@@ -27,9 +27,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
-	"k8s.io/klog"
 
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
 )
 
 const (
@@ -1393,7 +1393,7 @@ func (az *azStorageAccountClient) GetProperties(ctx context.Context, resourceGro
 	}()
 
 	mc := newMetricContext("storage_account", "get_properties", resourceGroupName, az.client.SubscriptionID, "")
-	result, err = az.client.GetProperties(ctx, resourceGroupName, accountName)
+	result, err = az.client.GetProperties(ctx, resourceGroupName, accountName, "")
 	mc.Observe(err)
 	return
 }
