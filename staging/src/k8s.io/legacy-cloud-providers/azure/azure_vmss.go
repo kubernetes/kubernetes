@@ -280,7 +280,7 @@ func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 			return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone %q: %v", zones, err)
 		}
 
-		failureDomain = ss.makeZone(zoneID)
+		failureDomain = ss.makeZone(to.String(vm.Location), zoneID)
 	} else if vm.InstanceView != nil && vm.InstanceView.PlatformFaultDomain != nil {
 		// Availability zone is not used for the node, falling back to fault domain.
 		failureDomain = strconv.Itoa(int(*vm.InstanceView.PlatformFaultDomain))
@@ -288,7 +288,7 @@ func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 
 	return cloudprovider.Zone{
 		FailureDomain: failureDomain,
-		Region:        *vm.Location,
+		Region:        to.String(vm.Location),
 	}, nil
 }
 
@@ -399,10 +399,10 @@ func (ss *scaleSet) getPrimaryInterfaceID(machine compute.VirtualMachineScaleSet
 }
 
 // getVmssMachineID returns the full identifier of a vmss virtual machine.
-func (az *Cloud) getVmssMachineID(resourceGroup, scaleSetName, instanceID string) string {
+func (az *Cloud) getVmssMachineID(subscriptionID, resourceGroup, scaleSetName, instanceID string) string {
 	return fmt.Sprintf(
 		vmssMachineIDTemplate,
-		az.SubscriptionID,
+		subscriptionID,
 		strings.ToLower(resourceGroup),
 		scaleSetName,
 		instanceID)

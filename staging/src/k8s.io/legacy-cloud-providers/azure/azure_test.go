@@ -21,8 +21,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net"
-	"net/http"
 	"strings"
 	"testing"
 
@@ -1723,70 +1721,6 @@ func validateEmptyConfig(t *testing.T, config string) {
 	// rate limits should be disabled by default if not explicitly enabled in config
 	if azureCloud.CloudProviderRateLimit != false {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
-	}
-}
-
-func TestGetZone(t *testing.T) {
-	cloud := &Cloud{
-		Config: Config{
-			Location:            "eastus",
-			UseInstanceMetadata: true,
-		},
-	}
-	testcases := []struct {
-		name        string
-		zone        string
-		faultDomain string
-		expected    string
-	}{
-		{
-			name:     "GetZone should get real zone if only node's zone is set",
-			zone:     "1",
-			expected: "eastus-1",
-		},
-		{
-			name:        "GetZone should get real zone if both node's zone and FD are set",
-			zone:        "1",
-			faultDomain: "99",
-			expected:    "eastus-1",
-		},
-		{
-			name:        "GetZone should get faultDomain if node's zone isn't set",
-			faultDomain: "99",
-			expected:    "99",
-		},
-	}
-
-	for _, test := range testcases {
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s"}}`, test.zone, test.faultDomain))
-		}))
-		go func() {
-			http.Serve(listener, mux)
-		}()
-		defer listener.Close()
-
-		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		zone, err := cloud.GetZone(context.Background())
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-		if zone.FailureDomain != test.expected {
-			t.Errorf("Test [%s] unexpected zone: %s, expected %q", test.name, zone.FailureDomain, test.expected)
-		}
-		if zone.Region != cloud.Location {
-			t.Errorf("Test [%s] unexpected region: %s, expected: %s", test.name, zone.Region, cloud.Location)
-		}
 	}
 }
 

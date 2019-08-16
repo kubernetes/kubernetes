@@ -81,6 +81,7 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 
 func TestInstanceID(t *testing.T) {
 	cloud := getTestCloud()
+	cloud.Config.UseInstanceMetadata = true
 
 	testcases := []struct {
 		name         string
@@ -120,7 +121,7 @@ func TestInstanceID(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s"}}`, test.metadataName))
+			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s","subscriptionId":"subscription","resourceGroupName":"rg"}}`, test.metadataName))
 		}))
 		go func() {
 			http.Serve(listener, mux)
@@ -214,7 +215,7 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 	for _, test := range testcases {
 		cloud := getTestCloud()
 		setTestVirtualMachines(cloud, test.vmList, false)
-		providerID := "azure://" + cloud.getStandardMachineID("rg", test.nodeName)
+		providerID := "azure://" + cloud.getStandardMachineID("subscription", "rg", test.nodeName)
 		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), providerID)
 		if test.expectError {
 			if err == nil {
