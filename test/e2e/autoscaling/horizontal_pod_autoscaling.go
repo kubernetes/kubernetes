@@ -28,7 +28,7 @@ import (
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
 	var rc *common.ResourceConsumer
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
