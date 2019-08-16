@@ -476,18 +476,6 @@ var _ = SIGDescribe("Services", func() {
 		}
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
-
-		ginkgo.By("Removing iptable rules")
-		result, err := e2essh.SSH(`
-			sudo iptables -t nat -F KUBE-SERVICES || true;
-			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, framework.TestContext.Provider)
-		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
-			framework.Failf("couldn't remove iptable rules: %v", err)
-		}
-		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 	})
 
 	ginkgo.It("should work after restarting apiserver [Disruptive]", func() {
