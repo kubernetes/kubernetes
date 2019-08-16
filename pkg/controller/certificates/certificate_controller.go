@@ -113,7 +113,7 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting certificate controller")
 	defer klog.Infof("Shutting down certificate controller")
 
-	if !controller.WaitForCacheSync("certificate", stopCh, cc.csrsSynced) {
+	if !cache.WaitForNamedCacheSync("certificate", stopCh, cc.csrsSynced) {
 		return
 	}
 

@@ -31,7 +31,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/nodeipam",
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
         "//pkg/controller/nodeipam/ipam/sync:go_default_library",
         "//pkg/util/metrics:go_default_library",

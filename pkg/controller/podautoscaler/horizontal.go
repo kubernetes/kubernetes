@@ -156,7 +156,7 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting HPA controller")
 	defer klog.Infof("Shutting down HPA controller")
 
-	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced, a.podListerSynced) {
+	if !cache.WaitForNamedCacheSync("HPA", stopCh, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 

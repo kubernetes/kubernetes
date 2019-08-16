@@ -40,7 +40,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/controller"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -102,7 +101,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	klog.Info("Starting route controller")
 	defer klog.Info("Shutting down route controller")
 
-	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("route", stopCh, rc.nodeListerSynced) {
 		return
 	}
 

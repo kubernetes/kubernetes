@@ -35,7 +35,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -167,7 +166,7 @@ func (r *rangeAllocator) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting range CIDR allocator")
 	defer klog.Infof("Shutting down range CIDR allocator")
 
-	if !controller.WaitForCacheSync("cidrallocator", stopCh, r.nodesSynced) {
+	if !cache.WaitForNamedCacheSync("cidrallocator", stopCh, r.nodesSynced) {
 		return
 	}
 

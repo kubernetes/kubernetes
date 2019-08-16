@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -349,7 +350,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
-	if !controller.WaitForCacheSync("HPA", stop, informer.Informer().HasSynced) {
+	if !cache.WaitForNamedCacheSync("HPA", stop, informer.Informer().HasSynced) {
 		return
 	}
 
