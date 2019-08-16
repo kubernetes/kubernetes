@@ -497,12 +497,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	}
 
 	podEphemeralStorageTotalUsage := &resource.Quantity{}
-	var fsStatsSet []fsStatsType
-	if *m.dedicatedImageFs {
-		fsStatsSet = []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}
-	} else {
-		fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
-	}
+	fsStatsSet := []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
 	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet)
 	if err != nil {
 		klog.Errorf("eviction manager: error getting pod disk usage %v", err)
