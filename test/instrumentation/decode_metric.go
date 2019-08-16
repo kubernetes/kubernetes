@@ -24,12 +24,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/component-base/metrics"
 )
 
-func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string) ([]metric, []error) {
+func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName, prometheusImportName string) ([]metric, []error) {
 	finder := metricDecoder{
-		metricsImportName: metricsImportName,
+		kubeMetricsImportName: metricsImportName,
+		prometheusImportName:  prometheusImportName,
 	}
 	ms := make([]metric, 0, len(fs))
 	errors := []error{}
@@ -45,7 +47,8 @@ func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string) ([]metric, 
 }
 
 type metricDecoder struct {
-	metricsImportName string
+	kubeMetricsImportName string
+	prometheusImportName  string
 }
 
 func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (metric, error) {
@@ -60,7 +63,7 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (metric, error) {
 	if !ok {
 		return m, newDecodeErrorf(fc, errNotDirectCall)
 	}
-	if functionImport.String() != c.metricsImportName {
+	if functionImport.String() != c.kubeMetricsImportName {
 		return m, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	switch functionName {
@@ -157,7 +160,7 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 		key := fmt.Sprintf("%v", kv.Key)
 
 		switch key {
-		case "Namespace", "Subsystem", "Name", "Help":
+		case "Namespace", "Subsystem", "Name", "Help", "DeprecatedVersion":
 			k, ok := kv.Value.(*ast.BasicLit)
 			if !ok {
 				return m, newDecodeErrorf(expr, errNonStringAttribute)
@@ -173,18 +176,20 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 				m.Subsystem = value
 			case "Name":
 				m.Name = value
+			case "DeprecatedVersion":
+				m.DeprecatedVersion = value
 			case "Help":
 				m.Help = value
 			}
 		case "Buckets":
-			buckets, err := decodeBuckets(kv)
+			buckets, err := c.decodeBuckets(kv.Value)
 			if err != nil {
 				return m, err
 			}
 			sort.Float64s(buckets)
 			m.Buckets = buckets
 		case "StabilityLevel":
-			level, err := decodeStabilityLevel(kv.Value, c.metricsImportName)
+			level, err := decodeStabilityLevel(kv.Value, c.kubeMetricsImportName)
 			if err != nil {
 				return m, err
 			}
@@ -196,13 +201,46 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 	return m, nil
 }
 
-func decodeBuckets(kv *ast.KeyValueExpr) ([]float64, error) {
-	cl, ok := kv.Value.(*ast.CompositeLit)
-	if !ok {
-		return nil, newDecodeErrorf(kv, errBuckets)
+func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
+	switch v := expr.(type) {
+	case *ast.CompositeLit:
+		return decodeListOfFloats(v.Elts)
+	case *ast.SelectorExpr:
+		variableName := v.Sel.String()
+		importName, ok := v.X.(*ast.Ident)
+		if ok && importName.String() == c.prometheusImportName && variableName == "DefBuckets" {
+			return prometheus.DefBuckets, nil
+		}
+	case *ast.CallExpr:
+		se, ok := v.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return nil, newDecodeErrorf(v, errBuckets)
+		}
+		functionName := se.Sel.String()
+		functionImport, ok := se.X.(*ast.Ident)
+		if !ok {
+			return nil, newDecodeErrorf(v, errBuckets)
+		}
+		if functionImport.String() != c.prometheusImportName {
+			return nil, newDecodeErrorf(v, errBuckets)
+		}
+		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+		if err != nil {
+			return nil, err
+		}
+		switch functionName {
+		case "LinearBuckets":
+			return prometheus.LinearBuckets(firstArg, secondArg, thirdArg), nil
+		case "ExponentialBuckets":
+			return prometheus.ExponentialBuckets(firstArg, secondArg, thirdArg), nil
+		}
 	}
-	buckets := make([]float64, len(cl.Elts))
-	for i, elt := range cl.Elts {
+	return nil, newDecodeErrorf(expr, errBuckets)
+}
+
+func decodeListOfFloats(exprs []ast.Expr) ([]float64, error) {
+	buckets := make([]float64, len(exprs))
+	for i, elt := range exprs {
 		bl, ok := elt.(*ast.BasicLit)
 		if !ok {
 			return nil, newDecodeErrorf(bl, errBuckets)
@@ -217,6 +255,37 @@ func decodeBuckets(kv *ast.KeyValueExpr) ([]float64, error) {
 		buckets[i] = value
 	}
 	return buckets, nil
+}
+
+func decodeBucketArguments(fc *ast.CallExpr) (float64, float64, int, error) {
+	if len(fc.Args) != 3 {
+		return 0, 0, 0, newDecodeErrorf(fc, errBuckets)
+	}
+	strArgs := make([]string, len(fc.Args))
+	for i, elt := range fc.Args {
+		bl, ok := elt.(*ast.BasicLit)
+		if !ok {
+			return 0, 0, 0, newDecodeErrorf(bl, errBuckets)
+		}
+		if bl.Kind != token.FLOAT && bl.Kind != token.INT {
+			return 0, 0, 0, newDecodeErrorf(bl, errBuckets)
+		}
+		strArgs[i] = bl.Value
+	}
+	firstArg, err := strconv.ParseFloat(strArgs[0], 64)
+	if err != nil {
+		return 0, 0, 0, newDecodeErrorf(fc.Args[0], errBuckets)
+	}
+	secondArg, err := strconv.ParseFloat(strArgs[1], 64)
+	if err != nil {
+		return 0, 0, 0, newDecodeErrorf(fc.Args[1], errBuckets)
+	}
+	thirdArg, err := strconv.ParseInt(strArgs[2], 10, 64)
+	if err != nil {
+		return 0, 0, 0, newDecodeErrorf(fc.Args[2], errBuckets)
+	}
+
+	return firstArg, secondArg, int(thirdArg), nil
 }
 
 func decodeStabilityLevel(expr ast.Expr, metricsFrameworkImportName string) (*metrics.StabilityLevel, error) {

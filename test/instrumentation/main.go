@@ -31,9 +31,12 @@ import (
 )
 
 const (
-	metricFrameworkPath = `"k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"`
-	// Should equal to final directory name of metricFrameworkPath
-	defaultFrameworkImportName = "metrics"
+	kubeMetricImportPath = `"k8s.io/component-base/metrics"`
+	// Should equal to final directory name of kubeMetricImportPath
+	kubeMetricsDefaultImportName = "metrics"
+	prometheusImportPath         = `"github.com/prometheus/client_golang/prometheus"`
+	// Should equal to final directory name of kubeMetricImportPath
+	prometheusDefaultImportName = "prometheus"
 )
 
 func main() {
@@ -67,7 +70,7 @@ func main() {
 }
 
 func searchPathForStableMetrics(path string) ([]metric, []error) {
-	ms := []metric{}
+	metrics := []metric{}
 	errors := []error{}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(path, "vendor") {
@@ -78,13 +81,13 @@ func searchPathForStableMetrics(path string) ([]metric, []error) {
 		}
 		ms, es := searchFileForStableMetrics(path, nil)
 		errors = append(errors, es...)
-		ms = append(ms, ms...)
+		metrics = append(metrics, ms...)
 		return nil
 	})
 	if err != nil {
 		errors = append(errors, err)
 	}
-	return ms, errors
+	return metrics, errors
 }
 
 // Pass either only filename of existing file or src including source code in any format and a filename that it comes from
@@ -94,26 +97,30 @@ func searchFileForStableMetrics(filename string, src interface{}) ([]metric, []e
 	if err != nil {
 		return []metric{}, []error{err}
 	}
-	metricsImportName, err := getMetricsFrameworkImportName(tree)
+	metricsImportName, err := getLocalNameOfImportedPackage(tree, kubeMetricImportPath, kubeMetricsDefaultImportName)
 	if err != nil {
 		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
 	}
 	if metricsImportName == "" {
 		return []metric{}, []error{}
 	}
+	prometheusImportName, err := getLocalNameOfImportedPackage(tree, prometheusImportPath, prometheusDefaultImportName)
+	if err != nil {
+		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
+	}
 
 	stableMetricsFunctionCalls, errors := findStableMetricDeclaration(tree, metricsImportName)
-	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName)
+	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName, prometheusImportName)
 	errors = append(errors, es...)
 	return metrics, addFileInformationToErrors(errors, fileset)
 }
 
-func getMetricsFrameworkImportName(tree *ast.File) (string, error) {
+func getLocalNameOfImportedPackage(tree *ast.File, importPath, defaultImportName string) (string, error) {
 	var importName string
 	for _, im := range tree.Imports {
-		if im.Path.Value == metricFrameworkPath {
+		if im.Path.Value == importPath {
 			if im.Name == nil {
-				importName = defaultFrameworkImportName
+				importName = defaultImportName
 			} else {
 				if im.Name.Name == "." {
 					return "", newDecodeErrorf(im, errImport)

@@ -63,4 +63,5 @@ go_test(
     srcs = ["main_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
+    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
 )
