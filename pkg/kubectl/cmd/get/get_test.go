@@ -702,6 +702,60 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	}
 }
 
+func TestEmptyResult(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{})}, nil
+		}),
+	}
+
+	streams, _, _, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	// we're assuming that an empty file is being passed from stdin
+	cmd.Flags().Set("filename", "-")
+	cmd.Run(cmd, []string{})
+
+	if !strings.Contains(errbuf.String(), "No resources found") {
+		t.Errorf("unexpected output: %q", errbuf.String())
+	}
+}
+
+func TestEmptyResultJSON(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{})}, nil
+		}),
+	}
+
+	streams, _, outbuf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	// we're assuming that an empty file is being passed from stdin
+	cmd.Flags().Set("filename", "-")
+	cmd.Flags().Set("output", "json")
+	cmd.Run(cmd, []string{})
+
+	if errbuf.Len() > 0 {
+		t.Errorf("unexpected error: %q", errbuf.String())
+	}
+	if !strings.Contains(outbuf.String(), `"items": []`) {
+		t.Errorf("unexpected output: %q", outbuf.String())
+	}
+}
+
 func TestGetSortedObjects(t *testing.T) {
 	pods := &corev1.PodList{
 		ListMeta: metav1.ListMeta{
