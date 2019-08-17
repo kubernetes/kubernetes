@@ -92,7 +92,17 @@ func NewController(
 		return nil, err
 	}
 
-	return c, nil
+	//check whether there is a remaining cidr after occupyServiceCIDR
+	cidr, err := c.set.AllocateNext()
+	switch err {
+	case cidrset.ErrCIDRRangeNoCIDRsRemaining:
+		return nil, fmt.Errorf("failed after occupy serviceCIDR: %v", err)
+	case nil:
+		err := c.set.Release(cidr)
+		return c, err
+	default:
+		return nil, fmt.Errorf("unexpected error when check remaining CIDR range: %v", err)
+	}
 }
 
 // Start initializes the Controller with the existing list of nodes and

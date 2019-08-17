@@ -77,6 +77,7 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 		{"invalid_cluster_CIDR", "invalid", "10.1.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, true},
 		{"valid_CIDR_smaller_than_mask_cloud_allocator", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
 		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, true},
+		{"invalid_serviceCIDR_contains_clusterCIDR", "10.0.0.0/23", "10.0.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, true},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			clusterCidrs, _ := netutils.ParseCIDRs(strings.Split(tc.clusterCIDR, ","))
