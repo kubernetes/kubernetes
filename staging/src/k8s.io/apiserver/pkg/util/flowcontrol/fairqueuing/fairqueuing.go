@@ -46,7 +46,7 @@ func NewQueueSetFactory(clk clock.PassiveClock, wg *sync.WaitGroup) QueueSetFact
 // NewQueueSet creates a new QueueSetSystem object
 // There is a new QueueSet created for each priority level.
 func (qsf queueSetFactoryImpl) NewQueueSet(concurrencyLimit, desiredNumQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet {
-	return NewQueueSetImpl(concurrencyLimit, desiredNumQueues,
+	return newQueueSetImpl(concurrencyLimit, desiredNumQueues,
 		queueLengthLimit, requestWaitLimit, qsf.clk, qsf.wg)
 }
 
@@ -88,8 +88,8 @@ func initQueues(numQueues int) []*Queue {
 	return fqqueues
 }
 
-// NewQueueSetImpl creates a new queueSetImpl from passed in parameters and
-func NewQueueSetImpl(concurrencyLimit, desiredNumQueues, queueLengthLimit int,
+// newQueueSetImpl creates a new queueSetImpl from passed in parameters and
+func newQueueSetImpl(concurrencyLimit, desiredNumQueues, queueLengthLimit int,
 	requestWaitLimit time.Duration, clk clock.PassiveClock, wg *sync.WaitGroup) *queueSetImpl {
 	fq := &queueSetImpl{
 		wg:               wg,
