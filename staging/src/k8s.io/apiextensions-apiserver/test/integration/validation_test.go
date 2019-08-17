@@ -548,9 +548,9 @@ func TestNonStructuralSchemaConditionUpdate(t *testing.T) {
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: foos.tests.apiextensions.k8s.io
+  name: foos.tests.example.com
 spec:
-  group: tests.apiextensions.k8s.io
+  group: tests.example.com
   version: v1beta1
   names:
     plural: foos

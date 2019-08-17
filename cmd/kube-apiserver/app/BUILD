@@ -34,6 +34,7 @@ go_library(
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion:go_default_library",

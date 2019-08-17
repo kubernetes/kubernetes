@@ -44,9 +44,9 @@ import (
 )
 
 var pruningFixture = &apiextensionsv1beta1.CustomResourceDefinition{
-	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.apiextensions.k8s.io"},
+	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
 	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "tests.apiextensions.k8s.io",
+		Group:   "tests.example.com",
 		Version: "v1beta1",
 		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 			Plural:   "foos",
@@ -172,7 +172,7 @@ embeddedNested:
 
 	fooInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 metadata:
   name: foo
 `

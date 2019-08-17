@@ -25,7 +25,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -35,11 +35,11 @@ import (
 type EtcdObjectReader struct {
 	etcdClient    *clientv3.Client
 	storagePrefix string
-	crd           *apiextensionsv1beta1.CustomResourceDefinition
+	crd           *apiextensionsv1.CustomResourceDefinition
 }
 
 // NewEtcdObjectReader creates a reader for accessing custom resource objects directly from etcd.
-func NewEtcdObjectReader(etcdClient *clientv3.Client, restOptions *generic.RESTOptions, crd *apiextensionsv1beta1.CustomResourceDefinition) *EtcdObjectReader {
+func NewEtcdObjectReader(etcdClient *clientv3.Client, restOptions *generic.RESTOptions, crd *apiextensionsv1.CustomResourceDefinition) *EtcdObjectReader {
 	return &EtcdObjectReader{etcdClient, restOptions.StorageConfig.Prefix, crd}
 }
 

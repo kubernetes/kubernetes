@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
@@ -147,7 +148,16 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		storage["customresourcedefinitions"] = customResourceDefintionStorage
 		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
 
-		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
+		apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = storage
+	}
+	if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) {
+		storage := map[string]rest.Storage{}
+		// customresourcedefinitions
+		customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+		storage["customresourcedefinitions"] = customResourceDefintionStorage
+		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
+
+		apiGroupInfo.VersionedResourcesStorageMap[v1.SchemeGroupVersion.Version] = storage
 	}
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
@@ -249,6 +259,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
 		v1beta1.SchemeGroupVersion,
+		v1.SchemeGroupVersion,
 	)
 
 	return ret
