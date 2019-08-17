@@ -1,5 +1,4 @@
 hack/verify-flags/known-flags.txt merge=union
-test/test_owners.csv merge=union
 
 **/zz_generated.*.go linguist-generated=true
 **/types.generated.go linguist-generated=true
