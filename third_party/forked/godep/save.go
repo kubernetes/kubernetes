@@ -64,12 +64,13 @@ For more about specifying packages, see 'go help packages'.
 
 var (
 	saveR, saveT bool
+	ignorePackages string
 )
 
 func init() {
 	cmdSave.Flag.BoolVar(&saveR, "r", false, "rewrite import paths")
 	cmdSave.Flag.BoolVar(&saveT, "t", false, "save test files")
-
+	cmdSave.Flag.StringVar(&ignorePackages, "i", "", "list of packages to ignore separated by commas")
 }
 
 func runSave(cmd *Command, args []string) {

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"go/build"
+	"os"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -42,9 +45,19 @@ func LoadPackages(names ...string) (a []*Package, err error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
+
+	pkgs := strings.Split(ignorePackages, ",")
+	sort.Strings(pkgs)
 	for _, i := range importPaths(names) {
 		p, err := listPackage(i)
 		if err != nil {
+			if len(pkgs) > 0 {
+				idx := sort.SearchStrings(pkgs, i)
+				if idx < len(pkgs) && pkgs[idx] == i {
+					fmt.Fprintf(os.Stderr, "warning: ignoring package %q \n", i)
+					continue
+				}
+			}
 			return nil, err
 		}
 		a = append(a, p)

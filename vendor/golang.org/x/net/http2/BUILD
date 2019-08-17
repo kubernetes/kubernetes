@@ -10,6 +10,7 @@ go_library(
         "errors.go",
         "flow.go",
         "frame.go",
+        "go111.go",
         "go16.go",
         "go17.go",
         "go17_not18.go",
@@ -18,6 +19,7 @@ go_library(
         "gotrack.go",
         "headermap.go",
         "http2.go",
+        "not_go111.go",
         "not_go16.go",
         "not_go17.go",
         "not_go18.go",
@@ -34,9 +36,9 @@ go_library(
     importpath = "golang.org/x/net/http2",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/golang.org/x/net/http/httpguts:go_default_library",
         "//vendor/golang.org/x/net/http2/hpack:go_default_library",
         "//vendor/golang.org/x/net/idna:go_default_library",
-        "//vendor/golang.org/x/net/lex/httplex:go_default_library",
     ],
 )
 

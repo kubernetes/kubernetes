@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
-	"golang.org/x/net/lex/httplex"
 )
 
 // writeFramer is implemented by any type that is used to write frames.
@@ -350,7 +350,7 @@ func encodeHeaders(enc *hpack.Encoder, h http.Header, keys []string) {
 		}
 		isTE := k == "transfer-encoding"
 		for _, v := range vv {
-			if !httplex.ValidHeaderFieldValue(v) {
+			if !httpguts.ValidHeaderFieldValue(v) {
 				// TODO: return an error? golang.org/issue/14048
 				// For now just omit it.
 				continue
