@@ -70,6 +70,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"runtime"
 	"sort"
 	"strconv"
@@ -110,6 +111,13 @@ var AuthRequest = func(req *http.Request) (any, sensitive bool) {
 }
 
 func init() {
+	_, pat := http.DefaultServeMux.Handler(&http.Request{URL: &url.URL{Path: "/debug/requests"}})
+	if pat != "" {
+		panic("/debug/requests is already registered. You may have two independent copies of " +
+			"golang.org/x/net/trace in your binary, trying to maintain separate state. This may " +
+			"involve a vendored copy of golang.org/x/net/trace.")
+	}
+
 	// TODO(jbd): Serve Traces from /debug/traces in the future?
 	// There is no requirement for a request to be present to have traces.
 	http.HandleFunc("/debug/requests", Traces)
@@ -368,7 +376,11 @@ func New(family, title string) Trace {
 }
 
 func (tr *trace) Finish() {
-	tr.Elapsed = time.Now().Sub(tr.Start)
+	elapsed := time.Now().Sub(tr.Start)
+	tr.mu.Lock()
+	tr.Elapsed = elapsed
+	tr.mu.Unlock()
+
 	if DebugUseAfterFinish {
 		buf := make([]byte, 4<<10) // 4 KB should be enough
 		n := runtime.Stack(buf, false)
@@ -381,14 +393,17 @@ func (tr *trace) Finish() {
 	m.Remove(tr)
 
 	f := getFamily(tr.Family, true)
+	tr.mu.RLock() // protects tr fields in Cond.match calls
 	for _, b := range f.Buckets {
 		if b.Cond.match(tr) {
 			b.Add(tr)
 		}
 	}
+	tr.mu.RUnlock()
+
 	// Add a sample of elapsed time as microseconds to the family's timeseries
 	h := new(histogram)
-	h.addMeasurement(tr.Elapsed.Nanoseconds() / 1e3)
+	h.addMeasurement(elapsed.Nanoseconds() / 1e3)
 	f.LatencyMu.Lock()
 	f.Latency.Add(h)
 	f.LatencyMu.Unlock()
@@ -684,25 +699,20 @@ type trace struct {
 	// Title is the title of this trace.
 	Title string
 
-	// Timing information.
-	Start   time.Time
-	Elapsed time.Duration // zero while active
+	// Start time of the this trace.
+	Start time.Time
 
-	// Trace information if non-zero.
-	traceID uint64
-	spanID  uint64
-
-	// Whether this trace resulted in an error.
-	IsError bool
-
-	// Append-only sequence of events (modulo discards).
 	mu        sync.RWMutex
-	events    []event
+	events    []event // Append-only sequence of events (modulo discards).
 	maxEvents int
+	recycler  func(interface{})
+	IsError   bool          // Whether this trace resulted in an error.
+	Elapsed   time.Duration // Elapsed time for this trace, zero while active.
+	traceID   uint64        // Trace information if non-zero.
+	spanID    uint64
 
-	refs     int32 // how many buckets this is in
-	recycler func(interface{})
-	disc     discarded // scratch space to avoid allocation
+	refs int32     // how many buckets this is in
+	disc discarded // scratch space to avoid allocation
 
 	finishStack []byte // where finish was called, if DebugUseAfterFinish is set
 
@@ -714,14 +724,18 @@ func (tr *trace) reset() {
 	tr.Family = ""
 	tr.Title = ""
 	tr.Start = time.Time{}
+
+	tr.mu.Lock()
 	tr.Elapsed = 0
 	tr.traceID = 0
 	tr.spanID = 0
 	tr.IsError = false
 	tr.maxEvents = 0
 	tr.events = nil
-	tr.refs = 0
 	tr.recycler = nil
+	tr.mu.Unlock()
+
+	tr.refs = 0
 	tr.disc = 0
 	tr.finishStack = nil
 	for i := range tr.eventsBuf {
@@ -801,21 +815,31 @@ func (tr *trace) LazyPrintf(format string, a ...interface{}) {
 	tr.addEvent(&lazySprintf{format, a}, false, false)
 }
 
-func (tr *trace) SetError() { tr.IsError = true }
+func (tr *trace) SetError() {
+	tr.mu.Lock()
+	tr.IsError = true
+	tr.mu.Unlock()
+}
 
 func (tr *trace) SetRecycler(f func(interface{})) {
+	tr.mu.Lock()
 	tr.recycler = f
+	tr.mu.Unlock()
 }
 
 func (tr *trace) SetTraceInfo(traceID, spanID uint64) {
+	tr.mu.Lock()
 	tr.traceID, tr.spanID = traceID, spanID
+	tr.mu.Unlock()
 }
 
 func (tr *trace) SetMaxEvents(m int) {
+	tr.mu.Lock()
 	// Always keep at least three events: first, discarded count, last.
 	if len(tr.events) == 0 && m > 3 {
 		tr.maxEvents = m
 	}
+	tr.mu.Unlock()
 }
 
 func (tr *trace) ref() {
@@ -824,6 +848,7 @@ func (tr *trace) ref() {
 
 func (tr *trace) unref() {
 	if atomic.AddInt32(&tr.refs, -1) == 0 {
+		tr.mu.RLock()
 		if tr.recycler != nil {
 			// freeTrace clears tr, so we hold tr.recycler and tr.events here.
 			go func(f func(interface{}), es []event) {
@@ -834,6 +859,7 @@ func (tr *trace) unref() {
 				}
 			}(tr.recycler, tr.events)
 		}
+		tr.mu.RUnlock()
 
 		freeTrace(tr)
 	}
@@ -844,7 +870,10 @@ func (tr *trace) When() string {
 }
 
 func (tr *trace) ElapsedTime() string {
+	tr.mu.RLock()
 	t := tr.Elapsed
+	tr.mu.RUnlock()
+
 	if t == 0 {
 		// Active trace.
 		t = time.Since(tr.Start)

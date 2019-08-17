@@ -57,7 +57,7 @@ func configureTransport(t1 *http.Transport) (*Transport, error) {
 
 // registerHTTPSProtocol calls Transport.RegisterProtocol but
 // converting panics into errors.
-func registerHTTPSProtocol(t *http.Transport, rt http.RoundTripper) (err error) {
+func registerHTTPSProtocol(t *http.Transport, rt noDialH2RoundTripper) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
@@ -69,10 +69,12 @@ func registerHTTPSProtocol(t *http.Transport, rt http.RoundTripper) (err error) 
 
 // noDialH2RoundTripper is a RoundTripper which only tries to complete the request
 // if there's already has a cached connection to the host.
-type noDialH2RoundTripper struct{ t *Transport }
+// (The field is exported so it can be accessed via reflect from net/http; tested
+// by TestNoDialH2RoundTripperType)
+type noDialH2RoundTripper struct{ *Transport }
 
 func (rt noDialH2RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	res, err := rt.t.RoundTrip(req)
+	res, err := rt.Transport.RoundTrip(req)
 	if isNoCachedConnError(err) {
 		return nil, http.ErrSkipAltProtocol
 	}
