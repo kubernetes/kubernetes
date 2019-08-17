@@ -71,39 +71,94 @@ func TestWebhookConverterWithDefaulting(t *testing.T) {
 
 func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 	tests := []struct {
-		group   string
-		handler http.Handler
-		checks  []Checker
+		group          string
+		handler        http.Handler
+		reviewVersions []string
+		checks         []Checker
 	}{
 		{
-			group:   "noop-converter",
-			handler: NewObjectConverterWebhookHandler(t, noopConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
+			group:          "noop-converter-v1",
+			handler:        NewObjectConverterWebhookHandler(t, noopConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
 		},
 		{
-			group:   "nontrivial-converter",
-			handler: NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
+			group:          "noop-converter-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, noopConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
 		},
 		{
-			group:   "metadata-mutating-converter",
-			handler: NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
-			checks:  checks(validateObjectMetaMutation),
+			group:          "nontrivial-converter-v1",
+			handler:        NewObjectConverterWebhookHandler(t, nontrivialConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
 		},
 		{
-			group:   "metadata-uid-mutating-converter",
-			handler: NewObjectConverterWebhookHandler(t, uidMutatingConverter),
-			checks:  checks(validateUIDMutation),
+			group:          "nontrivial-converter-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, nontrivialConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
 		},
 		{
-			group:   "empty-response",
-			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
-			checks:  checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+			group:          "metadata-mutating-v1",
+			handler:        NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateObjectMetaMutation),
 		},
 		{
-			group:   "failure-message",
-			handler: NewReviewWebhookHandler(t, failureResponseConverter("custom webhook conversion error")),
-			checks:  checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+			group:          "metadata-mutating-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateObjectMetaMutation),
+		},
+		{
+			group:          "metadata-uid-mutating-v1",
+			handler:        NewObjectConverterWebhookHandler(t, uidMutatingConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateUIDMutation),
+		},
+		{
+			group:          "metadata-uid-mutating-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, uidMutatingConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateUIDMutation),
+		},
+		{
+			group:          "empty-response-v1",
+			handler:        NewReviewWebhookHandler(t, nil, emptyV1ResponseConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+		},
+		{
+			group:          "empty-response-v1beta1",
+			handler:        NewReviewWebhookHandler(t, emptyV1Beta1ResponseConverter, nil),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+		},
+		{
+			group:          "failure-message-v1",
+			handler:        NewReviewWebhookHandler(t, nil, failureV1ResponseConverter("custom webhook conversion error")),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+		},
+		{
+			group:          "failure-message-v1beta1",
+			handler:        NewReviewWebhookHandler(t, failureV1Beta1ResponseConverter("custom webhook conversion error"), nil),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+		},
+		{
+			group:          "unhandled-v1",
+			handler:        NewReviewWebhookHandler(t, nil, nil),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request")),
+		},
+		{
+			group:          "unhandled-v1beta1",
+			handler:        NewReviewWebhookHandler(t, nil, nil),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request")),
 		},
 	}
 
@@ -174,7 +229,7 @@ func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 			}
 			defer tearDown()
 
-			ctc.setConversionWebhook(t, webhookClientConfig)
+			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
 			defer ctc.removeConversionWebhook(t)
 
 			// wait until new webhook is called the first time
@@ -711,7 +766,15 @@ func noopConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.
 	return runtime.RawExtension{Raw: raw}, nil
 }
 
-func emptyResponseConverter(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
+func emptyV1ResponseConverter(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+	review.Response = &apiextensionsv1.ConversionResponse{
+		UID:              review.Request.UID,
+		ConvertedObjects: []runtime.RawExtension{},
+		Result:           metav1.Status{Status: "Success"},
+	}
+	return review, nil
+}
+func emptyV1Beta1ResponseConverter(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
 	review.Response = &apiextensionsv1beta1.ConversionResponse{
 		UID:              review.Request.UID,
 		ConvertedObjects: []runtime.RawExtension{},
@@ -720,8 +783,19 @@ func emptyResponseConverter(review apiextensionsv1beta1.ConversionReview) (apiex
 	return review, nil
 }
 
-func failureResponseConverter(message string) func(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
-	return func(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
+func failureV1ResponseConverter(message string) func(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+	return func(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+		review.Response = &apiextensionsv1.ConversionResponse{
+			UID:              review.Request.UID,
+			ConvertedObjects: []runtime.RawExtension{},
+			Result:           metav1.Status{Message: message, Status: "Failure"},
+		}
+		return review, nil
+	}
+}
+
+func failureV1Beta1ResponseConverter(message string) func(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
+	return func(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
 		review.Response = &apiextensionsv1beta1.ConversionResponse{
 			UID:              review.Request.UID,
 			ConvertedObjects: []runtime.RawExtension{},
@@ -889,14 +963,15 @@ func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.R
 	return ret
 }
 
-func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig) {
+func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig, reviewVersions []string) {
 	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	crd.Spec.Conversion = &apiextensionsv1beta1.CustomResourceConversion{
-		Strategy:            apiextensionsv1beta1.WebhookConverter,
-		WebhookClientConfig: webhookClientConfig,
+		Strategy:                 apiextensionsv1beta1.WebhookConverter,
+		WebhookClientConfig:      webhookClientConfig,
+		ConversionReviewVersions: reviewVersions,
 	}
 	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
 	if err != nil {
