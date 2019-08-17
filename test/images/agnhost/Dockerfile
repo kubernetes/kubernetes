@@ -22,7 +22,7 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 # - iproute2: includes ss used in NodePort tests
 # from iperf image
 # install necessary packages: iperf, bash
-RUN apk --update add curl netcat-openbsd iproute2 iperf bash && rm -rf /var/cache/apk/* \
+RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash && rm -rf /var/cache/apk/* \
   && ln -s /usr/bin/iperf /usr/local/bin/iperf \
   && ls -altrh /usr/local/bin/iperf
 
