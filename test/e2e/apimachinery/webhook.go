@@ -412,7 +412,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		selectorListOpts := metav1.ListOptions{LabelSelector: "e2e-list-test-uuid=" + testUUID}
 
 		ginkgo.By("Listing all of the created validation webhooks")
-		list, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().List(selectorListOpts)
+		list, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(selectorListOpts)
 		framework.ExpectNoError(err, "Listing validating webhook configurations")
 		framework.ExpectEqual(len(list.Items), testListSize)
 
@@ -433,7 +433,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be denied creation by validating webhook", f.Namespace.Name)
 
 		ginkgo.By("Deleting the collection of validation webhooks")
-		err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().DeleteCollection(nil, selectorListOpts)
+		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().DeleteCollection(nil, selectorListOpts)
 		framework.ExpectNoError(err, "Deleting collection of validating webhook configurations")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
@@ -473,7 +473,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		selectorListOpts := metav1.ListOptions{LabelSelector: "e2e-list-test-uuid=" + testUUID}
 
 		ginkgo.By("Listing all of the created validation webhooks")
-		list, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().List(selectorListOpts)
+		list, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().List(selectorListOpts)
 		framework.ExpectNoError(err, "Listing mutating webhook configurations")
 		framework.ExpectEqual(len(list.Items), testListSize)
 
@@ -492,7 +492,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be mutated", f.Namespace.Name)
 
 		ginkgo.By("Deleting the collection of validation webhooks")
-		err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().DeleteCollection(nil, selectorListOpts)
+		err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().DeleteCollection(nil, selectorListOpts)
 		framework.ExpectNoError(err, "Deleting collection of mutating webhook configurations")
 
 		ginkgo.By("Creating a configMap that should not be mutated")
