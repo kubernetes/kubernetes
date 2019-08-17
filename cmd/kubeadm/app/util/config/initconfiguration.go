@@ -315,18 +315,6 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 	return initcfg, nil
 }
 
-func defaultedInternalConfig() *kubeadmapi.ClusterConfiguration {
-	externalcfg := &kubeadmapiv1beta2.ClusterConfiguration{}
-	internalcfg := &kubeadmapi.ClusterConfiguration{}
-
-	kubeadmscheme.Scheme.Default(externalcfg)
-	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
-
-	// Default the embedded ComponentConfig structs
-	componentconfigs.Known.Default(internalcfg)
-	return internalcfg
-}
-
 // MarshalInitConfigurationToBytes marshals the internal InitConfiguration object to bytes. It writes the embedded
 // ClusterConfiguration object with ComponentConfigs out as separate YAML documents
 func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schema.GroupVersion) ([]byte, error) {

@@ -157,7 +157,8 @@ func NewVolumeManager(
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
-	keepTerminatedPodVolumes bool) VolumeManager {
+	keepTerminatedPodVolumes bool,
+	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
@@ -169,7 +170,7 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			checkNodeCapabilitiesBeforeMount,
-			volumepathhandler.NewBlockVolumePathHandler())),
+			blockVolumePathHandler)),
 	}
 
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
@@ -435,13 +436,8 @@ func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string
 // getExpectedVolumes returns a list of volumes that must be mounted in order to
 // consider the volume setup step for this pod satisfied.
 func getExpectedVolumes(pod *v1.Pod) []string {
-	expectedVolumes := []string{}
-
-	for _, podVolume := range pod.Spec.Volumes {
-		expectedVolumes = append(expectedVolumes, podVolume.Name)
-	}
-
-	return expectedVolumes
+	mounts, devices := util.GetPodVolumeNames(pod)
+	return mounts.Union(devices).UnsortedList()
 }
 
 // getExtraSupplementalGid returns the value of an extra supplemental GID as

@@ -26,6 +26,7 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"sigs.k8s.io/yaml"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
@@ -253,22 +254,28 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 	}
 }
 
-var embeddedResourceFixture = &apiextensionsv1beta1.CustomResourceDefinition{
-	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.apiextensions.k8s.io"},
-	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "tests.apiextensions.k8s.io",
-		Version: "v1beta1",
-		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+var embeddedResourceFixture = &apiextensionsv1.CustomResourceDefinition{
+	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "tests.example.com",
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+			{
+				Name:    "v1beta1",
+				Storage: true,
+				Served:  true,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+				},
+			},
+		},
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
 			Plural:   "foos",
 			Singular: "foo",
 			Kind:     "Foo",
 			ListKind: "FooList",
 		},
-		Scope:                 apiextensionsv1beta1.ClusterScoped,
-		PreserveUnknownFields: pointer.BoolPtr(false),
-		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-			Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-		},
+		Scope:                 apiextensionsv1.ClusterScoped,
+		PreserveUnknownFields: false,
 	},
 }
 
@@ -319,7 +326,7 @@ properties:
 
 	embeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -348,7 +355,7 @@ embeddedNested:
 
 	expectedEmbeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -379,7 +386,7 @@ defaults:
 
 	wronglyTypedEmbeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -390,7 +397,7 @@ embedded:
 
 	invalidEmbeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: "%"
@@ -420,18 +427,18 @@ func TestEmbeddedResources(t *testing.T) {
 	defer tearDownFn()
 
 	crd := embeddedResourceFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(embeddedResourceSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(embeddedResourceSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned inside ObjectMetas")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(embeddedResourceInstance), &foo.Object); err != nil {
 		t.Fatal(err)

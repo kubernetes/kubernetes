@@ -22,7 +22,7 @@ import (
 
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -410,7 +410,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
 
@@ -459,7 +459,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
 
@@ -508,7 +508,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
 
@@ -557,7 +557,7 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
 

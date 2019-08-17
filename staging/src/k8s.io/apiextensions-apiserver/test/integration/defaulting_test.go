@@ -33,41 +33,42 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
-var defaultingFixture = &apiextensionsv1beta1.CustomResourceDefinition{
-	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.apiextensions.k8s.io"},
-	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "tests.apiextensions.k8s.io",
-		Version: "v1beta1",
-		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+var defaultingFixture = &apiextensionsv1.CustomResourceDefinition{
+	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "tests.example.com",
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 			{
 				Name:    "v1beta1",
 				Storage: false,
 				Served:  true,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+				},
 			},
 			{
 				Name:    "v1beta2",
 				Storage: true,
 				Served:  false,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+				},
 			},
 		},
-		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
 			Plural:   "foos",
 			Singular: "foo",
 			Kind:     "Foo",
 			ListKind: "FooList",
 		},
-		Scope:                 apiextensionsv1beta1.ClusterScoped,
-		PreserveUnknownFields: pointer.BoolPtr(false),
-		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-			Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-		},
+		Scope:                 apiextensionsv1.ClusterScoped,
+		PreserveUnknownFields: false,
 	},
 }
 
@@ -163,16 +164,16 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	defer tearDownFn()
 
 	crd := defaultingFixture.DeepCopy()
-	crd.Spec.Versions[0].Schema = &apiextensionsv1beta1.CustomResourceValidation{}
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
 	if err := yaml.Unmarshal([]byte(defaultingFooV1beta1Schema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
-	crd.Spec.Versions[1].Schema = &apiextensionsv1beta1.CustomResourceValidation{}
+	crd.Spec.Versions[1].Schema = &apiextensionsv1.CustomResourceValidation{}
 	if err := yaml.Unmarshal([]byte(defaultingFooV1beta2Schema), &crd.Spec.Versions[1].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,17 +194,17 @@ func testDefaulting(t *testing.T, watchCache bool) {
 			}
 		}
 	}
-	updateCRD := func(update func(*apiextensionsv1beta1.CustomResourceDefinition)) {
+	updateCRD := func(update func(*apiextensionsv1.CustomResourceDefinition)) {
 		t.Helper()
 		var err error
 		for retry := 0; retry < 10; retry++ {
-			var obj *apiextensionsv1beta1.CustomResourceDefinition
-			obj, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			var obj *apiextensionsv1.CustomResourceDefinition
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			update(obj)
-			obj, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(obj)
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(obj)
 			if err != nil && apierrors.IsConflict(err) {
 				continue
 			} else if err != nil {
@@ -218,13 +219,13 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 	addDefault := func(version string, key string, value interface{}) {
 		t.Helper()
-		updateCRD(func(obj *apiextensionsv1beta1.CustomResourceDefinition) {
+		updateCRD(func(obj *apiextensionsv1.CustomResourceDefinition) {
 			for _, root := range []string{"spec", "status"} {
 				for i := range obj.Spec.Versions {
 					if obj.Spec.Versions[i].Name != version {
 						continue
 					}
-					obj.Spec.Versions[i].Schema.OpenAPIV3Schema.Properties[root].Properties[key] = apiextensionsv1beta1.JSONSchemaProps{
+					obj.Spec.Versions[i].Schema.OpenAPIV3Schema.Properties[root].Properties[key] = apiextensionsv1.JSONSchemaProps{
 						Type:    "string",
 						Default: jsonPtr(value),
 					}
@@ -234,7 +235,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 	removeDefault := func(version string, key string) {
 		t.Helper()
-		updateCRD(func(obj *apiextensionsv1beta1.CustomResourceDefinition) {
+		updateCRD(func(obj *apiextensionsv1.CustomResourceDefinition) {
 			for _, root := range []string{"spec", "status"} {
 				for i := range obj.Spec.Versions {
 					if obj.Spec.Versions[i].Name != version {
@@ -249,7 +250,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 
 	t.Logf("Creating CR and expecting defaulted fields in spec, but status does not exist at all")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
@@ -399,11 +400,11 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	mustNotExist(foo.Object, [][]string{{"spec", "c"}})
 }
 
-func jsonPtr(x interface{}) *apiextensionsv1beta1.JSON {
+func jsonPtr(x interface{}) *apiextensionsv1.JSON {
 	bs, err := json.Marshal(x)
 	if err != nil {
 		panic(err)
 	}
-	ret := apiextensionsv1beta1.JSON{Raw: bs}
+	ret := apiextensionsv1.JSON{Raw: bs}
 	return &ret
 }

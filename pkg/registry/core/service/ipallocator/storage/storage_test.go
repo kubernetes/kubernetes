@@ -41,12 +41,18 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 	}
 
 	var backing allocator.Interface
-	storage := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
+	storage, err := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		backing = mem
-		etcd := allocatorstore.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
-		return etcd
+		etcd, err := allocatorstore.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
+		if err != nil {
+			return nil, err
+		}
+		return etcd, nil
 	})
+	if err != nil {
+		t.Fatalf("unexpected error creating etcd: %v", err)
+	}
 	s, d, err := generic.NewRawStorage(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create storage: %v", err)

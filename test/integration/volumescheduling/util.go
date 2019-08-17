@@ -123,6 +123,13 @@ func initTestSchedulerWithOptions(
 
 	// set DisablePreemption option
 	context.schedulerConfig.DisablePreemption = false
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
+		Interface: context.clientSet.EventsV1beta1().Events(""),
+	})
+	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
+		legacyscheme.Scheme,
+		v1.DefaultSchedulerName,
+	)
 
 	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
 
@@ -137,13 +144,6 @@ func initTestSchedulerWithOptions(
 		context.informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: context.clientSet.EventsV1beta1().Events(""),
-	})
-	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
-		legacyscheme.Scheme,
-		v1.DefaultSchedulerName,
-	)
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
 

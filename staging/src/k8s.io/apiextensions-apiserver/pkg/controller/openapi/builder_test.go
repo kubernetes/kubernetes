@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -512,6 +514,15 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 						action, ok := operation.VendorExtensible.Extensions.GetString(endpoints.ROUTE_META_ACTION)
 						if ok {
 							actions.Insert(action)
+						}
+						if action == "patch" {
+							expected := []string{"application/json-patch+json", "application/merge-patch+json"}
+							if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+								expected = append(expected, "application/apply-patch+yaml")
+							}
+							assert.Equal(t, operation.Consumes, expected)
+						} else {
+							assert.Equal(t, operation.Consumes, []string{"application/json", "application/yaml"})
 						}
 					}
 				}

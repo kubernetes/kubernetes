@@ -18,8 +18,10 @@ package testsuites
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -31,6 +33,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -61,6 +64,9 @@ func InitVolumeModeTestSuite() TestSuite {
 
 func (t *volumeModeTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
+}
+
+func (t *volumeModeTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -249,7 +255,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 		}()
 
-		ginkgo.By("Waiting for pod to fail")
+		ginkgo.By("Waiting for the pod to fail")
 		// Wait for an event that the pod is invalid.
 		eventSelector := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -276,6 +282,54 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		framework.ExpectEqual(p.Status.Phase, v1.PodPending)
 	})
 
+	ginkgo.It("should not mount / map unused volumes in a pod", func() {
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			skipBlockTest(driver)
+		}
+		init()
+		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern)
+		defer cleanup()
+
+		ginkgo.By("Creating pod")
+		var err error
+		pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+		for i := range pod.Spec.Containers {
+			pod.Spec.Containers[i].VolumeDevices = nil
+			pod.Spec.Containers[i].VolumeMounts = nil
+		}
+
+		// Run the pod
+		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+		framework.ExpectNoError(err)
+		defer func() {
+			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+		}()
+
+		err = e2epod.WaitForPodNameRunningInNamespace(l.cs, pod.Name, pod.Namespace)
+		framework.ExpectNoError(err)
+
+		// Reload the pod to get its node
+		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Listing mounted volumes in the pod")
+		volumePaths, devicePaths, err := utils.ListPodVolumePluginDirectory(l.cs, pod)
+		framework.ExpectNoError(err)
+		driverInfo := driver.GetDriverInfo()
+		volumePlugin := driverInfo.InTreePluginName
+		if len(volumePlugin) == 0 {
+			// TODO: check if it's a CSI volume first
+			volumePlugin = "kubernetes.io/csi"
+		}
+		ginkgo.By(fmt.Sprintf("Checking that volume plugin %s is not used in pod directory", volumePlugin))
+		safeVolumePlugin := strings.ReplaceAll(volumePlugin, "/", "~")
+		for _, path := range volumePaths {
+			gomega.Expect(path).NotTo(gomega.ContainSubstring(safeVolumePlugin), fmt.Sprintf("no %s volume should be mounted into pod directory", volumePlugin))
+		}
+		for _, path := range devicePaths {
+			gomega.Expect(path).NotTo(gomega.ContainSubstring(safeVolumePlugin), fmt.Sprintf("no %s volume should be symlinked into pod directory", volumePlugin))
+		}
+	})
 }
 
 func generateConfigsForPreprovisionedPVTest(scName string, volBindMode storagev1.VolumeBindingMode,

@@ -901,7 +901,11 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
 		HTTPProxyCheck{Proto: "https", Host: cfg.LocalAPIEndpoint.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
-		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
+	}
+
+	cidrs := strings.Split(cfg.Networking.PodSubnet, ",")
+	for _, cidr := range cidrs {
+		checks = append(checks, HTTPProxyCIDRCheck{Proto: "https", CIDR: cidr})
 	}
 
 	if !isSecondaryControlPlane {

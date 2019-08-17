@@ -215,7 +215,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 		result := om.GetLatestRuntimeOperationErrorRate()
 		e2elog.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
-	SIGDescribe("regular resource usage tracking", func() {
+	SIGDescribe("regular resource usage tracking [Feature:RegularResourceUsageTracking]", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
 		// and assign ~N pods on the node.
 		// Although we want to track N pods per node, there are N + add-on pods

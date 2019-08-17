@@ -212,10 +212,16 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		}
 	}
 
-	r := ipallocator.NewCIDRRange(makeIPNet(t))
+	r, err := ipallocator.NewCIDRRange(makeIPNet(t))
+	if err != nil {
+		t.Fatalf("cannot create CIDR Range %v", err)
+	}
 
 	portRange := utilnet.PortRange{Base: 30000, Size: 1000}
-	portAllocator := portallocator.NewPortAllocator(portRange)
+	portAllocator, err := portallocator.NewPortAllocator(portRange)
+	if err != nil {
+		t.Fatalf("cannot create port allocator %v", err)
+	}
 
 	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, r, portAllocator, nil)
 

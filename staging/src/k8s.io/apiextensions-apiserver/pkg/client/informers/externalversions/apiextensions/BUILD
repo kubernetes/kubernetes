@@ -11,6 +11,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions",
     deps = [
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces:go_default_library",
     ],
@@ -27,6 +28,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],

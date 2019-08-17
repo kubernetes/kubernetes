@@ -131,11 +131,12 @@ type Capability string
 
 // Constants related to capability
 const (
-	CapPersistence Capability = "persistence" // data is persisted across pod restarts
-	CapBlock       Capability = "block"       // raw block mode
-	CapFsGroup     Capability = "fsGroup"     // volume ownership via fsGroup
-	CapExec        Capability = "exec"        // exec a file in the volume
-	CapDataSource  Capability = "dataSource"  // support populate data from snapshot
+	CapPersistence        Capability = "persistence"        // data is persisted across pod restarts
+	CapBlock              Capability = "block"              // raw block mode
+	CapFsGroup            Capability = "fsGroup"            // volume ownership via fsGroup
+	CapExec               Capability = "exec"               // exec a file in the volume
+	CapSnapshotDataSource Capability = "snapshotDataSource" // support populate data from snapshot
+	CapPVCDataSource      Capability = "pvcDataSource"      // support populate data from pvc
 
 	// multiple pods on a node can use the same volume concurrently;
 	// for CSI, see:

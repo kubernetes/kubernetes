@@ -29,8 +29,8 @@ import (
 )
 
 // makeZone returns the zone value in format of <region>-<zone-id>.
-func (az *Cloud) makeZone(zoneID int) string {
-	return fmt.Sprintf("%s-%d", strings.ToLower(az.Location), zoneID)
+func (az *Cloud) makeZone(location string, zoneID int) string {
+	return fmt.Sprintf("%s-%d", strings.ToLower(location), zoneID)
 }
 
 // isAvailabilityZone returns true if the zone is in format of <region>-<zone-id>.
@@ -57,16 +57,18 @@ func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		}
 
 		if metadata.Compute == nil {
+			az.metadata.imsCache.Delete(metadataCacheKey)
 			return cloudprovider.Zone{}, fmt.Errorf("failure of getting compute information from instance metadata")
 		}
 
 		zone := ""
+		location := metadata.Compute.Location
 		if metadata.Compute.Zone != "" {
 			zoneID, err := strconv.Atoi(metadata.Compute.Zone)
 			if err != nil {
 				return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", metadata.Compute.Zone, err)
 			}
-			zone = az.makeZone(zoneID)
+			zone = az.makeZone(location, zoneID)
 		} else {
 			klog.V(3).Infof("Availability zone is not enabled for the node, falling back to fault domain")
 			zone = metadata.Compute.FaultDomain
@@ -74,7 +76,7 @@ func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 
 		return cloudprovider.Zone{
 			FailureDomain: zone,
-			Region:        az.Location,
+			Region:        location,
 		}, nil
 	}
 	// if UseInstanceMetadata is false, get Zone name by calling ARM

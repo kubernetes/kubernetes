@@ -17,7 +17,7 @@ limitations under the License.
 package testpatterns
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 )
@@ -233,3 +233,12 @@ var (
 		AllowExpansion: true,
 	}
 )
+
+// NewVolTypeMap creates a map with the given TestVolTypes enabled
+func NewVolTypeMap(types ...TestVolType) map[TestVolType]bool {
+	m := map[TestVolType]bool{}
+	for _, t := range types {
+		m[t] = true
+	}
+	return m
+}
