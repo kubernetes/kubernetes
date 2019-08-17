@@ -80,7 +80,7 @@ func NewStructural(s *apiextensions.JSONSchemaProps) (*Structural, error) {
 		ss.Items = item
 	}
 
-	if len(s.Properties) > 0 {
+	if s.Properties != nil {
 		ss.Properties = make(map[string]Structural, len(s.Properties))
 		for k, x := range s.Properties {
 			fld, err := NewStructural(&x)
