@@ -85,19 +85,18 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	return jobsByCj
 }
 
-// getRecentUnmetScheduleTimes gets a slice of times (from oldest to latest) that have passed when a Job should have started but did not.
-//
-// If there are too many (>100) unstarted times, just give up and return an empty slice.
-// If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
-	starts := []time.Time{}
+// getRecentUnmetScheduleTime returns a time.Time in the past when a Job should have started but did not.
+func getRecentUnmetScheduleTime(cj batchv1beta1.CronJob, now time.Time) (*time.Time, error) {
 	sched, err := cron.ParseStandard(cj.Spec.Schedule)
 	if err != nil {
-		return starts, fmt.Errorf("unparseable schedule: %s : %s", cj.Spec.Schedule, err)
+		return nil, fmt.Errorf("unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 	}
 
 	var earliestTime time.Time
-	if cj.Status.LastScheduleTime != nil {
+	if cj.Spec.StartingDeadlineSeconds != nil {
+		// Controller cannot schedule anything before this point
+		earliestTime = now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
+	} else if cj.Status.LastScheduleTime != nil {
 		earliestTime = cj.Status.LastScheduleTime.Time
 	} else {
 		// If none found, then this is either a recently created cronJob,
@@ -108,43 +107,13 @@ func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time
 		// CronJob as last known start time.
 		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
 	}
-	if cj.Spec.StartingDeadlineSeconds != nil {
-		// Controller is not going to schedule anything below this point
-		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
-
-		if schedulingDeadline.After(earliestTime) {
-			earliestTime = schedulingDeadline
-		}
-	}
 	if earliestTime.After(now) {
-		return []time.Time{}, nil
+		return nil, nil
 	}
-
-	for t := sched.Next(earliestTime); !t.After(now); t = sched.Next(t) {
-		starts = append(starts, t)
-		// An object might miss several starts. For example, if
-		// controller gets wedged on friday at 5:01pm when everyone has
-		// gone home, and someone comes in on tuesday AM and discovers
-		// the problem and restarts the controller, then all the hourly
-		// jobs, more than 80 of them for one hourly cronJob, should
-		// all start running with no further intervention (if the cronJob
-		// allows concurrency and late starts).
-		//
-		// However, if there is a bug somewhere, or incorrect clock
-		// on controller's server or apiservers (for setting creationTimestamp)
-		// then there could be so many missed start times (it could be off
-		// by decades or more), that it would eat up all the CPU and memory
-		// of this controller. In that case, we want to not try to list
-		// all the missed start times.
-		//
-		// I've somewhat arbitrarily picked 100, as more than 80,
-		// but less than "lots".
-		if len(starts) > 100 {
-			// We can't get the most recent times so just return an empty slice
-			return []time.Time{}, fmt.Errorf("too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew")
-		}
+	if next := sched.Next(earliestTime); !next.After(now) {
+		return &next, nil
 	}
-	return starts, nil
+	return nil, nil
 }
 
 // getJobFromTemplate makes a Job from a CronJob

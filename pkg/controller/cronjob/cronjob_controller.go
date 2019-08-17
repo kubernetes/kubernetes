@@ -266,36 +266,13 @@ func syncOne(cj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		return
 	}
 
-	times, err := getRecentUnmetScheduleTimes(*cj, now)
+	scheduledTime, err := getRecentUnmetScheduleTime(*cj, now)
 	if err != nil {
 		recorder.Eventf(cj, v1.EventTypeWarning, "FailedNeedsStart", "Cannot determine if job needs to be started: %v", err)
 		klog.Errorf("Cannot determine if %s needs to be started: %v", nameForLog, err)
 		return
 	}
-	// TODO: handle multiple unmet start times, from oldest to newest, updating status as needed.
-	if len(times) == 0 {
-		klog.V(4).Infof("No unmet start times for %s", nameForLog)
-		return
-	}
-	if len(times) > 1 {
-		klog.V(4).Infof("Multiple unmet start times for %s so only starting last one", nameForLog)
-	}
-
-	scheduledTime := times[len(times)-1]
-	tooLate := false
-	if cj.Spec.StartingDeadlineSeconds != nil {
-		tooLate = scheduledTime.Add(time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds)).Before(now)
-	}
-	if tooLate {
-		klog.V(4).Infof("Missed starting window for %s", nameForLog)
-		recorder.Eventf(cj, v1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
-		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
-		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
-		// the cj again and again, we could set a Status.LastMissedTime when we notice a miss.
-		// Then, when we call getRecentUnmetScheduleTimes, we can take max(creationTimestamp,
-		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
-		// and event the next time we process it, and also so the user looking at the status
-		// can see easily that there was a missed execution.
+	if scheduledTime == nil {
 		return
 	}
 	if cj.Spec.ConcurrencyPolicy == batchv1beta1.ForbidConcurrent && len(cj.Status.Active) > 0 {
@@ -326,7 +303,7 @@ func syncOne(cj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		}
 	}
 
-	jobReq, err := getJobFromTemplate(cj, scheduledTime)
+	jobReq, err := getJobFromTemplate(cj, *scheduledTime)
 	if err != nil {
 		klog.Errorf("Unable to make Job from template in %s: %v", nameForLog, err)
 		return
@@ -360,7 +337,7 @@ func syncOne(cj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	} else {
 		cj.Status.Active = append(cj.Status.Active, *ref)
 	}
-	cj.Status.LastScheduleTime = &metav1.Time{Time: scheduledTime}
+	cj.Status.LastScheduleTime = &metav1.Time{Time: now}
 	if _, err := cjc.UpdateStatus(cj); err != nil {
 		klog.Infof("Unable to update status for %s (rv = %s): %v", nameForLog, cj.ResourceVersion, err)
 	}

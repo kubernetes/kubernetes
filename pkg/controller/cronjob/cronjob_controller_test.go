@@ -231,15 +231,15 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), F, F, 1, 0},
 		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F, 2, 0},
 
-		// Controller should fail to schedule these, as there are too many missed starting times
-		// and either no deadline or a too long deadline.
-		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0, 1},
-		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0, 1},
-		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0, 1},
-		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noDead, T, F, weekAfterTheHour(), F, F, 0, 1},
-		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noDead, T, F, weekAfterTheHour(), F, F, 0, 1},
-		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noDead, T, F, weekAfterTheHour(), F, F, 0, 1},
+		// Controller should still schedule these, no deadline or not past deadline
+		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, weekAfterTheHour(), T, F, 1, 0},
+		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, weekAfterTheHour(), T, F, 1, 0},
+		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, longDead, T, F, weekAfterTheHour(), T, F, 1, 0},
+		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noDead, T, F, weekAfterTheHour(), T, F, 1, 0},
+		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noDead, T, F, weekAfterTheHour(), T, F, 1, 0},
+		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noDead, T, F, weekAfterTheHour(), T, F, 1, 0},
 
+		// Controller should fail to schedule these, as the scheduling deadline has passed
 		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, mediumDead, T, F, weekAfterTheHour(), T, F, 1, 0},
 		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, shortDead, T, F, weekAfterTheHour(), T, F, 1, 0},
 
@@ -769,7 +769,7 @@ func TestSyncOne_Status(t *testing.T) {
 				t.Errorf("%s: expected missing job to be removed from active list, actually active list = %#v", name, cjc.Updates[0].Status.Active)
 			}
 
-			if tc.expectCreate && !cjc.Updates[1].Status.LastScheduleTime.Time.Equal(topOfTheHour()) {
+			if tc.expectCreate && !cjc.Updates[1].Status.LastScheduleTime.Time.Equal(tc.now) {
 				t.Errorf("%s: expected LastScheduleTime updated to %s, got %s", name, topOfTheHour(), cjc.Updates[1].Status.LastScheduleTime)
 			}
 		})

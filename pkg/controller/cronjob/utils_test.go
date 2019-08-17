@@ -274,12 +274,12 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is more than creation time, but less than T1.
 		now := T1.Add(-7 * time.Minute)
-		times, err := getRecentUnmetScheduleTimes(cj, now)
+		scheduledTime, err := getRecentUnmetScheduleTime(cj, now)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if len(times) != 0 {
-			t.Errorf("expected no start times, got:  %v", times)
+		if scheduledTime != nil {
+			t.Errorf("expected no start time, got: %v", scheduledTime)
 		}
 	}
 	{
@@ -288,14 +288,12 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is after T1
 		now := T1.Add(2 * time.Second)
-		times, err := getRecentUnmetScheduleTimes(cj, now)
+		scheduledTime, err := getRecentUnmetScheduleTime(cj, now)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if len(times) != 1 {
-			t.Errorf("expected 1 start time, got: %v", times)
-		} else if !times[0].Equal(T1) {
-			t.Errorf("expected: %v, got: %v", T1, times[0])
+		if !scheduledTime.Equal(T1) {
+			t.Errorf("expected: %v, got: %v", T1, scheduledTime)
 		}
 	}
 	{
@@ -306,12 +304,12 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1
 		now := T1.Add(2 * time.Minute)
-		times, err := getRecentUnmetScheduleTimes(cj, now)
+		scheduledTime, err := getRecentUnmetScheduleTime(cj, now)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if len(times) != 0 {
-			t.Errorf("expected 0 start times, got: %v", times)
+		if scheduledTime != nil {
+			t.Errorf("expected no start time, got: %v", scheduledTime)
 		}
 	}
 	{
@@ -322,56 +320,36 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		times, err := getRecentUnmetScheduleTimes(cj, now)
+		scheduledTime, err := getRecentUnmetScheduleTime(cj, now)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if len(times) != 1 {
-			t.Errorf("expected 1 start times, got: %v", times)
-		} else if !times[0].Equal(T2) {
-			t.Errorf("expected: %v, got: %v", T1, times[0])
+		if !scheduledTime.Equal(T2) {
+			t.Errorf("expected: %v, got: %v", T2, scheduledTime)
 		}
 	}
 	{
-		// Case 5: known LastScheduleTime, two starts needed
-		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
-		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
-		// Current time is after T1 and after T2
-		now := T2.Add(5 * time.Minute)
-		times, err := getRecentUnmetScheduleTimes(cj, now)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if len(times) != 2 {
-			t.Errorf("expected 2 start times, got: %v", times)
-		} else {
-			if !times[0].Equal(T1) {
-				t.Errorf("expected: %v, got: %v", T1, times[0])
-			}
-			if !times[1].Equal(T2) {
-				t.Errorf("expected: %v, got: %v", T2, times[1])
-			}
-		}
-	}
-	{
-		// Case 6: now is way way ahead of last start time, and there is no deadline.
+		// Case 5: now is way way ahead of last start time, and there is no deadline.
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
-		_, err := getRecentUnmetScheduleTimes(cj, now)
-		if err == nil {
-			t.Errorf("expected an error")
+		scheduledTime, err := getRecentUnmetScheduleTime(cj, now)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if scheduledTime.Equal(T2) {
+			t.Errorf("expected: %v, got: %v", T2, scheduledTime)
 		}
 	}
 	{
-		// Case 7: now is way way ahead of last start time, but there is a short deadline.
+		// Case 6: now is way way ahead of last start time, but there is a short deadline.
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
 		// Deadline is short
 		deadline := int64(2 * 60 * 60)
 		cj.Spec.StartingDeadlineSeconds = &deadline
-		_, err := getRecentUnmetScheduleTimes(cj, now)
+		_, err := getRecentUnmetScheduleTime(cj, now)
 		if err != nil {
 			t.Errorf("unexpected error")
 		}
