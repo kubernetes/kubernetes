@@ -789,17 +789,19 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
+	// don't sync rules till we've received services and endpoints
+	if !proxier.endpointsSynced || !proxier.servicesSynced {
+		klog.V(2).Info("Not syncing ipvs rules until Services and Endpoints have been received from master")
+		return
+	}
+
+	// Keep track of how long syncs take.
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
 		metrics.DeprecatedSyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
 		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
-	// don't sync rules till we've received services and endpoints
-	if !proxier.endpointsSynced || !proxier.servicesSynced {
-		klog.V(2).Info("Not syncing ipvs rules until Services and Endpoints have been received from master")
-		return
-	}
 
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
