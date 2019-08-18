@@ -222,8 +222,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		conditions = rs.Status.Conditions
 
 		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
-		return cond != nil, nil
-
+		return cond.Status == v1.ConditionTrue, nil
 	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
@@ -252,7 +251,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		conditions = rs.Status.Conditions
 
 		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
-		return cond == nil, nil
+		return (cond == nil || cond.Status == v1.ConditionFalse), nil
 	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
