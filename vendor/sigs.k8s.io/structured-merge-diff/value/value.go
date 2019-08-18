@@ -34,6 +34,11 @@ type Value struct {
 	Null         bool // represents an explicit `"foo" = null`
 }
 
+// Equals returns true iff the two values are equal.
+func (v Value) Equals(rhs Value) bool {
+	return !v.Less(rhs) && !rhs.Less(v)
+}
+
 // Less provides a total ordering for Value (so that they can be sorted, even
 // if they are of different types).
 func (v Value) Less(rhs Value) bool {
@@ -167,7 +172,7 @@ type Map struct {
 
 	// may be nil; lazily constructed.
 	// TODO: Direct modifications to Items above will cause serious problems.
-	index map[string]*Field
+	index map[string]int
 	// may be empty; lazily constructed.
 	// TODO: Direct modifications to Items above will cause serious problems.
 	order []int
@@ -264,14 +269,16 @@ func (m *Map) Less(rhs *Map) bool {
 // Get returns the (Field, true) or (nil, false) if it is not present
 func (m *Map) Get(key string) (*Field, bool) {
 	if m.index == nil {
-		m.index = map[string]*Field{}
+		m.index = map[string]int{}
 		for i := range m.Items {
-			f := &m.Items[i]
-			m.index[f.Name] = f
+			m.index[m.Items[i].Name] = i
 		}
 	}
 	f, ok := m.index[key]
-	return f, ok
+	if !ok {
+		return nil, false
+	}
+	return &m.Items[f], true
 }
 
 // Set inserts or updates the given item.
@@ -281,7 +288,8 @@ func (m *Map) Set(key string, value Value) {
 		return
 	}
 	m.Items = append(m.Items, Field{Name: key, Value: value})
-	m.index = nil // Since the append might have reallocated
+	i := len(m.Items) - 1
+	m.index[key] = i
 	m.order = nil
 }
 
