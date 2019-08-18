@@ -113,7 +113,7 @@ func TestVersionFromNetwork(t *testing.T) {
 		ErrorExpected        bool
 	}
 
-	currentVersion := normalizedBuildVersion(constants.CurrentKubernetesVersion.String())
+	currentVersion := normalizedBuildVersion(constants.GetCurrentKubernetesVersion().String())
 
 	cases := map[string]T{
 		"stable":     {"stable-1", "v1.4.6", false, false}, // recursive pointer to stable-1

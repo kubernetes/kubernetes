@@ -46,7 +46,7 @@ const (
 
 // dummyKubernetesVersion is just used for unit testing, in order to not make
 // kubeadm lookup dl.k8s.io to resolve what the latest stable release is
-var dummyKubernetesVersion = constants.MinimumControlPlaneVersion.String()
+var dummyKubernetesVersion = constants.GetMinimumControlPlaneVersion().String()
 
 func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
@@ -71,13 +71,13 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
-				constants.CurrentKubernetesVersion.String(),
+				constants.GetCurrentKubernetesVersion().String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 				apiVersion: kubeadm.k8s.io/v1beta2
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.CurrentKubernetesVersion))),
+			`, constants.GetCurrentKubernetesVersion()))),
 		},
 		{
 			name:               "use coredns",
@@ -89,7 +89,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				apiVersion: kubeadm.k8s.io/v1beta2
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.MinimumControlPlaneVersion))),
+			`, constants.GetMinimumControlPlaneVersion()))),
 		},
 	}
 

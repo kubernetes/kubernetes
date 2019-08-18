@@ -40,7 +40,7 @@ const (
 	testCertsDir = "/var/lib/certs"
 )
 
-var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()
+var cpVersion = kubeadmconstants.GetMinimumControlPlaneVersion().WithPreRelease("beta.2").String()
 
 func TestGetStaticPodSpecs(t *testing.T) {
 

@@ -160,13 +160,13 @@ func TestEtcdSupportedVersion(t *testing.T) {
 			expectedError:     errors.New("unsupported or unknown Kubernetes version(1.99.0)"),
 		},
 		{
-			kubernetesVersion: MinimumControlPlaneVersion.WithPatch(1).String(),
-			expectedVersion:   version.MustParseSemantic(SupportedEtcdVersion[uint8(MinimumControlPlaneVersion.Minor())]),
+			kubernetesVersion: GetMinimumControlPlaneVersion().WithPatch(1).String(),
+			expectedVersion:   version.MustParseSemantic(SupportedEtcdVersion[uint8(GetMinimumControlPlaneVersion().Minor())]),
 			expectedError:     nil,
 		},
 		{
-			kubernetesVersion: CurrentKubernetesVersion.String(),
-			expectedVersion:   version.MustParseSemantic(SupportedEtcdVersion[uint8(CurrentKubernetesVersion.Minor())]),
+			kubernetesVersion: GetCurrentKubernetesVersion().String(),
+			expectedVersion:   version.MustParseSemantic(SupportedEtcdVersion[uint8(GetCurrentKubernetesVersion().Minor())]),
 			expectedError:     nil,
 		},
 	}

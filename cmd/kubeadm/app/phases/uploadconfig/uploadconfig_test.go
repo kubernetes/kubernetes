@@ -83,7 +83,7 @@ func TestUploadConfiguration(t *testing.T) {
 				},
 			}
 			clustercfg := &kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
+				KubernetesVersion: kubeadmconstants.GetMinimumControlPlaneVersion().WithPatch(10).String(),
 			}
 			cfg, err := configutil.DefaultedInitConfiguration(initialcfg, clustercfg)
 

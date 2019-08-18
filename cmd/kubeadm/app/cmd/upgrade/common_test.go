@@ -27,7 +27,7 @@ import (
 )
 
 func TestGetK8sVersionFromUserInput(t *testing.T) {
-	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
+	currentVersion := "v" + constants.GetCurrentKubernetesVersion().String()
 	validConfig := "apiVersion: kubeadm.k8s.io/v1beta2\n" +
 		"kind: ClusterConfiguration\n" +
 		"kubernetesVersion: " + currentVersion

@@ -32,7 +32,7 @@ import (
 func TestCreateConfigMap(t *testing.T) {
 	nodeName := "fake-node"
 	client := fake.NewSimpleClientset()
-	k8sVersionStr := constants.CurrentKubernetesVersion.String()
+	k8sVersionStr := constants.GetCurrentKubernetesVersion().String()
 	cfg := &kubeletconfig.KubeletConfiguration{}
 
 	client.PrependReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {

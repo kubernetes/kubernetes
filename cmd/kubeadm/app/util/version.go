@@ -106,8 +106,8 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 
 		if clientVersionErr != nil {
 			if err != nil {
-				klog.Warningf("could not obtain neither client nor remote version; fall back to: %s", constants.CurrentKubernetesVersion)
-				return kubernetesReleaseVersion(constants.CurrentKubernetesVersion.String(), fetcher)
+				klog.Warningf("could not obtain neither client nor remote version; fall back to: %s", constants.GetCurrentKubernetesVersion())
+				return kubernetesReleaseVersion(constants.GetCurrentKubernetesVersion().String(), fetcher)
 			}
 
 			klog.Warningf("could not obtain client version; using remote version: %s", body)

@@ -129,7 +129,7 @@ func TestNewFeatureGate(t *testing.T) {
 func TestValidateVersion(t *testing.T) {
 	var someFeatures = FeatureList{
 		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
-		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}, MinimumVersion: constants.MinimumControlPlaneVersion.WithPreRelease("alpha.1")},
+		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}, MinimumVersion: constants.GetMinimumControlPlaneVersion().WithPreRelease("alpha.1")},
 	}
 
 	var tests = []struct {
@@ -146,7 +146,7 @@ func TestValidateVersion(t *testing.T) {
 		{
 			name:              "min version but correct value given",
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  constants.MinimumControlPlaneVersion.String(),
+			requestedVersion:  constants.GetMinimumControlPlaneVersion().String(),
 			expectedError:     false,
 		},
 		{

@@ -482,7 +482,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpEtcdDataDir)
 
-			oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			oldcfg, err := getConfig(constants.GetMinimumControlPlaneVersion().String(), tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}
@@ -526,7 +526,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				t.Fatalf("couldn't read temp file: %v", err)
 			}
 
-			newcfg, err := getConfig(constants.CurrentKubernetesVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			newcfg, err := getConfig(constants.GetCurrentKubernetesVersion().String(), tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}

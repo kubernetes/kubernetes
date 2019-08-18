@@ -45,7 +45,7 @@ var (
 
 		# Download the kubelet configuration from the ConfigMap in the cluster. Use a specific desired kubelet version.
 		kubeadm alpha phase kubelet config download --kubelet-version %s
-		`, constants.CurrentKubernetesVersion))
+		`, constants.GetCurrentKubernetesVersion()))
 
 	kubeletConfigEnableDynamicLongDesc = cmdutil.LongDesc(`
 		Enable or update dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
@@ -62,7 +62,7 @@ var (
 
 		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
-		`, constants.CurrentKubernetesVersion))
+		`, constants.GetCurrentKubernetesVersion()))
 )
 
 // newCmdKubeletUtility returns command for `kubeadm phase kubelet`

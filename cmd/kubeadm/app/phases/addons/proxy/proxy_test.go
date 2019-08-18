@@ -185,7 +185,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 					PodSubnet: "5.6.7.8/24",
 				},
 				ImageRepository:   "someRepo",
-				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
+				KubernetesVersion: constants.GetMinimumControlPlaneVersion().String(),
 			}
 
 			// Simulate an error if necessary

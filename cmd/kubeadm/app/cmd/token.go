@@ -213,7 +213,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
 		// KubernetesVersion is not used, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
-		KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
+		KubernetesVersion: kubeadmconstants.GetCurrentKubernetesVersion().String(),
 	}
 	kubeadmscheme.Scheme.Default(clusterCfg)
 

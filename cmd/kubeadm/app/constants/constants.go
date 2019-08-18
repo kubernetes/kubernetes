@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	pkgversion "k8s.io/kubernetes/cmd/kubeadm/app/version"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -407,13 +409,8 @@ var (
 	// ControlPlaneComponents defines the control-plane component names
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
-	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.15.0")
-
-	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.15.0")
-
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
+	// DEPRECATED: please use GetCurrentKubernetesVersion() instead
 	CurrentKubernetesVersion = version.MustParseSemantic("v1.16.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
@@ -554,4 +551,37 @@ func GetDNSVersion(dnsType kubeadmapi.DNSAddOnType) string {
 // GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s
 func GetKubeletConfigMapName(k8sVersion *version.Version) string {
 	return fmt.Sprintf("%s%d.%d", KubeletBaseConfigurationConfigMapPrefix, k8sVersion.Major(), k8sVersion.Minor())
+}
+
+// GetCurrentKubernetesVersion returns current Kubernetes version supported by kubeadm
+func GetCurrentKubernetesVersion() *version.Version {
+	gitVersion := pkgversion.Get().GitVersion
+	if strings.Contains(gitVersion, "-") {
+		gitVersion = strings.Split(gitVersion, "-")[0]
+	}
+	// If bazel or hack/lib/version.sh does not generate the correct version number,
+	// use hardcoded CurrentKubernetesVersion
+	// TODO: Get rid of hardcoded version
+	if gitVersion == "" || gitVersion == "v0.0.0" {
+		return CurrentKubernetesVersion
+	}
+	curVersion, err := version.ParseSemantic(gitVersion)
+	if err != nil {
+		return CurrentKubernetesVersion
+	}
+	return curVersion
+}
+
+// GetMinimumControlPlaneVersion returns the minimum control plane version kubeadm can deploy
+func GetMinimumControlPlaneVersion() *version.Version {
+	currentVersion := GetCurrentKubernetesVersion()
+	if currentVersion.Minor() > 0 {
+		return currentVersion.WithMinor(currentVersion.Minor() - 1)
+	}
+	return currentVersion
+}
+
+// GetMinimumKubeletVersion returns the minimum version of kubelet which kubeadm supports
+func GetMinimumKubeletVersion() *version.Version {
+	return GetMinimumControlPlaneVersion()
 }

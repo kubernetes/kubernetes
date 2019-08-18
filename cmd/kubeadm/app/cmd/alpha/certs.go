@@ -128,7 +128,7 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 	flags := &renewFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
-			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			KubernetesVersion: constants.GetCurrentKubernetesVersion().String(),
 		},
 	}
 	// Default values for the cobra help text
@@ -234,7 +234,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 	flags := &expirationFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
-			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			KubernetesVersion: constants.GetCurrentKubernetesVersion().String(),
 		},
 	}
 	// Default values for the cobra help text

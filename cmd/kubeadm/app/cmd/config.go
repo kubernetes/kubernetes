@@ -188,7 +188,7 @@ func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 		},
 	}
 	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
+		KubernetesVersion: constants.GetCurrentKubernetesVersion().String(), // avoid going to the Internet for the current Kubernetes version
 	}
 	return configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
 }

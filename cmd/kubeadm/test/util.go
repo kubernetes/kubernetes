@@ -68,7 +68,7 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
 		kubernetesVersion: %s
-		`, kubeadmconstants.MinimumControlPlaneVersion))))
+		`, kubeadmconstants.GetMinimumControlPlaneVersion()))))
 
 	f, err := os.Create(cfgPath)
 	if err != nil {

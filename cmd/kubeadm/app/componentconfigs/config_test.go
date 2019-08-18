@@ -40,7 +40,7 @@ kind: KubeletConfiguration
 }
 
 func TestGetFromConfigMap(t *testing.T) {
-	k8sVersion := version.MustParseGeneric(kubeadmconstants.CurrentKubernetesVersion.String())
+	k8sVersion := version.MustParseGeneric(kubeadmconstants.GetCurrentKubernetesVersion().String())
 
 	var tests = []struct {
 		name          string
