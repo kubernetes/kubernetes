@@ -18,6 +18,9 @@ limitations under the License.
 package rand
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/binary"
+
 	"math/rand"
 	"sync"
 	"time"
@@ -75,6 +78,26 @@ func Perm(n int) []int {
 	rng.Lock()
 	defer rng.Unlock()
 	return rng.rand.Perm(n)
+}
+
+// InitMathRand adopts crypto/rand.Read which is less predictable seed for random number generator.
+// See https://stackoverflow.com/questions/12321133/golang-random-number-generator-how-to-seed-properly
+func InitMathRand() error {
+	var b [8]byte
+	var err error
+	timedOut := false
+	select {
+	case <-time.After(200 * time.Millisecond):
+		timedOut = true
+	default:
+		_, err = cryptorand.Read(b[:])
+	}
+	if err != nil || timedOut {
+		rand.Seed(time.Now().UnixNano())
+	} else {
+		rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
+	}
+	return nil
 }
 
 const (

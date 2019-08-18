@@ -20,15 +20,14 @@ import (
 	"errors"
 	goflag "flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
+	apirand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/features"
@@ -104,7 +104,11 @@ func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, err
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	err := apirand.InitMathRand()
+	if err != nil {
+		klog.Fatalf("cannot seed random: %v", err)
+		os.Exit(2)
+	}
 
 	command := newHollowNodeCommand()
 

@@ -21,16 +21,15 @@ package main
 
 import (
 	goflag "flag"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"time"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"os"
+	"path/filepath"
 
+	apirand "k8s.io/apimachinery/pkg/util/rand"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
 	cloudcontrollermanager "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 	kubeapiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	kubecontrollermanager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -43,7 +42,11 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	err := apirand.InitMathRand()
+	if err != nil {
+		klog.Fatalf("cannot seed random: %v", err)
+		os.Exit(2)
+	}
 
 	hyperkubeCommand, allCommandFns := NewHyperKubeCommand()
 

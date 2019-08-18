@@ -20,11 +20,11 @@ limitations under the License.
 package main
 
 import (
-	"math/rand"
 	"os"
-	"time"
 
+	apirand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 
 	// NOTE: Importing all in-tree cloud-providers is not required when
@@ -35,7 +35,11 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	err := apirand.InitMathRand()
+	if err != nil {
+		klog.Fatalf("cannot seed random: %v", err)
+		os.Exit(2)
+	}
 
 	command := app.NewCloudControllerManagerCommand()
 

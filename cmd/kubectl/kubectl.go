@@ -18,13 +18,13 @@ package main
 
 import (
 	goflag "flag"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/spf13/pflag"
 
+	apirand "k8s.io/apimachinery/pkg/util/rand"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 
@@ -33,7 +33,11 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	err := apirand.InitMathRand()
+	if err != nil {
+		klog.Fatalf("cannot seed random: %v", err)
+		os.Exit(2)
+	}
 
 	command := cmd.NewDefaultKubectlCommand()
 
