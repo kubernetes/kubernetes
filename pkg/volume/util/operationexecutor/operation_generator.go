@@ -401,7 +401,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	}
 
 	eventRecorderFunc := func(err *error) {
-		if *err != nil {
+		if err != nil {
 			for _, pod := range volumeToAttach.ScheduledPods {
 				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, (*err).Error())
 			}
@@ -776,7 +776,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}
 
 	eventRecorderFunc := func(err *error) {
-		if *err != nil {
+		if err != nil {
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, (*err).Error())
 		}
 	}
@@ -1184,7 +1184,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	}
 
 	eventRecorderFunc := func(err *error) {
-		if *err != nil {
+		if err != nil {
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, (*err).Error())
 		}
 	}
@@ -1600,7 +1600,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	}
 
 	eventRecorderFunc := func(err *error) {
-		if *err != nil {
+		if err != nil {
 			og.recorder.Eventf(pvc, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
 		}
 	}
@@ -1685,7 +1685,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	}
 
 	eventRecorderFunc := func(err *error) {
-		if *err != nil {
+		if err != nil {
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
 		}
 	}
