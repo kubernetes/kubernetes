@@ -997,12 +997,16 @@ func printGlusterfsVolumeSource(glusterfs *corev1.GlusterfsVolumeSource, w Prefi
 }
 
 func printGlusterfsPersistentVolumeSource(glusterfs *corev1.GlusterfsPersistentVolumeSource, w PrefixWriter) {
+	endpointsNamespace := "<unset>"
+	if glusterfs.EndpointsNamespace != nil {
+		endpointsNamespace = *glusterfs.EndpointsNamespace
+	}
 	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
 		"    EndpointsNamespace:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		glusterfs.EndpointsName, glusterfs.EndpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
+		glusterfs.EndpointsName, endpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
 }
 
 func printPersistentVolumeClaimVolumeSource(claim *corev1.PersistentVolumeClaimVolumeSource, w PrefixWriter) {
