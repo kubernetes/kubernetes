@@ -184,7 +184,6 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 	// Special treatment is required for etcd case, when rollbackOldManifests should roll back etcd
 	// manifests only for the case when component is Etcd
 	recoverEtcd := false
-	waitForComponentRestart := true
 	if component == constants.Etcd {
 		recoverEtcd = true
 	}
@@ -232,27 +231,23 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 
 	fmt.Printf("[upgrade/staticpods] Moved new manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
 
-	if waitForComponentRestart {
-		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
-		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
+	fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
+	fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
 
-		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
-		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
-		// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
-		// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
-		if err := waiter.WaitForStaticPodHashChange(cfg.NodeRegistration.Name, component, beforePodHash); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-		}
-
-		// Wait for the static pod component to come up and register itself as a mirror pod
-		if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-		}
-
-		fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
-	} else {
-		fmt.Printf("[upgrade/staticpods] Not waiting for pod-hash change for component %q\n", component)
+	// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
+	// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
+	// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
+	// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
+	if err := waiter.WaitForStaticPodHashChange(cfg.NodeRegistration.Name, component, beforePodHash); err != nil {
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
+
+	// Wait for the static pod component to come up and register itself as a mirror pod
+	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+	}
+
+	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
 
 	return nil
 }
