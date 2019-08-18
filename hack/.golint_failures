@@ -10,7 +10,6 @@ pkg/apis/apps
 pkg/apis/apps/v1
 pkg/apis/apps/v1beta1
 pkg/apis/apps/v1beta2
-pkg/apis/apps/validation
 pkg/apis/auditregistration/v1alpha1
 pkg/apis/authentication/v1
 pkg/apis/authorization/v1
