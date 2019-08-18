@@ -67,6 +67,9 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/restclient:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/workqueue:all-srcs",
     ],
     tags = ["automanaged"],
 )
