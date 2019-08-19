@@ -73,7 +73,7 @@ func (r *lazyMetric) IsCreated() bool {
 	return r.isCreated
 }
 
-// lazyInit provides the lazyMetric with a reference to the kubeCollector it is supposed
+// lazyInit provides the lazyMetric with reference to the kubeCollector it is supposed
 // to allow lazy initialization for. It should be invoked in the factory function which creates new
 // kubeCollector type objects.
 func (r *lazyMetric) lazyInit(self kubeCollector) {

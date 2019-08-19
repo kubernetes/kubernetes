@@ -218,7 +218,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 // startControllers starts the cloud specific controller loops.
 func startControllers(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}, cloud cloudprovider.Interface, controllers map[string]initFunc) error {
-	// Initialize the cloud provider with a reference to the clientBuilder
+	// Initialize the cloud provider with reference to the clientBuilder
 	cloud.Initialize(c.ClientBuilder, stopCh)
 	// Set the informer on the user cloud object
 	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
