@@ -548,6 +548,7 @@ func BuildRequestManagement(s *options.ServerRunOptions, extclient clientgoclien
 		fairqueuing.NewNoRestraintFactory( /* TODO: switch to real implementation */ ),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
+		nil,
 		flowcontrolbootstrap.PreservingFlowSchemas,
 		flowcontrolbootstrap.PreservingPriorityLevelConfigurations,
 	)
