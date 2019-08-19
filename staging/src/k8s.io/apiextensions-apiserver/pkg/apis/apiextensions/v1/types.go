@@ -34,13 +34,13 @@ const (
 
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
-	// Group is the group this resource belongs in
+	// group is the group this resource belongs in
 	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
-	// Names are the names used to describe this custom resource
+	// names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
-	// Scope indicates whether this resource is cluster or namespace scoped.
+	// scope indicates whether this resource is cluster or namespace scoped.
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
-	// Versions is the list of all supported versions for this resource.
+	// versions is the list of all supported versions for this resource.
 	// Order: The version name will be used to compute the order.
 	// If the version string is "kube-like", it will sort above non "kube-like" version strings, which are ordered
 	// lexicographically. "Kube-like" versions start with a "v", then are followed by a number (the major version),
@@ -50,7 +50,7 @@ type CustomResourceDefinitionSpec struct {
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion `json:"versions" protobuf:"bytes,7,rep,name=versions"`
 
-	// `conversion` defines conversion settings for the CRD.
+	// conversion defines conversion settings for the CRD.
 	// +optional
 	Conversion *CustomResourceConversion `json:"conversion,omitempty" protobuf:"bytes,9,opt,name=conversion"`
 
@@ -64,7 +64,7 @@ type CustomResourceDefinitionSpec struct {
 
 // CustomResourceConversion describes how to convert different versions of a CR.
 type CustomResourceConversion struct {
-	// `strategy` specifies the conversion strategy. Allowed values are:
+	// strategy specifies the conversion strategy. Allowed values are:
 	// - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
 	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
 	//   is needed for this option. This requires spec.preserveUnknownFields to be false.
@@ -77,11 +77,11 @@ type CustomResourceConversion struct {
 
 // WebhookConversion describes how to call a conversion webhook
 type WebhookConversion struct {
-	// `clientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
+	// clientConfig is the instructions for how to call the webhook if strategy is `Webhook`.
 	// +optional
 	ClientConfig *WebhookClientConfig `json:"clientConfig,omitempty" protobuf:"bytes,2,name=clientConfig"`
 
-	// ConversionReviewVersions is an ordered list of preferred `ConversionReview`
+	// conversionReviewVersions is an ordered list of preferred `ConversionReview`
 	// versions the Webhook expects. API server will try to use first version in
 	// the list which it supports. If none of the versions specified in this list
 	// supported by API server, conversion will fail for this object.
@@ -93,7 +93,7 @@ type WebhookConversion struct {
 // WebhookClientConfig contains the information to make a TLS
 // connection with the webhook. It has the same field as admissionregistration.v1.WebhookClientConfig.
 type WebhookClientConfig struct {
-	// `url` gives the location of the webhook, in standard URL form
+	// url gives the location of the webhook, in standard URL form
 	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
@@ -122,7 +122,7 @@ type WebhookClientConfig struct {
 	// +optional
 	URL *string `json:"url,omitempty" protobuf:"bytes,3,opt,name=url"`
 
-	// `service` is a reference to the service for this webhook. Either
+	// service is a reference to the service for this webhook. Either
 	// `service` or `url` must be specified.
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
@@ -130,7 +130,7 @@ type WebhookClientConfig struct {
 	// +optional
 	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// caBundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
@@ -138,19 +138,19 @@ type WebhookClientConfig struct {
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
 type ServiceReference struct {
-	// `namespace` is the namespace of the service.
+	// namespace is the namespace of the service.
 	// Required
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
-	// `name` is the name of the service.
+	// name is the name of the service.
 	// Required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
-	// `path` is an optional URL path which will be sent in any request to
+	// path is an optional URL path which will be sent in any request to
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
 
-	// If specified, the port on the service that hosting webhook.
+	// port if specified, the port on the service that hosting webhook.
 	// Default to 443 for backward compatibility.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
@@ -159,20 +159,20 @@ type ServiceReference struct {
 
 // CustomResourceDefinitionVersion describes a version for CRD.
 type CustomResourceDefinitionVersion struct {
-	// Name is the version name, e.g. “v1”, “v2beta1”, etc.
+	// name is the version name, e.g. “v1”, “v2beta1”, etc.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// Served is a flag enabling/disabling this version from being served via REST APIs
+	// served is a flag enabling/disabling this version from being served via REST APIs
 	Served bool `json:"served" protobuf:"varint,2,opt,name=served"`
-	// Storage flags the version as storage version. There must be exactly one
+	// storage flags the version as storage version. There must be exactly one
 	// flagged as storage version.
 	Storage bool `json:"storage" protobuf:"varint,3,opt,name=storage"`
-	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+	// schema describes the schema for CustomResource used in validation, pruning, and defaulting.
 	// +optional
 	Schema *CustomResourceValidation `json:"schema,omitempty" protobuf:"bytes,4,opt,name=schema"`
-	// Subresources describes the subresources for CustomResource
+	// subresources describes the subresources for CustomResource
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,5,opt,name=subresources"`
-	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// additionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
 }
@@ -198,27 +198,27 @@ type CustomResourceColumnDefinition struct {
 	// +optional
 	Priority int32 `json:"priority,omitempty" protobuf:"bytes,5,opt,name=priority"`
 
-	// JSONPath is a simple JSON path, i.e. with array notation.
+	// jsonPath is a simple JSON path, i.e. with array notation.
 	JSONPath string `json:"jsonPath" protobuf:"bytes,6,opt,name=jsonPath"`
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
 type CustomResourceDefinitionNames struct {
-	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResourceDefinition-registration
+	// plural is the plural name of the resource to serve.  It must match the name of the CustomResourceDefinition-registration
 	// too: plural.group and it must be all lowercase.
 	Plural string `json:"plural" protobuf:"bytes,1,opt,name=plural"`
-	// Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
+	// singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
 	// +optional
 	Singular string `json:"singular,omitempty" protobuf:"bytes,2,opt,name=singular"`
-	// ShortNames are short names for the resource.  It must be all lowercase.
+	// shortNames are short names for the resource.  It must be all lowercase.
 	// +optional
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,3,opt,name=shortNames"`
-	// Kind is the serialized kind of the resource.  It is normally CamelCase and singular.
+	// kinds is the serialized kind of the resource.  It is normally CamelCase and singular.
 	Kind string `json:"kind" protobuf:"bytes,4,opt,name=kind"`
-	// ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
+	// listKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
 	// +optional
 	ListKind string `json:"listKind,omitempty" protobuf:"bytes,5,opt,name=listKind"`
-	// Categories is a list of grouped resources custom resources belong to (e.g. 'all')
+	// categories is a list of grouped resources custom resources belong to (e.g. 'all')
 	// +optional
 	Categories []string `json:"categories,omitempty" protobuf:"bytes,6,rep,name=categories"`
 }
@@ -276,32 +276,32 @@ const (
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
+	// type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=CustomResourceDefinitionConditionType"`
-	// Status is the status of the condition.
+	// status is the status of the condition.
 	// Can be True, False, Unknown.
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime last time the condition transitioned from one status to another.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
+	// reason unique, one-word, CamelCase reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
-	// Human-readable message indicating details about last transition.
+	// message Human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
 type CustomResourceDefinitionStatus struct {
-	// Conditions indicate state for particular aspects of a CustomResourceDefinition
+	// conditions indicate state for particular aspects of a CustomResourceDefinition
 	Conditions []CustomResourceDefinitionCondition `json:"conditions" protobuf:"bytes,1,opt,name=conditions"`
 
-	// AcceptedNames are the names that are actually being used to serve discovery
+	// acceptedNames are the names that are actually being used to serve discovery
 	// They may be different than the names in spec.
 	AcceptedNames CustomResourceDefinitionNames `json:"acceptedNames" protobuf:"bytes,2,opt,name=acceptedNames"`
 
-	// StoredVersions are all versions of CustomResources that were ever persisted. Tracking these
+	// storedVersions are all versions of CustomResources that were ever persisted. Tracking these
 	// versions allows a migration path for stored versions in etcd. The field is mutable
 	// so the migration controller can first finish a migration to another version (i.e.
 	// that no old objects are left in the storage), and then remove the rest of the
@@ -324,9 +324,9 @@ type CustomResourceDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec describes how the user wants the resources to appear
+	// spec describes how the user wants the resources to appear
 	Spec CustomResourceDefinitionSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
-	// Status indicates the actual state of the CustomResourceDefinition
+	// status indicates the actual state of the CustomResourceDefinition
 	// +optional
 	Status CustomResourceDefinitionStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -338,23 +338,23 @@ type CustomResourceDefinitionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items individual CustomResourceDefinitions
+	// items individual CustomResourceDefinitions
 	Items []CustomResourceDefinition `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // CustomResourceValidation is a list of validation methods for CustomResources.
 type CustomResourceValidation struct {
-	// OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
+	// openAPIV3Schema is the OpenAPI v3 schema to be validated against.
 	// +optional
 	OpenAPIV3Schema *JSONSchemaProps `json:"openAPIV3Schema,omitempty" protobuf:"bytes,1,opt,name=openAPIV3Schema"`
 }
 
 // CustomResourceSubresources defines the status and scale subresources for CustomResources.
 type CustomResourceSubresources struct {
-	// Status denotes the status subresource for CustomResources
+	// status denotes the status subresource for CustomResources
 	// +optional
 	Status *CustomResourceSubresourceStatus `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
-	// Scale denotes the scale subresource for CustomResources
+	// scale denotes the scale subresource for CustomResources
 	// +optional
 	Scale *CustomResourceSubresourceScale `json:"scale,omitempty" protobuf:"bytes,2,opt,name=scale"`
 }
@@ -368,18 +368,18 @@ type CustomResourceSubresourceStatus struct{}
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
 type CustomResourceSubresourceScale struct {
-	// SpecReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Spec.Replicas.
+	// specReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Spec.Replicas.
 	// Only JSON paths without the array notation are allowed.
 	// Must be a JSON Path under .spec.
 	// If there is no value under the given path in the CustomResource, the /scale subresource will return an error on GET.
 	SpecReplicasPath string `json:"specReplicasPath" protobuf:"bytes,1,name=specReplicasPath"`
-	// StatusReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Replicas.
+	// statusReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Replicas.
 	// Only JSON paths without the array notation are allowed.
 	// Must be a JSON Path under .status.
 	// If there is no value under the given path in the CustomResource, the status replica value in the /scale subresource
 	// will default to 0.
 	StatusReplicasPath string `json:"statusReplicasPath" protobuf:"bytes,2,opt,name=statusReplicasPath"`
-	// LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
+	// labelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
 	// Only JSON paths without the array notation are allowed.
 	// Must be a JSON Path under .status or .spec.
 	// Must be set to work with HPA.
@@ -397,38 +397,38 @@ type CustomResourceSubresourceScale struct {
 // ConversionReview describes a conversion request/response.
 type ConversionReview struct {
 	metav1.TypeMeta `json:",inline"`
-	// `request` describes the attributes for the conversion request.
+	// request describes the attributes for the conversion request.
 	// +optional
 	Request *ConversionRequest `json:"request,omitempty" protobuf:"bytes,1,opt,name=request"`
-	// `response` describes the attributes for the conversion response.
+	// response describes the attributes for the conversion response.
 	// +optional
 	Response *ConversionResponse `json:"response,omitempty" protobuf:"bytes,2,opt,name=response"`
 }
 
 // ConversionRequest describes the conversion request parameters.
 type ConversionRequest struct {
-	// `uid` is an identifier for the individual request/response. It allows us to distinguish instances of requests which are
+	// uid is an identifier for the individual request/response. It allows us to distinguish instances of requests which are
 	// otherwise identical (parallel requests, requests when earlier requests did not modify etc)
 	// The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request.
 	// It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.
 	UID types.UID `json:"uid" protobuf:"bytes,1,name=uid"`
-	// `desiredAPIVersion` is the version to convert given objects to. e.g. "myapi.example.com/v1"
+	// desiredAPIVersion is the version to convert given objects to. e.g. "myapi.example.com/v1"
 	DesiredAPIVersion string `json:"desiredAPIVersion" protobuf:"bytes,2,name=desiredAPIVersion"`
-	// `objects` is the list of CR objects to be converted.
+	// objects is the list of CR objects to be converted.
 	Objects []runtime.RawExtension `json:"objects" protobuf:"bytes,3,rep,name=objects"`
 }
 
 // ConversionResponse describes a conversion response.
 type ConversionResponse struct {
-	// `uid` is an identifier for the individual request/response.
+	// uid is an identifier for the individual request/response.
 	// This should be copied over from the corresponding ConversionRequest.
 	UID types.UID `json:"uid" protobuf:"bytes,1,name=uid"`
-	// `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
+	// convertedObjects is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
 	// The webhook is expected to set apiVersion of these objects to the ConversionRequest.desiredAPIVersion. The list
 	// must also have the same size as the input list with the same objects in the same order (equal kind, UID, name and namespace).
 	// The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
 	ConvertedObjects []runtime.RawExtension `json:"convertedObjects" protobuf:"bytes,2,rep,name=convertedObjects"`
-	// `result` contains the result of conversion with extra details if the conversion failed. `result.status` determines if
+	// result contains the result of conversion with extra details if the conversion failed. `result.status` determines if
 	// the conversion failed or succeeded. The `result.status` field is required and represent the success or failure of the
 	// conversion. A successful conversion must set `result.status` to `Success`. A failed conversion must set
 	// `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message`
