@@ -128,7 +128,8 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1alpha1(),
 			fairqueuing.NewNoRestraintFactory( /* TODO: switch to real implementation */ ),
 			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-			config.RequestTimeout/4)
+			config.RequestTimeout/4,
+			nil)
 	}
 
 	return nil
