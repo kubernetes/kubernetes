@@ -194,6 +194,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 		return result, err
 	}
 
+	defer g.framework.RunCleanupPlugins(pluginContext, pod)
+
 	// Run "prefilter" plugins.
 	prefilterStatus := g.framework.RunPrefilterPlugins(pluginContext, pod)
 	if !prefilterStatus.IsSuccess() {

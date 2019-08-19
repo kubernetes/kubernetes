@@ -212,6 +212,15 @@ type ScoreWithNormalizePlugin interface {
 	NormalizeScore(pc *PluginContext, p *v1.Pod, scores NodeScoreList) *Status
 }
 
+// CleanupPlugin is an interface for clean-up plugin. Cleanup is an informational
+// extension point. Plugins will be called when the scheduling cycle is completed
+// or aborted.
+type CleanupPlugin interface {
+	Plugin
+	// Cleanup is called on each pod in the end of the scheduling cycle.
+	Cleanup(pc *PluginContext, p *v1.Pod)
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -316,6 +325,10 @@ type Framework interface {
 	// normalized scores. It returns a non-success Status if any of the normalize score plugins
 	// returns a non-success status.
 	RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status
+
+	// RunCleanupPlugins runs the cleanup plugins. It should be called after the scheduling
+	// cycle is completed or aborted.
+	RunCleanupPlugins(pc *PluginContext, pod *v1.Pod)
 
 	// ApplyScoreWeights applies weights to the score results. It should be called after
 	// RunNormalizeScorePlugins.

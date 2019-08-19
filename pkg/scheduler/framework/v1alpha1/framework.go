@@ -44,6 +44,7 @@ type framework struct {
 	postFilterPlugins         []PostFilterPlugin
 	scorePlugins              []ScorePlugin
 	scoreWithNormalizePlugins []ScoreWithNormalizePlugin
+	cleanupPlugins            []CleanupPlugin
 	reservePlugins            []ReservePlugin
 	prebindPlugins            []PrebindPlugin
 	bindPlugins               []BindPlugin
@@ -151,6 +152,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				}
 			} else {
 				return nil, fmt.Errorf("score plugin %q does not exist", sc.Name)
+			}
+		}
+	}
+
+	if plugins.Cleanup != nil {
+		for _, pb := range plugins.Cleanup.Enabled {
+			if pg, ok := pluginsMap[pb.Name]; ok {
+				p, ok := pg.(CleanupPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %q does not extend cleanup plugin", pb.Name)
+				}
+				f.cleanupPlugins = append(f.cleanupPlugins, p)
+			} else {
+				return nil, fmt.Errorf("cleanup plugin %q does not exist", pb.Name)
 			}
 		}
 	}
@@ -453,6 +468,14 @@ func (f *framework) ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores Plu
 	return nil
 }
 
+// RunCleanupPlugins runs the cleanup plugins. It should be called after the scheduling
+// cycle is completed or aborted.
+func (f *framework) RunCleanupPlugins(pc *PluginContext, pod *v1.Pod) {
+	for _, pl := range f.cleanupPlugins {
+		pl.Cleanup(pc, pod)
+	}
+}
+
 // RunPrebindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.
@@ -636,6 +659,7 @@ func pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
 	find(plugins.Filter)
 	find(plugins.PostFilter)
 	find(plugins.Score)
+	find(plugins.Cleanup)
 	find(plugins.Reserve)
 	find(plugins.Permit)
 	find(plugins.PreBind)
