@@ -52,6 +52,8 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
+	"k8s.io/kubernetes/plugin/pkg/scheduling/defaultbinder"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
@@ -167,6 +169,8 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 			return err
 		}
 	}
+
+	registry.Register(defaultbinder.Name, defaultbinder.New)
 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
