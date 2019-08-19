@@ -164,6 +164,9 @@ type Plugins struct {
 	// NormalizeScore is a list of plugins that should be invoked after the scoring phase to normalize scores.
 	NormalizeScore *PluginSet
 
+	// Cleanup is a list of plugins that should be invoked after the scheduling framework is completed or aborted.
+	Cleanup *PluginSet
+
 	// Reserve is a list of plugins invoked when reserving a node to run the pod.
 	Reserve *PluginSet
 
