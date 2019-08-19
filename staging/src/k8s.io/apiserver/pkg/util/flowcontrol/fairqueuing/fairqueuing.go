@@ -30,13 +30,13 @@ import (
 // This filter makes a QueueSetSystem for each priority level.
 type queueSetFactoryImpl struct {
 	// wg can be nil and is ignored in that case
-	wg *sync.WaitGroup
+	wg OptionalWaitGroup
 
 	clk clock.PassiveClock
 }
 
 // NewQueueSetFactory creates a new NewQueueSetFactory object
-func NewQueueSetFactory(clk clock.PassiveClock, wg *sync.WaitGroup) QueueSetFactory {
+func NewQueueSetFactory(clk clock.PassiveClock, wg OptionalWaitGroup) QueueSetFactory {
 	return &queueSetFactoryImpl{
 		wg:  wg,
 		clk: clk,
@@ -59,7 +59,7 @@ func (qsf queueSetFactoryImpl) NewQueueSet(concurrencyLimit, desiredNumQueues, q
 // https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
 type queueSetImpl struct {
 	lock                 sync.Mutex
-	wg                   *sync.WaitGroup
+	wg                   OptionalWaitGroup
 	queues               []*Queue
 	clk                  clock.PassiveClock
 	vt                   float64
@@ -90,7 +90,7 @@ func initQueues(numQueues int) []*Queue {
 
 // newQueueSetImpl creates a new queueSetImpl from passed in parameters and
 func newQueueSetImpl(concurrencyLimit, desiredNumQueues, queueLengthLimit int,
-	requestWaitLimit time.Duration, clk clock.PassiveClock, wg *sync.WaitGroup) *queueSetImpl {
+	requestWaitLimit time.Duration, clk clock.PassiveClock, wg OptionalWaitGroup) *queueSetImpl {
 	fq := &queueSetImpl{
 		wg:               wg,
 		queues:           initQueues(desiredNumQueues),
@@ -188,9 +188,7 @@ func (qs *queueSetImpl) removeTimedOutRequestsFromQueue(queue *Queue) {
 	waitLimit := now.Add(-qs.requestWaitLimit)
 	for i, pkt := range pkts {
 		if waitLimit.After(pkt.EnqueueTime) {
-			if qs.wg != nil {
-				qs.wg.Add(1)
-			}
+			qs.wg.Increment()
 			pkt.DequeueChannel <- false
 			close(pkt.DequeueChannel)
 			// // TODO(aaron-prindle) verify this makes sense here
@@ -392,6 +390,7 @@ func (qs *queueSetImpl) finishRequest(p *Request) {
 		if qs.quiescent && qs.numRequestsEnqueued == 0 &&
 			qs.GetRequestsExecuting() == 0 {
 			// then a call to the EmptyHandler should be forked.
+			qs.wg.Increment()
 			go qs.emptyHandler.HandleEmpty()
 		}
 	}
@@ -459,9 +458,7 @@ func (qs *queueSetImpl) dequeueWithChannel() (*Request, bool) {
 	if !ok {
 		return nil, false
 	}
-	if qs.wg != nil {
-		qs.wg.Add(1)
-	}
+	qs.wg.Increment()
 	pkt.DequeueChannel <- true
 	return pkt, ok
 }
@@ -539,6 +536,7 @@ func (qs *queueSetImpl) Quiesce(eh EmptyHandler) {
 	// if not then fork an invocation of the EmptyHandler.
 	if qs.numRequestsEnqueued == 0 && qs.GetRequestsExecuting() == 0 {
 		// fork an invocation of the EmptyHandler.
+		qs.wg.Increment()
 		go func() {
 			eh.HandleEmpty()
 		}()
@@ -611,9 +609,7 @@ func (qs *queueSetImpl) Wait(hashValue uint64, handSize int32) (quiescent, execu
 	// newly arrived request's channel, and return appropriately.  If a record
 	// has been sent to the request's channel then this `select` will
 	// immediately complete
-	if qs.wg != nil {
-		qs.wg.Done()
-	}
+	qs.wg.Decrement()
 
 	select {
 	case execute := <-pkt.DequeueChannel:
