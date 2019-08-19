@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -240,6 +240,35 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 			},
 		},
+		{ // Alternate update strategy with nil rolling update partition
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type:          appsv1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{},
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.OnDeleteStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+		},
+
 		{ // Parallel pod management policy.
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
