@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -120,8 +121,9 @@ type Interface interface {
 type MutationInterface interface {
 	Interface
 
-	// Admit makes an admission decision based on the request attributes
-	Admit(a Attributes, o ObjectInterfaces) (err error)
+	// Admit makes an admission decision based on the request attributes.
+	// Context is used only for timeout/deadline/cancellation and tracing information.
+	Admit(ctx context.Context, a Attributes, o ObjectInterfaces) (err error)
 }
 
 // ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
@@ -129,7 +131,8 @@ type ValidationInterface interface {
 	Interface
 
 	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
-	Validate(a Attributes, o ObjectInterfaces) (err error)
+	// Context is used only for timeout/deadline/cancellation and tracing information.
+	Validate(ctx context.Context, a Attributes, o ObjectInterfaces) (err error)
 }
 
 // Operation is the type of resource operation being checked for admission control

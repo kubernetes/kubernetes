@@ -17,6 +17,7 @@ limitations under the License.
 package limitranger
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -102,12 +103,12 @@ func (l *LimitRanger) ValidateInitialization() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return l.runLimitFunc(a, l.actions.MutateLimit)
 }
 
 // Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (l *LimitRanger) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return l.runLimitFunc(a, l.actions.ValidateLimit)
 }
 

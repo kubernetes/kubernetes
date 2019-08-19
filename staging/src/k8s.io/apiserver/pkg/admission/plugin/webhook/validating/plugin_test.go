@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -67,7 +68,7 @@ func TestValidate(t *testing.T) {
 		}
 
 		attr := webhooktesting.NewAttribute(ns, nil, tt.IsDryRun)
-		err = wh.Validate(attr, objectInterfaces)
+		err = wh.Validate(context.TODO(), attr, objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
@@ -132,7 +133,7 @@ func TestValidateCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Validate(webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
+		err = wh.Validate(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

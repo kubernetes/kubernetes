@@ -77,7 +77,7 @@ import (
 
 type alwaysMutatingDeny struct{}
 
-func (alwaysMutatingDeny) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (alwaysMutatingDeny) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Mutating admission control is denying all modifications"))
 }
 
@@ -87,7 +87,7 @@ func (alwaysMutatingDeny) Handles(operation admission.Operation) bool {
 
 type alwaysValidatingDeny struct{}
 
-func (alwaysValidatingDeny) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (alwaysValidatingDeny) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Validating admission control is denying all modifications"))
 }
 
@@ -448,7 +448,7 @@ func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, deleteV
 	if err := storage.errors["delete"]; err != nil {
 		return nil, false, err
 	}
-	if err := deleteValidation(&storage.item); err != nil {
+	if err := deleteValidation(ctx, &storage.item); err != nil {
 		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
@@ -477,7 +477,7 @@ func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := createValidation(obj); err != nil {
+	if err := createValidation(ctx, obj); err != nil {
 		return nil, err
 	}
 	return obj, err
@@ -496,7 +496,7 @@ func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objIn
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := updateValidation(&storage.item, obj); err != nil {
+	if err := updateValidation(ctx, &storage.item, obj); err != nil {
 		return nil, false, err
 	}
 	return obj, false, err
@@ -654,7 +654,7 @@ func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string,
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := createValidation(obj); err != nil {
+	if err := createValidation(ctx, obj); err != nil {
 		return nil, err
 	}
 	return obj, err

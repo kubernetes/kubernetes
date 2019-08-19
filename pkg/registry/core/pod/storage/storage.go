@@ -160,7 +160,7 @@ func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createVali
 	}
 
 	if createValidation != nil {
-		if err := createValidation(binding.DeepCopyObject()); err != nil {
+		if err := createValidation(ctx, binding.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}
