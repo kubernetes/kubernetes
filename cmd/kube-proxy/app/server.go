@@ -30,7 +30,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -603,9 +605,22 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
+	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
+	if err != nil {
+		return err
+	}
+
+	noHeadlessEndpoints, err := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
+	if err != nil {
+		return err
+	}
+
+	labelSelector := labels.NewSelector()
+	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
 		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
-			options.LabelSelector = "!" + apis.LabelServiceProxyName
+			options.LabelSelector = labelSelector.String()
 		}))
 
 	// Create configs (i.e. Watches for Services and Endpoints)
