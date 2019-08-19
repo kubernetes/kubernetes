@@ -202,7 +202,6 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 			continue
 		}
 		plState.concurrencyLimit = int(math.Ceil(float64(reqMgmt.serverConcurrencyLimit) * float64(plState.config.AssuredConcurrencyShares) / shareSum))
-		reqMgmt.syncPriorityLevelConcurrencyStatus(plByName[plName], plState.concurrencyLimit)
 		if plState.queues == nil {
 			klog.V(5).Infof("Introducing priority level %s: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
 			plState.queues = reqMgmt.queueSetFactory.NewQueueSet(plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgmt.requestWaitLimit)
@@ -237,6 +236,9 @@ func (reqMgmt *requestManagementSystem) syncFlowSchemaStatus(fs *rmtypesv1a1.Flo
 	case !isDangling && danglingCondition.Status != corev1.ConditionFalse:
 		danglingCondition.Status = corev1.ConditionFalse
 		danglingCondition.LastTransitionTime = metav1.Now()
+	default:
+		// the dangling status is already in sync, skip updating
+		return
 	}
 
 	rmtypesv1a1.SetFlowSchemaCondition(fs, *danglingCondition)
@@ -244,26 +246,6 @@ func (reqMgmt *requestManagementSystem) syncFlowSchemaStatus(fs *rmtypesv1a1.Flo
 	_, err := reqMgmt.flowcontrolClient.FlowSchemas().UpdateStatus(fs)
 	if err != nil {
 		klog.Warningf("failed updating condition for flow-schema %s", fs.Name)
-	}
-}
-
-func (reqMgmt *requestManagementSystem) syncPriorityLevelConcurrencyStatus(pl *rmtypesv1a1.PriorityLevelConfiguration, sharedConcurrency int) {
-	concurrencyCondition := rmtypesv1a1.GetPriorityLevelConfigurationConditionByType(pl, rmtypesv1a1.PriorityLevelConfigurationConditionConcurrencyShared)
-	if concurrencyCondition == nil {
-		concurrencyCondition = &rmtypesv1a1.PriorityLevelConfigurationCondition{
-			Type: rmtypesv1a1.PriorityLevelConfigurationConditionConcurrencyShared,
-		}
-	}
-
-	concurrencyCondition.LastTransitionTime = metav1.Now()
-	concurrencyCondition.Status = corev1.ConditionTrue
-	concurrencyCondition.Reason = fmt.Sprintf("Shared %d concurrency from limit", sharedConcurrency)
-
-	rmtypesv1a1.SetPriorityLevelConfigurationCondition(pl, *concurrencyCondition)
-
-	_, err := reqMgmt.flowcontrolClient.PriorityLevelConfigurations().UpdateStatus(pl)
-	if err != nil {
-		klog.Warningf("failed updating condition for flow-schema %s", pl.Name)
 	}
 }
 
