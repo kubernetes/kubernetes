@@ -296,6 +296,21 @@ func TestApplyManagedFields(t *testing.T) {
 		Resource("configmaps").
 		Name("test-cm").
 		Param("fieldManager", "updater").
+		Body([]byte(`{"data":{"new-key": "value"}}`)).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to patch object: %v", err)
+	}
+
+	// Sleep for one second to make sure that the times of each update operation is different.
+	// This will let us check that update entries with the same manager name are grouped together,
+	// and that the most recent update time is recorded in the grouped entry.
+	time.Sleep(1 * time.Second)
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Param("fieldManager", "updater").
 		Body([]byte(`{"data":{"key": "new value"}}`)).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to patch object: %v", err)
@@ -332,6 +347,7 @@ func TestApplyManagedFields(t *testing.T) {
 					"manager": "apply_test",
 					"operation": "Apply",
 					"apiVersion": "v1",
+					"time": "` + accessor.GetManagedFields()[0].Time.UTC().Format(time.RFC3339) + `",
 					"fields": {
 						"f:metadata": {
 							"f:labels": {
@@ -347,19 +363,25 @@ func TestApplyManagedFields(t *testing.T) {
 					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
 					"fields": {
 						"f:data": {
-							"f:key": {}
+							"f:key": {},
+							"f:new-key": {}
 						}
 					}
 				}
 			]
 		},
 		"data": {
-			"key": "new value"
+			"key": "new value",
+			"new-key": "value"
 		}
 	}`)
 
 	if string(expected) != string(actual) {
 		t.Fatalf("Expected:\n%v\nGot:\n%v", string(expected), string(actual))
+	}
+
+	if accessor.GetManagedFields()[0].Time.UTC().Format(time.RFC3339) == accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) {
+		t.Fatalf("Expected times to be different but got:\n%v", string(actual))
 	}
 }
 
