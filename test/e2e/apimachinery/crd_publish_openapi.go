@@ -337,7 +337,6 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 			e2elog.Failf("%v", err)
 		}
 
-		// TODO(jpbetz): Use json patch to update the name? This doesn't work.
 		ginkgo.By("rename a version")
 		patch := []byte(`[
 			{"op":"test","path":"/spec/versions/1/name","value":"v3"},
