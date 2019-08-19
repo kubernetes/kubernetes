@@ -8,6 +8,7 @@ go_library(
         "integrator.go",
         "interface.go",
         "no-restraint.go",
+        "optionalwaitgroup.go",
         "types.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing",

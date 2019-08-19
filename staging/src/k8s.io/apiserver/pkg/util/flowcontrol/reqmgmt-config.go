@@ -259,9 +259,12 @@ var _ fq.EmptyHandler = &emptyRelay{}
 
 func (er *emptyRelay) HandleEmpty() {
 	er.Lock()
-	defer func() { er.Unlock() }()
 	er.empty = true
+	// TODO: to support testing of the config controller, extend
+	// goroutine tracking to the config queue and worker
 	er.reqMgmt.configQueue.Add(0)
+	er.Unlock()
+	er.reqMgmt.wg.Decrement()
 }
 
 func (er *emptyRelay) IsEmpty() bool {
