@@ -244,22 +244,6 @@ function Set-PrerequisiteOptions {
   Install-Module -Name powershell-yaml -Force
 }
 
-# Disables Windows Defender realtime scanning.
-# TODO: remove this workaround once the fix is rolled out the Windows image
-# https://github.com/kubernetes/kubernetes/issues/75148
-function Disable-WindowsDefender {
-  # Windows Defender periodically consumes 100% of the CPU, so disable realtime
-  # scanning. Uninstalling the Windows Feature will prevent the service from
-  # starting after a reboot.
-  # TODO(pjh): move this step to image preparation, since we don't want to do a
-  # full reboot here.
-  if ((Get-WindowsFeature -Name 'Windows-Defender').Installed) {
-    Log-Output "Disabling Windows Defender service"
-    Set-MpPreference -DisableRealtimeMonitoring $true
-    Uninstall-WindowsFeature -Name 'Windows-Defender'
-  }
-}
-
 # Creates directories where other functions in this module will read and write
 # data.
 # Note: C:\tmp is required for running certain kubernetes tests.
