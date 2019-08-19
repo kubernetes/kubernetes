@@ -17,26 +17,32 @@ limitations under the License.
 package main
 
 import (
+	"encoding/base64"
 	"errors"
 	goflag "flag"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-
+	"golang.org/x/oauth2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/features"
@@ -64,6 +70,11 @@ type hollowNodeConfig struct {
 	UseRealProxier       bool
 	ProxierSyncPeriod    time.Duration
 	ProxierMinSyncPeriod time.Duration
+
+	AuthTokenSourceProvider string
+	Region                  string
+	ClusterContextName      string
+	ClusterName             string
 }
 
 const (
@@ -86,6 +97,11 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.UseRealProxier, "use-real-proxier", true, "Set to true if you want to use real proxier inside hollow-proxy.")
 	fs.DurationVar(&c.ProxierSyncPeriod, "proxier-sync-period", 30*time.Second, "Period that proxy rules are refreshed in hollow-proxy.")
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
+
+	fs.StringVar(&c.AuthTokenSourceProvider, "auth-token-source-provider", "", "Auth token source provider.")
+	fs.StringVar(&c.Region, "region", "", "Region where the target cluster has been deployed.")
+	fs.StringVar(&c.ClusterContextName, "cluster-context-name", "", "The name of the cluster context.")
+	fs.StringVar(&c.ClusterName, "cluster-name", "", "The name of the target cluster.")
 }
 
 func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -97,9 +113,6 @@ func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, err
 	if err != nil {
 		return nil, fmt.Errorf("error while creating kubeconfig: %v", err)
 	}
-	config.ContentType = c.ContentType
-	config.QPS = 10
-	config.Burst = 20
 	return config, nil
 }
 
@@ -145,10 +158,73 @@ func run(config *hollowNodeConfig) {
 	}
 
 	// create a client to communicate with API server.
-	clientConfig, err := config.createClientConfigFromFile()
-	if err != nil {
-		klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+	var clientConfig *restclient.Config
+	var err error
+	if config.AuthTokenSourceProvider == "" {
+		clientConfig, err = config.createClientConfigFromFile()
+		if err != nil {
+			klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+		}
+	} else {
+		switch config.AuthTokenSourceProvider {
+		case "eks":
+			if config.Region == "" {
+				klog.Fatalf("empty region is given for auth provider %q", config.AuthTokenSourceProvider)
+			}
+			if config.ClusterContextName == "" {
+				klog.Fatalf("empty cluster context name is given for auth provider %q", config.ClusterContextName)
+			}
+			if config.ClusterName == "" {
+				klog.Fatalf("empty cluster name is given for auth provider %q", config.ClusterName)
+			}
+
+			var kcfg *clientcmdapi.Config
+			kcfg, err = clientcmd.LoadFromFile(config.KubeconfigPath)
+			if err != nil {
+				klog.Fatalf("error while loading kubeconfig from file %q: %v", config.KubeconfigPath, err)
+			}
+			v, ok := kcfg.Clusters[config.ClusterContextName]
+			if !ok {
+				keys := make([]string, 0, len(kcfg.Clusters))
+				for k := range kcfg.Clusters {
+					keys = append(keys, k)
+				}
+				if err != nil {
+					klog.Fatalf("cluster context name %q not found in kubeconfig 'clusters' (%v)", config.ClusterContextName, keys)
+				}
+			}
+
+			klog.Infof("setting rest client to server %q from kubeconfig %q", v.Server, config.KubeconfigPath)
+			clientConfig = &restclient.Config{
+				Host: v.Server,
+				TLSClientConfig: restclient.TLSClientConfig{
+					CAData: v.CertificateAuthorityData, // already PEM-encoded (not base64-encode)
+				},
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Name: config.AuthTokenSourceProvider,
+					Config: map[string]string{
+						// TODO: support temporary credentials
+						"region":       config.Region,
+						"cluster-name": config.ClusterName,
+					},
+				},
+			}
+
+			restclient.RegisterAuthProviderPlugin(config.AuthTokenSourceProvider, newEKSAuthProvider)
+			klog.Infof("successfully registered auth provider %q with region %q and cluster name %q",
+				config.AuthTokenSourceProvider,
+				config.Region,
+				config.ClusterName,
+			)
+
+		default:
+			klog.Fatalf("unknown auth token source provider %q given", config.AuthTokenSourceProvider)
+		}
 	}
+
+	clientConfig.ContentType = config.ContentType
+	clientConfig.QPS = 10
+	clientConfig.Burst = 20
 
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
@@ -226,4 +302,68 @@ func run(config *hollowNodeConfig) {
 		}
 		hollowProxy.Run()
 	}
+}
+
+func newEKSAuthProvider(_ string, config map[string]string, _ restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	// TODO: support temporary credentials
+	awsRegion, ok := config["region"]
+	if !ok {
+		return nil, fmt.Errorf("'clientcmdapi.AuthProviderConfig' does not include 'region' key %+v", config)
+	}
+	clusterName, ok := config["cluster-name"]
+	if !ok {
+		return nil, fmt.Errorf("'clientcmdapi.AuthProviderConfig' does not include 'cluster-name' key %+v", config)
+	}
+	sess := session.Must(session.NewSession(aws.NewConfig().WithRegion(awsRegion)))
+	return &eksAuthProvider{ts: newEKSTokenSource(sess, clusterName)}, nil
+}
+
+type eksAuthProvider struct {
+	ts oauth2.TokenSource
+}
+
+func (p *eksAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
+	return &oauth2.Transport{
+		Source: p.ts,
+		Base:   rt,
+	}
+}
+
+func (p *eksAuthProvider) Login() error {
+	return nil
+}
+
+func newEKSTokenSource(sess *session.Session, clusterName string) oauth2.TokenSource {
+	return &eksTokenSource{sess: sess, clusterName: clusterName}
+}
+
+type eksTokenSource struct {
+	sess        *session.Session
+	clusterName string
+}
+
+// Reference
+// https://github.com/kubernetes-sigs/aws-iam-authenticator/blob/master/README.md#api-authorization-from-outside-a-cluster
+// https://github.com/kubernetes-sigs/aws-iam-authenticator/blob/master/pkg/token/token.go
+const (
+	v1Prefix        = "k8s-aws-v1."
+	clusterIDHeader = "x-k8s-aws-id"
+)
+
+func (s *eksTokenSource) Token() (*oauth2.Token, error) {
+	stsAPI := sts.New(s.sess)
+	request, _ := stsAPI.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
+	request.HTTPRequest.Header.Add(clusterIDHeader, s.clusterName)
+
+	payload, err := request.Presign(60)
+	if err != nil {
+		return nil, err
+	}
+	token := v1Prefix + base64.RawURLEncoding.EncodeToString([]byte(payload))
+	tokenExpiration := time.Now().Local().Add(14 * time.Minute)
+	return &oauth2.Token{
+		AccessToken: token,
+		TokenType:   "Bearer",
+		Expiry:      tokenExpiration,
+	}, nil
 }
