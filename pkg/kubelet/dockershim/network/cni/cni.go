@@ -389,6 +389,11 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 		},
 	}
 
+	//send the annotations as extra args to the cni plugins
+	for key, value := range annotations {
+		rt.Args = append(rt.Args, [2]string{key, value})
+	}
+
 	// port mappings are a cni capability-based args, rather than parameters
 	// to a specific plugin
 	portMappings, err := plugin.host.GetPodPortMappings(podSandboxID.ID)
