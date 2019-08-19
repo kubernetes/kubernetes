@@ -208,7 +208,10 @@ func (poc PortOpenCheck) Check() (warnings, errorList []error) {
 		errorList = []error{errors.Errorf("Port %d is in use", poc.port)}
 	}
 	if ln != nil {
-		ln.Close()
+		if err = ln.Close(); err != nil {
+			warnings = append(warnings,
+				errors.Errorf("when closing port %d, encountered %v", poc.port, err))
+		}
 	}
 
 	return nil, errorList
