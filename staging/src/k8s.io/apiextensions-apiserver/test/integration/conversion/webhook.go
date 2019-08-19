@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,11 +74,14 @@ func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv
 	return webhookServer.Close, webhookConfig, nil
 }
 
-// ReviewConverterFunc converts an entire ConversionReview.
-type ReviewConverterFunc func(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error)
+// V1Beta1ReviewConverterFunc converts an entire ConversionReview.
+type V1Beta1ReviewConverterFunc func(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error)
+
+// V1ReviewConverterFunc converts an entire ConversionReview.
+type V1ReviewConverterFunc func(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error)
 
 // NewReviewWebhookHandler creates a handler that delegates the review conversion to the provided ReviewConverterFunc.
-func NewReviewWebhookHandler(t *testing.T, converterFunc ReviewConverterFunc) http.Handler {
+func NewReviewWebhookHandler(t *testing.T, v1beta1ConverterFunc V1Beta1ReviewConverterFunc, v1ConverterFunc V1ReviewConverterFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		data, err := ioutil.ReadAll(r.Body)
@@ -90,21 +94,63 @@ func NewReviewWebhookHandler(t *testing.T, converterFunc ReviewConverterFunc) ht
 			return
 		}
 
-		review := apiextensionsv1beta1.ConversionReview{}
-		if err := json.Unmarshal(data, &review); err != nil {
+		typeMeta := &metav1.TypeMeta{}
+		if err := json.Unmarshal(data, typeMeta); err != nil {
 			t.Errorf("Fail to deserialize object: %s with error: %v", string(data), err)
 			http.Error(w, err.Error(), 400)
 			return
 		}
 
-		review, err = converterFunc(review)
-		if err != nil {
-			t.Errorf("Error converting review: %v", err)
-			http.Error(w, err.Error(), 500)
+		var response runtime.Object
+
+		switch typeMeta.GroupVersionKind() {
+		case apiextensionsv1.SchemeGroupVersion.WithKind("ConversionReview"):
+			review := &apiextensionsv1.ConversionReview{}
+			if err := json.Unmarshal(data, review); err != nil {
+				t.Errorf("Fail to deserialize object: %s with error: %v", string(data), err)
+				http.Error(w, err.Error(), 400)
+				return
+			}
+
+			if v1ConverterFunc == nil {
+				http.Error(w, "Cannot handle v1 ConversionReview", 422)
+				return
+			}
+			response, err = v1ConverterFunc(review)
+			if err != nil {
+				t.Errorf("Error converting review: %v", err)
+				http.Error(w, err.Error(), 500)
+				return
+			}
+
+		case apiextensionsv1beta1.SchemeGroupVersion.WithKind("ConversionReview"):
+			review := &apiextensionsv1beta1.ConversionReview{}
+			if err := json.Unmarshal(data, review); err != nil {
+				t.Errorf("Fail to deserialize object: %s with error: %v", string(data), err)
+				http.Error(w, err.Error(), 400)
+				return
+			}
+
+			if v1beta1ConverterFunc == nil {
+				http.Error(w, "Cannot handle v1beta1 ConversionReview", 422)
+				return
+			}
+			response, err = v1beta1ConverterFunc(review)
+			if err != nil {
+				t.Errorf("Error converting review: %v", err)
+				http.Error(w, err.Error(), 500)
+				return
+			}
+
+		default:
+			err := fmt.Errorf("unrecognized request kind: %v", typeMeta.GroupVersionKind())
+			t.Error(err)
+			http.Error(w, err.Error(), 400)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(review); err != nil {
+		if err := json.NewEncoder(w).Encode(response); err != nil {
 			t.Errorf("Marshal of response failed with error: %v", err)
 		}
 	})
@@ -115,7 +161,7 @@ type ObjectConverterFunc func(desiredAPIVersion string, customResource runtime.R
 
 // NewObjectConverterWebhookHandler creates a handler that delegates custom resource conversion to the provided ConverterFunc.
 func NewObjectConverterWebhookHandler(t *testing.T, converterFunc ObjectConverterFunc) http.Handler {
-	return NewReviewWebhookHandler(t, func(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
+	return NewReviewWebhookHandler(t, func(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
 		converted := []runtime.RawExtension{}
 		errMsgs := []string{}
 		for _, obj := range review.Request.Objects {
@@ -128,6 +174,28 @@ func NewObjectConverterWebhookHandler(t *testing.T, converterFunc ObjectConverte
 		}
 
 		review.Response = &apiextensionsv1beta1.ConversionResponse{
+			UID:              review.Request.UID,
+			ConvertedObjects: converted,
+		}
+		if len(errMsgs) == 0 {
+			review.Response.Result = metav1.Status{Status: "Success"}
+		} else {
+			review.Response.Result = metav1.Status{Status: "Failure", Message: strings.Join(errMsgs, ", ")}
+		}
+		return review, nil
+	}, func(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+		converted := []runtime.RawExtension{}
+		errMsgs := []string{}
+		for _, obj := range review.Request.Objects {
+			convertedObj, err := converterFunc(review.Request.DesiredAPIVersion, obj)
+			if err != nil {
+				errMsgs = append(errMsgs, err.Error())
+			}
+
+			converted = append(converted, convertedObj)
+		}
+
+		review.Response = &apiextensionsv1.ConversionResponse{
 			UID:              review.Request.UID,
 			ConvertedObjects: converted,
 		}
