@@ -240,7 +240,7 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewFramework(registry, tt.plugins, args)
+			_, err := NewFramework(registry, tt.plugins, args, nil)
 			if tt.initErr && err == nil {
 				t.Fatal("Framework initialization should fail")
 			}
@@ -476,7 +476,7 @@ func TestRunNormalizeScorePlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := NewFramework(tt.registry, tt.plugins, args)
+			f, err := NewFramework(tt.registry, tt.plugins, args, nil)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -662,7 +662,7 @@ func TestApplyScoreWeights(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := NewFramework(registry, tt.plugins, args)
+			f, err := NewFramework(registry, tt.plugins, args, nil)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}

@@ -139,7 +139,7 @@ func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[str
 
 // EmptyPluginRegistry is a test plugin set used by the default scheduler.
 var EmptyPluginRegistry = framework.Registry{}
-var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerconfig.PluginConfig{})
+var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerconfig.PluginConfig{}, nil)
 
 // FakeFilterPlugin is a test filter plugin used by default scheduler.
 type FakeFilterPlugin struct {
@@ -267,7 +267,7 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 		},
-	}, []schedulerconfig.PluginConfig{})
+	}, []schedulerconfig.PluginConfig{}, nil)
 	if err != nil {
 		t.Errorf("Unexpected error when initialize scheduling framework, err :%v", err.Error())
 	}

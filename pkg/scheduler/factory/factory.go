@@ -222,7 +222,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
-	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
+	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig, args.Client)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}

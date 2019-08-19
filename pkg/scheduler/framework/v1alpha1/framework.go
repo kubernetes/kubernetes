@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -37,6 +38,7 @@ type framework struct {
 	registry                  Registry
 	nodeInfoSnapshot          *cache.NodeInfoSnapshot
 	waitingPods               *waitingPodsMap
+	clientset                 clientset.Interface
 	pluginNameToWeightMap     map[string]int
 	queueSortPlugins          []QueueSortPlugin
 	prefilterPlugins          []PrefilterPlugin
@@ -60,9 +62,10 @@ const (
 var _ = Framework(&framework{})
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, clientset clientset.Interface) (Framework, error) {
 	f := &framework{
 		registry:              r,
+		clientset:             clientset,
 		nodeInfoSnapshot:      cache.NewNodeInfoSnapshot(),
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
@@ -606,6 +609,11 @@ func (f *framework) IterateOverWaitingPods(callback func(WaitingPod)) {
 // GetWaitingPod returns a reference to a WaitingPod given its UID.
 func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 	return f.waitingPods.get(uid)
+}
+
+// Clientset returns a kubernetes clientset.
+func (f *framework) Clientset() clientset.Interface {
+	return f.clientset
 }
 
 func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {

@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -374,4 +375,7 @@ type FrameworkHandle interface {
 
 	// GetWaitingPod returns a waiting pod given its UID.
 	GetWaitingPod(uid types.UID) WaitingPod
+
+	// Clientset returns a kubernetes clientset.
+	Clientset() clientset.Interface
 }
