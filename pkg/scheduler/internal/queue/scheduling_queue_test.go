@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -218,6 +219,10 @@ func (*fakeFramework) RunPermitPlugins(state *framework.CycleState, pod *v1.Pod,
 func (*fakeFramework) IterateOverWaitingPods(callback func(framework.WaitingPod)) {}
 
 func (*fakeFramework) GetWaitingPod(uid types.UID) framework.WaitingPod {
+	return nil
+}
+
+func (*fakeFramework) ClientSet() clientset.Interface {
 	return nil
 }
 

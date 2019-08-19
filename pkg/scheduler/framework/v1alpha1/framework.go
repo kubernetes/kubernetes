@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -56,6 +57,8 @@ type framework struct {
 	postBindPlugins       []PostBindPlugin
 	unreservePlugins      []UnreservePlugin
 	permitPlugins         []PermitPlugin
+
+	clientSet clientset.Interface
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -85,15 +88,37 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 	}
 }
 
+type frameworkOptions struct {
+	clientSet clientset.Interface
+}
+
+// Option for the framework.
+type Option func(*frameworkOptions)
+
+// WithClientSet sets clientSet for the scheduling framework.
+func WithClientSet(clientSet clientset.Interface) Option {
+	return func(o *frameworkOptions) {
+		o.clientSet = clientSet
+	}
+}
+
+var defaultFrameworkOptions = frameworkOptions{}
+
 var _ = Framework(&framework{})
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (Framework, error) {
+	options := defaultFrameworkOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	f := &framework{
 		registry:              r,
 		nodeInfoSnapshot:      schedulernodeinfo.NewSnapshot(),
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
+		clientSet:             options.clientSet,
 	}
 	if plugins == nil {
 		return f, nil
@@ -550,6 +575,11 @@ func (f *framework) ListPlugins() map[string][]string {
 		return m
 	}
 	return nil
+}
+
+// ClientSet returns a kubernetes clientset.
+func (f *framework) ClientSet() clientset.Interface {
+	return f.clientSet
 }
 
 func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
