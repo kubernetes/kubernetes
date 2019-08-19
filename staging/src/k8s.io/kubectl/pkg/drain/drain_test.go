@@ -19,16 +19,23 @@ package drain
 import (
 	"errors"
 	"fmt"
+	"os"
+	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/fake"
+	ktest "k8s.io/client-go/testing"
 )
 
 func TestDeletePods(t *testing.T) {
@@ -144,4 +151,156 @@ func createPods(ifCreateNewPods bool) (map[string]corev1.Pod, []corev1.Pod) {
 		podSlice = append(podSlice, pod)
 	}
 	return podMap, podSlice
+}
+
+// addEvictionSupport implements simple fake eviction support on the fake.Clientset
+func addEvictionSupport(t *testing.T, k *fake.Clientset) {
+	podsEviction := metav1.APIResource{
+		Name:    "pods/eviction",
+		Kind:    "Eviction",
+		Group:   "",
+		Version: "v1",
+	}
+	coreResources := &metav1.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []metav1.APIResource{podsEviction},
+	}
+
+	policyResources := &metav1.APIResourceList{
+		GroupVersion: "policy/v1",
+	}
+	k.Resources = append(k.Resources, coreResources, policyResources)
+
+	// Delete pods when evict is called
+	k.PrependReactor("create", "pods", func(action ktest.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "eviction" {
+			return false, nil, nil
+		}
+
+		eviction := *action.(ktest.CreateAction).GetObject().(*policyv1beta1.Eviction)
+		// Avoid the lock
+		go func() {
+			err := k.CoreV1().Pods(eviction.Namespace).Delete(eviction.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				// Errorf because we can't call Fatalf from another goroutine
+				t.Errorf("failed to delete pod: %s/%s", eviction.Namespace, eviction.Name)
+			}
+		}()
+
+		return true, nil, nil
+	})
+}
+
+func TestCheckEvictionSupport(t *testing.T) {
+	for _, evictionSupported := range []bool{true, false} {
+		evictionSupported := evictionSupported
+		t.Run(fmt.Sprintf("evictionSupported=%v", evictionSupported),
+			func(t *testing.T) {
+				k := fake.NewSimpleClientset()
+				if evictionSupported {
+					addEvictionSupport(t, k)
+				}
+
+				apiGroup, err := CheckEvictionSupport(k)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				expectedAPIGroup := ""
+				if evictionSupported {
+					expectedAPIGroup = "policy/v1"
+				}
+				if apiGroup != expectedAPIGroup {
+					t.Fatalf("expected apigroup %q, actual=%q", expectedAPIGroup, apiGroup)
+				}
+			})
+	}
+}
+
+func TestDeleteOrEvict(t *testing.T) {
+	for _, evictionSupported := range []bool{true, false} {
+		evictionSupported := evictionSupported
+		t.Run(fmt.Sprintf("evictionSupported=%v", evictionSupported),
+			func(t *testing.T) {
+				h := &Helper{
+					Out:                os.Stdout,
+					GracePeriodSeconds: 10,
+				}
+
+				// Create 4 pods, and try to remove the first 2
+				var expectedEvictions []policyv1beta1.Eviction
+				var create []runtime.Object
+				deletePods := []corev1.Pod{}
+				for i := 1; i <= 4; i++ {
+					pod := &corev1.Pod{}
+					pod.Name = fmt.Sprintf("mypod-%d", i)
+					pod.Namespace = "default"
+
+					create = append(create, pod)
+					if i <= 2 {
+						deletePods = append(deletePods, *pod)
+
+						if evictionSupported {
+							eviction := policyv1beta1.Eviction{}
+							eviction.Kind = "Eviction"
+							eviction.APIVersion = "policy/v1"
+							eviction.Namespace = pod.Namespace
+							eviction.Name = pod.Name
+
+							gracePeriodSeconds := int64(h.GracePeriodSeconds)
+							eviction.DeleteOptions = &metav1.DeleteOptions{
+								GracePeriodSeconds: &gracePeriodSeconds,
+							}
+
+							expectedEvictions = append(expectedEvictions, eviction)
+						}
+					}
+				}
+
+				// Build the fake client
+				k := fake.NewSimpleClientset(create...)
+				if evictionSupported {
+					addEvictionSupport(t, k)
+				}
+				h.Client = k
+
+				// Do the eviction
+				if err := h.DeleteOrEvictPods(deletePods); err != nil {
+					t.Fatalf("error from DeleteOrEvictPods: %v", err)
+				}
+
+				// Test that other pods are still there
+				var remainingPods []string
+				{
+					podList, err := k.CoreV1().Pods("").List(metav1.ListOptions{})
+					if err != nil {
+						t.Fatalf("error listing pods: %v", err)
+					}
+
+					for _, pod := range podList.Items {
+						remainingPods = append(remainingPods, pod.Namespace+"/"+pod.Name)
+					}
+					sort.Strings(remainingPods)
+				}
+				expected := []string{"default/mypod-3", "default/mypod-4"}
+				if !reflect.DeepEqual(remainingPods, expected) {
+					t.Errorf("unexpected remaining pods after DeleteOrEvictPods; actual %v; expected %v", remainingPods, expected)
+				}
+
+				// Test that pods were evicted as expected
+				var actualEvictions []policyv1beta1.Eviction
+				for _, action := range k.Actions() {
+					if action.GetVerb() != "create" || action.GetResource().Resource != "pods" || action.GetSubresource() != "eviction" {
+						continue
+					}
+					eviction := *action.(ktest.CreateAction).GetObject().(*policyv1beta1.Eviction)
+					actualEvictions = append(actualEvictions, eviction)
+				}
+				sort.Slice(actualEvictions, func(i, j int) bool {
+					return actualEvictions[i].Name < actualEvictions[j].Name
+				})
+				if !reflect.DeepEqual(actualEvictions, expectedEvictions) {
+					t.Errorf("unexpected evictions; actual %v; expected %v", actualEvictions, expectedEvictions)
+				}
+			})
+	}
 }

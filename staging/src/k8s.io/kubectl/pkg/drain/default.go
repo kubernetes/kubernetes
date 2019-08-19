@@ -31,6 +31,7 @@ import (
 // RunNodeDrain shows the canonical way to drain a node.
 // You should first cordon the node, e.g. using RunCordonOrUncordon
 func RunNodeDrain(drainer *Helper, nodeName string) error {
+	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
 	list, errs := drainer.GetPodsForDeletion(nodeName)
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
@@ -48,6 +49,7 @@ func RunNodeDrain(drainer *Helper, nodeName string) error {
 
 // RunCordonOrUncordon demonstrates the canonical way to cordon or uncordon a Node
 func RunCordonOrUncordon(drainer *Helper, node *corev1.Node, desired bool) error {
+	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
 	c := NewCordonHelper(node)
 
 	if updateRequired := c.UpdateIfRequired(desired); !updateRequired {
