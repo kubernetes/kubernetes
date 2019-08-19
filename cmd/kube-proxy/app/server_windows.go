@@ -164,12 +164,12 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	// Check for Windows Version
 
 	// guaranteed false on error, error only necessary for debugging
-	useWinKerelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
+	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
 	if err != nil {
 		klog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
 		return proxyModeUserspace
 	}
-	if useWinKerelProxy {
+	if useWinKernelProxy {
 		return proxyModeKernelspace
 	}
 	// Fallback.
