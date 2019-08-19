@@ -24,12 +24,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -306,7 +309,12 @@ var _ = SIGDescribe("kubelet", func() {
 			ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 			rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
-			err := framework.RunRC(testutils.RCConfig{
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+			ps, err := testutils.NewPodStore(f.ClientSet, f.Namespace.Name, label, fields.Everything())
+			framework.ExpectNoError(err)
+			interval := 10 * time.Second
+
+			err = framework.RunRC(testutils.RCConfig{
 				Client:       f.ClientSet,
 				Name:         rcName,
 				Namespace:    f.Namespace.Name,
@@ -319,8 +327,8 @@ var _ = SIGDescribe("kubelet", func() {
 			// running on the nodes according to kubelet. The timeout is set to
 			// only 30 seconds here because framework.RunRC already waited for all pods to
 			// transition to the running status.
-			err = waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, totalPods, time.Second*30)
-			framework.ExpectNoError(err)
+			err = e2epod.WaitForPodsGone(ps, interval, 10*time.Second)
+			framework.ExpectError(err)
 			if resourceMonitor != nil {
 				resourceMonitor.LogLatest()
 			}
@@ -335,8 +343,9 @@ var _ = SIGDescribe("kubelet", func() {
 			//   - a bug in graceful termination (if it is enabled)
 			//   - docker slow to delete pods (or resource problems causing slowness)
 			start := time.Now()
-			e2elog.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
-				time.Since(start))
+			err = e2epod.WaitForPodsGone(ps, interval, 10*time.Second)
+			framework.ExpectNoError(err)
+			e2elog.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames), time.Since(start))
 			if resourceMonitor != nil {
 				resourceMonitor.LogCPUSummary()
 			}
