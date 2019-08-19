@@ -47,7 +47,6 @@ pkg/kubelet/config
 pkg/kubelet/container/testing
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network/cni
-pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/eviction
 pkg/kubelet/kubeletconfig/checkpoint
 pkg/kubelet/kuberuntime

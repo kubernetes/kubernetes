@@ -64,10 +64,6 @@ const (
 	// ebtables Chain to store dedup rules
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
 
-	// defaultIPAMDir is the default location for the checkpoint files stored by host-local ipam
-	// https://github.com/containernetworking/cni/tree/master/plugins/ipam/host-local#backends
-	defaultIPAMDir = "/var/lib/cni/networks"
-
 	zeroCIDRv6 = "::/0"
 	zeroCIDRv4 = "0.0.0.0/0"
 
