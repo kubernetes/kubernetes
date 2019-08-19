@@ -241,7 +241,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testSlowWebhookTimeoutNoError(f)
 		slowWebhookCleanup()
 
-		ginkgo.By("Having no error when timeout is empty (defaulted to 10s in v1beta1)")
+		ginkgo.By("Having no error when timeout is empty (defaulted to 10s in v1)")
 		slowWebhookCleanup = registerSlowWebhook(f, f.UniqueName, context, &policyFail, nil)
 		testSlowWebhookTimeoutNoError(f)
 		slowWebhookCleanup()
@@ -1940,9 +1940,12 @@ func testSlowWebhookTimeoutFailEarly(f *framework.Framework) {
 	name := "e2e-test-slow-webhook-configmap"
 	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	framework.ExpectError(err, "create configmap in namespace %s should have timed-out reaching slow webhook", f.Namespace.Name)
-	expectedErrMsg := `/always-allow-delay-5s?timeout=1s: context deadline exceeded`
-	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	// http timeout message: context deadline exceeded
+	// dial timeout message: dial tcp {address}: i/o timeout
+	isTimeoutError := strings.Contains(err.Error(), `context deadline exceeded`) || strings.Contains(err.Error(), `timeout`)
+	isErrorQueryingWebhook := strings.Contains(err.Error(), `/always-allow-delay-5s?timeout=1s`)
+	if !isTimeoutError || !isErrorQueryingWebhook {
+		e2elog.Failf("expect an HTTP/dial timeout error querying the slow webhook, got: %q", err.Error())
 	}
 }
 
