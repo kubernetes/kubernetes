@@ -211,6 +211,7 @@ aliases:
     - resouer
     - sjenning
     - tallclair
+    - verb
     - vishh
     - yifan-gu
     - yujuhong
@@ -413,6 +414,7 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - tallclair
+    - verb
     - yujuhong
 
   sig-scalability-approvers:
