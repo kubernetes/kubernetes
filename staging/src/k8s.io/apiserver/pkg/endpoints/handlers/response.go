@@ -38,6 +38,24 @@ import (
 // the client's desired form, as well as ensuring any API level fields like self-link
 // are properly set.
 func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		if mediaType.Convert != nil {
+			// Non-nil mediaType.Convert means that some conversion of the object
+			// has to happen. Currently conversion may potentially modify the
+			// object or assume something about it (e.g. asTable operates on
+			// reflection, which won't work for any wrapper).
+			// To ensure it will work correctly, let's operate on base objects
+			// and not cache it for now.
+			//
+			// TODO: Long-term, transformObject should be changed so that it
+			// implements runtime.Encoder interface.
+			return doTransformObject(ctx, co.GetObject(), opts, mediaType, scope, req)
+		}
+	}
+	return doTransformObject(ctx, obj, opts, mediaType, scope, req)
+}
+
+func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
