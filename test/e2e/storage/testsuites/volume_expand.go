@@ -190,11 +190,9 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			l.resource.pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(l.resource.pvc.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "While fetching pvc after controller resize")
 
-			if pattern.VolMode == v1.PersistentVolumeBlock || !l.resource.driver.GetDriverInfo().Capabilities[CapNodeExpansion] {
-				pvcConditions := l.resource.pvc.Status.Conditions
-				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
-			} else {
-				inProgressConditions := l.resource.pvc.Status.Conditions
+			inProgressConditions := l.resource.pvc.Status.Conditions
+			// if there are conditions on the PVC, it must be of FileSystemResizePending type
+			if len(inProgressConditions) > 0 {
 				framework.ExpectEqual(len(inProgressConditions), 1, "pvc must have file system resize pending condition")
 				framework.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
 			}
