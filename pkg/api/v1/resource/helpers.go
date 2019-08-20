@@ -29,7 +29,7 @@ import (
 func addResourceList(list, new v1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
-			list[name] = *quantity.Copy()
+			list[name] = quantity.DeepCopy()
 		} else {
 			value.Add(quantity)
 			list[name] = value
@@ -42,11 +42,11 @@ func addResourceList(list, new v1.ResourceList) {
 func maxResourceList(list, new v1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
-			list[name] = *quantity.Copy()
+			list[name] = quantity.DeepCopy()
 			continue
 		} else {
 			if quantity.Cmp(value) > 0 {
-				list[name] = *quantity.Copy()
+				list[name] = quantity.DeepCopy()
 			}
 		}
 	}
@@ -197,7 +197,7 @@ func MergeContainerResourceLimits(container *v1.Container,
 	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage} {
 		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
 			if cap, exists := allocatable[resource]; exists {
-				container.Resources.Limits[resource] = *cap.Copy()
+				container.Resources.Limits[resource] = cap.DeepCopy()
 			}
 		}
 	}

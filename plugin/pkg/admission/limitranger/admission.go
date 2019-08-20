@@ -219,12 +219,10 @@ func defaultContainerResourceRequirements(limitRange *corev1.LimitRange) api.Res
 		limit := limitRange.Spec.Limits[i]
 		if limit.Type == corev1.LimitTypeContainer {
 			for k, v := range limit.DefaultRequest {
-				value := v.Copy()
-				requirements.Requests[api.ResourceName(k)] = *value
+				requirements.Requests[api.ResourceName(k)] = v.DeepCopy()
 			}
 			for k, v := range limit.Default {
-				value := v.Copy()
-				requirements.Limits[api.ResourceName(k)] = *value
+				requirements.Limits[api.ResourceName(k)] = v.DeepCopy()
 			}
 		}
 	}
@@ -244,14 +242,14 @@ func mergeContainerResources(container *api.Container, defaultRequirements *api.
 	for k, v := range defaultRequirements.Limits {
 		_, found := container.Resources.Limits[k]
 		if !found {
-			container.Resources.Limits[k] = *v.Copy()
+			container.Resources.Limits[k] = v.DeepCopy()
 			setLimits = append(setLimits, string(k))
 		}
 	}
 	for k, v := range defaultRequirements.Requests {
 		_, found := container.Resources.Requests[k]
 		if !found {
-			container.Resources.Requests[k] = *v.Copy()
+			container.Resources.Requests[k] = v.DeepCopy()
 			setRequests = append(setRequests, string(k))
 		}
 	}
