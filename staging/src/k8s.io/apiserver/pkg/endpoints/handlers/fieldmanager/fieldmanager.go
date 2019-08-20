@@ -98,7 +98,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	// If the managed field is empty or we failed to decode it,
 	// let's try the live object. This is to prevent clients who
 	// don't understand managedFields from deleting it accidentally.
-	if err != nil || len(managed) == 0 {
+	if err != nil || len(managed.Fields) == 0 {
 		managed, err = internal.DecodeObjectManagedFields(liveObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
@@ -133,11 +133,14 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	}
 
 	// TODO(apelisse) use the first return value when unions are implemented
-	_, managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
+	_, managed.Fields, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
-	managed = f.stripFields(managed, manager)
+	managed.Fields = f.stripFields(managed.Fields, manager)
+
+	// Update the time in the managedFieldsEntry for this operation
+	managed.Times[manager] = &metav1.Time{Time: time.Now().UTC()}
 
 	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
@@ -192,14 +195,17 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	}
 
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, manager, force)
+	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed.Fields, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
 			return nil, internal.NewConflictError(conflicts)
 		}
 		return nil, err
 	}
-	managed = f.stripFields(managed, manager)
+	managed.Fields = f.stripFields(managedFields, manager)
+
+	// Update the time in the managedFieldsEntry for this operation
+	managed.Times[manager] = &metav1.Time{Time: time.Now().UTC()}
 
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {
@@ -236,7 +242,6 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 		Manager:    prefix,
 		Operation:  operation,
 		APIVersion: f.groupVersion.String(),
-		Time:       &metav1.Time{Time: time.Now().UTC()},
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"

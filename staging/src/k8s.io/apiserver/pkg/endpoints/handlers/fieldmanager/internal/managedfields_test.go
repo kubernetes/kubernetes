@@ -169,7 +169,7 @@ manager: foo
 operation: Update
 time: "2001-02-03T04:05:06Z"
 `,
-			expected: "{\"manager\":\"foo\",\"operation\":\"Update\",\"apiVersion\":\"v1\",\"time\":\"2001-02-03T04:05:06Z\"}",
+			expected: "{\"manager\":\"foo\",\"operation\":\"Update\",\"apiVersion\":\"v1\"}",
 		},
 		{
 			managedFieldsEntry: `
