@@ -18,6 +18,7 @@ package flowcontrol
 
 import (
 	"hash/crc64"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -90,6 +91,9 @@ type priorityLevelState struct {
 // requestManagementSystem holds all the state and infrastructure of
 // this filter
 type requestManagementSystem struct {
+	// wg is kept informed of when goroutines start or stop or begin or end waiting
+	wg fq.OptionalWaitGroup
+
 	queueSetFactory fq.QueueSetFactory
 
 	// configQueue holds TypedConfigObjectReference values, identifying
@@ -132,6 +136,7 @@ func NewRequestManagementSystem(
 	queueSetFactory fq.QueueSetFactory,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
+	waitGroup *sync.WaitGroup,
 ) Interface {
 	return NewRequestManagementSystemWithPreservation(
 		informerFactory,
@@ -139,20 +144,27 @@ func NewRequestManagementSystem(
 		queueSetFactory,
 		serverConcurrencyLimit,
 		requestWaitLimit,
+		waitGroup,
 		nil, nil)
 }
 
-// NewRequestManagementSystemWithPreservation creates a new instance of request-management system with preservation
+// NewRequestManagementSystemWithPreservation creates a new instance
+// of request-management system with preservation.  The WaitGroup is
+// optional and, if supplied, is kept informed of whenever a goroutine
+// is started or stopped or begins or finishes waiting --- except that
+// the configuration controller is not fully plumbed yet.
 func NewRequestManagementSystemWithPreservation(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
 	queueSetFactory fq.QueueSetFactory,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
+	waitGroup *sync.WaitGroup,
 	preservingFlowSchemas []*rmtypesv1alpha1.FlowSchema,
 	preservingPriorityLevels []*rmtypesv1alpha1.PriorityLevelConfiguration,
 ) Interface {
 	reqMgmt := &requestManagementSystem{
+		wg:                     fq.WrapWaitGroupPointer(waitGroup),
 		queueSetFactory:        queueSetFactory,
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,

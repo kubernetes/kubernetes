@@ -167,7 +167,7 @@ func flowStdDevTest(t *testing.T, flows []flowDesc, expectedStdDev float64) {
 	// for i := range queues {
 	// 	fqqueues[i] = queues[i]
 	// }
-	fq := newQueueSetImpl(20000, len(flows), 20000, 5*time.Second, fc, nil)
+	fq := newQueueSetImpl(20000, len(flows), 20000, 5*time.Second, fc, NoWaitGroup())
 	for n := 0; n < len(flows); n++ {
 		genFlow(fq, &flows[n], n)
 	}
