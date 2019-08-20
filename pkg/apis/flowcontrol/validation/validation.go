@@ -113,7 +113,7 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 	}
 	switch subject.Kind {
 	case flowcontrol.ServiceAccountKind:
-		if len(subject.Name) > 0 {
+		if len(subject.Name) > 0 && subject.Name != flowcontrol.NameAll {
 			for _, msg := range validation.ValidateServiceAccountName(subject.Name, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
 			}
