@@ -95,9 +95,6 @@ type ListMeta struct {
 	// Servers older than v1.15 do not set this field.
 	// The intended use of the remainingItemCount is *estimating* the size of a collection. Clients
 	// should not rely on the remainingItemCount to be set or to be exact.
-	//
-	// This field is alpha and can be changed or removed without notice.
-	//
 	// +optional
 	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
 }

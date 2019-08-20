@@ -393,9 +393,6 @@ message ListMeta {
   // Servers older than v1.15 do not set this field.
   // The intended use of the remainingItemCount is *estimating* the size of a collection. Clients
   // should not rely on the remainingItemCount to be set or to be exact.
-  //
-  // This field is alpha and can be changed or removed without notice.
-  //
   // +optional
   optional int64 remainingItemCount = 4;
 }
