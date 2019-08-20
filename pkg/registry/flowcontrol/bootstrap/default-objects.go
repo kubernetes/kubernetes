@@ -29,8 +29,8 @@ var (
 		DefaultPriorityLevelConfigurationDefault,
 	}
 	PreservingFlowSchemas = []*rmv1a1.FlowSchema{
-		DefaultFlowSchemaSystemTop,
-		DefaultFlowSchemaCatchAll,
+		DefaultFlowSchemaExempt,
+		DefaultFlowSchemaDefault,
 	}
 )
 
@@ -52,8 +52,8 @@ var (
 
 // preserving default flow-schemas
 var (
-	DefaultFlowSchemaSystemTop = fs(
-		"system-top",
+	DefaultFlowSchemaExempt = fs(
+		"exempt",
 		rmv1a1.PriorityLevelConfigurationNameExempt,
 		1500, "",
 		rmv1a1.PolicyRuleWithSubjects{
@@ -70,10 +70,10 @@ var (
 				[]string{rmv1a1.NonResourceAll},
 			)},
 	)
-	DefaultFlowSchemaCatchAll = fs(
-		"catch-all",
+	DefaultFlowSchemaDefault = fs(
 		"default",
-		1500, rmv1a1.FlowDistinguisherMethodByUserType,
+		"default",
+		10000, rmv1a1.FlowDistinguisherMethodByUserType,
 		rmv1a1.PolicyRuleWithSubjects{
 			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
 			Rule: resourceRule(
@@ -96,12 +96,7 @@ var (
 func DefaultPriorityLevelConfigurations() []*rmv1a1.PriorityLevelConfiguration {
 	return []*rmv1a1.PriorityLevelConfiguration{
 		DefaultPriorityLevelConfigurationExempt,
-		pl("system-high", rmv1a1.PriorityLevelConfigurationSpec{
-			AssuredConcurrencyShares: 100,
-			Queues:                   128,
-			HandSize:                 6,
-			QueueLengthLimit:         10}),
-		pl("system-low", rmv1a1.PriorityLevelConfigurationSpec{
+		pl("system", rmv1a1.PriorityLevelConfigurationSpec{
 			AssuredConcurrencyShares: 30,
 			Queues:                   1,
 			QueueLengthLimit:         1000}),
@@ -130,14 +125,38 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 	ruleNonRscAll := rmv1a1.PolicyRule{
 		Verbs:           verbAll,
 		NonResourceURLs: []string{rmv1a1.NonResourceAll}}
-	subjectsAll := groups(user.AllAuthenticated, user.AllUnauthenticated)
+	allServiceAccountKubeControllerManager := []string{
+		"attachdetach-controller",
+		"certificate-controller",
+		"clusterrole-aggregation-controller",
+		"cronjob-controller",
+		"daemon-set-controller",
+		"deployment-controller",
+		"disruption-controller",
+		"endpoint-controller",
+		"expand-controller",
+		"generic-garbage-collector",
+		"horizontal-pod-autoscaler",
+		"job-controller",
+		"namespace-controller",
+		"node-controller",
+		"persistent-volume-binder",
+		"pod-garbage-collector",
+		"pv-protection-controller",
+		"pvc-protection-controller",
+		"replicaset-controller",
+		"replication-controller",
+		"resourcequota-controller",
+		"route-controller",
+		"service-account-controller",
+		"service-controller",
+		"statefulset-controller",
+		"ttl-controller",
+	}
 	return []*rmv1a1.FlowSchema{
-		DefaultFlowSchemaSystemTop,
-		fs("system-high", "system-high", 2500,
+		DefaultFlowSchemaExempt,
+		fs("system-nodes", "system", 2500,
 			rmv1a1.FlowDistinguisherMethodByUserType,
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: groups(user.NodesGroup),
-				Rule:     resourceRule(verbAll, []string{apiGroupCore}, []string{"nodes"})},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: groups(user.NodesGroup),
 				Rule:     ruleRscAll},
@@ -148,26 +167,45 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 				Subjects: users(user.KubeControllerManager, user.KubeScheduler),
 				Rule:     ruleNonRscAll},
 		),
-		fs("system-low", "system-low", 3500,
+		fs("system-leader-election", "system", 2500,
 			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: kubeSystemServiceAccount("generic-garbage-collector"),
+				Subjects: users(user.KubeControllerManager, user.KubeScheduler),
+				Rule:     resourceRule(verbAll, []string{"coordination.k8s.io"}, []string{"leases"})},
+		),
+		fs("kube-controller-manager", "workload-high", 3500,
+			rmv1a1.FlowDistinguisherMethodByNamespaceType,
+			rmv1a1.PolicyRuleWithSubjects{
+				Subjects: append(users(user.KubeControllerManager),
+					kubeSystemServiceAccount(allServiceAccountKubeControllerManager...)...),
+				Rule: ruleRscAll,
+			},
+			rmv1a1.PolicyRuleWithSubjects{
+				Subjects: append(users(user.KubeControllerManager),
+					kubeSystemServiceAccount(allServiceAccountKubeControllerManager...)...),
+				Rule: ruleNonRscAll,
+			},
+		),
+		fs("kube-scheduler", "workload-high", 3500,
+			rmv1a1.FlowDistinguisherMethodByNamespaceType,
+			rmv1a1.PolicyRuleWithSubjects{
+				Subjects: users(user.KubeScheduler),
 				Rule:     ruleRscAll,
 			},
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: kubeSystemServiceAccount("generic-garbage-collector"),
-				Rule:     nonResourceRule([]string{rmv1a1.VerbAll}, []string{rmv1a1.NonResourceAll}),
+				Subjects: users(user.KubeScheduler),
+				Rule:     ruleNonRscAll,
 			},
 		),
-		fs("workload-high", "workload-high", 7500,
-			rmv1a1.FlowDistinguisherMethodByNamespaceType,
+		fs("service-accounts", "workload-low", 7500,
+			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: subjectsAll,
+				Subjects: groups("system:serviceaccounts"),
 				Rule:     ruleRscAll},
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: subjectsAll,
+				Subjects: groups("system:serviceaccounts"),
 				Rule:     ruleNonRscAll}),
-		DefaultFlowSchemaCatchAll,
+		DefaultFlowSchemaDefault,
 	}
 }
 
@@ -211,8 +249,16 @@ func users(names ...string) []rmv1a1.Subject {
 	return ans
 }
 
-func kubeSystemServiceAccount(name string) []rmv1a1.Subject {
-	return []rmv1a1.Subject{{Kind: rmv1a1.ServiceAccountKind, Name: name, Namespace: metav1.NamespaceSystem}}
+func kubeSystemServiceAccount(names ...string) []rmv1a1.Subject {
+	subjects := []rmv1a1.Subject{}
+	for _, name := range names {
+		subjects = append(subjects, rmv1a1.Subject{
+			Kind:      rmv1a1.ServiceAccountKind,
+			Name:      name,
+			Namespace: metav1.NamespaceSystem,
+		})
+	}
+	return subjects
 }
 
 func resourceRule(verbs []string, groups []string, resources []string) rmv1a1.PolicyRule {
