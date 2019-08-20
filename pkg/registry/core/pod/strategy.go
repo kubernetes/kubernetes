@@ -312,15 +312,6 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 	return loc, rt, nil
 }
 
-// getContainerNames returns a formatted string containing the container names
-func getContainerNames(containers []api.Container) string {
-	names := []string{}
-	for _, c := range containers {
-		names = append(names, c.Name)
-	}
-	return strings.Join(names, " ")
-}
-
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func LogLocation(
@@ -553,13 +544,13 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 		case 0:
 			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.Name))
 		default:
-			containerNames := getContainerNames(pod.Spec.Containers)
-			initContainerNames := getContainerNames(pod.Spec.InitContainers)
-			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", pod.Name, containerNames)
-			if len(initContainerNames) > 0 {
-				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-			}
-			return "", errors.NewBadRequest(err)
+			var containerNames []string
+			podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+				containerNames = append(containerNames, c.Name)
+				return true
+			})
+			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
+			return "", errors.NewBadRequest(errStr)
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
