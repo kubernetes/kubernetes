@@ -98,17 +98,17 @@ filename | sha512 hash
 * fix: detach azure disk issue using dangling error ([#81266](https://github.com/kubernetes/kubernetes/pull/81266), [@andyzhangx](https://github.com/andyzhangx))
 * Conversion webhooks can now indicate they support receiving and responding with `ConversionReview` API objects in the `apiextensions.k8s.io/v1` version by including `v1` in the `conversionReviewVersions` list in their CustomResourceDefinition. Conversion webhooks must respond with a ConversionReview object in the same apiVersion they receive. `apiextensions.k8s.io/v1` `ConversionReview` responses must specify a `response.uid` that matches the `request.uid` of the object they were sent. ([#81476](https://github.com/kubernetes/kubernetes/pull/81476), [@liggitt](https://github.com/liggitt))
 * The `CustomResourceDefinition` API type is promoted to `apiextensions.k8s.io/v1` with the following changes: ([#79604](https://github.com/kubernetes/kubernetes/pull/79604), [@liggitt](https://github.com/liggitt))
-        * Use of the new `default` feature in validation schemas is limited to v1
-        * `spec.scope` is no longer defaulted to `Namespaced` and must be explicitly specified
-        * `spec.version` is removed; use `spec.versions` instead
-        * `spec.validation` is removed; use `spec.versions[*].schema` instead
-        * `spec.subresources` is removed; use `spec.versions[*].subresources` instead
-        * `spec.additionalPrinterColumns` is removed; use `spec.versions[*].additionalPrinterColumns` instead
-        * `spec.conversion.webhookClientConfig` is moved to `spec.conversion.webhook.clientConfig`
-        * `spec.conversion.conversionReviewVersions` is moved to `spec.conversion.webhook.conversionReviewVersions`
-        * `spec.versions[*].schema.openAPIV3Schema` is now required when creating v1 CustomResourceDefinitions
-        * `spec.preserveUnknownFields: true` is disallowed when creating v1 CustomResourceDefinitions; it must be specified within schema definitions as `x-kubernetes-preserve-unknown-fields: true`
-        * In `additionalPrinterColumns` items, the `JSONPath` field was renamed to `jsonPath` (fixes https://github.com/kubernetes/kubernetes/issues/66531)
+    * Use of the new `default` feature in validation schemas is limited to v1
+    * `spec.scope` is no longer defaulted to `Namespaced` and must be explicitly specified
+    * `spec.version` is removed; use `spec.versions` instead
+    * `spec.validation` is removed; use `spec.versions[*].schema` instead
+    * `spec.subresources` is removed; use `spec.versions[*].subresources` instead
+    * `spec.additionalPrinterColumns` is removed; use `spec.versions[*].additionalPrinterColumns` instead
+    * `spec.conversion.webhookClientConfig` is moved to `spec.conversion.webhook.clientConfig`
+    * `spec.conversion.conversionReviewVersions` is moved to `spec.conversion.webhook.conversionReviewVersions`
+    * `spec.versions[*].schema.openAPIV3Schema` is now required when creating v1 CustomResourceDefinitions
+    * `spec.preserveUnknownFields: true` is disallowed when creating v1 CustomResourceDefinitions; it must be specified within schema definitions as `x-kubernetes-preserve-unknown-fields: true`
+    * In `additionalPrinterColumns` items, the `JSONPath` field was renamed to `jsonPath` (fixes https://github.com/kubernetes/kubernetes/issues/66531)
 * openapi now advertises correctly supported patch types for custom resources ([#81515](https://github.com/kubernetes/kubernetes/pull/81515), [@liggitt](https://github.com/liggitt))
 * Kubelet could be run with no Azure identity without subscriptionId configured now. ([#81500](https://github.com/kubernetes/kubernetes/pull/81500), [@feiskyer](https://github.com/feiskyer))
     * A sample cloud provider configure is: '{"vmType": "vmss", "useInstanceMetadata": true}'.
