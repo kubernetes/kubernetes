@@ -32,6 +32,8 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/containernetworking/cni/libcni"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -343,5 +345,89 @@ func TestCNIPlugin(t *testing.T) {
 func TestLoNetNonNil(t *testing.T) {
 	if conf := getLoNetwork(nil); conf == nil {
 		t.Error("Expected non-nil lo network")
+	}
+}
+
+func TestAddAnnotationsToNetConfList(t *testing.T) {
+	type args struct {
+		netConfList *libcni.NetworkConfigList
+		annotations map[string]string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *libcni.NetworkConfigList
+		wantErr bool
+	}{
+		{
+			name: "add annotations multiple plugins",
+			args: args{
+				netConfList: &libcni.NetworkConfigList{
+					Plugins: []*libcni.NetworkConfig{
+						{
+							Network: &cnitypes.NetConf{Type: "host-local"},
+							Bytes:   []byte(`{"subnet":"10.0.0.1/24","type":"host-local"}`),
+						},
+						{
+							Network: &cnitypes.NetConf{Type: "bridge"},
+							Bytes:   []byte(`{"mtu":1400,"type":"bridge"}`),
+						},
+					},
+				},
+				annotations: map[string]string{
+					"test": "test",
+				},
+			},
+			want: &libcni.NetworkConfigList{
+				Plugins: []*libcni.NetworkConfig{
+					{
+						Network: &cnitypes.NetConf{Type: "host-local"},
+						Bytes:   []byte(`{"args":{"cni":{"labels":[{"key":"test","value":"test"}]}},"subnet":"10.0.0.1/24","type":"host-local"}`),
+					},
+					{
+						Network: &cnitypes.NetConf{Type: "bridge"},
+						Bytes:   []byte(`{"args":{"cni":{"labels":[{"key":"test","value":"test"}]}},"mtu":1400,"type":"bridge"}`),
+					},
+				},
+			},
+		},
+		{
+			name: "add annotations single plugin",
+			args: args{
+				netConfList: &libcni.NetworkConfigList{
+					Plugins: []*libcni.NetworkConfig{
+						{
+							Network: &cnitypes.NetConf{Type: "host-local"},
+							Bytes:   []byte(`{"subnet":"10.0.0.1/24","type":"host-local"}`),
+						},
+					},
+				},
+				annotations: map[string]string{
+					"test": "test",
+				},
+			},
+			want: &libcni.NetworkConfigList{
+				Plugins: []*libcni.NetworkConfig{
+					{
+						Network: &cnitypes.NetConf{Type: "host-local"},
+						Bytes:   []byte(`{"args":{"cni":{"labels":[{"key":"test","value":"test"}]}},"subnet":"10.0.0.1/24","type":"host-local"}`),
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := addAnnotationsToNetConfList(tt.args.netConfList, tt.args.annotations)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("addAnnotationsToNetConfList() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i, plugin := range tt.args.netConfList.Plugins {
+				if !reflect.DeepEqual(plugin.Bytes, tt.want.Plugins[i].Bytes) {
+					t.Errorf("addAnnotationsToNetConfList() = %s, want %s", plugin.Bytes, tt.want.Plugins[i].Bytes)
+				}
+			}
+		})
 	}
 }

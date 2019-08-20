@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"sort"
 	"strings"
 	"sync"
@@ -119,6 +120,22 @@ type cniDNSConfig struct {
 	Searches []string `json:"searches,omitempty"`
 	// List of DNS options.
 	Options []string `json:"options,omitempty"`
+}
+
+// cniArgs maps to the standard CNI args in network config
+// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+type cniArgs struct {
+	CNI cniArg `json:"cni"`
+}
+
+type cniArg struct {
+	Labels []cniLabel `json:"labels,omitempty"`
+	IPs    []net.IP   `json:"ips,omitempty"`
+}
+
+type cniLabel struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // SplitDirs : split dirs by ","
@@ -344,6 +361,10 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
+	if err := addAnnotationsToNetConfList(netConf, annotations); err != nil {
+		klog.Errorf("Error adding network when adding args to network config: %v", err)
+		return nil, err
+	}
 	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	res, err := cniNet.AddNetworkList(context.TODO(), netConf, rt)
 	if err != nil {
@@ -363,6 +384,10 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
+	if err := addAnnotationsToNetConfList(netConf, annotations); err != nil {
+		klog.Errorf("Error deleting network when adding args to network config: %v", err)
+		return err
+	}
 	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	err = cniNet.DelNetworkList(context.TODO(), netConf, rt)
 	// The pod may not get deleted successfully at the first time.
@@ -387,11 +412,6 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 			{"K8S_POD_NAME", podName},
 			{"K8S_POD_INFRA_CONTAINER_ID", podSandboxID.ID},
 		},
-	}
-
-	//send the annotations as extra args to the cni plugins
-	for key, value := range annotations {
-		rt.Args = append(rt.Args, [2]string{key, value})
 	}
 
 	// port mappings are a cni capability-based args, rather than parameters
@@ -452,4 +472,34 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	}
 
 	return rt, nil
+}
+
+// addAnnotationsToNetConfList will add annotations as label args to all the network configs. The cni plugins
+// can choose to ignore these args or use them for custom functionality.
+func addAnnotationsToNetConfList(netConfList *libcni.NetworkConfigList, annotations map[string]string) error {
+	cniLabels := make([]cniLabel, 0, len(annotations))
+	for key, value := range annotations {
+		cniLabels = append(cniLabels, cniLabel{
+			Key:   key,
+			Value: value,
+		})
+	}
+
+	inject := map[string]interface{}{
+		"args": cniArgs{
+			CNI: cniArg{
+				Labels: cniLabels,
+			},
+		},
+	}
+
+	for i, netConf := range netConfList.Plugins {
+		netConf, err := libcni.InjectConf(netConf, inject)
+		if err != nil {
+			return fmt.Errorf("error adding annotations to the args: %v", err)
+		}
+		netConfList.Plugins[i] = netConf
+	}
+
+	return nil
 }
