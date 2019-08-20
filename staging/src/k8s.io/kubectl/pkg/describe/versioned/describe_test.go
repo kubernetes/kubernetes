@@ -937,6 +937,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 func TestPersistentVolumeDescriber(t *testing.T) {
 	block := corev1.PersistentVolumeBlock
 	file := corev1.PersistentVolumeFilesystem
+	foo := "glusterfsendpointname"
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	testCases := []struct {
 		name               string
@@ -1023,6 +1024,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					},
 				},
 			},
+			expectedElements:   []string{"EndpointsNamespace", "<unset>"},
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
@@ -1272,6 +1274,22 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 			expectedElements: []string{"Driver", "VolumeHandle", "ReadOnly", "VolumeAttributes"},
+		},
+		{
+			name:   "test19",
+			plugin: "gluster",
+			pv: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						Glusterfs: &corev1.GlusterfsPersistentVolumeSource{
+							EndpointsNamespace: &foo,
+						},
+					},
+				},
+			},
+			expectedElements:   []string{"EndpointsNamespace", "glusterfsendpointname"},
+			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 	}
 
