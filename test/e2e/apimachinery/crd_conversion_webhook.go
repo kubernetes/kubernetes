@@ -39,7 +39,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration"
 
 	// ensure libs have a chance to initialize
@@ -56,15 +56,15 @@ const (
 
 var serverCRDConversionWebhookVersion = utilversion.MustParseSemantic("v1.13.0-alpha")
 
-var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
+var apiVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 	{
 		Name:    "v1",
 		Served:  true,
 		Storage: true,
-		Schema: &v1beta1.CustomResourceValidation{
-			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+		Schema: &apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 				Type: "object",
-				Properties: map[string]v1beta1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"hostPort": {Type: "string"},
 				},
 			},
@@ -74,10 +74,10 @@ var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v2",
 		Served:  true,
 		Storage: false,
-		Schema: &v1beta1.CustomResourceValidation{
-			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+		Schema: &apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 				Type: "object",
-				Properties: map[string]v1beta1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"host": {Type: "string"},
 					"port": {Type: "string"},
 				},
@@ -86,15 +86,15 @@ var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
 	},
 }
 
-var alternativeAPIVersions = []v1beta1.CustomResourceDefinitionVersion{
+var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 	{
 		Name:    "v1",
 		Served:  true,
 		Storage: false,
-		Schema: &v1beta1.CustomResourceValidation{
-			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+		Schema: &apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 				Type: "object",
-				Properties: map[string]v1beta1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"hostPort": {Type: "string"},
 				},
 			},
@@ -104,10 +104,10 @@ var alternativeAPIVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v2",
 		Served:  true,
 		Storage: true,
-		Schema: &v1beta1.CustomResourceValidation{
-			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+		Schema: &apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 				Type: "object",
-				Properties: map[string]v1beta1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"host": {Type: "string"},
 					"port": {Type: "string"},
 				},
@@ -142,21 +142,24 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 	})
 
 	ginkgo.It("Should be able to convert from CR v1 to CR v2", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
-			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
-				Strategy: v1beta1.WebhookConverter,
-				WebhookClientConfig: &v1beta1.WebhookClientConfig{
-					CABundle: context.signingCert,
-					Service: &v1beta1.ServiceReference{
-						Namespace: f.Namespace.Name,
-						Name:      serviceCRDName,
-						Path:      pointer.StringPtr("/crdconvert"),
-						Port:      pointer.Int32Ptr(serviceCRDPort),
+			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+				Strategy: apiextensionsv1.WebhookConverter,
+				Webhook: &apiextensionsv1.WebhookConversion{
+					ClientConfig: &apiextensionsv1.WebhookClientConfig{
+						CABundle: context.signingCert,
+						Service: &apiextensionsv1.ServiceReference{
+							Namespace: f.Namespace.Name,
+							Name:      serviceCRDName,
+							Path:      pointer.StringPtr("/crdconvert"),
+							Port:      pointer.Int32Ptr(serviceCRDPort),
+						},
 					},
+					ConversionReviewVersions: []string{"v1", "v1beta1"},
 				},
 			}
-			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
+			crd.Spec.PreserveUnknownFields = false
 		})
 		if err != nil {
 			return
@@ -166,21 +169,24 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 	})
 
 	ginkgo.It("Should be able to convert a non homogeneous list of CRs", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
-			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
-				Strategy: v1beta1.WebhookConverter,
-				WebhookClientConfig: &v1beta1.WebhookClientConfig{
-					CABundle: context.signingCert,
-					Service: &v1beta1.ServiceReference{
-						Namespace: f.Namespace.Name,
-						Name:      serviceCRDName,
-						Path:      pointer.StringPtr("/crdconvert"),
-						Port:      pointer.Int32Ptr(serviceCRDPort),
+			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+				Strategy: apiextensionsv1.WebhookConverter,
+				Webhook: &apiextensionsv1.WebhookConversion{
+					ClientConfig: &apiextensionsv1.WebhookClientConfig{
+						CABundle: context.signingCert,
+						Service: &apiextensionsv1.ServiceReference{
+							Namespace: f.Namespace.Name,
+							Name:      serviceCRDName,
+							Path:      pointer.StringPtr("/crdconvert"),
+							Port:      pointer.Int32Ptr(serviceCRDPort),
+						},
 					},
+					ConversionReviewVersions: []string{"v1", "v1beta1"},
 				},
 			}
-			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
+			crd.Spec.PreserveUnknownFields = false
 		})
 		if err != nil {
 			return
@@ -339,7 +345,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 	framework.ExpectNoError(err, "waiting for service %s/%s have %d endpoint", namespace, serviceCRDName, 1)
 }
 
-func verifyV1Object(f *framework.Framework, crd *v1beta1.CustomResourceDefinition, obj *unstructured.Unstructured) {
+func verifyV1Object(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v1"))
 	hostPort, exists := obj.Object["hostPort"]
 	gomega.Expect(exists).To(gomega.BeTrue())
@@ -350,7 +356,7 @@ func verifyV1Object(f *framework.Framework, crd *v1beta1.CustomResourceDefinitio
 	gomega.Expect(portExists).To(gomega.BeFalse())
 }
 
-func verifyV2Object(f *framework.Framework, crd *v1beta1.CustomResourceDefinition, obj *unstructured.Unstructured) {
+func verifyV2Object(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v2"))
 	_, hostPortExists := obj.Object["hostPort"]
 	gomega.Expect(hostPortExists).To(gomega.BeFalse())
@@ -362,7 +368,7 @@ func verifyV2Object(f *framework.Framework, crd *v1beta1.CustomResourceDefinitio
 	gomega.Expect(port).To(gomega.BeEquivalentTo("8080"))
 }
 
-func testCustomResourceConversionWebhook(f *framework.Framework, crd *v1beta1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface) {
+func testCustomResourceConversionWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface) {
 	name := "cr-instance-1"
 	ginkgo.By("Creating a v1 custom resource")
 	crInstance := &unstructured.Unstructured{
@@ -380,6 +386,7 @@ func testCustomResourceConversionWebhook(f *framework.Framework, crd *v1beta1.Cu
 	gomega.Expect(err).To(gomega.BeNil())
 	ginkgo.By("v2 custom resource should be converted")
 	v2crd, err := customResourceClients["v2"].Get(name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Getting v2 of custom resource %s", name)
 	verifyV2Object(f, crd, v2crd)
 }
 
@@ -404,7 +411,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	gomega.Expect(err).To(gomega.BeNil())
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
-	crd, err = integration.UpdateCustomResourceDefinitionWithRetry(testCrd.APIExtensionClient, crd.Name, func(c *v1beta1.CustomResourceDefinition) {
+	crd, err = integration.UpdateV1CustomResourceDefinitionWithRetry(testCrd.APIExtensionClient, crd.Name, func(c *apiextensionsv1.CustomResourceDefinition) {
 		c.Spec.Versions = alternativeAPIVersions
 	})
 	gomega.Expect(err).To(gomega.BeNil())

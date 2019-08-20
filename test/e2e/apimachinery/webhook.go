@@ -28,7 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,22 +195,24 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 
 	ginkgo.It("Should mutate custom resource with pruning", func() {
 		const prune = true
-		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
-			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
-			crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-					Type: "object",
-					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"data": {
-							Type: "object",
-							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"mutation-start":   {Type: "string"},
-								"mutation-stage-1": {Type: "string"},
-								// mutation-stage-2 is intentionally missing such that it is pruned
+		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
+			crd.Spec.PreserveUnknownFields = false
+			for i := range crd.Spec.Versions {
+				crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"data": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
+									"mutation-start":   {Type: "string"},
+									"mutation-stage-1": {Type: "string"},
+									// mutation-stage-2 is intentionally missing such that it is pruned
+								},
 							},
 						},
 					},
-				},
+				}
 			}
 		})
 		if err != nil {
@@ -733,7 +735,7 @@ func registerWebhookForAttachingPod(f *framework.Framework, configName string, c
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -821,7 +823,7 @@ func registerMutatingWebhookForPod(f *framework.Framework, configName string, co
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -1042,7 +1044,7 @@ func failingWebhook(namespace, name string) admissionregistrationv1.ValidatingWe
 			CABundle: nil,
 		},
 		SideEffects:             &sideEffectsNone,
-		AdmissionReviewVersions: []string{"v1beta1"},
+		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 	}
 }
 
@@ -1150,7 +1152,7 @@ func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, c
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				FailurePolicy:           &failurePolicy,
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
@@ -1209,7 +1211,7 @@ func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, con
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				FailurePolicy:           &failurePolicy,
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
@@ -1270,7 +1272,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework, configName str
 					CABundle: nil,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				FailurePolicy:           &failurePolicy,
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
@@ -1324,7 +1326,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework, configName str
 					CABundle: nil,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				FailurePolicy:           &failurePolicy,
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
@@ -1542,7 +1544,7 @@ func registerWebhookForCustomResource(f *framework.Framework, configName string,
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -1591,7 +1593,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, configName
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -1617,7 +1619,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, configName
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -1633,13 +1635,13 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, configName
 	return func() { client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(configName, nil) }
 }
 
-func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	ginkgo.By("Creating a custom resource that should be denied by the webhook")
 	crInstanceName := "cr-instance-1"
 	crInstance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
-			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
+			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      crInstanceName,
 				"namespace": f.Namespace.Name,
@@ -1657,13 +1659,13 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 	}
 }
 
-func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	ginkgo.By("Creating a custom resource whose deletion would be denied by the webhook")
 	crInstanceName := "cr-instance-2"
 	crInstance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
-			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
+			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      crInstanceName,
 				"namespace": f.Namespace.Name,
@@ -1701,13 +1703,13 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 
 }
 
-func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {
 	ginkgo.By("Creating a custom resource that should be mutated by the webhook")
 	crName := "cr-instance-1"
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
-			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
+			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      crName,
 				"namespace": f.Namespace.Name,
@@ -1738,7 +1740,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       testcrd.Crd.Spec.Names.Kind,
-			"apiVersion": testcrd.Crd.Spec.Group + "/" + testcrd.Crd.Spec.Version,
+			"apiVersion": testcrd.Crd.Spec.Group + "/" + testcrd.Crd.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      crName,
 				"namespace": f.Namespace.Name,
@@ -1752,8 +1754,29 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
 
 	ginkgo.By("Patching Custom Resource Definition to set v2 as storage")
-	apiVersionWithV2StoragePatch := fmt.Sprint(`{"spec": {"versions": [{"name": "v1", "storage": false, "served": true},{"name": "v2", "storage": true, "served": true}]}}`)
-	_, err = testcrd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
+	apiVersionWithV2StoragePatch := `{
+		"spec": {
+		  "versions": [
+		    {
+			  "name": "v1",
+			  "storage": false,
+			  "served": true,
+			  "schema": {
+			    "openAPIV3Schema": {"x-kubernetes-preserve-unknown-fields": true, "type": "object"}
+			  }
+            },
+		    {
+			  "name": "v2",
+			  "storage": true,
+			  "served": true,
+			  "schema": {
+			    "openAPIV3Schema": {"x-kubernetes-preserve-unknown-fields": true, "type": "object"}
+			  }
+            }
+          ]
+       }
+    }`
+	_, err = testcrd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
 	framework.ExpectNoError(err, "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
 
 	ginkgo.By("Patching the custom resource while v2 is storage version")
@@ -1798,7 +1821,7 @@ func registerValidatingWebhookForCRD(f *framework.Framework, configName string, 
 					CABundle: context.signingCert,
 				},
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				// Scope the webhook to just this namespace
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -1819,12 +1842,18 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	ginkgo.By("Creating a custom resource definition that should be denied by the webhook")
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, "deny")
 	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, "deny")
-	group := fmt.Sprintf("%s-crd-test.k8s.io", f.BaseName)
-	apiVersions := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+	group := fmt.Sprintf("%s.example.com", f.BaseName)
+	apiVersions := []apiextensionsv1.CustomResourceDefinitionVersion{
 		{
 			Name:    "v1",
 			Served:  true,
 			Storage: true,
+			Schema: &apiextensionsv1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					XPreserveUnknownFields: pointer.BoolPtr(true),
+					Type:                   "object",
+				},
+			},
 		},
 	}
 
@@ -1839,28 +1868,28 @@ func testCRDDenyWebhook(f *framework.Framework) {
 		e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
 		return
 	}
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name + "s." + group,
 			Labels: map[string]string{
 				"webhook-e2e-test": "webhook-disallow",
 			},
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 			Group:    group,
 			Versions: apiVersions,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Singular: name,
 				Kind:     kind,
 				ListKind: kind + "List",
 				Plural:   name + "s",
 			},
-			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Scope: apiextensionsv1.NamespaceScoped,
 		},
 	}
 
 	// create CRD
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(crd)
 	framework.ExpectError(err, "create custom resource definition %s should be denied by webhook", crd.Name)
 	expectedErrMsg := "the crd contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -1920,7 +1949,7 @@ func registerSlowWebhook(f *framework.Framework, configName string, context *cer
 				FailurePolicy:           policy,
 				TimeoutSeconds:          timeout,
 				SideEffects:             &sideEffectsNone,
-				AdmissionReviewVersions: []string{"v1beta1"},
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 			},
 		},
 	})
@@ -1958,25 +1987,37 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
 // for the admissin webhook calling test.
 func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework, opts ...crd.Option) (*crd.TestCrd, error) {
-	group := fmt.Sprintf("%s-multiversion-crd-test.k8s.io", f.BaseName)
-	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
-		crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+	group := fmt.Sprintf("%s.example.com", f.BaseName)
+	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1.CustomResourceDefinition) {
+		crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
 			{
 				Name:    "v1",
 				Served:  true,
 				Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						XPreserveUnknownFields: pointer.BoolPtr(true),
+						Type:                   "object",
+					},
+				},
 			},
 			{
 				Name:    "v2",
 				Served:  true,
 				Storage: false,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						XPreserveUnknownFields: pointer.BoolPtr(true),
+						Type:                   "object",
+					},
+				},
 			},
 		}
 	}}, opts...)...)
 }
 
 // servedAPIVersions returns the API versions served by the CRD.
-func servedAPIVersions(crd *apiextensionsv1beta1.CustomResourceDefinition) []string {
+func servedAPIVersions(crd *apiextensionsv1.CustomResourceDefinition) []string {
 	ret := []string{}
 	for _, v := range crd.Spec.Versions {
 		if v.Served {
@@ -2038,7 +2079,7 @@ func newDenyPodWebhookFixture(f *framework.Framework, context *certContext) admi
 			CABundle: context.signingCert,
 		},
 		SideEffects:             &sideEffectsNone,
-		AdmissionReviewVersions: []string{"v1beta1"},
+		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 		// Scope the webhook to just this namespace
 		NamespaceSelector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{f.UniqueName: "true"},
@@ -2079,7 +2120,7 @@ func newDenyConfigMapWebhookFixture(f *framework.Framework, context *certContext
 			CABundle: context.signingCert,
 		},
 		SideEffects:             &sideEffectsNone,
-		AdmissionReviewVersions: []string{"v1beta1"},
+		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 	}
 }
 
@@ -2105,7 +2146,7 @@ func newMutateConfigMapWebhookFixture(f *framework.Framework, context *certConte
 			CABundle: context.signingCert,
 		},
 		SideEffects:             &sideEffectsNone,
-		AdmissionReviewVersions: []string{"v1beta1"},
+		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 		// Scope the webhook to just this namespace
 		NamespaceSelector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{f.UniqueName: "true"},

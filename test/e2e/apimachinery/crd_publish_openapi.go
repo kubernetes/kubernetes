@@ -27,9 +27,10 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/onsi/ginkgo"
+	"k8s.io/utils/pointer"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -337,8 +338,11 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 
 		ginkgo.By("rename a version")
-		patch := []byte(`{"spec":{"versions":[{"name":"v2","served":true,"storage":true},{"name":"v4","served":true,"storage":false}]}}`)
-		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.Crd.Name, types.MergePatchType, patch)
+		patch := []byte(`[
+			{"op":"test","path":"/spec/versions/1/name","value":"v3"},
+			{"op": "replace", "path": "/spec/versions/1/name", "value": "v4"}
+		]`)
+		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(crdMultiVer.Crd.Name, types.JSONPatchType, patch)
 		if err != nil {
 			e2elog.Failf("%v", err)
 		}
@@ -379,12 +383,12 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 
 		ginkgo.By("mark a version not serverd")
-		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
 		if err != nil {
 			e2elog.Failf("%v", err)
 		}
 		crd.Crd.Spec.Versions[1].Served = false
-		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
 			e2elog.Failf("%v", err)
 		}
@@ -415,35 +419,42 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 }
 
 func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
-	group := fmt.Sprintf("%s-test-%s.k8s.io", f.BaseName, groupSuffix)
+	group := fmt.Sprintf("%s-test-%s.example.com", f.BaseName, groupSuffix)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
 	}
 
-	props := &v1beta1.JSONSchemaProps{}
+	props := &apiextensionsv1.JSONSchemaProps{}
 	if schema != nil {
 		if err := yaml.Unmarshal(schema, props); err != nil {
 			return nil, err
 		}
 	}
 
-	crd, err := crd.CreateMultiVersionTestCRD(f, group, func(crd *v1beta1.CustomResourceDefinition) {
-		var apiVersions []v1beta1.CustomResourceDefinitionVersion
+	crd, err := crd.CreateMultiVersionTestCRD(f, group, func(crd *apiextensionsv1.CustomResourceDefinition) {
+		var apiVersions []apiextensionsv1.CustomResourceDefinitionVersion
 		for i, version := range versions {
-			apiVersions = append(apiVersions, v1beta1.CustomResourceDefinitionVersion{
+			version := apiextensionsv1.CustomResourceDefinitionVersion{
 				Name:    version,
 				Served:  true,
 				Storage: i == 0,
-			})
+			}
+			// set up validation when input schema isn't nil
+			if schema != nil {
+				version.Schema = &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: props,
+				}
+			} else {
+				version.Schema = &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						XPreserveUnknownFields: pointer.BoolPtr(true),
+						Type:                   "object",
+					},
+				}
+			}
+			apiVersions = append(apiVersions, version)
 		}
 		crd.Spec.Versions = apiVersions
-
-		// set up validation when input schema isn't nil
-		if schema != nil {
-			crd.Spec.Validation = &v1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: props,
-			}
-		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
@@ -573,12 +584,12 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 
 // convertJSONSchemaProps converts JSONSchemaProps in YAML to spec.Schema
 func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
-	external := v1beta1.JSONSchemaProps{}
+	external := apiextensionsv1.JSONSchemaProps{}
 	if err := yaml.UnmarshalStrict(in, &external); err != nil {
 		return err
 	}
 	internal := apiextensions.JSONSchemaProps{}
-	if err := v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
+	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
 		return err
 	}
 	if err := validation.ConvertJSONSchemaProps(&internal, out); err != nil {
