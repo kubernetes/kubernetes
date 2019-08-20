@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/klog"
 )
 
 // New returns an http.RoundTripper that will provide the authentication
@@ -223,5 +226,19 @@ func (b *contextCanceller) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, b.err
 	default:
 		return b.rt.RoundTrip(req)
+	}
+}
+
+func tryCancelRequest(rt http.RoundTripper, req *http.Request) {
+	type canceler interface {
+		CancelRequest(*http.Request)
+	}
+	switch rt := rt.(type) {
+	case canceler:
+		rt.CancelRequest(req)
+	case utilnet.RoundTripperWrapper:
+		tryCancelRequest(rt.WrappedRoundTripper(), req)
+	default:
+		klog.Warningf("Unable to cancel request for %T", rt)
 	}
 }
