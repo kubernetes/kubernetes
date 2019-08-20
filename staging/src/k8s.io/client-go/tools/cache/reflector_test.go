@@ -20,7 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net"
+	"net/url"
+	"os"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
 
@@ -278,10 +282,11 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		return list
 	}
 	table := []struct {
-		list     *v1.PodList
-		listErr  error
-		events   []watch.Event
-		watchErr error
+		list       *v1.PodList
+		listErr    error
+		events     []watch.Event
+		watchErr   error
+		watchCycle int
 	}{
 		{
 			list: mkList("1"),
@@ -289,24 +294,34 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				{Type: watch.Added, Object: mkPod("foo", "2")},
 				{Type: watch.Added, Object: mkPod("bar", "3")},
 			},
+			watchCycle: 1,
 		}, {
 			list: mkList("3", mkPod("foo", "2"), mkPod("bar", "3")),
 			events: []watch.Event{
 				{Type: watch.Deleted, Object: mkPod("foo", "4")},
 				{Type: watch.Added, Object: mkPod("qux", "5")},
 			},
+			watchCycle: 1,
 		}, {
-			listErr: fmt.Errorf("a list error"),
+			listErr:    fmt.Errorf("a list error"),
+			watchCycle: 1,
 		}, {
-			list:     mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
-			watchErr: fmt.Errorf("a watch error"),
+			list:       mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
+			watchErr:   fmt.Errorf("a watch error"),
+			watchCycle: 1,
 		}, {
 			list: mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
 			events: []watch.Event{
 				{Type: watch.Added, Object: mkPod("baz", "6")},
 			},
+			watchCycle: 1,
 		}, {
-			list: mkList("6", mkPod("bar", "3"), mkPod("qux", "5"), mkPod("baz", "6")),
+			list:       mkList("6", mkPod("bar", "3"), mkPod("qux", "5"), mkPod("baz", "6")),
+			watchCycle: 1,
+		}, {
+			list:       mkList("6", mkPod("bar", "3"), mkPod("qux", "5"), mkPod("baz", "6")),
+			watchErr:   &url.Error{Err: &net.OpError{Err: &os.SyscallError{Err: syscall.Errno(syscall.ECONNREFUSED)}}},
+			watchCycle: 2,
 		},
 	}
 
@@ -329,10 +344,27 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				t.Errorf("%v: expected %v, got %v", line, e, a)
 			}
 		}
-		watchRet, watchErr := item.events, item.watchErr
+		watchRet, watchErr, watchCycle := item.events, item.watchErr, 1
 		lw := &testLW{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// If this is "connection refused" error, it means that most likely apiserver is not responsive.
+				// It doesn't make sense to re-list all objects because most likely we will be able to restart
+				// watch where we ended.
+				// If that's the case wait and resend watch request.
+				if urlError, ok := watchErr.(*url.Error); ok {
+					if opError, ok := urlError.Err.(*net.OpError); ok {
+						if osSyscallError, ok := opError.Err.(*os.SyscallError); ok {
+							if errno, ok := osSyscallError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
+								watchCycle++
+								watchErr = fmt.Errorf("second watch")
+							}
+						}
+					}
+				}
 				if watchErr != nil {
+					if item.watchCycle != watchCycle {
+						t.Errorf("exactly %v iterations were expected, got: %v", item.watchCycle, watchCycle)
+					}
 					return nil, watchErr
 				}
 				watchErr = fmt.Errorf("second watch")
