@@ -133,7 +133,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer testcrd.CleanUp()
 		webhookCleanup := registerWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient)
+		testCustomResourceWebhook(f, testcrd.Crd, testcrd.GetV1DynamicClient())
 	})
 
 	It("Should unconditionally reject operations on fail closed webhook", func() {
@@ -168,7 +168,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer testcrd.CleanUp()
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient)
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.GetV1DynamicClient())
 	})
 
 	It("Should deny crd creation", func() {
@@ -1088,7 +1088,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
-						APIVersions: []string{testcrd.ApiVersion},
+						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
 				}},
@@ -1129,7 +1129,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
-						APIVersions: []string{testcrd.ApiVersion},
+						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
 				}},
@@ -1148,7 +1148,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
-						APIVersions: []string{testcrd.ApiVersion},
+						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
 				}},
@@ -1272,12 +1272,18 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, "deny")
 	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, "deny")
 	group := fmt.Sprintf("%s-crd-test.k8s.io", f.BaseName)
-	apiVersion := "v1"
+	apiVersions := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+		{
+			Name:    "v1",
+			Served:  true,
+			Storage: true,
+		},
+	}
 	testcrd := &framework.TestCrd{
 		Name:       name,
 		Kind:       kind,
 		ApiGroup:   group,
-		ApiVersion: apiVersion,
+		Versions:   apiVersions,
 	}
 
 	// Creating a custom resource definition for use by assorted tests.
@@ -1299,8 +1305,8 @@ func testCRDDenyWebhook(f *framework.Framework) {
 			},
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   testcrd.ApiGroup,
-			Version: testcrd.ApiVersion,
+			Group:    testcrd.ApiGroup,
+			Versions: testcrd.Versions,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   testcrd.GetPluralName(),
 				Singular: testcrd.Name,

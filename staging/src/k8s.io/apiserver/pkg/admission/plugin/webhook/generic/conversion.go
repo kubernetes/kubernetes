@@ -19,6 +19,7 @@ package generic
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -36,6 +37,16 @@ func (c *convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind
 		return obj, nil
 	}
 	out, err := c.Scheme.New(gvk)
+	// This is a workaround for http://issue.k8s.io/73752 for sending multi-version custom resources to admission webhooks.
+	// If we're being asked to convert an unstructured object for a kind that is not registered, it must be a custom resource.
+	// In 1.13, only no-op custom resource conversion is possible, so setting the group version is sufficient to "convert".
+	// In 1.14+, this was fixed correctly in http://issue.k8s.io/74154 by plumbing the actual object converter here.
+	if runtime.IsNotRegisteredError(err) {
+		if u, ok := obj.(*unstructured.Unstructured); ok {
+			u.GetObjectKind().SetGroupVersionKind(gvk)
+			return u, nil
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

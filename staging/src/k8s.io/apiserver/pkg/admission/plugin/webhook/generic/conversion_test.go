@@ -126,6 +126,27 @@ func TestConvertToGVK(t *testing.T) {
 				},
 			},
 		},
+		"no-op conversion for Unstructured object whose gvk does not match the desired gvk": {
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "mygroup.k8s.io/v1",
+					"kind":       "Flunder",
+					"data": map[string]interface{}{
+						"Key": "Value",
+					},
+				},
+			},
+			gvk: schema.GroupVersionKind{Group: "mygroup.k8s.io", Version: "v2", Kind: "Flunder"},
+			expectedObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "mygroup.k8s.io/v2",
+					"kind":       "Flunder",
+					"data": map[string]interface{}{
+						"Key": "Value",
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range table {
