@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -77,8 +76,6 @@ const (
 	addedLabelValue           = "yes"
 )
 
-var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
-
 var _ = SIGDescribe("AdmissionWebhook", func() {
 	var context *certContext
 	f := framework.NewDefaultFramework("webhook")
@@ -91,15 +88,6 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		namespaceName = f.Namespace.Name
-
-		// Make sure the relevant provider supports admission webhook
-		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
-		framework.SkipUnlessProviderIs("gce", "gke", "local")
-
-		_, err := f.ClientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(metav1.ListOptions{})
-		if errors.IsNotFound(err) {
-			framework.Skipf("dynamic configuration of webhooks requires the admissionregistration.k8s.io group to be enabled")
-		}
 
 		// Make sure the namespace created for the test is labeled to be selected by the webhooks
 		labelNamespace(f, f.Namespace.Name)
