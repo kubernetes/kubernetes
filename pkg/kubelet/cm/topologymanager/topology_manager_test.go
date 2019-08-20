@@ -83,8 +83,16 @@ type mockHintProvider struct {
 	th map[string][]TopologyHint
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint {
-	return m.th
+func (m *mockHintProvider) GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]TopologyHint, error) {
+	return m.th, nil
+}
+
+type mockHintProviderError struct {
+	th map[string][]TopologyHint
+}
+
+func (m *mockHintProviderError) GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]TopologyHint, error) {
+	return m.th, fmt.Errorf("Failed to generate topology hints")
 }
 
 func TestGetAffinity(t *testing.T) {
@@ -664,7 +672,7 @@ func TestCalculateAffinity(t *testing.T) {
 	for _, tc := range tcases {
 		mngr := manager{}
 		mngr.hintProviders = tc.hp
-		actual := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
+		actual, _ := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
 		if !actual.SocketAffinity.IsEqual(tc.expected.SocketAffinity) {
 			t.Errorf("Expected SocketAffinity in result to be %v, got %v", tc.expected.SocketAffinity, actual.SocketAffinity)
 		}
@@ -859,6 +867,24 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "QOSClass set as Guaranteed. Best Effort Policy. GetTopologyError",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewBestEffortPolicy(),
+			hp: []HintProvider{
+				&mockHintProviderError{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      true,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
 			name:     "QOSClass set as Guaranteed. Strict Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   NewStrictPolicy(),
@@ -924,6 +950,24 @@ func TestAdmit(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name:     "QOSClass set as Guaranteed. Strict Policy. GetTopologyError",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewStrictPolicy(),
+			hp: []HintProvider{
+				&mockHintProviderError{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      true,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
 	}
 	for _, tc := range tcases {
 		man := manager{}
@@ -944,6 +988,7 @@ func TestAdmit(t *testing.T) {
 		podAttr.Pod = pod
 		actual := man.Admit(&podAttr)
 		if actual.Admit != tc.expected {
+			t.Errorf("Test Case: %s", tc.name)
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, actual.Admit)
 		}
 	}

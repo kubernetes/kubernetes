@@ -26,16 +26,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 )
 
-func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]topologymanager.TopologyHint, error) {
 	// The 'none' policy does not generate topology hints.
 	if m.policy.Name() == string(PolicyNone) {
-		return nil
+		return nil, nil
 	}
 
 	// For all other policies, if there are no CPU resources requested for this
 	// container, we do not generate any topology hints.
 	if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
-		return nil
+		return nil, nil
 	}
 
 	// Otherwise, attempt to generate TopologyHints for the CPUManager.
@@ -50,7 +50,7 @@ func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[strin
 	// containers don't have to have guaranteed CPUs in order for the pod
 	// to still be in the Guaranteed QOS tier.
 	if requested == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Get a list of available CPUs.
@@ -62,7 +62,7 @@ func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[strin
 
 	return map[string][]topologymanager.TopologyHint{
 		string(v1.ResourceCPU): cpuHints,
-	}
+	}, nil
 }
 
 // generateCPUtopologyHints generates a set of TopologyHints given the set of

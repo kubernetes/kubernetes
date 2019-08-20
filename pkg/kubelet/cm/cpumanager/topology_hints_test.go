@@ -134,7 +134,8 @@ func TestGetTopologyHints(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		hints := m.GetTopologyHints(tc.pod, tc.container)[string(v1.ResourceCPU)]
+		cpuHints, _ := m.GetTopologyHints(tc.pod, tc.container)
+		hints := cpuHints[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}

@@ -47,9 +47,9 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]topologymanager.TopologyHint, error) {
 	klog.Infof("[fake cpumanager] Get Topology Hints")
-	return map[string][]topologymanager.TopologyHint{}
+	return map[string][]topologymanager.TopologyHint{}, nil
 }
 
 func (m *fakeManager) State() state.Reader {

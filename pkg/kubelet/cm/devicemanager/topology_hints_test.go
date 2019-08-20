@@ -41,6 +41,15 @@ func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) top
 func makeNUMADevice(id string, numa int) pluginapi.Device {
 	return pluginapi.Device{
 		ID:       id,
+		Health:   pluginapi.Healthy,
+		Topology: &pluginapi.TopologyInfo{Node: &pluginapi.NUMANode{ID: int64(numa)}},
+	}
+}
+
+func makeNUMADeviceUnHealthy(id string, numa int) pluginapi.Device {
+	return pluginapi.Device{
+		ID:       id,
+		Health:   pluginapi.Unhealthy,
 		Topology: &pluginapi.TopologyInfo{Node: &pluginapi.NUMANode{ID: int64(numa)}},
 	}
 }
@@ -63,6 +72,7 @@ func TestGetTopologyHints(t *testing.T) {
 		request       map[string]string
 		devices       map[string][]pluginapi.Device
 		expectedHints map[string][]topologymanager.TopologyHint
+		expectedError bool
 	}{
 		{
 			description: "Single Request, no alignment",
@@ -78,6 +88,7 @@ func TestGetTopologyHints(t *testing.T) {
 			expectedHints: map[string][]topologymanager.TopologyHint{
 				"testdevice": nil,
 			},
+			expectedError: false,
 		},
 		{
 			description: "Single Request, only one with alignment",
@@ -93,6 +104,7 @@ func TestGetTopologyHints(t *testing.T) {
 			expectedHints: map[string][]topologymanager.TopologyHint{
 				"testdevice": nil,
 			},
+			expectedError: false,
 		},
 		{
 			description: "Single Request, one device per socket",
@@ -121,6 +133,7 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
+			expectedError: false,
 		},
 		{
 			description: "Request for 2, one device per socket",
@@ -141,6 +154,7 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
+			expectedError: false,
 		},
 		{
 			description: "Request for 2, 2 devices per socket",
@@ -171,6 +185,7 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
+			expectedError: false,
 		},
 		{
 			description: "2 device types, mixed configuration",
@@ -215,6 +230,27 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
+			expectedError: false,
+		},
+		{
+			description: "2 device types, 1 unhealthy",
+			request: map[string]string{
+				"testdevice1": "2",
+				"testdevice2": "1",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+					makeNUMADevice("Dev3", 0),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADeviceUnHealthy("Dev1", 0),
+				},
+			},
+			expectedHints: nil,
+			expectedError: true,
 		},
 	}
 
@@ -248,12 +284,17 @@ func TestGetTopologyHints(t *testing.T) {
 
 			for _, d := range tc.devices[r] {
 				m.allDevices[r][d.ID] = d
-				m.healthyDevices[r].Insert(d.ID)
+				if d.Health == pluginapi.Healthy {
+					m.healthyDevices[r].Insert(d.ID)
+				}
 			}
 		}
 
-		hints := m.GetTopologyHints(*pod, pod.Spec.Containers[0])
-
+		hints, err := m.GetTopologyHints(*pod, pod.Spec.Containers[0])
+		isError := err != nil
+		if isError != tc.expectedError {
+			t.Errorf("%v: Eexpected isError to be %v, got %v", tc.description, tc.expectedError, isError)
+		}
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {
 				return topologyHintLessThan(hints[r][i], hints[r][j])

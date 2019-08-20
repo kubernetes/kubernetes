@@ -68,7 +68,7 @@ type Manager interface {
 
 	// GetTopologyHints implements the Topology Manager Interface and is
 	// consulted to make Topology aware resource alignments
-	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]topologymanager.TopologyHint, error)
 }
 
 type manager struct {

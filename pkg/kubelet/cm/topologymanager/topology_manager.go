@@ -54,7 +54,7 @@ type manager struct {
 
 //HintProvider interface is to be implemented by Hint Providers
 type HintProvider interface {
-	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint
+	GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]TopologyHint, error)
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -148,7 +148,7 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 }
 
 // Merge the hints from all hint providers to find the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
+func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, error) {
 	// Set the default hint to return from this function as an any-socket
 	// affinity with an unpreferred allocation. This will only be returned if
 	// no better hint can be found when merging hints from each hint provider.
@@ -162,7 +162,10 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 	var allProviderHints [][]TopologyHint
 	for _, provider := range m.hintProviders {
 		// Get the TopologyHints from a provider.
-		hints := provider.GetTopologyHints(pod, container)
+		hints, err := provider.GetTopologyHints(pod, container)
+		if err != nil {
+			return defaultHint, err
+		}
 
 		// If hints is nil, insert a single, preferred any-socket hint into allProviderHints.
 		if hints == nil || len(hints) == 0 {
@@ -180,14 +183,6 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 				affinity, _ := socketmask.NewSocketMask()
 				affinity.Fill()
 				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
-				continue
-			}
-
-			if len(hints[resource]) == 0 {
-				klog.Infof("[topologymanager] Hint Provider has no possible socket affinities for resource '%s'", resource)
-				affinity, _ := socketmask.NewSocketMask()
-				affinity.Fill()
-				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, false}})
 				continue
 			}
 
@@ -258,7 +253,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
 
-	return bestHint
+	return bestHint, nil
 }
 
 func (m *manager) AddHintProvider(h HintProvider) {
@@ -292,7 +287,14 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			result := m.calculateAffinity(*pod, container)
+			result, err := m.calculateAffinity(*pod, container)
+			if err != nil {
+				return lifecycle.PodAdmitResult{
+					Admit:   false,
+					Reason:  err.Error(),
+					Message: err.Error(),
+				}
+			}
 			admitPod := m.policy.CanAdmitPodResult(result.Preferred)
 			if admitPod.Admit == false {
 				return admitPod

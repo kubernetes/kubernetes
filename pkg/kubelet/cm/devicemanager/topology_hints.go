@@ -17,6 +17,8 @@ limitations under the License.
 package devicemanager
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
@@ -27,7 +29,7 @@ import (
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
-func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) (map[string][]topologymanager.TopologyHint, error) {
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 
 	for resourceObj, requestedObj := range container.Resources.Limits {
@@ -44,15 +46,14 @@ func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) map[s
 			available := m.getAvailableDevices(resource)
 			if available.Len() < requested {
 				klog.Errorf("[devicemanager] Unable to generate topology hints: requested number of devices unavailable for '%s': requested: %d, available: %d", resource, requested, available.Len())
-				deviceHints[resource] = []topologymanager.TopologyHint{}
-				continue
+				return nil, fmt.Errorf("Failed to generate topology hints with resource %v", resource)
 			}
 
 			deviceHints[resource] = m.generateDeviceTopologyHints(resource, available, requested)
 		}
 	}
 
-	return deviceHints
+	return deviceHints, nil
 }
 
 func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
