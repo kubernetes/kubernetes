@@ -182,7 +182,7 @@ var map_Subject = map[string]string{
 	"":          "Subject matches a set of users. Syntactically, Subject is a general API object reference. Authorization produces a username and a set of groups, and we imagine special kinds of non-namespaced objects, User and Group in API group \"flowcontrol.apiserver.k8s.io\", to represent such a username or group. The only kind of true object reference that currently will match any users is ServiceAccount.",
 	"kind":      "`kind` of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the kind value is not recognized, the flow-control layer in api-server should report an error.",
 	"apiGroup":  "`apiGroup` holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"flowcontrol.apiserver.k8s.io\" for User and Group subjects.",
-	"name":      "`name` of the object being referenced.",
+	"name":      "`name` of the object being referenced.  To match regardless of name, use NameAll. Required.",
 	"namespace": "`namespace` of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
 }
 

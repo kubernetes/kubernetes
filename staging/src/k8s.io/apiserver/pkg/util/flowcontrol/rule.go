@@ -17,6 +17,8 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"strings"
+
 	rmtypesv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 )
@@ -45,14 +47,38 @@ func matchesSubject(digest RequestDigest, subject rmtypesv1alpha1.Subject) bool 
 	user := digest.User
 	switch subject.Kind {
 	case rmtypesv1alpha1.UserKind:
-		return user.GetName() == subject.Name
+		return subject.Name == rmtypesv1alpha1.NameAll || subject.Name == user.GetName()
 	case rmtypesv1alpha1.GroupKind:
-		return containsString(subject.Name, user.GetGroups(), "")
+		return containsString(subject.Name, user.GetGroups(), rmtypesv1alpha1.NameAll)
 	case rmtypesv1alpha1.ServiceAccountKind:
+		if subject.Name == rmtypesv1alpha1.NameAll {
+			return serviceAccountMatchesNamespace(subject.Namespace, subject.Name)
+		}
 		return serviceaccount.MatchesUsername(subject.Namespace, subject.Name, user.GetName())
 	default:
 		return false
 	}
+}
+
+// serviceAccountMatchesNamespace checks whether the provided service account username matches the namespace, without
+// allocating. Use this when checking a service account namespace against a known string.
+// This is copied from `k8s.io/apiserver/pkg/authentication/serviceaccount::MatchesUsername` and simplified to not check the name part.
+func serviceAccountMatchesNamespace(namespace string, username string) bool {
+	const (
+		ServiceAccountUsernamePrefix    = "system:serviceaccount:"
+		ServiceAccountUsernameSeparator = ":"
+	)
+	if !strings.HasPrefix(username, ServiceAccountUsernamePrefix) {
+		return false
+	}
+	username = username[len(ServiceAccountUsernamePrefix):]
+
+	if !strings.HasPrefix(username, namespace) {
+		return false
+	}
+	username = username[len(namespace):]
+
+	return strings.HasPrefix(username, ServiceAccountUsernameSeparator)
 }
 
 func matchesPolicyRule(digest RequestDigest, policyRule rmtypesv1alpha1.PolicyRule) bool {
