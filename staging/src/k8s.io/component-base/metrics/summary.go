@@ -150,3 +150,17 @@ func (v *SummaryVec) With(labels prometheus.Labels) ObserverMetric {
 	}
 	return v.SummaryVec.With(labels)
 }
+
+// Delete deletes the metric where the variable labels are the same as those
+// passed in as labels. It returns true if a metric was deleted.
+//
+// It is not an error if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc. However, such inconsistent Labels
+// can never match an actual metric, so the method will always return false in
+// that case.
+func (v *SummaryVec) Delete(labels prometheus.Labels) bool {
+	if !v.IsCreated() {
+		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
+	}
+	return v.SummaryVec.Delete(labels)
+}

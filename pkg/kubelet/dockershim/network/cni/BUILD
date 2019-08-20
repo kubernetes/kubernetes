@@ -19,6 +19,7 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/network:go_default_library",
         "//pkg/util/bandwidth:go_default_library",
+        "//pkg/util/slice:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",

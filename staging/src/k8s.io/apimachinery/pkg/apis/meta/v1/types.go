@@ -767,11 +767,13 @@ const (
 	// doesn't make any sense, for example deleting a read-only object.  This is different than
 	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
 	// data was invalid.  API calls that return BadRequest can never succeed.
+	// Status code 400
 	StatusReasonBadRequest StatusReason = "BadRequest"
 
 	// StatusReasonMethodNotAllowed means that the action the client attempted to perform on the
 	// resource was not supported by the code - for instance, attempting to delete a resource that
 	// can only be created. API calls that return MethodNotAllowed can never succeed.
+	// Status code 405
 	StatusReasonMethodNotAllowed StatusReason = "MethodNotAllowed"
 
 	// StatusReasonNotAcceptable means that the accept types indicated by the client were not acceptable

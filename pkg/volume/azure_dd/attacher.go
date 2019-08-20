@@ -87,7 +87,7 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 			klog.V(2).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)
 		} else {
 			klog.V(2).Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, nodeName, err)
-			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, nodeName, err)
+			return "", err
 		}
 	}
 

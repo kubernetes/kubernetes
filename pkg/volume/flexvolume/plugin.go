@@ -134,7 +134,7 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 		return "", err
 	}
 
-	klog.Warning(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
+	klog.V(4).Infof(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
 
 	return name, nil
 }
