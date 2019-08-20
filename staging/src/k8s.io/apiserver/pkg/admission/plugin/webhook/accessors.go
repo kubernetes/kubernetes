@@ -17,8 +17,14 @@ limitations under the License.
 package webhook
 
 import (
+	"sync"
+	"fmt"
+
 	"k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/rest"
 )
 
 // WebhookAccessor provides a common interface to both mutating and validating webhook types.
@@ -28,6 +34,13 @@ type WebhookAccessor interface {
 
 	// GetConfigurationName gets the name of the webhook configuration that owns this webhook.
 	GetConfigurationName() string
+
+	// GetRESTClient gets the webhook client
+	GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error)
+	// GetParsedNamespaceSelector gets the webhook NamespaceSelector field.
+	GetParsedNamespaceSelector() (labels.Selector, error)
+	// GetParsedObjectSelector gets the webhook ObjectSelector field.
+	GetParsedObjectSelector() (labels.Selector, error)
 
 	// GetName gets the webhook Name field. Note that the name is scoped to the webhook
 	// configuration and does not provide a globally unique identity, if a unique identity is
@@ -60,134 +73,200 @@ type WebhookAccessor interface {
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
 func NewMutatingWebhookAccessor(uid, configurationName string, h *v1beta1.MutatingWebhook) WebhookAccessor {
-	return mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h}
+	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h}
 }
 
 type mutatingWebhookAccessor struct {
 	*v1beta1.MutatingWebhook
 	uid               string
 	configurationName string
+
+	initObjectSelector sync.Once
+	objectSelector     labels.Selector
+	objectSelectorErr  error
+
+	initNamespaceSelector sync.Once
+	namespaceSelector     labels.Selector
+	namespaceSelectorErr  error
+
+	initClient sync.Once
+	client     *rest.RESTClient
+	clientErr  error
 }
 
-func (m mutatingWebhookAccessor) GetUID() string {
+func (m *mutatingWebhookAccessor) GetUID() string {
 	return m.uid
 }
 
-func (m mutatingWebhookAccessor) GetConfigurationName() string {
+func (m *mutatingWebhookAccessor) GetConfigurationName() string {
 	return m.configurationName
 }
 
-func (m mutatingWebhookAccessor) GetName() string {
+func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
+	m.initClient.Do(func() {
+		m.client, m.clientErr = nil, fmt.Errorf("unimplemented")
+	})
+	return m.client, m.clientErr
+}
+
+func (m *mutatingWebhookAccessor) GetParsedNamespaceSelector() (labels.Selector, error) {
+	m.initNamespaceSelector.Do(func() {
+		m.namespaceSelector, m.namespaceSelectorErr = metav1.LabelSelectorAsSelector(m.NamespaceSelector)
+	})
+	return m.namespaceSelector, m.namespaceSelectorErr
+}
+
+func (m *mutatingWebhookAccessor) GetParsedObjectSelector() (labels.Selector, error) {
+	m.initObjectSelector.Do(func() {
+		m.objectSelector, m.objectSelectorErr = metav1.LabelSelectorAsSelector(m.ObjectSelector)
+	})
+	return m.objectSelector, m.objectSelectorErr
+}
+
+func (m *mutatingWebhookAccessor) GetName() string {
 	return m.Name
 }
 
-func (m mutatingWebhookAccessor) GetClientConfig() v1beta1.WebhookClientConfig {
+func (m *mutatingWebhookAccessor) GetClientConfig() v1beta1.WebhookClientConfig {
 	return m.ClientConfig
 }
 
-func (m mutatingWebhookAccessor) GetRules() []v1beta1.RuleWithOperations {
+func (m *mutatingWebhookAccessor) GetRules() []v1beta1.RuleWithOperations {
 	return m.Rules
 }
 
-func (m mutatingWebhookAccessor) GetFailurePolicy() *v1beta1.FailurePolicyType {
+func (m *mutatingWebhookAccessor) GetFailurePolicy() *v1beta1.FailurePolicyType {
 	return m.FailurePolicy
 }
 
-func (m mutatingWebhookAccessor) GetMatchPolicy() *v1beta1.MatchPolicyType {
+func (m *mutatingWebhookAccessor) GetMatchPolicy() *v1beta1.MatchPolicyType {
 	return m.MatchPolicy
 }
 
-func (m mutatingWebhookAccessor) GetNamespaceSelector() *metav1.LabelSelector {
+func (m *mutatingWebhookAccessor) GetNamespaceSelector() *metav1.LabelSelector {
 	return m.NamespaceSelector
 }
 
-func (m mutatingWebhookAccessor) GetObjectSelector() *metav1.LabelSelector {
+func (m *mutatingWebhookAccessor) GetObjectSelector() *metav1.LabelSelector {
 	return m.ObjectSelector
 }
 
-func (m mutatingWebhookAccessor) GetSideEffects() *v1beta1.SideEffectClass {
+func (m *mutatingWebhookAccessor) GetSideEffects() *v1beta1.SideEffectClass {
 	return m.SideEffects
 }
 
-func (m mutatingWebhookAccessor) GetTimeoutSeconds() *int32 {
+func (m *mutatingWebhookAccessor) GetTimeoutSeconds() *int32 {
 	return m.TimeoutSeconds
 }
 
-func (m mutatingWebhookAccessor) GetAdmissionReviewVersions() []string {
+func (m *mutatingWebhookAccessor) GetAdmissionReviewVersions() []string {
 	return m.AdmissionReviewVersions
 }
 
-func (m mutatingWebhookAccessor) GetMutatingWebhook() (*v1beta1.MutatingWebhook, bool) {
+func (m *mutatingWebhookAccessor) GetMutatingWebhook() (*v1beta1.MutatingWebhook, bool) {
 	return m.MutatingWebhook, true
 }
 
-func (m mutatingWebhookAccessor) GetValidatingWebhook() (*v1beta1.ValidatingWebhook, bool) {
+func (m *mutatingWebhookAccessor) GetValidatingWebhook() (*v1beta1.ValidatingWebhook, bool) {
 	return nil, false
 }
 
 // NewValidatingWebhookAccessor creates an accessor for a ValidatingWebhook.
 func NewValidatingWebhookAccessor(uid, configurationName string, h *v1beta1.ValidatingWebhook) WebhookAccessor {
-	return validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
+	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
 }
 
 type validatingWebhookAccessor struct {
 	*v1beta1.ValidatingWebhook
 	uid               string
 	configurationName string
+
+	initObjectSelector sync.Once
+	objectSelector     labels.Selector
+	objectSelectorErr  error
+
+	initNamespaceSelector sync.Once
+	namespaceSelector     labels.Selector
+	namespaceSelectorErr  error
+
+	initClient sync.Once
+	client     *rest.RESTClient
+	clientErr  error
 }
 
-func (v validatingWebhookAccessor) GetUID() string {
+func (v *validatingWebhookAccessor) GetUID() string {
 	return v.uid
 }
 
-func (v validatingWebhookAccessor) GetConfigurationName() string {
+func (v *validatingWebhookAccessor) GetConfigurationName() string {
 	return v.configurationName
 }
 
-func (v validatingWebhookAccessor) GetName() string {
+func (v *validatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
+	v.initClient.Do(func() {
+		v.client, v.clientErr = nil, fmt.Errorf("unimplemented")
+	})
+	return v.client, v.clientErr
+}
+
+func (v *validatingWebhookAccessor) GetParsedNamespaceSelector() (labels.Selector, error) {
+	v.initNamespaceSelector.Do(func() {
+		v.namespaceSelector, v.namespaceSelectorErr = metav1.LabelSelectorAsSelector(v.NamespaceSelector)
+	})
+	return v.namespaceSelector, v.namespaceSelectorErr
+}
+
+func (v *validatingWebhookAccessor) GetParsedObjectSelector() (labels.Selector, error) {
+	v.initObjectSelector.Do(func() {
+		v.objectSelector, v.objectSelectorErr = metav1.LabelSelectorAsSelector(v.ObjectSelector)
+	})
+	return v.objectSelector, v.objectSelectorErr
+}
+
+func (v *validatingWebhookAccessor) GetName() string {
 	return v.Name
 }
 
-func (v validatingWebhookAccessor) GetClientConfig() v1beta1.WebhookClientConfig {
+func (v *validatingWebhookAccessor) GetClientConfig() v1beta1.WebhookClientConfig {
 	return v.ClientConfig
 }
 
-func (v validatingWebhookAccessor) GetRules() []v1beta1.RuleWithOperations {
+func (v *validatingWebhookAccessor) GetRules() []v1beta1.RuleWithOperations {
 	return v.Rules
 }
 
-func (v validatingWebhookAccessor) GetFailurePolicy() *v1beta1.FailurePolicyType {
+func (v *validatingWebhookAccessor) GetFailurePolicy() *v1beta1.FailurePolicyType {
 	return v.FailurePolicy
 }
 
-func (v validatingWebhookAccessor) GetMatchPolicy() *v1beta1.MatchPolicyType {
+func (v *validatingWebhookAccessor) GetMatchPolicy() *v1beta1.MatchPolicyType {
 	return v.MatchPolicy
 }
 
-func (v validatingWebhookAccessor) GetNamespaceSelector() *metav1.LabelSelector {
+func (v *validatingWebhookAccessor) GetNamespaceSelector() *metav1.LabelSelector {
 	return v.NamespaceSelector
 }
 
-func (v validatingWebhookAccessor) GetObjectSelector() *metav1.LabelSelector {
+func (v *validatingWebhookAccessor) GetObjectSelector() *metav1.LabelSelector {
 	return v.ObjectSelector
 }
 
-func (v validatingWebhookAccessor) GetSideEffects() *v1beta1.SideEffectClass {
+func (v *validatingWebhookAccessor) GetSideEffects() *v1beta1.SideEffectClass {
 	return v.SideEffects
 }
 
-func (v validatingWebhookAccessor) GetTimeoutSeconds() *int32 {
+func (v *validatingWebhookAccessor) GetTimeoutSeconds() *int32 {
 	return v.TimeoutSeconds
 }
 
-func (v validatingWebhookAccessor) GetAdmissionReviewVersions() []string {
+func (v *validatingWebhookAccessor) GetAdmissionReviewVersions() []string {
 	return v.AdmissionReviewVersions
 }
 
-func (v validatingWebhookAccessor) GetMutatingWebhook() (*v1beta1.MutatingWebhook, bool) {
+func (v *validatingWebhookAccessor) GetMutatingWebhook() (*v1beta1.MutatingWebhook, bool) {
 	return nil, false
 }
 
-func (v validatingWebhookAccessor) GetValidatingWebhook() (*v1beta1.ValidatingWebhook, bool) {
+func (v *validatingWebhookAccessor) GetValidatingWebhook() (*v1beta1.ValidatingWebhook, bool) {
 	return v.ValidatingWebhook, true
 }
