@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/version"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -66,11 +65,11 @@ func SetupSuite() {
 				v1.NamespaceNodeLease,
 			})
 		if err != nil {
-			e2elog.Failf("Error deleting orphaned namespaces: %v", err)
+			Failf("Error deleting orphaned namespaces: %v", err)
 		}
 		klog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
 		if err := WaitForNamespacesDeleted(c, deleted, NamespaceCleanupTimeout); err != nil {
-			e2elog.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
+			Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
 
@@ -97,26 +96,26 @@ func SetupSuite() {
 	// number equal to the number of allowed not-ready nodes).
 	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(TestContext.MinStartupPods), int32(TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
-		LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
+		LogFailedContainers(c, metav1.NamespaceSystem, Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
-		e2elog.Failf("Error waiting for all pods to be running and ready: %v", err)
+		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
 	if err := WaitForDaemonSets(c, metav1.NamespaceSystem, int32(TestContext.AllowedNotReadyNodes), TestContext.SystemDaemonsetStartupTimeout); err != nil {
-		e2elog.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
+		Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
 	// Log the version of the server and this client.
-	e2elog.Logf("e2e test version: %s", version.Get().GitVersion)
+	Logf("e2e test version: %s", version.Get().GitVersion)
 
 	dc := c.DiscoveryClient
 
 	serverVersion, serverErr := dc.ServerVersion()
 	if serverErr != nil {
-		e2elog.Logf("Unexpected server error retrieving version: %v", serverErr)
+		Logf("Unexpected server error retrieving version: %v", serverErr)
 	}
 	if serverVersion != nil {
-		e2elog.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
+		Logf("kube-apiserver version: %s", serverVersion.GitVersion)
 	}
 
 	if TestContext.NodeKiller.Enabled {
@@ -142,7 +141,7 @@ func SetupSuitePerGinkgoNode() {
 		klog.Fatal("Error loading client: ", err)
 	}
 	TestContext.IPFamily = getDefaultClusterIPFamily(c)
-	e2elog.Logf("Cluster IP family: %s", TestContext.IPFamily)
+	Logf("Cluster IP family: %s", TestContext.IPFamily)
 }
 
 // CleanupSuite is the boilerplate that can be used after tests on ginkgo were run, on the SynchronizedAfterSuite step.
@@ -151,20 +150,20 @@ func SetupSuitePerGinkgoNode() {
 // and then the function that only runs on the first Ginkgo node.
 func CleanupSuite() {
 	// Run on all Ginkgo nodes
-	e2elog.Logf("Running AfterSuite actions on all nodes")
+	Logf("Running AfterSuite actions on all nodes")
 	RunCleanupActions()
 }
 
 // AfterSuiteActions are actions that are run on ginkgo's SynchronizedAfterSuite
 func AfterSuiteActions() {
 	// Run only Ginkgo on node 1
-	e2elog.Logf("Running AfterSuite actions on node 1")
+	Logf("Running AfterSuite actions on node 1")
 	if TestContext.ReportDir != "" {
 		CoreDump(TestContext.ReportDir)
 	}
 	if TestContext.GatherSuiteMetricsAfterTest {
 		if err := gatherTestSuiteMetrics(); err != nil {
-			e2elog.Logf("Error gathering metrics: %v", err)
+			Logf("Error gathering metrics: %v", err)
 		}
 	}
 	if TestContext.NodeKiller.Enabled {
@@ -173,7 +172,7 @@ func AfterSuiteActions() {
 }
 
 func gatherTestSuiteMetrics() error {
-	e2elog.Logf("Gathering metrics")
+	Logf("Gathering metrics")
 	c, err := LoadClientset()
 	if err != nil {
 		return fmt.Errorf("error loading client: %v", err)
@@ -198,7 +197,7 @@ func gatherTestSuiteMetrics() error {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {
-		e2elog.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
+		Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
 	}
 
 	return nil
