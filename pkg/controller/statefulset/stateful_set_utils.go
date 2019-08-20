@@ -20,9 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"strconv"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +29,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"regexp"
+	"strconv"
 )
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
@@ -402,4 +401,11 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
+}
+
+func getControllerRevisionHash(cr *apps.ControllerRevision) (string, error) {
+	if hash, ok := cr.Labels[history.ControllerRevisionHashLabel]; ok{
+		return hash, nil
+	}
+	return "", fmt.Errorf("Fail to get hash from controllerrevision %s for revision label not found", cr.Name)
 }

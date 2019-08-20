@@ -480,7 +480,7 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 	}
 }
 
-func TestStatefulSetControl_getSetRevisions(t *testing.T) {
+func TestStatefulSetControlGetSetRevisions(t *testing.T) {
 	type testcase struct {
 		name            string
 		existing        []*apps.ControllerRevision
@@ -555,12 +555,12 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	rev0 := newRevisionOrDie(set, 1)
 	set1 := set.DeepCopy()
 	set1.Spec.Template.Spec.Containers[0].Image = "foo"
-	set1.Status.CurrentRevision = rev0.Name
+	set1.Status.CurrentRevision, _ = getControllerRevisionHash(rev0)
 	set1.Status.CollisionCount = new(int32)
 	rev1 := newRevisionOrDie(set1, 2)
 	set2 := set1.DeepCopy()
 	set2.Spec.Template.Labels["new"] = "label"
-	set2.Status.CurrentRevision = rev0.Name
+	set2.Status.CurrentRevision, _ = getControllerRevisionHash(rev0)
 	set2.Status.CollisionCount = new(int32)
 	rev2 := newRevisionOrDie(set2, 3)
 	tests := []testcase{

@@ -436,3 +436,22 @@ func newStatefulSet(replicas int) *apps.StatefulSet {
 	}
 	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
 }
+
+func TestGetControllerRevisionHash(t *testing.T) {
+	cr := &apps.ControllerRevision{}
+	cr.Name = "abc"
+
+	if _, err := getControllerRevisionHash(cr); err == nil {
+		t.Errorf("Expected error but not found")
+	}
+
+	cr.Labels= make(map[string]string)
+	cr.Labels[history.ControllerRevisionHashLabel] = "qwe123"
+	hash, err := getControllerRevisionHash(cr)
+	if err != nil {
+		t.Errorf("Found unexpected error")
+	}
+	if got,want := hash, "qwe123"; got != want {
+		t.Errorf("hash of controllerrevision name = %q, want %q", got, want)
+	}
+}

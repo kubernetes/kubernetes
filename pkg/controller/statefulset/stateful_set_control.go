@@ -229,7 +229,8 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 
 	// attempt to find the revision that corresponds to the current revision
 	for i := range revisions {
-		if revisions[i].Name == set.Status.CurrentRevision {
+		hash := revisions[i].Labels[history.ControllerRevisionHashLabel]
+		if hash == set.Status.CurrentRevision {
 			currentRevision = revisions[i]
 		}
 	}
@@ -267,11 +268,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return nil, err
 	}
 
+	currentHash, err := getControllerRevisionHash(currentRevision)
+	if err != nil {
+		return nil, err
+	}
+	updateHash, err := getControllerRevisionHash(updateRevision)
+	if err != nil {
+		return nil, err
+	}
+
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
 	status.ObservedGeneration = set.Generation
-	status.CurrentRevision = currentRevision.Name
-	status.UpdateRevision = updateRevision.Name
+	status.CurrentRevision = currentHash
+	status.UpdateRevision = updateHash
 	status.CollisionCount = new(int32)
 	*status.CollisionCount = collisionCount
 
@@ -295,10 +305,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// count the number of current and update replicas
 		if isCreated(pods[i]) && !isTerminating(pods[i]) {
-			if getPodRevision(pods[i]) == currentRevision.Name {
+			if getPodRevision(pods[i]) == currentHash {
 				status.CurrentReplicas++
 			}
-			if getPodRevision(pods[i]) == updateRevision.Name {
+			if getPodRevision(pods[i]) == updateHash {
+
 				status.UpdatedReplicas++
 			}
 		}
@@ -321,8 +332,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			replicas[ord] = newVersionedStatefulSetPod(
 				currentSet,
 				updateSet,
-				currentRevision.Name,
-				updateRevision.Name, ord)
+				currentHash,
+				updateHash,
+				ord)
 		}
 	}
 
@@ -378,18 +390,18 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
 				return &status, err
 			}
-			if getPodRevision(replicas[i]) == currentRevision.Name {
+			if getPodRevision(replicas[i]) == currentHash {
 				status.CurrentReplicas--
 			}
-			if getPodRevision(replicas[i]) == updateRevision.Name {
+			if getPodRevision(replicas[i]) == updateHash {
 				status.UpdatedReplicas--
 			}
 			status.Replicas--
 			replicas[i] = newVersionedStatefulSetPod(
 				currentSet,
 				updateSet,
-				currentRevision.Name,
-				updateRevision.Name,
+				currentHash,
+				updateHash,
 				i)
 		}
 		// If we find a Pod that has not been created we create the Pod
@@ -398,10 +410,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				return &status, err
 			}
 			status.Replicas++
-			if getPodRevision(replicas[i]) == currentRevision.Name {
+			if getPodRevision(replicas[i]) == currentHash {
 				status.CurrentReplicas++
 			}
-			if getPodRevision(replicas[i]) == updateRevision.Name {
+			if getPodRevision(replicas[i]) == updateHash {
 				status.UpdatedReplicas++
 			}
 
@@ -480,10 +492,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if err := ssc.podControl.DeleteStatefulPod(set, condemned[target]); err != nil {
 			return &status, err
 		}
-		if getPodRevision(condemned[target]) == currentRevision.Name {
+		if getPodRevision(condemned[target]) == currentHash {
 			status.CurrentReplicas--
 		}
-		if getPodRevision(condemned[target]) == updateRevision.Name {
+		if getPodRevision(condemned[target]) == updateHash {
 			status.UpdatedReplicas--
 		}
 		if monotonic {
@@ -505,7 +517,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for target := len(replicas) - 1; target >= updateMin; target-- {
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
-		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
+		if getPodRevision(replicas[target]) != updateHash && !isTerminating(replicas[target]) {
 			klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
 				set.Namespace,
 				set.Name,
