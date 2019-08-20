@@ -51,7 +51,6 @@ var (
 	preboundPVC         = makeTestPVC("prebound-pvc", "1G", "", pvcPrebound, "pv-node1a", "1", &waitClass)
 	preboundPVCNode1a   = makeTestPVC("unbound-pvc", "1G", "", pvcPrebound, "pv-node1a", "1", &waitClass)
 	boundPVC            = makeTestPVC("bound-pvc", "1G", "", pvcBound, "pv-bound", "1", &waitClass)
-	boundPVC2           = makeTestPVC("bound-pvc2", "1G", "", pvcBound, "pv-bound2", "1", &waitClass)
 	boundPVCNode1a      = makeTestPVC("unbound-pvc", "1G", "", pvcBound, "pv-node1a", "1", &waitClass)
 	immediateUnboundPVC = makeTestPVC("immediate-unbound-pvc", "1G", "", pvcUnbound, "", "1", &immediateClass)
 	immediateBoundPVC   = makeTestPVC("immediate-bound-pvc", "1G", "", pvcBound, "pv-bound-immediate", "1", &immediateClass)
@@ -67,12 +66,10 @@ var (
 	selectedNodePVC = makeTestPVC("provisioned-pvc", "1Gi", nodeLabelValue, pvcSelectedNode, "", "1", &waitClassWithProvisioner)
 
 	// PVs for manual binding
-	pvNoNode                   = makeTestPV("pv-no-node", "", "1G", "1", nil, waitClass)
 	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
 	pvNode1b                   = makeTestPV("pv-node1b", "node1", "10G", "1", nil, waitClass)
 	pvNode1c                   = makeTestPV("pv-node1b", "node1", "5G", "1", nil, waitClass)
 	pvNode2                    = makeTestPV("pv-node2", "node2", "1G", "1", nil, waitClass)
-	pvPrebound                 = makeTestPV("pv-prebound", "node1", "1G", "1", unboundPVC, waitClass)
 	pvBound                    = makeTestPV("pv-bound", "node1", "1G", "1", boundPVC, waitClass)
 	pvNode1aBound              = makeTestPV("pv-node1a", "node1", "5G", "1", unboundPVC, waitClass)
 	pvNode1bBound              = makeTestPV("pv-node1b", "node1", "10G", "1", unboundPVC2, waitClass)
@@ -278,7 +275,9 @@ func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, wait
 				if !ok {
 					return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
 				}
-				return versioner.CompareResourceVersion(pvInCache, pv) == 0, nil
+				if versioner.CompareResourceVersion(pvInCache, pv) != 0 {
+					return false, nil
+				}
 			}
 			return true, nil
 		})
@@ -302,7 +301,9 @@ func (env *testEnv) updateClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim,
 				if !ok {
 					return false, fmt.Errorf("PVC %s invalid object", pvcInCache.Name)
 				}
-				return versioner.CompareResourceVersion(pvcInCache, pvc) == 0, nil
+				if versioner.CompareResourceVersion(pvcInCache, pvc) != 0 {
+					return false, nil
+				}
 			}
 			return true, nil
 		})
