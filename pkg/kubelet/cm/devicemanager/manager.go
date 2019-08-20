@@ -22,9 +22,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 
@@ -39,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -79,6 +82,9 @@ type ManagerImpl struct {
 	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	callback monitorCallback
 
+	// allDevices is a map by resource name of all the devices currently registered to the device manager
+	allDevices map[string]map[string]pluginapi.Device
+
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.String
 
@@ -91,6 +97,12 @@ type ManagerImpl struct {
 	// podDevices contains pod to allocated device mapping.
 	podDevices        podDevices
 	checkpointManager checkpointmanager.CheckpointManager
+
+	// Information about the machine topology as reported by cadvisor.
+	machineInfo *cadvisorapi.MachineInfo
+
+	// Store of Topology Affinties that the Device Manager can query.
+	topologyAffinityStore topologymanager.Store
 }
 
 type endpointInfo struct {
@@ -104,11 +116,11 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl() (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket)
+func NewManagerImpl(machineInfo *cadvisorapi.MachineInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+	return newManagerImpl(pluginapi.KubeletSocket, machineInfo, topologyAffinityStore)
 }
 
-func newManagerImpl(socketPath string) (*ManagerImpl, error) {
+func newManagerImpl(socketPath string, machineInfo *cadvisorapi.MachineInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	klog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
 
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
@@ -119,12 +131,15 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	manager := &ManagerImpl{
 		endpoints: make(map[string]endpointInfo),
 
-		socketname:       file,
-		socketdir:        dir,
-		healthyDevices:   make(map[string]sets.String),
-		unhealthyDevices: make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		podDevices:       make(podDevices),
+		socketname:            file,
+		socketdir:             dir,
+		allDevices:            make(map[string]map[string]pluginapi.Device),
+		healthyDevices:        make(map[string]sets.String),
+		unhealthyDevices:      make(map[string]sets.String),
+		allocatedDevices:      make(map[string]sets.String),
+		podDevices:            make(podDevices),
+		machineInfo:           machineInfo,
+		topologyAffinityStore: topologyAffinityStore,
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -145,7 +160,9 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
 	m.unhealthyDevices[resourceName] = sets.NewString()
+	m.allDevices[resourceName] = make(map[string]pluginapi.Device)
 	for _, dev := range devices {
+		m.allDevices[resourceName][dev.ID] = dev
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
 		} else {
@@ -633,7 +650,57 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
+
+	// By default, pull devices from the unsorted list of available devices.
 	allocated := available.UnsortedList()[:needed]
+
+	// If topology alignment is desired, update allocated to the set of devices
+	// with the best alignment.
+	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	if m.deviceHasTopologyAlignment(resource) && hint.SocketAffinity != nil {
+		klog.Infof("Topology Affinities for pod %v container %v are: %v", podUID, contName, hint)
+
+		// Build a list of sockets and a map of per socket devices from the
+		// list of available devices on the node.
+		var sockets []int
+		perSocketDevices := make(map[int]sets.String)
+		for d := range available {
+			socket := int(m.allDevices[resource][d].Topology.Node.ID)
+			if _, ok := perSocketDevices[socket]; !ok {
+				sockets = append(sockets, socket)
+				perSocketDevices[socket] = sets.NewString()
+			}
+			perSocketDevices[socket].Insert(d)
+		}
+
+		// Sort the list of sockets by how many available devices they contain.
+		sort.Slice(sockets, func(i, j int) bool {
+			return perSocketDevices[i].Len() < perSocketDevices[j].Len()
+		})
+
+		// Generate two sorted lists of available devices. Devices in the first
+		// list come from sockets contained in the affinity mask. Devices in
+		// the second list come from the remaining sockets. Within each list,
+		// devices are sorted by their connection to sockets with more
+		// available devices on them.
+		var availableFromAffinity []string
+		var availableNotFromAffinity []string
+		for _, s := range sockets {
+			if hint.SocketAffinity.IsSet(s) {
+				for d := range perSocketDevices[s] {
+					availableFromAffinity = append(availableFromAffinity, d)
+				}
+			} else {
+				for d := range perSocketDevices[s] {
+					availableNotFromAffinity = append(availableNotFromAffinity, d)
+				}
+			}
+		}
+
+		// Concatenate the lists above and reset 'allocated' to the set of
+		// needed devices from the front of it.
+		allocated = append(availableFromAffinity, availableNotFromAffinity...)[:needed]
+	}
 	// Updates m.allocatedDevices with allocated devices to prevent them
 	// from being allocated to other pods/containers, given that we are
 	// not holding lock during the rpc call.

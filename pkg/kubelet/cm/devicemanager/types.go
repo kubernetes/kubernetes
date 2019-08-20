@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -63,6 +64,10 @@ type Manager interface {
 	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
 	// the node has been recreated.
 	ShouldResetExtendedResourceCapacity() bool
+
+	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
+	// and is consulted to make Topology aware resource alignments
+	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
