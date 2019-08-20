@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -50,7 +51,6 @@ const (
 	secretCRDName      = "sample-custom-resource-conversion-webhook-secret"
 	deploymentCRDName  = "sample-crd-conversion-webhook-deployment"
 	serviceCRDName     = "e2e-test-crd-conversion-webhook"
-	serviceCRDPort     = 9443
 	roleBindingCRDName = "crd-conversion-webhook-auth-reader"
 )
 
@@ -119,6 +119,8 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 	var context *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
+	servicePort := int32(9443)
+	containerPort := int32(9444)
 
 	var client clientset.Interface
 	var namespaceName string
@@ -134,7 +136,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 		context = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context)
+		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context, servicePort, containerPort)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -153,7 +155,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
 							Path:      pointer.StringPtr("/crdconvert"),
-							Port:      pointer.Int32Ptr(serviceCRDPort),
+							Port:      pointer.Int32Ptr(servicePort),
 						},
 					},
 					ConversionReviewVersions: []string{"v1", "v1beta1"},
@@ -180,7 +182,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
 							Path:      pointer.StringPtr("/crdconvert"),
-							Port:      pointer.Int32Ptr(serviceCRDPort),
+							Port:      pointer.Int32Ptr(servicePort),
 						},
 					},
 					ConversionReviewVersions: []string{"v1", "v1beta1"},
@@ -232,7 +234,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 	}
 }
 
-func deployCustomResourceWebhookAndService(f *framework.Framework, image string, context *certContext) {
+func deployCustomResourceWebhookAndService(f *framework.Framework, image string, context *certContext, servicePort int32, containerPort int32) {
 	ginkgo.By("Deploying the custom resource conversion webhook pod")
 	client := f.ClientSet
 
@@ -280,8 +282,11 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
 				"--alsologtostderr",
 				"-v=4",
+				// Use a non-default port for containers.
+				fmt.Sprintf("--port=%d", containerPort),
 			},
 			Image: image,
+			Ports: []v1.ContainerPort{{ContainerPort: containerPort}},
 		},
 	}
 	d := &appsv1.Deployment{
@@ -331,8 +336,8 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",
-					Port:       serviceCRDPort,
-					TargetPort: intstr.FromInt(443),
+					Port:       servicePort,
+					TargetPort: intstr.FromInt(int(containerPort)),
 				},
 			},
 		},
