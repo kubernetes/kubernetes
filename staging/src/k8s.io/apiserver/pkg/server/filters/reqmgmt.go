@@ -17,7 +17,6 @@ limitations under the License.
 package filters
 
 import (
-	"fmt"
 	"net/http"
 
 	// TODO: decide whether to use the existing metrics, which
@@ -48,12 +47,14 @@ func WithRequestManagement(
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
-			handleError(w, r, fmt.Errorf("no RequestInfo found in context"))
+			klog.Errorf("No RequestInfo found in context %#+v of request %#+v", ctx, r)
+			handler.ServeHTTP(w, r)
 			return
 		}
 		user, ok := apirequest.UserFrom(ctx)
 		if !ok {
-			handleError(w, r, fmt.Errorf("no User found in context"))
+			klog.Warningf("No User found in context %#+v of request %#+v", ctx, r)
+			handler.ServeHTTP(w, r)
 			return
 		}
 		requestDigest := utilflowcontrol.RequestDigest{requestInfo, user}
