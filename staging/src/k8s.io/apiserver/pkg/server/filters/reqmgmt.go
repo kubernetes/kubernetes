@@ -67,7 +67,6 @@ func WithRequestManagement(
 
 		execute, afterExecute := reqMgmt.Wait(requestDigest)
 		if execute {
-			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v after queuing\n", requestInfo, user)
 			timedOut := ctx.Done()
 			finished := make(chan struct{})
 			go func() {
@@ -81,8 +80,6 @@ func WithRequestManagement(
 			}
 			afterExecute()
 		} else {
-			klog.V(6).Infof("Rejecting RequestInfo=%#+v, user.Info=%#+v\n", requestInfo, user)
-
 			tooManyRequests(r, w)
 		}
 		return
