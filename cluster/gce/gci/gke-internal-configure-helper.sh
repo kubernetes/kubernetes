@@ -54,27 +54,27 @@ function add_vpa_admission_webhook_host {
   fi
 }
 
-function start_vertical_pod_autoscaler {
+function start_pod_autoscaler {
   local -r manifests_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-  mkdir -p "${manifests_dir}/vertical-pod-autoscaler"
+  mkdir -p "${manifests_dir}/pod-autoscaler"
   if [[ "${ENABLE_VERTICAL_POD_AUTOSCALER:-}" == "true" ]]; then
     echo "Start Vertical Pod Autoscaler (VPA)"
     generate_vertical_pod_autoscaler_admission_controller_certs
     add_vpa_admission_webhook_host
 
-    cp "${manifests_dir}/internal-vpa-crd.yaml" "${manifests_dir}/vertical-pod-autoscaler"
-    cp "${manifests_dir}/internal-vpa-rbac.yaml" "${manifests_dir}/vertical-pod-autoscaler"
-    setup-addon-manifests "addons" "vertical-pod-autoscaler"
+    cp "${manifests_dir}/internal-vpa-crd.yaml" "${manifests_dir}/pod-autoscaler"
+    cp "${manifests_dir}/internal-vpa-rbac.yaml" "${manifests_dir}/pod-autoscaler"
+    setup-addon-manifests "addons" "pod-autoscaler"
 
     for component in admission-controller recommender updater; do
-      setup_vertical_pod_autoscaler_component ${component} ${manifests_dir}
+      setup_pod_autoscaler_component ${component} ${manifests_dir}
     done
   elif [[ "${ENABLE_UNIFIED_AUTOSCALING:-}" == "true" ]]; then
-    cp "${manifests_dir}/internal-kuba-rbac.yaml" "${manifests_dir}/vertical-pod-autoscaler"
-    setup-addon-manifests "addons" "vertical-pod-autoscaler"
+    cp "${manifests_dir}/internal-kuba-rbac.yaml" "${manifests_dir}/pod-autoscaler"
+    setup-addon-manifests "addons" "pod-autoscaler"
 
     echo "Start Kubernetes Adapter for Unified Autoscaler (KUBA)"
-    setup_vertical_pod_autoscaler_component "recommender" ${manifests_dir}
+    setup_pod_autoscaler_component "recommender" ${manifests_dir}
   fi
 }
 
@@ -93,7 +93,7 @@ function base64_decode_or_die {
   fi
 }
 
-function setup_vertical_pod_autoscaler_component {
+function setup_pod_autoscaler_component {
   local component=$1
   local manifests_dir=$2
   create-static-auth-kubeconfig-for-component vpa-${component}
@@ -102,7 +102,7 @@ function setup_vertical_pod_autoscaler_component {
   local src_file="${manifests_dir}/internal-vpa-${component}.manifest"
 
   if [[ ${component} == "recommender" ]]; then
-    local uas_params="${VPA_UAS_PARAMS:-}"
+    local uas_params="${UAS_PARAMS:-}"
     sed -i -e "s@{{uas_params}}@${uas_params}@g" "${src_file}"
   fi
 
@@ -150,7 +150,7 @@ function gke-internal-master-start {
   echo "Internal GKE configuration start"
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
-  start_vertical_pod_autoscaler
+  start_pod_autoscaler
 
   setup_master_prom_to_sd_monitor_component
 
