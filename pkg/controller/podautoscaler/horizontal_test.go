@@ -92,9 +92,10 @@ type fakeResource struct {
 
 type testCase struct {
 	sync.Mutex
-	minReplicas     int32
-	maxReplicas     int32
-	initialReplicas int32
+	minReplicas    int32
+	maxReplicas    int32
+	specReplicas   int32
+	statusReplicas int32
 
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget                    int32
@@ -203,8 +204,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 						MaxReplicas: tc.maxReplicas,
 					},
 					Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-						CurrentReplicas: tc.initialReplicas,
-						DesiredReplicas: tc.initialReplicas,
+						CurrentReplicas: tc.specReplicas,
+						DesiredReplicas: tc.specReplicas,
 						LastScaleTime:   tc.lastScaleTime,
 					},
 				},
@@ -257,7 +258,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 		specifiedCPURequests := tc.reportedCPURequests != nil
 
-		numPodsToCreate := int(tc.initialReplicas)
+		numPodsToCreate := int(tc.statusReplicas)
 		if specifiedCPURequests {
 			numPodsToCreate = len(tc.reportedCPURequests)
 		}
@@ -380,10 +381,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				Namespace: namespace,
 			},
 			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 			},
 			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.statusReplicas,
 				Selector: selector,
 			},
 		}
@@ -400,10 +401,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				Namespace: namespace,
 			},
 			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 			},
 			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.statusReplicas,
 				Selector: selector,
 			},
 		}
@@ -420,10 +421,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				Namespace: namespace,
 			},
 			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 			},
 			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.statusReplicas,
 				Selector: selector,
 			},
 		}
@@ -613,10 +614,10 @@ func (tc *testCase) verifyResults(t *testing.T) {
 	tc.Lock()
 	defer tc.Unlock()
 
-	assert.Equal(t, tc.initialReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
+	assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
 	assert.True(t, tc.statusUpdated, "the status should have been updated")
 	if tc.verifyEvents {
-		assert.Equal(t, tc.initialReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
+		assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
 	}
 }
 
@@ -657,7 +658,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 				assert.Equal(t, fmt.Sprintf(
 					"Computed the desired num of replicas: %d (avgCPUutil: %d, current replicas: %d)",
 					tc.expectedDesiredReplicas,
-					(int64(tc.reportedLevels[0])*100)/tc.reportedCPURequests[0].MilliValue(), tc.initialReplicas), obj.Message)
+					(int64(tc.reportedLevels[0])*100)/tc.reportedCPURequests[0].MilliValue(), tc.specReplicas), obj.Message)
 			default:
 				assert.False(t, true, fmt.Sprintf("Unexpected event: %s / %s", obj.Reason, obj.Message))
 			}
@@ -737,7 +738,8 @@ func TestScaleUp(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               30,
 		verifyCPUCurrent:        true,
@@ -752,7 +754,8 @@ func TestScaleUpUnreadyLessScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               30,
 		CPUCurrent:              60,
@@ -769,7 +772,8 @@ func TestScaleUpHotCpuLessScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               30,
 		CPUCurrent:              60,
@@ -786,7 +790,8 @@ func TestScaleUpUnreadyNoScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               30,
 		CPUCurrent:              40,
@@ -808,7 +813,8 @@ func TestScaleUpHotCpuNoScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               30,
 		CPUCurrent:              40,
@@ -831,7 +837,8 @@ func TestScaleUpIgnoresFailedPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         2,
+		specReplicas:            2,
+		statusReplicas:          2,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               30,
 		CPUCurrent:              60,
@@ -849,7 +856,8 @@ func TestScaleUpIgnoresDeletionPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:                  2,
 		maxReplicas:                  6,
-		initialReplicas:              2,
+		specReplicas:                 2,
+		statusReplicas:               2,
 		expectedDesiredReplicas:      4,
 		CPUTarget:                    30,
 		CPUCurrent:                   60,
@@ -868,7 +876,8 @@ func TestScaleUpDeployment(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               30,
 		verifyCPUCurrent:        true,
@@ -888,7 +897,8 @@ func TestScaleUpReplicaSet(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               30,
 		verifyCPUCurrent:        true,
@@ -909,7 +919,8 @@ func TestScaleUpCM(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -936,7 +947,8 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 6,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -965,7 +977,8 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 6,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1003,7 +1016,8 @@ func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 6,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1040,7 +1054,8 @@ func TestScaleUpCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1071,7 +1086,8 @@ func TestScaleUpFromZeroCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             0,
 		maxReplicas:             6,
-		initialReplicas:         0,
+		specReplicas:            0,
+		statusReplicas:          0,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1102,7 +1118,8 @@ func TestScaleUpFromZeroIgnoresToleranceCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             0,
 		maxReplicas:             6,
-		initialReplicas:         0,
+		specReplicas:            0,
+		statusReplicas:          0,
 		expectedDesiredReplicas: 1,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1133,7 +1150,8 @@ func TestScaleUpPerPodCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1163,7 +1181,8 @@ func TestScaleUpCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1188,7 +1207,8 @@ func TestScaleUpPerPodCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1213,7 +1233,8 @@ func TestScaleDown(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               50,
 		verifyCPUCurrent:        true,
@@ -1229,7 +1250,8 @@ func TestScaleUpOneMetricInvalid(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               30,
 		verifyCPUCurrent:        true,
@@ -1248,7 +1270,8 @@ func TestScaleUpFromZeroOneMetricInvalid(t *testing.T) {
 	tc := testCase{
 		minReplicas:             0,
 		maxReplicas:             6,
-		initialReplicas:         0,
+		specReplicas:            0,
+		statusReplicas:          0,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               30,
 		verifyCPUCurrent:        true,
@@ -1268,7 +1291,8 @@ func TestScaleUpBothMetricsEmpty(t *testing.T) { // Switch to missing
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1290,7 +1314,8 @@ func TestScaleDownStabilizeInitialSize(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               50,
 		verifyCPUCurrent:        true,
@@ -1316,7 +1341,8 @@ func TestScaleDownCM(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1344,7 +1370,8 @@ func TestScaleDownCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1377,7 +1404,8 @@ func TestScaleDownToZeroCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             0,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 0,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1410,7 +1438,8 @@ func TestScaleDownPerPodCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1442,7 +1471,8 @@ func TestScaleDownCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1468,7 +1498,8 @@ func TestScaleDownToZeroCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             0,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 0,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1494,7 +1525,8 @@ func TestScaleDownPerPodCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1520,7 +1552,8 @@ func TestScaleDownIncludeUnreadyPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               50,
 		CPUCurrent:              30,
@@ -1538,7 +1571,8 @@ func TestScaleDownOneMetricInvalid(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               50,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1559,7 +1593,8 @@ func TestScaleDownOneMetricEmpty(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               50,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -1594,7 +1629,8 @@ func TestScaleDownIgnoreHotCpuPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               50,
 		CPUCurrent:              30,
@@ -1612,7 +1648,8 @@ func TestScaleDownIgnoresFailedPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               50,
 		CPUCurrent:              28,
@@ -1631,7 +1668,8 @@ func TestScaleDownIgnoresDeletionPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:                  2,
 		maxReplicas:                  6,
-		initialReplicas:              5,
+		specReplicas:                 5,
+		statusReplicas:               5,
 		expectedDesiredReplicas:      3,
 		CPUTarget:                    50,
 		CPUCurrent:                   28,
@@ -1651,7 +1689,8 @@ func TestTolerance(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{1010, 1030, 1020},
@@ -1671,7 +1710,8 @@ func TestToleranceCM(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1702,7 +1742,8 @@ func TestToleranceCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1737,7 +1778,8 @@ func TestToleranceCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 4,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1767,7 +1809,8 @@ func TestTolerancePerPodCMObject(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 4,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1802,7 +1845,8 @@ func TestTolerancePerPodCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 4,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -1832,7 +1876,8 @@ func TestMinReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{10, 95, 10},
@@ -1852,7 +1897,8 @@ func TestZeroMinReplicasDesiredZero(t *testing.T) {
 	tc := testCase{
 		minReplicas:             0,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 0,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{0, 0, 0},
@@ -1872,7 +1918,8 @@ func TestMinReplicasDesiredZero(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{0, 0, 0},
@@ -1892,7 +1939,8 @@ func TestZeroReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:             3,
 		maxReplicas:             5,
-		initialReplicas:         0,
+		specReplicas:            0,
+		statusReplicas:          0,
 		expectedDesiredReplicas: 0,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{},
@@ -1910,7 +1958,8 @@ func TestTooFewReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:             3,
 		maxReplicas:             5,
-		initialReplicas:         2,
+		specReplicas:            2,
+		statusReplicas:          2,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{},
@@ -1927,7 +1976,8 @@ func TestTooManyReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:             3,
 		maxReplicas:             5,
-		initialReplicas:         10,
+		specReplicas:            10,
+		statusReplicas:          10,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{},
@@ -1944,7 +1994,8 @@ func TestMaxReplicas(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{8000, 9500, 1000},
@@ -1963,7 +2014,8 @@ func TestSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 6,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{4000, 9500, 3000, 7000, 3200, 2000},
@@ -1982,7 +2034,8 @@ func TestMissingMetrics(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{400, 95},
@@ -1997,7 +2050,8 @@ func TestEmptyMetrics(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{},
@@ -2015,7 +2069,8 @@ func TestEmptyCPURequest(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         1,
+		specReplicas:            1,
+		statusReplicas:          1,
 		expectedDesiredReplicas: 1,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{200},
@@ -2033,7 +2088,8 @@ func TestEventCreated(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         1,
+		specReplicas:            1,
+		statusReplicas:          1,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               50,
 		reportedLevels:          []uint64{200},
@@ -2048,7 +2104,8 @@ func TestEventNotCreated(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         2,
+		specReplicas:            2,
+		statusReplicas:          2,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               50,
 		reportedLevels:          []uint64{200, 200},
@@ -2068,7 +2125,8 @@ func TestMissingReports(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               50,
 		reportedLevels:          []uint64{200},
@@ -2083,7 +2141,8 @@ func TestUpscaleCap(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             100,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 24,
 		CPUTarget:               10,
 		reportedLevels:          []uint64{100, 200, 300},
@@ -2100,9 +2159,10 @@ func TestUpscaleCap(t *testing.T) {
 
 func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     20,
-		initialReplicas: 3,
+		minReplicas:    1,
+		maxReplicas:    20,
+		specReplicas:   3,
+		statusReplicas: 3,
 		// expectedDesiredReplicas would be 24 without maxReplicas
 		expectedDesiredReplicas: 20,
 		CPUTarget:               10,
@@ -2118,11 +2178,38 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestMoreReplicasThanSpecNoScale(t *testing.T) {
+	tc := testCase{
+		minReplicas:             1,
+		maxReplicas:             8,
+		specReplicas:            4,
+		statusReplicas:          5, // Deployment update with 25% surge.
+		expectedDesiredReplicas: 4,
+		CPUTarget:               50,
+		reportedLevels:          []uint64{500, 500, 500, 500, 500},
+		reportedCPURequests: []resource.Quantity{
+			resource.MustParse("1"),
+			resource.MustParse("1"),
+			resource.MustParse("1"),
+			resource.MustParse("1"),
+			resource.MustParse("1"),
+		},
+		useMetricsAPI: true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+	}
+	tc.runTest(t)
+}
+
 func TestConditionInvalidSelectorMissing(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             100,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               10,
 		reportedLevels:          []uint64{100, 200, 300},
@@ -2151,10 +2238,10 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 				Name: tc.resource.name,
 			},
 			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 			},
 			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 			},
 		}
 		return true, obj, nil
@@ -2167,7 +2254,8 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             100,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               10,
 		reportedLevels:          []uint64{100, 200, 300},
@@ -2196,10 +2284,10 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 				Name: tc.resource.name,
 			},
 			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 			},
 			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.initialReplicas,
+				Replicas: tc.specReplicas,
 				Selector: "cheddar cheese",
 			},
 		}
@@ -2265,7 +2353,8 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 		tc := testCase{
 			minReplicas:             1,
 			maxReplicas:             100,
-			initialReplicas:         3,
+			specReplicas:            3,
+			statusReplicas:          3,
 			expectedDesiredReplicas: 3,
 			CPUTarget:               10,
 			reportedLevels:          []uint64{100, 200, 300},
@@ -2305,7 +2394,8 @@ func TestConditionInvalidSourceType(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -2334,7 +2424,8 @@ func TestConditionFailedGetScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             100,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               10,
 		reportedLevels:          []uint64{100, 200, 300},
@@ -2363,7 +2454,8 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{150, 150, 150},
@@ -2391,7 +2483,8 @@ func NoTestBackoffUpscale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 3,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{150, 150, 150},
@@ -2417,7 +2510,8 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -2460,7 +2554,8 @@ func TestNoBackoffUpscaleCMNoBackoffCpu(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               10,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -2501,7 +2596,8 @@ func TestStabilizeDownscale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
-		initialReplicas:         4,
+		specReplicas:            4,
+		statusReplicas:          4,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               100,
 		reportedLevels:          []uint64{50, 50, 50},
@@ -2551,7 +2647,8 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 	tc1 := testCase{
 		minReplicas:             0,
 		maxReplicas:             1000,
-		initialReplicas:         startPods,
+		specReplicas:            startPods,
+		statusReplicas:          startPods,
 		expectedDesiredReplicas: finalPods,
 		CPUTarget:               finalCPUPercentTarget,
 		reportedLevels: []uint64{
@@ -2588,7 +2685,8 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 	tc2 := testCase{
 		minReplicas:             0,
 		maxReplicas:             1000,
-		initialReplicas:         startPods,
+		specReplicas:            startPods,
+		statusReplicas:          startPods,
 		expectedDesiredReplicas: startPods,
 		CPUTarget:               finalCPUPercentTarget,
 		reportedLevels: []uint64{
@@ -2631,7 +2729,8 @@ func TestScaleUpRCImmediately(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         1,
+		specReplicas:            1,
+		statusReplicas:          1,
 		expectedDesiredReplicas: 2,
 		verifyCPUCurrent:        false,
 		reportedLevels:          []uint64{0, 0, 0, 0},
@@ -2650,7 +2749,8 @@ func TestScaleDownRCImmediately(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             5,
-		initialReplicas:         6,
+		specReplicas:            6,
+		statusReplicas:          6,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               50,
 		reportedLevels:          []uint64{8000, 9500, 1000},
@@ -2669,7 +2769,8 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         2,
+		specReplicas:            2,
+		statusReplicas:          2,
 		expectedDesiredReplicas: 2,
 		CPUTarget:               30,
 		CPUCurrent:              40,
@@ -2717,8 +2818,8 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 						MaxReplicas: tc.maxReplicas,
 					},
 					Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-						CurrentReplicas: tc.initialReplicas,
-						DesiredReplicas: tc.initialReplicas,
+						CurrentReplicas: tc.specReplicas,
+						DesiredReplicas: tc.specReplicas,
 						LastScaleTime:   tc.lastScaleTime,
 						CurrentMetrics: []autoscalingv2.MetricStatus{
 							{
@@ -2930,7 +3031,8 @@ func TestScaleUpOneMetricEmpty(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         3,
+		specReplicas:            3,
+		statusReplicas:          3,
 		expectedDesiredReplicas: 4,
 		CPUTarget:               30,
 		verifyCPUCurrent:        true,
@@ -2963,7 +3065,8 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               50,
 		metricsTarget: []autoscalingv2.MetricSpec{
@@ -2988,7 +3091,8 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
-		initialReplicas:         5,
+		specReplicas:            5,
+		statusReplicas:          5,
 		expectedDesiredReplicas: 5,
 		CPUTarget:               50,
 		metricsTarget: []autoscalingv2.MetricSpec{
