@@ -23,7 +23,7 @@ require (
 	github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e
 	github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
-	github.com/caddyserver/caddy v1.0.1
+	github.com/caddyserver/caddy v1.0.3
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b // indirect
 	github.com/client9/misspell v0.3.4
@@ -35,6 +35,7 @@ require (
 	github.com/containerd/containerd v1.0.2 // indirect
 	github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20 // indirect
 	github.com/containernetworking/cni v0.7.1
+	github.com/coredns/corefile-migration v1.0.2
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
@@ -113,7 +114,7 @@ require (
 	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/spf13/afero v1.2.2
-	github.com/spf13/cobra v0.0.4
+	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.3.2
@@ -201,7 +202,7 @@ replace (
 	github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
 	github.com/blang/semver => github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
-	github.com/caddyserver/caddy => github.com/caddyserver/caddy v1.0.1
+	github.com/caddyserver/caddy => github.com/caddyserver/caddy v1.0.3
 	github.com/cenkalti/backoff => github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/cespare/prettybench => github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
@@ -216,6 +217,7 @@ replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.0.2
 	github.com/containerd/typeurl => github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
+	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.2
 	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.1-coreos.6
 	github.com/coreos/etcd => github.com/coreos/etcd v3.3.13+incompatible
 	github.com/coreos/go-etcd => github.com/coreos/go-etcd v2.0.0+incompatible
@@ -376,7 +378,7 @@ replace (
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.3
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 	github.com/spf13/cast => github.com/spf13/cast v1.3.0
-	github.com/spf13/cobra => github.com/spf13/cobra v0.0.4
+	github.com/spf13/cobra => github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper => github.com/spf13/viper v1.3.2
