@@ -43,6 +43,7 @@ const (
 	VerbAll        = "*"
 	NonResourceAll = "*"
 	NameAll        = "*"
+	NamespaceAll   = metav1.NamespaceAll
 )
 
 // System preset priority level names
@@ -134,14 +135,17 @@ type PriorityLevelConfigurationReference struct {
 }
 
 // PolicyRuleWithSubjects prescribes a test that applies to a request to an apiserver. The test considers the subject
-// making the request, the verb being requested, and the resource to be acted upon.
+// making the request, the verb being requested, and the resource or subresource or non-resource to be acted upon.
 type PolicyRuleWithSubjects struct {
 	// `subjects` is the list of normal user, serviceaccount, or group that this rule cares about.
 	// +optional
 	Subjects []Subject
-	// `rule` is the target verb, resource or the subresource the rule cares about. APIGroups, Resources, etc.
+	// `rule` is the target verb and most attributes of the resource or subresource or non-resource the rule cares about. This includes APIGroups, Resources, etc.  This excludes the namespace, if any, identifying the resource or subresource to act upon.  This exclusion is because the PolicyRule datatype is copied from rbac, which identifies the namespace in a different way.
 	// Required.
 	Rule PolicyRule
+	// `objectNamespaces` identifies the allowable namespaces, if any, of the resource or subresource that the rule matches.  For a non-namespaced resource this list does not matter.  When the rule is for non-resources this list must have length zero.  To match a resource or subresource regardless of its namespace, use NamespaceAll.  If NamespaceAll appears in the list then it may be the only entry in the list.
+	// +optional
+	ObjectNamespaces []string
 }
 
 // FlowSchemaStatus represents the current state of a flow-schema.

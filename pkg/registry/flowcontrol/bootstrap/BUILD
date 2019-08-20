@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/flowcontrol/bootstrap",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",

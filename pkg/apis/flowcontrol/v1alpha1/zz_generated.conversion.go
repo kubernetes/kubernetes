@@ -373,6 +373,7 @@ func autoConvert_v1alpha1_PolicyRuleWithSubjects_To_flowcontrol_PolicyRuleWithSu
 	if err := Convert_v1alpha1_PolicyRule_To_flowcontrol_PolicyRule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
+	out.ObjectNamespaces = *(*[]string)(unsafe.Pointer(&in.ObjectNamespaces))
 	return nil
 }
 
@@ -386,6 +387,7 @@ func autoConvert_flowcontrol_PolicyRuleWithSubjects_To_v1alpha1_PolicyRuleWithSu
 	if err := Convert_flowcontrol_PolicyRule_To_v1alpha1_PolicyRule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
+	out.ObjectNamespaces = *(*[]string)(unsafe.Pointer(&in.ObjectNamespaces))
 	return nil
 }
 

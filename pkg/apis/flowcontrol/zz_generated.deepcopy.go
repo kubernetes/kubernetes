@@ -241,6 +241,11 @@ func (in *PolicyRuleWithSubjects) DeepCopyInto(out *PolicyRuleWithSubjects) {
 		copy(*out, *in)
 	}
 	in.Rule.DeepCopyInto(&out.Rule)
+	if in.ObjectNamespaces != nil {
+		in, out := &in.ObjectNamespaces, &out.ObjectNamespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

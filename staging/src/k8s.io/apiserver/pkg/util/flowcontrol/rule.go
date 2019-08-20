@@ -35,7 +35,9 @@ func matchesFlowSchema(digest RequestDigest, flowSchema *rmtypesv1alpha1.FlowSch
 		if !subjectMatches {
 			continue
 		}
-
+		if !matchObjectNamespace(policyRule.ObjectNamespaces, digest.RequestInfo.Namespace) {
+			continue
+		}
 		if matchesPolicyRule(digest, policyRule.Rule) {
 			return true
 		}
@@ -95,6 +97,10 @@ func matchesPolicyRule(digest RequestDigest, policyRule rmtypesv1alpha1.PolicyRu
 		return false
 	}
 	return true
+}
+
+func matchObjectNamespace(namespaces []string, namespace string) bool {
+	return len(namespace) == 0 || containsString(namespace, namespaces, rmtypesv1alpha1.NamespaceAll)
 }
 
 func matchPolicyRuleVerb(policyRuleVerbs []string, requestVerb string) bool {

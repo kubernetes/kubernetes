@@ -103,6 +103,22 @@ func ValidateFlowSchemaPolicyRuleWithSubjects(rule *flowcontrol.PolicyRuleWithSu
 		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value"))
 	}
 	allErrs = append(allErrs, ValidateFlowSchemaPolicyRule(&rule.Rule, fldPath.Child("rule"))...)
+	if len(rule.ObjectNamespaces) > 0 {
+		if len(rule.Rule.NonResourceURLs) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("objectNamespaces"), "ObjectNamespaces is not relevant to non-resource requests"))
+		}
+		for idx, objNamespace := range rule.ObjectNamespaces {
+			if objNamespace == flowcontrol.NamespaceAll {
+				if len(rule.ObjectNamespaces) > 1 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("objectNamespaces"), rule.ObjectNamespaces, "when NamespaceAll is present there may be no other members in the list"))
+				}
+				continue
+			}
+			for _, msg := range apimachineryvalidation.ValidateNamespaceName(objNamespace, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("objectNamespaces").Index(idx), objNamespace, msg))
+			}
+		}
+	}
 	return allErrs
 }
 

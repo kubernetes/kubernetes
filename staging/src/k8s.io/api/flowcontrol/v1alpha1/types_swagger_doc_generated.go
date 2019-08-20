@@ -104,9 +104,10 @@ func (PolicyRule) SwaggerDoc() map[string]string {
 }
 
 var map_PolicyRuleWithSubjects = map[string]string{
-	"":         "PolicyRuleWithSubjects prescribes a test that applies to a request to an apiserver. The test considers the subject making the request, the verb being requested, and the resource to be acted upon.",
-	"subjects": "`subjects` is the list of normal user, serviceaccount, or group that this rule cares about.",
-	"rule":     "`rule` is the target verb, resource or the subresource the rule cares about. APIGroups, Resources, etc. Required.",
+	"":                 "PolicyRuleWithSubjects prescribes a test that applies to a request to an apiserver. The test considers the subject making the request, the verb being requested, and the resource or subresource or non-resource to be acted upon.",
+	"subjects":         "`subjects` is the list of normal user, serviceaccount, or group that this rule cares about.",
+	"rule":             "`rule` is the target verb and most attributes of the resource or subresource or non-resource the rule cares about. This includes APIGroups, Resources, etc.  This excludes the namespace, if any, identifying the resource or subresource to act upon.  This exclusion is because the PolicyRule datatype is copied from rbac, which identifies the namespace in a different way. Required.",
+	"objectNamespaces": "`objectNamespaces` identifies the allowable namespaces, if any, of the resource or subresource that the rule matches.  For a non-namespaced resource this list does not matter.  When the rule is for non-resources this list must have length zero.  To match a resource or subresource regardless of its namespace, use NamespaceAll.  If NamespaceAll appears in the list then it may be the only entry in the list.",
 }
 
 func (PolicyRuleWithSubjects) SwaggerDoc() map[string]string {

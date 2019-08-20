@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	rmv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -62,7 +63,8 @@ var (
 				[]string{rmv1a1.VerbAll},
 				[]string{rmv1a1.APIGroupAll},
 				[]string{rmv1a1.ResourceAll},
-			)},
+			),
+			ObjectNamespaces: []string{rmv1a1.NamespaceAll}},
 		rmv1a1.PolicyRuleWithSubjects{
 			Subjects: groups(user.SystemPrivilegedGroup),
 			Rule: nonResourceRule(
@@ -80,7 +82,8 @@ var (
 				[]string{rmv1a1.VerbAll},
 				[]string{rmv1a1.APIGroupAll},
 				[]string{rmv1a1.ResourceAll},
-			)},
+			),
+			ObjectNamespaces: []string{rmv1a1.NamespaceAll}},
 		rmv1a1.PolicyRuleWithSubjects{
 			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
 			Rule: nonResourceRule(
@@ -158,11 +161,13 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 		fs("system-nodes", "system", 2500,
 			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: groups(user.NodesGroup),
-				Rule:     ruleRscAll},
+				Subjects:         groups(user.NodesGroup),
+				Rule:             ruleRscAll,
+				ObjectNamespaces: []string{metav1.NamespaceSystem}},
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: kubeSystemServiceAccount(rmv1a1.NameAll),
-				Rule:     resourceRule(verbAll, []string{apiGroupCore}, []string{"endpoints", "configmaps", "leases"})},
+				Subjects:         kubeSystemServiceAccount(rmv1a1.NameAll),
+				Rule:             resourceRule(verbAll, []string{apiGroupCore}, []string{"endpoints", "configmaps", "leases"}),
+				ObjectNamespaces: []string{metav1.NamespaceSystem, corev1.NamespaceNodeLease}},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: kubeSystemServiceAccount(rmv1a1.NameAll),
 				Rule:     ruleNonRscAll},
@@ -170,15 +175,17 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 		fs("system-leader-election", "system", 2500,
 			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: users(user.KubeControllerManager, user.KubeScheduler),
-				Rule:     resourceRule(verbAll, []string{"coordination.k8s.io"}, []string{"leases"})},
+				Subjects:         users(user.KubeControllerManager, user.KubeScheduler),
+				Rule:             resourceRule(verbAll, []string{"coordination.k8s.io"}, []string{"leases"}),
+				ObjectNamespaces: []string{rmv1a1.NamespaceAll}},
 		),
 		fs("kube-controller-manager", "workload-high", 3500,
 			rmv1a1.FlowDistinguisherMethodByNamespaceType,
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: append(users(user.KubeControllerManager),
 					kubeSystemServiceAccount(allServiceAccountKubeControllerManager...)...),
-				Rule: ruleRscAll,
+				Rule:             ruleRscAll,
+				ObjectNamespaces: []string{rmv1a1.NamespaceAll},
 			},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: append(users(user.KubeControllerManager),
@@ -189,8 +196,9 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 		fs("kube-scheduler", "workload-high", 3500,
 			rmv1a1.FlowDistinguisherMethodByNamespaceType,
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: users(user.KubeScheduler),
-				Rule:     ruleRscAll,
+				Subjects:         users(user.KubeScheduler),
+				Rule:             ruleRscAll,
+				ObjectNamespaces: []string{rmv1a1.NamespaceAll},
 			},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: users(user.KubeScheduler),
@@ -200,8 +208,9 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 		fs("service-accounts", "workload-low", 7500,
 			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: groups("system:serviceaccounts"),
-				Rule:     ruleRscAll},
+				Subjects:         groups("system:serviceaccounts"),
+				Rule:             ruleRscAll,
+				ObjectNamespaces: []string{rmv1a1.NamespaceAll}},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: groups("system:serviceaccounts"),
 				Rule:     ruleNonRscAll}),
