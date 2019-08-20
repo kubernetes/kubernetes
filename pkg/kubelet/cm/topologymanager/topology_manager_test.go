@@ -80,10 +80,10 @@ func TestNewManager(t *testing.T) {
 }
 
 type mockHintProvider struct {
-	th []TopologyHint
+	th map[string][]TopologyHint
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod v1.Pod, container v1.Container) []TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint {
 	return m.th
 }
 
@@ -125,10 +125,10 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "HintProvider returns empty non-nil []TopologyHint",
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{},
+					map[string][]TopologyHint{},
 				},
 			},
 			expected: TopologyHint{
@@ -136,15 +136,44 @@ func TestCalculateAffinity(t *testing.T) {
 				Preferred:      true,
 			},
 		},
-
+		{
+			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": nil,
+					},
+				},
+			},
+			expected: TopologyHint{
+				SocketAffinity: NewTestSocketMaskFull(),
+				Preferred:      true,
+			},
+		},
+		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {},
+					},
+				},
+			},
+			expected: TopologyHint{
+				SocketAffinity: NewTestSocketMaskFull(),
+				Preferred:      false,
+			},
+		},
 		{
 			name: "Single TopologyHint with Preferred as true and SocketAffinity as nil",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: nil,
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: nil,
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -158,10 +187,12 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Single TopologyHint with Preferred as false and SocketAffinity as nil",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: nil,
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: nil,
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -175,18 +206,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, same mask, both preferred 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -200,18 +235,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, same mask, both preferred 2/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -225,18 +264,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -250,18 +293,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -275,18 +322,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, no common mask",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -300,18 +351,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -325,18 +380,22 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -351,10 +410,12 @@ func TestCalculateAffinity(t *testing.T) {
 			hp: []HintProvider{
 				&mockHintProvider{},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -369,10 +430,12 @@ func TestCalculateAffinity(t *testing.T) {
 			hp: []HintProvider{
 				&mockHintProvider{},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -386,22 +449,26 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 with 2 hints, 1 with single hint matching 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -415,22 +482,26 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 with 2 hints, 1 with single hint matching 2/2",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
@@ -444,22 +515,26 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -473,26 +548,30 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Two providers, both with 2 hints, matching narrower preferred hint from both",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -506,30 +585,71 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "Ensure less narrow preferred hints are chosen over narrower non-preferred hints",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+					},
+				},
+			},
+			expected: TopologyHint{
+				SocketAffinity: NewTestSocketMask(1),
+				Preferred:      true,
+			},
+		},
+		{
+			name: "Multiple resources, same provider",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+						"resource2": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -678,14 +798,16 @@ func TestAdmit(t *testing.T) {
 			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -698,18 +820,20 @@ func TestAdmit(t *testing.T) {
 			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -722,10 +846,12 @@ func TestAdmit(t *testing.T) {
 			policy:   NewBestEffortPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -738,14 +864,16 @@ func TestAdmit(t *testing.T) {
 			policy:   NewStrictPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -758,18 +886,20 @@ func TestAdmit(t *testing.T) {
 			policy:   NewStrictPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(1),
+								Preferred:      true,
+							},
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
@@ -782,10 +912,12 @@ func TestAdmit(t *testing.T) {
 			policy:   NewStrictPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								SocketAffinity: NewTestSocketMask(0, 1),
+								Preferred:      false,
+							},
 						},
 					},
 				},
