@@ -989,7 +989,7 @@ google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8 => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
+# google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8 => google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.23.0 => google.golang.org/grpc v1.23.0
