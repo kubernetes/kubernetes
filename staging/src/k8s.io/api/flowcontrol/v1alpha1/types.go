@@ -42,6 +42,7 @@ const (
 	ResourceAll    = "*"
 	VerbAll        = "*"
 	NonResourceAll = "*"
+	NameAll        = "*"
 )
 
 // System preset priority level names
@@ -265,7 +266,8 @@ type Subject struct {
 	// Defaults to "flowcontrol.apiserver.k8s.io" for User and Group subjects.
 	// +optional
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,2,opt.name=apiGroup"`
-	// `name` of the object being referenced.
+	// `name` of the object being referenced.  To match regardless of name, use NameAll.
+	// Required.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// `namespace` of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
 	// the Authorizer should report an error.
