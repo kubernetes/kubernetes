@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
 	v1 "k8s.io/api/core/v1"
@@ -1005,9 +1005,9 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				})
 			}
 
-			loadDistribution := network.Default
+			loadDistribution := network.LoadDistributionDefault
 			if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
-				loadDistribution = network.SourceIP
+				loadDistribution = network.LoadDistributionSourceIP
 			}
 
 			expectedRule := network.LoadBalancingRule{
