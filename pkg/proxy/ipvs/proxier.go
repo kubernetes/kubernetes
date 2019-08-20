@@ -1830,9 +1830,14 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 }
 
 func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer, legacyBindAddrs map[string]bool) {
+	isIPv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for cs := range currentServices {
 		svc := currentServices[cs]
 		if proxier.isIPInExcludeCIDRs(svc.Address) {
+			continue
+		}
+		if utilnet.IsIPv6(svc.Address) != isIPv6 {
+			// Not our family
 			continue
 		}
 		if _, ok := activeServices[cs]; !ok {
