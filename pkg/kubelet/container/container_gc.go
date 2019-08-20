@@ -28,6 +28,9 @@ type ContainerGCPolicy struct {
 	// Minimum age at which a container can be garbage collected, zero for no limit.
 	MinAge time.Duration
 
+	// Minimum duration since finish time which a dead container should be retained, zero for no limit.
+	MinimumTimeSinceFinish time.Duration
+
 	// Max number of dead containers any single pod (UID, container name) pair is
 	// allowed to have, less than zero for no limit.
 	MaxPerPodContainer int

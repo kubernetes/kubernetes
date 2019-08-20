@@ -74,6 +74,7 @@ type containerTemplate struct {
 	sandboxAttempt uint32
 	attempt        int
 	createdAt      int64
+	finishedAt     int64
 	state          runtimeapi.ContainerState
 }
 
@@ -167,6 +168,7 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 			Image:       containerConfig.Image,
 			ImageRef:    imageRef,
 			CreatedAt:   template.createdAt,
+			FinishedAt:  template.finishedAt,
 			State:       template.state,
 			Labels:      containerConfig.Labels,
 			Annotations: containerConfig.Annotations,

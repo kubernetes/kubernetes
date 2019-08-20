@@ -169,6 +169,9 @@ type KubeletFlags struct {
 	// minimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
 	MinimumGCAge metav1.Duration
+	// MinimumGCTimeSinceFinish is the minimum duration since finish time for a dead container can be retained before it is
+	// garbage collected.
+	MinimumGCTimeSinceFinish metav1.Duration
 	// maxPerPodContainerCount is the maximum number of old instances to
 	// retain per container. Each container takes up some disk space.
 	MaxPerPodContainerCount int32
@@ -209,6 +212,7 @@ func NewKubeletFlags() *KubeletFlags {
 		MaxContainerCount:                   -1,
 		MaxPerPodContainerCount:             1,
 		MinimumGCAge:                        metav1.Duration{Duration: 0},
+		MinimumGCTimeSinceFinish:            metav1.Duration{Duration: -1},
 		NonMasqueradeCIDR:                   "10.0.0.0/8",
 		RegisterSchedulable:                 true,
 		ExperimentalKernelMemcgNotification: false,
@@ -403,6 +407,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	fs.DurationVar(&f.MinimumGCTimeSinceFinish.Duration, "minimum-duration-since-finish", f.MinimumGCTimeSinceFinish.Duration, "Minimum duration since finish time for a dead container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
+	fs.MarkDeprecated("minimum-duration-since-finish", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxContainerCount, "maximum-dead-containers", f.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")

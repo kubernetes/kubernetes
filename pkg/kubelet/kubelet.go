@@ -351,6 +351,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
 	minimumGCAge metav1.Duration,
+	MinimumGCTimeSinceFinish metav1.Duration,
 	maxPerPodContainerCount int32,
 	maxContainerCount int32,
 	masterServiceNamespace string,
@@ -410,9 +411,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	containerGCPolicy := kubecontainer.ContainerGCPolicy{
-		MinAge:             minimumGCAge.Duration,
-		MaxPerPodContainer: int(maxPerPodContainerCount),
-		MaxContainers:      int(maxContainerCount),
+		MinAge:                 minimumGCAge.Duration,
+		MinimumTimeSinceFinish: MinimumGCTimeSinceFinish.Duration,
+		MaxPerPodContainer:     int(maxPerPodContainerCount),
+		MaxContainers:          int(maxContainerCount),
 	}
 
 	daemonEndpoints := &v1.NodeDaemonEndpoints{

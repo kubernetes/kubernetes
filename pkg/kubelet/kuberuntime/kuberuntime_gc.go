@@ -56,6 +56,9 @@ type containerGCInfo struct {
 	name string
 	// Creation time for the container.
 	createTime time.Time
+
+	// Finished time for the container.
+	finishTime time.Time
 	// If true, the container is in unknown state. Garbage collector should try
 	// to stop containers before removal.
 	unknown bool
@@ -117,6 +120,23 @@ func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersBy
 
 		if toRemove > 0 {
 			evictUnits[key] = cgc.removeOldestN(evictUnits[key], toRemove)
+		}
+	}
+}
+
+// enforceMinimumTimeSinceFinishPerEvictUnit enforces MinimumTimeSinceFinish for each evictUnit.
+func (cgc *containerGC) enforceMinimumTimeSinceFinishPerEvictUnit(evictUnits containersByEvictUnit, MinimumTimeSinceFinish time.Duration) {
+	defaultFinishTime := time.Unix(0, 0)
+	oldestGCTime := time.Now().Add(-MinimumTimeSinceFinish)
+	for key := range evictUnits {
+		containers := evictUnits[key]
+		for i := 0; i < len(containers); i++ {
+			if containers[i].finishTime == defaultFinishTime || oldestGCTime.Before(containers[i].finishTime) {
+				continue
+			}
+			if err := cgc.manager.removeContainer(containers[i].id); err != nil {
+				klog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
+			}
 		}
 	}
 }
@@ -196,11 +216,22 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		}
 
+		finishedAt := time.Unix(0, 0)
+		if container.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+			status, err := cgc.client.ContainerStatus(container.Id)
+			if err != nil {
+				klog.Errorf("Failed to get the status of container %v: %v", container.Id, err)
+			} else {
+				finishedAt = time.Unix(0, status.FinishedAt)
+			}
+		}
+
 		labeledInfo := getContainerInfoFromLabels(container.Labels)
 		containerInfo := containerGCInfo{
 			id:         container.Id,
 			name:       container.Metadata.Name,
 			createTime: createdAt,
+			finishTime: finishedAt,
 			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
 		}
 		key := evictUnit{
@@ -239,6 +270,11 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy
 	// Enforce max containers per evict unit.
 	if gcPolicy.MaxPerPodContainer >= 0 {
 		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
+	}
+
+	// Enforce MinimumTimeSinceFinish for per evict unit.
+	if gcPolicy.MinimumTimeSinceFinish >= 0 {
+		cgc.enforceMinimumTimeSinceFinishPerEvictUnit(evictUnits, gcPolicy.MinimumTimeSinceFinish)
 	}
 
 	// Enforce max total number of containers.
