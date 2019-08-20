@@ -833,4 +833,26 @@ var _ = framework.KubeDescribe("Pods", func() {
 		validatePodReadiness(false)
 
 	})
+
+	ginkgo.It("should create pod templates", func() {
+		ginkgo.By("creating PodTemplate with name: pod-template-test")
+		_, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).Create(
+			&v1.PodTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-template-test",
+				},
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "test", Image: imageutils.GetE2EImage(imageutils.Agnhost)},
+						},
+					},
+				},
+			})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("validating the creation of the PodTemplate")
+		_, err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).Get("pod-template-test", metav1.GetOptions{})
+		framework.ExpectNoError(err)
+	})
 })
