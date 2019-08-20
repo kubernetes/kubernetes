@@ -372,12 +372,16 @@ type Pausable interface {
 }
 
 func (t *Transport) Pause() {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	for _, p := range t.peers {
 		p.(Pausable).Pause()
 	}
 }
 
 func (t *Transport) Resume() {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	for _, p := range t.peers {
 		p.(Pausable).Resume()
 	}

@@ -647,6 +647,7 @@ func NewClientV3(m *member) (*clientv3.Client, error) {
 	cfg := clientv3.Config{
 		Endpoints:          []string{m.grpcAddr},
 		DialTimeout:        5 * time.Second,
+		DialOptions:        []grpc.DialOption{grpc.WithBlock()},
 		MaxCallSendMsgSize: m.clientMaxCallSendMsgSize,
 		MaxCallRecvMsgSize: m.clientMaxCallRecvMsgSize,
 	}

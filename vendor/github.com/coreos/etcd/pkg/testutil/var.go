@@ -1,4 +1,4 @@
-// Copyright 2017 The etcd Authors
+// Copyright 2018 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clientv3
+package testutil
 
-import "context"
+import "time"
 
-// TODO: remove this when "FailFast=false" is fixed.
-// See https://github.com/grpc/grpc-go/issues/1532.
-func readyWait(rpcCtx, clientCtx context.Context, ready <-chan struct{}) error {
-	select {
-	case <-ready:
-		return nil
-	case <-rpcCtx.Done():
-		return rpcCtx.Err()
-	case <-clientCtx.Done():
-		return clientCtx.Err()
-	}
-}
+var (
+	ApplyTimeout   = time.Second
+	RequestTimeout = 3 * time.Second
+)
