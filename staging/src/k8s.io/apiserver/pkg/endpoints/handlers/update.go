@@ -61,7 +61,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			scope.err(err, w, req)
 			return
 		}
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)

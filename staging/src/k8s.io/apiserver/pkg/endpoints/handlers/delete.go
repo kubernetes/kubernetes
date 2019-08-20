@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -59,7 +60,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 			scope.err(err, w, req)
 			return
 		}
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
@@ -177,7 +179,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			return
 		}
 
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 		ae := request.AuditEventFrom(ctx)
 

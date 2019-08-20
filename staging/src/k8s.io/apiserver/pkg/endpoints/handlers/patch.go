@@ -93,7 +93,8 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
