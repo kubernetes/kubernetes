@@ -443,7 +443,7 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v2.2.0-k8s1.12",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v2.2.2",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
