@@ -63,7 +63,7 @@ var (
 			Name:      "transformation_operations_total",
 			Help:      "Total number of transformations.",
 		},
-		[]string{"transformation_type", "status"},
+		[]string{"transformation_type", "transformer_prefix", "status"},
 	)
 
 	deprecatedTransformerFailuresTotal = prometheus.NewCounterVec(
@@ -130,8 +130,8 @@ func RegisterMetrics() {
 
 // RecordTransformation records latencies and count of TransformFromStorage and TransformToStorage operations.
 // Note that transformation_failures_total metric is deprecated, use transformation_operations_total instead.
-func RecordTransformation(transformationType string, start time.Time, err error) {
-	transformerOperationsTotal.WithLabelValues(transformationType, status.Code(err).String()).Inc()
+func RecordTransformation(transformationType, transformerPrefix string, start time.Time, err error) {
+	transformerOperationsTotal.WithLabelValues(transformationType, transformerPrefix, status.Code(err).String()).Inc()
 
 	switch {
 	case err == nil:
