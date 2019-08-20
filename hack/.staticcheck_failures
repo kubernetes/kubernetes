@@ -31,6 +31,18 @@ pkg/kubectl/cmd/get
 pkg/kubelet/apis/podresources
 pkg/kubelet/cm/devicemanager
 pkg/kubelet/pluginmanager/operationexecutor
+pkg/kubelet/config
+pkg/kubelet/container/testing
+pkg/kubelet/dockershim/libdocker
+pkg/kubelet/eviction
+pkg/kubelet/kubeletconfig/checkpoint
+pkg/kubelet/kuberuntime
+pkg/kubelet/kuberuntime/logs
+pkg/kubelet/lifecycle
+pkg/kubelet/network/dns
+pkg/kubelet/pluginmanager
+pkg/kubelet/pluginmanager/metrics
+>>>>>>> fixed static check failures for pkg/kubelet
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/remote
 pkg/master
@@ -84,11 +96,9 @@ pkg/volume/quobyte
 pkg/volume/rbd
 pkg/volume/scaleio
 pkg/volume/storageos
-pkg/volume/util
 pkg/volume/util/fsquota
 pkg/volume/util/fsquota/common
 pkg/volume/util/operationexecutor
-pkg/volume/util/subpath
 pkg/volume/vsphere_volume
 plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/podnodeselector

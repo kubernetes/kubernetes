@@ -1052,7 +1052,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	}
 	podCfg := kubeDeps.PodConfig
 
-	rlimit.RlimitNumFiles(uint64(kubeServer.MaxOpenFiles))
+	if err = rlimit.RlimitNumFiles(uint64(kubeServer.MaxOpenFiles)); err != nil {
+		return fmt.Errorf("failed to set rlimit: %v", err)
+	}
 
 	// process pods and exit.
 	if runOnce {
