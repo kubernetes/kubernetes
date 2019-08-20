@@ -179,6 +179,11 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Cleanup != nil {
+		in, out := &in.Cleanup, &out.Cleanup
+		*out = new(PluginSet)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Reserve != nil {
 		in, out := &in.Reserve, &out.Reserve
 		*out = new(PluginSet)
