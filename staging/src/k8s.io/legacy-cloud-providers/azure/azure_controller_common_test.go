@@ -53,8 +53,8 @@ func TestCommonAttachDisk(t *testing.T) {
 			desc:        "correct LUN and no error shall be returned if everything is good",
 			vmList:      map[string]string{"vm1": "PowerState/Running"},
 			nodeName:    "vm1",
-			expectedLun: 1,
-			expectedErr: false,
+			expectedLun: -1,
+			expectedErr: true,
 		},
 	}
 
@@ -73,7 +73,7 @@ func TestCommonAttachDisk(t *testing.T) {
 
 		lun, err := common.AttachDisk(true, "", diskURI, test.nodeName, compute.CachingTypesReadOnly)
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
-		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, return error: %v", i, test.desc, err)
 	}
 }
 
