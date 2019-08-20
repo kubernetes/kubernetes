@@ -18,11 +18,11 @@ package lifecycle
 
 import (
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	"net"
 	"net/http"
 	"strconv"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
@@ -107,15 +107,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
-		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-		if err != nil {
-			klog.Errorf("Unable to get pod info, event handlers may be invalid.")
-			return "", err
-		}
-		if len(status.IPs) == 0 {
-			return "", fmt.Errorf("failed to find networking container: %v", status)
-		}
-		host = status.IPs[0]
+		host = pod.Status.PodIP
 	}
 	var port int
 	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
