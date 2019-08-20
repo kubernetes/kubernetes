@@ -7,10 +7,10 @@ go_library(
     importpath = "google.golang.org/grpc/balancer/roundrobin",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc/balancer:go_default_library",
         "//vendor/google.golang.org/grpc/balancer/base:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
+        "//vendor/google.golang.org/grpc/internal/grpcrand:go_default_library",
         "//vendor/google.golang.org/grpc/resolver:go_default_library",
     ],
 )

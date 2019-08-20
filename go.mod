@@ -130,7 +130,7 @@ require (
 	github.com/vmware/govmomi v0.20.1
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
+	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
@@ -138,7 +138,7 @@ require (
 	golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	google.golang.org/api v0.0.0-20181220000619-583d854617af
-	google.golang.org/grpc v1.13.0
+	google.golang.org/grpc v1.23.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.2
@@ -428,7 +428,7 @@ replace (
 	google.golang.org/api => google.golang.org/api v0.0.0-20181220000619-583d854617af
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
-	google.golang.org/grpc => google.golang.org/grpc v1.13.0
+	google.golang.org/grpc => google.golang.org/grpc v1.23.0
 	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0
