@@ -201,7 +201,7 @@ func newProxyServer(
 			if err != nil {
 				return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 			}
-			proxier = proxy.NewMetaProxier(proxier, ipv6Proxier, proxy.FamilyIpv4)
+			proxier = ipvs.NewMetaProxier(proxier, ipv6Proxier, ipvs.FamilyIpv4)
 		}
 		metrics.RegisterMetrics()
 	} else {

@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxy
+package ipvs
 
 import (
+	"net"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
-	"net"
+	"k8s.io/kubernetes/pkg/proxy"
 )
 
 type MetaProxier struct {
-	ipv4Proxier   ProxyProvider
-	ipv6Proxier   ProxyProvider
+	ipv4Proxier   proxy.ProxyProvider
+	ipv6Proxier   proxy.ProxyProvider
 	defaultFamily IpFamily
 }
 
@@ -39,7 +41,7 @@ const (
 // NewMetaProxier returns a dual-stack "meta-proxier". Proxier API
 // calls will be dispatched to the ProxyProvider instances depending
 // on address family.
-func NewMetaProxier(ipv4Proxier, ipv6Proxier ProxyProvider, defaultFamily IpFamily) *MetaProxier {
+func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.ProxyProvider, defaultFamily IpFamily) *MetaProxier {
 	return &MetaProxier{
 		ipv4Proxier:   ipv4Proxier,
 		ipv6Proxier:   ipv6Proxier,
