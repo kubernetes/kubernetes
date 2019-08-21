@@ -17,6 +17,7 @@ limitations under the License.
 package priority
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -98,7 +99,7 @@ var (
 
 // Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
 // Note that pod validation mechanism prevents update of a pod priority.
-func (p *priorityPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *priorityPlugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {
@@ -118,7 +119,7 @@ func (p *priorityPlugin) Admit(a admission.Attributes, o admission.ObjectInterfa
 }
 
 // Validate checks PriorityClasses and admits or rejects them.
-func (p *priorityPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *priorityPlugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {

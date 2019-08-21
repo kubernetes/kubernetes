@@ -22,6 +22,7 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -79,7 +80,7 @@ func (r *RuntimeClass) ValidateInitialization() error {
 }
 
 // Admit makes an admission decision based on the request attributes
-func (r *RuntimeClass) Admit(attributes admission.Attributes, o admission.ObjectInterfaces) error {
+func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
 
 	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {
@@ -101,7 +102,7 @@ func (r *RuntimeClass) Admit(attributes admission.Attributes, o admission.Object
 }
 
 // Validate makes sure that pod adhere's to RuntimeClass's definition
-func (r *RuntimeClass) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) error {
+func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
 
 	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {

@@ -160,9 +160,9 @@ type NamespaceScopedStrategy interface {
 func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
-		return func(obj runtime.Object) error { return nil }
+		return func(ctx context.Context, obj runtime.Object) error { return nil }
 	}
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			staticAttributes.GetOldObject(),
@@ -179,6 +179,6 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes, o)
+		return validatingAdmission.Validate(ctx, finalAttributes, o)
 	}
 }

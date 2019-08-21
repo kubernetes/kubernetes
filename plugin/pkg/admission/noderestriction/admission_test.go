@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1210,7 +1211,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				c.features = tt.features
 			}
 			c.podsGetter = tt.podsGetter
-			err := c.Admit(tt.attributes, nil)
+			err := c.Admit(context.TODO(), tt.attributes, nil)
 			if (err == nil) != (len(tt.err) == 0) {
 				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
 				return

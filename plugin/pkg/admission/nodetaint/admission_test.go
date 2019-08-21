@@ -17,7 +17,9 @@ limitations under the License.
 package nodetaint
 
 import (
+	"context"
 	"reflect"
+
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -106,7 +108,7 @@ func Test_nodeTaints(t *testing.T) {
 			if tt.features != nil {
 				c.features = tt.features
 			}
-			err := c.Admit(attributes, nil)
+			err := c.Admit(context.TODO(), attributes, nil)
 			if err != nil {
 				t.Errorf("nodePlugin.Admit() error = %v", err)
 			}

@@ -17,6 +17,10 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
+	"strconv"
+	"testing"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/node/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,8 +32,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"strconv"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -217,7 +219,7 @@ func TestValidate(t *testing.T) {
 
 			attrs := admission.NewAttributesRecord(tc.pod, nil, core.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
-			errs := rt.Validate(attrs, o)
+			errs := rt.Validate(context.TODO(), attrs, o)
 			if tc.expectError {
 				assert.NotEmpty(t, errs)
 			} else {

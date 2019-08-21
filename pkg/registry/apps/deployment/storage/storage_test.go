@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -394,7 +395,7 @@ func TestCreateDeploymentRollbackValidation(t *testing.T) {
 	}
 
 	validationError := fmt.Errorf("admission deny")
-	alwaysDenyValidationFunc := func(obj runtime.Object) error { return validationError }
+	alwaysDenyValidationFunc := func(ctx context.Context, obj runtime.Object) error { return validationError }
 	_, err := rollbackStorage.Create(ctx, rollback.Name, &rollback, alwaysDenyValidationFunc, &metav1.CreateOptions{})
 
 	if err == nil || validationError != err {

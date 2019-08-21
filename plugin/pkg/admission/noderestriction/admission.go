@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -105,7 +106,7 @@ var (
 )
 
 // Admit checks the admission policy and triggers corresponding actions
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	nodeName, isNode := p.nodeIdentifier.NodeIdentity(a.GetUserInfo())
 
 	// Our job is just to restrict nodes

@@ -1713,11 +1713,11 @@ func TestQualifiedResource(t *testing.T) {
 	}
 }
 
-func denyCreateValidation(obj runtime.Object) error {
+func denyCreateValidation(ctx context.Context, obj runtime.Object) error {
 	return fmt.Errorf("admission denied")
 }
 
-func denyUpdateValidation(obj, old runtime.Object) error {
+func denyUpdateValidation(ctx context.Context, obj, old runtime.Object) error {
 	return fmt.Errorf("admission denied")
 }
 
@@ -1933,7 +1933,7 @@ func TestRetryDeleteValidation(t *testing.T) {
 		updated := make(chan struct{})
 		var readyOnce, updatedOnce sync.Once
 		var called int
-		deleteValidation := func(runtime.Object) error {
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
 			readyOnce.Do(func() {
 				close(ready)
 			})

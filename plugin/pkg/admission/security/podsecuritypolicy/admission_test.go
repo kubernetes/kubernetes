@@ -17,6 +17,7 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -479,7 +480,7 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 	pod := &v1.Pod{}
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
-	err := plugin.Admit(attrs, nil)
+	err := plugin.Admit(context.TODO(), attrs, nil)
 	if err == nil {
 		t.Fatalf("expected versioned pod object to fail mutating admission")
 	}
@@ -487,7 +488,7 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 		t.Errorf("expected type error on Admit but got: %v", err)
 	}
 
-	err = plugin.Validate(attrs, nil)
+	err = plugin.Validate(context.TODO(), attrs, nil)
 	if err == nil {
 		t.Fatalf("expected versioned pod object to fail validating admission")
 	}
@@ -1785,7 +1786,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, nil, false, userInfo)
 	annotations := make(map[string]string)
 	attrs = &fakeAttributes{attrs, annotations}
-	err := admissiontesting.WithReinvocationTesting(t, plugin).Admit(attrs, nil)
+	err := admissiontesting.WithReinvocationTesting(t, plugin).Admit(context.TODO(), attrs, nil)
 
 	if shouldPassAdmit && err != nil {
 		t.Errorf("%s: expected no errors on Admit but received %v", testCaseName, err)
@@ -1813,7 +1814,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 		t.Errorf("%s: expected errors on Admit but received none", testCaseName)
 	}
 
-	err = plugin.Validate(attrs, nil)
+	err = plugin.Validate(context.TODO(), attrs, nil)
 	psp := ""
 	if shouldPassAdmit && op == kadmission.Create {
 		psp = expectedPSP

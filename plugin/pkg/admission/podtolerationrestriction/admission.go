@@ -17,6 +17,7 @@ limitations under the License.
 package podtolerationrestriction
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,7 +74,7 @@ type Plugin struct {
 }
 
 // Admit checks the admission policy and triggers corresponding actions
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -127,11 +128,11 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 	// Final merge of tolerations irrespective of pod type, if the user while creating pods gives
 	// conflicting tolerations(with same key+effect), the existing ones should be overwritten by latest one
 	pod.Spec.Tolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{})
-	return p.Validate(a, o)
+	return p.Validate(ctx, a, o)
 }
 
 // Validate we can obtain a whitelist of tolerations
-func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}

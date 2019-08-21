@@ -19,6 +19,7 @@ limitations under the License.
 package imagepolicy
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -131,7 +132,7 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 }
 
 // Validate makes an admission decision based on the request attributes
-func (a *Plugin) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil

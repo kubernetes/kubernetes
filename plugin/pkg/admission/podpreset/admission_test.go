@@ -17,6 +17,7 @@ limitations under the License.
 package podpreset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -828,7 +829,7 @@ func admitPod(t *testing.T, pod *api.Pod, pip *settingsv1alpha1.PodPreset) error
 		&user.DefaultInfo{},
 	)
 
-	err := plugin.Admit(attrs, nil)
+	err := plugin.Admit(context.TODO(), attrs, nil)
 	if err != nil {
 		return err
 	}
