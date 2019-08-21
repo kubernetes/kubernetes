@@ -84,9 +84,9 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 	return pod
 }
 
-// configureHugePages attempts to allocate 100Mi of 2Mi hugepages for testing purposes
+// configureHugePages attempts to allocate 10Mi of 2Mi hugepages for testing purposes
 func configureHugePages() error {
-	err := exec.Command("/bin/sh", "-c", "echo 50 > /proc/sys/vm/nr_hugepages").Run()
+	err := exec.Command("/bin/sh", "-c", "echo 5 > /proc/sys/vm/nr_hugepages").Run()
 	if err != nil {
 		return err
 	}
@@ -99,10 +99,10 @@ func configureHugePages() error {
 		return err
 	}
 	e2elog.Logf("HugePages_Total is set to %v", numHugePages)
-	if numHugePages == 50 {
+	if numHugePages == 5 {
 		return nil
 	}
-	return fmt.Errorf("expected hugepages %v, but found %v", 50, numHugePages)
+	return fmt.Errorf("expected hugepages %v, but found %v", 5, numHugePages)
 }
 
 // releaseHugePages releases all pre-allocated hugepages
@@ -154,7 +154,7 @@ func runHugePagesTests(f *framework.Framework) {
 							Limits: v1.ResourceList{
 								v1.ResourceName("cpu"):           resource.MustParse("10m"),
 								v1.ResourceName("memory"):        resource.MustParse("100Mi"),
-								v1.ResourceName("hugepages-2Mi"): resource.MustParse("50Mi"),
+								v1.ResourceName("hugepages-2Mi"): resource.MustParse("6Mi"),
 							},
 						},
 					},
@@ -163,7 +163,7 @@ func runHugePagesTests(f *framework.Framework) {
 		})
 		podUID := string(pod.UID)
 		ginkgo.By("checking if the expected hugetlb settings were applied")
-		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
+		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("6Mi"))
 		f.PodClient().Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -194,7 +194,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePage
 			ginkgo.By("by waiting for hugepages resource to become available on the local node")
 			gomega.Eventually(func() string {
 				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(gomega.Equal("100Mi"))
+			}, 30*time.Second, framework.Poll).Should(gomega.Equal("10Mi"))
 		})
 
 		runHugePagesTests(f)
