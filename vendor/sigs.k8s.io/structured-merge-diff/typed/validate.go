@@ -17,17 +17,33 @@ limitations under the License.
 package typed
 
 import (
+	"sync"
+
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/schema"
 	"sigs.k8s.io/structured-merge-diff/value"
 )
 
+var vPool = sync.Pool{
+	New: func() interface{} { return &validatingObjectWalker{} },
+}
+
 func (tv TypedValue) walker() *validatingObjectWalker {
-	return &validatingObjectWalker{
-		value:   tv.value,
-		schema:  tv.schema,
-		typeRef: tv.typeRef,
-	}
+	v := vPool.Get().(*validatingObjectWalker)
+	v.value = tv.value
+	v.schema = tv.schema
+	v.typeRef = tv.typeRef
+	return v
+}
+
+func (v *validatingObjectWalker) finished() {
+	v.value = value.Value{}
+	v.schema = nil
+	v.typeRef = schema.TypeRef{}
+	v.leafFieldCallback = nil
+	v.nodeFieldCallback = nil
+	v.inLeaf = false
+	vPool.Put(v)
 }
 
 type validatingObjectWalker struct {
@@ -49,9 +65,36 @@ type validatingObjectWalker struct {
 
 	// internal housekeeping--don't set when constructing.
 	inLeaf bool // Set to true if we're in a "big leaf"--atomic map/list
+
+	// Allocate only as many walkers as needed for the depth by storing them here.
+	spareWalkers *[]*validatingObjectWalker
 }
 
-func (v validatingObjectWalker) validate() ValidationErrors {
+func (v *validatingObjectWalker) prepareDescent(pe fieldpath.PathElement, tr schema.TypeRef) *validatingObjectWalker {
+	if v.spareWalkers == nil {
+		// first descent.
+		v.spareWalkers = &[]*validatingObjectWalker{}
+	}
+	var v2 *validatingObjectWalker
+	if n := len(*v.spareWalkers); n > 0 {
+		v2, *v.spareWalkers = (*v.spareWalkers)[n-1], (*v.spareWalkers)[:n-1]
+	} else {
+		v2 = &validatingObjectWalker{}
+	}
+	*v2 = *v
+	v2.typeRef = tr
+	v2.errorFormatter.descend(pe)
+	return v2
+}
+
+func (v *validatingObjectWalker) finishDescent(v2 *validatingObjectWalker) {
+	// if the descent caused a realloc, ensure that we reuse the buffer
+	// for the next sibling.
+	v.errorFormatter = v2.errorFormatter.parent()
+	*v.spareWalkers = append(*v.spareWalkers, v2)
+}
+
+func (v *validatingObjectWalker) validate() ValidationErrors {
 	return resolveSchema(v.schema, v.typeRef, &v.value, v)
 }
 
@@ -87,7 +130,7 @@ func (v *validatingObjectWalker) doNode() {
 	}
 }
 
-func (v validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
+func (v *validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
 	if errs := v.validateScalar(t, &v.value, ""); len(errs) > 0 {
 		return errs
 	}
@@ -98,7 +141,7 @@ func (v validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
 	return nil
 }
 
-func (v validatingObjectWalker) visitListItems(t schema.List, list *value.List) (errs ValidationErrors) {
+func (v *validatingObjectWalker) visitListItems(t schema.List, list *value.List) (errs ValidationErrors) {
 	observedKeys := map[string]struct{}{}
 	for i, child := range list.Items {
 		pe, err := listItemToPathElement(t, i, child)
@@ -114,18 +157,17 @@ func (v validatingObjectWalker) visitListItems(t schema.List, list *value.List) 
 			errs = append(errs, v.errorf("duplicate entries for key %v", keyStr)...)
 		}
 		observedKeys[keyStr] = struct{}{}
-		v2 := v
-		v2.errorFormatter.descend(pe)
+		v2 := v.prepareDescent(pe, t.ElementType)
 		v2.value = child
-		v2.typeRef = t.ElementType
 		errs = append(errs, v2.validate()...)
 
 		v2.doNode()
+		v.finishDescent(v2)
 	}
 	return errs
 }
 
-func (v validatingObjectWalker) doList(t schema.List) (errs ValidationErrors) {
+func (v *validatingObjectWalker) doList(t schema.List) (errs ValidationErrors) {
 	list, err := listValue(v.value)
 	if err != nil {
 		return v.error(err)
@@ -144,7 +186,7 @@ func (v validatingObjectWalker) doList(t schema.List) (errs ValidationErrors) {
 	return errs
 }
 
-func (v validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs ValidationErrors) {
+func (v *validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs ValidationErrors) {
 	fieldTypes := map[string]schema.TypeRef{}
 	for i := range t.Fields {
 		// I don't want to use the loop variable since a reference
@@ -153,25 +195,27 @@ func (v validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs 
 		fieldTypes[f.Name] = f.Type
 	}
 
-	for _, item := range m.Items {
-		v2 := v
-		name := item.Name
-		v2.errorFormatter.descend(fieldpath.PathElement{FieldName: &name})
-		v2.value = item.Value
+	for i := range m.Items {
+		item := &m.Items[i]
+		pe := fieldpath.PathElement{FieldName: &item.Name}
 
-		var ok bool
-		if v2.typeRef, ok = fieldTypes[name]; ok {
+		if tr, ok := fieldTypes[item.Name]; ok {
+			v2 := v.prepareDescent(pe, tr)
+			v2.value = item.Value
 			errs = append(errs, v2.validate()...)
+			v.finishDescent(v2)
 		} else {
-			v2.typeRef = t.ElementType
+			v2 := v.prepareDescent(pe, t.ElementType)
+			v2.value = item.Value
 			errs = append(errs, v2.validate()...)
 			v2.doNode()
+			v.finishDescent(v2)
 		}
 	}
 	return errs
 }
 
-func (v validatingObjectWalker) doMap(t schema.Map) (errs ValidationErrors) {
+func (v *validatingObjectWalker) doMap(t schema.Map) (errs ValidationErrors) {
 	m, err := mapValue(v.value)
 	if err != nil {
 		return v.error(err)

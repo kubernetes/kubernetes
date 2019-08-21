@@ -17,8 +17,6 @@ limitations under the License.
 package typed
 
 import (
-	"reflect"
-
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/schema"
 	"sigs.k8s.io/structured-merge-diff/value"
@@ -43,6 +41,9 @@ type mergingWalker struct {
 
 	// internal housekeeping--don't set when constructing.
 	inLeaf bool // Set to true if we're in a "big leaf"--atomic map/list
+
+	// Allocate only as many walkers as needed for the depth by storing them here.
+	spareWalkers *[]*mergingWalker
 }
 
 // merge rules examine w.lhs and w.rhs (up to one of which may be nil) and
@@ -75,7 +76,7 @@ func (w *mergingWalker) merge() (errs ValidationErrors) {
 
 	alhs := deduceAtom(a, w.lhs)
 	arhs := deduceAtom(a, w.rhs)
-	if reflect.DeepEqual(alhs, arhs) {
+	if alhs.Equals(arhs) {
 		errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
 	} else {
 		w2 := *w
@@ -117,13 +118,30 @@ func (w *mergingWalker) doScalar(t schema.Scalar) (errs ValidationErrors) {
 }
 
 func (w *mergingWalker) prepareDescent(pe fieldpath.PathElement, tr schema.TypeRef) *mergingWalker {
-	w2 := *w
+	if w.spareWalkers == nil {
+		// first descent.
+		w.spareWalkers = &[]*mergingWalker{}
+	}
+	var w2 *mergingWalker
+	if n := len(*w.spareWalkers); n > 0 {
+		w2, *w.spareWalkers = (*w.spareWalkers)[n-1], (*w.spareWalkers)[:n-1]
+	} else {
+		w2 = &mergingWalker{}
+	}
+	*w2 = *w
 	w2.typeRef = tr
 	w2.errorFormatter.descend(pe)
 	w2.lhs = nil
 	w2.rhs = nil
 	w2.out = nil
-	return &w2
+	return w2
+}
+
+func (w *mergingWalker) finishDescent(w2 *mergingWalker) {
+	// if the descent caused a realloc, ensure that we reuse the buffer
+	// for the next sibling.
+	w.errorFormatter = w2.errorFormatter.parent()
+	*w.spareWalkers = append(*w.spareWalkers, w2)
 }
 
 func (w *mergingWalker) derefMap(prefix string, v *value.Value, dest **value.Map) (errs ValidationErrors) {
@@ -198,6 +216,7 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 			} else if w2.out != nil {
 				out.Items = append(out.Items, *w2.out)
 			}
+			w.finishDescent(w2)
 			// Keep track of children that have been handled
 			delete(observedRHS, keyStr)
 		}
@@ -212,6 +231,7 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 			} else if w2.out != nil {
 				out.Items = append(out.Items, *w2.out)
 			}
+			w.finishDescent(w2)
 		}
 	}
 
@@ -272,13 +292,13 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 	}
 
 	if lhs != nil {
-		for _, litem := range lhs.Items {
-			name := litem.Name
+		for i := range lhs.Items {
+			litem := &lhs.Items[i]
 			fieldType := t.ElementType
-			if ft, ok := fieldTypes[name]; ok {
+			if ft, ok := fieldTypes[litem.Name]; ok {
 				fieldType = ft
 			}
-			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, fieldType)
+			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &litem.Name}, fieldType)
 			w2.lhs = &litem.Value
 			if rhs != nil {
 				if ritem, ok := rhs.Get(litem.Name); ok {
@@ -288,31 +308,33 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 			if newErrs := w2.merge(); len(newErrs) > 0 {
 				errs = append(errs, newErrs...)
 			} else if w2.out != nil {
-				out.Set(name, *w2.out)
+				out.Items = append(out.Items, value.Field{litem.Name, *w2.out})
 			}
+			w.finishDescent(w2)
 		}
 	}
 
 	if rhs != nil {
-		for _, ritem := range rhs.Items {
+		for j := range rhs.Items {
+			ritem := &rhs.Items[j]
 			if lhs != nil {
 				if _, ok := lhs.Get(ritem.Name); ok {
 					continue
 				}
 			}
 
-			name := ritem.Name
 			fieldType := t.ElementType
-			if ft, ok := fieldTypes[name]; ok {
+			if ft, ok := fieldTypes[ritem.Name]; ok {
 				fieldType = ft
 			}
-			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, fieldType)
+			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &ritem.Name}, fieldType)
 			w2.rhs = &ritem.Value
 			if newErrs := w2.merge(); len(newErrs) > 0 {
 				errs = append(errs, newErrs...)
 			} else if w2.out != nil {
-				out.Set(name, *w2.out)
+				out.Items = append(out.Items, value.Field{ritem.Name, *w2.out})
 			}
+			w.finishDescent(w2)
 		}
 	}
 
