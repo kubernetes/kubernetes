@@ -139,7 +139,7 @@ message PolicyRule {
 message PolicyRuleWithSubjects {
   // `subjects` is the list of normal user, serviceaccount, or group that this rule cares about.
   // +optional
-  repeated Subject subject = 1;
+  repeated Subject subjects = 1;
 
   // `rule` is the target verb, resource or the subresource the rule cares about. APIGroups, Resources, etc.
   // Required.
