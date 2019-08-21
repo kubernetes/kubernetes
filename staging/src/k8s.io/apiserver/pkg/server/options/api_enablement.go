@@ -22,9 +22,12 @@ import (
 
 	"github.com/spf13/pflag"
 
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
@@ -69,6 +72,18 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)
 	if err != nil {
 		return append(errors, err)
+	}
+
+	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+		flowcontrolRegistered := false
+		for _, g := range groups {
+			if g == flowcontrolv1alpha1.SchemeGroupVersion.Group {
+				flowcontrolRegistered = true
+			}
+		}
+		if !flowcontrolRegistered {
+			return append(errors, fmt.Errorf("flowcontrol.apiserver.k8s.io has to be enabled with RequestManagement feature gate on"))
+		}
 	}
 
 	for _, registry := range registries {
