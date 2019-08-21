@@ -130,7 +130,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
 	// expect one entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
-	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1)
 	verifyNoOperationTimestamp(t, fCache, key, "volume_detach")
 }
 
@@ -211,9 +211,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
 	// expect one attach entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
-	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1)
 	// expect one detach entry in cache, with AddIfNotExist potentially called multiple times
-	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_detach", 1, 1)
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -289,10 +289,10 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
-	// expect one attach entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
-	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one attach entry in cache, with AddIfNotExist/Delete called once
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1)
 	// expect one detach entry in cache, with AddIfNotExist potentially called multiple times
-	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_detach", 1, 1)
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -372,8 +372,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key := string(nodeName) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
-	// expect one attach entry in cache, with AddIfNotExist/Delete/UpdatePluginName called once
-	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one attach entry in cache, with AddIfNotExist/Delete called once
+	verifyOperationTimestampCache(t, fCache, key, fakePlugin.PluginName, "volume_attach", 1, 1)
 	// expect one detach entry in cache
 	verifyNoOperationTimestamp(t, fCache, key, "volume_detach")
 }
@@ -476,14 +476,14 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
 	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
-	// expect one attach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
-	// expect one detach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
-	// expect one attach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
-	// expect one detach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+	// expect one attach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1)
+	// expect one detach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1)
+	// expect one attach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1)
+	// expect one detach entry in cache, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_detach", 1, 1)
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -553,12 +553,12 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	// at least one volume+node should be marked with multiattach error
 	nodeAttachedTo := nodesForVolume[0]
 
-	// expect one attach entry in cache with one of the node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	// expect one attach entry in cache with one of the node, with multiple AddIfNotExist >= 1, Delete = 1
 	firstAttachedToNode1 := nodeAttachedTo == nodeName1
 	if firstAttachedToNode1 {
-		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1)
 	} else {
-		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1)
 	}
 
 	waitForMultiAttachErrorOnNode(t, nodeAttachedTo, dsw)
@@ -591,14 +591,15 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForTotalAttachCallCount(t, 2 /* expectedAttachCallCount */, fakePlugin)
 
-	// expect one detach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
+	// expect one detach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1
+	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1
+
 	if firstAttachedToNode1 {
-		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
-		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1)
+		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1)
 	} else {
-		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
-		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+		verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_detach", 1, 1)
+		verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1)
 	}
 }
 
@@ -655,8 +656,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
 	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
-	// expect one attach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one attach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 1)
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
@@ -665,8 +666,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
 	waitForVolumeRemovedFromNode(t, generatedVolumeName, nodeName1, asw)
-	// expect one detach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1, 1)
+	// expect one detach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_detach", 1, 1)
 
 	// Add a second pod which tries to attach the volume to a different node.
 	generatedVolumeName, podAddErr = dsw.AddPod(types.UniquePodName(podName2), controllervolumetesting.NewPod(podName2, podName2), volumeSpec, nodeName2)
@@ -676,8 +677,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
 
-	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1)
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -732,9 +733,9 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	fCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
 	key1 := string(nodeName1) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
 	key2 := string(nodeName2) + "/" + fakePlugin.PluginName + "/" + string(volumeName)
-	// expect one attach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 0, UpdatePluginName = 1
+	// expect one attach entry in cache for the first node, with multiple AddIfNotExist >= 1, Delete = 0
 	// the volume will NOT be successfully attached to the TimeoutAttachNode
-	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 0, 1)
+	verifyOperationTimestampCache(t, fCache, key1, fakePlugin.PluginName, "volume_attach", 1, 0)
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
@@ -752,8 +753,8 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
 
-	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1, UpdatePluginName = 1
-	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1, 1)
+	// expect one attach entry in cache for the second node, with multiple AddIfNotExist >= 1, Delete = 1
+	verifyOperationTimestampCache(t, fCache, key2, fakePlugin.PluginName, "volume_attach", 1, 1)
 }
 
 func Test_ReportMultiAttachError(t *testing.T) {
@@ -1296,20 +1297,19 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 }
 
 func verifyOperationTimestampCache(
-	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, plugin, operation string, countAdd, countDelete, countUpdate int) {
-	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
-	if p != plugin || op != operation || countAdd > cAdd || countDelete != cDelete || countUpdate != cUpdate {
-		t.Errorf("OperationStartTimeCache for key <%s>, Expected, plugin = %s, operation = %s, countAdd >= %v, countDelete = %v, countUpdate = %v, Actual: %s, %s, %v, %v, %v",
-			key, plugin, operation, countAdd, countDelete, countUpdate,
-			p, op, cAdd, cDelete, cUpdate)
+	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, plugin, operation string, countAdd, countDelete int) {
+	p, op, cAdd, cDelete := fakeC.LoadAll(key, operation)
+	if p != plugin || op != operation || countAdd > cAdd || countDelete != cDelete {
+		t.Errorf("OperationStartTimeCache for key <%s>, Expected, plugin = %s, operation = %s, countAdd >= %v, countDelete = %v, Actual: %s, %s, %v, %v",
+			key, plugin, operation, countAdd, countDelete, p, op, cAdd, cDelete)
 	}
 }
 
 func verifyNoOperationTimestamp(
 	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, operation string) {
-	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
-	if p != "" || op != "" || cAdd != 0 || cDelete != 0 || cUpdate != 0 {
-		t.Errorf("OperationStartTimeCache should be empty: volume<%s>, operation<%s>, Got: %s %s %v %v %v",
-			key, operation, p, op, cAdd, cDelete, cUpdate)
+	p, op, cAdd, cDelete := fakeC.LoadAll(key, operation)
+	if p != "" || op != "" || cAdd != 0 || cDelete != 0 {
+		t.Errorf("OperationStartTimeCache should be empty: volume<%s>, operation<%s>, Got: %s %s %v %v",
+			key, operation, p, op, cAdd, cDelete)
 	}
 }

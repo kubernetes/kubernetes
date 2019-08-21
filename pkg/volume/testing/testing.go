@@ -1539,7 +1539,6 @@ type fakeOperationTimestamp struct {
 	operation          string
 	countAddIfNotExist int
 	countDelete        int
-	countUpdatePlugin  int
 }
 
 type FakeOperationStartTimeCache struct {
@@ -1548,7 +1547,7 @@ type FakeOperationStartTimeCache struct {
 	rwLock  sync.RWMutex
 }
 
-func newFackOperationTimestamp(plugin, op string) *fakeOperationTimestamp {
+func newFakeOperationTimestamp(plugin, op string) *fakeOperationTimestamp {
 	return &fakeOperationTimestamp{
 		plugin:    plugin,
 		operation: op,
@@ -1569,7 +1568,7 @@ func (c *FakeOperationStartTimeCache) AddIfNotExist(key, pluginName, operationNa
 	if found {
 		existed.countAddIfNotExist += 1
 	} else {
-		ts := newFackOperationTimestamp(pluginName, operationName)
+		ts := newFakeOperationTimestamp(pluginName, operationName)
 		ts.countAddIfNotExist = 1
 		c.cache[key] = ts
 	}
@@ -1584,13 +1583,11 @@ func (c *FakeOperationStartTimeCache) Delete(key string) {
 		deleteExisted, found := c.deleted[dKey]
 		if found {
 			deleteExisted.countDelete += existed.countDelete
-			deleteExisted.countUpdatePlugin += existed.countUpdatePlugin
 			deleteExisted.countAddIfNotExist += existed.countAddIfNotExist
 		} else {
-			newlyDeleted := newFackOperationTimestamp(existed.plugin, existed.operation)
+			newlyDeleted := newFakeOperationTimestamp(existed.plugin, existed.operation)
 			newlyDeleted.countAddIfNotExist = existed.countAddIfNotExist
 			newlyDeleted.countDelete = 1
-			newlyDeleted.countUpdatePlugin = existed.countUpdatePlugin
 			c.deleted[dKey] = newlyDeleted
 		}
 		delete(c.cache, key)
@@ -1614,42 +1611,29 @@ func (c *FakeOperationStartTimeCache) Load(key string) (pluginName, operationNam
 	return ts.plugin, ts.operation, time.Time{}, found
 }
 
-func (c *FakeOperationStartTimeCache) UpdatePluginName(key, newPluginName string) bool {
-	c.rwLock.Lock()
-	defer c.rwLock.Unlock()
-	ts, found := c.cache[key]
-	if !found || ts.plugin == newPluginName {
-		return false
-	}
-	ts.plugin = newPluginName
-	ts.countUpdatePlugin += 1
-	return true
-}
-
-func (c *FakeOperationStartTimeCache) LoadAll(key, op string) (plugin, operation string, countAdd, countDelete, countUpdate int) {
+func (c *FakeOperationStartTimeCache) LoadAll(key, op string) (plugin, operation string, countAdd, countDelete int) {
 	c.rwLock.RLock()
 	defer c.rwLock.RUnlock()
 	ts, found := c.cache[key]
 	deleted, deletedFound := c.deleted[key+"-"+op]
 	if !found && !deletedFound {
-		return "", "", 0, 0, 0
+		return "", "", 0, 0
 	}
 
 	if found && !deletedFound {
 		if ts.operation == op {
-			return ts.plugin, ts.operation, ts.countAddIfNotExist, ts.countDelete, ts.countUpdatePlugin
+			return ts.plugin, ts.operation, ts.countAddIfNotExist, ts.countDelete
 		}
-		return "", "", 0, 0, 0
+		return "", "", 0, 0
 	}
 
 	if !found || ts.operation != op {
-		return deleted.plugin, deleted.operation, deleted.countAddIfNotExist, deleted.countDelete, deleted.countUpdatePlugin
+		return deleted.plugin, deleted.operation, deleted.countAddIfNotExist, deleted.countDelete
 	}
 
 	// combine deleted and on-going
 	return deleted.plugin,
 		deleted.operation,
 		deleted.countAddIfNotExist + ts.countAddIfNotExist,
-		deleted.countDelete + ts.countDelete,
-		deleted.countUpdatePlugin + ts.countUpdatePlugin
+		deleted.countDelete + ts.countDelete
 }

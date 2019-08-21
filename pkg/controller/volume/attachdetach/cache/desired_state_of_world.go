@@ -213,7 +213,7 @@ type pod struct {
 // cleanCacheOnOperationAbort deletes cached operation timestamp of a specific
 // volume-node pair from cache in the case when the operation should be aborted
 func cleanCacheOnOperationAbort(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName, toBeCleanedOperationName string, operationTimestamps util.OperationStartTimeCache) {
-	key := string(nodeName) + "/" + string(volumeName)
+	key := operationexecutor.CreateAttachDetachOperationUniqueKey(volumeName, nodeName)
 	if _, cachedOpName, _, ok := operationTimestamps.Load(key); ok && cachedOpName == toBeCleanedOperationName {
 		operationTimestamps.Delete(key)
 	}

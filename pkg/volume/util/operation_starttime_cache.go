@@ -66,10 +66,6 @@ type OperationStartTimeCache interface {
 	// the entry in the cache is not of operationTimestamp type, "ok" will be set to false and
 	// all other returned values should NOT be relied upon.
 	Load(key string) (pluginName, operationName string, startTime time.Time, ok bool)
-
-	// UpdatePluginName updates the pluginName field of a cached operationTimestamp entry
-	// returns true upon success
-	UpdatePluginName(key, newPluginName string) bool
 }
 
 func (c *operationStartTimeCache) AddIfNotExist(key, pluginName, operationName string) {
@@ -101,16 +97,4 @@ func (c *operationStartTimeCache) Load(key string) (pluginName, operationName st
 		return "", "", time.Time{}, ok
 	}
 	return ts.pluginName, ts.operation, ts.startTs, ok
-}
-
-func (c *operationStartTimeCache) UpdatePluginName(key, newPluginName string) bool {
-	ts, ok := c.loadEntry(key)
-	if !ok || ts.pluginName == newPluginName {
-		return false
-	}
-	ts.pluginName = newPluginName
-	newTs := newOperationTimestamp(newPluginName, ts.operation)
-	newTs.startTs = ts.startTs
-	c.cache.Store(key, newTs)
-	return true
 }

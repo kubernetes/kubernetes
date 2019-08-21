@@ -1059,7 +1059,7 @@ func Test_AddPod_TriggersCleaningDetachOperationStartTimeEntryForTheSpecificVolu
 	nodeVolKey := string(nodeName) + "/" + plugin + "/" + string(volumeName)
 	fakeOpCache.AddIfNotExist(nodeVolKey, plugin, "volume_detach")
 	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
-	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_detach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_detach", 1, 0)
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
 	if podAddErr != nil {
 		t.Fatalf(
@@ -1074,7 +1074,7 @@ func Test_AddPod_TriggersCleaningDetachOperationStartTimeEntryForTheSpecificVolu
 		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
 	}
 	verifyVolumeToAttach(t, volumesToAttach, nodeName, generatedVolumeName, string(volumeName))
-	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_detach", 1, 1, 0)
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_detach", 1, 1)
 }
 
 // Test AddPod which causes abort of a volume detach operation triggers cleaning up of a cached detach operation
@@ -1096,7 +1096,7 @@ func Test_AddPod_ShouldNotCleanAttachOperationStartTimeEntryForTheSpecificVolume
 	nodeVolKey := string(nodeName) + "/" + plugin + "/" + string(volumeName)
 	fakeOpCache.AddIfNotExist(nodeVolKey, plugin, "volume_attach")
 	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
-	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_attach", 1, 0)
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
 	if podAddErr != nil {
 		t.Fatalf(
@@ -1111,7 +1111,7 @@ func Test_AddPod_ShouldNotCleanAttachOperationStartTimeEntryForTheSpecificVolume
 		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
 	}
 	verifyVolumeToAttach(t, volumesToAttach, nodeName, generatedVolumeName, string(volumeName))
-	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, nodeVolKey, plugin, "volume_attach", 1, 0)
 }
 
 // Test DeletePod which causes abort of an attach operation will NOT clean up of a cached detach operation
@@ -1147,10 +1147,10 @@ func Test_DeletePod_DoesNotCleanDetachOperationStartTimeCacheForTheSpecificVolum
 	}
 	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
 	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_detach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_detach", 1, 0)
 	// delete a pod should NOT remove detach operation entry in cache
 	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_detach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_detach", 1, 0)
 }
 
 // Test DeletePod which causes abort of an attach operation will clean up of a cached attach operation
@@ -1187,10 +1187,10 @@ func Test_DeletePod_TriggersCleaningAttachOperationStartTimeCacheForTheSpecificV
 	}
 	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
 	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0)
 	// delete a pod should NOT remove detach operation entry in cache
 	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 1, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 1)
 }
 
 // Test DeletePod should NOT clean up the cached attach operation
@@ -1241,10 +1241,10 @@ func Test_DeletePod_ShouldNotCleanAttachOperationStartTimeCacheWhenOtherPodStill
 	}
 	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
 	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0)
 	// delete a pod should NOT clean the cached to attach operation timestamp
 	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0)
 }
 
 // Test DeletePod only cleans cached volume_attach operation timestamp for the specific node/volume pair
@@ -1294,30 +1294,20 @@ func Test_DeletePod_ShouldOnlyCleanAttachOperationStartTimeCacheForTheSpecificNo
 	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume1Name, string(volume1Name))
 	verifyVolumeToAttach(t, volumesToAttach, node1Name, generatedVolume2Name, string(volume2Name))
 	testCache, _ := fakeOpCache.(*volumetesting.FakeOperationStartTimeCache)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0, 0)
-	verifyOperationTimestampCache(t, testCache, node1Vol2Key, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol2Key, plugin, "volume_attach", 1, 0)
 	// delete a pod should NOT clean the cached to attach operation timestamp
 	dsw.DeletePod(types.UniquePodName(pod1Name), generatedVolume1Name, node1Name)
-	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 1, 0)
-	verifyOperationTimestampCache(t, testCache, node1Vol2Key, plugin, "volume_attach", 1, 0, 0)
+	verifyOperationTimestampCache(t, testCache, node1Vol1Key, plugin, "volume_attach", 1, 1)
+	verifyOperationTimestampCache(t, testCache, node1Vol2Key, plugin, "volume_attach", 1, 0)
 }
 
 func verifyOperationTimestampCache(
-	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, plugin, operation string, countAdd, countDelete, countUpdate int) {
-	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
-	if p != plugin || op != operation || countAdd > cAdd || countDelete != cDelete || countUpdate != cUpdate {
-		t.Errorf("OperationStartTimeCache for key <%s>, Expected, plugin = %s, operation = %s, countAdd >= %v, countDelete = %v, countUpdate = %v, Actual: %s, %s, %v, %v, %v",
-			key, plugin, operation, countAdd, countDelete, countUpdate,
-			p, op, cAdd, cDelete, cUpdate)
-	}
-}
-
-func verifyNoOperationTimestamp(
-	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, operation string) {
-	p, op, cAdd, cDelete, cUpdate := fakeC.LoadAll(key, operation)
-	if p != "" || op != "" || cAdd != 0 || cDelete != 0 || cUpdate != 0 {
-		t.Errorf("OperationStartTimeCache should be empty: volume<%s>, operation<%s>, Got: %s %s %v %v %v",
-			key, operation, p, op, cAdd, cDelete, cUpdate)
+	t *testing.T, fakeC *volumetesting.FakeOperationStartTimeCache, key, plugin, operation string, countAdd, countDelete int) {
+	p, op, cAdd, cDelete := fakeC.LoadAll(key, operation)
+	if p != plugin || op != operation || countAdd > cAdd || countDelete != cDelete {
+		t.Errorf("OperationStartTimeCache for key <%s>, Expected, plugin = %s, operation = %s, countAdd >= %v, countDelete = %v, Actual: %s, %s, %v, %v",
+			key, plugin, operation, countAdd, countDelete, p, op, cAdd, cDelete)
 	}
 }
 

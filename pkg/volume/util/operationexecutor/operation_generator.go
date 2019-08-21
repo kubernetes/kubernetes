@@ -390,6 +390,10 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		}
 		klog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
 
+		// the volume has been attached, BEFORE the actualStateOfWorld has been updated,
+		// record end of end latency and clean up cache
+		util.RecordMetric(CreateAttachDetachOperationUniqueKey(volumeToAttach.VolumeName, volumeToAttach.NodeName), operationStartTimeCache, nil)
+
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
 			v1.UniqueVolumeName(""), originalSpec, volumeToAttach.NodeName, devicePath)
@@ -397,10 +401,6 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			// On failure, return error. Caller will log and retry.
 			return volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 		}
-
-		// the volume has been attached, and actualStateOfWorld has been updated,
-		// record end of end latency and clean up cache
-		util.RecordMetric(createOperationUniqueKey(volumeToAttach.VolumeName, volumeToAttach.NodeName), operationStartTimeCache, nil)
 
 		return nil, nil
 	}
@@ -449,9 +449,14 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		attachableVolumePluginName = attachableVolumePlugin.GetPluginName()
 	}
 
-	// update operation start time cache with fully qualified plugin name for the corresponding volumeToAttach
+	// insert a attach operation start time into cache if needed for the volume for metrics reporting
+	// NOTE: the metric does NOT include the wait time of potential "detach" operation
+	//       Including the "detach" time might introduce challenges to define SLO or to set alerts based on it.
+	//       Whether the "detach" operation will happen depends on the current status of the volume
+	//       (currently attached to any none-desired node or not)
+	//       and "detach" can be a long operation.
 	fullPluginName := util.GetFullQualifiedPluginNameForVolume(attachableVolumePluginName, volumeToAttach.VolumeSpec)
-	operationStartTimeCache.UpdatePluginName(createOperationUniqueKey(volumeToAttach.VolumeName, volumeToAttach.NodeName), fullPluginName)
+	operationStartTimeCache.AddIfNotExist(CreateAttachDetachOperationUniqueKey(volumeToAttach.VolumeName, volumeToAttach.NodeName), fullPluginName, "volume_attach")
 
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_attach",
@@ -573,14 +578,14 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 		// the volume has been detached, and actualStateOfWorld has been updated,
 		// record end of end latency and clean up cache
-		util.RecordMetric(createOperationUniqueKey(volumeToDetach.VolumeName, volumeToDetach.NodeName), operationStartTimeCache, nil)
+		util.RecordMetric(CreateAttachDetachOperationUniqueKey(volumeToDetach.VolumeName, volumeToDetach.NodeName), operationStartTimeCache, nil)
 
 		return nil, nil
 	}
 
-	// update operation start time cache with fully qualified plugin name for the corresponding volumeToDetach
+	// insert a detach operation start time into cache for the volume for metrics reporting
 	fullPluginName := util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec)
-	operationStartTimeCache.UpdatePluginName(createOperationUniqueKey(volumeToDetach.VolumeName, volumeToDetach.NodeName), fullPluginName)
+	operationStartTimeCache.AddIfNotExist(CreateAttachDetachOperationUniqueKey(volumeToDetach.VolumeName, volumeToDetach.NodeName), fullPluginName, "volume_detach")
 
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_detach",
@@ -1940,6 +1945,8 @@ func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
 	}, nil
 }
 
-func createOperationUniqueKey(volumeName v1.UniqueVolumeName, nodeName types.NodeName) string {
+// CreateAttachDetachOperationUniqueKey creates a unique string key for attach/detach operation to store
+// or retrieve attach detach operation start timestamp from cache
+func CreateAttachDetachOperationUniqueKey(volumeName v1.UniqueVolumeName, nodeName types.NodeName) string {
 	return string(nodeName) + "/" + string(volumeName)
 }

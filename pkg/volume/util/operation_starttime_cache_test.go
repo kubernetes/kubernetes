@@ -116,31 +116,3 @@ func TestOperationStartTimeCacheDelete(t *testing.T) {
 		t.Errorf("c.Has('%s') = %t; got TRUE, want FALSE", cKey, existed)
 	}
 }
-
-func TestOperationStartTimeCacheUpdatePluginName(t *testing.T) {
-	cKey := "unique-identifier"
-	op := "some-volume-operation"
-	p := "kubernetes.io/volume-plugin-name"
-	np := "kubernetes.io/new-volume-plugin-name"
-	c := NewOperationStartTimeCache()
-	// add an entry
-	c.AddIfNotExist(cKey, p, op)
-	// load entry to check original values
-	oldPlugin, operation, startTime, ok := c.Load(cKey)
-	if !ok || oldPlugin != p || operation != op {
-		t.Errorf("c.Load('%s') = %s, %s, %s, %t; expected: %s, %s, %s, true",
-			cKey, oldPlugin, operation, startTime.String(), ok,
-			p, op, startTime.String())
-	}
-	// update
-	ok = c.UpdatePluginName(cKey, np)
-	if !ok {
-		t.Errorf("c.UpdatePluginName(%s, %s) = %v; expected: true", cKey, np, ok)
-	}
-	newPlugin, operation, newStartTime, ok := c.Load(cKey)
-	if !ok || newPlugin != np || operation != op || newStartTime != startTime {
-		t.Errorf("c.Load('%s') = %s, %s, %s, %t; expected: %s, %s, %s, true",
-			cKey, newPlugin, operation, startTime.String(), ok,
-			np, op, startTime.String())
-	}
-}

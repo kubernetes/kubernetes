@@ -66,7 +66,7 @@ var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
 var volumeOperationErrorsMetric = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "volume_operation_total_errors",
-		Help: "Total volume operation erros",
+		Help: "Total volume operation errors",
 	},
 	[]string{"plugin_name", "operation_name"})
 
