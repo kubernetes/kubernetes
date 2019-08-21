@@ -23,8 +23,9 @@ import (
 	"net"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -270,4 +271,18 @@ func AppendPortIfNeeded(addr string, port int32) string {
 		return fmt.Sprintf("%s:%d", addr, port)
 	}
 	return fmt.Sprintf("[%s]:%d", addr, port)
+}
+
+// ShuffleStrings copies strings from the specified slice into a copy in random
+// order. It returns a new slice.
+func ShuffleStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	shuffled := make([]string, len(s))
+	perm := utilrand.Perm(len(s))
+	for i, j := range perm {
+		shuffled[j] = s[i]
+	}
+	return shuffled
 }
