@@ -614,11 +614,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if val == nil {
 			continue
 		}
-		structuralSchemas[v.Name], err = structuralschema.NewStructural(val.OpenAPIV3Schema)
+		s, err := structuralschema.NewStructural(val.OpenAPIV3Schema)
 		if *crd.Spec.PreserveUnknownFields == false && err != nil {
-			utilruntime.HandleError(err)
+			// This should never happen. If it does, it is a programming error.
+			utilruntime.HandleError(fmt.Errorf("failed to convert schema to structural: %v", err))
 			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
 		}
+		if err := structuraldefaulting.PruneDefaults(s); err != nil {
+			// This should never happen. If it does, it is a programming error.
+			utilruntime.HandleError(fmt.Errorf("failed to prune defaults: %v", err))
+			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
+		}
+		structuralSchemas[v.Name] = s
 	}
 
 	for _, v := range crd.Spec.Versions {
