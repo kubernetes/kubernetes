@@ -17,16 +17,15 @@ limitations under the License.
 package ipvs
 
 import (
-	"net"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
+	utilnet "k8s.io/utils/net"
 )
 
 type MetaProxier struct {
-	ipv4Proxier   proxy.ProxyProvider
-	ipv6Proxier   proxy.ProxyProvider
+	ipv4Proxier proxy.ProxyProvider
+	ipv6Proxier proxy.ProxyProvider
 }
 
 type ipFamily int
@@ -42,8 +41,8 @@ const (
 // on address family.
 func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.ProxyProvider) *MetaProxier {
 	return &MetaProxier{
-		ipv4Proxier:   ipv4Proxier,
-		ipv6Proxier:   ipv6Proxier,
+		ipv4Proxier: ipv4Proxier,
+		ipv6Proxier: ipv6Proxier,
 	}
 }
 
@@ -109,7 +108,7 @@ func (proxier *MetaProxier) serviceFamily(service *v1.Service) ipFamily {
 	if service.Spec.ClusterIP == "" {
 		return familyUnknown
 	}
-	if net.ParseIP(service.Spec.ClusterIP).To4() == nil {
+	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
 		return familyIpv6
 	}
 	return familyIpv4
@@ -183,7 +182,7 @@ func endpointsAddressesFamily(addresses []v1.EndpointAddress) ipFamily {
 	}
 	for _, adr := range addresses {
 		if adr.IP != "" {
-			if net.ParseIP(adr.IP).To4() == nil {
+			if utilnet.IsIPv6String(adr.IP) {
 				return familyIpv6
 			} else {
 				return familyIpv4
