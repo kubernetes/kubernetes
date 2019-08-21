@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"k8s.io/klog"
@@ -100,13 +99,10 @@ func absoluteKubeletRunDirectory() (string, error) {
 		klog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
 		return "", err
 	}
-
-	// Only unmount mount points which start with "/var/lib/kubelet" or absolute path of symbolic link, and avoid using empty absoluteKubeletRunDirectory
-	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", absoluteKubeletRunDirectory)
-	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
-	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
+	err = unmountKubeletDirectory(absoluteKubeletRunDirectory)
 	if err != nil {
-		klog.Warningf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		klog.Warningf("[reset] Failed to unmount mounted directories in %s \n", kubeadmconstants.KubeletRunDirectory)
+		return "", err
 	}
 	return absoluteKubeletRunDirectory, nil
 }
