@@ -321,6 +321,8 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	})
 
 	ginkgo.It("should not mount / map unused volumes in a pod", func() {
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		framework.SkipUnlessSSHKeyPresent()
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			skipBlockTest(driver)
 		}
