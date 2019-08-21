@@ -67,6 +67,14 @@ func (ef *errorFormatter) descend(pe fieldpath.PathElement) {
 	ef.path = append(ef.path, pe)
 }
 
+// parent returns the parent, for the purpose of buffer reuse. It's an error to
+// call this if there is no parent.
+func (ef *errorFormatter) parent() errorFormatter {
+	return errorFormatter{
+		path: ef.path[:len(ef.path)-1],
+	}
+}
+
 func (ef errorFormatter) errorf(format string, args ...interface{}) ValidationErrors {
 	return ValidationErrors{{
 		Path:         append(fieldpath.Path{}, ef.path...),
