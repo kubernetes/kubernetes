@@ -568,10 +568,11 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 		{
 			name:     "CoreDNSDeployment",
 			manifest: CoreDNSDeployment,
-			data: struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
+			data: struct{ DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string }{
 				DeploymentName:       "foo",
 				Image:                "foo",
 				ControlPlaneTaintKey: "foo",
+				CoreDNSConfigMapName: "foo",
 			},
 		},
 	}
@@ -587,4 +588,151 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateCoreDNSConfigMap(t *testing.T) {
+	tests := []struct {
+		name                 string
+		initialCorefileData  string
+		expectedCorefileData string
+		coreDNSVersion       string
+	}{
+		{
+			name: "Remove Deprecated options",
+			initialCorefileData: `.:53 {
+        errors
+        health
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+    }`,
+			expectedCorefileData: `.:53 {
+    errors
+    health
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+        pods insecure
+        fallthrough in-addr.arpa ip6.arpa
+        ttl 30
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf
+    cache 30
+    loop
+    reload
+    loadbalance
+    ready
+}
+`,
+			coreDNSVersion: "1.3.1",
+		},
+		{
+			name: "Update proxy plugin to forward plugin",
+			initialCorefileData: `.:53 {
+        errors
+        health
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        proxy . /etc/resolv.conf
+        k8s_external example.com
+        cache 30
+        loop
+        reload
+        loadbalance
+    }`,
+			expectedCorefileData: `.:53 {
+    errors
+    health
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+        pods insecure
+        fallthrough in-addr.arpa ip6.arpa
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf
+    k8s_external example.com
+    cache 30
+    loop
+    reload
+    loadbalance
+    ready
+}
+`,
+			coreDNSVersion: "1.3.1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := createClientAndCoreDNSManifest(t, tc.initialCorefileData, tc.coreDNSVersion)
+			// Get the Corefile and installed CoreDNS version.
+			cm, corefile, currentInstalledCoreDNSVersion, err := GetCoreDNSInfo(client)
+			if err != nil {
+				t.Fatalf("unable to fetch CoreDNS current installed version and ConfigMap.")
+			}
+			err = migrateCoreDNSCorefile(client, cm, corefile, currentInstalledCoreDNSVersion)
+			if err != nil {
+				t.Fatalf("error creating the CoreDNS ConfigMap: %v", err)
+			}
+			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
+			if !strings.EqualFold(migratedConfigMap.Data["Corefile"], tc.expectedCorefileData) {
+				t.Fatalf("expected to get %v, but got %v", tc.expectedCorefileData, migratedConfigMap.Data["Corefile"])
+			}
+		})
+	}
+}
+
+func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion string) *clientsetfake.Clientset {
+	client := clientsetfake.NewSimpleClientset()
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.CoreDNSConfigMap,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			"Corefile": corefile,
+		},
+	})
+	if err != nil {
+		t.Fatalf("error creating ConfigMap: %v", err)
+	}
+	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(&apps.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.CoreDNSConfigMap,
+			Namespace: metav1.NamespaceSystem,
+			Labels: map[string]string{
+				"k8s-app": "kube-dns",
+			},
+		},
+		Spec: apps.DeploymentSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Image: "test:" + coreDNSVersion,
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("error creating deployment: %v", err)
+	}
+	return client
 }

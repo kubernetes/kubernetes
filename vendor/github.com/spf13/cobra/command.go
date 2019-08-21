@@ -177,8 +177,6 @@ type Command struct {
 	// that we can use on every pflag set and children commands
 	globNormFunc func(f *flag.FlagSet, name string) flag.NormalizedName
 
-	// output is an output writer defined by user.
-	output io.Writer
 	// usageFunc is usage func defined by user.
 	usageFunc func(*Command) error
 	// usageTemplate is usage template defined by user.
@@ -195,6 +193,13 @@ type Command struct {
 	helpCommand *Command
 	// versionTemplate is the version template defined by user.
 	versionTemplate string
+
+	// inReader is a reader defined by the user that replaces stdin
+	inReader io.Reader
+	// outWriter is a writer defined by the user that replaces stdout
+	outWriter io.Writer
+	// errWriter is a writer defined by the user that replaces stderr
+	errWriter io.Writer
 }
 
 // SetArgs sets arguments for the command. It is set to os.Args[1:] by default, if desired, can be overridden
@@ -205,8 +210,28 @@ func (c *Command) SetArgs(a []string) {
 
 // SetOutput sets the destination for usage and error messages.
 // If output is nil, os.Stderr is used.
+// Deprecated: Use SetOut and/or SetErr instead
 func (c *Command) SetOutput(output io.Writer) {
-	c.output = output
+	c.outWriter = output
+	c.errWriter = output
+}
+
+// SetOut sets the destination for usage messages.
+// If newOut is nil, os.Stdout is used.
+func (c *Command) SetOut(newOut io.Writer) {
+	c.outWriter = newOut
+}
+
+// SetErr sets the destination for error messages.
+// If newErr is nil, os.Stderr is used.
+func (c *Command) SetErr(newErr io.Writer) {
+	c.errWriter = newErr
+}
+
+// SetOut sets the source for input data
+// If newIn is nil, os.Stdin is used.
+func (c *Command) SetIn(newIn io.Reader) {
+	c.inReader = newIn
 }
 
 // SetUsageFunc sets usage function. Usage can be defined by application.
@@ -267,12 +292,42 @@ func (c *Command) OutOrStderr() io.Writer {
 	return c.getOut(os.Stderr)
 }
 
+// ErrOrStderr returns output to stderr
+func (c *Command) ErrOrStderr() io.Writer {
+	return c.getErr(os.Stderr)
+}
+
+// ErrOrStderr returns output to stderr
+func (c *Command) InOrStdin() io.Reader {
+	return c.getIn(os.Stdin)
+}
+
 func (c *Command) getOut(def io.Writer) io.Writer {
-	if c.output != nil {
-		return c.output
+	if c.outWriter != nil {
+		return c.outWriter
 	}
 	if c.HasParent() {
 		return c.parent.getOut(def)
+	}
+	return def
+}
+
+func (c *Command) getErr(def io.Writer) io.Writer {
+	if c.errWriter != nil {
+		return c.errWriter
+	}
+	if c.HasParent() {
+		return c.parent.getErr(def)
+	}
+	return def
+}
+
+func (c *Command) getIn(def io.Reader) io.Reader {
+	if c.inReader != nil {
+		return c.inReader
+	}
+	if c.HasParent() {
+		return c.parent.getIn(def)
 	}
 	return def
 }
@@ -329,13 +384,22 @@ func (c *Command) Help() error {
 	return nil
 }
 
-// UsageString return usage string.
+// UsageString returns usage string.
 func (c *Command) UsageString() string {
-	tmpOutput := c.output
+	// Storing normal writers
+	tmpOutput := c.outWriter
+	tmpErr := c.errWriter
+
 	bb := new(bytes.Buffer)
-	c.SetOutput(bb)
+	c.outWriter = bb
+	c.errWriter = bb
+
 	c.Usage()
-	c.output = tmpOutput
+
+	// Setting things back to normal
+	c.outWriter = tmpOutput
+	c.errWriter = tmpErr
+
 	return bb.String()
 }
 
@@ -1065,6 +1129,21 @@ func (c *Command) Println(i ...interface{}) {
 
 // Printf is a convenience method to Printf to the defined output, fallback to Stderr if not set.
 func (c *Command) Printf(format string, i ...interface{}) {
+	c.Print(fmt.Sprintf(format, i...))
+}
+
+// PrintErr is a convenience method to Print to the defined Err output, fallback to Stderr if not set.
+func (c *Command) PrintErr(i ...interface{}) {
+	fmt.Fprint(c.ErrOrStderr(), i...)
+}
+
+// PrintErrln is a convenience method to Println to the defined Err output, fallback to Stderr if not set.
+func (c *Command) PrintErrln(i ...interface{}) {
+	c.Print(fmt.Sprintln(i...))
+}
+
+// PrintErrf is a convenience method to Printf to the defined Err output, fallback to Stderr if not set.
+func (c *Command) PrintErrf(format string, i ...interface{}) {
 	c.Print(fmt.Sprintf(format, i...))
 }
 

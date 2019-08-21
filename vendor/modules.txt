@@ -139,7 +139,7 @@ github.com/bazelbuild/buildtools/wspace
 github.com/beorn7/perks/quantile
 # github.com/blang/semver v3.5.0+incompatible => github.com/blang/semver v3.5.0+incompatible
 github.com/blang/semver
-# github.com/caddyserver/caddy v1.0.1 => github.com/caddyserver/caddy v1.0.1
+# github.com/caddyserver/caddy v1.0.3 => github.com/caddyserver/caddy v1.0.3
 github.com/caddyserver/caddy/caddyfile
 # github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c => github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 github.com/cespare/prettybench
@@ -190,6 +190,9 @@ github.com/containernetworking/cni/pkg/types
 github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/version
+# github.com/coredns/corefile-migration v1.0.2 => github.com/coredns/corefile-migration v1.0.2
+github.com/coredns/corefile-migration/migration
+github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/bbolt v1.3.1-coreos.6 => github.com/coreos/bbolt v1.3.1-coreos.6
 github.com/coreos/bbolt
 # github.com/coreos/etcd v3.3.13+incompatible => github.com/coreos/etcd v3.3.13+incompatible
@@ -743,7 +746,7 @@ github.com/spf13/afero
 github.com/spf13/afero/mem
 # github.com/spf13/cast v1.3.0 => github.com/spf13/cast v1.3.0
 github.com/spf13/cast
-# github.com/spf13/cobra v0.0.4 => github.com/spf13/cobra v0.0.4
+# github.com/spf13/cobra v0.0.5 => github.com/spf13/cobra v0.0.5
 github.com/spf13/cobra
 github.com/spf13/cobra/doc
 # github.com/spf13/jwalterweatherman v1.1.0 => github.com/spf13/jwalterweatherman v1.1.0
