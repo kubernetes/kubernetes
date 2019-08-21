@@ -37,7 +37,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"text/tabwriter"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -120,9 +119,6 @@ const (
 	// failures caused by leaked resources from a previous test run.
 	NamespaceCleanupTimeout = 15 * time.Minute
 
-	// Some pods can take much longer to get ready due to volume attach/detach latency.
-	slowPodStartTimeout = 15 * time.Minute
-
 	// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
 	ServiceStartTimeout = 3 * time.Minute
 
@@ -149,10 +145,6 @@ const (
 	// PodReadyBeforeTimeout is how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
-	// How long pods have to become scheduled onto nodes
-	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
-
-	podRespondingTimeout = 15 * time.Minute
 	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
 	ClaimProvisionTimeout = 5 * time.Minute
 
@@ -213,13 +205,6 @@ var (
 
 	// For parsing Kubectl version for version-skewed testing.
 	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
-
-	// Slice of regexps for names of pods that have to be running to consider a Node "healthy"
-	requiredPerNodePods = []*regexp.Regexp{
-		regexp.MustCompile(".*kube-proxy.*"),
-		regexp.MustCompile(".*fluentd-elasticsearch.*"),
-		regexp.MustCompile(".*node-problem-detector.*"),
-	}
 
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -438,7 +423,7 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
-		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
+		if strings.EqualFold(provider, TestContext.Provider) {
 			return true
 		}
 	}
@@ -448,7 +433,7 @@ func ProviderIs(providers ...string) bool {
 // MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
 func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
-		if strings.ToLower(distro) == strings.ToLower(TestContext.MasterOSDistro) {
+		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
 			return true
 		}
 	}
@@ -458,7 +443,7 @@ func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 // NodeOSDistroIs returns true if the node OS distro is included in the supportedNodeOsDistros. Otherwise false.
 func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	for _, distro := range supportedNodeOsDistros {
-		if strings.ToLower(distro) == strings.ToLower(TestContext.NodeOSDistro) {
+		if strings.EqualFold(distro, TestContext.NodeOSDistro) {
 			return true
 		}
 	}
@@ -521,32 +506,6 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 
 // ProvidersWithSSH are those providers where each node is accessible with SSH
 var ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
-
-type podCondition func(pod *v1.Pod) (bool, error)
-
-// errorBadPodsStates create error message of basic info of bad pods for debugging.
-func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState string, timeout time.Duration) string {
-	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
-	// Print bad pods info only if there are fewer than 10 bad pods
-	if len(badPods) > 10 {
-		return errStr + "There are too many bad pods. Please check log for details."
-	}
-
-	buf := bytes.NewBuffer(nil)
-	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "POD\tNODE\tPHASE\tGRACE\tCONDITIONS")
-	for _, badPod := range badPods {
-		grace := ""
-		if badPod.DeletionGracePeriodSeconds != nil {
-			grace = fmt.Sprintf("%ds", *badPod.DeletionGracePeriodSeconds)
-		}
-		podInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%+v",
-			badPod.ObjectMeta.Name, badPod.Spec.NodeName, badPod.Status.Phase, grace, badPod.Status.Conditions)
-		fmt.Fprintln(w, podInfo)
-	}
-	w.Flush()
-	return errStr + buf.String()
-}
 
 // WaitForDaemonSets for all daemonsets in the given namespace to be ready
 // (defined as all but 'allowedNotReadyNodes' pods associated with that
@@ -1557,12 +1516,12 @@ func (b KubectlBuilder) ExecOrDie() string {
 
 func isTimeout(err error) bool {
 	switch err := err.(type) {
-	case net.Error:
-		if err.Timeout() {
-			return true
-		}
 	case *url.Error:
 		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
+			return true
+		}
+	case net.Error:
+		if err.Timeout() {
 			return true
 		}
 	}
@@ -2472,6 +2431,9 @@ func RestartKubelet(host string) error {
 			sudoPresent = true
 		}
 		sshResult, err = e2essh.SSH("systemctl --version", host, TestContext.Provider)
+		if err != nil {
+			return fmt.Errorf("Failed to execute command 'systemctl' on host %s with error %v", host, err)
+		}
 		if !strings.Contains(sshResult.Stderr, "command not found") {
 			cmd = "systemctl restart kubelet"
 		} else {

@@ -95,12 +95,6 @@ const (
 	// IngressReqTimeout is the timeout on a single http request.
 	IngressReqTimeout = 10 * time.Second
 
-	// healthz port used to verify glbc restarted correctly on the master.
-	glbcHealthzPort = 8086
-
-	// General cloud resource poll timeout (eg: create static ip, firewall etc)
-	cloudResourcePollTimeout = 5 * time.Minute
-
 	// NEGAnnotation is NEG annotation.
 	NEGAnnotation = "cloud.google.com/neg"
 

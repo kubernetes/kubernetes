@@ -621,18 +621,6 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	}
 }
 
-func (config *NetworkingTestConfig) cleanup() {
-	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(metav1.ListOptions{})
-	if err == nil {
-		for _, ns := range nsList.Items {
-			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {
-				nsClient.Delete(ns.Name, nil)
-			}
-		}
-	}
-}
-
 // shuffleNodes copies nodes from the specified slice into a copy in random
 // order. It returns a new slice.
 func shuffleNodes(nodes []v1.Node) []v1.Node {
@@ -711,10 +699,6 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 
 func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
 	return config.f.ClientSet.CoreV1().Services(config.Namespace)
-}
-
-func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
-	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
 // CheckReachabilityFromPod checks reachability from the specified pod.

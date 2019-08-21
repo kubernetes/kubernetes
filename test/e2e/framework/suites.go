@@ -31,10 +31,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-var (
-	cloudConfig = &TestContext.CloudConfig
-)
-
 // SetupSuite is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
 // There are certain operations we only want to run once per overall test invocation
 // (such as deleting old namespaces, or verifying that all system pods are running.
