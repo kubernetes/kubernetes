@@ -17,15 +17,11 @@ limitations under the License.
 package drain
 
 import (
-	"errors"
-	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -38,14 +34,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -905,135 +897,6 @@ func TestDrain(t *testing.T) {
 			})
 		}
 	}
-}
-
-func TestDeletePods(t *testing.T) {
-	ifHasBeenCalled := map[string]bool{}
-	tests := []struct {
-		description       string
-		interval          time.Duration
-		timeout           time.Duration
-		expectPendingPods bool
-		expectError       bool
-		expectedError     *error
-		getPodFn          func(namespace, name string) (*corev1.Pod, error)
-	}{
-		{
-			description:       "Wait for deleting to complete",
-			interval:          100 * time.Millisecond,
-			timeout:           10 * time.Second,
-			expectPendingPods: false,
-			expectError:       false,
-			expectedError:     nil,
-			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
-				oldPodMap, _ := createPods(false)
-				newPodMap, _ := createPods(true)
-				if oldPod, found := oldPodMap[name]; found {
-					if _, ok := ifHasBeenCalled[name]; !ok {
-						ifHasBeenCalled[name] = true
-						return &oldPod, nil
-					}
-					if oldPod.ObjectMeta.Generation < 4 {
-						newPod := newPodMap[name]
-						return &newPod, nil
-					}
-					return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
-
-				}
-				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
-			},
-		},
-		{
-			description:       "Deleting could timeout",
-			interval:          200 * time.Millisecond,
-			timeout:           3 * time.Second,
-			expectPendingPods: true,
-			expectError:       true,
-			expectedError:     &wait.ErrWaitTimeout,
-			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
-				oldPodMap, _ := createPods(false)
-				if oldPod, found := oldPodMap[name]; found {
-					return &oldPod, nil
-				}
-				return nil, fmt.Errorf("%q: not found", name)
-			},
-		},
-		{
-			description:       "Client error could be passed out",
-			interval:          200 * time.Millisecond,
-			timeout:           5 * time.Second,
-			expectPendingPods: true,
-			expectError:       true,
-			expectedError:     nil,
-			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
-				return nil, errors.New("This is a random error for testing")
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.description, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
-			defer tf.Cleanup()
-
-			o := DrainCmdOptions{
-				PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
-			}
-			o.Out = os.Stdout
-
-			o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
-				return func(obj runtime.Object, out io.Writer) error {
-					return nil
-				}, nil
-			}
-
-			_, pods := createPods(false)
-			pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)
-
-			if test.expectError {
-				if err == nil {
-					t.Fatalf("%s: unexpected non-error", test.description)
-				} else if test.expectedError != nil {
-					if *test.expectedError != err {
-						t.Fatalf("%s: the error does not match expected error", test.description)
-					}
-				}
-			}
-			if !test.expectError && err != nil {
-				t.Fatalf("%s: unexpected error", test.description)
-			}
-			if test.expectPendingPods && len(pendingPods) == 0 {
-				t.Fatalf("%s: unexpected empty pods", test.description)
-			}
-			if !test.expectPendingPods && len(pendingPods) > 0 {
-				t.Fatalf("%s: unexpected pending pods", test.description)
-			}
-		})
-	}
-}
-
-func createPods(ifCreateNewPods bool) (map[string]corev1.Pod, []corev1.Pod) {
-	podMap := make(map[string]corev1.Pod)
-	podSlice := []corev1.Pod{}
-	for i := 0; i < 8; i++ {
-		var uid types.UID
-		if ifCreateNewPods {
-			uid = types.UID(i)
-		} else {
-			uid = types.UID(strconv.Itoa(i) + strconv.Itoa(i))
-		}
-		pod := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       "pod" + strconv.Itoa(i),
-				Namespace:  "default",
-				UID:        uid,
-				Generation: int64(i),
-			},
-		}
-		podMap[pod.Name] = pod
-		podSlice = append(podSlice, pod)
-	}
-	return podMap, podSlice
 }
 
 type MyReq struct {

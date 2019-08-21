@@ -19,19 +19,14 @@ package drain
 import (
 	"errors"
 	"fmt"
-	"math"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -146,13 +141,33 @@ var (
 )
 
 func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
-	return &DrainCmdOptions{
+	o := &DrainCmdOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 		drainer: &drain.Helper{
 			GracePeriodSeconds: -1,
+			Out:                ioStreams.Out,
 			ErrOut:             ioStreams.ErrOut,
 		},
+	}
+	o.drainer.OnPodDeletedOrEvicted = o.onPodDeletedOrEvicted
+	return o
+}
+
+// onPodDeletedOrEvicted is called by drain.Helper, when the pod has been deleted or evicted
+func (o *DrainCmdOptions) onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
+	var verbStr string
+	if usingEviction {
+		verbStr = "evicted"
+	} else {
+		verbStr = "deleted"
+	}
+	printObj, err := o.ToPrinter(verbStr)
+	if err != nil {
+		fmt.Fprintf(o.ErrOut, "error building printer: %v\n", err)
+		fmt.Fprintf(o.Out, "pod %s/%s %s\n", pod.Namespace, pod.Name, verbStr)
+	} else {
+		printObj(pod, o.Out)
 	}
 }
 
@@ -313,7 +328,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
 	}
 
-	if err := o.deleteOrEvictPods(list.Pods()); err != nil {
+	if err := o.drainer.DeleteOrEvictPods(list.Pods()); err != nil {
 		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
 
 		fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
@@ -326,136 +341,6 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 		return err
 	}
 	return nil
-}
-
-// deleteOrEvictPods deletes or evicts the pods on the api server
-func (o *DrainCmdOptions) deleteOrEvictPods(pods []corev1.Pod) error {
-	if len(pods) == 0 {
-		return nil
-	}
-
-	policyGroupVersion, err := drain.CheckEvictionSupport(o.drainer.Client)
-	if err != nil {
-		return err
-	}
-
-	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.drainer.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
-	}
-
-	if len(policyGroupVersion) > 0 {
-		return o.evictPods(pods, policyGroupVersion, getPodFn)
-	} else {
-		return o.deletePods(pods, getPodFn)
-	}
-}
-
-func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
-	returnCh := make(chan error, 1)
-
-	for _, pod := range pods {
-		go func(pod corev1.Pod, returnCh chan error) {
-			for {
-				fmt.Fprintf(o.Out, "evicting pod %q\n", pod.Name)
-				err := o.drainer.EvictPod(pod, policyGroupVersion)
-				if err == nil {
-					break
-				} else if apierrors.IsNotFound(err) {
-					returnCh <- nil
-					return
-				} else if apierrors.IsTooManyRequests(err) {
-					fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
-					time.Sleep(5 * time.Second)
-				} else {
-					returnCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
-					return
-				}
-			}
-			_, err := o.waitForDelete([]corev1.Pod{pod}, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn)
-			if err == nil {
-				returnCh <- nil
-			} else {
-				returnCh <- fmt.Errorf("error when waiting for pod %q terminating: %v", pod.Name, err)
-			}
-		}(pod, returnCh)
-	}
-
-	doneCount := 0
-	var errors []error
-
-	// 0 timeout means infinite, we use MaxInt64 to represent it.
-	var globalTimeout time.Duration
-	if o.drainer.Timeout == 0 {
-		globalTimeout = time.Duration(math.MaxInt64)
-	} else {
-		globalTimeout = o.drainer.Timeout
-	}
-	globalTimeoutCh := time.After(globalTimeout)
-	numPods := len(pods)
-	for doneCount < numPods {
-		select {
-		case err := <-returnCh:
-			doneCount++
-			if err != nil {
-				errors = append(errors, err)
-			}
-		case <-globalTimeoutCh:
-			return fmt.Errorf("drain did not complete within %v", globalTimeout)
-		}
-	}
-	return utilerrors.NewAggregate(errors)
-}
-
-func (o *DrainCmdOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
-	// 0 timeout means infinite, we use MaxInt64 to represent it.
-	var globalTimeout time.Duration
-	if o.drainer.Timeout == 0 {
-		globalTimeout = time.Duration(math.MaxInt64)
-	} else {
-		globalTimeout = o.drainer.Timeout
-	}
-	for _, pod := range pods {
-		err := o.drainer.DeletePod(pod)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	}
-	_, err := o.waitForDelete(pods, 1*time.Second, globalTimeout, false, getPodFn)
-	return err
-}
-
-func (o *DrainCmdOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error)) ([]corev1.Pod, error) {
-	var verbStr string
-	if usingEviction {
-		verbStr = "evicted"
-	} else {
-		verbStr = "deleted"
-	}
-	printObj, err := o.ToPrinter(verbStr)
-	if err != nil {
-		return pods, err
-	}
-
-	err = wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pendingPods := []corev1.Pod{}
-		for i, pod := range pods {
-			p, err := getPodFn(pod.Namespace, pod.Name)
-			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				printObj(&pod, o.Out)
-				continue
-			} else if err != nil {
-				return false, err
-			} else {
-				pendingPods = append(pendingPods, pods[i])
-			}
-		}
-		pods = pendingPods
-		if len(pendingPods) > 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-	return pods, err
 }
 
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
