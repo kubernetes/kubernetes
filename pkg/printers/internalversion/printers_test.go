@@ -1122,12 +1122,12 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.NewBuffer([]byte{})
-	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.PrintOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	verifyTable(t, table)
-	printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+	printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true, ColumnLabels: []string{"app_name"}})
 	if err := printer.PrintObj(table, buff); err != nil {
 		t.Fatal(err)
 	}
@@ -1449,7 +1449,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	generator := printers.NewTableGenerator().With(AddHandlers)
 	printer := printers.NewTablePrinter(options)
 	for i, test := range table {
-		table, err := generator.GenerateTable(test.obj, options)
+		table, err := generator.GenerateTable(test.obj, printers.PrintOptions{})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for object: %#v", err)
 		}
@@ -1940,9 +1940,10 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 
 func TestPrintPodWithLabels(t *testing.T) {
 	tests := []struct {
-		pod          api.Pod
-		labelColumns []string
-		expect       []metav1beta1.TableRow
+		pod                 api.Pod
+		labelColumns        []string
+		expectedLabelValues []string
+		labelsPrinted       bool
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1961,7 +1962,8 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{"col1", "COL2"},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "asd", "zxc"}}},
+			[]string{"asd", "zxc"},
+			true,
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1979,23 +1981,51 @@ func TestPrintPodWithLabels(t *testing.T) {
 					},
 				},
 			},
-			[]string{},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]string{"col1", "COL2"},
+			[]string{"asd", "zxc"},
+			false,
 		},
 	}
 
-	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{ColumnLabels: test.labelColumns})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		verifyTable(t, table)
-		rows := table.Rows
-		for i := range rows {
-			rows[i].Object.Object = nil
+		buf := bytes.NewBuffer([]byte{})
+		options := printers.PrintOptions{}
+		if test.labelsPrinted {
+			options = printers.PrintOptions{ColumnLabels: test.labelColumns}
 		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+		printer := printers.NewTablePrinter(options)
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Errorf("Error printing table: %v", err)
+		}
+
+		if test.labelsPrinted {
+			// Labels columns should be printed.
+			for _, columnName := range test.labelColumns {
+				if !strings.Contains(buf.String(), strings.ToUpper(columnName)) {
+					t.Errorf("Error printing table: expected column %s not printed", columnName)
+				}
+			}
+			for _, labelValue := range test.expectedLabelValues {
+				if !strings.Contains(buf.String(), labelValue) {
+					t.Errorf("Error printing table: expected column value %s not printed", labelValue)
+				}
+			}
+		} else {
+			// Lable columns should not be printed.
+			for _, columnName := range test.labelColumns {
+				if strings.Contains(buf.String(), strings.ToUpper(columnName)) {
+					t.Errorf("Error printing table: expected column %s not printed", columnName)
+				}
+			}
+			for _, labelValue := range test.expectedLabelValues {
+				if strings.Contains(buf.String(), labelValue) {
+					t.Errorf("Error printing table: expected column value %s not printed", labelValue)
+				}
+			}
 		}
 	}
 }
@@ -2868,9 +2898,9 @@ func TestPrintHPA(t *testing.T) {
 
 func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
-		pod        api.Pod
-		showLabels bool
-		expect     []metav1beta1.TableRow
+		pod          api.Pod
+		showLabels   bool
+		expectLabels []string
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2889,7 +2919,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			true,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "COL2=zxc,col1=asd"}}},
+			[]string{"col1=asd", "COL2=zxc"},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2908,22 +2938,38 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			false,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]string{},
 		},
 	}
 
-	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{ShowLabels: test.showLabels})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		verifyTable(t, table)
-		rows := table.Rows
-		for i := range rows {
-			rows[i].Object.Object = nil
+
+		buf := bytes.NewBuffer([]byte{})
+		printer := printers.NewTablePrinter(printers.PrintOptions{ShowLabels: test.showLabels})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Errorf("Error printing table: %v", err)
 		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+
+		if test.showLabels {
+			// LABELS column header should be present.
+			if !strings.Contains(buf.String(), "LABELS") {
+				t.Errorf("Error Printing Table: missing LABELS column heading: (%s)", buf.String())
+			}
+			// Validate that each of the expected labels is present.
+			for _, label := range test.expectLabels {
+				if !strings.Contains(buf.String(), label) {
+					t.Errorf("Error Printing Table: missing LABEL column value: (%s) from (%s)", label, buf.String())
+				}
+			}
+		} else {
+			// LABELS column header should not be present.
+			if strings.Contains(buf.String(), "LABELS") {
+				t.Errorf("Error Printing Table: unexpected LABEL column heading: (%s)", buf.String())
+			}
 		}
 	}
 }

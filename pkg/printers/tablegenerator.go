@@ -115,11 +115,6 @@ func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options Print
 			table.SelfLink = m.GetSelfLink()
 		}
 	}
-	// TODO(seans3): Remove the following decorateTable call. This should only be
-	// called in the table printer.
-	if err := decorateTable(table, options); err != nil {
-		return nil, err
-	}
 	return table, nil
 }
 
