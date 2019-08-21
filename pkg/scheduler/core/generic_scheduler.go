@@ -1107,7 +1107,7 @@ func selectVictimsOnNode(
 	removePod := func(rp *v1.Pod) {
 		nodeInfoCopy.RemovePod(rp)
 		if meta != nil {
-			meta.RemovePod(rp)
+			meta.RemovePod(rp, nodeInfoCopy.Node())
 		}
 	}
 	addPod := func(ap *v1.Pod) {

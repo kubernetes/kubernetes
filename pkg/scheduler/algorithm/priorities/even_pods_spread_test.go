@@ -17,7 +17,6 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -32,8 +31,8 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 		name                string
 		pod                 *v1.Pod
 		nodes               []*v1.Node
-		wantNodeNameMap     map[string]int64
-		wantTopologyPairMap map[topologyPair]*int64
+		wantNodeNameMap     map[string]int32
+		wantTopologyPairMap map[topologyPair]*int32
 	}{
 		{
 			name: "normal case",
@@ -46,17 +45,17 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int64{
+			wantNodeNameMap: map[string]int32{
 				"node-a": 0,
 				"node-b": 0,
 				"node-x": 0,
 			},
-			wantTopologyPairMap: map[topologyPair]*int64{
-				{key: "zone", value: "zone1"}:  new(int64),
-				{key: "zone", value: "zone2"}:  new(int64),
-				{key: "node", value: "node-a"}: new(int64),
-				{key: "node", value: "node-b"}: new(int64),
-				{key: "node", value: "node-x"}: new(int64),
+			wantTopologyPairMap: map[topologyPair]*int32{
+				{key: "zone", value: "zone1"}:  new(int32),
+				{key: "zone", value: "zone2"}:  new(int32),
+				{key: "node", value: "node-a"}: new(int32),
+				{key: "node", value: "node-b"}: new(int32),
+				{key: "node", value: "node-x"}: new(int32),
 			},
 		},
 		{
@@ -70,14 +69,14 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int64{
+			wantNodeNameMap: map[string]int32{
 				"node-a": 0,
 				"node-b": 0,
 			},
-			wantTopologyPairMap: map[topologyPair]*int64{
-				{key: "zone", value: "zone1"}:  new(int64),
-				{key: "node", value: "node-a"}: new(int64),
-				{key: "node", value: "node-b"}: new(int64),
+			wantTopologyPairMap: map[topologyPair]*int32{
+				{key: "zone", value: "zone1"}:  new(int32),
+				{key: "node", value: "node-a"}: new(int32),
+				{key: "node", value: "node-b"}: new(int32),
 			},
 		},
 	}
@@ -445,43 +444,6 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 	}
 }
 
-func makeNodesAndPods(pod *v1.Pod, existingPodsNum, allNodesNum, filteredNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node, filteredNodes []*v1.Node) {
-	var topologyKeys []string
-	var labels []string
-	// regions := 3
-	zones := 10
-	for _, c := range pod.Spec.TopologySpreadConstraints {
-		topologyKeys = append(topologyKeys, c.TopologyKey)
-		labels = append(labels, c.LabelSelector.MatchExpressions[0].Key)
-	}
-	// build nodes
-	for i := 0; i < allNodesNum; i++ {
-		nodeWrapper := st.MakeNode().Name(fmt.Sprintf("node%d", i))
-		for _, tpKey := range topologyKeys {
-			if tpKey == "zone" {
-				nodeWrapper = nodeWrapper.Label("zone", fmt.Sprintf("zone%d", i%zones))
-			} else if tpKey == "node" {
-				nodeWrapper = nodeWrapper.Label("node", fmt.Sprintf("node%d", i))
-			}
-		}
-		node := nodeWrapper.Obj()
-		allNodes = append(allNodes, node)
-		if len(filteredNodes) < filteredNodesNum {
-			filteredNodes = append(filteredNodes, node)
-		}
-	}
-	// build pods
-	for i := 0; i < existingPodsNum; i++ {
-		podWrapper := st.MakePod().Name(fmt.Sprintf("pod%d", i)).Node(fmt.Sprintf("node%d", i%allNodesNum))
-		// apply labels[0], labels[0,1], ..., labels[all] to each pod in turn
-		for _, label := range labels[:i%len(labels)+1] {
-			podWrapper = podWrapper.Label(label, "")
-		}
-		existingPods = append(existingPods, podWrapper.Obj())
-	}
-	return
-}
-
 func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 	tests := []struct {
 		name             string
@@ -521,7 +483,7 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			existingPods, allNodes, filteredNodes := makeNodesAndPods(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
+			existingPods, allNodes, filteredNodes := st.MakeNodesAndPods(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
