@@ -32,37 +32,37 @@ ephemeralContainers:
       name: "27"
       optional: false
   image: "19"
-  imagePullPolicy: /
   lifecycle:
     postStart:
       exec:
         command:
-        - "58"
-      httpGet:
-        host: "60"
-        httpHeaders:
-        - name: "61"
-          value: "62"
-        path: "59"
-        port: 1114837452
-      tcpSocket:
-        host: "63"
-        port: 672648281
-    preStop:
-      exec:
-        command:
-        - "64"
+        - "65"
       httpGet:
         host: "67"
         httpHeaders:
         - name: "68"
           value: "69"
-        path: "65"
-        port: "66"
-        scheme: 魋Ď儇击3ƆìQ喞艋涽
+        path: "66"
+        port: -1293912096
+        scheme: 託仭
       tcpSocket:
         host: "71"
         port: "70"
+    preStop:
+      exec:
+        command:
+        - "72"
+      httpGet:
+        host: "75"
+        httpHeaders:
+        - name: "76"
+          value: "77"
+        path: "73"
+        port: "74"
+        scheme: 鴜Ł%Ũ
+      tcpSocket:
+        host: "79"
+        port: "78"
   livenessProbe:
     exec:
       command:
@@ -118,28 +118,49 @@ ephemeralContainers:
     allowPrivilegeEscalation: true
     capabilities:
       add:
-      - -议}ȧ外ĺ稥氹Ç|¶
+      - 2Ō¾\ĒP鄸靇杧ž
       drop:
-      - ¡ Ɠ(嘒ėf倐ȓ圬剴扲ȿQZ
-    privileged: true
-    procMount: 1ZƜ/C龷
+      - 娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^
+    privileged: false
+    procMount: ĭÐl恕ɍȇ廄裭4懙
     readOnlyRootFilesystem: true
-    runAsGroup: -3031446704001093654
+    runAsGroup: -5441351197948631872
     runAsNonRoot: true
-    runAsUser: -2195720433245498980
+    runAsUser: 4491726672505793472
     seLinuxOptions:
-      level: "76"
-      role: "74"
-      type: "75"
-      user: "73"
+      level: "84"
+      role: "82"
+      type: "83"
+      user: "81"
     windowsOptions:
-      gmsaCredentialSpec: "78"
-      gmsaCredentialSpecName: "77"
-      runAsUserName: "79"
-  stdinOnce: true
-  targetContainerName: "80"
-  terminationMessagePath: "72"
-  terminationMessagePolicy: w-檮Ǣ冖ž琔n宂¬轚9Ȏ瀮
+      gmsaCredentialSpec: "86"
+      gmsaCredentialSpecName: "85"
+      runAsUserName: "87"
+  startupProbe:
+    exec:
+      command:
+      - "58"
+    failureThreshold: 13573196
+    httpGet:
+      host: "60"
+      httpHeaders:
+      - name: "61"
+        value: "62"
+      path: "59"
+      port: 180803110
+      scheme: ņ錕?øēƺ
+    initialDelaySeconds: -816398166
+    periodSeconds: -1583208879
+    successThreshold: 1088264954
+    tcpSocket:
+      host: "64"
+      port: "63"
+    timeoutSeconds: 1229400382
+  stdin: true
+  targetContainerName: "88"
+  terminationMessagePath: "80"
+  terminationMessagePolicy: Ņ£
+  tty: true
   volumeDevices:
   - devicePath: "43"
     name: "42"
