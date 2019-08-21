@@ -28,7 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
+	volevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -188,27 +190,47 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pv")
 
 				// Prebind pv
 				l.pvc.Spec.VolumeName = l.pv.Name
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pvc")
 
-				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
+				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc), "Failed to bind pv and pvc")
 
 				ginkgo.By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
-					nil, false, "", false, false, framework.SELinuxLabel,
-					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+				pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+				// Setting node
+				pod.Spec.NodeName = l.config.ClientNodeName
+				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+				framework.ExpectNoError(err, "Failed to create pod")
 				defer func() {
-					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod), "Failed to delete pod")
 				}()
-				framework.ExpectError(err)
+
+				eventSelector := fields.Set{
+					"involvedObject.kind":      "Pod",
+					"involvedObject.name":      pod.Name,
+					"involvedObject.namespace": l.ns.Name,
+					"reason":                   events.FailedMountVolume,
+				}.AsSelector().String()
+				msg := "Unable to attach or mount volumes"
+
+				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+				if err != nil {
+					e2elog.Logf("Warning: did not get event about FailedMountVolume")
+				}
+
+				// Check the pod is still not running
+				p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+				framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 			})
 		}
 
@@ -222,14 +244,30 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "Failed to create pvc")
 
-				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-				framework.ExpectError(err)
+				eventSelector := fields.Set{
+					"involvedObject.kind":      "PersistentVolumeClaim",
+					"involvedObject.name":      l.pvc.Name,
+					"involvedObject.namespace": l.ns.Name,
+					"reason":                   volevents.ProvisioningFailed,
+				}.AsSelector().String()
+				msg := "does not support block volume provisioning"
+
+				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
+				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+				if err != nil {
+					e2elog.Logf("Warning: did not get event about provisioing failed")
+				}
+
+				// Check the pvc is still pending
+				pvc, err := l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Get(l.pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to re-read the pvc after event (or timeout)")
+				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending, "PVC phase isn't pending")
 			})
 		}
 	default:
@@ -250,9 +288,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 		// Run the pod
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Failed to create pod")
 		defer func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+			framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod), "Failed to delete pod")
 		}()
 
 		ginkgo.By("Waiting for the pod to fail")
@@ -270,7 +308,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		} else {
 			msg = "has volumeMode Filesystem, but is specified in volumeDevices"
 		}
-		err = e2epod.WaitTimeoutForPodEvent(l.cs, pod.Name, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+		err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
 			e2elog.Logf("Warning: did not get event about mismatched volume use")
@@ -279,7 +317,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		// Check the pod is still not running
 		p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-		framework.ExpectEqual(p.Status.Phase, v1.PodPending)
+		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
 	ginkgo.It("should not mount / map unused volumes in a pod", func() {
