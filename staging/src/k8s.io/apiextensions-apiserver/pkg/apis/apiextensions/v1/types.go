@@ -295,6 +295,7 @@ type CustomResourceDefinitionCondition struct {
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
 type CustomResourceDefinitionStatus struct {
 	// Conditions indicate state for particular aspects of a CustomResourceDefinition
+	// +optional
 	Conditions []CustomResourceDefinitionCondition `json:"conditions" protobuf:"bytes,1,opt,name=conditions"`
 
 	// AcceptedNames are the names that are actually being used to serve discovery
