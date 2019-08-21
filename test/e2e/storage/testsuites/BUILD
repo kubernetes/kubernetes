@@ -20,6 +20,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/storage/testsuites",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/controller/volume/events:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
@@ -38,6 +39,7 @@ go_library(
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
+        "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
