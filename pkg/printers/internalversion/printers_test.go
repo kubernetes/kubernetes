@@ -305,7 +305,7 @@ func TestCustomTypePrinting(t *testing.T) {
 	generator.TableHandler(columns, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
-	table, err := generator.GenerateTable(&obj, printers.PrintOptions{})
+	table, err := generator.GenerateTable(&obj, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("An error occurred generating the table for custom type: %#v", err)
 	}
@@ -328,7 +328,7 @@ func TestPrintHandlerError(t *testing.T) {
 	generator := printers.NewTableGenerator()
 	generator.TableHandler(columns, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
-	_, err := generator.GenerateTable(&obj, printers.PrintOptions{})
+	_, err := generator.GenerateTable(&obj, printers.GenerateOptions{})
 	if err == nil || err.Error() != "ErrorPrintHandler error" {
 		t.Errorf("Did not get the expected error: %#v", err)
 	}
@@ -627,7 +627,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	}
 
 	// Act
-	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&obj, printers.PrintOptions{})
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&obj, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("An error occurred generating the Table: %#v", err)
 	}
@@ -723,7 +723,7 @@ func TestPrintNodeStatus(t *testing.T) {
 	generator := printers.NewTableGenerator().With(AddHandlers)
 	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, printers.PrintOptions{})
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -773,7 +773,7 @@ func TestPrintNodeRole(t *testing.T) {
 	generator := printers.NewTableGenerator().With(AddHandlers)
 	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, printers.PrintOptions{})
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -816,13 +816,10 @@ func TestPrintNodeOSImage(t *testing.T) {
 		},
 	}
 
-	options := printers.PrintOptions{
-		Wide: true,
-	}
 	generator := printers.NewTableGenerator().With(AddHandlers)
-	printer := printers.NewTablePrinter(options)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, options)
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -865,13 +862,10 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 		},
 	}
 
-	options := printers.PrintOptions{
-		Wide: true,
-	}
 	generator := printers.NewTableGenerator().With(AddHandlers)
-	printer := printers.NewTablePrinter(options)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, options)
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -914,13 +908,10 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 		},
 	}
 
-	options := printers.PrintOptions{
-		Wide: true,
-	}
 	generator := printers.NewTableGenerator().With(AddHandlers)
-	printer := printers.NewTablePrinter(options)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, options)
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -957,13 +948,10 @@ func TestPrintNodeName(t *testing.T) {
 		},
 	}
 
-	options := printers.PrintOptions{
-		Wide: true,
-	}
 	generator := printers.NewTableGenerator().With(AddHandlers)
-	printer := printers.NewTablePrinter(options)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, options)
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -1011,13 +999,10 @@ func TestPrintNodeExternalIP(t *testing.T) {
 		},
 	}
 
-	options := printers.PrintOptions{
-		Wide: true,
-	}
 	generator := printers.NewTableGenerator().With(AddHandlers)
-	printer := printers.NewTablePrinter(options)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, options)
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -1065,13 +1050,10 @@ func TestPrintNodeInternalIP(t *testing.T) {
 		},
 	}
 
-	options := printers.PrintOptions{
-		Wide: true,
-	}
 	generator := printers.NewTableGenerator().With(AddHandlers)
-	printer := printers.NewTablePrinter(options)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
-		table, err := generator.GenerateTable(&test.node, options)
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for Node: %#v", err)
 		}
@@ -1122,7 +1104,7 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.NewBuffer([]byte{})
-	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.PrintOptions{})
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1257,7 +1239,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
 			buff := bytes.NewBuffer([]byte{})
-			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&svc, printers.PrintOptions{Wide: wide})
+			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&svc, printers.GenerateOptions{Wide: wide})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1449,7 +1431,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	generator := printers.NewTableGenerator().With(AddHandlers)
 	printer := printers.NewTablePrinter(options)
 	for i, test := range table {
-		table, err := generator.GenerateTable(test.obj, printers.PrintOptions{})
+		table, err := generator.GenerateTable(test.obj, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatalf("An error occurred generating table for object: %#v", err)
 		}
@@ -1536,7 +1518,7 @@ func TestPrintPodTable(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(test.obj, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(test.obj, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1923,7 +1905,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1988,7 +1970,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2124,7 +2106,7 @@ func TestPrintDeployment(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2137,7 +2119,7 @@ func TestPrintDeployment(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
-		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.GenerateOptions{Wide: true})
 		verifyTable(t, table)
 		// print deployment with '-o wide' option
 		printer = printers.NewTablePrinter(printers.PrintOptions{Wide: true, NoHeaders: true})
@@ -2181,7 +2163,7 @@ func TestPrintDaemonSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.ds, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.ds, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2271,7 +2253,7 @@ func TestPrintJob(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.job, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.job, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2879,7 +2861,7 @@ func TestPrintHPA(t *testing.T) {
 
 	buff := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.hpa, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.hpa, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2943,7 +2925,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3126,7 +3108,7 @@ func TestPrintService(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.service, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.service, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3185,7 +3167,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pdb, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pdb, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3267,7 +3249,7 @@ func TestPrintControllerRevision(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.history, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.history, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3329,7 +3311,7 @@ func TestPrintReplicaSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3343,7 +3325,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		}
 		buf.Reset()
 
-		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3490,7 +3472,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 	}
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pv, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pv, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3616,7 +3598,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 	}
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pvc, printers.PrintOptions{Wide: true})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pvc, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3688,7 +3670,7 @@ func TestPrintCronJob(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.cronjob, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.cronjob, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3733,7 +3715,7 @@ func TestPrintStorageClass(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3784,7 +3766,7 @@ func TestPrintLease(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3829,7 +3811,7 @@ func TestPrintPriorityClass(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3874,7 +3856,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
