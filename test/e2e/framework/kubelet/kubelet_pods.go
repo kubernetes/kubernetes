@@ -21,7 +21,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 // GetKubeletPods retrieves the list of pods on the kubelet.
@@ -38,7 +37,7 @@ func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, err
 
 func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
 	result := &v1.PodList{}
-	client, err := e2enode.ProxyRequest(c, node, resource, ports.KubeletPort)
+	client, err := ProxyRequest(c, node, resource, ports.KubeletPort)
 	if err != nil {
 		return &v1.PodList{}, err
 	}

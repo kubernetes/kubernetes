@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -47,9 +46,6 @@ const (
 
 	// ssh port
 	sshPort = "22"
-
-	// timeout for proxy requests.
-	proxyTimeout = 2 * time.Minute
 )
 
 // PodNode is a pod-node pair indicating which node a given pod is running on
@@ -248,30 +244,6 @@ func GetPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 		}
 	}
 	return "", fmt.Errorf("Failed to find external address for service %v", name)
-}
-
-// ProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
-func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
-	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
-	// This will leak a goroutine if proxy hangs. #22165
-	var result restclient.Result
-	finished := make(chan struct{})
-	go func() {
-		result = c.CoreV1().RESTClient().Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, port)).
-			Suffix(endpoint).
-			Do()
-
-		finished <- struct{}{}
-	}()
-	select {
-	case <-finished:
-		return result, nil
-	case <-time.After(proxyTimeout):
-		return restclient.Result{}, nil
-	}
 }
 
 // GetExternalIP returns node external IP concatenated with port 22 for ssh

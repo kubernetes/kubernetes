@@ -32,12 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+)
+
+const (
+	// timeout for proxy requests.
+	proxyTimeout = 2 * time.Minute
 )
 
 // ContainerResourceUsage is a structure for gathering container resource usage.
@@ -80,6 +85,30 @@ type RuntimeOperationErrorRate struct {
 	TotalNumber float64
 	ErrorRate   float64
 	TimeoutRate float64
+}
+
+// ProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
+func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
+	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
+	// This will leak a goroutine if proxy hangs. #22165
+	var result restclient.Result
+	finished := make(chan struct{})
+	go func() {
+		result = c.CoreV1().RESTClient().Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", node, port)).
+			Suffix(endpoint).
+			Do()
+
+		finished <- struct{}{}
+	}()
+	select {
+	case <-finished:
+		return result, nil
+	case <-time.After(proxyTimeout):
+		return restclient.Result{}, nil
+	}
 }
 
 // NewRuntimeOperationMonitor returns a new RuntimeOperationMonitor.
@@ -368,7 +397,7 @@ func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerCo
 
 // GetKubeletHeapStats returns stats of kubelet heap.
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := e2enode.ProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
+	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
 	if err != nil {
 		return "", err
 	}
