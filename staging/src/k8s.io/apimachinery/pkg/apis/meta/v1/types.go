@@ -1105,9 +1105,12 @@ type ManagedFieldsEntry struct {
 	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
 	// +optional
 	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
-	// Fields identifies a set of fields.
+	// FieldsType is the discriminator for the different fields format and version.
+	// There is currently only one possible value: "FieldsV1"
+	FieldsType string `json:"fieldsType,omitempty" protobuf:"bytes,6,opt,name=fieldsType"`
+	// FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
 	// +optional
-	Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
+	FieldsV1 *FieldsV1 `json:"fieldsV1,omitempty" protobuf:"bytes,7,opt,name=fieldsV1"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
@@ -1118,7 +1121,7 @@ const (
 	ManagedFieldsOperationUpdate ManagedFieldsOperationType = "Update"
 )
 
-// Fields stores a set of fields in a data structure like a Trie.
+// FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.
 //
 // Each key is either a '.' representing the field itself, and will always map to an empty set,
 // or a string representing a sub-field or item. The string will follow one of these four formats:
@@ -1129,12 +1132,9 @@ const (
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
-// +protobuf.options.marshal=false
-// +protobuf.as=ProtoFields
-// +protobuf.options.(gogoproto.goproto_stringer)=false
-type Fields struct {
+type FieldsV1 struct {
 	// Raw is the underlying serialization of this object.
-	Raw []byte `json:"-" protobuf:"-"`
+	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=Raw"`
 }
 
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf
