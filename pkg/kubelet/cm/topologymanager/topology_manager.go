@@ -26,6 +26,18 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
+const (
+	// maxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
+	// the TopologyManager supports on the underlying machine.
+	//
+	// At present, having more than this number of NUMA Nodes will result in a
+	// state explosion when trying to enumerate possible NUMAAffinity masks and
+	// generate hints for them. As such, if more NUMA Nodes than this are
+	// present on a machine and the TopologyManager is enabled, an error will
+	// be returned and the TopologyManager will not be loaded.
+	maxAllowableNUMANodes = 8
+)
+
 //Manager interface provides methods for Kubelet to manage pod topology hints
 type Manager interface {
 	//Manager implements pod admit handler interface
@@ -98,6 +110,10 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 	var numaNodes []int
 	for node := range numaNodeInfo {
 		numaNodes = append(numaNodes, node)
+	}
+
+	if len(numaNodes) > maxAllowableNUMANodes {
+		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
 	var hp []HintProvider
