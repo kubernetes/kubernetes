@@ -7,6 +7,7 @@ go_library(
         "health.go",
         "policy.go",
         "postupgrade.go",
+        "preflight.go",
         "prepull.go",
         "staticpods.go",
         "versiongetter.go",
@@ -44,7 +45,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/github.com/coredns/corefile-migration/migration:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

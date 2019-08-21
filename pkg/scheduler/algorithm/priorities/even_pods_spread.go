@@ -38,15 +38,15 @@ type topologyPair struct {
 
 type topologySpreadConstraintsMap struct {
 	// nodeNameToPodCounts is keyed with node name, and valued with the number of matching pods.
-	nodeNameToPodCounts map[string]int64
+	nodeNameToPodCounts map[string]int32
 	// topologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
-	topologyPairToPodCounts map[topologyPair]*int64
+	topologyPairToPodCounts map[topologyPair]*int32
 }
 
 func newTopologySpreadConstraintsMap() *topologySpreadConstraintsMap {
 	return &topologySpreadConstraintsMap{
-		nodeNameToPodCounts:     make(map[string]int64),
-		topologyPairToPodCounts: make(map[topologyPair]*int64),
+		nodeNameToPodCounts:     make(map[string]int32),
+		topologyPairToPodCounts: make(map[topologyPair]*int32),
 	}
 }
 
@@ -54,7 +54,7 @@ func newTopologySpreadConstraintsMap() *topologySpreadConstraintsMap {
 // This function iterates <nodes> to filter out the nodes which don't have required topologyKey(s),
 // and initialize two maps:
 // 1) t.topologyPairToPodCounts: keyed with both eligible topology pair and node names.
-// 2) t.nodeNameToPodCounts: keyed with node name, and valued with a *int64 pointer for eligible node only.
+// 2) t.nodeNameToPodCounts: keyed with node name, and valued with a *int32 pointer for eligible node only.
 func (t *topologySpreadConstraintsMap) initialize(pod *v1.Pod, nodes []*v1.Node) {
 	constraints := getSoftTopologySpreadConstraints(pod)
 	for _, node := range nodes {
@@ -64,7 +64,7 @@ func (t *topologySpreadConstraintsMap) initialize(pod *v1.Pod, nodes []*v1.Node)
 		for _, constraint := range constraints {
 			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
 			if t.topologyPairToPodCounts[pair] == nil {
-				t.topologyPairToPodCounts[pair] = new(int64)
+				t.topologyPairToPodCounts[pair] = new(int32)
 			}
 		}
 		t.nodeNameToPodCounts[node.Name] = 0
@@ -122,7 +122,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 			}
 
 			// <matchSum> indicates how many pods (on current node) match the <constraint>.
-			matchSum := int64(0)
+			matchSum := int32(0)
 			for _, existingPod := range nodeInfo.Pods() {
 				match, err := predicates.PodMatchesSpreadConstraint(existingPod.Labels, constraint)
 				if err != nil {
@@ -133,7 +133,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 					matchSum++
 				}
 			}
-			atomic.AddInt64(t.topologyPairToPodCounts[pair], matchSum)
+			atomic.AddInt32(t.topologyPairToPodCounts[pair], matchSum)
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processAllNode)
@@ -141,9 +141,9 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 		return nil, err
 	}
 
-	var minCount int64 = math.MaxInt64
+	var minCount int32 = math.MaxInt32
 	// <total> sums up the number of matching pods on each qualified topology pair
-	var total int64
+	var total int32
 	for _, node := range nodes {
 		if _, ok := t.nodeNameToPodCounts[node.Name]; !ok {
 			continue

@@ -18,7 +18,7 @@ package typed
 
 import (
 	"fmt"
-	"reflect"
+	"sync"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/schema"
@@ -67,7 +67,9 @@ func (tv TypedValue) AsValue() *value.Value {
 
 // Validate returns an error with a list of every spec violation.
 func (tv TypedValue) Validate() error {
-	if errs := tv.walker().validate(); len(errs) != 0 {
+	w := tv.walker()
+	defer w.finished()
+	if errs := w.validate(); len(errs) != 0 {
 		return errs
 	}
 	return nil
@@ -78,6 +80,7 @@ func (tv TypedValue) Validate() error {
 func (tv TypedValue) ToFieldSet() (*fieldpath.Set, error) {
 	s := fieldpath.NewSet()
 	w := tv.walker()
+	defer w.finished()
 	w.leafFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
 	w.nodeFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
 	if errs := w.validate(); len(errs) != 0 {
@@ -118,8 +121,8 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
 			c.Removed.Insert(w.path)
-		} else if !reflect.DeepEqual(w.rhs, w.lhs) {
-			// TODO: reflect.DeepEqual is not sufficient for this.
+		} else if !w.rhs.Equals(*w.lhs) {
+			// TODO: Equality is not sufficient for this.
 			// Need to implement equality check on the value type.
 			c.Modified.Insert(w.path)
 		}
@@ -154,6 +157,8 @@ func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
 // - If discriminator changed to non-nil, all other fields but the
 // discriminated one will be cleared,
 // - Otherwise, If only one field is left, update discriminator to that value.
+//
+// Please note: union behavior isn't finalized yet and this is still experimental.
 func (tv TypedValue) NormalizeUnions(new *TypedValue) (*TypedValue, error) {
 	var errs ValidationErrors
 	var normalizeFn = func(w *mergingWalker) {
@@ -178,6 +183,8 @@ func (tv TypedValue) NormalizeUnions(new *TypedValue) (*TypedValue, error) {
 // NormalizeUnionsApply specifically normalize unions on apply. It
 // validates that the applied union is correct (there should be no
 // ambiguity there), and clear the fields according to the sent intent.
+//
+// Please note: union behavior isn't finalized yet and this is still experimental.
 func (tv TypedValue) NormalizeUnionsApply(new *TypedValue) (*TypedValue, error) {
 	var errs ValidationErrors
 	var normalizeFn = func(w *mergingWalker) {
@@ -204,24 +211,41 @@ func (tv TypedValue) Empty() *TypedValue {
 	return &tv
 }
 
+var mwPool = sync.Pool{
+	New: func() interface{} { return &mergingWalker{} },
+}
+
 func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) {
 	if lhs.schema != rhs.schema {
 		return nil, errorFormatter{}.
 			errorf("expected objects with types from the same schema")
 	}
-	if !reflect.DeepEqual(lhs.typeRef, rhs.typeRef) {
+	if !lhs.typeRef.Equals(rhs.typeRef) {
 		return nil, errorFormatter{}.
 			errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
 	}
 
-	mw := mergingWalker{
-		lhs:          &lhs.value,
-		rhs:          &rhs.value,
-		schema:       lhs.schema,
-		typeRef:      lhs.typeRef,
-		rule:         rule,
-		postItemHook: postRule,
-	}
+	mw := mwPool.Get().(*mergingWalker)
+	defer func() {
+		mw.lhs = nil
+		mw.rhs = nil
+		mw.schema = nil
+		mw.typeRef = schema.TypeRef{}
+		mw.rule = nil
+		mw.postItemHook = nil
+		mw.out = nil
+		mw.inLeaf = false
+
+		mwPool.Put(mw)
+	}()
+
+	mw.lhs = &lhs.value
+	mw.rhs = &rhs.value
+	mw.schema = lhs.schema
+	mw.typeRef = lhs.typeRef
+	mw.rule = rule
+	mw.postItemHook = postRule
+
 	errs := mw.merge()
 	if len(errs) > 0 {
 		return nil, errs

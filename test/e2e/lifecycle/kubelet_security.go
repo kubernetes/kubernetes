@@ -28,6 +28,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
@@ -47,7 +48,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are disabled via API server proxy
 	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func() {
-		result, err := e2enode.ProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
+		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
 		framework.ExpectNoError(err)
 
 		var statusCode int
@@ -55,7 +56,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
-		result, err := e2enode.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
+		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
 		framework.ExpectNoError(err)
 
 		var statusCode int

@@ -144,6 +144,6 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodEvent(
-		f.ClientSet, pod.Name, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
+	framework.ExpectNoError(WaitTimeoutForEvent(
+		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }

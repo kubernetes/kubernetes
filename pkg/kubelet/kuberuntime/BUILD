@@ -100,6 +100,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/container:go_default_library",

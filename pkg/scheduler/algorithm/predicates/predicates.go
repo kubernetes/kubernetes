@@ -1796,15 +1796,15 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		return true, nil, nil
 	}
 
-	var topologyPairsPodSpreadMap *topologyPairsPodSpreadMap
+	var podSpreadCache *podSpreadCache
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		topologyPairsPodSpreadMap = predicateMeta.topologyPairsPodSpreadMap
+		podSpreadCache = predicateMeta.podSpreadCache
 	} else { // We don't have precomputed metadata. We have to follow a slow path to check spread constraints.
-		// TODO(Huang-Wei): get it implemented
+		// TODO(autoscaler): get it implemented
 		return false, nil, errors.New("metadata not pre-computed for EvenPodsSpreadPredicate")
 	}
 
-	if topologyPairsPodSpreadMap == nil || len(topologyPairsPodSpreadMap.topologyKeyToMinPodsMap) == 0 {
+	if podSpreadCache == nil || len(podSpreadCache.tpPairToMatchNum) == 0 {
 		return true, nil, nil
 	}
 
@@ -1821,25 +1821,24 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		if err != nil {
 			return false, nil, err
 		}
-		selfMatchNum := 0
+		selfMatchNum := int32(0)
 		if selfMatch {
 			selfMatchNum = 1
 		}
 
 		pair := topologyPair{key: tpKey, value: tpVal}
-		minMatchNum, ok := topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[tpKey]
+		paths, ok := podSpreadCache.tpKeyToCriticalPaths[tpKey]
 		if !ok {
 			// error which should not happen
-			klog.Errorf("internal error: get minMatchNum from key %q of %#v", tpKey, topologyPairsPodSpreadMap.topologyKeyToMinPodsMap)
+			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, podSpreadCache.tpKeyToCriticalPaths)
 			continue
 		}
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
-		matchNum := len(topologyPairsPodSpreadMap.topologyPairToPods[pair])
-
-		// cast to int to avoid potential overflow.
-		skew := matchNum + selfMatchNum - int(minMatchNum)
-		if skew > int(constraint.MaxSkew) {
+		minMatchNum := paths[0].matchNum
+		matchNum := podSpreadCache.tpPairToMatchNum[pair]
+		skew := matchNum + selfMatchNum - minMatchNum
+		if skew > constraint.MaxSkew {
 			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
 		}

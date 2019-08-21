@@ -41,10 +41,13 @@ import (
 
 	"github.com/elazarl/goproxy"
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
+	uexec "k8s.io/utils/exec"
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/yaml"
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,8 +72,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
-	uexec "k8s.io/utils/exec"
-	"sigs.k8s.io/yaml"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -927,12 +928,14 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
 			ginkgo.By("prepare CRD with validation schema")
-			crd, err := crd.CreateTestCRD(f, func(crd *v1beta1.CustomResourceDefinition) {
-				props := &v1beta1.JSONSchemaProps{}
+			crd, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
+				props := &apiextensionsv1.JSONSchemaProps{}
 				if err := yaml.Unmarshal(schemaFoo, props); err != nil {
 					e2elog.Failf("failed to unmarshal schema: %v", err)
 				}
-				crd.Spec.Validation = &v1beta1.CustomResourceValidation{OpenAPIV3Schema: props}
+				for i := range crd.Spec.Versions {
+					crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: props}
+				}
 			})
 			if err != nil {
 				e2elog.Failf("failed to create test CRD: %v", err)
@@ -951,12 +954,16 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
-			crd, err := crd.CreateTestCRD(f, func(crd *v1beta1.CustomResourceDefinition) {
-				props := &v1beta1.JSONSchemaProps{}
+			crd, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
+				props := &apiextensionsv1.JSONSchemaProps{}
 				if err := yaml.Unmarshal(schemaFoo, props); err != nil {
 					e2elog.Failf("failed to unmarshal schema: %v", err)
 				}
-				crd.Spec.Validation = &v1beta1.CustomResourceValidation{OpenAPIV3Schema: props}
+				// Allow for arbitrary-extra properties.
+				props.XPreserveUnknownFields = pointer.BoolPtr(true)
+				for i := range crd.Spec.Versions {
+					crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: props}
+				}
 			})
 			if err != nil {
 				e2elog.Failf("failed to create test CRD: %v", err)
@@ -966,31 +973,14 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			publishedSchema := schemaForGVK(schema.GroupVersionKind{Group: crd.Crd.Spec.Group, Version: crd.Crd.Spec.Version, Kind: crd.Crd.Spec.Names.Kind})
-			expectSuccess := false
-			if publishedSchema == nil || publishedSchema.Properties == nil || publishedSchema.Properties.AdditionalProperties == nil || len(publishedSchema.Properties.AdditionalProperties) == 0 {
-				// expect success in the following cases:
-				// - no schema was published
-				// - a schema was published with no properties
-				expectSuccess = true
-				e2elog.Logf("no schema with properties found, expect apply with extra properties to succeed")
-			} else {
-				e2elog.Logf("schema with properties found, expect apply with extra properties to fail")
-			}
+			schema := schemaForGVK(schema.GroupVersionKind{Group: crd.Crd.Spec.Group, Version: crd.Crd.Spec.Versions[0].Name, Kind: crd.Crd.Spec.Names.Kind})
+			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
 
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
-			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
-				if expectSuccess {
-					e2elog.Failf("%v", err)
-				}
-			} else {
-				if !expectSuccess {
-					e2elog.Failf("expected error, got none")
-				}
-			}
+			err = createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd)
+			framework.ExpectNoError(err, "creating custom resource")
 		})
-
 	})
 
 	framework.KubeDescribe("Kubectl cluster-info", func() {

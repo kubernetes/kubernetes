@@ -19,7 +19,7 @@ package apimachinery
 import (
 	"fmt"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -63,21 +63,22 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 				e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
 			}
 
-			noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-			noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
+			noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
 				e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
-				err = fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+				err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
 				if err != nil {
 					e2elog.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}
 			}()
 
 			ns := ""
-			noxuResourceClient := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
+			noxuResourceClient, err := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
+			framework.ExpectNoError(err, "creating custom resource client")
 
 			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
 			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameA)
@@ -124,7 +125,7 @@ func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (
 	)
 }
 
-func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -141,7 +142,10 @@ func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, clie
 	if err != nil {
 		return nil, err
 	}
-	if e, a := definition.Spec.Group+"/"+definition.Spec.Version, createdTypeMeta.GetAPIVersion(); e != a {
+	if len(definition.Spec.Versions) != 1 {
+		return nil, fmt.Errorf("expected exactly one version, got %v", definition.Spec.Versions)
+	}
+	if e, a := definition.Spec.Group+"/"+definition.Spec.Versions[0].Name, createdTypeMeta.GetAPIVersion(); e != a {
 		return nil, fmt.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := definition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
@@ -154,12 +158,15 @@ func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
 	return client.Delete(name, &metav1.DeleteOptions{})
 }
 
-func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.ResourceInterface {
-	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.Resource(gvr).Namespace(ns)
+func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1.CustomResourceDefinition) (dynamic.ResourceInterface, error) {
+	if len(crd.Spec.Versions) != 1 {
+		return nil, fmt.Errorf("expected exactly one version, got %v", crd.Spec.Versions)
 	}
-	return client.Resource(gvr)
+	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural}
+
+	if crd.Spec.Scope != apiextensionsv1.ClusterScoped {
+		return client.Resource(gvr).Namespace(ns), nil
+	}
+	return client.Resource(gvr), nil
 
 }
