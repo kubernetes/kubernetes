@@ -61,13 +61,23 @@ var (
 	withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 )
 
+// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
+// more elegant output. It is not threadsafe, but you may call PrintObj repeatedly; headers
+// will only be printed if the object type changes. This makes it useful for printing items
+// received from watches.
+type HumanReadablePrinter struct {
+	options        PrintOptions
+	lastType       interface{}
+	lastColumns    []metav1beta1.TableColumnDefinition
+	printedHeaders bool
+}
+
 // NewTablePrinter creates a printer suitable for calling PrintObj().
 // TODO(seans3): Change return type to ResourcePrinter interface once we no longer need
 // to constuct the "handlerMap".
 func NewTablePrinter(options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
-		options:    options,
+		options: options,
 	}
 	return printer
 }
@@ -81,6 +91,7 @@ func printHeader(columnNames []string, w io.Writer) error {
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
+
 	w, found := output.(*tabwriter.Writer)
 	if !found {
 		w = GetNewTabWriter(output)
@@ -94,7 +105,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		obj = event.Object.Object
 	}
 
-	// Case 1: Parameter "obj" is a table from server; print it.
+	// Parameter "obj" is a table from server; print it.
 	// display tables following the rules of options
 	if table, ok := obj.(*metav1beta1.Table); ok {
 		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
@@ -131,25 +142,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		return printTable(table, output, localOptions)
 	}
 
-	// Case 2: Parameter "obj" is not a table; search for a handler to print it.
-	// TODO(seans3): Remove this case in 1.16, since table should be returned from server-side printing.
-	// print with a registered handler
-	t := reflect.TypeOf(obj)
-	if handler := h.handlerMap[t]; handler != nil {
-		includeHeaders := h.lastType != t && !h.options.NoHeaders
-
-		if h.lastType != nil && h.lastType != t && !h.options.NoHeaders {
-			fmt.Fprintln(output)
-		}
-
-		if err := printRowsForHandlerEntry(output, handler, eventType, obj, h.options, includeHeaders); err != nil {
-			return err
-		}
-		h.lastType = t
-		return nil
-	}
-
-	// Case 3: Could not find print handler for "obj"; use the default or status print handler.
+	// Could not find print handler for "obj"; use the default or status print handler.
 	// Print with the default or status handler, and use the columns from the last time
 	var handler *handlerEntry
 	if _, isStatus := obj.(*metav1.Status); isStatus {
