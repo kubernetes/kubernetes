@@ -46,7 +46,7 @@ next:
 // another, only the superset is kept.
 func MergeTolerations(first, second []api.Toleration) []api.Toleration {
 	all := append(first, second...)
-	merged := []api.Toleration{}
+	var merged []api.Toleration
 
 next:
 	for i, t := range all {
@@ -58,7 +58,7 @@ next:
 		if i+1 < len(all) {
 			for _, t2 := range all[i+1:] {
 				// If the tolerations are equal, prefer the first.
-				if isSuperset(t2, t) && !apiequality.Semantic.DeepEqual(&t, &t2) {
+				if !apiequality.Semantic.DeepEqual(&t, &t2) && isSuperset(t2, t) {
 					continue next // t is redundant; ignore it
 				}
 			}
