@@ -49,15 +49,27 @@ var _ = SIGDescribe("DNS", func() {
 		namesToResolve := []string{
 			fmt.Sprintf("kubernetes.default.svc.%s", framework.TestContext.ClusterDNSDomain),
 		}
-		// Added due to #8512. This is critical for GCE and GKE deployments.
-		if framework.ProviderIs("gce", "gke") {
-			namesToResolve = append(namesToResolve, "google.com")
-			// Windows containers do not have a route to the GCE
-			// metadata server by default.
-			if !framework.NodeOSDistroIs("windows") {
-				namesToResolve = append(namesToResolve, "metadata")
-			}
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+
+		// Run a pod which probes DNS and exposes the results by HTTP.
+		ginkgo.By("creating a pod to probe DNS")
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
+
+	// Added due to #8512. This is critical for GCE and GKE deployments.
+	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+
+		namesToResolve := []string{"google.com"}
+		// Windows containers do not have a route to the GCE metadata server by default.
+		if !framework.NodeOSDistroIs("windows") {
+			namesToResolve = append(namesToResolve, "metadata")
 		}
+
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
@@ -76,15 +88,6 @@ var _ = SIGDescribe("DNS", func() {
 		namesToResolve := []string{
 			"kubernetes.default",
 			"kubernetes.default.svc",
-		}
-		// Added due to #8512. This is critical for GCE and GKE deployments.
-		if framework.ProviderIs("gce", "gke") {
-			namesToResolve = append(namesToResolve, "google.com")
-			// Windows containers do not have a route to the GCE
-			// metadata server by default.
-			if !framework.NodeOSDistroIs("windows") {
-				namesToResolve = append(namesToResolve, "metadata")
-			}
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
