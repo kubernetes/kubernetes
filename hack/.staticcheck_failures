@@ -210,9 +210,6 @@ vendor/k8s.io/client-go/rest/watch
 vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
-vendor/k8s.io/code-generator/cmd/client-gen/generators/fake
-vendor/k8s.io/code-generator/cmd/client-gen/generators/util
-vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 vendor/k8s.io/component-base/metrics
 vendor/k8s.io/kubectl/pkg/cmd/annotate
 vendor/k8s.io/kubectl/pkg/cmd/certificates

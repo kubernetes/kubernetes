@@ -279,7 +279,7 @@ func Run(g *Generator) {
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -300,7 +300,7 @@ func Run(g *Generator) {
 		cmd = exec.Command("goimports", "-w", outputPath)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -311,7 +311,7 @@ func Run(g *Generator) {
 		cmd = exec.Command("gofmt", "-s", "-w", outputPath)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
