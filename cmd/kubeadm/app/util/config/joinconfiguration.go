@@ -103,7 +103,9 @@ func documentMapToJoinConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 		}
 
 		// verify the validity of the YAML
-		strict.VerifyUnmarshalStrict(bytes, gvk)
+		if err := strict.VerifyUnmarshalStrict(bytes, gvk); err != nil {
+			return nil, errors.Errorf("YAML verification failed %v", err)
+		}
 
 		joinBytes = bytes
 	}
