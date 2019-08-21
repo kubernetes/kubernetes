@@ -830,6 +830,10 @@ func GetResourceRequest(pod *v1.Pod) *schedulernodeinfo.Resource {
 		result.SetMaxResource(container.Resources.Requests)
 	}
 
+	for _, container := range pod.Spec.EphemeralContainers {
+		result.Add(container.Resources.Requests)
+	}
+
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		result.Add(pod.Spec.Overhead)
