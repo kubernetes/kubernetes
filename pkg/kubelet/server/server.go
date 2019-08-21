@@ -203,7 +203,7 @@ type HostInterface interface {
 	ResyncInterval() time.Duration
 	GetHostname() string
 	LatestLoopEntryTime() time.Time
-	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
+	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, user string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 }
@@ -636,16 +636,21 @@ type execRequestParams struct {
 	podUID        types.UID
 	containerName string
 	cmd           []string
+	user          string
 }
 
 func getExecRequestParams(req *restful.Request) execRequestParams {
-	return execRequestParams{
+	params := execRequestParams{
 		podNamespace:  req.PathParameter("podNamespace"),
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
 		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
 	}
+	if u, ok := req.Request.URL.Query()[api.ExecUserParam]; ok && len(u) > 0 {
+		params.user = u[0]
+	}
+	return params
 }
 
 type portForwardRequestParams struct {
@@ -721,7 +726,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	url, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
+	url, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, params.user, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return

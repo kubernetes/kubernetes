@@ -970,6 +970,8 @@ message ExecRequest {
     // in this case. The output of stdout and stderr will be combined to a
     // single stream.
     bool stderr = 6;
+    // execute command as a specific user
+    string user = 7;
 }
 
 message ExecResponse {

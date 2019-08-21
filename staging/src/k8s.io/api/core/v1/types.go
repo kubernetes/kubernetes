@@ -4800,6 +4800,9 @@ type PodExecOptions struct {
 
 	// Command is the remote command to execute. argv array. Not executed within a shell.
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
+
+	// User is the user identity used to execute exec.
+	User string `json:"user,omitempty" protobuf:"bytes,7,opt,name=user"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

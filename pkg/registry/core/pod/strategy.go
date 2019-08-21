@@ -415,6 +415,9 @@ func streamParams(params url.Values, opts runtime.Object) error {
 		for _, c := range opts.Command {
 			params.Add("command", c)
 		}
+		if len(opts.User) > 0 {
+			params.Add("user", opts.User)
+		}
 	case *api.PodAttachOptions:
 		if opts.Stdin {
 			params.Add(api.ExecStdinParam, "1")

@@ -5525,6 +5525,7 @@ func autoConvert_v1_PodExecOptions_To_core_PodExecOptions(in *v1.PodExecOptions,
 	out.TTY = in.TTY
 	out.Container = in.Container
 	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.User = in.User
 	return nil
 }
 
@@ -5540,6 +5541,7 @@ func autoConvert_core_PodExecOptions_To_v1_PodExecOptions(in *core.PodExecOption
 	out.TTY = in.TTY
 	out.Container = in.Container
 	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.User = in.User
 	return nil
 }
 

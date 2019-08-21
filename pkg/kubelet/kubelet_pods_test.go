@@ -2024,6 +2024,7 @@ func TestGetExec(t *testing.T) {
 		podNamespace           = "nsFoo"
 		podUID       types.UID = "12345678"
 		containerID            = "containerFoo"
+		user                   = "0"
 		tty                    = true
 	)
 	var (
@@ -2074,7 +2075,7 @@ func TestGetExec(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, user, remotecommand.Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {

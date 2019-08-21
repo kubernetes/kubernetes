@@ -414,7 +414,7 @@ type fakeRuntime struct {
 	t *testing.T
 }
 
-func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Exec(containerID string, cmd []string, user string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "exec", stdin, stdout, stderr)
 	return nil

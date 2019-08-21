@@ -361,7 +361,7 @@ func (f *FakeRuntime) ImageStats() (*kubecontainer.ImageStats, error) {
 	return nil, f.Err
 }
 
-func (f *FakeStreamingRuntime) GetExec(id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (f *FakeStreamingRuntime) GetExec(id kubecontainer.ContainerID, cmd []string, user string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 

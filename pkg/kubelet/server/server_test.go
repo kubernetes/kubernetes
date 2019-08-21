@@ -143,13 +143,13 @@ func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, contain
 }
 
 type fakeRuntime struct {
-	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
+	execFunc        func(string, []string, string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
 	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
 	portForwardFunc func(string, int32, io.ReadWriteCloser) error
 }
 
-func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	return f.execFunc(containerID, cmd, stdin, stdout, stderr, tty, resize)
+func (f *fakeRuntime) Exec(containerID string, cmd []string, user string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+	return f.execFunc(containerID, cmd, user, stdin, stdout, stderr, tty, resize)
 }
 
 func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
@@ -195,7 +195,7 @@ func newTestStreamingServer(streamIdleTimeout time.Duration) (s *testStreamingSe
 	return s, nil
 }
 
-func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, user string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	if fk.getExecCheck != nil {
 		fk.getExecCheck(podFullName, podUID, containerName, cmd, streamOpts)
 	}
@@ -207,6 +207,7 @@ func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerNa
 		Stdin:       streamOpts.Stdin,
 		Stdout:      streamOpts.Stdout,
 		Stderr:      streamOpts.Stderr,
+		User:        user,
 	})
 	if err != nil {
 		return nil, err
@@ -1237,7 +1238,7 @@ func testExecAttach(t *testing.T, verb string) {
 				return nil
 			}
 
-			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, user string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
 				return testStream(containerID, stdin, stdout, stderr, tty, done)
 			}

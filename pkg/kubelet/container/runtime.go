@@ -118,7 +118,7 @@ type Runtime interface {
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
 // the runtime server.
 type StreamingRuntime interface {
-	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
+	GetExec(id ContainerID, cmd []string, user string, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
 }

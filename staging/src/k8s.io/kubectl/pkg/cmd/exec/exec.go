@@ -97,6 +97,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().StringVarP(&options.Username, "uname", "u", options.Username, "User name. The user to be used when exec")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
 	return cmd
@@ -128,6 +129,7 @@ type StreamOptions struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
+	Username      string
 	Stdin         bool
 	TTY           bool
 	// minimize unnecessary output
@@ -350,6 +352,7 @@ func (p *ExecOptions) Run() error {
 		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
+			User:      p.Username,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.ErrOut != nil,
