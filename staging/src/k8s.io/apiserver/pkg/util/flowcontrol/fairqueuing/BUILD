@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

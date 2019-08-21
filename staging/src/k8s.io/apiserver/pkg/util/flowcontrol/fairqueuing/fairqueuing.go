@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/util/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog"
 )
@@ -47,8 +48,8 @@ func NewQueueSetFactory(clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) 
 
 // NewQueueSet creates a new QueueSetSystem object
 // There is a new QueueSet created for each priority level.
-func (qsf queueSetFactoryImpl) NewQueueSet(concurrencyLimit, desiredNumQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet {
-	return newQueueSetImpl(concurrencyLimit, desiredNumQueues,
+func (qsf queueSetFactoryImpl) NewQueueSet(name string, concurrencyLimit, desiredNumQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet {
+	return newQueueSetImpl(name, concurrencyLimit, desiredNumQueues,
 		queueLengthLimit, requestWaitLimit, qsf.clk, qsf.wg)
 }
 
@@ -96,6 +97,7 @@ func newQueueSetImpl(name string, concurrencyLimit, desiredNumQueues, queueLengt
 	requestWaitLimit time.Duration, clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) *queueSetImpl {
 	fq := &queueSetImpl{
 		wg:               wg,
+		name:             name,
 		queues:           initQueues(desiredNumQueues),
 		clk:              clk,
 		vt:               0,
@@ -173,6 +175,7 @@ func (qs *queueSetImpl) TimeoutOldRequestsAndRejectOrEnqueue(hashValue uint64, h
 	if ok := qs.rejectOrEnqueue(pkt); !ok {
 		return nil
 	}
+	metrics.ObserveQueueLength(qs.name, len(queue.Requests))
 	return pkt
 
 }
@@ -267,6 +270,8 @@ func (qs *queueSetImpl) enqueue(packet *Request) {
 	queue.Enqueue(packet)
 	qs.updateQueueVirStartTime(packet, queue)
 	qs.numRequestsEnqueued++
+
+	metrics.UpdateFlowControlRequestsInQueue(qs.name, qs.numRequestsEnqueued)
 }
 
 // Enqueue enqueues a packet directly into an queueSetImpl w/ no restriction
@@ -396,8 +401,10 @@ func (qs *queueSetImpl) dequeue() (*Request, bool) {
 		queue.VirStart += qs.estimatedServiceTime
 
 		packet.StartTime = qs.clk.Now()
+
 		// request dequeued, service has started
 		queue.RequestsExecuting++
+		metrics.UpdateFlowControlRequestsExecuting(qs.name, queue.RequestsExecuting)
 	} else {
 		// TODO(aaron-prindle) verify this statement is needed...
 		return nil, false
@@ -569,6 +576,7 @@ func (qs *queueSetImpl) Wait(hashValue uint64, handSize int32) (quiescent, execu
 	// concurrency shares and at max queue length already
 	if pkt == nil {
 		qs.lock.Unlock()
+		metrics.AddReject(qs.name, "queue-full")
 		return false, false, func() {}
 	}
 	// ========================================================================
@@ -607,6 +615,7 @@ func (qs *queueSetImpl) Wait(hashValue uint64, handSize int32) (quiescent, execu
 		}
 		// timed out
 		klog.V(5).Infof("pkt.DequeueChannel timed out\n")
+		metrics.AddReject(qs.name, "time-out")
 		return false, false, func() {}
 	}
 	// ************************************************************************
