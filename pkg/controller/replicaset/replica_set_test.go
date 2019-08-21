@@ -931,7 +931,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Delete(rs)
 	manager.syncReplicaSet(GetKey(rs, t))
 
-	if _, exists, err = manager.expectations.GetExpectations(rsKey); exists {
+	if _, exists, _ = manager.expectations.GetExpectations(rsKey); exists {
 		t.Errorf("Found expectaions, expected none since the ReplicaSet has been deleted.")
 	}
 

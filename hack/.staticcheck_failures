@@ -18,9 +18,6 @@ pkg/controller/nodeipam
 pkg/controller/nodeipam/ipam/cidrset
 pkg/controller/podautoscaler
 pkg/controller/podgc
-pkg/controller/replicaset
-pkg/controller/resourcequota
-pkg/controller/statefulset
 pkg/credentialprovider
 pkg/credentialprovider/aws
 pkg/kubeapiserver/admission
