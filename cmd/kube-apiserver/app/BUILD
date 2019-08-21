@@ -56,6 +56,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/preflight:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/term:go_default_library",

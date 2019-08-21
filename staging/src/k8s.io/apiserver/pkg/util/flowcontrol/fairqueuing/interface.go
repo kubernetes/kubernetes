@@ -26,7 +26,7 @@ import (
 // each QueueSet is known to the factory, the client does not need to
 // pass this stuff in each call to NewQueueSet.
 type QueueSetFactory interface {
-	NewQueueSet(concurrencyLimit, numQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet
+	NewQueueSet(name string, concurrencyLimit, numQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet
 }
 
 // QueueSet is the abstraction for the queuing and dispatching
