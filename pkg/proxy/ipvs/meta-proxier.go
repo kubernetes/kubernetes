@@ -29,12 +29,12 @@ type MetaProxier struct {
 	ipv6Proxier   proxy.ProxyProvider
 }
 
-type IpFamily int
+type ipFamily int
 
 const (
-	FamilyUnknown = iota + 1
-	FamilyIpv4
-	FamilyIpv6
+	familyUnknown = iota + 1
+	familyIpv4
+	familyIpv6
 )
 
 // NewMetaProxier returns a dual-stack "meta-proxier". Proxier API
@@ -65,9 +65,9 @@ func (proxier *MetaProxier) SyncLoop() {
 func (proxier *MetaProxier) OnServiceAdd(service *v1.Service) {
 	family := proxier.serviceFamily(service)
 	switch family {
-	case FamilyIpv4:
+	case familyIpv4:
 		proxier.ipv4Proxier.OnServiceAdd(service)
-	case FamilyIpv6:
+	case familyIpv6:
 		proxier.ipv6Proxier.OnServiceAdd(service)
 	}
 }
@@ -76,13 +76,13 @@ func (proxier *MetaProxier) OnServiceAdd(service *v1.Service) {
 // service object is observed.
 func (proxier *MetaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 	family := proxier.serviceFamily(service)
-	if family == FamilyUnknown {
+	if family == familyUnknown {
 		family = proxier.serviceFamily(oldService)
 	}
 	switch family {
-	case FamilyIpv4:
+	case familyIpv4:
 		proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
-	case FamilyIpv6:
+	case familyIpv6:
 		proxier.ipv6Proxier.OnServiceUpdate(oldService, service)
 	}
 }
@@ -91,9 +91,9 @@ func (proxier *MetaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 // object is observed.
 func (proxier *MetaProxier) OnServiceDelete(service *v1.Service) {
 	switch proxier.serviceFamily(service) {
-	case FamilyIpv4:
+	case familyIpv4:
 		proxier.ipv4Proxier.OnServiceDelete(service)
-	case FamilyIpv6:
+	case familyIpv6:
 		proxier.ipv6Proxier.OnServiceDelete(service)
 	}
 }
@@ -105,23 +105,23 @@ func (proxier *MetaProxier) OnServiceSynced() {
 	proxier.ipv6Proxier.OnServiceSynced()
 }
 
-func (proxier *MetaProxier) serviceFamily(service *v1.Service) IpFamily {
+func (proxier *MetaProxier) serviceFamily(service *v1.Service) ipFamily {
 	if service.Spec.ClusterIP == "" {
-		return FamilyUnknown
+		return familyUnknown
 	}
 	if net.ParseIP(service.Spec.ClusterIP).To4() == nil {
-		return FamilyIpv6
+		return familyIpv6
 	}
-	return FamilyIpv4
+	return familyIpv4
 }
 
 // OnEndpointsAdd is called whenever creation of new endpoints object
 // is observed.
 func (proxier *MetaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	switch endpointsFamily(endpoints) {
-	case FamilyIpv4:
+	case familyIpv4:
 		proxier.ipv4Proxier.OnEndpointsAdd(endpoints)
-	case FamilyIpv6:
+	case familyIpv6:
 		proxier.ipv6Proxier.OnEndpointsAdd(endpoints)
 	}
 }
@@ -130,13 +130,13 @@ func (proxier *MetaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 // endpoints object is observed.
 func (proxier *MetaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	family := endpointsFamily(endpoints)
-	if family == FamilyUnknown {
+	if family == familyUnknown {
 		family = endpointsFamily(oldEndpoints)
 	}
 	switch family {
-	case FamilyIpv4:
+	case familyIpv4:
 		proxier.ipv4Proxier.OnEndpointsUpdate(oldEndpoints, endpoints)
-	case FamilyIpv6:
+	case familyIpv6:
 		proxier.ipv6Proxier.OnEndpointsUpdate(oldEndpoints, endpoints)
 	}
 }
@@ -145,9 +145,9 @@ func (proxier *MetaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoi
 // endpoints object is observed.
 func (proxier *MetaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	switch endpointsFamily(endpoints) {
-	case FamilyIpv4:
+	case familyIpv4:
 		proxier.ipv4Proxier.OnEndpointsDelete(endpoints)
-	case FamilyIpv6:
+	case familyIpv6:
 		proxier.ipv6Proxier.OnEndpointsDelete(endpoints)
 	}
 }
@@ -159,36 +159,36 @@ func (proxier *MetaProxier) OnEndpointsSynced() {
 	proxier.ipv6Proxier.OnEndpointsSynced()
 }
 
-func endpointsFamily(endpoints *v1.Endpoints) IpFamily {
+func endpointsFamily(endpoints *v1.Endpoints) ipFamily {
 	if endpoints.Subsets == nil || len(endpoints.Subsets) == 0 {
-		return FamilyUnknown
+		return familyUnknown
 	}
 	for _, subset := range endpoints.Subsets {
-		if family := endpointsSubsetFamily(subset); family != FamilyUnknown {
+		if family := endpointsSubsetFamily(subset); family != familyUnknown {
 			return family
 		}
 	}
 	klog.Warningf("Endpoints familyUnknown; %s:%s\n", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name)
-	return FamilyUnknown
+	return familyUnknown
 }
-func endpointsSubsetFamily(subsets v1.EndpointSubset) IpFamily {
-	if family := endpointsAddressesFamily(subsets.Addresses); family != FamilyUnknown {
+func endpointsSubsetFamily(subsets v1.EndpointSubset) ipFamily {
+	if family := endpointsAddressesFamily(subsets.Addresses); family != familyUnknown {
 		return family
 	}
 	return endpointsAddressesFamily(subsets.NotReadyAddresses)
 }
-func endpointsAddressesFamily(addresses []v1.EndpointAddress) IpFamily {
+func endpointsAddressesFamily(addresses []v1.EndpointAddress) ipFamily {
 	if addresses == nil || len(addresses) == 0 {
-		return FamilyUnknown
+		return familyUnknown
 	}
 	for _, adr := range addresses {
 		if adr.IP != "" {
 			if net.ParseIP(adr.IP).To4() == nil {
-				return FamilyIpv6
+				return familyIpv6
 			} else {
-				return FamilyIpv4
+				return familyIpv4
 			}
 		}
 	}
-	return FamilyUnknown
+	return familyUnknown
 }
