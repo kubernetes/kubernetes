@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -220,6 +221,7 @@ type RequestDigest struct {
 }
 
 func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool, func()) {
+	startWaitingTime := time.Now()
 	for {
 		rmState := reqMgmt.curState.Load().(*requestManagementState)
 
@@ -235,6 +237,7 @@ func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool,
 			matchingpriorityLevelName = fs.Spec.PriorityLevelConfiguration.Name
 			matchingFlowDistinguisherMethod = fs.Spec.DistinguisherMethod
 		default: // reject
+			metrics.AddReject("<none>", "non-match")
 			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v because no FlowSchema matched", requestDigest.RequestInfo, requestDigest.User)
 			return false, func() {}
 		}
@@ -249,17 +252,24 @@ func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool,
 			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q without delay", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 			return true, func() {}
 		}
+
 		quiescent, execute, afterExecute := ps.queues.Wait(hashValue, ps.config.HandSize)
 		if quiescent {
 			klog.V(5).Infof("Request requestInfo=%v, user=%v, fs=%q landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 			continue
 		}
 		if execute {
+			metrics.ObserveWaitingDuration(matchingpriorityLevelName, fs.Name, "true", time.Now().Sub(startWaitingTime))
 			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 		} else {
+			metrics.ObserveWaitingDuration(matchingpriorityLevelName, fs.Name, "false", time.Now().Sub(startWaitingTime))
 			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 		}
-		return execute, afterExecute
+		startExecutionTime := time.Now()
+		return execute, func() {
+			metrics.ObserveExecutionDuration(matchingpriorityLevelName, fs.Name, time.Now().Sub(startExecutionTime))
+			afterExecute()
+		}
 	}
 }
 

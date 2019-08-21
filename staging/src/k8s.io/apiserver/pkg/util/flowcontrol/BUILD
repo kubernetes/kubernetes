@@ -23,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/flowcontrol/v1alpha1:go_default_library",
@@ -44,6 +45,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

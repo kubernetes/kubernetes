@@ -424,6 +424,7 @@ staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
 staging/src/k8s.io/apiserver/pkg/storage/value
+staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics
 staging/src/k8s.io/apiserver/pkg/util/proxy
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream

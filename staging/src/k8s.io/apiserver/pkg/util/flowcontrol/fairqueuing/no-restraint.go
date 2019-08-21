@@ -29,7 +29,7 @@ func NewNoRestraintFactory() QueueSetFactory {
 
 type noRestraintFactory struct{}
 
-func (noRestraintFactory) NewQueueSet(concurrencyLimit, numQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet {
+func (noRestraintFactory) NewQueueSet(name string, concurrencyLimit, numQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet {
 	return noRestraint{}
 }
 
