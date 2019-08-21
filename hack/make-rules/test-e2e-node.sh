@@ -156,7 +156,7 @@ if [ "${remote}" = true ] ; then
 else
   # Refresh sudo credentials if needed
   if ping -c 1 -q metadata.google.internal &> /dev/null; then
-    echo 'Running on CGE, not asking for sudo credentials'
+    echo 'Running on GCE, not asking for sudo credentials'
   elif sudo --non-interactive "$(which bash)" -c true 2> /dev/null; then
     # if we can run bash without a password, it's a pretty safe bet that either
     # we can run any command without a password, or that sudo credentials
