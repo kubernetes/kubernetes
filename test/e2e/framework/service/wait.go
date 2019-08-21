@@ -20,11 +20,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+
+	"github.com/onsi/ginkgo"
 )
 
 // WaitForServiceResponding waits for the service to be responding.
@@ -62,4 +66,53 @@ func WaitForServiceResponding(c clientset.Interface, ns, name string) error {
 		e2elog.Logf("Service %s: found nonempty answer: %s", name, got)
 		return true, nil
 	})
+}
+
+// WaitForServiceDeletedWithFinalizer waits for the service with finalizer to be deleted.
+func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
+	ginkgo.By("Delete service with finalizer")
+	if err := cs.CoreV1().Services(namespace).Delete(name, nil); err != nil {
+		e2elog.Failf("Failed to delete service %s/%s", namespace, name)
+	}
+
+	ginkgo.By("Wait for service to disappear")
+	if pollErr := wait.PollImmediate(LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
+		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				e2elog.Logf("Service %s/%s is gone.", namespace, name)
+				return true, nil
+			}
+			return false, err
+		}
+		e2elog.Logf("Service %s/%s still exists with finalizers: %v", namespace, name, svc.Finalizers)
+		return false, nil
+	}); pollErr != nil {
+		e2elog.Failf("Failed to wait for service to disappear: %v", pollErr)
+	}
+}
+
+// WaitForServiceUpdatedWithFinalizer waits for the service to be updated to have or
+// don't have a finalizer.
+func WaitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name string, hasFinalizer bool) {
+	ginkgo.By(fmt.Sprintf("Wait for service to hasFinalizer=%t", hasFinalizer))
+	if pollErr := wait.PollImmediate(LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
+		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		foundFinalizer := false
+		for _, finalizer := range svc.Finalizers {
+			if finalizer == servicehelper.LoadBalancerCleanupFinalizer {
+				foundFinalizer = true
+			}
+		}
+		if foundFinalizer != hasFinalizer {
+			e2elog.Logf("Service %s/%s hasFinalizer=%t, want %t", namespace, name, foundFinalizer, hasFinalizer)
+			return false, nil
+		}
+		return true, nil
+	}); pollErr != nil {
+		e2elog.Failf("Failed to wait for service to hasFinalizer=%t: %v", hasFinalizer, pollErr)
+	}
 }
