@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	apiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -261,6 +262,14 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	c.LeaderElectionBroadcaster = leaderElectionBroadcaster
 	c.LeaderElection = leaderElectionConfig
 
+	if c.InsecureServing != nil {
+		c.InsecureServing.Name = "healthz"
+	}
+	if c.InsecureMetricsServing != nil {
+		c.InsecureMetricsServing.Name = "metrics"
+	}
+
+	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 	return c, nil
 }
 

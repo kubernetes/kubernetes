@@ -136,8 +136,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	}
 
 	stopCh := make(chan struct{})
-	// Get the completed config
-	cc := c.Complete()
 
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
@@ -148,16 +146,16 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
-		cz.Set(cc.ComponentConfig)
+		cz.Set(c.ComponentConfig)
 	} else {
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	return Run(cc, stopCh, registryOptions...)
+	return Run(c, stopCh, registryOptions...)
 }
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
-func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, registryOptions ...Option) error {
+func Run(c *schedulerserverconfig.Config, stopCh <-chan struct{}, registryOptions ...Option) error {
 	// To help debugging, immediately log version
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
 
@@ -169,75 +167,75 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	}
 
 	// Create the scheduler.
-	sched, err := scheduler.New(cc.Client,
-		cc.InformerFactory.Core().V1().Nodes(),
-		cc.PodInformer,
-		cc.InformerFactory.Core().V1().PersistentVolumes(),
-		cc.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		cc.InformerFactory.Core().V1().ReplicationControllers(),
-		cc.InformerFactory.Apps().V1().ReplicaSets(),
-		cc.InformerFactory.Apps().V1().StatefulSets(),
-		cc.InformerFactory.Core().V1().Services(),
-		cc.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		cc.InformerFactory.Storage().V1().StorageClasses(),
-		cc.InformerFactory.Storage().V1beta1().CSINodes(),
-		cc.Recorder,
-		cc.ComponentConfig.AlgorithmSource,
+	sched, err := scheduler.New(c.Client,
+		c.InformerFactory.Core().V1().Nodes(),
+		c.PodInformer,
+		c.InformerFactory.Core().V1().PersistentVolumes(),
+		c.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		c.InformerFactory.Core().V1().ReplicationControllers(),
+		c.InformerFactory.Apps().V1().ReplicaSets(),
+		c.InformerFactory.Apps().V1().StatefulSets(),
+		c.InformerFactory.Core().V1().Services(),
+		c.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		c.InformerFactory.Storage().V1().StorageClasses(),
+		c.InformerFactory.Storage().V1beta1().CSINodes(),
+		c.Recorder,
+		c.ComponentConfig.AlgorithmSource,
 		stopCh,
 		registry,
-		cc.ComponentConfig.Plugins,
-		cc.ComponentConfig.PluginConfig,
-		scheduler.WithName(cc.ComponentConfig.SchedulerName),
-		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
-		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
-		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds))
+		c.ComponentConfig.Plugins,
+		c.ComponentConfig.PluginConfig,
+		scheduler.WithName(c.ComponentConfig.SchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(c.ComponentConfig.HardPodAffinitySymmetricWeight),
+		scheduler.WithPreemptionDisabled(c.ComponentConfig.DisablePreemption),
+		scheduler.WithPercentageOfNodesToScore(c.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithBindTimeoutSeconds(*c.ComponentConfig.BindTimeoutSeconds))
 	if err != nil {
 		return err
 	}
 
 	// Prepare the event broadcaster.
-	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartRecordingToSink(stopCh)
+	if c.Broadcaster != nil && c.EventClient != nil {
+		c.Broadcaster.StartRecordingToSink(stopCh)
 	}
-	if cc.LeaderElectionBroadcaster != nil && cc.CoreEventClient != nil {
-		cc.LeaderElectionBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
+	if c.LeaderElectionBroadcaster != nil && c.CoreEventClient != nil {
+		c.LeaderElectionBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: c.CoreEventClient.Events("")})
 	}
 	// Setup healthz checks.
 	var checks []healthz.HealthChecker
-	if cc.ComponentConfig.LeaderElection.LeaderElect {
-		checks = append(checks, cc.LeaderElection.WatchDog)
+	if c.ComponentConfig.LeaderElection.LeaderElect {
+		checks = append(checks, c.LeaderElection.WatchDog)
 	}
 
 	// Start up the healthz server.
-	if cc.InsecureServing != nil {
-		separateMetrics := cc.InsecureMetricsServing != nil
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics, checks...), nil, nil)
-		if err := cc.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+	if c.InsecureServing != nil {
+		separateMetrics := c.InsecureMetricsServing != nil
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, separateMetrics, checks...), nil, nil)
+		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return fmt.Errorf("failed to start healthz server: %v", err)
 		}
 	}
-	if cc.InsecureMetricsServing != nil {
-		handler := buildHandlerChain(newMetricsHandler(&cc.ComponentConfig), nil, nil)
-		if err := cc.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
+	if c.InsecureMetricsServing != nil {
+		handler := buildHandlerChain(newMetricsHandler(&c.ComponentConfig), nil, nil)
+		if err := c.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
 			return fmt.Errorf("failed to start metrics server: %v", err)
 		}
 	}
-	if cc.SecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
+	if c.SecureServing != nil {
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false, checks...), c.Authentication.Authenticator, c.Authorization.Authorizer)
 		// TODO: handle stoppedCh returned by c.SecureServing.Serve
-		if _, err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start secure server: %v", err)
 		}
 	}
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(stopCh)
-	cc.InformerFactory.Start(stopCh)
+	go c.PodInformer.Informer().Run(stopCh)
+	c.InformerFactory.Start(stopCh)
 
 	// Wait for all caches to sync before scheduling.
-	cc.InformerFactory.WaitForCacheSync(stopCh)
+	c.InformerFactory.WaitForCacheSync(stopCh)
 
 	// Prepare a reusable runCommand function.
 	run := func(ctx context.Context) {
@@ -257,14 +255,14 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	}()
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
-	if cc.LeaderElection != nil {
-		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
+	if c.LeaderElection != nil {
+		c.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
 			},
 		}
-		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
+		leaderElector, err := leaderelection.NewLeaderElector(*c.LeaderElection)
 		if err != nil {
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}

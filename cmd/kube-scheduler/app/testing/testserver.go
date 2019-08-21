@@ -120,7 +120,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
-		if err := app.Run(config.Complete(), stopCh); err != nil {
+		if err := app.Run(config, stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)

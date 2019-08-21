@@ -59,29 +59,3 @@ type Config struct {
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
 }
-
-type completedConfig struct {
-	*Config
-}
-
-// CompletedConfig same as Config, just to swap private object.
-type CompletedConfig struct {
-	// Embed a private pointer that cannot be instantiated outside of this package.
-	*completedConfig
-}
-
-// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() CompletedConfig {
-	cc := completedConfig{c}
-
-	if c.InsecureServing != nil {
-		c.InsecureServing.Name = "healthz"
-	}
-	if c.InsecureMetricsServing != nil {
-		c.InsecureMetricsServing.Name = "metrics"
-	}
-
-	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
-
-	return CompletedConfig{&cc}
-}
