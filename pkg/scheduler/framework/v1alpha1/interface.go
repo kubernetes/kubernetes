@@ -311,16 +311,6 @@ type Framework interface {
 	// a non-success status.
 	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScores, *Status)
 
-	// RunNormalizeScorePlugins runs the normalize score plugins. It should be called after
-	// RunScorePlugins with the PluginToNodeScores result. It then modifies the map with
-	// normalized scores. It returns a non-success Status if any of the normalize score plugins
-	// returns a non-success status.
-	RunNormalizeScorePlugins(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status
-
-	// ApplyScoreWeights applies weights to the score results. It should be called after
-	// RunNormalizeScorePlugins.
-	ApplyScoreWeights(pc *PluginContext, pod *v1.Pod, scores PluginToNodeScores) *Status
-
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If the Status code is "Unschedulable", it is
