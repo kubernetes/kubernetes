@@ -19,7 +19,7 @@
 package grpc
 
 import (
-	"golang.org/x/net/context"
+	"context"
 )
 
 // UnaryInvoker is called by UnaryClientInterceptor to complete RPCs.

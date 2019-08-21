@@ -8,6 +8,7 @@ go_library(
         "pauseable_handler.go",
         "recorder.go",
         "testutil.go",
+        "var.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/testutil",
     importpath = "github.com/coreos/etcd/pkg/testutil",

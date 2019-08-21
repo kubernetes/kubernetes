@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "error.go",
         "md.go",
+        "metadatafields.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",

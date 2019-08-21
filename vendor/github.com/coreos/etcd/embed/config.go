@@ -36,9 +36,9 @@ import (
 	"github.com/coreos/etcd/pkg/types"
 
 	"github.com/coreos/pkg/capnslog"
-	"github.com/ghodss/yaml"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
+	"sigs.k8s.io/yaml"
 )
 
 const (
