@@ -172,36 +172,54 @@ func newProxyServer(
 		metrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
-		proxier, err = ipvs.NewProxier(
-			iptInterface,
-			ipvsInterface,
-			ipsetInterface,
-			utilsysctl.New(),
-			execer,
-			config.IPVS.SyncPeriod.Duration,
-			config.IPVS.MinSyncPeriod.Duration,
-			config.IPVS.ExcludeCIDRs,
-			config.IPVS.StrictARP,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
-			config.ClusterCIDR,
-			hostname,
-			nodeIP,
-			recorder,
-			healthzServer,
-			config.IPVS.Scheduler,
-			config.NodePortAddresses,
-		)
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			klog.V(0).Info("IPv6DualStack; Creating DualStackProxier for ipvs.")
+			// TODO: Temporary create dual-stack params as they will look
+			// when other dual-stack PR's have been merged.
+			proxier, err = ipvs.NewDualStackProxier(
+				iptInterface,
+				ipvsInterface,
+				ipsetInterface,
+				utilsysctl.New(),
+				execer,
+				config.IPVS.SyncPeriod.Duration,
+				config.IPVS.MinSyncPeriod.Duration,
+				config.IPVS.ExcludeCIDRs,
+				config.IPVS.StrictARP,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				config.ClusterCIDR,
+				hostname,
+				nodeIP,
+				recorder,
+				healthzServer,
+				config.IPVS.Scheduler,
+				config.NodePortAddresses,
+			)
+		} else {
+			proxier, err = ipvs.NewProxier(
+				iptInterface,
+				ipvsInterface,
+				ipsetInterface,
+				utilsysctl.New(),
+				execer,
+				config.IPVS.SyncPeriod.Duration,
+				config.IPVS.MinSyncPeriod.Duration,
+				config.IPVS.ExcludeCIDRs,
+				config.IPVS.StrictARP,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				config.ClusterCIDR,
+				hostname,
+				nodeIP,
+				recorder,
+				healthzServer,
+				config.IPVS.Scheduler,
+				config.NodePortAddresses,
+			)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-			klog.V(0).Info("IPv6DualStack; Creating MetaProxier for ipvs.")
-			ipv6Proxier, err := ipvs.NewOtherProxyServer(config)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
-			}
-			proxier = ipvs.NewMetaProxier(proxier, ipv6Proxier, ipvs.FamilyIpv4)
 		}
 		metrics.RegisterMetrics()
 	} else {

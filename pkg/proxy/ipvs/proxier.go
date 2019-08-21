@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -48,9 +47,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	"k8s.io/utils/exec"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )
@@ -457,61 +454,59 @@ func NewProxier(ipt utiliptables.Interface,
 	return proxier, nil
 }
 
-// Create the "other" proxier for dual-stack
-func NewOtherProxyServer(
-	config *proxyconfigapi.KubeProxyConfiguration) (*Proxier, error) {
+func NewDualStackProxier(
+	ipt utiliptables.Interface,
+	ipvs utilipvs.Interface,
+	ipset utilipset.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	excludeCIDRs []string,
+	strictARP bool,
+	masqueradeAll bool,
+	masqueradeBit int,
+	clusterCIDR string,
+	hostname string,
+	nodeIP net.IP,
+	recorder record.EventRecorder,
+	healthzServer healthcheck.HealthzUpdater,
+	scheduler string,
+	nodePortAddresses []string,
+) (*MetaProxier, error) {
 
-	// TODO: Remove hard-coded ipv6
-	nodeIP := net.ParseIP("::1")
-	protocol := utiliptables.ProtocolIpv6
-	clusterCIDR := os.Getenv("CLUSTER_IPV6_CIDR")
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(ipt, ipvs, ipset, sysctl,
+		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
+		masqueradeAll, masqueradeBit, clusterCIDR, hostname, nodeIP,
+		recorder, healthzServer, scheduler, nodePortAddresses)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
+	}
+
+	// Create an ipv6 instance of the single-stack proxier
+
+	// TODO: Remove hard-coded values
+	nodeIP = net.ParseIP("::1")
+	clusterCIDR = os.Getenv("CLUSTER_IPV6_CIDR")
 	if clusterCIDR == "" {
 		clusterCIDR = "1100::/16"
 	}
 
-	var iptInterface utiliptables.Interface
-	var ipvsInterface utilipvs.Interface
-	var ipsetInterface utilipset.Interface
-	var dbus utildbus.Interface
+	dbus := utildbus.New()
+	ipt = utiliptables.New(exec, dbus, utiliptables.ProtocolIpv6)
 
-	// Create a iptables utils.
-	execer := exec.New()
-
-	dbus = utildbus.New()
-	iptInterface = utiliptables.New(execer, dbus, protocol)
-	ipsetInterface = utilipset.New(execer)
-	ipvsInterface = utilipvs.New(execer)
-
-	// Create event recorder
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-
-	proxier, err := NewProxier(
-		iptInterface,
-		ipvsInterface,
-		ipsetInterface,
-		utilsysctl.New(),
-		execer,
-		config.IPVS.SyncPeriod.Duration,
-		config.IPVS.MinSyncPeriod.Duration,
-		config.IPVS.ExcludeCIDRs,
-		config.IPVS.StrictARP,
-		config.IPTables.MasqueradeAll,
-		int(*config.IPTables.MasqueradeBit),
-		clusterCIDR,
-		hostname,
-		nodeIP,
-		nil, // recorder
-		nil, // healthzServer
-		config.IPVS.Scheduler,
-		config.NodePortAddresses,
-	)
+	ipv6Proxier, err := NewProxier(ipt, ipvs, ipset, sysctl,
+		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
+		masqueradeAll, masqueradeBit, clusterCIDR, hostname, nodeIP,
+		nil, nil, scheduler, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
-	return proxier, nil
+
+	// Return a meta-proxier that dispatch calls between the two
+	// single-stack proxier instances
+	return NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // internal struct for string service information

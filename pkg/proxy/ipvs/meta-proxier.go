@@ -27,7 +27,6 @@ import (
 type MetaProxier struct {
 	ipv4Proxier   proxy.ProxyProvider
 	ipv6Proxier   proxy.ProxyProvider
-	defaultFamily IpFamily
 }
 
 type IpFamily int
@@ -41,11 +40,10 @@ const (
 // NewMetaProxier returns a dual-stack "meta-proxier". Proxier API
 // calls will be dispatched to the ProxyProvider instances depending
 // on address family.
-func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.ProxyProvider, defaultFamily IpFamily) *MetaProxier {
+func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.ProxyProvider) *MetaProxier {
 	return &MetaProxier{
 		ipv4Proxier:   ipv4Proxier,
 		ipv6Proxier:   ipv6Proxier,
-		defaultFamily: defaultFamily,
 	}
 }
 
