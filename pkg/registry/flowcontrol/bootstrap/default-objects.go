@@ -161,10 +161,10 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 				Subjects: groups(user.NodesGroup),
 				Rule:     ruleRscAll},
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: users(user.KubeControllerManager, user.KubeScheduler),
+				Subjects: kubeSystemServiceAccount(rmv1a1.NameAll),
 				Rule:     resourceRule(verbAll, []string{apiGroupCore}, []string{"endpoints", "configmaps", "leases"})},
 			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: users(user.KubeControllerManager, user.KubeScheduler),
+				Subjects: kubeSystemServiceAccount(rmv1a1.NameAll),
 				Rule:     ruleNonRscAll},
 		),
 		fs("system-leader-election", "system", 2500,

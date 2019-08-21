@@ -260,7 +260,8 @@ message Subject {
   // +optional
   optional string apiGroup = 2;
 
-  // `name` of the object being referenced.
+  // `name` of the object being referenced.  To match regardless of name, use NameAll.
+  // Required.
   optional string name = 3;
 
   // `namespace` of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
