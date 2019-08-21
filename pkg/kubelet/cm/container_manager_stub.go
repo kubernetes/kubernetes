@@ -64,6 +64,10 @@ func (cm *containerManagerStub) UpdateQOSCgroups() error {
 	return nil
 }
 
+func (cm *containerManagerStub) UpdateNodeAllocatableCgroups(rl v1.ResourceList) error {
+	return nil
+}
+
 func (cm *containerManagerStub) Status() Status {
 	return Status{}
 }

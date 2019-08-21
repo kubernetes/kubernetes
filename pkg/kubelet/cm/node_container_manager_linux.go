@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -57,6 +57,37 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 		klog.Errorf("Failed to create %q cgroup", cm.cgroupRoot)
 		return err
 	}
+	return nil
+}
+
+func (cm *containerManagerImpl) updateInternalCapacity(rl v1.ResourceList) bool {
+	changed := false
+
+	for k, v := range rl {
+		if _, ok := cm.internalCapacity[k]; !ok {
+			continue
+		}
+
+		if !v.Equal(cm.internalCapacity[k]) {
+			klog.V(5).Infof("node allocatable resource %q has changed", k)
+			cm.internalCapacity[k] = v
+			changed = true
+		}
+	}
+
+	return changed
+}
+
+// UpdateNodeAllocatableCgroups updates cgroups for node allocatable resources.
+func (cm *containerManagerImpl) UpdateNodeAllocatableCgroups(rl v1.ResourceList) error {
+
+	if cm.updateInternalCapacity(rl) {
+		if err := cm.enforceNodeAllocatableCgroups(); err != nil {
+			klog.Errorf("Failed to enforce cgroups: %v", err)
+			return err
+		}
+	}
+
 	return nil
 }
 

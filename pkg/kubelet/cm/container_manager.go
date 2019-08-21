@@ -93,6 +93,9 @@ type ContainerManager interface {
 	// any registered device plugin resource
 	UpdatePluginResources(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
+	// UpdateNodeAllocatableCgroups updates cgroups for node allocatable resources.
+	UpdateNodeAllocatableCgroups(v1.ResourceList) error
+
 	InternalContainerLifecycle() InternalContainerLifecycle
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.

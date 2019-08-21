@@ -120,6 +120,10 @@ func (cm *containerManagerImpl) UpdateQOSCgroups() error {
 	return nil
 }
 
+func (cm *containerManagerImpl) UpdateNodeAllocatableCgroups(rl v1.ResourceList) error {
+	return nil
+}
+
 func (cm *containerManagerImpl) Status() Status {
 	return Status{}
 }

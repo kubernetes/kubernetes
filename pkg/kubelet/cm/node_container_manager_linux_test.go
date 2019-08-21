@@ -19,11 +19,14 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/tools/record"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -399,4 +402,161 @@ func getEphemeralStorageResourceList(storage string) v1.ResourceList {
 		res[v1.ResourceEphemeralStorage] = resource.MustParse(storage)
 	}
 	return res
+}
+
+func TestUpdateInternalCapacity(t *testing.T) {
+	tests := []struct {
+		name             string
+		internalCapacity v1.ResourceList
+		updatedList      v1.ResourceList
+		expectedCapacity v1.ResourceList
+		expectedOutput   bool
+	}{
+		{
+			name:             "Empty capacity",
+			internalCapacity: v1.ResourceList{},
+			updatedList:      v1.ResourceList{},
+			expectedCapacity: v1.ResourceList{},
+		},
+		{
+			name:             "irrelevant capacity update",
+			internalCapacity: v1.ResourceList{},
+			updatedList:      getResourceList("10", "10Gi"),
+			expectedCapacity: v1.ResourceList{},
+		},
+		{
+			name:             "CPU updated",
+			internalCapacity: getResourceList("12", "10Gi"),
+			updatedList:      getResourceList("10", "10Gi"),
+			expectedCapacity: getResourceList("10", "10Gi"),
+			expectedOutput:   true,
+		},
+		{
+			name:             "CPU and Mem updated",
+			internalCapacity: getResourceList("12", "10Gi"),
+			updatedList:      getResourceList("10", "12Gi"),
+			expectedCapacity: getResourceList("10", "12Gi"),
+			expectedOutput:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			node := &v1.Node{}
+			node.Name = "test"
+			cm := &containerManagerImpl{
+				internalCapacity: test.internalCapacity.DeepCopy(),
+				nodeInfo:         node,
+			}
+
+			actualOutput := cm.updateInternalCapacity(test.updatedList)
+
+			if test.expectedOutput != actualOutput {
+				t.Errorf("failed update: expected output - %v, but actually got - %v",
+					test.expectedOutput, actualOutput)
+			}
+
+			if !apiequality.Semantic.DeepEqual(cm.internalCapacity, test.expectedCapacity) {
+				t.Errorf("failed update: expected change - %+v, but actually got - %+v",
+					test.expectedCapacity, cm.internalCapacity)
+			}
+		})
+	}
+}
+
+type mockCgroupManager struct{}
+
+func (m *mockCgroupManager) Name(_ CgroupName) string {
+	return ""
+}
+
+func (m *mockCgroupManager) CgroupName(name string) CgroupName {
+	return CgroupName([]string{})
+}
+
+func (m *mockCgroupManager) Create(_ *CgroupConfig) error {
+	return nil
+}
+
+func (m *mockCgroupManager) Exists(_ CgroupName) bool {
+	return false
+}
+
+func (m *mockCgroupManager) Destroy(_ *CgroupConfig) error {
+	return nil
+}
+
+func (m *mockCgroupManager) Update(_ *CgroupConfig) error {
+	return fmt.Errorf("fake error")
+}
+
+func (m *mockCgroupManager) GetResourceStats(name CgroupName) (*ResourceStats, error) {
+	return nil, fmt.Errorf("fake error")
+}
+
+func (m *mockCgroupManager) Pids(_ CgroupName) []int {
+	return nil
+}
+
+func (m *mockCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
+	return nil
+}
+
+func TestUpdateNodeAllocatableCgroups(t *testing.T) {
+	tests := []struct {
+		name             string
+		internalCapacity v1.ResourceList
+		updatedList      v1.ResourceList
+		expectedCapacity v1.ResourceList
+	}{
+		{
+			name:             "Empty capacity",
+			internalCapacity: v1.ResourceList{},
+			updatedList:      v1.ResourceList{},
+			expectedCapacity: v1.ResourceList{},
+		},
+		{
+			name:             "irrelevant capacity update",
+			internalCapacity: v1.ResourceList{},
+			updatedList:      getResourceList("10", "10Gi"),
+			expectedCapacity: v1.ResourceList{},
+		},
+		{
+			name:             "CPU updated",
+			internalCapacity: getResourceList("12", "10Gi"),
+			updatedList:      getResourceList("10", "10Gi"),
+			expectedCapacity: getResourceList("10", "10Gi"),
+		},
+		{
+			name:             "CPU and Mem updated",
+			internalCapacity: getResourceList("12", "10Gi"),
+			updatedList:      getResourceList("10", "12Gi"),
+			expectedCapacity: getResourceList("10", "12Gi"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			node := &v1.Node{}
+			node.Name = "test"
+			cm := &containerManagerImpl{
+				internalCapacity: test.internalCapacity.DeepCopy(),
+				nodeInfo:         node,
+
+				// Set these fields to cover the goroutine in enforceNodeAllocatableCgroups()
+				cgroupRoot:    []string{"fake_root"},
+				cgroupManager: &mockCgroupManager{},
+				recorder:      &record.FakeRecorder{},
+			}
+
+			// TODO(rojkov): we don't check errors here because they are simply propagated from
+			// cm.enforceNodeAllocatableCgroups() which needs to be covered with its own unit tests.
+			_ = cm.UpdateNodeAllocatableCgroups(test.updatedList)
+
+			if !apiequality.Semantic.DeepEqual(cm.internalCapacity, test.expectedCapacity) {
+				t.Errorf("failed update: expected change - %+v, but actually got - %+v",
+					test.expectedCapacity, cm.internalCapacity)
+			}
+		})
+	}
 }

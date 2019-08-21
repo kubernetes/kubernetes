@@ -511,6 +511,10 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		}
 	}
 
+	if err := kl.containerManager.UpdateNodeAllocatableCgroups(node.Status.Capacity); err != nil {
+		klog.Errorf("Failed to update cgroups for node allocatable resources: %v", err)
+	}
+
 	// Patch the current status on the API server
 	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)
 	if err != nil {
