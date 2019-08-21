@@ -240,6 +240,7 @@ func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool,
 			matchingpriorityLevelName = fs.Spec.PriorityLevelConfiguration.Name
 			matchingFlowDistinguisherMethod = fs.Spec.DistinguisherMethod
 		default: // reject
+			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v because no FlowSchema matched", requestDigest.RequestInfo, requestDigest.User)
 			return false, func() {}
 		}
 
@@ -250,13 +251,18 @@ func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool,
 		// 3. executing
 		ps := rmState.priorityLevelStates[matchingpriorityLevelName]
 		if ps.config.Exempt {
-			klog.V(7).Infof("Serving %v without delay", requestDigest)
+			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q without delay", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 			return true, func() {}
 		}
 		quiescent, execute, afterExecute := ps.queues.Wait(hashValue, ps.config.HandSize)
 		if quiescent {
-			klog.V(5).Infof("Request %v landed in timing splinter, re-classifying", requestDigest)
+			klog.V(5).Infof("Request requestInfo=%v, user=%v, fs=%q landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 			continue
+		}
+		if execute {
+			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
+		} else {
+			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 		}
 		return execute, afterExecute
 	}
