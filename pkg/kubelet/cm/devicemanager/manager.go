@@ -192,7 +192,7 @@ func (m *ManagerImpl) checkpointFile() string {
 	return filepath.Join(m.socketdir, kubeletDeviceManagerCheckpoint)
 }
 
-// Start starts the Device Plugin Manager and start initialization of
+// Start starts the Device Plugin Manager and starts initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
@@ -223,8 +223,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 
 	s, err := net.Listen("unix", socketPath)
 	if err != nil {
-		klog.Errorf(errListenSocket+" %v", err)
-		return err
+		return fmt.Errorf(errListenSocket+" %v", err)
 	}
 
 	m.wg.Add(1)
