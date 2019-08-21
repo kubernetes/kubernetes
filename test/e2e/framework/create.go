@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -81,7 +80,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
 		data, err := testfiles.Read(fileName)
 		if err != nil {
-			e2elog.Failf("reading manifest file: %v", err)
+			Failf("reading manifest file: %v", err)
 		}
 
 		// Split at the "---" separator before working on
@@ -117,7 +116,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 func (f *Framework) PatchItems(items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
-		// e2elog.Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
+		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
 		if err := f.patchItemRecursively(item); err != nil {
 			return err
 		}
@@ -156,7 +155,7 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		// to non-namespaced items.
 		for _, destructor := range destructors {
 			if err := destructor(); err != nil && !apierrs.IsNotFound(err) {
-				e2elog.Logf("deleting failed: %s", err)
+				Logf("deleting failed: %s", err)
 			}
 		}
 	}
@@ -169,12 +168,12 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		description := DescribeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
-		e2elog.Logf("creating %s", description)
+		Logf("creating %s", description)
 		for _, factory := range factories {
 			destructor, err := factory.Create(f, item)
 			if destructor != nil {
 				destructors = append(destructors, func() error {
-					e2elog.Logf("deleting %s", description)
+					Logf("deleting %s", description)
 					return destructor()
 				})
 			}
@@ -417,7 +416,7 @@ func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, er
 		return nil, errorItemNotSupported
 	}
 
-	e2elog.Logf("Define cluster role %v", item.GetName())
+	Logf("Define cluster role %v", item.GetName())
 	client := f.ClientSet.RbacV1().ClusterRoles()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRole")
