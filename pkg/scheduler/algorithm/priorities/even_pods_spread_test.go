@@ -493,7 +493,4 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 	}
 }
 
-var (
-	hardSpread = v1.DoNotSchedule
-	softSpread = v1.ScheduleAnyway
-)
+var softSpread = v1.ScheduleAnyway

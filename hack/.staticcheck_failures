@@ -47,11 +47,6 @@ pkg/registry/core/service/ipallocator
 pkg/registry/core/service/portallocator
 pkg/registry/core/service/storage
 pkg/registry/extensions/controller/storage
-pkg/scheduler
-pkg/scheduler/algorithm/predicates
-pkg/scheduler/algorithm/priorities
-pkg/scheduler/api/v1
-pkg/scheduler/internal/queue
 pkg/util/coverage
 pkg/util/ebtables
 pkg/util/ipconfig

@@ -145,7 +145,7 @@ type UtilizationShapePoint struct {
 // ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
 type ResourceSpec struct {
 	// Name of the resource to be managed by RequestedToCapacityRatio function.
-	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
+	Name apiv1.ResourceName `json:"name"`
 	// Weight of the resource.
 	Weight int64 `json:"weight,omitempty"`
 }
@@ -154,7 +154,7 @@ type ResourceSpec struct {
 // managed by an extender.
 type ExtenderManagedResource struct {
 	// Name is the extended resource name.
-	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
+	Name apiv1.ResourceName `json:"name"`
 	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
 	// resource when applying predicates.
 	IgnoredByScheduler bool `json:"ignoredByScheduler,omitempty"`
