@@ -34,6 +34,15 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+var(
+
+	defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
+)
+const(
+
+	dockerNetNSFmt = "/proc/%v/ns/net"
+
+)
 func DefaultMemorySwap() int64 {
 	return 0
 }
@@ -117,7 +126,7 @@ func (ds *dockerService) updateCreateConfig(
 		// Note: ShmSize is handled in kube_docker_client.go
 
 		// Apply security context.
-		if err := applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, createConfig.HostConfig, securityOptSep); err != nil {
+		if err := ApplyContainerSecurityContext(lc, podSandboxID, createConfig.Config, createConfig.HostConfig, securityOptSep); err != nil {
 			return fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
 		}
 		modifyContainerPIDNamespaceOverrides(apiVersion, createConfig.HostConfig, podSandboxID)

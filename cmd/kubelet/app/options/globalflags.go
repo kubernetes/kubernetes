@@ -51,6 +51,17 @@ func normalize(s string) string {
 	return strings.Replace(s, "_", "-", -1)
 }
 
+// Register adds a flag to local that targets the Value associated with the Flag named globalName in global
+func Register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
+	if f := global.Lookup(globalName); f != nil {
+		pflagFlag := pflag.PFlagFromGoFlag(f)
+		pflagFlag.Name = normalize(pflagFlag.Name)
+		local.AddFlag(pflagFlag)
+	} else {
+		panic(fmt.Sprintf("failed to find flag in global flagset (flag): %s", globalName))
+	}
+}
+
 // pflagRegister adds a flag to local that targets the Value associated with the Flag named globalName in global
 func pflagRegister(global, local *pflag.FlagSet, globalName string) {
 	if f := global.Lookup(globalName); f != nil {
@@ -59,6 +70,12 @@ func pflagRegister(global, local *pflag.FlagSet, globalName string) {
 	} else {
 		panic(fmt.Sprintf("failed to find flag in global flagset (pflag): %s", globalName))
 	}
+}
+
+// RegisterDeprecated registers the flag with register, and then marks it deprecated
+func RegisterDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
+	Register(global, local, globalName)
+	local.Lookup(normalize(globalName)).Deprecated = deprecated
 }
 
 // addCredentialProviderFlags adds flags from k8s.io/kubernetes/pkg/credentialprovider

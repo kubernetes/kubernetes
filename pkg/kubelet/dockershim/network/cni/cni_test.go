@@ -76,6 +76,7 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	f, err = os.Create(pluginExec)
 	require.NoError(t, err)
 
+
 	const execScriptTempl = `#!/usr/bin/env bash
 cat > {{.InputFile}}
 env > {{.OutputEnv}}
@@ -333,6 +334,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	output, err = ioutil.ReadFile(outputFile)
 	require.NoError(t, err)
+
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))

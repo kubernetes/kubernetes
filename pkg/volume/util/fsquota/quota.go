@@ -44,6 +44,6 @@ type Interface interface {
 	ClearQuota(m mount.Interface, path string) error
 }
 
-func enabledQuotasForMonitoring() bool {
+func EnabledQuotasForMonitoring() bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }

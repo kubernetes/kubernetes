@@ -228,6 +228,9 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 	if !supportsQuotas {
 		return nil
 	}
+	if err != nil {
+		klog.V(3).Infof("Attempt to get support quotas failed: %v", err)
+	}
 	projid, err := getQuotaOnDir(m, path)
 	if err == nil && projid != common.BadQuotaID {
 		// This means that we have a quota on the directory but
@@ -260,7 +263,7 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 // However, do cache the device->applier map; the number of devices
 // is bounded.
 func SupportsQuotas(m mount.Interface, path string) (bool, error) {
-	if !enabledQuotasForMonitoring() {
+	if !EnabledQuotasForMonitoring() {
 		klog.V(3).Info("SupportsQuotas called, but quotas disabled")
 		return false, nil
 	}
@@ -388,7 +391,7 @@ func GetInodes(path string) (*resource.Quantity, error) {
 // ClearQuota -- remove the quota assigned to a directory
 func ClearQuota(m mount.Interface, path string) error {
 	klog.V(3).Infof("ClearQuota %s", path)
-	if !enabledQuotasForMonitoring() {
+	if !EnabledQuotasForMonitoring() {
 		return fmt.Errorf("ClearQuota called, but quotas disabled")
 	}
 	quotaLock.Lock()
@@ -409,10 +412,10 @@ func ClearQuota(m mount.Interface, path string) error {
 		return fmt.Errorf("ClearQuota: No quota available for %s", path)
 	}
 	var err error
-	projid, err := getQuotaOnDir(m, path)
-	if projid != dirQuotaMap[path] {
+	projid, err  := getQuotaOnDir(m, path)
+	if err == nil && projid != dirQuotaMap[path] {
 		return fmt.Errorf("Expected quota ID %v on dir %s does not match actual %v", dirQuotaMap[path], path, projid)
-	}
+	} 
 	count, ok := podDirCountMap[poduid]
 	if count <= 1 || !ok {
 		err = clearQuotaOnDir(m, path)

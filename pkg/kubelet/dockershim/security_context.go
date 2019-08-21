@@ -58,6 +58,23 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 	return nil
 }
 
+// ApplyContainerSecurityContext updates docker container options according to security context.
+func ApplyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, podSandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) error {
+	if lc == nil {
+		return nil
+	}
+
+	err := modifyContainerConfig(lc.SecurityContext, config)
+	if err != nil {
+		return err
+	}
+	if err := modifyHostConfig(lc.SecurityContext, hc, separator); err != nil {
+		return err
+	}
+	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), podSandboxID, hc)
+	return nil
+}
+
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
 func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) error {
 	if sc == nil {

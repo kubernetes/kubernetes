@@ -33,7 +33,6 @@ pkg/kubelet/cm/devicemanager
 pkg/kubelet/pluginmanager/operationexecutor
 pkg/kubelet/config
 pkg/kubelet/container/testing
-pkg/kubelet/dockershim/libdocker
 pkg/kubelet/eviction
 pkg/kubelet/kubeletconfig/checkpoint
 pkg/kubelet/kuberuntime
@@ -96,9 +95,6 @@ pkg/volume/quobyte
 pkg/volume/rbd
 pkg/volume/scaleio
 pkg/volume/storageos
-pkg/volume/util/fsquota
-pkg/volume/util/fsquota/common
-pkg/volume/util/operationexecutor
 pkg/volume/vsphere_volume
 plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/podnodeselector

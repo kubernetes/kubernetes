@@ -258,7 +258,7 @@ func dummyQuotaTest() mount.Interface {
 }
 
 func dummySetFSInfo(path string) {
-	if enabledQuotasForMonitoring() {
+	if EnabledQuotasForMonitoring() {
 		for _, mount := range dummyMountPoints {
 			if strings.HasPrefix(path, mount.Path) {
 				mountpointMap[path] = mount.Path
