@@ -17,7 +17,7 @@ function start_internal_ca {
 
   # Re-using Cluster Autoscaler setup functions from OSS
   setup-addon-manifests "addons" "rbac/cluster-autoscaler"
-  create-clusterautoscaler-kubeconfig
+  create-kubeconfig "cluster-autoscaler" ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
   prepare-log-file /var/log/cluster-autoscaler.log
 
   # Add our GKE specific CRD
