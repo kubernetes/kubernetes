@@ -27,7 +27,7 @@ type revision struct {
 	// main is the main revision of a set of changes that happen atomically.
 	main int64
 
-	// sub is the the sub revision of a change in a set of changes that happen
+	// sub is the sub revision of a change in a set of changes that happen
 	// atomically. Each change has different increasing sub revision in that
 	// set.
 	sub int64

@@ -200,7 +200,7 @@ func ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Asse
 // Then
 //    Eventually(FetchFromDB).Should(Equal("hasselhoff"))
 //
-// Will pass only if the the returned error is nil and the returned string passes the matcher.
+// Will pass only if the returned error is nil and the returned string passes the matcher.
 //
 // Eventually's default timeout is 1 second, and its default polling interval is 10ms
 func Eventually(actual interface{}, intervals ...interface{}) AsyncAssertion {

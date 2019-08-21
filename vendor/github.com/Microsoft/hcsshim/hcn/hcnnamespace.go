@@ -327,7 +327,7 @@ func (namespace *HostComputeNamespace) Delete() error {
 // hosting those endpoints. It is safe to call for any `NamespaceType` but
 // `NamespaceTypeGuest` is the only case when a sync will actually occur. For
 // `NamespaceTypeHost` the process container will be automatically synchronized
-// when the the endpoint is added via `AddNamespaceEndpoint`.
+// when the endpoint is added via `AddNamespaceEndpoint`.
 //
 // Note: This method sync's both additions and removals of endpoints from a
 // `NamespaceTypeGuest` namespace.

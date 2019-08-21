@@ -24,7 +24,7 @@ var xvalues = [256]byte{
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 }
 
-// xtob converts the the first two hex bytes of x into a byte.
+// xtob converts the first two hex bytes of x into a byte.
 func xtob(x string) (byte, bool) {
 	b1 := xvalues[x[0]]
 	b2 := xvalues[x[1]]

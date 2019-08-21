@@ -212,7 +212,7 @@ func init() {
 //	\\LogicalDisk(C:)\% Free Space
 //
 // To view all (internationalized...) counters on a system, there are three non-programmatic ways: perfmon utility,
-// the typeperf command, and the the registry editor. perfmon.exe is perhaps the easiest way, because it's basically a
+// the typeperf command, and the registry editor. perfmon.exe is perhaps the easiest way, because it's basically a
 // full implemention of the pdh.dll API, except with a GUI and all that. The registry setting also provides an
 // interface to the available counters, and can be found at the following key:
 //

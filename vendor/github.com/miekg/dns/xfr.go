@@ -162,7 +162,7 @@ func (t *Transfer) inIxfr(q *Msg, c chan *Envelope) {
 			if v, ok := rr.(*SOA); ok {
 				if v.Serial == serial {
 					n++
-					// quit if it's a full axfr or the the servers' SOA is repeated the third time
+					// quit if it's a full axfr or the servers' SOA is repeated the third time
 					if axfr && n == 2 || n == 3 {
 						c <- &Envelope{in.Answer, nil}
 						return

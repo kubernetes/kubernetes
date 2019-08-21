@@ -30,7 +30,7 @@ type DetailedError struct {
 	Original error
 
 	// PackageType is the package type of the object emitting the error. For types, the value
-	// matches that produced the the '%T' format specifier of the fmt package. For other elements,
+	// matches that produced the '%T' format specifier of the fmt package. For other elements,
 	// such as functions, it is just the package name (e.g., "autorest").
 	PackageType string
 

@@ -185,7 +185,7 @@ func Dial(network, addr string, config *ClientConfig) (*Client, error) {
 // keys.  A HostKeyCallback must return nil if the host key is OK, or
 // an error to reject it. It receives the hostname as passed to Dial
 // or NewClientConn. The remote address is the RemoteAddr of the
-// net.Conn underlying the the SSH connection.
+// net.Conn underlying the SSH connection.
 type HostKeyCallback func(hostname string, remote net.Addr, key PublicKey) error
 
 // BannerCallback is the function type used for treat the banner sent by

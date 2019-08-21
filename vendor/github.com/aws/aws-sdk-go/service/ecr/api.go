@@ -5477,7 +5477,7 @@ func (s *Tag) SetValue(v string) *Tag {
 type TagResourceInput struct {
 	_ struct{} `type:"structure"`
 
-	// The Amazon Resource Name (ARN) of the the resource to which to add tags.
+	// The Amazon Resource Name (ARN) of the resource to which to add tags.
 	// Currently, the only supported resource is an Amazon ECR repository.
 	//
 	// ResourceArn is a required field

@@ -26,7 +26,7 @@ import (
 	"net/http"
 )
 
-// AccountsClient is the the Azure Storage Management API.
+// AccountsClient is the Azure Storage Management API.
 type AccountsClient struct {
 	BaseClient
 }

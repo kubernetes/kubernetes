@@ -26,7 +26,7 @@ import (
 	"net/http"
 )
 
-// BlobServicesClient is the the Azure Storage Management API.
+// BlobServicesClient is the Azure Storage Management API.
 type BlobServicesClient struct {
 	BaseClient
 }

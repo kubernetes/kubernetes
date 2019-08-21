@@ -85,7 +85,7 @@ func CompareDomainName(s1, s2 string) (n int) {
 	return
 }
 
-// CountLabel counts the the number of labels in the string s.
+// CountLabel counts the number of labels in the string s.
 // s must be a syntactically valid domain name.
 func CountLabel(s string) (labels int) {
 	if s == "." {

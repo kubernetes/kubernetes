@@ -302,7 +302,7 @@ func errorString(ret C.nvmlReturn_t) error {
 	return fmt.Errorf("nvml: %v", err)
 }
 
-// SystemDriverVersion returns the the driver version on the system.
+// SystemDriverVersion returns the driver version on the system.
 func SystemDriverVersion() (string, error) {
 	if C.nvmlHandle == nil {
 		return "", errLibraryNotLoaded

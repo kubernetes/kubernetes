@@ -26,7 +26,7 @@ import (
 	"net/http"
 )
 
-// UsagesClient is the the Azure Storage Management API.
+// UsagesClient is the Azure Storage Management API.
 type UsagesClient struct {
 	BaseClient
 }

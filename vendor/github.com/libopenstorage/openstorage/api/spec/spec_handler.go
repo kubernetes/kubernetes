@@ -31,7 +31,7 @@ type SpecHandler interface {
 		string,
 	)
 
-	// SpecFromOpts parses in docker options passed in the the docker run
+	// SpecFromOpts parses in docker options passed in the docker run
 	// command of the form --opt name=value
 	// source is populated if --opt parent=<volume_id> is specified.
 	// If the options are validated then it returns:

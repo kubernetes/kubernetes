@@ -100,7 +100,7 @@ func (c *Cholesky) At(i, j int) float64 {
 	return val
 }
 
-// T returns the the receiver, the transpose of a symmetric matrix.
+// T returns the receiver, the transpose of a symmetric matrix.
 func (c *Cholesky) T() Matrix {
 	return c
 }

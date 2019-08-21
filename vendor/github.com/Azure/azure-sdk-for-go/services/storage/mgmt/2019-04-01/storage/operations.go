@@ -25,7 +25,7 @@ import (
 	"net/http"
 )
 
-// OperationsClient is the the Azure Storage Management API.
+// OperationsClient is the Azure Storage Management API.
 type OperationsClient struct {
 	BaseClient
 }

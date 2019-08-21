@@ -2192,7 +2192,7 @@ nvmlReturn_t DECLDIR nvmlDeviceGetUUID(nvmlDevice_t device, char *uuid, unsigned
 nvmlReturn_t DECLDIR nvmlDeviceGetMinorNumber(nvmlDevice_t device, unsigned int *minorNumber);
 
 /**
- * Retrieves the the device board part number which is programmed into the board's InfoROM
+ * Retrieves the device board part number which is programmed into the board's InfoROM
  *
  * For all products.
  *

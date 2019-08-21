@@ -99,7 +99,7 @@ func (w *Watcher) Add(name string) error {
 	return err
 }
 
-// Remove stops watching the the named file or directory (non-recursively).
+// Remove stops watching the named file or directory (non-recursively).
 func (w *Watcher) Remove(name string) error {
 	name = filepath.Clean(name)
 	w.mu.Lock()
