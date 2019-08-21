@@ -19,6 +19,7 @@ package statefulset
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strconv"
 	"testing"
@@ -285,6 +286,39 @@ func TestCreateApplyRevision(t *testing.T) {
 	}
 	if value != expectedValue {
 		t.Errorf("for annotation %s wanted %s got %s", key, expectedValue, value)
+	}
+}
+
+func TestRollingUpdateApplyRevision(t *testing.T) {
+	set := newStatefulSet(1)
+	set.Status.CollisionCount = new(int32)
+	currentSet := set.DeepCopy()
+	currentRevision, err := newRevision(set, 1, set.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	set.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
+	updateSet := set.DeepCopy()
+	updateRevision, err := newRevision(set, 2, set.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	restoredCurrentSet, err := ApplyRevision(set, currentRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(currentSet.Spec.Template, restoredCurrentSet.Spec.Template) {
+		t.Errorf("want %v got %v", currentSet.Spec.Template, restoredCurrentSet.Spec.Template)
+	}
+
+	restoredUpdateSet, err := ApplyRevision(set, updateRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(updateSet.Spec.Template, restoredUpdateSet.Spec.Template) {
+		t.Errorf("want %v got %v", updateSet.Spec.Template, restoredUpdateSet.Spec.Template)
 	}
 }
 
