@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
+	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -50,6 +51,8 @@ type manager struct {
 	podMap map[string]string
 	//Topology Manager Policy
 	policy Policy
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
 }
 
 //HintProvider interface is to be implemented by Hint Providers
@@ -73,7 +76,7 @@ type TopologyHint struct {
 var _ Manager = &manager{}
 
 //NewManager creates a new TopologyManager based on provided policy
-func NewManager(topologyPolicyName string) (Manager, error) {
+func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
 	var policy Policy
 
@@ -92,6 +95,11 @@ func NewManager(topologyPolicyName string) (Manager, error) {
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
 
+	var numaNodes []int
+	for node := range numaNodeInfo {
+		numaNodes = append(numaNodes, node)
+	}
+
 	var hp []HintProvider
 	pth := make(map[string]map[string]TopologyHint)
 	pm := make(map[string]string)
@@ -100,6 +108,7 @@ func NewManager(topologyPolicyName string) (Manager, error) {
 		podTopologyHints: pth,
 		podMap:           pm,
 		policy:           policy,
+		numaNodes:        numaNodes,
 	}
 
 	return manager, nil
@@ -149,12 +158,9 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 
 // Merge the hints from all hint providers to find the best one.
 func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
-	// Set the default hint to return from this function as an any-numa
-	// affinity with an unpreferred allocation. This will only be returned if
-	// no better hint can be found when merging hints from each hint provider.
-	defaultAffinity, _ := socketmask.NewSocketMask()
-	defaultAffinity.Fill()
-	defaultHint := TopologyHint{defaultAffinity, false}
+	// Set the default affinity as an any-numa affinity containing the list
+	// of NUMA Nodes available on this machine.
+	defaultAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
 
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
@@ -167,9 +173,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
-			affinity, _ := socketmask.NewSocketMask()
-			affinity.Fill()
-			allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
+			allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
 			continue
 		}
 
@@ -177,17 +181,13 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		for resource := range hints {
 			if hints[resource] == nil {
 				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
-				affinity, _ := socketmask.NewSocketMask()
-				affinity.Fill()
-				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
-				affinity, _ := socketmask.NewSocketMask()
-				affinity.Fill()
-				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, false}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, false}})
 				continue
 			}
 
@@ -199,8 +199,8 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 	// hints in each permutation by taking the bitwise-and of their affinity masks.
 	// Return the hint with the narrowest NUMANodeAffinity of all merged
 	// permutations that have at least one NUMA ID set. If no merged mask can be
-	// found that has at least one NUMA ID set, return the 'defaultHint'.
-	bestHint := defaultHint
+	// found that has at least one NUMA ID set, return the 'defaultAffinity'.
+	bestHint := TopologyHint{defaultAffinity, false}
 	m.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
@@ -217,8 +217,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		}
 
 		// Merge the affinities using a bitwise-and operation.
-		mergedAffinity, _ := socketmask.NewSocketMask()
-		mergedAffinity.Fill()
+		mergedAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
 		mergedAffinity.And(numaAffinities...)
 
 		// Build a mergedHintfrom the merged affinity mask, indicating if an

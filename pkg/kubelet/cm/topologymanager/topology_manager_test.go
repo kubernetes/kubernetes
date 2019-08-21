@@ -33,12 +33,6 @@ func NewTestSocketMask(sockets ...int) socketmask.SocketMask {
 	return s
 }
 
-func NewTestSocketMaskFull() socketmask.SocketMask {
-	s, _ := socketmask.NewSocketMask()
-	s.Fill()
-	return s
-}
-
 func TestNewManager(t *testing.T) {
 	tcases := []struct {
 		description    string
@@ -64,7 +58,7 @@ func TestNewManager(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(tc.policyName)
+		mngr, err := NewManager(nil, tc.policyName)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -111,6 +105,8 @@ func TestGetAffinity(t *testing.T) {
 }
 
 func TestCalculateAffinity(t *testing.T) {
+	numaNodes := []int{0, 1}
+
 	tcases := []struct {
 		name     string
 		hp       []HintProvider
@@ -120,7 +116,7 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "TopologyHint not set",
 			hp:   []HintProvider{},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -132,7 +128,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -146,7 +142,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -160,7 +156,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        false,
 			},
 		},
@@ -179,7 +175,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -198,7 +194,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -343,7 +339,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMaskFull(),
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
 				Preferred:        false,
 			},
 		},
@@ -662,8 +658,10 @@ func TestCalculateAffinity(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr := manager{}
-		mngr.hintProviders = tc.hp
+		mngr := manager{
+			hintProviders: tc.hp,
+			numaNodes:     numaNodes,
+		}
 		actual := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
 		if !actual.NUMANodeAffinity.IsEqual(tc.expected.NUMANodeAffinity) {
 			t.Errorf("Expected NUMANodeAffinity in result to be %v, got %v", tc.expected.NUMANodeAffinity, actual.NUMANodeAffinity)
@@ -926,10 +924,13 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		man := manager{}
-		man.policy = tc.policy
-		man.podTopologyHints = make(map[string]map[string]TopologyHint)
-		man.hintProviders = tc.hp
+		man := manager{
+			policy:           tc.policy,
+			podTopologyHints: make(map[string]map[string]TopologyHint),
+			hintProviders:    tc.hp,
+			numaNodes:        []int{0, 1},
+		}
+
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -938,10 +939,15 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
+			Status: v1.PodStatus{
+				QOSClass: tc.qosClass,
+			},
 		}
-		podAttr := lifecycle.PodAdmitAttributes{}
-		pod.Status.QOSClass = tc.qosClass
-		podAttr.Pod = pod
+
+		podAttr := lifecycle.PodAdmitAttributes{
+			Pod: pod,
+		}
+
 		actual := man.Admit(&podAttr)
 		if actual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, actual.Admit)
