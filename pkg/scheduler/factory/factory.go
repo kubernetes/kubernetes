@@ -207,6 +207,8 @@ type ConfigFactoryArgs struct {
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
+	BackOffInitialDurationSecond   int32
+	BackOffMaxDurationSecond       int32
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
 	Plugins                        *config.Plugins
@@ -240,7 +242,9 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 
 	c := &Configurator{
 		client:                         args.Client,
-		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
+		podQueue:                       internalqueue.NewSchedulingQueueWithBackOffDurations(
+			stopEverything, framework, args.BackOffInitialDurationSecond, args.BackOffMaxDurationSecond,
+		),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),

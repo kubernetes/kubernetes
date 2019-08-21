@@ -191,7 +191,10 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds))
+		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds),
+		scheduler.WithBackOffInitialDurationSecond(cc.ComponentConfig.BackOffInitialDurationSecond),
+		scheduler.WithBackOffMaxDurationSecond(cc.ComponentConfig.BackOffMaxDurationSecond),
+	)
 	if err != nil {
 		return err
 	}

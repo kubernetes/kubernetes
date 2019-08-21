@@ -1198,7 +1198,7 @@ func TestPodTimestamp(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueueWithClockAndBackOffDurations(nil, clock.NewFakeClock(timestamp), nil, BackOffInitialDurationSecond, BackOffMaxDurationSecond)
 			var podInfoList []*framework.PodInfo
 
 			for i, op := range test.operations {
@@ -1328,7 +1328,7 @@ func TestPendingPodsMetric(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueueWithClockAndBackOffDurations(nil, clock.NewFakeClock(timestamp), nil, BackOffInitialDurationSecond, BackOffMaxDurationSecond)
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)

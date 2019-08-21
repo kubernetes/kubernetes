@@ -44,6 +44,8 @@ import (
 )
 
 var (
+	BackOffInitialDurationSecond = int32(1)
+	BackOffMaxDurationSecond = int32(10)
 	queueClosed = "scheduling queue is closed"
 )
 
@@ -87,9 +89,14 @@ type SchedulingQueue interface {
 	NumUnschedulablePods() int
 }
 
-// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
+// NewSchedulingQueue initializes a priority queue as a new scheduling queue with default backoff durations.
 func NewSchedulingQueue(stop <-chan struct{}, fwk framework.Framework) SchedulingQueue {
-	return NewPriorityQueue(stop, fwk)
+	return NewPriorityQueueWithBackOffDurations(stop, fwk, BackOffInitialDurationSecond, BackOffMaxDurationSecond)
+}
+
+// NewSchedulingQueue initializes a priority queue as a new scheduling queue with specified backoff durations
+func NewSchedulingQueueWithBackOffDurations(stop <-chan struct{}, fwk framework.Framework, backOffInitialDurationSecond, backOffMaxDurationSeconds int32) SchedulingQueue {
+	return NewPriorityQueueWithBackOffDurations(stop, fwk, backOffInitialDurationSecond, backOffMaxDurationSeconds)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -159,13 +166,17 @@ func activeQComp(podInfo1, podInfo2 interface{}) bool {
 	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 
-// NewPriorityQueue creates a PriorityQueue object.
+// NewPriorityQueue creates a PriorityQueue object with default BackOff durations.
 func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
-	return NewPriorityQueueWithClock(stop, util.RealClock{}, fwk)
+	return NewPriorityQueueWithClockAndBackOffDurations(stop, util.RealClock{}, fwk, BackOffInitialDurationSecond, BackOffMaxDurationSecond)
 }
 
-// NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
-func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
+func NewPriorityQueueWithBackOffDurations(stop <-chan struct{}, fwk framework.Framework, backOffInitialDurationSecond, backOffMaxDurationSeconds int32) *PriorityQueue {
+	return NewPriorityQueueWithClockAndBackOffDurations(stop, util.RealClock{}, fwk, backOffInitialDurationSecond, backOffMaxDurationSeconds)
+}
+
+// NewPriorityQueueWithClockAndBackOffDurations creates a PriorityQueue which uses the passed clock for time.
+func NewPriorityQueueWithClockAndBackOffDurations(stop <-chan struct{}, clock util.Clock, fwk framework.Framework, backOffInitialDurationSecond, backOffMaxDurationSeconds int32) *PriorityQueue {
 	comp := activeQComp
 	if fwk != nil {
 		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
@@ -181,7 +192,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk frame
 	pq := &PriorityQueue{
 		clock:            clock,
 		stop:             stop,
-		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
+		podBackoff:       NewPodBackoffMap(time.Duration(backOffInitialDurationSecond)*time.Second, time.Duration(backOffMaxDurationSeconds)*time.Second),
 		activeQ:          util.NewHeapWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),

@@ -47,6 +47,14 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
 			cc.PercentageOfNodesToScore, "not in valid range 0-100"))
 	}
+	if cc.BackOffInitialDurationSecond < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("backOffInitialDurationSecond"),
+			cc.BackOffInitialDurationSecond, "not in valid range 0-"))
+	}
+	if cc.BackOffMaxDurationSecond < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("backOffMaxDurationSecond"),
+			cc.BackOffMaxDurationSecond, "not in valid range 0-"))
+	}
 	return allErrs
 }
 

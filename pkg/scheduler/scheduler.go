@@ -50,6 +50,8 @@ import (
 const (
 	// BindTimeoutSeconds defines the default bind timeout
 	BindTimeoutSeconds = 100
+	BackOffInitialDurationSecond = 1
+	BackOffMaxDurationSecond = 10
 	// SchedulerError is the reason recorded for events when an error occurs during scheduling a pod.
 	SchedulerError = "SchedulerError"
 )
@@ -114,6 +116,8 @@ type schedulerOptions struct {
 	disablePreemption              bool
 	percentageOfNodesToScore       int32
 	bindTimeoutSeconds             int64
+	backOffInitialDurationSecond   int32
+	backOffMaxDurationSecond       int32
 }
 
 // Option configures a Scheduler
@@ -154,12 +158,28 @@ func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 	}
 }
 
+// WithBackOffInitialDurationSecond sets backOffInitialDurationSecond for Scheduler, the default value is 1
+func WithBackOffInitialDurationSecond(backOffInitialDurationSecond int32) Option {
+	return func(o *schedulerOptions) {
+		o.backOffInitialDurationSecond = backOffInitialDurationSecond
+	}
+}
+
+// WithBackOffMaxDurationSecond sets backOffMaxDurationSecond for Scheduler, the default value is 10
+func WithBackOffMaxDurationSecond(backOffMaxDurationSecond int32) Option {
+	return func(o *schedulerOptions) {
+		o.backOffMaxDurationSecond = backOffMaxDurationSecond
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	schedulerName:                  v1.DefaultSchedulerName,
 	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 	disablePreemption:              false,
 	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 	bindTimeoutSeconds:             BindTimeoutSeconds,
+	backOffInitialDurationSecond:   BackOffInitialDurationSecond,
+	backOffMaxDurationSecond:       BackOffMaxDurationSecond,
 }
 
 // New returns a Scheduler
@@ -205,6 +225,8 @@ func New(client clientset.Interface,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
+		BackOffInitialDurationSecond:   options.backOffInitialDurationSecond,
+		BackOffMaxDurationSecond:       options.backOffMaxDurationSecond,
 		Registry:                       registry,
 		Plugins:                        plugins,
 		PluginConfig:                   pluginConfig,

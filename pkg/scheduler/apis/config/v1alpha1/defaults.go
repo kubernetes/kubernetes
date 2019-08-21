@@ -103,4 +103,11 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		defaultBindTimeoutSeconds := int64(600)
 		obj.BindTimeoutSeconds = &defaultBindTimeoutSeconds
 	}
+
+	if obj.BackOffInitialDurationSecond == 0 {
+		obj.BackOffInitialDurationSecond = 1
+	}
+	if obj.BackOffMaxDurationSecond == 0 {
+		obj.BackOffMaxDurationSecond = 10
+	}
 }
