@@ -17,6 +17,7 @@ limitations under the License.
 package fairqueuing
 
 import (
+	"k8s.io/apimachinery/pkg/util/waitgroup"
 	"math"
 	"sync"
 	"time"
@@ -32,13 +33,13 @@ import (
 // This filter makes a QueueSetSystem for each priority level.
 type queueSetFactoryImpl struct {
 	// wg can be nil and is ignored in that case
-	wg OptionalWaitGroup
+	wg waitgroup.OptionalWaitGroup
 
 	clk clock.PassiveClock
 }
 
 // NewQueueSetFactory creates a new NewQueueSetFactory object
-func NewQueueSetFactory(clk clock.PassiveClock, wg OptionalWaitGroup) QueueSetFactory {
+func NewQueueSetFactory(clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) QueueSetFactory {
 	return &queueSetFactoryImpl{
 		wg:  wg,
 		clk: clk,
@@ -62,7 +63,7 @@ func (qsf queueSetFactoryImpl) NewQueueSet(name string, concurrencyLimit, desire
 type queueSetImpl struct {
 	lock                 sync.Mutex
 	name                 string
-	wg                   OptionalWaitGroup
+	wg                   waitgroup.OptionalWaitGroup
 	queues               []*Queue
 	clk                  clock.PassiveClock
 	vt                   float64
@@ -93,7 +94,7 @@ func initQueues(numQueues int) []*Queue {
 
 // newQueueSetImpl creates a new queueSetImpl from passed in parameters and
 func newQueueSetImpl(name string, concurrencyLimit, desiredNumQueues, queueLengthLimit int,
-	requestWaitLimit time.Duration, clk clock.PassiveClock, wg OptionalWaitGroup) *queueSetImpl {
+	requestWaitLimit time.Duration, clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) *queueSetImpl {
 	fq := &queueSetImpl{
 		wg:               wg,
 		name:             name,
