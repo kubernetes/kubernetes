@@ -163,7 +163,7 @@ func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects:         groups(user.NodesGroup),
 				Rule:             ruleRscAll,
-				ObjectNamespaces: []string{metav1.NamespaceSystem}},
+				ObjectNamespaces: []string{metav1.NamespaceSystem, corev1.NamespaceNodeLease}},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects:         kubeSystemServiceAccount(rmv1a1.NameAll),
 				Rule:             resourceRule(verbAll, []string{apiGroupCore}, []string{"endpoints", "configmaps", "leases"}),
