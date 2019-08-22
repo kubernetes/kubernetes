@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -507,6 +507,33 @@ func TestAppendPortIfNeeded(t *testing.T) {
 		got := AppendPortIfNeeded(testCases[i].addr, testCases[i].port)
 		if testCases[i].expect != got {
 			t.Errorf("case %s: expected %v, got %v", testCases[i].name, testCases[i].expect, got)
+		}
+	}
+}
+
+func TestShuffleStrings(t *testing.T) {
+	var src []string
+	dest := ShuffleStrings(src)
+
+	if dest != nil {
+		t.Errorf("ShuffleStrings for a nil slice got a non-nil slice")
+	}
+
+	src = []string{"a", "b", "c", "d", "e", "f"}
+	dest = ShuffleStrings(src)
+
+	if len(src) != len(dest) {
+		t.Errorf("Shuffled slice is wrong length, expected %v got %v", len(src), len(dest))
+	}
+
+	m := make(map[string]bool, len(dest))
+	for _, s := range dest {
+		m[s] = true
+	}
+
+	for _, k := range src {
+		if _, exists := m[k]; !exists {
+			t.Errorf("Element %v missing from shuffled slice", k)
 		}
 	}
 }
