@@ -1,16 +1,20 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
+)
 
 go_library(
     name = "go_default_library",
-    srcs = ["registry.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/legacyregistry",
-    importpath = "k8s.io/component-base/metrics/legacyregistry",
+    srcs = ["metrics.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/prometheus/restclient",
+    importpath = "k8s.io/component-base/metrics/prometheus/restclient",
     deps = [
+        "//staging/src/k8s.io/client-go/tools/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
     ],
 )
 

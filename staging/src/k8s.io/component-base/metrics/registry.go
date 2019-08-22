@@ -25,6 +25,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"k8s.io/component-base/version"
 )
 
 var (
@@ -139,11 +140,22 @@ func (kr *kubeRegistry) Gather() ([]*dto.MetricFamily, error) {
 	return kr.PromRegistry.Gather()
 }
 
-// NewKubeRegistry creates a new vanilla Registry without any Collectors
-// pre-registered.
-func NewKubeRegistry(v apimachineryversion.Info) KubeRegistry {
-	return &kubeRegistry{
+func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
+	r := &kubeRegistry{
 		PromRegistry: prometheus.NewRegistry(),
 		version:      parseVersion(v),
 	}
+	return r
+}
+
+func registerMetadataMetrics(r *kubeRegistry) {
+	RegisterBuildInfo(r)
+}
+
+// NewKubeRegistry creates a new vanilla Registry without any Collectors
+// pre-registered.
+func NewKubeRegistry() KubeRegistry {
+	r := newKubeRegistry(version.Get())
+	registerMetadataMetrics(r)
+	return r
 }
