@@ -165,7 +165,7 @@ func (t *awsElasticBlockStoreCSITranslator) GetCSIPluginName() string {
 var awsVolumeRegMatch = regexp.MustCompile("^vol-[^/]*$")
 
 // KubernetesVolumeIDToEBSVolumeID translates Kubernetes volume ID to EBS volume ID
-// KubernetsVolumeID forms:
+// KubernetesVolumeID forms:
 //  * aws://<zone>/<awsVolumeId>
 //  * aws:///<awsVolumeId>
 //  * <awsVolumeId>
