@@ -45,6 +45,10 @@ var nodeLabels = map[string]string{
 	"test-key2": "test-value2",
 }
 
+var nodeFields = map[string]string{
+	"metadata.name": "test-node",
+}
+
 func TestCheckVolumeNodeAffinity(t *testing.T) {
 	type affinityTest struct {
 		name          string
@@ -209,10 +213,48 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name:          "valid-match-name-field",
+			expectSuccess: true,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{
+									Key:      "metadata.name",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-node"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "invalid-match-name-field",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{
+									Key:      "metadata.name",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"other-node"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
 	}
 
 	for _, c := range cases {
-		err := CheckNodeAffinity(c.pv, nodeLabels)
+		err := CheckNodeAffinity(c.pv, nodeLabels, nodeFields)
 
 		if err != nil && c.expectSuccess {
 			t.Errorf("CheckTopology %v returned error: %v", c.name, err)

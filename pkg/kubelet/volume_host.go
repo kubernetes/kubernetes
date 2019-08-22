@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -262,6 +263,18 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Labels, nil
+}
+
+func (kvh *kubeletVolumeHost) GetNodeFields() (map[string]string, error) {
+	node, err := kvh.kubelet.GetNode()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving node: %v", err)
+	}
+	nodeFields := map[string]string{}
+	for k, f := range algorithm.NodeFieldSelectorKeys {
+		nodeFields[k] = f(node)
+	}
+	return nodeFields, nil
 }
 
 func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {

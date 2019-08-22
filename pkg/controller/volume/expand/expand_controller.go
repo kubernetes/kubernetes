@@ -435,6 +435,10 @@ func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
 }
 
+func (expc *expandController) GetNodeFields() (map[string]string, error) {
+	return nil, fmt.Errorf("GetNodeFields unsupported in expandController")
+}
+
 func (expc *expandController) GetNodeName() types.NodeName {
 	return ""
 }

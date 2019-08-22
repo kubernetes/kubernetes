@@ -253,6 +253,10 @@ func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 	return f.nodeLabels, nil
 }
 
+func (f *fakeVolumeHost) GetNodeFields() (map[string]string, error) {
+	return map[string]string{"metadata.name": f.nodeName}, nil
+}
+
 func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 	return types.NodeName(f.nodeName)
 }

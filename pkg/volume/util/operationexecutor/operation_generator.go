@@ -1564,7 +1564,11 @@ func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) erro
 		if err != nil {
 			return err
 		}
-		err = util.CheckNodeAffinity(pv, nodeLabels)
+		nodeFields, err := og.volumePluginMgr.Host.GetNodeFields()
+		if err != nil {
+			return err
+		}
+		err = util.CheckNodeAffinity(pv, nodeLabels, nodeFields)
 		if err != nil {
 			return err
 		}

@@ -809,6 +809,10 @@ func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
 }
 
+func (adc *attachDetachController) GetNodeFields() (map[string]string, error) {
+	return nil, fmt.Errorf("GetNodeFields() unsupported on Attach/Detach controller")
+}
+
 func (adc *attachDetachController) GetNodeName() types.NodeName {
 	return ""
 }

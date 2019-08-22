@@ -34,6 +34,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utypes "k8s.io/apimachinery/pkg/types"
@@ -44,6 +45,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -162,13 +164,23 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	return class, nil
 }
 
-// CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
-// This ensures that we don't mount a volume that doesn't belong to this node
-func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	return checkVolumeNodeAffinity(pv, nodeLabels)
+// CheckNodeAffinityByNode looks at the PV node affinity, and checks if the node has the same corresponding labels
+// This ensures that we don't mount a volume that doesn't belong on this node
+func CheckNodeAffinityByNode(pv *v1.PersistentVolume, node *v1.Node) error {
+	nodeFields := map[string]string{}
+	for k, f := range algorithm.NodeFieldSelectorKeys {
+		nodeFields[k] = f(node)
+	}
+	return CheckNodeAffinity(pv, labels.Set(node.Labels), fields.Set(nodeFields))
 }
 
-func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
+// CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
+// This ensures that we don't mount a volume that doesn't belong to this node
+func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels labels.Set, nodeFields fields.Set) error {
+	return checkVolumeNodeAffinity(pv, nodeLabels, nodeFields)
+}
+
+func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels labels.Set, nodeFields fields.Set) error {
 	if pv.Spec.NodeAffinity == nil {
 		return nil
 	}
@@ -176,7 +188,7 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
 		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
+		if !v1helper.MatchNodeSelectorTerms(terms, nodeLabels, nodeFields) {
 			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
 	}

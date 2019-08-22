@@ -440,6 +440,9 @@ type VolumeHost interface {
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)
 
+	// Returns the fields of the node
+	GetNodeFields() (map[string]string, error)
+
 	// Returns the name of the node
 	GetNodeName() types.NodeName
 

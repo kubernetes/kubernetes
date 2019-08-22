@@ -518,7 +518,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		}
 
 		// Check PV's node affinity (the node might not have the proper label)
-		if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+		if err := volumeutil.CheckNodeAffinityByNode(pv, node); err != nil {
 			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
 		}
 
@@ -576,7 +576,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 				return false, err
 			}
 
-			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+			if err := volumeutil.CheckNodeAffinityByNode(pv, node); err != nil {
 				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
 			}
 		}
@@ -697,7 +697,7 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 			return false, err
 		}
 
-		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
+                err = volumeutil.CheckNodeAffinityByNode(pv, node)
 		if err != nil {
 			klog.V(4).Infof("PersistentVolume %q, Node %q mismatch for Pod %q: %v", pvName, node.Name, podName, err)
 			return false, nil

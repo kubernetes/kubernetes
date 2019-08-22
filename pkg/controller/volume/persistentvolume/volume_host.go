@@ -126,6 +126,10 @@ func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, erro
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
 }
 
+func (ctrl *PersistentVolumeController) GetNodeFields() (map[string]string, error) {
+	return nil, fmt.Errorf("GetNodeFiels() unsupported in PersistentVolumeController")
+}
+
 func (ctrl *PersistentVolumeController) GetNodeName() types.NodeName {
 	return ""
 }

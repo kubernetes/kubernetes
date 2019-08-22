@@ -223,7 +223,7 @@ func FindMatchingVolume(
 		if node != nil {
 			// Scheduler path, check that the PV NodeAffinity
 			// is satisfied by the node
-			err := volumeutil.CheckNodeAffinity(volume, node.Labels)
+			err := volumeutil.CheckNodeAffinityByNode(volume, node)
 			if err != nil {
 				nodeAffinityValid = false
 			}
