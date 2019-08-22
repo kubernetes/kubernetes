@@ -17,7 +17,6 @@ limitations under the License.
 package customresource_test
 
 import (
-	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -48,7 +47,7 @@ import (
 
 func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testing.EtcdTestServer) {
 	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	etcdStorage.Codec = unstructuredJsonCodec{}
+	etcdStorage.Codec = unstructured.UnstructuredJSONScheme
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
 
 	parameterScheme := runtime.NewScheme()
@@ -525,28 +524,6 @@ func TestScaleUpdateWithoutSpecReplicas(t *testing.T) {
 	if scale.Spec.Replicas != int32(replicas) {
 		t.Errorf("wrong replicas count: expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}
-}
-
-type unstructuredJsonCodec struct{}
-
-func (c unstructuredJsonCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	obj := into.(*unstructured.Unstructured)
-	err := obj.UnmarshalJSON(data)
-	if err != nil {
-		return nil, nil, err
-	}
-	gvk := obj.GroupVersionKind()
-	return obj, &gvk, nil
-}
-
-func (c unstructuredJsonCodec) Encode(obj runtime.Object, w io.Writer) error {
-	u := obj.(*unstructured.Unstructured)
-	bs, err := u.MarshalJSON()
-	if err != nil {
-		return err
-	}
-	w.Write(bs)
-	return nil
 }
 
 func setSpecReplicas(u *unstructured.Unstructured, replicas int64) {
