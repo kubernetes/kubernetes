@@ -27,7 +27,7 @@ var byteOrder binary.ByteOrder
 func ByteOrder() binary.ByteOrder { return byteOrder }
 
 func init() {
-	var i int = 0x1
+	i := int(0x1)
 	if v := (*[intWidth]byte)(unsafe.Pointer(&i)); v[0] == 0 {
 		byteOrder = binary.BigEndian
 	} else {

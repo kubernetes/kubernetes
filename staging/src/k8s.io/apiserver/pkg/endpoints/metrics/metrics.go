@@ -148,6 +148,14 @@ var (
 		},
 		[]string{"group", "version", "kind"},
 	)
+	WatchEventsSizes = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "apiserver_watch_events_sizes",
+			Help:    "Watch event size distribution in bytes",
+			Buckets: prometheus.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
+		},
+		[]string{"group", "version", "kind"},
+	)
 	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = prometheus.NewGaugeVec(
@@ -171,6 +179,7 @@ var (
 		DeprecatedDroppedRequests,
 		RegisteredWatchers,
 		WatchEvents,
+		WatchEventsSizes,
 		currentInflightRequests,
 	}
 )

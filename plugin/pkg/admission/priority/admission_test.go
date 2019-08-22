@@ -17,6 +17,7 @@ limitations under the License.
 package priority
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/klog"
@@ -191,7 +192,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			false,
 			test.userInfo,
 		)
-		err := ctrl.Validate(attrs, nil)
+		err := ctrl.Validate(context.TODO(), attrs, nil)
 		klog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
@@ -287,7 +288,7 @@ func TestDefaultPriority(t *testing.T) {
 				test.name, test.expectedDefaultNameBefore, test.expectedDefaultBefore, pcName, defaultPriority)
 		}
 		if test.attributes != nil {
-			err := ctrl.Validate(test.attributes, nil)
+			err := ctrl.Validate(context.TODO(), test.attributes, nil)
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}
@@ -701,7 +702,7 @@ func TestPodAdmission(t *testing.T) {
 			false,
 			nil,
 		)
-		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(attrs, nil)
+		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(context.TODO(), attrs, nil)
 		klog.Infof("Got %v", err)
 		if !test.expectError {
 			if err != nil {

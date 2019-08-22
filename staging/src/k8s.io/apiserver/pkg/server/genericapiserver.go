@@ -147,10 +147,10 @@ type GenericAPIServer struct {
 
 	// healthz checks
 	healthzLock                sync.Mutex
-	healthzChecks              []healthz.HealthzChecker
+	healthzChecks              []healthz.HealthChecker
 	healthzChecksInstalled     bool
 	readyzLock                 sync.Mutex
-	readyzChecks               []healthz.HealthzChecker
+	readyzChecks               []healthz.HealthChecker
 	readyzChecksInstalled      bool
 	maxStartupSequenceDuration time.Duration
 	healthzClock               clock.Clock
@@ -203,7 +203,7 @@ type DelegationTarget interface {
 	PreShutdownHooks() map[string]preShutdownHookEntry
 
 	// HealthzChecks returns the healthz checks that need to be combined
-	HealthzChecks() []healthz.HealthzChecker
+	HealthzChecks() []healthz.HealthChecker
 
 	// ListedPaths returns the paths for supporting an index
 	ListedPaths() []string
@@ -225,7 +225,7 @@ func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return s.preShutdownHooks
 }
-func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
+func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
 	return s.healthzChecks
 }
 func (s *GenericAPIServer) ListedPaths() []string {
@@ -252,8 +252,8 @@ func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return map[string]preShutdownHookEntry{}
 }
-func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
-	return []healthz.HealthzChecker{}
+func (s emptyDelegate) HealthzChecks() []healthz.HealthChecker {
+	return []healthz.HealthChecker{}
 }
 func (s emptyDelegate) ListedPaths() []string {
 	return []string{}

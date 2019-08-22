@@ -204,7 +204,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		cc.LeaderElectionBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
 	}
 	// Setup healthz checks.
-	var checks []healthz.HealthzChecker
+	var checks []healthz.HealthChecker
 	if cc.ComponentConfig.LeaderElection.LeaderElect {
 		checks = append(checks, cc.LeaderElection.WatchDog)
 	}
@@ -321,7 +321,7 @@ func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) h
 // newHealthzHandler creates a healthz server from the config, and will also
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
-func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, checks ...healthz.HealthzChecker) http.Handler {
+func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, checks ...healthz.HealthChecker) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(pathRecorderMux, checks...)
 	if !separateMetrics {

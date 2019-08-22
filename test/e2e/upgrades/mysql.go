@@ -62,7 +62,7 @@ func (MySQLUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func mysqlKubectlCreate(ns, file string) {
-	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file), ginkgo.Fail))
+	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file)))
 	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 

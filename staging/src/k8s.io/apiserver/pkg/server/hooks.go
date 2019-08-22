@@ -219,7 +219,7 @@ type postStartHookHealthz struct {
 	done chan struct{}
 }
 
-var _ healthz.HealthzChecker = postStartHookHealthz{}
+var _ healthz.HealthChecker = postStartHookHealthz{}
 
 func (h postStartHookHealthz) Name() string {
 	return h.name

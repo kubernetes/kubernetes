@@ -71,7 +71,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return
 		}
 
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -131,7 +132,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		userInfo, _ := request.UserFrom(ctx)
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-			err = mutatingAdmission.Admit(admissionAttributes, scope)
+			err = mutatingAdmission.Admit(ctx, admissionAttributes, scope)
 			if err != nil {
 				scope.err(err, w, req)
 				return

@@ -25,15 +25,15 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 )
 
-// AddHealthzCheck adds HealthzCheck(s) to both healthz and readyz. All healthz checks
+// AddHealthChecks adds HealthzCheck(s) to both healthz and readyz. All healthz checks
 // are automatically added to readyz, since we want to avoid the situation where the
 // apiserver is ready but not live.
-func (s *GenericAPIServer) AddHealthzChecks(checks ...healthz.HealthzChecker) error {
+func (s *GenericAPIServer) AddHealthChecks(checks ...healthz.HealthChecker) error {
 	return s.AddDelayedHealthzChecks(0, checks...)
 }
 
 // AddReadyzChecks allows you to add a HealthzCheck to readyz.
-func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthzChecker) error {
+func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthChecker) error {
 	s.readyzLock.Lock()
 	defer s.readyzLock.Unlock()
 	return s.addReadyzChecks(checks...)
@@ -41,7 +41,7 @@ func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthzChecker) err
 
 // addReadyzChecks allows you to add a HealthzCheck to readyz.
 // premise: readyzLock has been obtained
-func (s *GenericAPIServer) addReadyzChecks(checks ...healthz.HealthzChecker) error {
+func (s *GenericAPIServer) addReadyzChecks(checks ...healthz.HealthChecker) error {
 	if s.readyzChecksInstalled {
 		return fmt.Errorf("unable to add because the readyz endpoint has already been created")
 	}
@@ -94,7 +94,7 @@ func (c shutdownCheck) Check(req *http.Request) error {
 // grace period has not yet elapsed. One may want to set a grace period in order to prevent
 // the kubelet from restarting the kube-apiserver due to long-ish boot sequences. Readyz health
 // checks have no grace period, since we want readyz to fail while boot has not completed.
-func (s *GenericAPIServer) AddDelayedHealthzChecks(delay time.Duration, checks ...healthz.HealthzChecker) error {
+func (s *GenericAPIServer) AddDelayedHealthzChecks(delay time.Duration, checks ...healthz.HealthChecker) error {
 	s.healthzLock.Lock()
 	defer s.healthzLock.Unlock()
 	if s.healthzChecksInstalled {
@@ -110,7 +110,7 @@ func (s *GenericAPIServer) AddDelayedHealthzChecks(delay time.Duration, checks .
 }
 
 // delayedHealthCheck wraps a health check which will not fail until the explicitly defined delay has elapsed.
-func delayedHealthCheck(check healthz.HealthzChecker, clock clock.Clock, delay time.Duration) healthz.HealthzChecker {
+func delayedHealthCheck(check healthz.HealthChecker, clock clock.Clock, delay time.Duration) healthz.HealthChecker {
 	return delayedHealthzCheck{
 		check,
 		clock.Now().Add(delay),
@@ -119,7 +119,7 @@ func delayedHealthCheck(check healthz.HealthzChecker, clock clock.Clock, delay t
 }
 
 type delayedHealthzCheck struct {
-	check      healthz.HealthzChecker
+	check      healthz.HealthChecker
 	startCheck time.Time
 	clock      clock.Clock
 }

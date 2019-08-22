@@ -114,7 +114,7 @@ func (l *DefaultLogger) Fatalf(format string, v ...interface{}) {
 }
 
 func (l *DefaultLogger) Panic(v ...interface{}) {
-	l.Logger.Panic(v)
+	l.Logger.Panic(v...)
 }
 
 func (l *DefaultLogger) Panicf(format string, v ...interface{}) {

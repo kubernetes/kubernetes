@@ -5,7 +5,7 @@ module k8s.io/apiextensions-apiserver
 go 1.12
 
 require (
-	github.com/coreos/etcd v3.3.13+incompatible
+	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.2
@@ -35,6 +35,7 @@ require (
 
 replace (
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
+	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db

@@ -17,6 +17,7 @@ limitations under the License.
 package mutating
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -80,7 +81,7 @@ func TestAdmit(t *testing.T) {
 				attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
 			}
 
-			err = wh.Admit(attr, objectInterfaces)
+			err = wh.Admit(context.TODO(), attr, objectInterfaces)
 			if tt.ExpectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.ExpectAllow, err)
 			}
@@ -163,7 +164,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
+		err = wh.Admit(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

@@ -43,30 +43,25 @@ type handlerEntry struct {
 	args              []reflect.Value
 }
 
-// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
-// more elegant output. It is not threadsafe, but you may call PrintObj repeatedly; headers
-// will only be printed if the object type changes. This makes it useful for printing items
-// received from watches.
-type HumanReadablePrinter struct {
-	handlerMap     map[reflect.Type]*handlerEntry
-	options        PrintOptions
-	lastType       interface{}
-	lastColumns    []metav1beta1.TableColumnDefinition
-	printedHeaders bool
+// HumanReadableGenerator is an implementation of TableGenerator used to generate
+// a table for a specific resource. The table is printed with a TablePrinter using
+// PrintObj().
+type HumanReadableGenerator struct {
+	handlerMap map[reflect.Type]*handlerEntry
 }
 
-var _ TableGenerator = &HumanReadablePrinter{}
-var _ PrintHandler = &HumanReadablePrinter{}
+var _ TableGenerator = &HumanReadableGenerator{}
+var _ PrintHandler = &HumanReadableGenerator{}
 
-// NewTableGenerator creates a HumanReadablePrinter suitable for calling GenerateTable().
-func NewTableGenerator() *HumanReadablePrinter {
-	return &HumanReadablePrinter{
+// NewTableGenerator creates a HumanReadableGenerator suitable for calling GenerateTable().
+func NewTableGenerator() *HumanReadableGenerator {
+	return &HumanReadableGenerator{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 	}
 }
 
-// With method - accepts a list of builder functions that modify HumanReadablePrinter
-func (h *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
+// With method - accepts a list of builder functions that modify HumanReadableGenerator
+func (h *HumanReadableGenerator) With(fns ...func(PrintHandler)) *HumanReadableGenerator {
 	for _, fn := range fns {
 		fn(h)
 	}
@@ -76,7 +71,7 @@ func (h *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePri
 // GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
 // a table that includes all of the information requested by options, but will not remove rows or columns. The
 // caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadablePrinter) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
+func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
 	t := reflect.TypeOf(obj)
 	handler, ok := h.handlerMap[t]
 	if !ok {
@@ -120,15 +115,17 @@ func (h *HumanReadablePrinter) GenerateTable(obj runtime.Object, options PrintOp
 			table.SelfLink = m.GetSelfLink()
 		}
 	}
+	// TODO(seans3): Remove the following decorateTable call. This should only be
+	// called in the table printer.
 	if err := decorateTable(table, options); err != nil {
 		return nil, err
 	}
 	return table, nil
 }
 
-// TableHandler adds a print handler with a given set of columns to HumanReadablePrinter instance.
+// TableHandler adds a print handler with a given set of columns to HumanReadableGenerator instance.
 // See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
+func (h *HumanReadableGenerator) TableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
 	printFuncValue := reflect.ValueOf(printFunc)
 	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))

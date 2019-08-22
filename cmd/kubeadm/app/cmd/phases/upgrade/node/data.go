@@ -31,4 +31,5 @@ type Data interface {
 	Cfg() *kubeadmapi.InitConfiguration
 	IsControlPlaneNode() bool
 	Client() clientset.Interface
+	KustomizeDir() string
 }

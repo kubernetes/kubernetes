@@ -134,7 +134,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 }
 
 func readTestFileOrDie(file string) []byte {
-	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file), ginkgo.Fail)
+	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
 }
 
 func runKubectlRetryOrDie(args ...string) string {
@@ -276,8 +276,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var nautilus, kitten string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"), ginkgo.Fail)))
-			kitten = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"), ginkgo.Fail)))
+			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
+			kitten = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
 		})
 		/*
 			Release : v1.9
@@ -341,7 +341,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"redis-master-deployment.yaml.in",
 				"redis-slave-deployment.yaml.in",
 			} {
-				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile), ginkgo.Fail)))
+				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
 			}
 		}

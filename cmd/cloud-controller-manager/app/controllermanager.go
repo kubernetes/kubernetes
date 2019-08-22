@@ -139,8 +139,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		klog.Errorf("unable to register configz: %v", err)
 	}
 
-	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthzChecker
+	// Setup any health checks we will want to use.
+	var checks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)

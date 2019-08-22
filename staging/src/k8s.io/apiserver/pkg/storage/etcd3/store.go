@@ -208,7 +208,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 				return err
 			}
 		}
-		if err := validateDeletion(origState.obj); err != nil {
+		if err := validateDeletion(ctx, origState.obj); err != nil {
 			return err
 		}
 		startTime := time.Now()

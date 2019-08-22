@@ -7,6 +7,7 @@ go 1.12
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 // indirect
 	github.com/go-openapi/spec v0.19.2
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/prometheus/client_golang v0.9.2
@@ -27,6 +28,7 @@ require (
 
 replace (
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
+	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db

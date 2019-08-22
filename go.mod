@@ -38,7 +38,7 @@ require (
 	github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20 // indirect
 	github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration v1.0.2
-	github.com/coreos/etcd v3.3.13+incompatible
+	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/coreos/rkt v1.30.0 // indirect
@@ -130,7 +130,7 @@ require (
 	github.com/vmware/govmomi v0.20.1
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
+	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
@@ -138,7 +138,7 @@ require (
 	golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	google.golang.org/api v0.0.0-20181220000619-583d854617af
-	google.golang.org/grpc v1.13.0
+	google.golang.org/grpc v1.23.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.2
@@ -229,7 +229,7 @@ replace (
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.2
 	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.1-coreos.6
-	github.com/coreos/etcd => github.com/coreos/etcd v3.3.13+incompatible
+	github.com/coreos/etcd => github.com/coreos/etcd v3.3.15+incompatible
 	github.com/coreos/go-etcd => github.com/coreos/go-etcd v2.0.0+incompatible
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v0.0.0-20180117170138-065b426bd416
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
@@ -427,8 +427,8 @@ replace (
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	google.golang.org/api => google.golang.org/api v0.0.0-20181220000619-583d854617af
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
-	google.golang.org/grpc => google.golang.org/grpc v1.13.0
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
+	google.golang.org/grpc => google.golang.org/grpc v1.23.0
 	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0

@@ -211,7 +211,7 @@ type attrWithResourceOverride struct {
 func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { return a.resource }
 
 // Dispatch is called by the downstream Validate or Admit methods.
-func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfaces) error {
+func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if rules.IsWebhookConfigurationResource(attr) {
 		return nil
 	}
@@ -219,8 +219,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
-	// TODO: Figure out if adding one second timeout make sense here.
-	ctx := context.TODO()
-
 	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

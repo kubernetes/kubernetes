@@ -36,6 +36,7 @@ pkg/kubeapiserver/admission
 pkg/kubectl/cmd/get
 pkg/kubelet
 pkg/kubelet/apis/config
+pkg/kubelet/apis/podresources
 pkg/kubelet/apis/stats/v1alpha1
 pkg/kubelet/checkpoint
 pkg/kubelet/cm
@@ -55,8 +56,10 @@ pkg/kubelet/lifecycle
 pkg/kubelet/network/dns
 pkg/kubelet/pluginmanager
 pkg/kubelet/pluginmanager/metrics
+pkg/kubelet/pluginmanager/operationexecutor
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pluginmanager/reconciler
+pkg/kubelet/remote
 pkg/kubelet/remote/fake
 pkg/kubelet/server
 pkg/kubelet/server/streaming

@@ -238,6 +238,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// type
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
+			metrics.WatchEventsSizes.WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
 
 			*outEvent = metav1.WatchEvent{}
 

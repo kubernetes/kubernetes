@@ -53,6 +53,7 @@ func keyFunc(req *pb.RangeRequest) string {
 func NewCache(maxCacheEntries int) Cache {
 	return &cache{
 		lru:          lru.New(maxCacheEntries),
+		cachedRanges: adt.NewIntervalTree(),
 		compactedRev: -1,
 	}
 }

@@ -399,10 +399,10 @@ func NewIngressTestJig(c clientset.Interface) *TestJig {
 func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
 	var err error
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file), ginkgo.Fail))
+		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
 	}
 	exists := func(file string) bool {
-		return testfiles.Exists(filepath.Join(manifestPath, file), ginkgo.Fail)
+		return testfiles.Exists(filepath.Join(manifestPath, file))
 	}
 
 	j.Logger.Infof("creating replication controller")
@@ -844,7 +844,7 @@ type NginxIngressController struct {
 // Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), ginkgo.Fail))
+		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))
 	}
 	e2elog.Logf("initializing nginx ingress controller")
 	framework.RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))

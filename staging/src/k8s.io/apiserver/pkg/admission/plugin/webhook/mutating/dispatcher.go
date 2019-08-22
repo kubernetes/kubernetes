@@ -136,7 +136,15 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 				utilruntime.HandleError(callErr)
-				continue
+
+				select {
+				case <-ctx.Done():
+					// parent context is canceled or timed out, no point in continuing
+					return apierrors.NewTimeoutError("request did not complete within requested timeout", 0)
+				default:
+					// individual webhook timed out, but parent context did not, continue
+					continue
+				}
 			}
 			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 			return apierrors.NewInternalError(err)
@@ -181,10 +189,29 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		utiltrace.Field{"operation", attr.GetOperation()},
 		utiltrace.Field{"UID", uid})
 	defer trace.LogIfLong(500 * time.Millisecond)
-	r := client.Post().Context(ctx).Body(request)
+
+	// if the webhook has a specific timeout, wrap the context to apply it
 	if h.TimeoutSeconds != nil {
-		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(*h.TimeoutSeconds)*time.Second)
+		defer cancel()
 	}
+
+	r := client.Post().Context(ctx).Body(request)
+
+	// if the context has a deadline, set it as a parameter to inform the backend
+	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
+		// compute the timeout
+		if timeout := time.Until(deadline); timeout > 0 {
+			// if it's not an even number of seconds, round up to the nearest second
+			if truncated := timeout.Truncate(time.Second); truncated != timeout {
+				timeout = truncated + time.Second
+			}
+			// set the timeout
+			r.Timeout(timeout)
+		}
+	}
+
 	if err := r.Do().Into(response); err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

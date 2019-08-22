@@ -17,6 +17,7 @@ limitations under the License.
 package gc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -310,7 +311,7 @@ func TestGCAdmission(t *testing.T) {
 			user := &user.DefaultInfo{Name: tc.username}
 			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
 
-			err = gcAdmit.Validate(attributes, nil)
+			err = gcAdmit.Validate(context.TODO(), attributes, nil)
 			if !tc.checkError(err) {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -615,7 +616,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
 
-		err := gcAdmit.Validate(attributes, nil)
+		err := gcAdmit.Validate(context.TODO(), attributes, nil)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

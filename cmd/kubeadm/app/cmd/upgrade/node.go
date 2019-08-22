@@ -45,6 +45,7 @@ type nodeOptions struct {
 	etcdUpgrade      bool
 	renewCerts       bool
 	dryRun           bool
+	kustomizeDir     string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -60,6 +61,7 @@ type nodeData struct {
 	cfg                *kubeadmapi.InitConfiguration
 	isControlPlaneNode bool
 	client             clientset.Interface
+	kustomizeDir       string
 }
 
 // NewCmdNode returns the cobra command for `kubeadm upgrade node`
@@ -80,6 +82,7 @@ func NewCmdNode() *cobra.Command {
 	// adds flags to the node command
 	// flags could be eventually inherited by the sub-commands automatically generated for phases
 	addUpgradeNodeFlags(cmd.Flags(), nodeOptions)
+	options.AddKustomizePodsFlag(cmd.Flags(), &nodeOptions.kustomizeDir)
 
 	// initialize the workflow runner with the list of phases
 	nodeRunner.AppendPhase(phases.NewControlPlane())
@@ -151,6 +154,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		cfg:                cfg,
 		client:             client,
 		isControlPlaneNode: isControlPlaneNode,
+		kustomizeDir:       options.kustomizeDir,
 	}, nil
 }
 
@@ -187,6 +191,11 @@ func (d *nodeData) IsControlPlaneNode() bool {
 // Client returns a Kubernetes client to be used by kubeadm.
 func (d *nodeData) Client() clientset.Interface {
 	return d.client
+}
+
+// KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
+func (d *nodeData) KustomizeDir() string {
+	return d.kustomizeDir
 }
 
 // NewCmdUpgradeNodeConfig returns the cobra.Command for downloading the new/upgrading the kubelet configuration from the kubelet-config-1.X
