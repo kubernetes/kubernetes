@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/klog"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/version"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -65,6 +66,7 @@ func SetupSuite() {
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
 				metav1.NamespacePublic,
+				corev1.NamespaceNodeLease,
 			})
 		if err != nil {
 			e2elog.Failf("Error deleting orphaned namespaces: %v", err)
