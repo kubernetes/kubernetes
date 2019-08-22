@@ -304,7 +304,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		cmdutil.CheckErr(err)
 	}()
 	prefix := getPrefix(src.File)
-	prefix = path.Clean(prefix)
+	prefix = path.Dir(path.Clean(prefix))
 	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
 	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix = stripPathShortcuts(prefix)
