@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "algorithm.go",
+        "prune.go",
         "surroundingobject.go",
         "validation.go",
     ],
