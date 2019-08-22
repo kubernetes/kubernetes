@@ -30,7 +30,7 @@ const dockerEndpoint = "unix:///var/run/docker.sock"
 var DefaultSysSpec = SysSpec{
 	OS: "Linux",
 	KernelSpec: KernelSpec{
-		Versions: []string{`3\.[1-9][0-9].*`, `4\..*`, `5\..*`}, // Requires 3.10+, 4+ or 5+
+		Versions: []string{`^3\.[1-9][0-9].*$`, `^([4-9]|[1-9][0-9]+)\.([0-9]+)\.([0-9]+).*$`}, // Requires 3.10+, or newer
 		// TODO(random-liu): Add more config
 		// TODO(random-liu): Add description for each kernel configuration:
 		Required: []KernelConfig{
