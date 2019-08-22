@@ -729,6 +729,7 @@ func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.Rec
 
 // VolumeLimits returns a Setter that updates the volume limits on the node.
 func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLimits, // typically Kubelet.volumePluginMgr.ListVolumePluginWithLimits
+	numNonKubeVolumes int64,
 ) Setter {
 	return func(node *v1.Node) error {
 		if node.Status.Capacity == nil {
@@ -746,8 +747,8 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 				continue
 			}
 			for limitKey, value := range attachLimits {
-				node.Status.Capacity[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
-				node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+				node.Status.Capacity[v1.ResourceName(limitKey)] = *resource.NewQuantity(value-numNonKubeVolumes, resource.DecimalSI)
+				node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value-numNonKubeVolumes, resource.DecimalSI)
 			}
 		}
 		return nil

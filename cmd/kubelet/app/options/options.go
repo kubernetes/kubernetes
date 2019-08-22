@@ -189,6 +189,10 @@ type KubeletFlags struct {
 	KeepTerminatedPodVolumes bool
 	// EnableCAdvisorJSONEndpoints enables some cAdvisor endpoints that will be removed in future versions
 	EnableCAdvisorJSONEndpoints bool
+	// Number of volumes which exist outside of kubelet's control. Allows
+	// kubelet to account for volumes explicitly mounted to the node for purposes
+	// such as container storage.
+	NumNonKubeVolumes int64
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -220,6 +224,7 @@ func NewKubeletFlags() *KubeletFlags {
 		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
 		NodeStatusMaxImages:         50,
 		EnableCAdvisorJSONEndpoints: true,
+		NumNonKubeVolumes:           0,
 	}
 }
 
@@ -381,6 +386,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.BoolVar(&f.RegisterNode, "register-node", f.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
 	fs.Var(utiltaints.NewTaintsVar(&f.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
+	fs.Int64Var(&f.NumNonKubeVolumes, "num-non-kube-volumes", f.NumNonKubeVolumes, "Number of non root volumes which exist outside of kubelet's control. If set, kubelet will reduce the number of volumes which can be mounted to the node by the quantity specified. Default: 0")
 
 	// EXPERIMENTAL FLAGS
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")

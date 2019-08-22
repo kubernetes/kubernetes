@@ -27,7 +27,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1529,7 +1529,71 @@ func TestVolumeLimits(t *testing.T) {
 				return tc.volumePluginList
 			}
 			// construct setter
-			setter := VolumeLimits(volumePluginListFunc)
+			setter := VolumeLimits(volumePluginListFunc, 0)
+			// call setter on node
+			node := &v1.Node{}
+			if err := setter(node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected node
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, node),
+				"Diff: %s", diff.ObjectDiff(tc.expectNode, node))
+		})
+	}
+}
+
+func TestVolumeLimitsWithNonKubeVols(t *testing.T) {
+	const (
+		volumeLimitKey = "attachable-volumes-fake-provider"
+		volumeLimitVal = 16
+		nonKubeVols    = 1
+	)
+
+	var cases = []struct {
+		desc             string
+		volumePluginList []volume.VolumePluginWithAttachLimits
+		expectNode       *v1.Node
+	}{
+		{
+			desc: "translate limits to capacity and allocatable for plugins that return successfully from GetVolumeLimits",
+			volumePluginList: []volume.VolumePluginWithAttachLimits{
+				&volumetest.FakeVolumePlugin{
+					VolumeLimits: map[string]int64{volumeLimitKey: volumeLimitVal},
+				},
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						volumeLimitKey: *resource.NewQuantity(volumeLimitVal-nonKubeVols, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						volumeLimitKey: *resource.NewQuantity(volumeLimitVal-nonKubeVols, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc: "skip plugins that return errors from GetVolumeLimits",
+			volumePluginList: []volume.VolumePluginWithAttachLimits{
+				&volumetest.FakeVolumePlugin{
+					VolumeLimitsError: fmt.Errorf("foo"),
+				},
+			},
+			expectNode: &v1.Node{},
+		},
+		{
+			desc:       "no plugins",
+			expectNode: &v1.Node{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			volumePluginListFunc := func() []volume.VolumePluginWithAttachLimits {
+				return tc.volumePluginList
+			}
+			// construct setter
+			setter := VolumeLimits(volumePluginListFunc, nonKubeVols)
 			// call setter on node
 			node := &v1.Node{}
 			if err := setter(node); err != nil {
