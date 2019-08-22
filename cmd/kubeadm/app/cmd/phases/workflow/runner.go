@@ -18,12 +18,13 @@ package workflow
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // phaseSeparator defines the separator to be used when concatenating nested
@@ -346,10 +347,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 				// overrides the command triggering the Runner using the phaseCmd
 				e.runCmd = cmd
 				e.Options.FilterPhases = []string{phaseSelector}
-				if err := e.Run(args); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
-				}
+				util.CheckErr(e.Run(args))
 			},
 		}
 
