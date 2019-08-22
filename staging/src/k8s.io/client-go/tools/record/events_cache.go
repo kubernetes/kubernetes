@@ -418,7 +418,7 @@ type EventCorrelateResult struct {
 //
 // The default behavior is as follows:
 //   * Aggregation is performed if a similar event is recorded 10 times in a
-//     in a 10 minute rolling interval.  A similar event is an event that varies only by
+//     10 minute rolling interval.  A similar event is an event that varies only by
 //     the Event.Message field.  Rather than recording the precise event, aggregation
 //     will create a new event whose message reports that it has combined events with
 //     the same reason.
