@@ -204,7 +204,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
-	ginkgo.It("should provision storage with pvc data source [Feature:VolumePVCDataSource]", func() {
+	ginkgo.It("should provision storage with pvc data source", func() {
 		if !dInfo.Capabilities[CapPVCDataSource] {
 			framework.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
