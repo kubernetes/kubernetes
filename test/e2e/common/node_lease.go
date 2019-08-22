@@ -42,7 +42,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 	ginkgo.BeforeEach(func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())
+		framework.ExpectNotEqual(len(nodes.Items), 0)
 		nodeName = nodes.Items[0].ObjectMeta.Name
 	})
 
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
-			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())
+			framework.ExpectEqual(expectLease(lease, nodeName), nil)
 
 			ginkgo.By("check that node lease is updated at least once within the lease duration")
 			gomega.Eventually(func() error {
@@ -100,7 +100,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
-			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())
+			framework.ExpectEqual(expectLease(lease, nodeName), nil)
 			leaseDuration := time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second
 
 			ginkgo.By("verify NodeStatus report period is longer than lease duration")
@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			// running as cluster e2e test, because node e2e test does not create and
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 		})
@@ -162,7 +162,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
 	node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time

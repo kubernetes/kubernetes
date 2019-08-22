@@ -31,7 +31,6 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Security Context", func() {
@@ -135,7 +134,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
 			framework.ExpectNoError(err)
-			gomega.Expect(ev).NotTo(gomega.BeNil())
+			framework.ExpectNotEqual(ev, nil)
 			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
 		ginkgo.It("should run with an image specified user ID", func() {
@@ -153,7 +152,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
 			framework.ExpectNoError(err)
-			gomega.Expect(ev).NotTo(gomega.BeNil())
+			framework.ExpectNotEqual(ev, nil)
 			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
 	})

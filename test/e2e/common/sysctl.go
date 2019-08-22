@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 			framework.Skipf("No sysctl support in Docker <1.12")
 		}
-		gomega.Expect(ev).To(gomega.BeNil())
+		framework.ExpectEqual(ev, nil)
 
 		ginkgo.By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 			framework.Skipf("No sysctl support in Docker <1.12")
 		}
-		gomega.Expect(ev).To(gomega.BeNil())
+		framework.ExpectEqual(ev, nil)
 
 		ginkgo.By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
@@ -172,7 +172,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		_, err := client.Create(pod)
 
-		gomega.Expect(err).NotTo(gomega.BeNil())
+		framework.ExpectError(err)
 		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "foo-"`))
 		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "bar.."`))
 		gomega.Expect(err.Error()).NotTo(gomega.ContainSubstring(`safe-and-unsafe`))
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		}
 
 		ginkgo.By("Checking that the pod was rejected")
-		gomega.Expect(ev).ToNot(gomega.BeNil())
+		framework.ExpectNotEqual(ev, nil)
 		framework.ExpectEqual(ev.Reason, "SysctlForbidden")
 	})
 })

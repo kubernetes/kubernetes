@@ -85,7 +85,7 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 func startPodAndGetBackOffs(podClient *framework.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
 	podClient.CreateSync(pod)
 	time.Sleep(sleepAmount)
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	framework.ExpectNotEqual(pod.Spec.Containers, "")
 	podName := pod.Name
 	containerName := pod.Spec.Containers[0].Name
 
@@ -331,8 +331,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			e2elog.Failf("Failed to observe pod deletion")
 		}
 
-		gomega.Expect(lastPod.DeletionTimestamp).ToNot(gomega.BeNil())
-		gomega.Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(gomega.BeZero())
+		framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
+		framework.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
 
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
@@ -813,14 +813,14 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		ginkgo.By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
-		gomega.Expect(podClient.PodIsReady(podName)).To(gomega.BeFalse(), "Expect pod's Ready condition to be false initially.")
+		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false initially.")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate1))
 		_, err := podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), "status")
 		framework.ExpectNoError(err)
 		// Sleep for 10 seconds.
 		time.Sleep(maxReadyStatusUpdateTolerance)
-		gomega.Expect(podClient.PodIsReady(podName)).To(gomega.BeFalse(), "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
+		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
 		_, err = podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate2, "True")), "status")

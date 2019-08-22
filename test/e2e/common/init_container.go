@@ -35,7 +35,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
@@ -96,19 +95,19 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.UntilWithoutRetry(ctx, wr, conditions.PodCompleted)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodSucceeded)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectNotEqual(init, nil)
 		framework.ExpectEqual(init.Status, v1.ConditionTrue)
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			gomega.Expect(status.Ready).To(gomega.BeTrue())
-			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
-			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
+			framework.ExpectEqual(status.Ready, true)
+			framework.ExpectNotEqual(status.State.Terminated, nil)
+			framework.ExpectEqual(status.State.Terminated.ExitCode, 0)
 		}
 	})
 
@@ -167,19 +166,19 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.UntilWithoutRetry(ctx, wr, conditions.PodRunning)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodRunning)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectNotEqual(init, nil)
 		framework.ExpectEqual(init.Status, v1.ConditionTrue)
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			gomega.Expect(status.Ready).To(gomega.BeTrue())
-			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
-			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
+			framework.ExpectEqual(status.Ready, true)
+			framework.ExpectNotEqual(status.State.Terminated, nil)
+			framework.ExpectEqual(status.State.Terminated.ExitCode, 0)
 		}
 	})
 
@@ -289,12 +288,12 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				}
 			},
 		)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodPending)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectNotEqual(init, nil)
 		framework.ExpectEqual(init.Status, v1.ConditionFalse)
 		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
 		framework.ExpectEqual(init.Message, "containers with incomplete status: [init1 init2]")
@@ -398,17 +397,17 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 			},
 			conditions.PodCompleted,
 		)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodFailed)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectNotEqual(init, nil)
 		framework.ExpectEqual(init.Status, v1.ConditionFalse)
 		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
 		framework.ExpectEqual(init.Message, "containers with incomplete status: [init2]")
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
-		gomega.Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(gomega.BeNil())
+		framework.ExpectNotEqual(endPod.Status.ContainerStatuses[0].State.Waiting, nil)
 	})
 })

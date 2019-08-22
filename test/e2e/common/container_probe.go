@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		gomega.Expect(isReady).To(gomega.BeTrue(), "pod should be ready")
+		framework.ExpectEqual(isReady, true, "pod should be ready")
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}
 
 		restartCount := getRestartCount(p)
-		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -106,10 +106,10 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
-		gomega.Expect(isReady).NotTo(gomega.BeTrue(), "pod should be not ready")
+		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
 
 		restartCount := getRestartCount(p)
-		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -407,7 +407,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	framework.ExpectNotEqual(pod.Spec.Containers, "")
 	containerName := pod.Spec.Containers[0].Name
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
