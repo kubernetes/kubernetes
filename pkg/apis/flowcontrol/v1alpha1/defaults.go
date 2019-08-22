@@ -18,13 +18,22 @@ package v1alpha1
 
 import (
 	"k8s.io/api/flowcontrol/v1alpha1"
-	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+)
+
+// Default settings for flow-schema
+const (
+	FlowSchemaDefaultMatchingPrecedence int32 = 1000
+)
+
+// Default settings for priority-level-configuration
+const (
+	PriorityLevelConfigurationDefaultHandSize int32 = 1
 )
 
 // SetDefaults_FlowSchema sets default values for flow schema
 func SetDefaults_FlowSchema(obj *v1alpha1.FlowSchema) {
 	if obj.Spec.MatchingPrecedence == 0 {
-		obj.Spec.MatchingPrecedence = flowcontrol.FlowSchemaDefaultMatchingPrecedence
+		obj.Spec.MatchingPrecedence = FlowSchemaDefaultMatchingPrecedence
 	}
 }
 
@@ -32,7 +41,7 @@ func SetDefaults_FlowSchema(obj *v1alpha1.FlowSchema) {
 func SetDefaults_PriorityLevelConfiguration(obj *v1alpha1.PriorityLevelConfiguration) {
 	if !obj.Spec.Exempt {
 		if obj.Spec.HandSize == 0 {
-			obj.Spec.HandSize = flowcontrol.PriorityLevelConfigurationDefaultHandSize
+			obj.Spec.HandSize = PriorityLevelConfigurationDefaultHandSize
 		}
 	}
 }

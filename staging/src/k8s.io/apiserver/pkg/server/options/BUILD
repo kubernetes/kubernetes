@@ -67,7 +67,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/buffered:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/dynamic:go_default_library",
