@@ -475,11 +475,7 @@ func (c *Configurator) getPriorityMetadataProducer() (priorities.PriorityMetadat
 // GetPredicateMetadataProducer returns a function to build Predicate Metadata.
 // It is used by the scheduler and other components, such as k8s.io/autoscaler/cluster-autoscaler.
 func (c *Configurator) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
-	pluginArgs, err := c.getPluginArgs()
-	if err != nil {
-		return nil, err
-	}
-	return getPredicateMetadataProducer(*pluginArgs)
+	return getPredicateMetadataProducer()
 }
 
 // GetPredicates returns the predicate functions.

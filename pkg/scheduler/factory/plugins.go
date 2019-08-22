@@ -88,7 +88,7 @@ var (
 
 	// Registered metadata producers
 	priorityMetadataProducer  PriorityMetadataProducerFactory
-	predicateMetadataProducer PredicateMetadataProducerFactory
+	predicateMetadataProducer predicates.PredicateMetadataProducer
 )
 
 const (
@@ -313,11 +313,11 @@ func RegisterPriorityMetadataProducerFactory(factory PriorityMetadataProducerFac
 	priorityMetadataProducer = factory
 }
 
-// RegisterPredicateMetadataProducerFactory registers a PredicateMetadataProducerFactory.
-func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerFactory) {
+// RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
+func RegisterPredicateMetadataProducer(producer predicates.PredicateMetadataProducer) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	predicateMetadataProducer = factory
+	predicateMetadataProducer = producer
 }
 
 // RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
@@ -494,14 +494,14 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMet
 	return priorityMetadataProducer(args), nil
 }
 
-func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateMetadataProducer, error) {
+func getPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	if predicateMetadataProducer == nil {
 		return predicates.EmptyPredicateMetadataProducer, nil
 	}
-	return predicateMetadataProducer(args), nil
+	return predicateMetadataProducer, nil
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {

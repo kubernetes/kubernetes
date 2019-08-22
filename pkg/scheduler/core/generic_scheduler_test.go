@@ -634,7 +634,7 @@ func TestGenericScheduler(t *testing.T) {
 
 			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
 			if test.buildPredMeta {
-				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
+				predMetaProducer = algorithmpredicates.GetPredicateMetadata
 			}
 			scheduler := NewGenericScheduler(
 				cache,
@@ -969,7 +969,7 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) algorithmpredicates.PredicateMetadata {
-	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p})(p, nodeInfo)
+	return algorithmpredicates.GetPredicateMetadata(p, nodeInfo)
 }
 
 var smallContainers = []v1.Container{
@@ -1912,7 +1912,7 @@ func TestPreempt(t *testing.T) {
 			}
 			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
 			if test.buildPredMeta {
-				predMetaProducer = algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister(test.pods))
+				predMetaProducer = algorithmpredicates.GetPredicateMetadata
 			}
 			scheduler := NewGenericScheduler(
 				cache,
