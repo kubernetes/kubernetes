@@ -144,14 +144,6 @@ func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
 	}
 }
 
-func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadcaster {
-	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		sleepDuration: defaultSleepDuration,
-		options:       options,
-	}
-}
-
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
 	sleepDuration time.Duration
