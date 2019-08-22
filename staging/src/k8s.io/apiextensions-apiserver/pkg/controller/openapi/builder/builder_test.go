@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package builder
 
 import (
 	"reflect"
@@ -485,7 +485,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 				},
 			},
 		}
-		swagger, err := BuildSwagger(testNamespacedCRD, testCRDVersion)
+		swagger, err := BuildSwagger(testNamespacedCRD, testCRDVersion, Options{V2: true, StripDefaults: true})
 		require.NoError(t, err)
 		require.Equal(t, len(testCase.paths), len(swagger.Paths.Paths), testCase.scope)
 		for path, expected := range testCase.paths {
@@ -557,21 +557,49 @@ func TestBuildSwagger(t *testing.T) {
 		name         string
 		schema       string
 		wantedSchema string
+		opts         Options
 	}{
 		{
 			"nil",
 			"",
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with invalid-typed properties",
 			`{"type":"object","properties":{"spec":{"type":"bug"},"status":{"type":"object"}}}`,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"with stripped defaults",
+			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"with stripped defaults",
+			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"v2",
+			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"v3",
+			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: false, StripDefaults: true},
 		},
 	}
 	for _, tt := range tests {
@@ -603,7 +631,7 @@ func TestBuildSwagger(t *testing.T) {
 					Scope:      apiextensions.NamespaceScoped,
 					Validation: validation,
 				},
-			}, "v1")
+			}, "v1", tt.opts)
 			if err != nil {
 				t.Fatal(err)
 			}

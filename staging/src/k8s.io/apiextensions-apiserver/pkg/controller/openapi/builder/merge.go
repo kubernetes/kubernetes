@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package builder
 
 import (
 	"github.com/go-openapi/spec"
 )
 
-// mergeSpecs aggregates all OpenAPI specs, reusing the metadata of the first, static spec as the basis.
-func mergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) *spec.Swagger {
+// MergeSpecs aggregates all OpenAPI specs, reusing the metadata of the first, static spec as the basis.
+// Later paths and definitions override earlier ones. None of the input is mutated, but input
+// and output share data structures.
+func MergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) *spec.Swagger {
 	// create shallow copy of staticSpec, but replace paths and definitions because we modify them.
 	specToReturn := *staticSpec
 	if staticSpec.Definitions != nil {

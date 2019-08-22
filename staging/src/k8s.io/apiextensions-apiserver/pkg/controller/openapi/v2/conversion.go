@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package v2
 
 import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
