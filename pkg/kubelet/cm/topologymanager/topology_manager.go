@@ -164,8 +164,8 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// Get the TopologyHints from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 
-		// If hints is nil, insert a single, preferred any-socket hint into allProviderHints.
-		if hints == nil || len(hints) == 0 {
+		// If hints is empty, insert a single, preferred any-socket hint into allProviderHints.
+		if len(hints) == 0 {
 			klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with any resource")
 			affinity, _ := socketmask.NewSocketMask()
 			affinity.Fill()
@@ -294,7 +294,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			result := m.calculateAffinity(*pod, container)
 			admitPod := m.policy.CanAdmitPodResult(result.Preferred)
-			if admitPod.Admit == false {
+			if !admitPod.Admit {
 				return admitPod
 			}
 			c[container.Name] = result

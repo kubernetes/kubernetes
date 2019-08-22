@@ -382,7 +382,7 @@ func TestPodUpdateAnnotations(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
 	pod := CreateValidPod("foo2", "new")
-	pod.Annotations = make(map[string]string, 0)
+	pod.Annotations = make(map[string]string)
 	pod.Annotations["kubernetes.io/blah"] = "blah"
 
 	clone := pod.DeepCopy()
@@ -411,7 +411,7 @@ func TestPodUpdateLabels(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
 	pod := CreateValidPod("foo2", "new")
-	pod.Labels = make(map[string]string, 0)
+	pod.Labels = make(map[string]string)
 	pod.Labels["key"] = "value"
 
 	clone := pod.DeepCopy()
@@ -432,7 +432,7 @@ func TestPodRestore(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	pod := CreateValidPod("api-server", "kube-default")
-	pod.Annotations = make(map[string]string, 0)
+	pod.Annotations = make(map[string]string)
 	pod.Annotations["kubernetes.io/config.source"] = kubetypes.ApiserverSource
 	pod.Annotations[core.BootstrapCheckpointAnnotationKey] = "true"
 

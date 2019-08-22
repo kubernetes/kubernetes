@@ -253,7 +253,7 @@ func (g *GenericPLEG) relist() {
 				needsReinspection[pid] = pod
 
 				continue
-			} else if _, found := g.podsToReinspect[pid]; found {
+			} else {
 				// this pod was in the list to reinspect and we did so because it had events, so remove it
 				// from the list (we don't want the reinspection code below to inspect it a second time in
 				// this relist execution)

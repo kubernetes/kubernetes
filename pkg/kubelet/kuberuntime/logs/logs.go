@@ -49,8 +49,6 @@ import (
 const (
 	// timeFormat is the time format used in the log.
 	timeFormat = time.RFC3339Nano
-	// blockSize is the block size used in tail.
-	blockSize = 1024
 
 	// stateCheckPeriod is the period to check container state while following
 	// the container log. Kubelet should not keep following the log when the

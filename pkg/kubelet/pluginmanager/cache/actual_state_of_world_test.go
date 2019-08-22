@@ -19,6 +19,8 @@ package cache
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Calls AddPlugin() to add a plugin
@@ -63,10 +65,7 @@ func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 		Timestamp:            time.Now(),
 	}
 	err := asw.AddPlugin(pluginInfo)
-	// Assert
-	if err == nil || err.Error() != "Socket path is empty" {
-		t.Fatalf("AddOrUpdatePlugin failed. Expected: <Socket path is empty> Actual: <%v>", err)
-	}
+	require.EqualError(t, err, "socket path is empty")
 
 	// Get registered plugins and check the newly added plugin is there
 	aswPlugins := asw.GetRegisteredPlugins()

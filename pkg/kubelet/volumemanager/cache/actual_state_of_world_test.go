@@ -19,6 +19,7 @@ package cache
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -359,8 +360,10 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	volumeSpec2 := &volume.Spec{Volume: &pod2.Spec.Volumes[0]}
 	generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec1)
+	require.NoError(t, err)
 	generatedVolumeName2, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec2)
+	require.NoError(t, err)
 
 	if generatedVolumeName1 != generatedVolumeName2 {
 		t.Fatalf(
@@ -466,6 +469,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	volumeName, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
+	require.NoError(t, err)
 
 	podName := util.GetUniquePodName(pod)
 

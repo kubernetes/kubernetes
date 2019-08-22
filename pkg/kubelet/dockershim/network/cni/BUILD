@@ -52,6 +52,7 @@ go_test(
             "//staging/src/k8s.io/client-go/util/testing:go_default_library",
             "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
             "//vendor/github.com/stretchr/testify/mock:go_default_library",
+            "//vendor/github.com/stretchr/testify/require:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/exec/testing:go_default_library",
         ],
