@@ -225,13 +225,13 @@ type ReservePlugin interface {
 	Reserve(pc *PluginContext, p *v1.Pod, nodeName string) *Status
 }
 
-// PrebindPlugin is an interface that must be implemented by "prebind" plugins.
+// PreBindPlugin is an interface that must be implemented by "prebind" plugins.
 // These plugins are called before a pod being scheduled.
-type PrebindPlugin interface {
+type PreBindPlugin interface {
 	Plugin
-	// Prebind is called before binding a pod. All prebind plugins must return
+	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
-	Prebind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
+	PreBind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
 }
 
 // PostBindPlugin is an interface that must be implemented by "postbind" plugins.
@@ -311,12 +311,12 @@ type Framework interface {
 	// a non-success status.
 	RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScores, *Status)
 
-	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
+	// RunPreBindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If the Status code is "Unschedulable", it is
 	// considered as a scheduling check failure, otherwise, it is considered as an
 	// internal error. In either case the pod is not going to be bound.
-	RunPrebindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+	RunPreBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 
 	// RunPostBindPlugins runs the set of configured postbind plugins.
 	RunPostBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string)

@@ -45,7 +45,7 @@ type framework struct {
 	scorePlugins              []ScorePlugin
 	scoreWithNormalizePlugins []ScoreWithNormalizePlugin
 	reservePlugins            []ReservePlugin
-	prebindPlugins            []PrebindPlugin
+	preBindPlugins            []PreBindPlugin
 	bindPlugins               []BindPlugin
 	postBindPlugins           []PostBindPlugin
 	unreservePlugins          []UnreservePlugin
@@ -186,11 +186,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.PreBind != nil {
 		for _, pb := range plugins.PreBind.Enabled {
 			if pg, ok := pluginsMap[pb.Name]; ok {
-				p, ok := pg.(PrebindPlugin)
+				p, ok := pg.(PreBindPlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend prebind plugin", pb.Name)
 				}
-				f.prebindPlugins = append(f.prebindPlugins, p)
+				f.preBindPlugins = append(f.preBindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prebind plugin %q does not exist", pb.Name)
 			}
@@ -425,13 +425,13 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	return pluginToNodeScores, nil
 }
 
-// RunPrebindPlugins runs the set of configured prebind plugins. It returns a
+// RunPreBindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.
-func (f *framework) RunPrebindPlugins(
+func (f *framework) RunPreBindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
-	for _, pl := range f.prebindPlugins {
-		status := pl.Prebind(pc, pod, nodeName)
+	for _, pl := range f.preBindPlugins {
+		status := pl.PreBind(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
 				msg := fmt.Sprintf("rejected by %q at prebind: %v", pl.Name(), status.Message())

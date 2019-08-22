@@ -179,7 +179,7 @@ func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, 
 	return nil, nil
 }
 
-func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunPreBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
