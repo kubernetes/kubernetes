@@ -23,13 +23,11 @@ import (
 
 // These are valid flow-dingtinguisher methods.
 const (
-	// FlowDistinguisherMethodByUser specifies that the flow distinguisher is the username works in the request context
+	// FlowDistinguisherMethodByUserType specifies that the flow distinguisher is the username works in the request context
 	// so that the requests from the same user will enqueued into the same set of queues for processing.
 	FlowDistinguisherMethodByUserType FlowDistinguisherMethodType = "ByUser"
 
-	// FlowDistinguisherMethodByNamespace works by computing flow distinguisher with the user requested namespace. Any
-	// user requesting the namespace will be put into the same queue for processing.
-	// FlowDistinguisherMethodByNamespaceType specifies that the flow distinguisher is the namespace of the object
+	// FlowDistinguisherMethodByNamespaceType specifies that the flow distinguisher is the object's requested namespace
 	// that the request accesses.  If the object is not namespaced or the request is a non-resource request then
 	// the flow distinguisher is the empty string.
 	FlowDistinguisherMethodByNamespaceType FlowDistinguisherMethodType = "ByNamespace"
@@ -69,7 +67,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// FlowSchema defines the schema of a group of flows. Note that a flow makes up of a set of inbound API requests with
+// FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
 type FlowSchema struct {
 	metav1.TypeMeta
@@ -112,9 +110,9 @@ type FlowSchemaSpec struct {
 	// MatchingPrecedence.  Each MatchingPrecedence value must be non-negative.
 	MatchingPrecedence int32
 	// `distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema.
-	// `nil` specifies that the computation always yields the empty string.
+	// `nil` specifies that the distinguisher is disabled and thus will always be the empty string.
 	DistinguisherMethod *FlowDistinguisherMethod
-	// `rules` describes which requests will match this flow schema.
+	// `rules` describes which requests will match this flow schema. The flow-schema applies if any rule matches.
 	Rules []PolicyRuleWithSubjects
 }
 
@@ -142,6 +140,27 @@ type PolicyRuleWithSubjects struct {
 	// `rule` is the target verb, resource or the subresource the rule cares about. APIGroups, Resources, etc.
 	// Required.
 	Rule PolicyRule
+}
+
+// PolicyRule holds information that describes a policy rule, but does not contain information
+// about who the rule applies to or which namespace the rule applies to.
+type PolicyRule struct {
+	// `verbs` is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.
+	// VerbAll represents all verbs.
+	Verbs []string
+	// `apiGroups` is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+	// the enumerated resources in any API group will be allowed. '*' represents all api groups.
+	// +optional
+	APIGroups []string
+	// `resources` is a list of resources this rule applies to.  ResourceAll represents all resources.
+	// +optional
+	Resources []string
+	// `nonResourceURLs` is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+	// Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+	// Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
+	// NonResourceAll represents all non-resource urls.
+	// +optional
+	NonResourceURLs []string
 }
 
 // FlowSchemaStatus represents the current state of a flow-schema.
@@ -204,16 +223,8 @@ type PriorityLevelConfigurationList struct {
 
 // PriorityLevelConfigurationSpec is specification of a priority level
 type PriorityLevelConfigurationSpec struct {
-	// `exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level.
-	// Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued)
-	// and do not detract from the concurrency available for non-exempt requests. In a more sophisticated system, the
-	// exempt priority level would be the highest priority level. The field is default to false and only those system
-	// preset priority level can be exempt.
-	// +optional
-	Exempt bool
-	// `assuredConcurrencyShares` is a positive number for a non-exempt priority level, representing the weight by which
-	// the priority level shares the concurrency from the global limit. The concurrency limit of an apiserver is divided
-	// among the non-exempt priority levels in proportion to their assured concurrency shares. Basically this produces
+	// `assuredConcurrencyShares` is a positive number for a non-exempt priority level. The concurrency limit of an apiserver
+	// is divided among the non-exempt priority levels in proportion to their assured concurrency shares. Basically this produces
 	// the assured concurrency value (ACV) for each priority level:
 	//
 	//             ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )
@@ -223,17 +234,25 @@ type PriorityLevelConfigurationSpec struct {
 	// `queues` is a number of queues that belong to a non-exempt PriorityLevelConfiguration object. The queues exist
 	// independently at each apiserver. The value must be positive for a non-exempt priority level and setting it to 1
 	// disables shufflesharding and makes the distinguisher method irrelevant.
+	// TODO: sugguest a default or a way of deciding on a value.
 	// +optional
 	Queues int32
 	// `handSize` is a small positive number for applying shuffle sharding. When a request arrives at an apiserver the
 	// request flow identifier’s string pair is hashed and the hash value is used to shuffle the queue indices and deal
 	// a hand of the size specified here. If empty, the hand size will the be set to 1.
+	// NOTE: To figure out a better value for your cluster, please refer to (#76846)[https://github.com/kubernetes/kubernetes/issues/76846#issuecomment-523700960]
 	// +optional
 	HandSize int32
 	// `queueLengthLimit` is a length limit applied to each queue belongs to the priority.  The value must be positive
 	// for a non-exempt priority level.
 	// +optional
 	QueueLengthLimit int32
+	// `exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level.
+	// Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued)
+	// and do not detract from the concurrency available for non-exempt requests. The field is default to false and only those system
+	// preset priority level can be exempt.
+	// +optional
+	Exempt bool
 }
 
 // PriorityLevelConfigurationConditionType is a valid value for PriorityLevelConfigurationStatusCondition.Type
@@ -281,25 +300,4 @@ type Subject struct {
 	// the Authorizer should report an error.
 	// +optional
 	Namespace string
-}
-
-// PolicyRule holds information that describes a policy rule, but does not contain information
-// about who the rule applies to or which namespace the rule applies to.
-type PolicyRule struct {
-	// `verbs` is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.
-	// VerbAll represents all kinds.
-	Verbs []string
-	// `apiGroups` is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
-	// the enumerated resources in any API group will be allowed. APIGroupAll represents all api groups.
-	// +optional
-	APIGroups []string
-	// `resources` is a list of resources this rule applies to.  ResourceAll represents all resources.
-	// +optional
-	Resources []string
-	// `nonResourceURLs` is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
-	// Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
-	// Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
-	// NonResourceAll represents all non-resource urls.
-	// +optional
-	NonResourceURLs []string
 }

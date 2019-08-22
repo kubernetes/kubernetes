@@ -497,11 +497,11 @@ func Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1alpha1_Priorit
 }
 
 func autoConvert_v1alpha1_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *v1alpha1.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Exempt = in.Exempt
 	out.AssuredConcurrencyShares = in.AssuredConcurrencyShares
 	out.Queues = in.Queues
 	out.HandSize = in.HandSize
 	out.QueueLengthLimit = in.QueueLengthLimit
+	out.Exempt = in.Exempt
 	return nil
 }
 
@@ -511,11 +511,11 @@ func Convert_v1alpha1_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLeve
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1alpha1_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *v1alpha1.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Exempt = in.Exempt
 	out.AssuredConcurrencyShares = in.AssuredConcurrencyShares
 	out.Queues = in.Queues
 	out.HandSize = in.HandSize
 	out.QueueLengthLimit = in.QueueLengthLimit
+	out.Exempt = in.Exempt
 	return nil
 }
 

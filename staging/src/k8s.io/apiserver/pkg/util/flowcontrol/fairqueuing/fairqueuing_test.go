@@ -24,7 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/waitgroup"
 )
 
 // adapted from https://github.com/tadglines/wfq/blob/master/wfq_test.go
@@ -167,7 +168,7 @@ func flowStdDevTest(t *testing.T, flows []flowDesc, expectedStdDev float64) {
 	// for i := range queues {
 	// 	fqqueues[i] = queues[i]
 	// }
-	fq := newQueueSetImpl(20000, len(flows), 20000, 5*time.Second, fc, NoWaitGroup())
+	fq := newQueueSetImpl("", 20000, len(flows), 20000, 5*time.Second, fc, waitgroup.NoWaitGroup())
 	for n := 0; n < len(flows); n++ {
 		genFlow(fq, &flows[n], n)
 	}
