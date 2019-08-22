@@ -37,7 +37,7 @@ func (FlowDistinguisherMethod) SwaggerDoc() map[string]string {
 }
 
 var map_FlowSchema = map[string]string{
-	"":         "FlowSchema defines the schema of a group of flows. Note that a flow makes up of a set of inbound API requests with similar attributes and is identified by a pair of strings: the name of the FlowSchema and a \"flow distinguisher\".",
+	"":         "FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with similar attributes and is identified by a pair of strings: the name of the FlowSchema and a \"flow distinguisher\".",
 	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "`spec` is the specification of the desired behavior of a flow-schema. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
 	"status":   "`status` is the current status of a flow-schema. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
@@ -74,8 +74,8 @@ var map_FlowSchemaSpec = map[string]string{
 	"":                           "FlowSchemaSpec describes how the flow-schema's specification looks like.",
 	"priorityLevelConfiguration": "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the flow-schema will ignored and marked as invalid in its status. Required.",
 	"matchingPrecedence":         "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request.  The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be non-negative.",
-	"distinguisherMethod":        "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the computation always yields the empty string.",
-	"rules":                      "`rules` describes which requests will match this flow schema.",
+	"distinguisherMethod":        "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
+	"rules":                      "`rules` describes which requests will match this flow schema. The flow-schema applies if any rule matches.",
 }
 
 func (FlowSchemaSpec) SwaggerDoc() map[string]string {
@@ -93,8 +93,8 @@ func (FlowSchemaStatus) SwaggerDoc() map[string]string {
 
 var map_PolicyRule = map[string]string{
 	"":                "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
-	"verbs":           "`verbs` is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule. VerbAll represents all kinds.",
-	"apiGroups":       "`apiGroups` is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. APIGroupAll represents all api groups.",
+	"verbs":           "`verbs` is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule. VerbAll represents all verbs.",
+	"apiGroups":       "`apiGroups` is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. '*' represents all api groups.",
 	"resources":       "`resources` is a list of resources this rule applies to.  ResourceAll represents all resources.",
 	"nonResourceURLs": "`nonResourceURLs` is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both. NonResourceAll represents all non-resource urls.",
 }
@@ -158,11 +158,11 @@ func (PriorityLevelConfigurationReference) SwaggerDoc() map[string]string {
 
 var map_PriorityLevelConfigurationSpec = map[string]string{
 	"":                         "PriorityLevelConfigurationSpec is specification of a priority level",
-	"exempt":                   "`exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level. Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued) and do not detract from the concurrency available for non-exempt requests. In a more sophisticated system, the exempt priority level would be the highest priority level. The field is default to false and only those system preset priority level can be exempt.",
-	"assuredConcurrencyShares": "`assuredConcurrencyShares` is a positive number for a non-exempt priority level, representing the weight by which the priority level shares the concurrency from the global limit. The concurrency limit of an apiserver is divided among the non-exempt priority levels in proportion to their assured concurrency shares. Basically this produces the assured concurrency value (ACV) for each priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )",
+	"assuredConcurrencyShares": "`assuredConcurrencyShares` is a positive number for a non-exempt priority level. The concurrency limit of an apiserver is divided among the non-exempt priority levels in proportion to their assured concurrency shares. Basically this produces the assured concurrency value (ACV) for each priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )",
 	"queues":                   "`queues` is a number of queues that belong to a non-exempt PriorityLevelConfiguration object. The queues exist independently at each apiserver. The value must be positive for a non-exempt priority level and setting it to 1 disables shufflesharding and makes the distinguisher method irrelevant.",
-	"handSize":                 "`handSize` is a small positive number for applying shuffle sharding. When a request arrives at an apiserver the request flow identifier’s string pair is hashed and the hash value is used to shuffle the queue indices and deal a hand of the size specified here. If empty, the hand size will the be set to 1.",
+	"handSize":                 "`handSize` is a small positive number for applying shuffle sharding. When a request arrives at an apiserver the request flow identifier’s string pair is hashed and the hash value is used to shuffle the queue indices and deal a hand of the size specified here. If empty, the hand size will the be set to 1. NOTE: To figure out a better value for your cluster, please refer to (#76846)[https://github.com/kubernetes/kubernetes/issues/76846#issuecomment-523700960]",
 	"queueLengthLimit":         "`queueLengthLimit` is a length limit applied to each queue belongs to the priority.  The value must be positive for a non-exempt priority level.",
+	"exempt":                   "`exempt` defines whether the priority level is exempted or not.  There should be at most one exempt priority level. Being exempt means that requests of that priority are not subject to concurrency limits (and thus are never queued) and do not detract from the concurrency available for non-exempt requests. The field is default to false and only those system preset priority level can be exempt.",
 }
 
 func (PriorityLevelConfigurationSpec) SwaggerDoc() map[string]string {

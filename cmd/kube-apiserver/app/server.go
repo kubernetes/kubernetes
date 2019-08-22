@@ -52,7 +52,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -510,7 +509,7 @@ func buildGenericConfig(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RequestManagement) {
-		genericConfig.RequestManagement = BuildRequestManagement(s, clientgoExternalClient, versionedInformers)
+		genericConfig.RequestManagement = BuildRequestManager(s, clientgoExternalClient, versionedInformers)
 	}
 
 	return
@@ -540,15 +539,14 @@ func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinf
 	return authorizationConfig.New()
 }
 
-// BuildRequestManagement constructs the authenticator
-func BuildRequestManagement(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
-	return utilflowcontrol.NewRequestManagementSystemWithPreservation(
+// BuildRequestManagement constructs the request manager
+func BuildRequestManager(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
+	return utilflowcontrol.NewRequestManagerWithPreservation(
 		versionedInformer,
 		extclient.FlowcontrolV1alpha1(),
 		fairqueuing.NewNoRestraintFactory( /* TODO: switch to real implementation */ ),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
-		nil,
 		flowcontrolbootstrap.PreservingFlowSchemas,
 		flowcontrolbootstrap.PreservingPriorityLevelConfigurations,
 	)

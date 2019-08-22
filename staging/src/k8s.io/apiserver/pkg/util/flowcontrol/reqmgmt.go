@@ -18,7 +18,6 @@ package flowcontrol
 
 import (
 	"hash/crc64"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,7 +29,9 @@ import (
 	// "k8s.io/apiserver/pkg/endpoints/metrics"
 
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -92,7 +93,7 @@ type priorityLevelState struct {
 // this filter
 type requestManagementSystem struct {
 	// wg is kept informed of when goroutines start or stop or begin or end waiting
-	wg fq.OptionalWaitGroup
+	wg waitgroup.OptionalWaitGroup
 
 	queueSetFactory fq.QueueSetFactory
 
@@ -129,43 +130,37 @@ type requestManagementSystem struct {
 	curState atomic.Value
 }
 
-// NewRequestManagementSystem creates a new instance of request-management system
-func NewRequestManagementSystem(
+// NewRequestManager creates a new instance of request-management system
+func NewRequestManager(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
-	queueSetFactory fq.QueueSetFactory,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	waitGroup *sync.WaitGroup,
 ) Interface {
-	return NewRequestManagementSystemWithPreservation(
+	return NewRequestManagerWithPreservation(
 		informerFactory,
 		flowcontrolClient,
-		queueSetFactory,
 		serverConcurrencyLimit,
 		requestWaitLimit,
-		waitGroup,
 		nil, nil)
 }
 
-// NewRequestManagementSystemWithPreservation creates a new instance
+// NewRequestManagerWithPreservation creates a new instance
 // of request-management system with preservation.  The WaitGroup is
 // optional and, if supplied, is kept informed of whenever a goroutine
 // is started or stopped or begins or finishes waiting --- except that
 // the configuration controller is not fully plumbed yet.
-func NewRequestManagementSystemWithPreservation(
+func NewRequestManagerWithPreservation(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
-	queueSetFactory fq.QueueSetFactory,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	waitGroup *sync.WaitGroup,
 	preservingFlowSchemas []*rmtypesv1alpha1.FlowSchema,
 	preservingPriorityLevels []*rmtypesv1alpha1.PriorityLevelConfiguration,
 ) Interface {
 	reqMgmt := &requestManagementSystem{
-		wg:                     fq.WrapWaitGroupPointer(waitGroup),
-		queueSetFactory:        queueSetFactory,
+		wg:                     waitgroup.NoWaitGroup(),
+		queueSetFactory:        fq.NewQueueSetFactory(&clock.RealClock{}, waitgroup.NoWaitGroup()),
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,
 		flowcontrolClient:      flowcontrolClient,

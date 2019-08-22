@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 )
 
 // RecommendedOptions contains the recommended options for running an API server.
@@ -123,13 +122,11 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		return err
 	}
 	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) {
-		config.RequestManagement = utilflowcontrol.NewRequestManagementSystem(
+		config.RequestManagement = utilflowcontrol.NewRequestManager(
 			config.SharedInformerFactory,
 			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1alpha1(),
-			fairqueuing.NewNoRestraintFactory( /* TODO: switch to real implementation */ ),
 			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-			config.RequestTimeout/4,
-			nil)
+			config.RequestTimeout/4)
 	}
 
 	return nil
