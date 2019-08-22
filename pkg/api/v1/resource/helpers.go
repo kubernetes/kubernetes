@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -220,15 +221,16 @@ func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity
 
 // findContainerInPod finds a container by its name in the provided pod
 func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error) {
-	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			return &container, nil
+	var container *v1.Container
+	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+		if c.Name == containerName {
+			container = c
+			return false
 		}
-	}
-	for _, container := range pod.Spec.InitContainers {
-		if container.Name == containerName {
-			return &container, nil
-		}
+		return true
+	})
+	if container != nil {
+		return container, nil
 	}
 	return nil, fmt.Errorf("container %s not found", containerName)
 }
