@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog"
@@ -31,13 +32,13 @@ import (
 // This filter makes a QueueSetSystem for each priority level.
 type queueSetFactoryImpl struct {
 	// wg can be nil and is ignored in that case
-	wg OptionalWaitGroup
+	wg waitgroup.OptionalWaitGroup
 
 	clk clock.PassiveClock
 }
 
 // NewQueueSetFactory creates a new NewQueueSetFactory object
-func NewQueueSetFactory(clk clock.PassiveClock, wg OptionalWaitGroup) QueueSetFactory {
+func NewQueueSetFactory(clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) QueueSetFactory {
 	return &queueSetFactoryImpl{
 		wg:  wg,
 		clk: clk,
@@ -60,7 +61,8 @@ func (qsf queueSetFactoryImpl) NewQueueSet(concurrencyLimit, desiredNumQueues, q
 // https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
 type queueSetImpl struct {
 	lock                 sync.Mutex
-	wg                   OptionalWaitGroup
+	name                 string
+	wg                   waitgroup.OptionalWaitGroup
 	queues               []*Queue
 	clk                  clock.PassiveClock
 	vt                   float64
@@ -90,8 +92,8 @@ func initQueues(numQueues int) []*Queue {
 }
 
 // newQueueSetImpl creates a new queueSetImpl from passed in parameters and
-func newQueueSetImpl(concurrencyLimit, desiredNumQueues, queueLengthLimit int,
-	requestWaitLimit time.Duration, clk clock.PassiveClock, wg OptionalWaitGroup) *queueSetImpl {
+func newQueueSetImpl(name string, concurrencyLimit, desiredNumQueues, queueLengthLimit int,
+	requestWaitLimit time.Duration, clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) *queueSetImpl {
 	fq := &queueSetImpl{
 		wg:               wg,
 		queues:           initQueues(desiredNumQueues),
