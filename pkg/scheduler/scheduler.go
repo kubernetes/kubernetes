@@ -670,7 +670,7 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PodScheduleSuccesses.Inc()
 
 			// Run "postbind" plugins.
-			fwk.RunPostbindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
+			fwk.RunPostBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
 }

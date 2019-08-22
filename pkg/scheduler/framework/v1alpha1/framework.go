@@ -47,7 +47,7 @@ type framework struct {
 	reservePlugins            []ReservePlugin
 	prebindPlugins            []PrebindPlugin
 	bindPlugins               []BindPlugin
-	postbindPlugins           []PostbindPlugin
+	postBindPlugins           []PostBindPlugin
 	unreservePlugins          []UnreservePlugin
 	permitPlugins             []PermitPlugin
 }
@@ -214,11 +214,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.PostBind != nil {
 		for _, pb := range plugins.PostBind.Enabled {
 			if pg, ok := pluginsMap[pb.Name]; ok {
-				p, ok := pg.(PostbindPlugin)
+				p, ok := pg.(PostBindPlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend postbind plugin", pb.Name)
 				}
-				f.postbindPlugins = append(f.postbindPlugins, p)
+				f.postBindPlugins = append(f.postBindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("postbind plugin %q does not exist", pb.Name)
 			}
@@ -467,11 +467,11 @@ func (f *framework) RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName stri
 	return status
 }
 
-// RunPostbindPlugins runs the set of configured postbind plugins.
-func (f *framework) RunPostbindPlugins(
+// RunPostBindPlugins runs the set of configured postbind plugins.
+func (f *framework) RunPostBindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) {
-	for _, pl := range f.postbindPlugins {
-		pl.Postbind(pc, pod, nodeName)
+	for _, pl := range f.postBindPlugins {
+		pl.PostBind(pc, pod, nodeName)
 	}
 }
 

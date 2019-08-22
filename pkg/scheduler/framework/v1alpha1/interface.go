@@ -234,15 +234,15 @@ type PrebindPlugin interface {
 	Prebind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
 }
 
-// PostbindPlugin is an interface that must be implemented by "postbind" plugins.
+// PostBindPlugin is an interface that must be implemented by "postbind" plugins.
 // These plugins are called after a pod is successfully bound to a node.
-type PostbindPlugin interface {
+type PostBindPlugin interface {
 	Plugin
-	// Postbind is called after a pod is successfully bound. These plugins are
+	// PostBind is called after a pod is successfully bound. These plugins are
 	// informational. A common application of this extension point is for cleaning
 	// up. If a plugin needs to clean-up its state after a pod is scheduled and
-	// bound, Postbind is the extension point that it should register.
-	Postbind(pc *PluginContext, p *v1.Pod, nodeName string)
+	// bound, PostBind is the extension point that it should register.
+	PostBind(pc *PluginContext, p *v1.Pod, nodeName string)
 }
 
 // UnreservePlugin is an interface for Unreserve plugins. This is an informational
@@ -318,8 +318,8 @@ type Framework interface {
 	// internal error. In either case the pod is not going to be bound.
 	RunPrebindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 
-	// RunPostbindPlugins runs the set of configured postbind plugins.
-	RunPostbindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string)
+	// RunPostBindPlugins runs the set of configured postbind plugins.
+	RunPostBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string)
 
 	// RunReservePlugins runs the set of configured reserve plugins. If any of these
 	// plugins returns an error, it does not continue running the remaining ones and
