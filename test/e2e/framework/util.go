@@ -2221,10 +2221,10 @@ func ScaleResource(
 	size uint,
 	wait bool,
 	kind schema.GroupKind,
-	gr schema.GroupResource,
+	gvr schema.GroupVersionResource,
 ) error {
 	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gr); err != nil {
+	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gvr); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {

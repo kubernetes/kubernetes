@@ -107,6 +107,7 @@ type RunObjectConfig interface {
 	GetReplicas() int
 	GetLabelValue(string) (string, bool)
 	GetGroupResource() schema.GroupResource
+	GetGroupVersionResource() schema.GroupVersionResource
 }
 
 type RCConfig struct {
@@ -298,6 +299,10 @@ func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
 	return extensionsinternal.Resource("deployments")
 }
 
+func (config *DeploymentConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return extensionsinternal.SchemeGroupVersion.WithResource("deployments")
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -374,6 +379,10 @@ func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
 	return extensionsinternal.Resource("replicasets")
 }
 
+func (config *ReplicaSetConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return extensionsinternal.SchemeGroupVersion.WithResource("replicasets")
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -444,6 +453,10 @@ func (config *JobConfig) GetKind() schema.GroupKind {
 
 func (config *JobConfig) GetGroupResource() schema.GroupResource {
 	return batchinternal.Resource("jobs")
+}
+
+func (config *JobConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return batchinternal.SchemeGroupVersion.WithResource("jobs")
 }
 
 func (config *JobConfig) create() error {
@@ -520,6 +533,10 @@ func (config *RCConfig) GetKind() schema.GroupKind {
 
 func (config *RCConfig) GetGroupResource() schema.GroupResource {
 	return api.Resource("replicationcontrollers")
+}
+
+func (config *RCConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return api.SchemeGroupVersion.WithResource("replicationcontrollers")
 }
 
 func (config *RCConfig) GetClient() clientset.Interface {

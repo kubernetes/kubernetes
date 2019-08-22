@@ -691,7 +691,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		newSize,
 		true,
 		config.GetKind(),
-		config.GetGroupResource(),
+		config.GetGroupVersionResource(),
 	),
 		fmt.Sprintf("scaling %v %v", config.GetKind(), config.GetName()))
 
