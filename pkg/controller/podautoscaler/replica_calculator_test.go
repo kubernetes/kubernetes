@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -89,9 +88,8 @@ type replicaCalcTestCase struct {
 
 	timestamp time.Time
 
-	resource            *resourceInfo
-	metric              *metricInfo
-	metricLabelSelector labels.Selector
+	resource *resourceInfo
+	metric   *metricInfo
 
 	podReadiness         []v1.ConditionStatus
 	podStartTime         []metav1.Time
