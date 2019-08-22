@@ -34,15 +34,13 @@ import (
 	// Azure route controller changes behavior if ipv6dual stack feature is turned on
 	// remove this once the feature graduates
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 )
 
 // copied to minimize the number of cross reference
 // and exceptions in publishing and allowed imports.
 const (
-	IPv6DualStack      featuregate.Feature = "IPv6DualStack"
-	routeNameFmt                           = "%s____%s"
-	routeNameSeparator                     = "____"
+	routeNameFmt       = "%s____%s"
+	routeNameSeparator = "____"
 )
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
