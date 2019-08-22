@@ -208,12 +208,12 @@ func TestResourceListConversion(t *testing.T) {
 		},
 		{ // Large values should still be accurate.
 			input: v1.ResourceList{
-				v1.ResourceCPU:     *bigMilliQuantity.Copy(),
-				v1.ResourceStorage: *bigMilliQuantity.Copy(),
+				v1.ResourceCPU:     bigMilliQuantity.DeepCopy(),
+				v1.ResourceStorage: bigMilliQuantity.DeepCopy(),
 			},
 			expected: core.ResourceList{
-				core.ResourceCPU:     *bigMilliQuantity.Copy(),
-				core.ResourceStorage: *bigMilliQuantity.Copy(),
+				core.ResourceCPU:     bigMilliQuantity.DeepCopy(),
+				core.ResourceStorage: bigMilliQuantity.DeepCopy(),
 			},
 		},
 	}
