@@ -180,9 +180,11 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Post().
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		Namespace("default").
+		Param("fieldManager", "apply_test").
 		Resource(podResource).
+		Name(podName).
 		Body(podBytes).
 		Do().
 		Get()
@@ -364,6 +366,81 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Body([]byte(obj)).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to apply object with force: %v", err)
+	}
+}
+
+// TestUpdateApplyConflict tests that applying to an object, which wasn't created by apply, will give conflicts
+func TestUpdateApplyConflict(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+                        "replicas": 3,
+                        "selector": {
+                                "matchLabels": {
+                                         "app": "nginx"
+                                }
+                        },
+                        "template": {
+                                "metadata": {
+                                        "labels": {
+                                                "app": "nginx"
+                                        }
+                                },
+                                "spec": {
+				        "containers": [{
+					        "name":  "nginx",
+					        "image": "nginx:latest"
+				        }]
+                                }
+                        }
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using post: %v", err)
+	}
+
+	obj = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+		},
+		"spec": {
+			"replicas": 101,
+		}
+	}`)
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body([]byte(obj)).Do().Get()
+	if err == nil {
+		t.Fatalf("Expecting to get conflicts when applying object")
+	}
+	status, ok := err.(*errors.StatusError)
+	if !ok {
+		t.Fatalf("Expecting to get conflicts as API error")
+	}
+	if len(status.Status().Details.Causes) < 1 {
+		t.Fatalf("Expecting to get at least one conflict when applying object, got: %v", status.Status().Details.Causes)
 	}
 }
 

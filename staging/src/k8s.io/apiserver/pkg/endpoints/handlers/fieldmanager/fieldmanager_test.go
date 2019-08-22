@@ -72,6 +72,29 @@ func TestFieldManagerCreation(t *testing.T) {
 	}
 }
 
+func TestUpdateOnlyDoesNotTrackManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	liveObj := &corev1.Pod{}
+
+	updatedObj := liveObj.DeepCopy()
+	updatedObj.ObjectMeta.Labels = map[string]string{"k": "v"}
+
+	newObj, err := f.Update(liveObj, updatedObj, "fieldmanager_test")
+	if err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(newObj)
+	if err != nil {
+		t.Fatalf("couldn't get accessor: %v", err)
+	}
+
+	if m := accessor.GetManagedFields(); len(m) != 0 {
+		t.Fatalf("managedFields were tracked on update only: %v", m)
+	}
+}
+
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager()
 
