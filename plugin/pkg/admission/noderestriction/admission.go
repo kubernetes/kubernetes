@@ -361,11 +361,6 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		if forbiddenUpdateLabels := p.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
 			klog.Warningf("node %q added disallowed labels on node creation: %s", nodeName, strings.Join(forbiddenUpdateLabels.List(), ", "))
 		}
-
-		// On create, get name from new object if unset in admission
-		if len(requestedName) == 0 {
-			requestedName = node.Name
-		}
 	}
 	if requestedName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
