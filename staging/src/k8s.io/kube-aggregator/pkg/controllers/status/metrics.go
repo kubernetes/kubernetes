@@ -17,19 +17,20 @@ limitations under the License.
 package apiserver
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
-	unavailableCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	unavailableCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Name: "aggregator_unavailable_apiservice_count",
 			Help: "Counter of APIServices which are marked as unavailable broken down by APIService name and reason.",
 		},
 		[]string{"name", "reason"},
 	)
-	unavailableGauge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	unavailableGauge = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
 			Name: "aggregator_unavailable_apiservice",
 			Help: "Gauge of APIServices which are marked as unavailable broken down by APIService name.",
 		},
@@ -38,6 +39,6 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(unavailableCounter)
-	prometheus.MustRegister(unavailableGauge)
+	legacyregistry.MustRegister(unavailableCounter)
+	legacyregistry.MustRegister(unavailableGauge)
 }

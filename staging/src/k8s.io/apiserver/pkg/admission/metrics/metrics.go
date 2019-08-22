@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -154,33 +154,35 @@ func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, 
 }
 
 type metricSet struct {
-	latencies        *prometheus.HistogramVec
-	latenciesSummary *prometheus.SummaryVec
+	latencies        *metrics.HistogramVec
+	latenciesSummary *metrics.SummaryVec
 }
 
 func newMetricSet(name string, labels []string, helpTemplate string, hasSummary bool) *metricSet {
-	var summary *prometheus.SummaryVec
+	var summary *metrics.SummaryVec
 	if hasSummary {
-		summary = prometheus.NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_duration_seconds_summary", name),
-				Help:      fmt.Sprintf(helpTemplate, "latency summary in seconds"),
-				MaxAge:    latencySummaryMaxAge,
+		summary = metrics.NewSummaryVec(
+			&metrics.SummaryOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           fmt.Sprintf("%s_admission_duration_seconds_summary", name),
+				Help:           fmt.Sprintf(helpTemplate, "latency summary in seconds"),
+				MaxAge:         latencySummaryMaxAge,
+				StabilityLevel: metrics.ALPHA,
 			},
 			labels,
 		)
 	}
 
 	return &metricSet{
-		latencies: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_duration_seconds", name),
-				Help:      fmt.Sprintf(helpTemplate, "latency histogram in seconds"),
-				Buckets:   latencyBuckets,
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           fmt.Sprintf("%s_admission_duration_seconds", name),
+				Help:           fmt.Sprintf(helpTemplate, "latency histogram in seconds"),
+				Buckets:        latencyBuckets,
+				StabilityLevel: metrics.ALPHA,
 			},
 			labels,
 		),
@@ -191,9 +193,9 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 
 // MustRegister registers all the prometheus metrics in the metricSet.
 func (m *metricSet) mustRegister() {
-	prometheus.MustRegister(m.latencies)
+	legacyregistry.MustRegister(m.latencies)
 	if m.latenciesSummary != nil {
-		prometheus.MustRegister(m.latenciesSummary)
+		legacyregistry.MustRegister(m.latenciesSummary)
 	}
 }
 

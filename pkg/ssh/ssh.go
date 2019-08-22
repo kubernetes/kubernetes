@@ -36,33 +36,36 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 )
 
 var (
-	tunnelOpenCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "ssh_tunnel_open_count",
-			Help: "Counter of ssh tunnel total open attempts",
+	tunnelOpenCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "ssh_tunnel_open_count",
+			Help:           "Counter of ssh tunnel total open attempts",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	tunnelOpenFailCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "ssh_tunnel_open_fail_count",
-			Help: "Counter of ssh tunnel failed open attempts",
+	tunnelOpenFailCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "ssh_tunnel_open_fail_count",
+			Help:           "Counter of ssh tunnel failed open attempts",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(tunnelOpenCounter)
-	prometheus.MustRegister(tunnelOpenFailCounter)
+	legacyregistry.MustRegister(tunnelOpenCounter)
+	legacyregistry.MustRegister(tunnelOpenFailCounter)
 }
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 // The short keepalive timeout and interval have been chosen to aggressively
@@ -45,6 +46,10 @@ const keepaliveTimeout = 10 * time.Second
 // It is set to 20 seconds as times shorter than that will cause TLS connections to fail
 // on heavily loaded arm64 CPUs (issue #64649)
 const dialTimeout = 20 * time.Second
+
+func init() {
+	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
+}
 
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
