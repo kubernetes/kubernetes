@@ -94,7 +94,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 	cpuCap := localNodeCap[v1.ResourceCPU]
 	localNodeAlloc := getLocalNode(f).Status.Allocatable
 	cpuAlloc := localNodeAlloc[v1.ResourceCPU]
-	cpuRes := cpuCap.Copy()
+	cpuRes := cpuCap.DeepCopy()
 	cpuRes.Sub(cpuAlloc)
 
 	// RoundUp reserved CPUs to get only integer cores.

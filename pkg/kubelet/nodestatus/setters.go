@@ -332,7 +332,7 @@ func MachineInfo(nodeName string,
 		}
 		allocatableReservation := nodeAllocatableReservationFunc()
 		for k, v := range node.Status.Capacity {
-			value := *(v.Copy())
+			value := v.DeepCopy()
 			if res, exists := allocatableReservation[k]; exists {
 				value.Sub(res)
 			}
@@ -355,7 +355,7 @@ func MachineInfo(nodeName string,
 		for k, v := range node.Status.Capacity {
 			if v1helper.IsHugePageResourceName(k) {
 				allocatableMemory := node.Status.Allocatable[v1.ResourceMemory]
-				value := *(v.Copy())
+				value := v.DeepCopy()
 				allocatableMemory.Sub(value)
 				if allocatableMemory.Sign() < 0 {
 					// Negative Allocatable resources don't make sense.
