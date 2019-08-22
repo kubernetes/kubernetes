@@ -130,7 +130,7 @@ type PriorityLevelConfigurationReference struct {
 type PolicyRuleWithSubjects struct {
 	// `subjects` is the list of normal user, serviceaccount, or group that this rule cares about.
 	// +optional
-	Subjects []Subject `json:"subjects,omitempty" protobuf:"bytes,1,opt,name=subject"`
+	Subjects []Subject `json:"subjects,omitempty" protobuf:"bytes,1,opt,name=subjects"`
 	// `rule` is the target verb, resource or the subresource the rule cares about. APIGroups, Resources, etc.
 	// Required.
 	Rule PolicyRule `json:"rule" protobuf:"bytes,2,opt,name=rule"`
