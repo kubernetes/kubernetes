@@ -12,7 +12,6 @@ go_library(
         "fakegenerator.go",
         "operation_executor.go",
         "operation_generator.go",
-        "volume_operation.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/util/operationexecutor",
     deps = [
