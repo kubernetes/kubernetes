@@ -267,7 +267,7 @@ func (grm *nestedPendingOperations) operationComplete(
 	// Log error
 	operationKey :=
 		getOperationKey(volumeName, podName)
-	klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
+	klog.Errorf("%+v", grm.operations[existingOpIndex].expBackoff.
 		GenerateNoRetriesPermittedMsg(operationKey))
 }
 

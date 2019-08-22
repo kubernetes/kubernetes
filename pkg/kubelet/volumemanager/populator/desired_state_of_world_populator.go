@@ -388,7 +388,8 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		// so we only need to check it once if more than one pod use it.
 		return
 	}
-	if mountedReadOnlyByPod(podVolume, pod) {
+	// We need to be consistent with what we check.
+	if volumeSpec.ReadOnly {
 		// This volume is used as read only by this pod, we don't perform resize for read only volumes.
 		klog.V(5).Infof("Skip file system resize check for volume %s in pod %s/%s "+
 			"as the volume is mounted as readonly", podVolume.Name, pod.Namespace, pod.Name)
@@ -398,13 +399,6 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		dswp.actualStateOfWorld.MarkFSResizeRequired(uniqueVolumeName, uniquePodName)
 	}
 	processedVolumesForFSResize.Insert(string(uniqueVolumeName))
-}
-
-func mountedReadOnlyByPod(podVolume v1.Volume, pod *v1.Pod) bool {
-	if podVolume.PersistentVolumeClaim.ReadOnly {
-		return true
-	}
-	return false
 }
 
 func getUniqueVolumeName(
