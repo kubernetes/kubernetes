@@ -19,67 +19,8 @@ limitations under the License.
 package mount
 
 import (
-	"errors"
 	"os"
 )
-
-// Mounter implements mount.Interface for unsupported platforms
-type Mounter struct {
-	mounterPath string
-}
-
-var errUnsupported = errors.New("util/mount on this platform is not supported")
-
-// New returns a mount.Interface for the current system.
-// It provides options to override the default mounter behavior.
-// mounterPath allows using an alternative to `/bin/mount` for mounting.
-func New(mounterPath string) Interface {
-	return &Mounter{
-		mounterPath: mounterPath,
-	}
-}
-
-// Mount always returns an error on unsupported platforms
-func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	return errUnsupported
-}
-
-// Unmount always returns an error on unsupported platforms
-func (mounter *Mounter) Unmount(target string) error {
-	return errUnsupported
-}
-
-// List always returns an error on unsupported platforms
-func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, errUnsupported
-}
-
-// IsMountPointMatch returns true if the path in mp is the same as dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return (mp.Path == dir)
-}
-
-// IsLikelyNotMountPoint always returns an error on unsupported platforms
-func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	return true, errUnsupported
-}
-
-// GetMountRefs always returns an error on unsupported platforms
-func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errUnsupported
-}
-
-func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
-	return mounter.Interface.Mount(source, target, fstype, options)
-}
-
-func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, errUnsupported
-}
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return "", errUnsupported
-}
 
 type hostUtil struct{}
 

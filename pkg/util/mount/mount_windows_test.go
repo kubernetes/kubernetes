@@ -30,48 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNormalizeWindowsPath(t *testing.T) {
-	path := `/var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4/volumes/kubernetes.io~azure-disk`
-	normalizedPath := normalizeWindowsPath(path)
-	if normalizedPath != `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~azure-disk` {
-		t.Errorf("normizeWindowsPath test failed, normalizedPath : %q", normalizedPath)
-	}
-
-	path = `/var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~azure-disk`
-	normalizedPath = normalizeWindowsPath(path)
-	if normalizedPath != `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~azure-disk` {
-		t.Errorf("normizeWindowsPath test failed, normalizedPath : %q", normalizedPath)
-	}
-
-	path = `/`
-	normalizedPath = normalizeWindowsPath(path)
-	if normalizedPath != `c:\` {
-		t.Errorf("normizeWindowsPath test failed, normalizedPath : %q", normalizedPath)
-	}
-}
-
-func TestValidateDiskNumber(t *testing.T) {
-	diskNum := "0"
-	if err := ValidateDiskNumber(diskNum); err != nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
-	}
-
-	diskNum = "99"
-	if err := ValidateDiskNumber(diskNum); err != nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
-	}
-
-	diskNum = "ab"
-	if err := ValidateDiskNumber(diskNum); err == nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
-	}
-
-	diskNum = "100"
-	if err := ValidateDiskNumber(diskNum); err == nil {
-		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
-	}
-}
-
 func makeLink(link, target string) error {
 	if output, err := exec.Command("cmd", "/c", "mklink", "/D", link, target).CombinedOutput(); err != nil {
 		return fmt.Errorf("mklink failed: %v, link(%q) target(%q) output: %q", err, link, target, string(output))
@@ -171,55 +129,6 @@ func TestPathWithinBase(t *testing.T) {
 		result := PathWithinBase(test.fullPath, test.basePath)
 		assert.Equal(t, result, test.expectedResult, "Expect result not equal with PathWithinBase(%s, %s) return: %q, expected: %q",
 			test.fullPath, test.basePath, result, test.expectedResult)
-	}
-}
-
-func TestGetFileType(t *testing.T) {
-	hu := NewHostUtil()
-
-	testCase := []struct {
-		name         string
-		expectedType FileType
-		setUp        func() (string, string, error)
-	}{
-		{
-			"Directory Test",
-			FileTypeDirectory,
-			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
-				return tempDir, tempDir, err
-			},
-		},
-		{
-			"File Test",
-			FileTypeFile,
-			func() (string, string, error) {
-				tempFile, err := ioutil.TempFile("", "test-get-filetype")
-				if err != nil {
-					return "", "", err
-				}
-				tempFile.Close()
-				return tempFile.Name(), tempFile.Name(), nil
-			},
-		},
-	}
-
-	for idx, tc := range testCase {
-		path, cleanUpPath, err := tc.setUp()
-		if err != nil {
-			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
-		}
-		if len(cleanUpPath) > 0 {
-			defer os.RemoveAll(cleanUpPath)
-		}
-
-		fileType, err := hu.GetFileType(path)
-		if err != nil {
-			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
-		}
-		if fileType != tc.expectedType {
-			t.Fatalf("[%d-%s] expected %s, but got %s", idx, tc.name, tc.expectedType, fileType)
-		}
 	}
 }
 
