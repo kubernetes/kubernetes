@@ -168,6 +168,7 @@ func (c *Controller) sync(name string) error {
 			return nil
 		}
 		delete(c.crdSpecs, name)
+		klog.V(2).Infof("Updating CRD OpenAPI spec because %s was removed", name)
 		return c.updateSpecLocked()
 	}
 
@@ -183,6 +184,7 @@ func (c *Controller) sync(name string) error {
 
 	// update specs of this CRD
 	c.crdSpecs[crd.Name] = newSpecs
+	klog.V(2).Infof("Updating CRD OpenAPI spec because %s changed", name)
 	return c.updateSpecLocked()
 }
 

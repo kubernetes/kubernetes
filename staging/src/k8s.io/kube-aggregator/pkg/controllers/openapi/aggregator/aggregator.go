@@ -25,9 +25,10 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/aggregator"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
@@ -104,6 +105,10 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Build initial spec to serve.
+	klog.V(2).Infof("Building initial OpenAPI spec")
+	defer func(start time.Time) {
+		klog.V(2).Infof("Finished initial OpenAPI spec generation after %v", time.Now().Sub(start))
+	}(time.Now())
 	specToServe, err := s.buildOpenAPISpec()
 	if err != nil {
 		return nil, err
@@ -209,6 +214,10 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	if existedBefore && origSpecInfo != nil && origSpecInfo.etag == specInfo.etag {
 		return nil
 	}
+	klog.V(2).Infof("Updating OpenAPI spec because %s is updated", specInfo.apiService.Name)
+	defer func(start time.Time) {
+		klog.V(2).Infof("Finished OpenAPI spec generation after %v", time.Now().Sub(start))
+	}(time.Now())
 	if err := s.updateOpenAPISpec(); err != nil {
 		if existedBefore {
 			s.openAPISpecs[specInfo.apiService.Name] = origSpecInfo
@@ -228,6 +237,10 @@ func (s *specAggregator) tryDeleteServiceSpecs(apiServiceName string) error {
 		return nil
 	}
 	delete(s.openAPISpecs, apiServiceName)
+	klog.V(2).Infof("Updating OpenAPI spec because %s is removed", apiServiceName)
+	defer func(start time.Time) {
+		klog.V(2).Infof("Finished OpenAPI spec generation after %v", time.Now().Sub(start))
+	}(time.Now())
 	if err := s.updateOpenAPISpec(); err != nil {
 		s.openAPISpecs[apiServiceName] = orgSpecInfo
 		return err
