@@ -124,16 +124,6 @@ func ParseEtcdVersionPair(s string) (*EtcdVersionPair, error) {
 	return &EtcdVersionPair{version, storageVersion}, nil
 }
 
-// MustParseEtcdVersionPair parses a "<version>/<storage-version>" string to an EtcdVersionPair
-// or panics if the parse fails.
-func MustParseEtcdVersionPair(s string) *EtcdVersionPair {
-	pair, err := ParseEtcdVersionPair(s)
-	if err != nil {
-		panic(err)
-	}
-	return pair
-}
-
 // String returns "<version>/<storage-version>" string of the EtcdVersionPair.
 func (vp *EtcdVersionPair) String() string {
 	return fmt.Sprintf("%s/%s", vp.version, vp.storageVersion)
@@ -186,13 +176,4 @@ func ParseSupportedVersions(s string) (SupportedVersions, error) {
 		}
 	}
 	return versions, nil
-}
-
-// MustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
-func MustParseSupportedVersions(s string) SupportedVersions {
-	versions, err := ParseSupportedVersions(s)
-	if err != nil {
-		panic(err)
-	}
-	return versions
 }

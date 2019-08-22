@@ -1,6 +1,5 @@
 cluster/images/conformance/go-runner
 cluster/images/etcd-version-monitor
-cluster/images/etcd/migrate
 cmd/controller-manager/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
