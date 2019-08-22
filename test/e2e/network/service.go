@@ -911,6 +911,12 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
+	/*
+		Testname: Service, update NodePort, same port different protocol
+		Description: Create a service of type ClusterIP to accept TCP requests. Service creation MUST be successful by assigning ClusterIP to the service.
+		When service type is updated to NodePort to support two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service.
+		TODO: Test Service reachability, good to include this check in Conformance perspective.
+	*/
 	ginkgo.It("should be able to update NodePorts with two same port numbers but different protocols", func() {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
@@ -928,7 +934,6 @@ var _ = SIGDescribe("Services", func() {
 		e2elog.Logf("service port TCP: %d", svcPort)
 
 		// Change the services to NodePort and add a UDP port.
-
 		ginkgo.By("changing the TCP service to type=NodePort and add a UDP port")
 		newService := jig.UpdateServiceOrFail(ns, tcpService.Name, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
@@ -958,7 +963,14 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should be able to change the type from ExternalName to ClusterIP", func() {
+	/*
+		Release: v1.16
+		Testname: Service, change type, ExternalName to ClusterIP
+		Description: Create a service of type ExternalName, pointing to external DNS. ClusterIP MUST not be assigned to the service.
+		Update the service from ExternalName to ClusterIP by removing ExternalName entry, assigning port 80 as service port and TCP as protocol.
+		Service update MUST be successful by assigning ClusterIP to the service and it MUST be reachable over serviceName and ClusterIP on provided service port.
+	*/
+	framework.ConformanceIt("should be able to change the type from ExternalName to ClusterIP", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, serviceName)
@@ -986,7 +998,15 @@ var _ = SIGDescribe("Services", func() {
 		jig.CheckServiceReachability(ns, clusterIPService, execPod)
 	})
 
-	ginkgo.It("should be able to change the type from ExternalName to NodePort", func() {
+	/*
+		Release: v1.16
+		Testname: Service, change type, ExternalName to NodePort
+		Description: Create a service of type ExternalName, pointing to external DNS. ClusterIP MUST not be assigned to the service.
+		Update the service from ExternalName to NodePort, assigning port 80 as service port and, TCP as protocol.
+		service update MUST be successful by exposing service on every node's IP on dynamically assigned NodePort and, ClusterIP MUST be assigned to route service requests.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
+	*/
+	framework.ConformanceIt("should be able to change the type from ExternalName to NodePort", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, serviceName)
@@ -1014,7 +1034,14 @@ var _ = SIGDescribe("Services", func() {
 		jig.CheckServiceReachability(ns, nodePortService, execPod)
 	})
 
-	ginkgo.It("should be able to change the type from ClusterIP to ExternalName", func() {
+	/*
+		Release: v1.16
+		Testname: Service, change type, ClusterIP to ExternalName
+		Description: Create a service of type ClusterIP. Service creation MUST be successful by assigning ClusterIP to the service.
+		Update service type from ClusterIP to ExternalName by setting CNAME entry as externalName. Service update MUST be successful and service MUST not has associated ClusterIP.
+		Service MUST be able to resolve to IP address by returning A records ensuring service is pointing to provided externalName.
+	*/
+	framework.ConformanceIt("should be able to change the type from ClusterIP to ExternalName", func() {
 		serviceName := "clusterip-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, serviceName)
@@ -1045,7 +1072,14 @@ var _ = SIGDescribe("Services", func() {
 		jig.CheckServiceReachability(ns, externalNameService, execPod)
 	})
 
-	ginkgo.It("should be able to change the type from NodePort to ExternalName", func() {
+	/*
+		Release: v1.16
+		Testname: Service, change type, NodePort to ExternalName
+		Description: Create a service of type NodePort. Service creation MUST be successful by exposing service on every node's IP on dynamically assigned NodePort and, ClusterIP MUST be assigned to route service requests.
+		Update the service type from NodePort to ExternalName by setting CNAME entry as externalName. Service update MUST be successful and, MUST not has ClusterIP associated with the service and, allocated NodePort MUST be released.
+		Service MUST be able to resolve to IP address by returning A records ensuring service is pointing to provided externalName.
+	*/
+	framework.ConformanceIt("should be able to change the type from NodePort to ExternalName", func() {
 		serviceName := "nodeport-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, serviceName)
@@ -1080,6 +1114,12 @@ var _ = SIGDescribe("Services", func() {
 
 	})
 
+	/*
+		Testname: Service, NodePort, same port different protocols
+		Description: Create a service of type NodePort listening on port 53 for two protocols TCP and UDP.
+		Service creation MUST be successful by assigning a ClusterIP and two unique nodePorts for each protocol, making service reachable on every node's IP and nodePort.
+		TODO: Test Service reachability, good to include this check in Conformance perspective.
+	*/
 	ginkgo.It("should use same NodePort with same port but different protocols", func() {
 		serviceName := "nodeports"
 		ns := f.Namespace.Name
