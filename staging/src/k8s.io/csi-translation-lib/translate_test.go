@@ -194,7 +194,7 @@ func TestTopologyTranslation(t *testing.T) {
 	}
 }
 
-func makePV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+func makePV(labels map[string]string, topology *v1.NumericAwareSelectorRequirement) *v1.PersistentVolume {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,
@@ -206,7 +206,7 @@ func makePV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.
 		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
 			Required: &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{MatchExpressions: []v1.NodeSelectorRequirement{*topology}},
+					{MatchExpressions: []v1.NumericAwareSelectorRequirement{*topology}},
 				},
 			},
 		}
@@ -215,7 +215,7 @@ func makePV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.
 	return pv
 }
 
-func makeGCEPDPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+func makeGCEPDPV(labels map[string]string, topology *v1.NumericAwareSelectorRequirement) *v1.PersistentVolume {
 	pv := makePV(labels, topology)
 	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
@@ -228,20 +228,20 @@ func makeGCEPDPV(labels map[string]string, topology *v1.NodeSelectorRequirement)
 	return pv
 }
 
-func makeGCEPDPVMultTerms(labels map[string]string, topologies ...*v1.NodeSelectorRequirement) *v1.PersistentVolume {
+func makeGCEPDPVMultTerms(labels map[string]string, topologies ...*v1.NumericAwareSelectorRequirement) *v1.PersistentVolume {
 	pv := makeGCEPDPV(labels, topologies[0])
 	for _, topology := range topologies[1:] {
 		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = append(
 			pv.Spec.NodeAffinity.Required.NodeSelectorTerms,
 			v1.NodeSelectorTerm{
-				MatchExpressions: []v1.NodeSelectorRequirement{*topology},
+				MatchExpressions: []v1.NumericAwareSelectorRequirement{*topology},
 			},
 		)
 	}
 	return pv
 }
 
-func makeAWSEBSPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+func makeAWSEBSPV(labels map[string]string, topology *v1.NumericAwareSelectorRequirement) *v1.PersistentVolume {
 	pv := makePV(labels, topology)
 	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
@@ -254,7 +254,7 @@ func makeAWSEBSPV(labels map[string]string, topology *v1.NodeSelectorRequirement
 	return pv
 }
 
-func makeCinderPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+func makeCinderPV(labels map[string]string, topology *v1.NumericAwareSelectorRequirement) *v1.PersistentVolume {
 	pv := makePV(labels, topology)
 	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
 		Cinder: &v1.CinderPersistentVolumeSource{
@@ -271,10 +271,10 @@ func makeNodeAffinity(multiTerms bool, key string, values ...string) *v1.VolumeN
 		Required: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      key,
-							Operator: v1.NodeSelectorOpIn,
+							Operator: v1.LabelSelectorOpIn,
 							Values:   values,
 						},
 					},
@@ -292,10 +292,10 @@ func makeNodeAffinity(multiTerms bool, key string, values ...string) *v1.VolumeN
 	nodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Values = values[:1] // If values=[1,2,3], overwrite with [1]
 	for _, value := range values[1:] {
 		term := v1.NodeSelectorTerm{
-			MatchExpressions: []v1.NodeSelectorRequirement{
+			MatchExpressions: []v1.NumericAwareSelectorRequirement{
 				{
 					Key:      key,
-					Operator: v1.NodeSelectorOpIn,
+					Operator: v1.LabelSelectorOpIn,
 					Values:   []string{value},
 				},
 			},
@@ -306,10 +306,10 @@ func makeNodeAffinity(multiTerms bool, key string, values ...string) *v1.VolumeN
 	return nodeAffinity
 }
 
-func makeTopology(key string, values ...string) *v1.NodeSelectorRequirement {
-	return &v1.NodeSelectorRequirement{
+func makeTopology(key string, values ...string) *v1.NumericAwareSelectorRequirement {
+	return &v1.NumericAwareSelectorRequirement{
 		Key:      key,
-		Operator: v1.NodeSelectorOpIn,
+		Operator: v1.LabelSelectorOpIn,
 		Values:   values,
 	}
 }

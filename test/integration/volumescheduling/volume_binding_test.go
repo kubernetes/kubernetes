@@ -555,11 +555,11 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 		pod.Spec.Affinity = &v1.Affinity{}
 		affinityTerms := []v1.PodAffinityTerm{
 			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      "app",
-							Operator: metav1.LabelSelectorOpIn,
+							Operator: v1.LabelSelectorOpIn,
 							Values:   []string{"volume-binding-test"},
 						},
 					},
@@ -1035,10 +1035,10 @@ func makePV(name, scName, pvcName, ns, node string) *v1.PersistentVolume {
 				Required: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      nodeAffinityLabelKey,
-									Operator: v1.NodeSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{node},
 								},
 							},
@@ -1227,10 +1227,10 @@ func markNodeAffinity(pod *v1.Pod, node string) {
 			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{
 					{
-						MatchExpressions: []v1.NodeSelectorRequirement{
+						MatchExpressions: []v1.NumericAwareSelectorRequirement{
 							{
 								Key:      nodeAffinityLabelKey,
-								Operator: v1.NodeSelectorOpIn,
+								Operator: v1.LabelSelectorOpIn,
 								Values:   []string{node},
 							},
 						},

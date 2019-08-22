@@ -145,11 +145,11 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			PodAntiAffinity: &v1.PodAntiAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "test",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"dualstack-test-server"},
 								},
 							},
@@ -172,11 +172,11 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			PodAntiAffinity: &v1.PodAntiAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "test",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"dualstack-test-client"},
 								},
 							},

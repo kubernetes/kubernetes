@@ -970,16 +970,16 @@ func setAffinities(d *appsv1.Deployment, setAffinity bool) {
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
 					TopologyKey: "kubernetes.io/hostname",
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
+					LabelSelector: &v1.PodSelector{
+						MatchExpressions: []v1.NumericAwareSelectorRequirement{
 							{
 								Key:      "name",
-								Operator: metav1.LabelSelectorOpIn,
+								Operator: v1.LabelSelectorOpIn,
 								Values:   []string{d.Spec.Template.Labels["name"]},
 							},
 							{
 								Key:      "iteration",
-								Operator: metav1.LabelSelectorOpIn,
+								Operator: v1.LabelSelectorOpIn,
 								Values:   []string{d.Spec.Template.Labels["iteration"]},
 							},
 						},
@@ -993,16 +993,16 @@ func setAffinities(d *appsv1.Deployment, setAffinity bool) {
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
 					TopologyKey: "kubernetes.io/hostname",
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
+					LabelSelector: &v1.PodSelector{
+						MatchExpressions: []v1.NumericAwareSelectorRequirement{
 							{
 								Key:      "name",
-								Operator: metav1.LabelSelectorOpIn,
+								Operator: v1.LabelSelectorOpIn,
 								Values:   []string{d.Spec.Template.Labels["name"]},
 							},
 							{
 								Key:      "iteration",
-								Operator: metav1.LabelSelectorOpNotIn,
+								Operator: v1.LabelSelectorOpNotIn,
 								Values:   []string{d.Spec.Template.Labels["iteration"]},
 							},
 						},

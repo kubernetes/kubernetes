@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -609,7 +609,7 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 	rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 		rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 		v1.PodAffinityTerm{
-			LabelSelector: &metav1.LabelSelector{MatchLabels: j.Labels},
+			LabelSelector: &v1.PodSelector{MatchLabels: j.Labels},
 			Namespaces:    nil,
 			TopologyKey:   "kubernetes.io/hostname",
 		})

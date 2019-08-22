@@ -202,11 +202,11 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		t.setAllowedTopologies(l.resource.Sc, l.allTopologies, excludedIndex)
 
 		// Set pod nodeSelector to the excluded topology
-		exprs := []v1.NodeSelectorRequirement{}
+		exprs := []v1.NumericAwareSelectorRequirement{}
 		for k, v := range l.allTopologies[excludedIndex] {
-			exprs = append(exprs, v1.NodeSelectorRequirement{
+			exprs = append(exprs, v1.NumericAwareSelectorRequirement{
 				Key:      k,
-				Operator: v1.NodeSelectorOpIn,
+				Operator: v1.LabelSelectorOpIn,
 				Values:   []string{v},
 			})
 		}

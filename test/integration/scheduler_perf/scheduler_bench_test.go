@@ -314,7 +314,7 @@ func makeBasePodWithPreferredPodAntiAffinity(podLabels, affinityLabels map[strin
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
 				{
 					PodAffinityTerm: v1.PodAffinityTerm{
-						LabelSelector: &metav1.LabelSelector{
+						LabelSelector: &v1.PodSelector{
 							MatchLabels: affinityLabels,
 						},
 						TopologyKey: v1.LabelHostname,
@@ -343,7 +343,7 @@ func makeBasePodWithPreferredPodAffinity(podLabels, affinityLabels map[string]st
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
 				{
 					PodAffinityTerm: v1.PodAffinityTerm{
-						LabelSelector: &metav1.LabelSelector{
+						LabelSelector: &v1.PodSelector{
 							MatchLabels: affinityLabels,
 						},
 						TopologyKey: v1.LabelHostname,

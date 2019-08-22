@@ -281,15 +281,15 @@ func Test_PVLAdmission(t *testing.T) {
 						Required: &api.NodeSelector{
 							NodeSelectorTerms: []api.NodeSelectorTerm{
 								{
-									MatchExpressions: []api.NodeSelectorRequirement{
+									MatchExpressions: []api.NumericAwareSelectorRequirement{
 										{
 											Key:      v1.LabelZoneRegion,
-											Operator: api.NodeSelectorOpIn,
+											Operator: api.LabelSelectorOpIn,
 											Values:   []string{"existingRegion"},
 										},
 										{
 											Key:      v1.LabelZoneFailureDomain,
-											Operator: api.NodeSelectorOpIn,
+											Operator: api.LabelSelectorOpIn,
 											Values:   []string{"existingDomain"},
 										},
 									},
@@ -343,15 +343,15 @@ func Test_PVLAdmission(t *testing.T) {
 						Required: &api.NodeSelector{
 							NodeSelectorTerms: []api.NodeSelectorTerm{
 								{
-									MatchExpressions: []api.NodeSelectorRequirement{
+									MatchExpressions: []api.NumericAwareSelectorRequirement{
 										{
 											Key:      v1.LabelZoneRegion,
-											Operator: api.NodeSelectorOpIn,
+											Operator: api.LabelSelectorOpIn,
 											Values:   []string{"region1"},
 										},
 										{
 											Key:      v1.LabelZoneFailureDomain,
-											Operator: api.NodeSelectorOpIn,
+											Operator: api.LabelSelectorOpIn,
 											Values:   []string{"domain1"},
 										},
 									},

@@ -29,7 +29,7 @@ type NodeSelection struct {
 }
 
 // setNodeAffinityRequirement sets affinity with specified operator to nodeName to nodeSelection
-func setNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSelectorOperator, nodeName string) {
+func setNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.LabelSelectorOperator, nodeName string) {
 	// Add node-anti-affinity.
 	if nodeSelection.Affinity == nil {
 		nodeSelection.Affinity = &v1.Affinity{}
@@ -42,7 +42,7 @@ func setNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSe
 	}
 	nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
 		v1.NodeSelectorTerm{
-			MatchFields: []v1.NodeSelectorRequirement{
+			MatchFields: []v1.NumericAwareSelectorRequirement{
 				{Key: "metadata.name", Operator: operator, Values: []string{nodeName}},
 			},
 		})
@@ -50,10 +50,10 @@ func setNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSe
 
 // SetAffinity sets affinity to nodeName to nodeSelection
 func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
-	setNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpIn, nodeName)
+	setNodeAffinityRequirement(nodeSelection, v1.LabelSelectorOpIn, nodeName)
 }
 
 // SetAntiAffinity sets anti-affinity to nodeName to nodeSelection
 func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
-	setNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
+	setNodeAffinityRequirement(nodeSelection, v1.LabelSelectorOpNotIn, nodeName)
 }

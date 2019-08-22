@@ -2329,7 +2329,7 @@ type NodeSelectorTerm struct {
 	MatchFields []NumericAwareSelectorRequirement
 }
 
-// A pod selector is a label query over a set of pod resources. The result of matchLabels and
+// PodSelector is a label query over a set of pod resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
 type PodSelector struct {
@@ -2343,7 +2343,7 @@ type PodSelector struct {
 	MatchExpressions []NumericAwareSelectorRequirement
 }
 
-// A numeric aware selector requirement is a selector that contains values, a key, and an operator that
+// NumericAwareSelectorRequirement is a selector that contains values, a key, and an operator that
 // relates the key and values.
 type NumericAwareSelectorRequirement struct {
 	// The label key that the selector applies to.
@@ -2360,7 +2360,7 @@ type NumericAwareSelectorRequirement struct {
 	Values []string
 }
 
-// A label selector operator is the set of operators that can be used in a
+// LabelSelectorOperator is the set of operators that can be used in a
 // numeric aware selector requirement.
 type LabelSelectorOperator string
 

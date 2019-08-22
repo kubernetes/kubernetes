@@ -3145,7 +3145,7 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
-					LabelSelector: &metav1.LabelSelector{MatchLabels: labels},
+					LabelSelector: &v1.PodSelector{MatchLabels: labels},
 					TopologyKey:   "kubernetes.io/hostname",
 					Namespaces:    []string{ns},
 				},

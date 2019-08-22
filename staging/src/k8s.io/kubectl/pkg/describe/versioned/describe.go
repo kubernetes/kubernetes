@@ -1359,7 +1359,7 @@ func printVolumeNodeAffinity(w PrefixWriter, affinity *corev1.VolumeNodeAffinity
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printNodeSelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []corev1.NodeSelectorRequirement) {
+func printNodeSelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []corev1.NumericAwareSelectorRequirement) {
 	w.Write(indentLevel, "%s:%s", title, innerIndent)
 
 	if len(reqs) == 0 {
