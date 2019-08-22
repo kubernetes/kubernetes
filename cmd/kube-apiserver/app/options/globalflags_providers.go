@@ -1,4 +1,4 @@
-// +build nolegacyproviders
+// +build !providerless
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -16,11 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package options
 
-import "k8s.io/kubernetes/pkg/volume"
+import (
+	"github.com/spf13/pflag"
 
-func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
-	// no-op when we didn't compile in support for these
-	return allPlugins
+	"k8s.io/component-base/cli/globalflag"
+)
+
+func registerLegacyGlobalFlags(fs *pflag.FlagSet) {
+	globalflag.Register(fs, "cloud-provider-gce-lb-src-cidrs")
+	fs.MarkDeprecated("cloud-provider-gce-lb-src-cidrs", "This flag will be removed once the GCE Cloud Provider is removed from kube-apiserver")
 }

@@ -1,4 +1,4 @@
-// +build nolegacyproviders
+// +build providerless
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -19,9 +19,20 @@ limitations under the License.
 package app
 
 import (
-	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
-func registerLegacyGlobalFlags(namedFlagSets cliflag.NamedFlagSets) {
-	// no-op when legacy cloud providers are not compiled
+func appendAttachableLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
+	// no-op when compiled without legacy cloud providers
+	return allPlugins
+}
+
+func appendExpandableLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
+	// no-op when compiled without legacy cloud providers
+	return allPlugins
+}
+
+func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
+	// no-op when compiled without legacy cloud providers
+	return allPlugins
 }

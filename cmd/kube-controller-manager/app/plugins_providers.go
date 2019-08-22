@@ -1,4 +1,4 @@
-// +build !nolegacyproviders
+// +build !providerless
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -27,6 +27,19 @@ import (
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
+
+func appendAttachableLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	return allPlugins
+}
+
+func appendExpandableLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
+	return appendLegacyProviderVolumes(allPlugins)
+}
 
 func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
 	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)

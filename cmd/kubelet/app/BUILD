@@ -33,7 +33,7 @@ go_library(
         "init_others.go",
         "init_windows.go",
         "plugins.go",
-        "plugins_legacyproviders.go",
+        "plugins_providers.go",
         "server.go",
         "server_linux.go",
         "server_unsupported.go",

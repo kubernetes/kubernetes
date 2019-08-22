@@ -1,4 +1,4 @@
-// +build !nolegacyproviders
+// +build providerless
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -16,15 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package options
+package app
 
 import (
-	"github.com/spf13/pflag"
-
-	"k8s.io/component-base/cli/globalflag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
-func registerLegacyGlobalFlags(fs *pflag.FlagSet) {
-	globalflag.Register(fs, "cloud-provider-gce-lb-src-cidrs")
-	fs.MarkDeprecated("cloud-provider-gce-lb-src-cidrs", "This flag will be removed once the GCE Cloud Provider is removed from kube-apiserver")
+func registerLegacyGlobalFlags(namedFlagSets cliflag.NamedFlagSets) {
+	// no-op when legacy cloud providers are not compiled
 }
