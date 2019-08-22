@@ -78,6 +78,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TLSBootstrapToken,
 			options.TokenStr,
 			options.CertificateKey,
+			options.Kustomize,
 		}
 	case "download-certs":
 		flags = []string{
@@ -122,6 +123,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.APIServerBindPort,
 			options.CfgPath,
 			options.ControlPlane,
+			options.Kustomize,
 		}
 	default:
 		flags = []string{}
@@ -183,15 +185,11 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	}
 
 	fmt.Printf("[control-plane] Using manifest folder %q\n", kubeadmconstants.GetStaticPodDirectory())
-
-	// TODO: this should be replaced by a value from a flag in subsequent PR. see the POC https://github.com/kubernetes/kubernetes/pull/80580
-	kustomizeDir := ""
-
 	for _, component := range kubeadmconstants.ControlPlaneComponents {
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
 		err := controlplane.CreateStaticPodFiles(
 			kubeadmconstants.GetStaticPodDirectory(),
-			kustomizeDir,
+			data.KustomizeDir(),
 			&cfg.ClusterConfiguration,
 			&cfg.LocalAPIEndpoint,
 			component,
