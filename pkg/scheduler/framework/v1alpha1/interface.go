@@ -152,13 +152,13 @@ type QueueSortPlugin interface {
 	Less(*PodInfo, *PodInfo) bool
 }
 
-// PrefilterPlugin is an interface that must be implemented by "prefilter" plugins.
+// PreFilterPlugin is an interface that must be implemented by "prefilter" plugins.
 // These plugins are called at the beginning of the scheduling cycle.
-type PrefilterPlugin interface {
+type PreFilterPlugin interface {
 	Plugin
-	// Prefilter is called at the beginning of the scheduling cycle. All prefilter
+	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
 	// plugins must return success or the pod will be rejected.
-	Prefilter(pc *PluginContext, p *v1.Pod) *Status
+	PreFilter(pc *PluginContext, p *v1.Pod) *Status
 }
 
 // FilterPlugin is an interface for Filter plugins. These plugins are called at the
@@ -289,11 +289,11 @@ type Framework interface {
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 
-	// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+	// RunPreFilterPlugins runs the set of configured prefilter plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If a non-success status is returned, then the scheduling
 	// cycle is aborted.
-	RunPrefilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
+	RunPreFilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
 
 	// RunFilterPlugins runs the set of configured filter plugins for pod on the
 	// given host. If any of these plugins returns any status other than "Success",

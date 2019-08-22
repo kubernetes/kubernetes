@@ -39,7 +39,7 @@ type framework struct {
 	waitingPods               *waitingPodsMap
 	pluginNameToWeightMap     map[string]int
 	queueSortPlugins          []QueueSortPlugin
-	prefilterPlugins          []PrefilterPlugin
+	preFilterPlugins          []PreFilterPlugin
 	filterPlugins             []FilterPlugin
 	postFilterPlugins         []PostFilterPlugin
 	scorePlugins              []ScorePlugin
@@ -105,11 +105,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.PreFilter != nil {
 		for _, pf := range plugins.PreFilter.Enabled {
 			if pg, ok := pluginsMap[pf.Name]; ok {
-				p, ok := pg.(PrefilterPlugin)
+				p, ok := pg.(PreFilterPlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend prefilter plugin", pf.Name)
 				}
-				f.prefilterPlugins = append(f.prefilterPlugins, p)
+				f.preFilterPlugins = append(f.preFilterPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prefilter plugin %q does not exist", pf.Name)
 			}
@@ -283,14 +283,14 @@ func (f *framework) QueueSortFunc() LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
-// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
 // anything but Success. If a non-success status is returned, then the scheduling
 // cycle is aborted.
-func (f *framework) RunPrefilterPlugins(
+func (f *framework) RunPreFilterPlugins(
 	pc *PluginContext, pod *v1.Pod) *Status {
-	for _, pl := range f.prefilterPlugins {
-		status := pl.Prefilter(pc, pod)
+	for _, pl := range f.preFilterPlugins {
+		status := pl.PreFilter(pc, pod)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
 				msg := fmt.Sprintf("rejected by %q at prefilter: %v", pl.Name(), status.Message())

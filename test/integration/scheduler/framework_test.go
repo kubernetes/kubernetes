@@ -31,10 +31,10 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-type PrefilterPlugin struct {
-	numPrefilterCalled int
-	failPrefilter      bool
-	rejectPrefilter    bool
+type PreFilterPlugin struct {
+	numPreFilterCalled int
+	failPreFilter      bool
+	rejectPreFilter    bool
 }
 
 type ScorePlugin struct {
@@ -113,7 +113,7 @@ const (
 	permitPluginName             = "permit-plugin"
 )
 
-var _ = framework.PrefilterPlugin(&PrefilterPlugin{})
+var _ = framework.PreFilterPlugin(&PreFilterPlugin{})
 var _ = framework.ScorePlugin(&ScorePlugin{})
 var _ = framework.FilterPlugin(&FilterPlugin{})
 var _ = framework.ScorePlugin(&ScorePlugin{})
@@ -321,27 +321,27 @@ func (pp *PostbindPlugin) reset() {
 }
 
 // Name returns name of the plugin.
-func (pp *PrefilterPlugin) Name() string {
+func (pp *PreFilterPlugin) Name() string {
 	return prefilterPluginName
 }
 
-// Prefilter is a test function that returns (true, nil) or errors for testing.
-func (pp *PrefilterPlugin) Prefilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
-	pp.numPrefilterCalled++
-	if pp.failPrefilter {
+// PreFilter is a test function that returns (true, nil) or errors for testing.
+func (pp *PreFilterPlugin) PreFilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+	pp.numPreFilterCalled++
+	if pp.failPreFilter {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
-	if pp.rejectPrefilter {
+	if pp.rejectPreFilter {
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	return nil
 }
 
 // reset used to reset prefilter plugin.
-func (pp *PrefilterPlugin) reset() {
-	pp.numPrefilterCalled = 0
-	pp.failPrefilter = false
-	pp.rejectPrefilter = false
+func (pp *PreFilterPlugin) reset() {
+	pp.numPreFilterCalled = 0
+	pp.failPreFilter = false
+	pp.rejectPreFilter = false
 }
 
 // Name returns name of the plugin.
@@ -426,11 +426,11 @@ func newPermitPlugin(permitPlugin *PermitPlugin) framework.PluginFactory {
 	}
 }
 
-// TestPrefilterPlugin tests invocation of prefilter plugins.
-func TestPrefilterPlugin(t *testing.T) {
+// TestPreFilterPlugin tests invocation of prefilter plugins.
+func TestPreFilterPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a pre-filter plugin.
-	prefilterPlugin := &PrefilterPlugin{}
-	registry := framework.Registry{prefilterPluginName: newPlugin(prefilterPlugin)}
+	preFilterPlugin := &PreFilterPlugin{}
+	registry := framework.Registry{prefilterPluginName: newPlugin(preFilterPlugin)}
 
 	// Setup initial prefilter plugin for testing.
 	plugins := &schedulerconfig.Plugins{
@@ -478,8 +478,8 @@ func TestPrefilterPlugin(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		prefilterPlugin.failPrefilter = test.fail
-		prefilterPlugin.rejectPrefilter = test.reject
+		preFilterPlugin.failPreFilter = test.fail
+		preFilterPlugin.rejectPreFilter = test.reject
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
 			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
@@ -497,11 +497,11 @@ func TestPrefilterPlugin(t *testing.T) {
 			}
 		}
 
-		if prefilterPlugin.numPrefilterCalled == 0 {
+		if preFilterPlugin.numPreFilterCalled == 0 {
 			t.Errorf("Expected the prefilter plugin to be called.")
 		}
 
-		prefilterPlugin.reset()
+		preFilterPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
