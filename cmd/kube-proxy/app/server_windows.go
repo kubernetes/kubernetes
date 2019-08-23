@@ -94,7 +94,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		healthzUpdater = healthzServer
 	}
 
-	var proxier proxy.ProxyProvider
+	var proxier proxy.Provider
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {

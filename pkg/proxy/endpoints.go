@@ -205,7 +205,7 @@ type UpdateEndpointMapResult struct {
 	LastChangeTriggerTimes []time.Time
 }
 
-// UpdateEndpointsMap updates endpointsMap base on the given changes.
+// Update updates endpointsMap base on the given changes.
 func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
 	result.StaleEndpoints = make([]ServiceEndpoint, 0)
 	result.StaleServiceNames = make([]ServicePortName, 0)

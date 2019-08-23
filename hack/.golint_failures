@@ -141,7 +141,6 @@ pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
 pkg/master/tunneler
-pkg/proxy
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
 pkg/proxy/userspace

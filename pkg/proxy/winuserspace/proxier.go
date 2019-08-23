@@ -92,8 +92,8 @@ type Proxier struct {
 	hostIP         net.IP
 }
 
-// assert Proxier is a ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// assert Proxier is a proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // A key for the portMap.  The ip has to be a string because slices can't be map
 // keys.
