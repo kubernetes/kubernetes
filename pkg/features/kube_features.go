@@ -468,6 +468,12 @@ const (
 	//
 	// Schedule pods evenly across available topology domains.
 	EvenPodsSpread featuregate.Feature = "EvenPodsSpread"
+
+	// owner: @logicalhan
+	// alpha: v1.16
+	//
+	// Globally enable showing hidden metrics.
+	ShowHiddenMetrics featuregate.Feature = "ShowHiddenMetrics"
 )
 
 func init() {
@@ -546,6 +552,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
+	ShowHiddenMetrics:                              {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
