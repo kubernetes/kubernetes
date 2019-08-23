@@ -416,6 +416,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				field.Invalid(field.NewPath("spec").Child("assuredConcurrencyShares"), int32(0), "must be positive"),
 				field.Invalid(field.NewPath("spec").Child("queueLengthLimit"), int32(0), "must be positive"),
 				field.Invalid(field.NewPath("spec").Child("queues"), int32(0), "must be positive"),
+				field.Invalid(field.NewPath("spec").Child("handSize"), int32(0), "handSize is not positive; deckSize is not positive"),
 			},
 		},
 		{
@@ -432,7 +433,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("handSize"), int32(8), "falling factorial of handSize (8) and queues (512) exceeds 60 bits"),
+				field.Invalid(field.NewPath("spec").Child("handSize"), int32(8), "more than 60 bits of entropy required"),
 			},
 		},
 		{
@@ -449,7 +450,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("handSize"), int32(10), "falling factorial of handSize (10) and queues (128) exceeds 60 bits"),
+				field.Invalid(field.NewPath("spec").Child("handSize"), int32(10), "more than 60 bits of entropy required"),
 			},
 		},
 		{
@@ -466,7 +467,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("handSize"), int32(3), "falling factorial of handSize (3) and queues (2147483647) exceeds 60 bits"),
+				field.Invalid(field.NewPath("spec").Child("handSize"), int32(3), "more than 60 bits of entropy required"),
 			},
 		},
 		{
@@ -499,6 +500,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			},
 			expectedErrors: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("handSize"), int32(8), "should not be greater than queues (7)"),
+				field.Invalid(field.NewPath("spec").Child("handSize"), int32(8), "handSize is greater than deckSize"),
 			},
 		},
 	}
