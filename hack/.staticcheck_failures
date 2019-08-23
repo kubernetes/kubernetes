@@ -126,7 +126,6 @@ test/images/agnhost/pause
 test/images/agnhost/serve-hostname
 test/images/agnhost/webhook
 test/images/pets/peer-finder
-test/instrumentation
 test/integration/apiserver
 test/integration/apiserver/admissionwebhook
 test/integration/auth
