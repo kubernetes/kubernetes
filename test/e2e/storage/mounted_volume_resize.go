@@ -131,8 +131,9 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
-		pvc, err = testsuites.ExpandPVCSize(pvc, newSize, c)
+		newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, c)
 		framework.ExpectNoError(err, "While updating pvc for more size")
+		pvc = newPVC
 		gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]

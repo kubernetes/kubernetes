@@ -146,7 +146,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			l.resource.pvc, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+			_, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
 			framework.ExpectError(err, "While updating non-expandable PVC")
 		})
 	} else {
@@ -173,8 +173,9 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			l.resource.pvc, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+			newPVC, err := ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
+			l.resource.pvc = newPVC
 			gomega.Expect(l.resource.pvc).NotTo(gomega.BeNil())
 
 			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -232,8 +233,9 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			l.resource.pvc, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+			newPVC, err := ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
+			l.resource.pvc = newPVC
 			gomega.Expect(l.resource.pvc).NotTo(gomega.BeNil())
 
 			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
