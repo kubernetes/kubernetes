@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -30,13 +31,13 @@ metadata:
   uid: "7"
 spec:
   audiences:
-  - "18"
+  - "19"
   boundObjectRef:
-    apiVersion: "20"
-    kind: "19"
-    name: "21"
+    apiVersion: "21"
+    kind: "20"
+    name: "22"
     uid: r鯹)晿<o,c鮽ort昍řČ扷5ƗǸ
   expirationSeconds: 3850803321873644574
 status:
   expirationTimestamp: "1999-07-03T22:31:10Z"
-  token: "22"
+  token: "23"

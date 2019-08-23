@@ -119,12 +119,12 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
 }
 
-var map_Fields = map[string]string{
-	"": "Fields stores a set of fields in a data structure like a Trie.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
+var map_FieldsV1 = map[string]string{
+	"": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
 }
 
-func (Fields) SwaggerDoc() map[string]string {
-	return map_Fields
+func (FieldsV1) SwaggerDoc() map[string]string {
+	return map_FieldsV1
 }
 
 var map_GetOptions = map[string]string{
@@ -211,7 +211,8 @@ var map_ManagedFieldsEntry = map[string]string{
 	"operation":  "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
 	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
 	"time":       "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
-	"fields":     "Fields identifies a set of fields.",
+	"fieldsType": "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
+	"fieldsV1":   "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
 }
 
 func (ManagedFieldsEntry) SwaggerDoc() map[string]string {

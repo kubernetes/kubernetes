@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -32,4 +33,4 @@ spec:
   replicas: -595102844
 status:
   replicas: 70007838
-  selector: "18"
+  selector: "19"

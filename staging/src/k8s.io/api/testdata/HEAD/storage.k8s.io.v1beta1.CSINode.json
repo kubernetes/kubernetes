@@ -35,17 +35,18 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "drivers": [
       {
-        "name": "18",
-        "nodeID": "19",
+        "name": "19",
+        "nodeID": "20",
         "topologyKeys": [
-          "20"
+          "21"
         ],
         "allocatable": {
           "count": 1305381319

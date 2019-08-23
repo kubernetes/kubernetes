@@ -39,7 +39,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/apis/meta/v1.DeleteOptions":                        schema_pkg_apis_meta_v1_DeleteOptions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Duration":                             schema_pkg_apis_meta_v1_Duration(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.ExportOptions":                        schema_pkg_apis_meta_v1_ExportOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Fields":                               schema_pkg_apis_meta_v1_Fields(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1":                             schema_pkg_apis_meta_v1_FieldsV1(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.GetOptions":                           schema_pkg_apis_meta_v1_GetOptions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupKind":                            schema_pkg_apis_meta_v1_GroupKind(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupResource":                        schema_pkg_apis_meta_v1_GroupResource(ref),
@@ -62,7 +62,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Patch":                                schema_pkg_apis_meta_v1_Patch(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.PatchOptions":                         schema_pkg_apis_meta_v1_PatchOptions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions":                        schema_pkg_apis_meta_v1_Preconditions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ProtoFields":                          schema_pkg_apis_meta_v1_ProtoFields(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.RootPaths":                            schema_pkg_apis_meta_v1_RootPaths(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR":            schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":                               schema_pkg_apis_meta_v1_Status(ref),
@@ -587,11 +586,11 @@ func schema_pkg_apis_meta_v1_ExportOptions(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_Fields(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_FieldsV1(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Fields stores a set of fields in a data structure like a Trie.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
+				Description: "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
 				Type:        []string{"object"},
 			},
 		},
@@ -1128,17 +1127,24 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
-					"fields": {
+					"fieldsType": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Fields identifies a set of fields.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Fields"),
+							Description: "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"fieldsV1": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Fields", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -1553,17 +1559,6 @@ func schema_pkg_apis_meta_v1_Preconditions(ref common.ReferenceCallback) common.
 						},
 					},
 				},
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_meta_v1_ProtoFields(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ProtoFields is a struct that is equivalent to Fields, but intended for protobuf marshalling/unmarshalling. It is generated into a serialization that matches Fields. Do not use in Go structs.",
-				Type:        []string{"object"},
 			},
 		},
 	}

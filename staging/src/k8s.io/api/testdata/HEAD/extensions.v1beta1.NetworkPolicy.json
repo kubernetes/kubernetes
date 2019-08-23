@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -86,9 +87,9 @@
               ]
             },
             "ipBlock": {
-              "cidr": "36",
+              "cidr": "37",
               "except": [
-                "37"
+                "38"
               ]
             }
           }
@@ -133,9 +134,9 @@
               ]
             },
             "ipBlock": {
-              "cidr": "50",
+              "cidr": "51",
               "except": [
-                "51"
+                "52"
               ]
             }
           }

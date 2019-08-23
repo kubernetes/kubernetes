@@ -212,7 +212,7 @@ message ExportOptions {
   optional bool exact = 2;
 }
 
-// Fields stores a set of fields in a data structure like a Trie.
+// FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.
 //
 // Each key is either a '.' representing the field itself, and will always map to an empty set,
 // or a string representing a sub-field or item. The string will follow one of these four formats:
@@ -223,15 +223,9 @@ message ExportOptions {
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
-// +protobuf.options.marshal=false
-// +protobuf.as=ProtoFields
-// +protobuf.options.(gogoproto.goproto_stringer)=false
-message Fields {
-  // Map is the representation used in the alpha version of this API
-  map<string, Fields> map = 1;
-
+message FieldsV1 {
   // Raw is the underlying serialization of this object.
-  optional bytes raw = 2;
+  optional bytes Raw = 1;
 }
 
 // GetOptions is the standard query options to the standard REST get call.
@@ -500,9 +494,13 @@ message ManagedFieldsEntry {
   // +optional
   optional Time time = 4;
 
-  // Fields identifies a set of fields.
+  // FieldsType is the discriminator for the different fields format and version.
+  // There is currently only one possible value: "FieldsV1"
+  optional string fieldsType = 6;
+
+  // FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
   // +optional
-  optional Fields fields = 5;
+  optional FieldsV1 fieldsV1 = 7;
 }
 
 // MicroTime is version of Time with microsecond level precision.
@@ -788,17 +786,6 @@ message Preconditions {
   // Specifies the target ResourceVersion
   // +optional
   optional string resourceVersion = 2;
-}
-
-// ProtoFields is a struct that is equivalent to Fields, but intended for
-// protobuf marshalling/unmarshalling. It is generated into a serialization
-// that matches Fields. Do not use in Go structs.
-message ProtoFields {
-  // Map is the representation used in the alpha version of this API
-  map<string, Fields> map = 1;
-
-  // Raw is the underlying serialization of this object.
-  optional bytes raw = 2;
 }
 
 // RootPaths lists the paths available at root.
