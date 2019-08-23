@@ -3330,6 +3330,17 @@ type LoadBalancerIngress struct {
 	Hostname string
 }
 
+// IPFamily represents the IP Family (IPv4 or IPv6). This type is used
+// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+type IPFamily string
+
+const (
+	// IPv4Protocol indicates that this IP is IPv4 protocol
+	IPv4Protocol IPFamily = "IPv4"
+	// IPv6Protocol indicates that this IP is IPv6 protocol
+	IPv6Protocol IPFamily = "IPv6"
+)
+
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
 	// Type determines how the Service is exposed. Defaults to ClusterIP. Valid
@@ -3430,6 +3441,16 @@ type ServiceSpec struct {
 	// of peer discovery.
 	// +optional
 	PublishNotReadyAddresses bool
+
+	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
+	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+	// +optional
+	IPFamily *IPFamily
 }
 
 type ServicePort struct {

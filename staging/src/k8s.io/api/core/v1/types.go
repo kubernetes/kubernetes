@@ -3794,6 +3794,17 @@ type LoadBalancerIngress struct {
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 }
 
+// IPFamily represents the IP Family (IPv4 or IPv6). This type is used
+// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+type IPFamily string
+
+const (
+	// IPv4Protocol indicates that this IP is IPv4 protocol
+	IPv4Protocol IPFamily = "IPv4"
+	// IPv6Protocol indicates that this IP is IPv6 protocol
+	IPv6Protocol IPFamily = "IPv6"
+)
+
 // ServiceSpec describes the attributes that a user creates on a service.
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
@@ -3909,6 +3920,16 @@ type ServiceSpec struct {
 	// sessionAffinityConfig contains the configurations of session affinity.
 	// +optional
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
+
+	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
+	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+	// +optional
+	IPFamily *IPFamily `json:"ipFamily,omitempty" protobuf:"bytes,15,opt,name=ipFamily,Configcasttype=IPFamily"`
 }
 
 // ServicePort contains information on service's port.
