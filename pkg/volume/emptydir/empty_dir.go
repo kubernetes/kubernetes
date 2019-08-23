@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -310,26 +311,35 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 // getPageSizeMountOptionFromPod retrieves pageSize mount option from Pod's resources
 // and validates pageSize options in all containers of given Pod.
 func getPageSizeMountOptionFromPod(pod *v1.Pod) (string, error) {
-	pageSizeFound := false
+	var (
+		pageSizeFound bool
+		retErr        error
+	)
 	pageSize := resource.Quantity{}
+
 	// In some rare cases init containers can also consume Huge pages.
-	containers := append(pod.Spec.Containers, pod.Spec.InitContainers...)
-	for _, container := range containers {
+	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
 		// We can take request because limit and requests must match.
-		for requestName := range container.Resources.Requests {
+		for requestName := range c.Resources.Requests {
 			if v1helper.IsHugePageResourceName(requestName) {
 				currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
 				if err != nil {
-					return "", err
+					retErr = err
+					return false
 				}
 				// PageSize for all volumes in a POD are equal, except for the first one discovered.
 				if pageSizeFound && pageSize.Cmp(currentPageSize) != 0 {
-					return "", fmt.Errorf("multiple pageSizes for huge pages in a single PodSpec")
+					retErr = fmt.Errorf("multiple pageSizes for huge pages in a single PodSpec")
+					return false
 				}
 				pageSize = currentPageSize
 				pageSizeFound = true
 			}
 		}
+		return true
+	})
+	if retErr != nil {
+		return "", retErr
 	}
 
 	if !pageSizeFound {
