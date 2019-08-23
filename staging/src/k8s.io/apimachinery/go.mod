@@ -33,7 +33,7 @@ require (
 	gopkg.in/inf.v0 v0.9.0
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/klog v0.4.0
-	k8s.io/kube-openapi v0.0.0-20190709113604-33be087ad058
+	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
 	sigs.k8s.io/yaml v1.1.0
 )
 
