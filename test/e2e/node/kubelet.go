@@ -37,7 +37,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -273,7 +272,7 @@ var _ = SIGDescribe("kubelet", func() {
 			nodeLabels["kubelet_cleanup"] = "true"
 			nodes := framework.GetReadySchedulableNodesOrDie(c)
 			numNodes = len(nodes.Items)
-			gomega.Expect(numNodes).NotTo(gomega.BeZero())
+			framework.ExpectNotEqual(numNodes, 0)
 			nodeNames = sets.NewString()
 			// If there are a lot of nodes, we don't want to use all of them
 			// (if there are 1000 nodes in the cluster, starting 10 pods/node

@@ -28,7 +28,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode, hostDir string) *v1.Pod {
@@ -88,7 +87,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 
 		// Pick a node where all pods will run.
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero(), "No available nodes for scheduling")
+		framework.ExpectNotEqual(len(nodes.Items), 0, "No available nodes for scheduling")
 		node := &nodes.Items[0]
 
 		// Fail the test if the namespace is not set. We expect that the
