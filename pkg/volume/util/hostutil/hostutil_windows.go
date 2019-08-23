@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package hostutil
 
 import (
 	"fmt"
@@ -26,27 +26,28 @@ import (
 	"strings"
 
 	"k8s.io/klog"
-
 	utilpath "k8s.io/utils/path"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-type hostUtil struct{}
+// HostUtil implements HostUtils for Windows platforms.
+type HostUtil struct{}
 
-// NewHostUtil returns a struct that implements the HostUtils interface on
-// windows platforms
-func NewHostUtil() HostUtils {
-	return &hostUtil{}
+// NewHostUtil returns a struct that implements HostUtils on Windows platforms
+func NewHostUtil() *HostUtil {
+	return &HostUtil{}
 }
 
 // GetDeviceNameFromMount given a mnt point, find the device
-func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+func (hu *HostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
 }
 
 // getDeviceNameFromMount find the device(drive) name in which
 // the mount path reference should match the given plugin mount directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
@@ -55,10 +56,10 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string)
 	if len(refs) == 0 {
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
-	basemountPath := NormalizeWindowsPath(pluginMountDir)
+	basemountPath := mount.NormalizeWindowsPath(pluginMountDir)
 	for _, ref := range refs {
 		if strings.Contains(ref, basemountPath) {
-			volumeID, err := filepath.Rel(NormalizeWindowsPath(basemountPath), ref)
+			volumeID, err := filepath.Rel(mount.NormalizeWindowsPath(basemountPath), ref)
 			if err != nil {
 				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
 				return "", err
@@ -71,49 +72,51 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string)
 }
 
 // DeviceOpened determines if the device is in use elsewhere
-func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
+func (hu *HostUtil) DeviceOpened(pathname string) (bool, error) {
 	return false, nil
 }
 
 // PathIsDevice determines if a path is a device.
-func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+func (hu *HostUtil) PathIsDevice(pathname string) (bool, error) {
 	return false, nil
 }
 
 // MakeRShared checks that given path is on a mount with 'rshared' mount
 // propagation. Empty implementation here.
-func (hu *hostUtil) MakeRShared(path string) error {
+func (hu *HostUtil) MakeRShared(path string) error {
 	return nil
 }
 
 // GetFileType checks for sockets/block/character devices
-func (hu *(hostUtil)) GetFileType(pathname string) (FileType, error) {
+func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
 	return getFileType(pathname)
 }
 
 // PathExists checks whether the path exists
-func (hu *hostUtil) PathExists(pathname string) (bool, error) {
+func (hu *HostUtil) PathExists(pathname string) (bool, error) {
 	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 
 // EvalHostSymlinks returns the path name after evaluating symlinks
-func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+func (hu *HostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return filepath.EvalSymlinks(pathname)
 }
 
 // GetOwner returns the integer ID for the user and group of the given path
 // Note that on windows, it always returns 0. We actually don't set Group on
 // windows platform, see SetVolumeOwnership implementation.
-func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
+func (hu *HostUtil) GetOwner(pathname string) (int64, int64, error) {
 	return -1, -1, nil
 }
 
-func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
-	// Windows does not support SELinux.
+// GetSELinuxSupport returns a boolean indicating support for SELinux.
+// Windows does not support SELinux.
+func (hu *HostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, nil
 }
 
-func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
+// GetMode returns permissions of the path.
+func (hu *HostUtil) GetMode(pathname string) (os.FileMode, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {
 		return 0, err

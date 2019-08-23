@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -84,7 +85,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 
@@ -128,7 +129,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
@@ -206,7 +207,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
@@ -285,7 +286,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
@@ -375,7 +376,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
@@ -502,7 +503,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 
@@ -608,7 +609,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 
@@ -709,7 +710,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 
@@ -823,7 +824,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 
@@ -993,7 +994,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 				nil,   /* fakeRecorder */
 				false, /* checkNodeCapabilitiesBeforeMount */
 				nil))
-			var hostutil mount.HostUtils
+			var hostutil hostutil.HostUtils
 			volumeMode := v1.PersistentVolumeBlock
 			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
 			deviceToDetach := operationexecutor.AttachedVolume{VolumeSpec: tmpSpec, PluginName: "fake-file-plugin"}
@@ -1096,7 +1097,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				hasAddedPods,
 				oex,
 				&mount.FakeMounter{},
-				&mount.FakeHostUtil{},
+				hostutil.NewFakeHostUtil(nil),
 				volumePluginMgr,
 				kubeletPodsDir)
 
@@ -1278,7 +1279,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		hasAddedPods,
 		oex,
 		&mount.FakeMounter{},
-		&mount.FakeHostUtil{},
+		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{

@@ -94,6 +94,7 @@ filegroup(
         "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/fsquota:all-srcs",
+        "//pkg/volume/util/hostutil:all-srcs",
         "//pkg/volume/util/nestedpendingoperations:all-srcs",
         "//pkg/volume/util/operationexecutor:all-srcs",
         "//pkg/volume/util/recyclerclient:all-srcs",

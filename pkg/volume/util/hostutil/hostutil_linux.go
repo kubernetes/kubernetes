@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package hostutil
 
 import (
 	"fmt"
@@ -27,17 +27,26 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
+
 	"k8s.io/klog"
 	utilpath "k8s.io/utils/path"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-type hostUtil struct {
+const (
+	// Location of the mountinfo file
+	procMountInfoPath = "/proc/self/mountinfo"
+)
+
+// HostUtil implements HostUtils for Linux platforms.
+type HostUtil struct {
 }
 
 // NewHostUtil returns a struct that implements the HostUtils interface on
 // linux platforms
-func NewHostUtil() HostUtils {
-	return &hostUtil{}
+func NewHostUtil() *HostUtil {
+	return &HostUtil{}
 }
 
 // DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
@@ -45,13 +54,13 @@ func NewHostUtil() HostUtils {
 // If open returns errno EBUSY, return true with nil error.
 // If open returns nil, return false with nil error.
 // Otherwise, return false with error
-func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
+func (hu *HostUtil) DeviceOpened(pathname string) (bool, error) {
 	return ExclusiveOpenFailsOnDevice(pathname)
 }
 
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
 // to a device.
-func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+func (hu *HostUtil) PathIsDevice(pathname string) (bool, error) {
 	pathType, err := hu.GetFileType(pathname)
 	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
 	return isDevice, err
@@ -95,20 +104,15 @@ func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	return false, errno
 }
 
-//GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
-func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
+// GetDeviceNameFromMount given a mount point, find the device name from its global mount point
+func (hu *HostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
+	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
 }
 
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
-}
-
-// GetDeviceNameFromMountLinux find the device name from /proc/mounts in which
+// getDeviceNameFromMountLinux find the device name from /proc/mounts in which
 // the mount path reference should match the given plugin mount directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
-// This implementation is shared with NsEnterMounter
-func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
@@ -132,19 +136,27 @@ func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginMountDir st
 	return path.Base(mountPath), nil
 }
 
-func (hu *hostUtil) MakeRShared(path string) error {
+// MakeRShared checks that given path is on a mount with 'rshared' mount
+// propagation. If not, it bind-mounts the path as rshared.
+func (hu *HostUtil) MakeRShared(path string) error {
 	return DoMakeRShared(path, procMountInfoPath)
 }
 
-func (hu *hostUtil) GetFileType(pathname string) (FileType, error) {
+// GetFileType checks for file/directory/socket/block/character devices.
+func (hu *HostUtil) GetFileType(pathname string) (FileType, error) {
 	return getFileType(pathname)
 }
 
-func (hu *hostUtil) PathExists(pathname string) (bool, error) {
+// PathExists tests if the given path already exists
+// Error is returned on any other error than "file not found".
+func (hu *HostUtil) PathExists(pathname string) (bool, error) {
 	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 
-func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+// EvalHostSymlinks returns the path name after evaluating symlinks.
+// TODO once the nsenter implementation is removed, this method can be removed
+// from the interface and filepath.EvalSymlinks used directly
+func (hu *HostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return filepath.EvalSymlinks(pathname)
 }
 
@@ -157,7 +169,7 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	}
 
 	// parse optional parameters
-	for _, opt := range info.optionalFields {
+	for _, opt := range info.OptionalFields {
 		if strings.HasPrefix(opt, "shared:") {
 			return true, nil
 		}
@@ -165,23 +177,23 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	return false, nil
 }
 
-func findMountInfo(path, mountInfoPath string) (mountInfo, error) {
-	infos, err := parseMountInfo(mountInfoPath)
+func findMountInfo(path, mountInfoPath string) (mount.MountInfo, error) {
+	infos, err := mount.ParseMountInfo(mountInfoPath)
 	if err != nil {
-		return mountInfo{}, err
+		return mount.MountInfo{}, err
 	}
 
 	// process /proc/xxx/mountinfo in backward order and find the first mount
 	// point that is prefix of 'path' - that's the mount where path resides
-	var info *mountInfo
+	var info *mount.MountInfo
 	for i := len(infos) - 1; i >= 0; i-- {
-		if PathWithinBase(path, infos[i].mountPoint) {
+		if mount.PathWithinBase(path, infos[i].MountPoint) {
 			info = &infos[i]
 			break
 		}
 	}
 	if info == nil {
-		return mountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
+		return mount.MountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
 	}
 	return *info, nil
 }
@@ -222,12 +234,12 @@ func GetSELinux(path string, mountInfoFilename string) (bool, error) {
 	}
 
 	// "seclabel" can be both in mount options and super options.
-	for _, opt := range info.superOptions {
+	for _, opt := range info.SuperOptions {
 		if opt == "seclabel" {
 			return true, nil
 		}
 	}
-	for _, opt := range info.mountOptions {
+	for _, opt := range info.MountOptions {
 		if opt == "seclabel" {
 			return true, nil
 		}
@@ -235,12 +247,14 @@ func GetSELinux(path string, mountInfoFilename string) (bool, error) {
 	return false, nil
 }
 
-func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
+// GetSELinuxSupport returns true if given path is on a mount that supports
+// SELinux.
+func (hu *HostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return GetSELinux(pathname, procMountInfoPath)
 }
 
 // GetOwner returns the integer ID for the user and group of the given path
-func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
+func (hu *HostUtil) GetOwner(pathname string) (int64, int64, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
 		return -1, -1, err
@@ -248,7 +262,8 @@ func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
 	return GetOwnerLinux(realpath)
 }
 
-func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
+// GetMode returns permissions of the path.
+func (hu *HostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return GetModeLinux(pathname)
 }
 

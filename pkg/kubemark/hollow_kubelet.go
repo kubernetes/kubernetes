@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils"
 
@@ -75,7 +76,7 @@ func NewHollowKubelet(
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
 		Mounter:            mount.New("" /* default mount path */),
 		Subpather:          &subpath.FakeSubpath{},
-		HostUtil:           &mount.FakeHostUtil{},
+		HostUtil:           hostutil.NewFakeHostUtil(nil),
 	}
 
 	return &HollowKubelet{
