@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -29,36 +30,40 @@ const (
 	statusFailUnknown = "fail-unknown"
 )
 
-var storageOperationMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
+var storageOperationMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
 		Name:    "storage_operation_duration_seconds",
 		Help:    "Storage operation duration",
 		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name"},
 )
 
-var storageOperationErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
+var storageOperationErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
 		Name: "storage_operation_errors_total",
 		Help: "Storage operation errors",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name"},
 )
 
-var storageOperationStatusMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
+var storageOperationStatusMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
 		Name: "storage_operation_status_count",
 		Help: "Storage operation return statuses count",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name", "status"},
 )
 
-var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
+var storageOperationEndToEndLatencyMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
 		Name:    "volume_operation_total_seconds",
 		Help:    "Storage operation end to end duration in seconds",
 		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"plugin_name", "operation_name"},
 )
@@ -68,10 +73,10 @@ func init() {
 }
 
 func registerMetrics() {
-	prometheus.MustRegister(storageOperationMetric)
-	prometheus.MustRegister(storageOperationErrorMetric)
-	prometheus.MustRegister(storageOperationStatusMetric)
-	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
+	legacyregistry.MustRegister(storageOperationMetric)
+	legacyregistry.MustRegister(storageOperationErrorMetric)
+	legacyregistry.MustRegister(storageOperationStatusMetric)
+	legacyregistry.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
