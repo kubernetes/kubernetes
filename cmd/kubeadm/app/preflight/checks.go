@@ -984,11 +984,9 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			checks = append(checks,
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
-			if !addIPv6Checks {
-				if ip := net.ParseIP(ipstr); ip != nil {
-					if utilsnet.IsIPv6(ip) {
-						addIPv6Checks = true
-					}
+			if ip := net.ParseIP(ipstr); ip != nil {
+				if utilsnet.IsIPv6(ip) {
+					addIPv6Checks = true
 				}
 			}
 		}
