@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "equivalence_cache_predicates.go",
         "events.go",
         "framework.go",
         "limit_range.go",
@@ -19,7 +18,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/scheduling",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
