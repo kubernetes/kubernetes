@@ -73,9 +73,7 @@ type HumanReadablePrinter struct {
 }
 
 // NewTablePrinter creates a printer suitable for calling PrintObj().
-// TODO(seans3): Change return type to ResourcePrinter interface once we no longer need
-// to constuct the "handlerMap".
-func NewTablePrinter(options PrintOptions) *HumanReadablePrinter {
+func NewTablePrinter(options PrintOptions) ResourcePrinter {
 	printer := &HumanReadablePrinter{
 		options: options,
 	}
