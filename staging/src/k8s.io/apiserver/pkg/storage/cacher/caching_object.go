@@ -21,6 +21,7 @@ import (
 	"io"
 	"sync"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -127,6 +128,9 @@ type ObjectWithSerializations struct {
 }
 
 func newObjectWithSerializations(object runtime.Object) *ObjectWithSerializations {
+	if _, ok := object.(MetaRuntimeObject); !ok {
+		panic("unexpected")
+	}
 	return &ObjectWithSerializations{
 		Object: object,
 	}
@@ -247,3 +251,16 @@ func (o *ObjectWithSerializations) DeepCopyObject() runtime.Object {
 
 
 // FIXME: Setting SelfLinks doesn't seem to work now.
+
+type MetaRuntimeObject interface {
+	runtime.Object
+	metav1.Object
+}
+
+type metaRuntimeObject struct {
+	object MetaRuntimeObject
+}
+
+func (m *metaRuntimeObject) SetSelfLink(selfLink string) {
+	m.object.SetSelfLink(selfLink)
+}
