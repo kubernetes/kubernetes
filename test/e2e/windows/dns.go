@@ -23,10 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const dnsTestPodHostName = "dns-querier-1"
@@ -54,14 +54,14 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testUtilsPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
 		framework.ExpectNoError(err)
-		framework.Logf("Created pod %v", testUtilsPod)
+		e2elog.Logf("Created pod %v", testUtilsPod)
 		defer func() {
-			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
+			e2elog.Logf("Deleting pod %s...", testUtilsPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
+				e2elog.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
 		}()
-		gomega.Expect(f.WaitForPodRunning(testUtilsPod.Name)).NotTo(gomega.HaveOccurred(), "failed to wait for pod %s to be running", testUtilsPod.Name)
+		framework.ExpectNoError(f.WaitForPodRunning(testUtilsPod.Name), "failed to wait for pod %s to be running", testUtilsPod.Name)
 
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
 		cmd := []string{"ipconfig", "/all"}
@@ -75,17 +75,17 @@ var _ = SIGDescribe("DNS", func() {
 		})
 		framework.ExpectNoError(err)
 
-		framework.Logf("ipconfig /all:\n%s", stdout)
+		e2elog.Logf("ipconfig /all:\n%s", stdout)
 		dnsRegex, err := regexp.Compile(`DNS Servers[\s*.]*:(\s*[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})+`)
 
 		if dnsRegex.MatchString(stdout) {
 			match := dnsRegex.FindString(stdout)
 
 			if !strings.Contains(match, testInjectedIP) {
-				framework.Failf("customized DNS options not found in ipconfig /all, got: %s", match)
+				e2elog.Failf("customized DNS options not found in ipconfig /all, got: %s", match)
 			}
 		} else {
-			framework.Failf("cannot find DNS server info in ipconfig /all output: \n%s", stdout)
+			e2elog.Failf("cannot find DNS server info in ipconfig /all output: \n%s", stdout)
 		}
 		// TODO: Add more test cases for other DNSPolicies.
 	})
