@@ -27,7 +27,6 @@ go_library(
         "//pkg/master/reconcilers:go_default_library",
         "//pkg/master/tunneler:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
-        "//pkg/registry/flowcontrol/bootstrap:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/flag:go_default_library",

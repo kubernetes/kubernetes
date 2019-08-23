@@ -3,7 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["default-objects.go"],
-    importpath = "k8s.io/kubernetes/pkg/registry/flowcontrol/bootstrap",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/bootstrap",
+    importpath = "k8s.io/apiserver/pkg/util/flowcontrol/bootstrap",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",

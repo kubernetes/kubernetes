@@ -18,6 +18,7 @@ package flowcontrol
 
 import (
 	"hash/crc64"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -42,6 +43,7 @@ import (
 	"k8s.io/klog"
 
 	rmtypesv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	fcbootstrap "k8s.io/apiserver/pkg/util/flowcontrol/bootstrap"
 	rmclientv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
 	rmlistersv1alpha1 "k8s.io/client-go/listers/flowcontrol/v1alpha1"
 )
@@ -62,9 +64,9 @@ type Interface interface {
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
 
-// requestManagementState is the variable state that this filter is
+// requestManagerState is the variable state that this filter is
 // working with at a given point in time.
-type requestManagementState struct {
+type requestManagerState struct {
 	// flowSchemas holds the flow schema objects, sorted by increasing
 	// numerical (decreasing logical) matching precedence.  Every
 	// FlowSchema in this slice is immutable.
@@ -90,9 +92,9 @@ type priorityLevelState struct {
 	emptyHandler *emptyRelay
 }
 
-// requestManagementSystem holds all the state and infrastructure of
+// requestManager holds all the state and infrastructure of
 // this filter
-type requestManagementSystem struct {
+type requestManager struct {
 	// wg is kept informed of when goroutines start or stop or begin or end waiting
 	wg waitgroup.OptionalWaitGroup
 
@@ -120,72 +122,81 @@ type requestManagementSystem struct {
 	// requestWaitLimit comes from server configuration.
 	requestWaitLimit time.Duration
 
-	// curState holds a pointer to the current requestManagementState.
-	// That is, `Load()` produces a `*requestManagementState`.  When a
+	// curState holds a pointer to the current requestManagerState.
+	// That is, `Load()` produces a `*requestManagerState`.  When a
 	// config work queue worker processes a configuration change, it
 	// stores a new pointer here --- it does NOT side-effect the old
-	// `requestManagementState` value.  The new
-	// `requestManagementState` has a freshly constructed slice of
+	// `requestManagerState` value.  The new
+	// `requestManagerState` has a freshly constructed slice of
 	// FlowSchema pointers and a freshly constructed map of priority
 	// level states.
 	curState atomic.Value
 }
 
-// NewRequestManager creates a new instance of request-management system
+// NewRequestManager creates a new instance to implement API priority and fairness
 func NewRequestManager(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
+	waitForAllPredefined bool,
 ) Interface {
-	return NewRequestManagerWithPreservation(
+	wg := waitgroup.NoWaitGroup()
+	return NewRequestManagerTestable(
 		informerFactory,
 		flowcontrolClient,
 		serverConcurrencyLimit,
 		requestWaitLimit,
-		nil, nil)
+		waitForAllPredefined,
+		wg,
+		fq.NewQueueSetFactory(&clock.RealClock{}, wg),
+	)
 }
 
-// NewRequestManagerWithPreservation creates a new instance
-// of request-management system with preservation.  The WaitGroup is
-// optional and, if supplied, is kept informed of whenever a goroutine
-// is started or stopped or begins or finishes waiting --- except that
-// the configuration controller is not fully plumbed yet.
-func NewRequestManagerWithPreservation(
+// NewRequestManagerTestable is extra flexible to facilitate testing
+func NewRequestManagerTestable(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	preservingFlowSchemas []*rmtypesv1alpha1.FlowSchema,
-	preservingPriorityLevels []*rmtypesv1alpha1.PriorityLevelConfiguration,
+	waitForAllPredefined bool,
+	wg waitgroup.OptionalWaitGroup,
+	queueSetFactory fq.QueueSetFactory,
 ) Interface {
-	reqMgmt := &requestManagementSystem{
-		wg:                     waitgroup.NoWaitGroup(),
-		queueSetFactory:        fq.NewQueueSetFactory(&clock.RealClock{}, waitgroup.NoWaitGroup()),
+	initialPLCs := fcbootstrap.InitialPriorityLevelConfigurations
+	initialFSs := fcbootstrap.InitialFlowSchemas
+	waitPLCs := initialPLCs
+	waitFSs := initialFSs
+	if waitForAllPredefined {
+		waitPLCs = fcbootstrap.PredefinedPriorityLevelConfigurations()
+		waitFSs = fcbootstrap.PredefinedFlowSchemas()
+	}
+
+	reqMgr := &requestManager{
+		wg:                     wg,
+		queueSetFactory:        queueSetFactory,
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,
 		flowcontrolClient:      flowcontrolClient,
 	}
 	klog.V(2).Infof("NewRequestManagementSystem with serverConcurrencyLimit=%d, requestWaitLimit=%s", serverConcurrencyLimit, requestWaitLimit)
-	reqMgmt.initializeConfigController(informerFactory)
-	emptyRMState := &requestManagementState{
+	reqMgr.initializeConfigController(informerFactory)
+	emptyRMState := &requestManagerState{
 		priorityLevelStates: make(map[string]*priorityLevelState),
 	}
-	reqMgmt.curState.Store(emptyRMState)
-	if len(preservingFlowSchemas) > 0 || len(preservingPriorityLevels) > 0 {
-		reqMgmt.digestConfigObjects(
-			preservingPriorityLevels,
-			preservingFlowSchemas,
-		)
-	}
-	reqMgmt.readyFunc = func() bool {
+	reqMgr.curState.Store(emptyRMState)
+	reqMgr.digestConfigObjects(
+		initialPLCs,
+		initialFSs,
+	)
+	reqMgr.readyFunc = func() bool {
 		existingFSNames, existingPLNames := sets.NewString(), sets.NewString()
-		existingFlowSchemas, err := reqMgmt.fsLister.List(labels.Everything())
+		existingFlowSchemas, err := reqMgr.fsLister.List(labels.Everything())
 		if err != nil {
 			klog.Errorf("failed to list flow-schemas: %v", err)
 			return false
 		}
-		existingPriorityLevels, err := reqMgmt.plLister.List(labels.Everything())
+		existingPriorityLevels, err := reqMgr.plLister.List(labels.Everything())
 		if err != nil {
 			klog.Errorf("failed to list priority-levels: %v", err)
 			return false
@@ -194,24 +205,24 @@ func NewRequestManagerWithPreservation(
 		for _, fs := range existingFlowSchemas {
 			existingFSNames.Insert(fs.Name)
 		}
-		for _, fs := range preservingFlowSchemas {
+		for _, fs := range waitFSs {
 			if !existingFSNames.Has(fs.Name) {
-				klog.V(5).Infof("waiting for preserved flow-schema %s to be ready", fs.Name)
+				klog.V(5).Infof("waiting for flow-schema %s to be ready", fs.Name)
 				return false
 			}
 		}
 		for _, pl := range existingPriorityLevels {
 			existingPLNames.Insert(pl.Name)
 		}
-		for _, pl := range preservingPriorityLevels {
+		for _, pl := range waitPLCs {
 			if !existingPLNames.Has(pl.Name) {
-				klog.V(5).Infof("waiting for preserved priority-level %s to be ready", pl.Name)
+				klog.V(5).Infof("waiting for priority-level %s to be ready", pl.Name)
 				return false
 			}
 		}
 		return true
 	}
-	return reqMgmt
+	return reqMgr
 }
 
 // RequestDigest holds necessary info from request for flow-control
@@ -220,51 +231,48 @@ type RequestDigest struct {
 	User        user.Info
 }
 
-func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool, func()) {
+func (reqMgr *requestManager) Wait(requestDigest RequestDigest) (bool, func()) {
 	startWaitingTime := time.Now()
 	for {
-		rmState := reqMgmt.curState.Load().(*requestManagementState)
+		rmState := reqMgr.curState.Load().(*requestManagerState)
 
-		var matchingflowSchemaName string
-		var matchingpriorityLevelName string
-		var matchingFlowDistinguisherMethod *rmtypesv1alpha1.FlowDistinguisherMethod
-
-		// 1. computing flow
+		// 1. figure out which flow schema applies
 		fs := rmState.pickFlowSchema(requestDigest)
-		switch {
-		case fs != nil: // successfully matched a flow-schema
-			matchingflowSchemaName = fs.Name
-			matchingpriorityLevelName = fs.Spec.PriorityLevelConfiguration.Name
-			matchingFlowDistinguisherMethod = fs.Spec.DistinguisherMethod
-		default: // reject
+		if fs == nil { // reject
 			metrics.AddReject("<none>", "non-match")
 			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v because no FlowSchema matched", requestDigest.RequestInfo, requestDigest.User)
 			return false, func() {}
 		}
+		matchingpriorityLevelName := fs.Spec.PriorityLevelConfiguration.Name
 
-		// 2. computing hash
-		flowDistinguisher := requestDigest.ComputeFlowDistinguisher(matchingFlowDistinguisherMethod)
-		hashValue := hashFlowID(matchingflowSchemaName, flowDistinguisher)
-
-		// 3. executing
+		// 2. early out for exempt
 		ps := rmState.priorityLevelStates[matchingpriorityLevelName]
 		if ps.config.Exempt {
 			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q without delay", requestDigest.RequestInfo, requestDigest.User, fs.Name)
-			return true, func() {}
+			startExecutionTime := time.Now()
+			return true, func() {
+				metrics.ObserveExecutionDuration(matchingpriorityLevelName, fs.Name, time.Now().Sub(startExecutionTime))
+			}
 		}
 
+		// 3. computing hash
+		flowDistinguisher := requestDigest.ComputeFlowDistinguisher(fs.Spec.DistinguisherMethod)
+		hashValue := hashFlowID(fs.Name, flowDistinguisher)
+
+		// 4. queuing
 		quiescent, execute, afterExecute := ps.queues.Wait(hashValue, ps.config.HandSize)
 		if quiescent {
 			klog.V(5).Infof("Request requestInfo=%v, user=%v, fs=%q landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 			continue
 		}
-		if execute {
-			metrics.ObserveWaitingDuration(matchingpriorityLevelName, fs.Name, "true", time.Now().Sub(startWaitingTime))
-			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
-		} else {
-			metrics.ObserveWaitingDuration(matchingpriorityLevelName, fs.Name, "false", time.Now().Sub(startWaitingTime))
+
+		// 5. execute or reject
+		metrics.ObserveWaitingDuration(matchingpriorityLevelName, fs.Name, strconv.FormatBool(execute), time.Now().Sub(startWaitingTime))
+		if !execute {
 			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
+			return false, func() {}
 		}
+		klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
 		startExecutionTime := time.Now()
 		return execute, func() {
 			metrics.ObserveExecutionDuration(matchingpriorityLevelName, fs.Name, time.Now().Sub(startExecutionTime))
@@ -273,7 +281,7 @@ func (reqMgmt *requestManagementSystem) Wait(requestDigest RequestDigest) (bool,
 	}
 }
 
-func (rmState *requestManagementState) pickFlowSchema(rd RequestDigest) *rmtypesv1alpha1.FlowSchema {
+func (rmState *requestManagerState) pickFlowSchema(rd RequestDigest) *rmtypesv1alpha1.FlowSchema {
 	for _, flowSchema := range rmState.flowSchemas {
 		if matchesFlowSchema(rd, flowSchema) {
 			return flowSchema
