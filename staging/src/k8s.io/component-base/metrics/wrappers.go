@@ -63,6 +63,7 @@ type GaugeMetric interface {
 	Dec()
 	Add(float64)
 	Write(out *dto.Metric) error
+	SetToCurrentTime()
 }
 
 // ObserverMetric captures individual observations.
