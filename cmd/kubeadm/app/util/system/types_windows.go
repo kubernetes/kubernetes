@@ -23,9 +23,6 @@ import (
 	"strings"
 )
 
-// dockerEndpoint is the os specific endpoint for docker communication
-const dockerEndpoint = "npipe:////./pipe/docker_engine"
-
 // DefaultSysSpec is the default SysSpec for Windows
 var DefaultSysSpec = SysSpec{
 	OS: "Microsoft Windows Server 2016",

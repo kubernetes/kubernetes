@@ -213,7 +213,7 @@ func (poc PortOpenCheck) Check() (warnings, errorList []error) {
 		}
 	}
 
-	return nil, errorList
+	return warnings, errorList
 }
 
 // IsPrivilegedUserCheck verifies user is privileged (linux - root, windows - Administrator)
