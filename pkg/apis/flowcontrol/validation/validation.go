@@ -18,12 +18,13 @@ package validation
 
 import (
 	"fmt"
-	"math/big"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validation"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/shufflesharding"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 )
@@ -53,10 +54,6 @@ var supportedSubjectKinds = sets.NewString(
 	flowcontrol.ServiceAccountKind,
 	flowcontrol.UserKind,
 	flowcontrol.GroupKind,
-)
-
-const (
-	maxHashBits = 60
 )
 
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
@@ -217,6 +214,13 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		if spec.HandSize < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), spec.HandSize, "must be positive"))
 		}
+		if spec.HandSize > spec.Queues {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), spec.HandSize,
+				fmt.Sprintf("should not be greater than queues (%d)", spec.Queues)))
+		}
+		if errs := shufflesharding.ValidateParameters(int(spec.Queues), int(spec.HandSize)); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), spec.HandSize, strings.Join(errs, "; ")))
+		}
 	} else {
 		if spec.AssuredConcurrencyShares != 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("assuredConcurrencyShares"), "must be zero for exempt priority"))
@@ -231,14 +235,6 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("handSize"), "must be zero for exempt priority"))
 		}
 	}
-	if spec.HandSize > spec.Queues {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), spec.HandSize,
-			fmt.Sprintf("should not be greater than queues (%d)", spec.Queues)))
-	}
-	if !validateShuffleShardingParameters(spec.HandSize, spec.Queues) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("handSize"), spec.HandSize,
-			fmt.Sprintf("falling factorial of handSize (%d) and queues (%d) exceeds %d bits", spec.HandSize, spec.Queues, maxHashBits)))
-	}
 	return allErrs
 }
 
@@ -246,11 +242,6 @@ func ValidatePriorityLevelConfigurationStatus(status *flowcontrol.PriorityLevelC
 	var allErrs field.ErrorList
 	// conditions will not be validated
 	return allErrs
-}
-
-func validateShuffleShardingParameters(handSize, queues int32) bool {
-	// TODO: performance impact from bit-int multiplication?
-	return int32(big.NewInt(int64(queues)).BitLen())*handSize <= maxHashBits
 }
 
 func hasWildcard(operations []string) bool {
