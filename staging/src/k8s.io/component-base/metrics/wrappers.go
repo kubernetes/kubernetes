@@ -61,6 +61,8 @@ type GaugeMetric interface {
 	Set(float64)
 	Inc()
 	Dec()
+	Add(float64)
+	Write(out *dto.Metric) error
 }
 
 // ObserverMetric captures individual observations.
