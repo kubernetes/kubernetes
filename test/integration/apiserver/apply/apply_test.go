@@ -180,7 +180,7 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	o, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		Namespace("default").
 		Param("fieldManager", "apply_test").
 		Resource(podResource).
@@ -190,6 +190,23 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 		Get()
 	if err != nil {
 		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// Need to update once for some reason
+	// TODO: Remove this once possible
+	b, err := json.MarshalIndent(o, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal created object: %v", err)
+	}
+	_, err = client.CoreV1().RESTClient().Put().
+		Namespace("default").
+		Resource(podResource).
+		Name(podName).
+		Body(b).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply first no-op update: %v", err)
 	}
 
 	// Sleep for one second to make sure that the times of each update operation is different.
