@@ -2,12 +2,9 @@ cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
-cmd/kube-scheduler/app
 cmd/linkcheck
 cmd/preferredimports
 hack/make-rules/helpers/go2make/testdata/dir-with-gofiles
-pkg/apis/scheduling/v1alpha1
-pkg/apis/scheduling/v1beta1
 pkg/client/tests
 pkg/controller/daemon
 pkg/controller/deployment
@@ -93,7 +90,6 @@ test/e2e/manifest
 test/e2e/network
 test/e2e/node
 test/e2e/scalability
-test/e2e/scheduling
 test/e2e/storage
 test/e2e/storage/drivers
 test/e2e/storage/testsuites
@@ -124,13 +120,11 @@ test/integration/kubelet
 test/integration/master
 test/integration/replicationcontroller
 test/integration/scale
-test/integration/scheduler
 test/integration/scheduler_perf
 test/integration/serviceaccount
 test/integration/serving
 test/integration/ttlcontroller
 test/integration/volume
-test/integration/volumescheduling
 test/utils
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion

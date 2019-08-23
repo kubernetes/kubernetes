@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -757,35 +756,6 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 
 	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
 	framework.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
-}
-
-// verifyReplicasResult is wrapper of verifyResult for a group pods with same "name: labelName" label, which means they belong to same RC
-func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string, labelName string) {
-	allPods := getPodsByLabels(c, ns, map[string]string{"name": labelName})
-	scheduledPods, notScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
-
-	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
-	framework.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
-}
-
-func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {
-	selector := labels.SelectorFromSet(labels.Set(labelsMap))
-	allPods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
-	framework.ExpectNoError(err)
-	return allPods
-}
-
-func runAndKeepPodWithLabelAndGetNodeName(f *framework.Framework) (string, string) {
-	// launch a pod to find a node which can launch a pod. We intentionally do
-	// not just take the node list and choose the first of them. Depending on the
-	// cluster and the scheduler it might be that a "normal" pod cannot be
-	// scheduled onto it.
-	ginkgo.By("Trying to launch a pod with a label to get a node which can launch it.")
-	pod := runPausePod(f, pausePodConfig{
-		Name:   "with-label-" + string(uuid.NewUUID()),
-		Labels: map[string]string{"security": "S1"},
-	})
-	return pod.Spec.NodeName, pod.Name
 }
 
 // GetNodeThatCanRunPod trying to launch a pod without a label to get a node which can launch it

@@ -425,6 +425,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 
 		ginkgo.By("Starting pods...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod1, 2*time.Minute)
+		framework.ExpectNoError(err)
 		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		nodeHostNameLabel, ok := node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
