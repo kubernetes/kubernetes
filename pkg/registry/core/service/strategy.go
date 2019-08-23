@@ -47,6 +47,8 @@ func (svcStrategy) NamespaceScoped() bool {
 func (svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
+
+	dropServiceDisabledFields(service, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -54,6 +56,8 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
+
+	dropServiceDisabledFields(newService, oldService)
 }
 
 // Validate validates a new service.
@@ -102,6 +106,14 @@ func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) e
 		}
 	}
 	return nil
+}
+
+// dropServiceDisabledFields drops fields that are not used if their associated feature gates
+// are not enabled.  The typical pattern is:
+//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//         newSvc.Spec.MyFeature = nil
+//     }
+func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 }
 
 type serviceStatusStrategy struct {
