@@ -4,7 +4,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["providers.go"],
+    srcs = [
+        "doc.go",
+        "providers.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers",
     visibility = [
         "//cmd/cloud-controller-manager:__pkg__",
