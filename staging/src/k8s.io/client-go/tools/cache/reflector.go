@@ -129,9 +129,6 @@ var (
 	// nothing will ever be sent down this channel
 	neverExitWatch <-chan time.Time = make(chan time.Time)
 
-	// Used to indicate that watching stopped so that a resync could happen.
-	errorResyncRequested = errors.New("resync channel fired")
-
 	// Used to indicate that watching stopped because of a signal from the stop
 	// channel passed in from a client of the reflector.
 	errorStopRequested = errors.New("Stop requested")
