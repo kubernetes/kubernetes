@@ -86,7 +86,6 @@ pkg/volume/storageos
 pkg/volume/util
 pkg/volume/util/fsquota
 pkg/volume/util/fsquota/common
-pkg/volume/util/nsenter
 pkg/volume/util/operationexecutor
 pkg/volume/util/subpath
 pkg/volume/vsphere_volume
