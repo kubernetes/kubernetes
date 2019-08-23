@@ -166,7 +166,7 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Kubectl run CronJob", func() {
+	ginkgo.Describe("Kubectl run CronJob", func() {
 		var nsFlag string
 		var cjName string
 
@@ -272,7 +272,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		e2elog.Logf("scanned %s for discovery docs: %v", home, err)
 	}
 
-	framework.KubeDescribe("Update Demo", func() {
+	ginkgo.Describe("Update Demo", func() {
 		var nautilus, kitten string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
@@ -330,7 +330,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 	})
 
-	framework.KubeDescribe("Guestbook application", func() {
+	ginkgo.Describe("Guestbook application", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
@@ -366,7 +366,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 	})
 
-	framework.KubeDescribe("Simple pod", func() {
+	ginkgo.Describe("Simple pod", func() {
 		var podYaml string
 		ginkgo.BeforeEach(func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
@@ -747,7 +747,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl api-versions", func() {
+	ginkgo.Describe("Kubectl api-versions", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, check version v1
@@ -762,7 +762,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl get componentstatuses", func() {
+	ginkgo.Describe("Kubectl get componentstatuses", func() {
 		ginkgo.It("should get componentstatuses", func() {
 			ginkgo.By("getting list of componentstatuses")
 			output := framework.RunKubectlOrDie("get", "componentstatuses", "-o", "jsonpath={.items[*].metadata.name}")
@@ -775,7 +775,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl apply", func() {
+	ginkgo.Describe("Kubectl apply", func() {
 		ginkgo.It("should apply a new configuration to an existing RC", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 
@@ -907,7 +907,7 @@ metadata:
 		return nil
 	}
 
-	framework.KubeDescribe("Kubectl client-side validation", func() {
+	ginkgo.Describe("Kubectl client-side validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
 			crd, err := crd.CreateTestCRD(f)
@@ -983,7 +983,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl cluster-info", func() {
+	ginkgo.Describe("Kubectl cluster-info", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, cluster info
@@ -1002,14 +1002,14 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl cluster-info dump", func() {
+	ginkgo.Describe("Kubectl cluster-info dump", func() {
 		ginkgo.It("should check if cluster-info dump succeeds", func() {
 			ginkgo.By("running cluster-info dump")
 			framework.RunKubectlOrDie("cluster-info", "dump")
 		})
 	})
 
-	framework.KubeDescribe("Kubectl describe", func() {
+	ginkgo.Describe("Kubectl describe", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, describe pod or rc
@@ -1114,7 +1114,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl expose", func() {
+	ginkgo.Describe("Kubectl expose", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, create service, replication controller
@@ -1198,7 +1198,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl label", func() {
+	ginkgo.Describe("Kubectl label", func() {
 		var podYaml string
 		var nsFlag string
 		ginkgo.BeforeEach(func() {
@@ -1239,7 +1239,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl copy", func() {
+	ginkgo.Describe("Kubectl copy", func() {
 		var podYaml string
 		var nsFlag string
 		ginkgo.BeforeEach(func() {
@@ -1279,7 +1279,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl logs", func() {
+	ginkgo.Describe("Kubectl logs", func() {
 		var nsFlag string
 		podName := "logs-generator"
 		containerName := "logs-generator"
@@ -1355,7 +1355,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl patch", func() {
+	ginkgo.Describe("Kubectl patch", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, patch to annotate
@@ -1389,7 +1389,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl version", func() {
+	ginkgo.Describe("Kubectl version", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, version
@@ -1406,7 +1406,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run default", func() {
+	ginkgo.Describe("Kubectl run default", func() {
 		var nsFlag string
 		var name string
 
@@ -1444,7 +1444,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run rc", func() {
+	ginkgo.Describe("Kubectl run rc", func() {
 		var nsFlag string
 		var rcName string
 
@@ -1503,7 +1503,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl rolling-update", func() {
+	ginkgo.Describe("Kubectl rolling-update", func() {
 		var nsFlag string
 		var rcName string
 		var c clientset.Interface
@@ -1545,7 +1545,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run deployment", func() {
+	ginkgo.Describe("Kubectl run deployment", func() {
 		var nsFlag string
 		var dName string
 
@@ -1600,7 +1600,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run job", func() {
+	ginkgo.Describe("Kubectl run job", func() {
 		var nsFlag string
 		var jobName string
 
@@ -1636,7 +1636,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run CronJob", func() {
+	ginkgo.Describe("Kubectl run CronJob", func() {
 		var nsFlag string
 		var cjName string
 
@@ -1673,7 +1673,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run pod", func() {
+	ginkgo.Describe("Kubectl run pod", func() {
 		var nsFlag string
 		var podName string
 
@@ -1709,7 +1709,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl replace", func() {
+	ginkgo.Describe("Kubectl replace", func() {
 		var nsFlag string
 		var podName string
 
@@ -1760,7 +1760,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl run --rm job", func() {
+	ginkgo.Describe("Kubectl run --rm job", func() {
 		jobName := "e2e-test-rm-busybox-job"
 
 		/*
@@ -1791,7 +1791,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Proxy server", func() {
+	ginkgo.Describe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
 		/*
 			Release : v1.9
@@ -1854,7 +1854,7 @@ metadata:
 
 	// This test must run [Serial] because it modifies the node so it doesn't allow pods to execute on
 	// it, which will affect anything else running in parallel.
-	framework.KubeDescribe("Kubectl taint [Serial]", func() {
+	ginkgo.Describe("Kubectl taint [Serial]", func() {
 		ginkgo.It("should update the taint on a node", func() {
 			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-001-%s", string(uuid.NewUUID())),
@@ -1954,7 +1954,7 @@ metadata:
 		})
 	})
 
-	framework.KubeDescribe("Kubectl create quota", func() {
+	ginkgo.Describe("Kubectl create quota", func() {
 		ginkgo.It("should create a quota without scopes", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "million"
