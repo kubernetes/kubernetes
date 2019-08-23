@@ -41,8 +41,6 @@ type Interface interface {
 	// consistent (i.e. it could change between chunked reads). This is guaranteed
 	// to be consistent.
 	List() ([]MountPoint, error)
-	// IsMountPointMatch determines if the mountpoint matches the dir.
-	IsMountPointMatch(mp MountPoint, dir string) bool
 	// IsLikelyNotMountPoint uses heuristics to determine if a directory
 	// is not a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
@@ -162,7 +160,7 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 // IsNotMountPoint detects bind mounts in linux.
 // IsNotMountPoint enumerates all the mountpoints using List() and
 // the list of mountpoints may be large, then it uses
-// IsMountPointMatch to evaluate whether the directory is a mountpoint.
+// isMountPointMatch to evaluate whether the directory is a mountpoint.
 func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint.
@@ -195,7 +193,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		return notMnt, mountPointsErr
 	}
 	for _, mp := range mountPoints {
-		if mounter.IsMountPointMatch(mp, resolvedFile) {
+		if isMountPointMatch(mp, resolvedFile) {
 			notMnt = false
 			break
 		}

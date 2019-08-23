@@ -137,11 +137,6 @@ func (f *FakeMounter) List() ([]MountPoint, error) {
 	return f.MountPoints, nil
 }
 
-// IsMountPointMatch tests if dir and mp are the same path
-func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return mp.Path == dir
-}
-
 // IsLikelyNotMountPoint determines whether a path is a mountpoint by checking
 // if the absolute path to file is in the in-memory mountpoints
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
