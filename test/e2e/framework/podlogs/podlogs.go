@@ -251,10 +251,10 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 						)
 					} else if cst.State.Running != nil {
 						fmt.Fprintf(buffer, "RUNNING")
-					} else if cst.State.Waiting != nil {
+					} else if cst.State.Terminated != nil {
 						fmt.Fprintf(buffer, "TERMINATED: %s - %s",
-							cst.State.Waiting.Reason,
-							cst.State.Waiting.Message,
+							cst.State.Terminated.Reason,
+							cst.State.Terminated.Message,
 						)
 					}
 					fmt.Fprintf(buffer, "\n")

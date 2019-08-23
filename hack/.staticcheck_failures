@@ -98,17 +98,6 @@ test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling
 test/e2e/common
-test/e2e/framework
-test/e2e/framework/ingress
-test/e2e/framework/kubelet
-test/e2e/framework/node
-test/e2e/framework/pod
-test/e2e/framework/podlogs
-test/e2e/framework/providers/aws
-test/e2e/framework/providers/gce
-test/e2e/framework/psp
-test/e2e/framework/service
-test/e2e/framework/volume
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
 test/e2e/lifecycle

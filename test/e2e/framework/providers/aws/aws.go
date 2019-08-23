@@ -50,13 +50,21 @@ type Provider struct {
 
 // ResizeGroup resizes an instance group
 func (p *Provider) ResizeGroup(group string, size int32) error {
-	client := autoscaling.New(session.New())
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+	client := autoscaling.New(awsSession)
 	return awscloud.ResizeInstanceGroup(client, group, int(size))
 }
 
 // GroupSize returns the size of an instance group
 func (p *Provider) GroupSize(group string) (int, error) {
-	client := autoscaling.New(session.New())
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return -1, err
+	}
+	client := autoscaling.New(awsSession)
 	instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
 	if err != nil {
 		return -1, fmt.Errorf("error describing instance group: %v", err)
@@ -151,5 +159,9 @@ func newAWSClient(zone string) *ec2.EC2 {
 		region := zone[:len(zone)-1]
 		cfg = &aws.Config{Region: aws.String(region)}
 	}
-	return ec2.New(session.New(), cfg)
+	session, err := session.NewSession()
+	if err != nil {
+		e2elog.Logf("Warning: failed to create aws session")
+	}
+	return ec2.New(session, cfg)
 }
