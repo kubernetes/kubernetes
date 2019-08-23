@@ -63,6 +63,7 @@ type Cloud struct {
 	ErrByProviderID         error
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
+	ErrInstanceID           error
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
@@ -255,7 +256,7 @@ func (f *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (f *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
-	return f.ExtID[nodeName], nil
+	return f.ExtID[nodeName], f.ErrInstanceID
 }
 
 // InstanceType returns the type of the specified instance.
