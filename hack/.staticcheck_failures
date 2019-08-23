@@ -1,4 +1,3 @@
-cluster/images/conformance/go-runner
 cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
 cmd/controller-manager/app
