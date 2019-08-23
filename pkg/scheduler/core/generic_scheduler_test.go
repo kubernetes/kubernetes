@@ -750,6 +750,72 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 }
 
+type predicateCallCounter struct {
+	count int
+}
+
+func (c *predicateCallCounter) truePredicate() algorithmpredicates.FitPredicate {
+	return func(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+		c.count++
+		return truePredicate(pod, meta, nodeInfo)
+	}
+}
+
+func TestFindFitPredicateCallCounts(t *testing.T) {
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
+
+	tests := []struct {
+		name          string
+		pod           *v1.Pod
+		expectedCount int
+	}{
+		{
+			name:          "nominated pods have lower priority, predicate is called once",
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}, Spec: v1.PodSpec{Priority: &highPriority}},
+			expectedCount: 1,
+		},
+		{
+			name:          "nominated pods have higher priority, predicate is called twice",
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}, Spec: v1.PodSpec{Priority: &lowPriority}},
+			expectedCount: 2,
+		},
+	}
+
+	for _, test := range tests {
+		pc := predicateCallCounter{}
+		predicates := map[string]algorithmpredicates.FitPredicate{"true": pc.truePredicate()}
+		nodes := makeNodeList([]string{"1"})
+
+		cache := internalcache.New(time.Duration(0), wait.NeverStop)
+		for _, n := range nodes {
+			cache.AddNode(n)
+		}
+		prioritizers := []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
+		queue := internalqueue.NewSchedulingQueue(nil, nil)
+		scheduler := NewGenericScheduler(
+			cache,
+			queue,
+			predicates,
+			algorithmpredicates.EmptyPredicateMetadataProducer,
+			prioritizers,
+			priorities.EmptyPriorityMetadataProducer,
+			emptyFramework,
+			nil, nil, nil, nil, false, false,
+			schedulerapi.DefaultPercentageOfNodesToScore, false).(*genericScheduler)
+		cache.UpdateNodeInfoSnapshot(scheduler.nodeInfoSnapshot)
+		queue.UpdateNominatedPodForNode(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("nominated")}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
+
+		_, _, _, err := scheduler.findNodesThatFit(nil, test.pod)
+
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectedCount != pc.count {
+			t.Errorf("predicate was called %d times, expected is %d", pc.count, test.expectedCount)
+		}
+	}
+}
+
 func makeNode(node string, milliCPU, memory int64) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: node},
