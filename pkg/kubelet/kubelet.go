@@ -53,6 +53,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -1313,10 +1314,17 @@ func (kl *Kubelet) StartGarbageCollection() {
 	}, ImageGCPeriod, wait.NeverStop)
 }
 
+func (kl *Kubelet) showHiddenMetrics() {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShowHiddenMetrics) {
+		basemetrics.SetShowHidden()
+	}
+}
+
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
 // Note that the modules here must not depend on modules that are not initialized here.
 func (kl *Kubelet) initializeModules() error {
 	// Prometheus metrics.
+	kl.showHiddenMetrics()
 	metrics.Register(
 		kl.runtimeCache,
 		collectors.NewVolumeStatsCollector(kl),
