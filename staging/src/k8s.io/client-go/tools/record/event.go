@@ -171,9 +171,8 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 
 func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrelator, sleepDuration time.Duration) {
 	// Make a copy before modification, because there could be multiple listeners.
-	// Events are safe to copy like this.
-	eventCopy := *event
-	event = &eventCopy
+	eventCopy := event.DeepCopy()
+	event = eventCopy
 	result, err := eventCorrelator.EventCorrelate(event)
 	if err != nil {
 		utilruntime.HandleError(err)

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -460,6 +461,10 @@ func TestUpdateExpiredEvent(t *testing.T) {
 	ev.ResourceVersion = "updated-resource-version"
 	ev.Count = 2
 	recordToSink(sink, ev, eventCorrelator, 0)
+	ev.ResourceVersion = ""
+	if !reflect.DeepEqual(ev, createdEvent) {
+		t.Error("event passed to recordToSink was not deep copied")
+	}
 
 	if createdEvent == nil {
 		t.Error("Event did not get created after patch failed")
