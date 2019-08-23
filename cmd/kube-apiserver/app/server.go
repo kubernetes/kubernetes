@@ -50,7 +50,6 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
-	"k8s.io/apiserver/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/term"
@@ -540,12 +539,11 @@ func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinf
 	return authorizationConfig.New()
 }
 
-// BuildRequestManagement constructs the request manager
+// BuildRequestManager constructs the request manager
 func BuildRequestManager(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
 	return utilflowcontrol.NewRequestManagerWithPreservation(
 		versionedInformer,
 		extclient.FlowcontrolV1alpha1(),
-		fairqueuing.NewQueueSetFactory(&clock.RealClock{}, fairqueuing.NoWaitGroup()),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
 		flowcontrolbootstrap.PreservingFlowSchemas,
