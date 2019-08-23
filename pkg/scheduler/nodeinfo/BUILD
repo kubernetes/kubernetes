@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "host_ports.go",
         "node_info.go",
+        "snapshot.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/nodeinfo",

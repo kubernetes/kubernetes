@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Code is the Status code/type which is returned from plugins.
@@ -357,7 +357,7 @@ type FrameworkHandle interface {
 	// cycle(permit/pre-bind/bind/post-bind/un-reserve plugin) should not use it,
 	// otherwise a concurrent read/write error might occur, they should use scheduler
 	// cache instead.
-	NodeInfoSnapshot() *internalcache.NodeInfoSnapshot
+	NodeInfoSnapshot() *schedulernodeinfo.Snapshot
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))

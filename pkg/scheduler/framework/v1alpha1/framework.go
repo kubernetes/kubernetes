@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -35,7 +35,7 @@ import (
 // plugins.
 type framework struct {
 	registry                  Registry
-	nodeInfoSnapshot          *cache.NodeInfoSnapshot
+	nodeInfoSnapshot          *schedulernodeinfo.Snapshot
 	waitingPods               *waitingPodsMap
 	pluginNameToWeightMap     map[string]int
 	queueSortPlugins          []QueueSortPlugin
@@ -63,7 +63,7 @@ var _ = Framework(&framework{})
 func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
 	f := &framework{
 		registry:              r,
-		nodeInfoSnapshot:      cache.NewNodeInfoSnapshot(),
+		nodeInfoSnapshot:      schedulernodeinfo.NewSnapshot(),
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 	}
@@ -566,7 +566,7 @@ func (f *framework) RunPermitPlugins(
 // is taken at the beginning of a scheduling cycle and remains unchanged until a
 // pod finishes "Reserve". There is no guarantee that the information remains
 // unchanged after "Reserve".
-func (f *framework) NodeInfoSnapshot() *cache.NodeInfoSnapshot {
+func (f *framework) NodeInfoSnapshot() *schedulernodeinfo.Snapshot {
 	return f.nodeInfoSnapshot
 }
 
