@@ -51,7 +51,7 @@ func newActiveDeadlineHandler(
 
 	// check for all required fields
 	if clock == nil || podStatusProvider == nil || recorder == nil {
-		return nil, fmt.Errorf("Required arguments must not be nil: %v, %v, %v", clock, podStatusProvider, recorder)
+		return nil, fmt.Errorf("required arguments must not be nil: %v, %v, %v", clock, podStatusProvider, recorder)
 	}
 	return &activeDeadlineHandler{
 		clock:             clock,

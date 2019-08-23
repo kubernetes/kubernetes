@@ -85,7 +85,6 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
-        "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/kubelet:go_default_library",
         "//test/e2e/framework/log:go_default_library",

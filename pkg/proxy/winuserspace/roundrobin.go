@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -230,7 +230,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 			// if one does not already exist.  The affinity will be updated
 			// later, once NewService is called.
 			state = lb.newServiceInternal(svcPort, v1.ServiceAffinity(""), 0)
-			state.endpoints = slice.ShuffleStrings(newEndpoints)
+			state.endpoints = util.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
 			state.index = 0
@@ -264,7 +264,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 			// if one does not already exist.  The affinity will be updated
 			// later, once NewService is called.
 			state = lb.newServiceInternal(svcPort, v1.ServiceAffinity(""), 0)
-			state.endpoints = slice.ShuffleStrings(newEndpoints)
+			state.endpoints = util.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
 			state.index = 0

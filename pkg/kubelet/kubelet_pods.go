@@ -403,7 +403,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
-			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
+			return "", "", fmt.Errorf("pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
 		hostname = pod.Spec.Hostname
 	}
@@ -416,7 +416,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 	hostDomain := ""
 	if len(pod.Spec.Subdomain) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Subdomain); len(msgs) != 0 {
-			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
+			return "", "", fmt.Errorf("pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
 		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
 	}
@@ -581,7 +581,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			configMap, ok := configMaps[name]
 			if !ok {
 				if kl.kubeClient == nil {
-					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
+					return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
 				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
@@ -616,7 +616,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			secret, ok := secrets[name]
 			if !ok {
 				if kl.kubeClient == nil {
-					return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+					return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := s.Optional != nil && *s.Optional
 				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
@@ -690,7 +690,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				configMap, ok := configMaps[name]
 				if !ok {
 					if kl.kubeClient == nil {
-						return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
+						return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
 					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
 					if err != nil {
@@ -707,7 +707,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if optional {
 						continue
 					}
-					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
+					return result, fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
 				}
 			case envVar.ValueFrom.SecretKeyRef != nil:
 				s := envVar.ValueFrom.SecretKeyRef
@@ -717,7 +717,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				secret, ok := secrets[name]
 				if !ok {
 					if kl.kubeClient == nil {
-						return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+						return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
 					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
 					if err != nil {
@@ -734,7 +734,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if optional {
 						continue
 					}
-					return result, fmt.Errorf("Couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
+					return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
 				runtimeVal = string(runtimeValBytes)
 			}

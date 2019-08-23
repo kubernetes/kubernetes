@@ -98,12 +98,10 @@ func (c *controller) sync() {
 		// If at some point other agents will also be frequently updating the Lease object, this
 		// can result in performance degradation, because we will end up with calling additional
 		// GET/PUT - at this point this whole "if" should be removed.
-		lease, err := c.leaseClient.Update(c.newLease(c.latestLease))
+		err := c.retryUpdateLease(c.newLease(c.latestLease))
 		if err == nil {
-			c.latestLease = lease
 			return
 		}
-
 		klog.Infof("failed to update lease using latest lease, fallback to ensure lease, err: %v", err)
 	}
 

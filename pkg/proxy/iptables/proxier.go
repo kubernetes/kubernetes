@@ -36,7 +36,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -52,15 +51,6 @@ import (
 )
 
 const (
-	// iptablesMinVersion is the minimum version of iptables for which we will use the Proxier
-	// from this package instead of the userspace Proxier.  While most of the
-	// features we need were available earlier, the '-C' flag was added more
-	// recently.  We use that indirectly in Ensure* functions, and if we don't
-	// have it, we have to be extra careful about the exact args we feed in being
-	// the same as the args we read back (iptables itself normalizes some args).
-	// This is the "new" Proxier, so we require "new" versions of tools.
-	iptablesMinVersion = utiliptables.MinCheckVersion
-
 	// the services chain
 	kubeServicesChain utiliptables.Chain = "KUBE-SERVICES"
 
@@ -83,12 +73,6 @@ const (
 	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
 )
 
-// Versioner can query the current iptables version.
-type Versioner interface {
-	// returns "X.Y.Z"
-	GetVersion() (string, error)
-}
-
 // KernelCompatTester tests whether the required kernel capabilities are
 // present to run the iptables proxier.
 type KernelCompatTester interface {
@@ -96,28 +80,8 @@ type KernelCompatTester interface {
 }
 
 // CanUseIPTablesProxier returns true if we should use the iptables Proxier
-// instead of the "classic" userspace Proxier.  This is determined by checking
-// the iptables version and for the existence of kernel features. It may return
-// an error if it fails to get the iptables version without error, in which
-// case it will also return false.
-func CanUseIPTablesProxier(iptver Versioner, kcompat KernelCompatTester) (bool, error) {
-	minVersion, err := utilversion.ParseGeneric(iptablesMinVersion)
-	if err != nil {
-		return false, err
-	}
-	versionString, err := iptver.GetVersion()
-	if err != nil {
-		return false, err
-	}
-	version, err := utilversion.ParseGeneric(versionString)
-	if err != nil {
-		return false, err
-	}
-	if version.LessThan(minVersion) {
-		return false, nil
-	}
-
-	// Check that the kernel supports what we need.
+// instead of the "classic" userspace Proxier.
+func CanUseIPTablesProxier(kcompat KernelCompatTester) (bool, error) {
 	if err := kcompat.IsCompatible(); err != nil {
 		return false, err
 	}
@@ -131,7 +95,6 @@ type LinuxKernelCompatTester struct{}
 // that it exists.  If this Proxier is chosen, we'll initialize it as we
 // need.
 func (lkct LinuxKernelCompatTester) IsCompatible() error {
-
 	_, err := utilsysctl.New().GetSysctl(sysctlRouteLocalnet)
 	return err
 }
@@ -272,8 +235,8 @@ func (l *listenPortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Clo
 	return openLocalPort(lp)
 }
 
-// Proxier implements ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// Proxier implements proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new Proxier given an iptables Interface instance.
 // Because of the iptables logic, it is assumed that there is only a single Proxier active on a machine.

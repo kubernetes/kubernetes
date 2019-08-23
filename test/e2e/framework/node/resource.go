@@ -96,9 +96,10 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 					if !hasNodeControllerTaints {
 						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					} else {
+						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
-					msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					if !silent {
 						e2elog.Logf(msg)
 					}

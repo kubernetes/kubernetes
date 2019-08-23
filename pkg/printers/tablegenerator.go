@@ -27,9 +27,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// GenerateOptions encapsulates attributes for table generation.
+type GenerateOptions struct {
+	NoHeaders bool
+	Wide      bool
+}
+
 // TableGenerator - an interface for generating metav1beta1.Table provided a runtime.Object
 type TableGenerator interface {
-	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
+	GenerateTable(obj runtime.Object, options GenerateOptions) (*metav1beta1.Table, error)
 }
 
 // PrintHandler - interface to handle printing provided an array of metav1beta1.TableColumnDefinition
@@ -71,14 +77,15 @@ func (h *HumanReadableGenerator) With(fns ...func(PrintHandler)) *HumanReadableG
 // GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
 // a table that includes all of the information requested by options, but will not remove rows or columns. The
 // caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
+func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options GenerateOptions) (*metav1beta1.Table, error) {
 	t := reflect.TypeOf(obj)
 	handler, ok := h.handlerMap[t]
 	if !ok {
 		return nil, fmt.Errorf("no table handler registered for this type %v", t)
 	}
 
-	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(options)}
+	printOptions := PrintOptions{NoHeaders: options.NoHeaders, Wide: options.Wide}
+	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(printOptions)}
 	results := handler.printFunc.Call(args)
 	if !results[1].IsNil() {
 		return nil, results[1].Interface().(error)
@@ -114,11 +121,6 @@ func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options Print
 			table.ResourceVersion = m.GetResourceVersion()
 			table.SelfLink = m.GetSelfLink()
 		}
-	}
-	// TODO(seans3): Remove the following decorateTable call. This should only be
-	// called in the table printer.
-	if err := decorateTable(table, options); err != nil {
-		return nil, err
 	}
 	return table, nil
 }

@@ -110,6 +110,10 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/component-base
@@ -540,6 +544,10 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kube-proxy
@@ -604,6 +612,10 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kube-scheduler
@@ -635,6 +647,10 @@ rules:
     - repository: apimachinery
       branch: master
     - repository: component-base
+      branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
       branch: master
   - source:
       branch: release-1.15

@@ -70,11 +70,8 @@ type backendType string
 // IngressController manages implementation details of Ingress on GCE/GKE.
 type IngressController struct {
 	Ns           string
-	rcPath       string
 	UID          string
 	staticIPName string
-	rc           *v1.ReplicationController
-	svc          *v1.Service
 	Client       clientset.Interface
 	Cloud        framework.CloudConfig
 }

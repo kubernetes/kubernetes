@@ -20,6 +20,7 @@ go_test(
         "//test/e2e/cloud:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/framework/viperconfig:go_default_library",
         "//test/e2e/generated:go_default_library",

@@ -304,14 +304,12 @@ func GetOneTimeResourceUsageOnNode(
 	// Process container infos that are relevant to us.
 	containers := containerNames()
 	usageMap := make(ResourceUsagePerContainer, len(containers))
-	observedContainers := []string{}
 	for _, pod := range summary.Pods {
 		for _, container := range pod.Containers {
 			isInteresting := false
 			for _, interestingContainerName := range containers {
 				if container.Name == interestingContainerName {
 					isInteresting = true
-					observedContainers = append(observedContainers, container.Name)
 					break
 				}
 			}

@@ -127,10 +127,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return newObj, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	manager, err = f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
-	}
 
 	// TODO(apelisse) use the first return value when unions are implemented
 	_, managed.Fields, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields, manager)
@@ -139,8 +135,24 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	}
 	managed.Fields = f.stripFields(managed.Fields, manager)
 
-	// Update the time in the managedFieldsEntry for this operation
-	managed.Times[manager] = &metav1.Time{Time: time.Now().UTC()}
+	// If the current operation took any fields from anything, it means the object changed,
+	// so update the timestamp of the managedFieldsEntry and merge with any previous updates from the same manager
+	if vs, ok := managed.Fields[manager]; ok {
+		delete(managed.Fields, manager)
+
+		// Build a manager identifier which will only match previous updates from the same manager
+		manager, err = f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build manager identifier: %v", err)
+		}
+
+		managed.Times[manager] = &metav1.Time{Time: time.Now().UTC()}
+		if previous, ok := managed.Fields[manager]; ok {
+			managed.Fields[manager] = fieldpath.NewVersionedSet(vs.Set().Union(previous.Set()), vs.APIVersion(), vs.Applied())
+		} else {
+			managed.Fields[manager] = vs
+		}
+	}
 
 	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)

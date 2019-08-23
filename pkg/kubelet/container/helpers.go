@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -92,9 +93,13 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 
 // HashContainer returns the hash of the container. It is used to compare
 // the running container with its desired spec.
+// Note: remember to update hashValues in container_hash_test.go as well.
 func HashContainer(container *v1.Container) uint64 {
 	hash := fnv.New32a()
-	hashutil.DeepHashObject(hash, *container)
+	// Omit nil or empty field when calculating hash value
+	// Please see https://github.com/kubernetes/kubernetes/issues/53644
+	containerJson, _ := json.Marshal(container)
+	hashutil.DeepHashObject(hash, containerJson)
 	return uint64(hash.Sum32())
 }
 

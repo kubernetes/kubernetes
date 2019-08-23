@@ -118,7 +118,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 		}
 
 		psp := privilegedPSP(podSecurityPolicyPrivileged)
-		psp, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(psp)
+		_, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(psp)
 		if !apierrs.IsAlreadyExists(err) {
 			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}

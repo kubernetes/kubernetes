@@ -177,7 +177,7 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 func (cm *containerManagerImpl) getNodeAllocatableAbsoluteImpl(capacity v1.ResourceList) v1.ResourceList {
 	result := make(v1.ResourceList)
 	for k, v := range capacity {
-		value := *(v.Copy())
+		value := v.DeepCopy()
 		if cm.NodeConfig.SystemReserved != nil {
 			value.Sub(cm.NodeConfig.SystemReserved[k])
 		}
@@ -237,7 +237,7 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("Invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
+		return fmt.Errorf("invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
 	}
 	return nil
 }

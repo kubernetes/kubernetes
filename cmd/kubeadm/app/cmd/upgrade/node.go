@@ -38,14 +38,12 @@ import (
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
 // supported by this api will be exposed as a flag.
 type nodeOptions struct {
-	kubeConfigPath   string
-	kubeletVersion   string
-	advertiseAddress string
-	nodeName         string
-	etcdUpgrade      bool
-	renewCerts       bool
-	dryRun           bool
-	kustomizeDir     string
+	kubeConfigPath string
+	kubeletVersion string
+	etcdUpgrade    bool
+	renewCerts     bool
+	dryRun         bool
+	kustomizeDir   string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.

@@ -34,6 +34,7 @@ import (
 
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -73,6 +74,7 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 
 	pluginExec := path.Join(testBinDir, binName)
 	f, err = os.Create(pluginExec)
+	require.NoError(t, err)
 
 	const execScriptTempl = `#!/usr/bin/env bash
 cat > {{.InputFile}}
@@ -329,6 +331,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("Expected nil: %v", err)
 	}
 	output, err = ioutil.ReadFile(outputFile)
+	require.NoError(t, err)
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))

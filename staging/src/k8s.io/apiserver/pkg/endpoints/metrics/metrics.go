@@ -222,10 +222,16 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, component, cont
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
 	scope := CleanScope(requestInfo)
+	// We don't use verb from <requestInfo>, as for the healthy path
+	// MonitorRequest is called from InstrumentRouteFunc which is registered
+	// in installer.go with predefined list of verbs (different than those
+	// translated to RequestInfo).
+	// However, we need to tweak it e.g. to differentiate GET from LIST.
+	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, verb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, contentType, code, responseSizeInBytes, elapsed)
 	} else {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", "", "", requestInfo.Path, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, verb, "", "", "", requestInfo.Path, scope, component, contentType, code, responseSizeInBytes, elapsed)
 	}
 }
 
@@ -237,7 +243,12 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	}
 	var g prometheus.Gauge
 	scope := CleanScope(requestInfo)
-	reportedVerb := cleanVerb(strings.ToUpper(requestInfo.Verb), req)
+	// We don't use verb from <requestInfo>, as for the healthy path
+	// MonitorRequest is called from InstrumentRouteFunc which is registered
+	// in installer.go with predefined list of verbs (different than those
+	// translated to RequestInfo).
+	// However, we need to tweak it e.g. to differentiate GET from LIST.
+	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
@@ -327,6 +338,18 @@ func CleanScope(requestInfo *request.RequestInfo) string {
 	}
 	// this is the empty scope
 	return ""
+}
+
+func canonicalVerb(verb string, scope string) string {
+	switch verb {
+	case "GET", "HEAD":
+		if scope != "resource" {
+			return "LIST"
+		}
+		return "GET"
+	default:
+		return verb
+	}
 }
 
 func cleanVerb(verb string, request *http.Request) string {

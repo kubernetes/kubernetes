@@ -46,7 +46,6 @@ go_test(
     deps = [
         "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/config:go_default_library",
-        "//pkg/kubelet/pluginmanager/cache:go_default_library",
         "//pkg/kubelet/pluginmanager/pluginwatcher:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

@@ -150,6 +150,7 @@ func (m *manager) Start() {
 	}
 
 	klog.Info("Starting to sync pod status with apiserver")
+	//lint:ignore SA1015 Ticker can link since this is only called once and doesn't handle termination.
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {

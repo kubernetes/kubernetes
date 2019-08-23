@@ -145,6 +145,106 @@ func TestApplyAlsoCreates(t *testing.T) {
 	}
 }
 
+// TestNoOpUpdateSameResourceVersion makes sure that PUT requests which change nothing
+// will not change the resource version (no write to etcd is done)
+func TestNoOpUpdateSameResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	podName := "no-op"
+	podResource := "pods"
+	podBytes := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "` + podName + `",
+			"labels": {
+				"a": "one",
+				"c": "two",
+				"b": "three"
+			}
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one"
+			},{
+				"name":  "test-container-c",
+				"image": "test-image-two"
+			},{
+				"name":  "test-container-b",
+				"image": "test-image-three"
+			}]
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Post().
+		Namespace("default").
+		Resource(podResource).
+		Body(podBytes).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1 * time.Second)
+
+	createdObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podResource).Name(podName).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve created object: %v", err)
+	}
+
+	createdAccessor, err := meta.Accessor(createdObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for created object: %v", err)
+	}
+
+	createdBytes, err := json.MarshalIndent(createdObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal created object: %v", err)
+	}
+
+	// Test that we can put the same object and don't change the RV
+	_, err = client.CoreV1().RESTClient().Put().
+		Namespace("default").
+		Resource(podResource).
+		Name(podName).
+		Body(createdBytes).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply no-op update: %v", err)
+	}
+
+	updatedObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podResource).Name(podName).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated object: %v", err)
+	}
+
+	updatedAccessor, err := meta.Accessor(updatedObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for updated object: %v", err)
+	}
+
+	updatedBytes, err := json.MarshalIndent(updatedObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal updated object: %v", err)
+	}
+
+	if createdAccessor.GetResourceVersion() != updatedAccessor.GetResourceVersion() {
+		t.Fatalf("Expected same resource version to be %v but got: %v\nold object:\n%v\nnew object:\n%v",
+			createdAccessor.GetResourceVersion(),
+			updatedAccessor.GetResourceVersion(),
+			string(createdBytes),
+			string(updatedBytes),
+		)
+	}
+}
+
 // TestCreateOnApplyFailsWithUID makes sure that PATCH requests with the apply content type
 // will not create the object if it doesn't already exist and it specifies a UID
 func TestCreateOnApplyFailsWithUID(t *testing.T) {

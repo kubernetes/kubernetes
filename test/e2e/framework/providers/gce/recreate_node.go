@@ -58,6 +58,7 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 		e2elog.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
 
 		ps, err = testutils.NewPodStore(f.ClientSet, systemNamespace, labels.Everything(), fields.Everything())
+		framework.ExpectNoError(err)
 		allPods := ps.List()
 		originalPods := e2epod.FilterNonRestartablePods(allPods)
 		originalPodNames = make([]string, len(originalPods))

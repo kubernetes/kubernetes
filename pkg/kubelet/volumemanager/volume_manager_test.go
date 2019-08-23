@@ -426,7 +426,6 @@ func delayClaimBecomesBound(
 		Phase: v1.ClaimBound,
 	}
 	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(volumeClaim)
-	return
 }
 
 func runVolumeManager(manager VolumeManager) chan struct{} {

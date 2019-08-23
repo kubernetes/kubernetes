@@ -465,7 +465,7 @@ type ProxyServer struct {
 	IpvsInterface          utilipvs.Interface
 	IpsetInterface         utilipset.Interface
 	execer                 exec.Interface
-	Proxier                proxy.ProxyProvider
+	Proxier                proxy.Provider
 	Broadcaster            record.EventBroadcaster
 	Recorder               record.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration

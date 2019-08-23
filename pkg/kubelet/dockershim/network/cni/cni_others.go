@@ -66,7 +66,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 	if netnsPath == "" {
-		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)
+		return nil, fmt.Errorf("cannot find the network namespace, skipping pod network status for container %q", id)
 	}
 
 	ips, err := network.GetPodIPs(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)

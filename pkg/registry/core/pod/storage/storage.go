@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -49,6 +50,7 @@ import (
 type PodStorage struct {
 	Pod                 *REST
 	Binding             *BindingREST
+	LegacyBinding       *LegacyBindingREST
 	Eviction            *EvictionREST
 	Status              *StatusREST
 	EphemeralContainers *EphemeralContainersREST
@@ -95,9 +97,11 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = pod.EphemeralContainersStrategy
 
+	bindingREST := &BindingREST{store: store}
 	return PodStorage{
 		Pod:                 &REST{store, proxyTransport},
 		Binding:             &BindingREST{store: store},
+		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
@@ -148,11 +152,18 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
-var _ = rest.Creater(&BindingREST{})
+var _ = rest.NamedCreater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
-func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
-	binding := obj.(*api.Binding)
+func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	binding, ok := obj.(*api.Binding)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %#v", obj))
+	}
+
+	if name != binding.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in Binding object")
+	}
 
 	// TODO: move me to a binding strategy
 	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
@@ -216,6 +227,32 @@ func (r *BindingREST) assignPod(ctx context.Context, podID string, machine strin
 		}
 	}
 	return
+}
+
+var _ = rest.Creater(&LegacyBindingREST{})
+
+// LegacyBindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
+type LegacyBindingREST struct {
+	bindingRest *BindingREST
+}
+
+// NamespaceScoped fulfill rest.Scoper
+func (r *LegacyBindingREST) NamespaceScoped() bool {
+	return r.bindingRest.NamespaceScoped()
+}
+
+// New creates a new binding resource
+func (r *LegacyBindingREST) New() runtime.Object {
+	return r.bindingRest.New()
+}
+
+// Create ensures a pod is bound to a specific host.
+func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %T", obj))
+	}
+	return r.bindingRest.Create(ctx, metadata.GetName(), obj, createValidation, options)
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.

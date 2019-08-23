@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/assert"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -40,7 +41,7 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusURL := "http://" + temporalServer + "/metrics"
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", prometheus.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{
 		Addr:    temporalServer,
 		Handler: mux,

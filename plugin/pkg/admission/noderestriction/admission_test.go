@@ -826,19 +826,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "allow create of my node pulling name from object",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "allow create of my node with taints",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "allow create of my node with labels",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{

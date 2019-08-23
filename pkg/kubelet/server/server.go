@@ -296,6 +296,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.restfulCont.Add(ws)
 
 	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, enableCAdvisorJSONEndpoints))
+	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
 	s.restfulCont.Handle(metricsPath, prometheus.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
@@ -661,9 +662,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 	}
 }
 
-type responder struct {
-	errorMessage string
-}
+type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	klog.Errorf("Error while proxying request: %v", err)
