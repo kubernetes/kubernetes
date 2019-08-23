@@ -23,9 +23,6 @@ import (
 	"strings"
 )
 
-// dockerEndpoint is the os specific endpoint for docker communication
-const dockerEndpoint = "unix:///var/run/docker.sock"
-
 // DefaultSysSpec is the default SysSpec for Linux
 var DefaultSysSpec = SysSpec{
 	OS: "Linux",

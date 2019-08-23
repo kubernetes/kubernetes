@@ -5,10 +5,6 @@ cmd/controller-manager/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kube-scheduler/app
-cmd/kubeadm/app/cmd/upgrade
-cmd/kubeadm/app/phases/certs/renewal
-cmd/kubeadm/app/preflight
-cmd/kubeadm/app/util/system
 cmd/linkcheck
 cmd/preferredimports
 hack/make-rules/helpers/go2make/testdata/dir-with-gofiles
