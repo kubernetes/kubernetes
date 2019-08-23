@@ -38,6 +38,8 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:go_default_library",

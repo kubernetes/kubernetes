@@ -32,6 +32,6 @@ var (
 // RegisterBuildInfo registers the build and version info in a metadata metric in prometheus
 func RegisterBuildInfo(r KubeRegistry) {
 	info := version.Get()
-	buildInfo.WithLabelValues(info.Major, info.Minor, info.GitVersion, info.GitCommit, info.GitTreeState, info.BuildDate, info.GoVersion, info.Compiler, info.Platform).Set(1)
 	r.MustRegister(buildInfo)
+	buildInfo.WithLabelValues(info.Major, info.Minor, info.GitVersion, info.GitCommit, info.GitTreeState, info.BuildDate, info.GoVersion, info.Compiler, info.Platform).Set(1)
 }
