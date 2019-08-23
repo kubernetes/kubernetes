@@ -170,7 +170,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 		}
 	}
 
-	if s.XEmbeddedResource && !s.XPreserveUnknownFields && s.Properties == nil {
+	if s.XEmbeddedResource && !s.XPreserveUnknownFields && len(s.Properties) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("properties"), "must not be empty if x-kubernetes-embedded-resource is true without x-kubernetes-preserve-unknown-fields"))
 	}
 

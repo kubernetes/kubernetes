@@ -1787,6 +1787,50 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 		},
 		{
+			name: "x-kubernetes-embedded-resource with pruning and empty properties",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"nil": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        nil,
+								},
+								"empty": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "properties[nil]", "properties"),
+				required("spec", "validation", "openAPIV3Schema", "properties[empty]", "properties"),
+			},
+		},
+		{
 			name: "x-kubernetes-embedded-resource inside resource meta",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
