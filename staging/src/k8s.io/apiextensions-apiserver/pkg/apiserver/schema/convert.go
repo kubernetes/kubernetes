@@ -114,7 +114,7 @@ func newGenerics(s *apiextensions.JSONSchemaProps) (*Generic, error) {
 			if err != nil {
 				return nil, err
 			}
-			g.AdditionalProperties = &StructuralOrBool{Structural: ss}
+			g.AdditionalProperties = &StructuralOrBool{Structural: ss, Bool: true}
 		} else {
 			g.AdditionalProperties = &StructuralOrBool{Bool: s.AdditionalProperties.Allows}
 		}
