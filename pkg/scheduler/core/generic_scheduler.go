@@ -195,9 +195,9 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 	}
 
 	// Run "prefilter" plugins.
-	prefilterStatus := g.framework.RunPrefilterPlugins(pluginContext, pod)
-	if !prefilterStatus.IsSuccess() {
-		return result, prefilterStatus.AsError()
+	preFilterStatus := g.framework.RunPreFilterPlugins(pluginContext, pod)
+	if !preFilterStatus.IsSuccess() {
+		return result, preFilterStatus.AsError()
 	}
 
 	numNodes := g.cache.NodeTree().NumNodes()
