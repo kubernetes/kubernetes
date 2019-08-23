@@ -25,7 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 
 	"reflect"
 	"strings"
@@ -661,6 +664,7 @@ func TestMakeAbsolutePath(t *testing.T) {
 }
 
 func TestGetPodVolumeNames(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	tests := []struct {
 		name            string
 		pod             *v1.Pod
@@ -821,6 +825,48 @@ func TestGetPodVolumeNames(t *testing.T) {
 			},
 			expectedMounts:  sets.NewString("vol1", "vol3"),
 			expectedDevices: sets.NewString("vol2", "vol4"),
+		},
+		{
+			name: "pod with ephemeral containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+							},
+						},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "debugger",
+								VolumeMounts: []v1.VolumeMount{
+									{
+										Name: "vol1",
+									},
+									{
+										Name: "vol2",
+									},
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString(),
 		},
 	}
 
