@@ -28,7 +28,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
+	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -109,13 +111,13 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	e2elog.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
-	e2eperf.PrintPerfData(e2eperf.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
+	printPerfData(e2eperf.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
 	verifyMemoryLimits(f.ClientSet, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	e2elog.Logf("%s", rm.FormatCPUSummary(cpuSummary))
 	// Log perf result
-	e2eperf.PrintPerfData(e2eperf.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
+	printPerfData(e2eperf.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	ginkgo.By("Deleting the RC")
@@ -279,3 +281,12 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 		}
 	})
 })
+
+// printPerfData prints the perfdata in json format with PerfResultTag prefix.
+// If an error occurs, nothing will be printed.
+func printPerfData(p *perftype.PerfData) {
+	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
+	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+		e2elog.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+	}
+}
