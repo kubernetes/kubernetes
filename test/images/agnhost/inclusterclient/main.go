@@ -48,7 +48,7 @@ This subcommand can also be used to validate token rotation.`,
 
 func init() {
 	CmdInClusterClient.Flags().IntVar(&pollInterval, "poll-interval", 30,
-		"poll interval of call to /healhtz in seconds")
+		"poll interval of call to /healthz in seconds")
 }
 
 func main(cmd *cobra.Command, args []string) {
