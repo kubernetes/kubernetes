@@ -71,9 +71,9 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
-		readyTime, err := getTransitionTimeForReadyCondition(p)
+		readyTime, err := GetTransitionTimeForReadyCondition(p)
 		framework.ExpectNoError(err)
-		startedTime, err := getContainerStartedTime(p, containerName)
+		startedTime, err := GetContainerStartedTime(p, containerName)
 		framework.ExpectNoError(err)
 
 		e2elog.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
@@ -262,19 +262,9 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(WaitTimeoutForEvent(
 			f.ClientSet, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
-
-	/*
-		Release : v1.15
-		Testname: Pod liveness probe, using local file, delayed by startup probe
-		Description: A Pod is created with liveness probe that uses ‘exec’ command to cat /temp/health file. Liveness probe MUST not fail until startup probe succeeds.
-
-		This test is located in test/e2e_node/startup_probe_test.go as it requires tempSetCurrentKubeletConfig
-		to enable the feature gate for startupProbe, once removed test should come here.
-	*/
-
 })
 
-func getContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
+func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
 	for _, status := range p.Status.ContainerStatuses {
 		if status.Name != containerName {
 			continue
@@ -287,7 +277,7 @@ func getContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error)
 	return time.Time{}, fmt.Errorf("cannot find container named %q", containerName)
 }
 
-func getTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
+func GetTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
 	for _, cond := range p.Status.Conditions {
 		if cond.Type == v1.PodReady {
 			return cond.LastTransitionTime.Time, nil
