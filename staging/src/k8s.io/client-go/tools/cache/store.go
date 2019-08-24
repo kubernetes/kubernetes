@@ -125,8 +125,7 @@ func (c *cache) Add(obj interface{}) error {
 	if err != nil {
 		return KeyError{obj, err}
 	}
-	c.cacheStorage.Add(key, obj)
-	return nil
+	return c.cacheStorage.Add(key, obj)
 }
 
 // Update sets an item in the cache to its updated state.
@@ -135,8 +134,7 @@ func (c *cache) Update(obj interface{}) error {
 	if err != nil {
 		return KeyError{obj, err}
 	}
-	c.cacheStorage.Update(key, obj)
-	return nil
+	return c.cacheStorage.Update(key, obj)
 }
 
 // Delete removes an item from the cache.
@@ -145,8 +143,7 @@ func (c *cache) Delete(obj interface{}) error {
 	if err != nil {
 		return KeyError{obj, err}
 	}
-	c.cacheStorage.Delete(key)
-	return nil
+	return c.cacheStorage.Delete(key)
 }
 
 // List returns a list of all the items.
@@ -218,8 +215,7 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 		}
 		items[key] = item
 	}
-	c.cacheStorage.Replace(items, resourceVersion)
-	return nil
+	return c.cacheStorage.Replace(items, resourceVersion)
 }
 
 // Resync touches all items in the store to force processing

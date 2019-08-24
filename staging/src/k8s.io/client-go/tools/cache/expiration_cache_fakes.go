@@ -26,11 +26,13 @@ type fakeThreadSafeMap struct {
 	deletedKeys chan<- string
 }
 
-func (c *fakeThreadSafeMap) Delete(key string) {
+func (c *fakeThreadSafeMap) Delete(key string) error {
 	if c.deletedKeys != nil {
-		c.ThreadSafeStore.Delete(key)
+		err := c.ThreadSafeStore.Delete(key)
 		c.deletedKeys <- key
+		return err
 	}
+	return nil
 }
 
 // FakeExpirationPolicy keeps the list for keys which never expires.

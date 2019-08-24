@@ -153,8 +153,7 @@ func (c *ExpirationCache) Add(obj interface{}) error {
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
 
-	c.cacheStorage.Add(key, &TimestampedEntry{obj, c.clock.Now(), key})
-	return nil
+	return c.cacheStorage.Add(key, &TimestampedEntry{obj, c.clock.Now(), key})
 }
 
 // Update has not been implemented yet for lack of a use case, so this method
@@ -171,8 +170,7 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 	}
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
-	c.cacheStorage.Delete(key)
-	return nil
+	return c.cacheStorage.Delete(key)
 }
 
 // Replace will convert all items in the given list to TimestampedEntries
@@ -190,8 +188,7 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 	}
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
-	c.cacheStorage.Replace(items, resourceVersion)
-	return nil
+	return c.cacheStorage.Replace(items, resourceVersion)
 }
 
 // Resync will touch all objects to put them into the processing queue
