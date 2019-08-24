@@ -64,6 +64,7 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
@@ -110,6 +111,7 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 			svc := fakeLoadbalancerService(string(LBTypeInternal))
 			lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+			require.NoError(t, err)
 			igName := makeInstanceGroupName(vals.ClusterID)
 			igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 			require.NoError(t, err)
@@ -180,6 +182,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
@@ -499,6 +502,7 @@ func TestClearPreviousInternalResources(t *testing.T) {
 	err = gce.ensureInternalBackendService(svc.ObjectMeta.Name, "", svc.Spec.SessionAffinity, cloud.SchemeInternal, v1.ProtocolTCP, []string{}, "")
 	require.NoError(t, err)
 	backendSvc, err := gce.GetRegionBackendService(svc.ObjectMeta.Name, gce.region)
+	require.NoError(t, err)
 	backendSvc.HealthChecks = []string{hc1.SelfLink, hc2.SelfLink}
 
 	c.MockRegionBackendServices.DeleteHook = mock.DeleteRegionBackendServicesErrHook
@@ -747,6 +751,7 @@ func TestEnsureInternalLoadBalancerErrors(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
 			nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 			require.NoError(t, err)
 			params = newEnsureILBParams(nodes)

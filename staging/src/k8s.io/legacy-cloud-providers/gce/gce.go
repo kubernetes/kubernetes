@@ -863,7 +863,7 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
-			oauth2.NoContext,
+			context.Background(),
 			compute.CloudPlatformScope,
 			compute.ComputeScope)
 		klog.Infof("Using DefaultTokenSource %#v", tokenSource)
@@ -890,22 +890,13 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 		return nil, err
 	}
 
-	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
+	return oauth2.NewClient(context.Background(), tokenSource), nil
 }
 
 func (manager *gceServiceManager) getProjectsAPIEndpoint() string {
 	projectsAPIEndpoint := gceComputeAPIEndpoint + "projects/"
 	if manager.gce.service != nil {
 		projectsAPIEndpoint = manager.gce.service.BasePath
-	}
-
-	return projectsAPIEndpoint
-}
-
-func (manager *gceServiceManager) getProjectsAPIEndpointBeta() string {
-	projectsAPIEndpoint := gceComputeAPIEndpointBeta + "projects/"
-	if manager.gce.service != nil {
-		projectsAPIEndpoint = manager.gce.serviceBeta.BasePath
 	}
 
 	return projectsAPIEndpoint
