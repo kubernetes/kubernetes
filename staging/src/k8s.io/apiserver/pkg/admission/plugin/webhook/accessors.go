@@ -18,7 +18,6 @@ package webhook
 
 import (
 	"sync"
-	"fmt"
 
 	"k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,7 +103,7 @@ func (m *mutatingWebhookAccessor) GetConfigurationName() string {
 
 func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
 	m.initClient.Do(func() {
-		m.client, m.clientErr = nil, fmt.Errorf("unimplemented")
+		m.client, m.clientErr = clientManager.HookClient(hookClientConfigForWebhook(m))
 	})
 	return m.client, m.clientErr
 }
@@ -204,7 +203,7 @@ func (v *validatingWebhookAccessor) GetConfigurationName() string {
 
 func (v *validatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
 	v.initClient.Do(func() {
-		v.client, v.clientErr = nil, fmt.Errorf("unimplemented")
+		v.client, v.clientErr = clientManager.HookClient(hookClientConfigForWebhook(v))
 	})
 	return v.client, v.clientErr
 }
@@ -269,4 +268,30 @@ func (v *validatingWebhookAccessor) GetMutatingWebhook() (*v1beta1.MutatingWebho
 
 func (v *validatingWebhookAccessor) GetValidatingWebhook() (*v1beta1.ValidatingWebhook, bool) {
 	return v.ValidatingWebhook, true
+}
+
+// hookClientConfigForWebhook construct a webhookutil.ClientConfig using a WebhookAccessor to access
+// v1beta1.MutatingWebhook and v1beta1.ValidatingWebhook API objects.  webhookutil.ClientConfig is used
+// to create a HookClient and the purpose of the config struct is to share that with other packages
+// that need to create a HookClient.
+func hookClientConfigForWebhook(w WebhookAccessor) webhookutil.ClientConfig {
+	ret := webhookutil.ClientConfig{Name: w.GetName(), CABundle: w.GetClientConfig().CABundle}
+	if w.GetClientConfig().URL != nil {
+		ret.URL = *w.GetClientConfig().URL
+	}
+	if w.GetClientConfig().Service != nil {
+		ret.Service = &webhookutil.ClientConfigService{
+			Name:      w.GetClientConfig().Service.Name,
+			Namespace: w.GetClientConfig().Service.Namespace,
+		}
+		if w.GetClientConfig().Service.Port != nil {
+			ret.Service.Port = *w.GetClientConfig().Service.Port
+		} else {
+			ret.Service.Port = 443
+		}
+		if w.GetClientConfig().Service.Path != nil {
+			ret.Service.Path = *w.GetClientConfig().Service.Path
+		}
+	}
+	return ret
 }
