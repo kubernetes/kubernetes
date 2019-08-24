@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -387,24 +389,19 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 		}
 	}
 
-	for _, container := range pod.Spec.InitContainers {
-		for _, env := range container.Env {
+	var retErr error
+	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, p *field.Path) bool {
+		for _, env := range c.Env {
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+					retErr = fmt.Errorf("%s: container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", p, c.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
 				}
 			}
 		}
-	}
-
-	for _, container := range pod.Spec.Containers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
-		}
+		return true
+	})
+	if retErr != nil {
+		return retErr
 	}
 
 	// limit pull secret references as well
@@ -473,9 +470,9 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 
 	// Ensure every container mounts the APISecret volume
 	needsTokenVolume := false
-	for i, container := range pod.Spec.InitContainers {
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
 		existingContainerMount := false
-		for _, volumeMount := range container.VolumeMounts {
+		for _, volumeMount := range c.VolumeMounts {
 			// Existing mounts at the default mount path prevent mounting of the API token
 			if volumeMount.MountPath == DefaultAPITokenMountPath {
 				existingContainerMount = true
@@ -483,24 +480,11 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 			}
 		}
 		if !existingContainerMount {
-			pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
+			c.VolumeMounts = append(c.VolumeMounts, volumeMount)
 			needsTokenVolume = true
 		}
-	}
-	for i, container := range pod.Spec.Containers {
-		existingContainerMount := false
-		for _, volumeMount := range container.VolumeMounts {
-			// Existing mounts at the default mount path prevent mounting of the API token
-			if volumeMount.MountPath == DefaultAPITokenMountPath {
-				existingContainerMount = true
-				break
-			}
-		}
-		if !existingContainerMount {
-			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, volumeMount)
-			needsTokenVolume = true
-		}
-	}
+		return true
+	})
 
 	// Add the volume if a container needs it
 	if !hasTokenVolume && needsTokenVolume {

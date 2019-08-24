@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install the clientgo image policy API for use with api registry
@@ -144,14 +145,12 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 
 	// Build list of ImageReviewContainerSpec
 	var imageReviewContainerSpecs []v1alpha1.ImageReviewContainerSpec
-	containers := make([]api.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
-	containers = append(containers, pod.Spec.Containers...)
-	containers = append(containers, pod.Spec.InitContainers...)
-	for _, c := range containers {
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
 		imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
 			Image: c.Image,
 		})
-	}
+		return true
+	})
 	imageReview := v1alpha1.ImageReview{
 		Spec: v1alpha1.ImageReviewSpec{
 			Containers:  imageReviewContainerSpecs,

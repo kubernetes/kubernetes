@@ -30,14 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	settingsv1alpha1listers "k8s.io/client-go/listers/settings/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/pods"
 	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -186,7 +185,7 @@ func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.Pod
 	if _, err := mergeVolumes(pod.Spec.Volumes, podPresets); err != nil {
 		errs = append(errs, err)
 	}
-	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, _ *field.Path) bool {
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
 		if err := safeToApplyPodPresetsOnContainer(c, podPresets); err != nil {
 			errs = append(errs, err)
 		}
@@ -421,14 +420,10 @@ func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.PodPreset
 	volumes, _ := mergeVolumes(pod.Spec.Volumes, podPresets)
 	pod.Spec.Volumes = volumes
 
-	for i, ctr := range pod.Spec.Containers {
-		applyPodPresetsOnContainer(&ctr, podPresets)
-		pod.Spec.Containers[i] = ctr
-	}
-	for i, iCtr := range pod.Spec.InitContainers {
-		applyPodPresetsOnContainer(&iCtr, podPresets)
-		pod.Spec.InitContainers[i] = iCtr
-	}
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+		applyPodPresetsOnContainer(c, podPresets)
+		return true
+	})
 
 	// add annotation
 	if pod.ObjectMeta.Annotations == nil {

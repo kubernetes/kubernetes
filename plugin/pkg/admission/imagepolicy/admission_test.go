@@ -33,8 +33,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 
 	"fmt"
 	"io/ioutil"
@@ -591,6 +594,8 @@ func TestWebhookCache(t *testing.T) {
 }
 
 func TestContainerCombinations(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	tests := []struct {
 		test                 string
 		pod                  *api.Pod
@@ -709,6 +714,30 @@ func TestContainerCombinations(t *testing.T) {
 						{
 							Image:           "good",
 							SecurityContext: &api.SecurityContext{},
+						},
+					},
+				},
+			},
+			wantAllowed: false,
+			wantErr:     true,
+		},
+		{
+			test: "Good container, bad ephemeral container",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Image: "bad",
+							},
 						},
 					},
 				},

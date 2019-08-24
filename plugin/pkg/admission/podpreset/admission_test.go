@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	corev1 "k8s.io/api/core/v1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
@@ -31,11 +32,14 @@ import (
 	kadmission "k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	settingsv1alpha1listers "k8s.io/client-go/listers/settings/v1alpha1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestMergeEnv(t *testing.T) {
@@ -552,7 +556,7 @@ func TestAdmitConflictShouldNotModifyPod(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
-	containerName := "container"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -565,8 +569,20 @@ func TestAdmit(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name: containerName,
+					Name: "container1",
 					Env:  []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABCD", Value: "value3"}},
+				},
+			},
+			InitContainers: []api.Container{
+				{
+					Name: "init1",
+				},
+			},
+			EphemeralContainers: []api.EphemeralContainer{
+				{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "ephemeral1",
+					},
 				},
 			},
 		},
@@ -605,9 +621,104 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 
-	err := admitPod(t, pod, pip)
-	if err != nil {
+	wantPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mypod",
+			Namespace: "namespace",
+			Labels: map[string]string{
+				"security": "S2",
+			},
+			Annotations: map[string]string{
+				"podpreset.admission.kubernetes.io/podpreset-hello": "",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "container1",
+					Env: []api.EnvVar{
+						{Name: "abc", Value: "value2"},
+						{Name: "ABCD", Value: "value3"},
+						{Name: "abcd", Value: "value"},
+						{Name: "ABC", Value: "value"},
+					},
+					EnvFrom: []api.EnvFromSource{
+						{
+							ConfigMapRef: &api.ConfigMapEnvSource{
+								LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+							},
+						},
+						{
+							Prefix: "pre_",
+							ConfigMapRef: &api.ConfigMapEnvSource{
+								LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+							},
+						},
+					},
+					VolumeMounts: []api.VolumeMount{},
+				},
+			},
+			InitContainers: []api.Container{
+				{
+					Name: "init1",
+					Env: []api.EnvVar{
+						{Name: "abcd", Value: "value"},
+						{Name: "ABC", Value: "value"},
+					},
+					EnvFrom: []api.EnvFromSource{
+						{
+							ConfigMapRef: &api.ConfigMapEnvSource{
+								LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+							},
+						},
+						{
+							Prefix: "pre_",
+							ConfigMapRef: &api.ConfigMapEnvSource{
+								LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+							},
+						},
+					},
+					VolumeMounts: []api.VolumeMount{},
+				},
+			},
+			EphemeralContainers: []api.EphemeralContainer{
+				{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "ephemeral1",
+						Env: []api.EnvVar{
+							{Name: "abcd", Value: "value"},
+							{Name: "ABC", Value: "value"},
+						},
+						EnvFrom: []api.EnvFromSource{
+							{
+								ConfigMapRef: &api.ConfigMapEnvSource{
+									LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+								},
+							},
+							{
+								Prefix: "pre_",
+								ConfigMapRef: &api.ConfigMapEnvSource{
+									LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+								},
+							},
+						},
+						VolumeMounts: []api.VolumeMount{},
+					},
+				},
+			},
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			},
+		},
+	}
+
+	if err := admitPod(t, pod, pip); err != nil {
 		t.Fatal(err)
+	}
+
+	// verify PodSpec mutations
+	if diff := cmp.Diff(wantPod, pod); diff != "" {
+		t.Fatalf("Admit returned unexpected mutation: (-want +got)\n%v", diff)
 	}
 }
 

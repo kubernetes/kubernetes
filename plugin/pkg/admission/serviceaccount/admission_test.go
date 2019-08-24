@@ -29,11 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -382,6 +384,35 @@ func TestAutomountsAPIToken(t *testing.T) {
 		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
 			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
 		}
+
+		// testing EphemeralContainers
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.EphemeralContainers, true)()
+		pod = &api.Pod{
+			Spec: api.PodSpec{
+				EphemeralContainers: []api.EphemeralContainer{
+					{},
+				},
+			},
+		}
+		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+			t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+		}
+		if len(pod.Spec.Volumes) != 1 {
+			t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+		}
+		if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+		}
+		if len(pod.Spec.EphemeralContainers[0].VolumeMounts) != 1 {
+			t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.EphemeralContainers[0].VolumeMounts))
+		}
+		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.EphemeralContainers[0].VolumeMounts[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.EphemeralContainers[0].VolumeMounts[0])
+		}
 	})
 }
 
@@ -550,6 +581,7 @@ func TestAllowsReferencedSecret(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.EphemeralContainers, true)()
 	pod2 = &api.Pod{
 		Spec: api.PodSpec{
 			InitContainers: []api.Container{
@@ -561,6 +593,32 @@ func TestAllowsReferencedSecret(t *testing.T) {
 							ValueFrom: &api.EnvVarSource{
 								SecretKeyRef: &api.SecretKeySelector{
 									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			EphemeralContainers: []api.EphemeralContainer{
+				{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "ephemeralcontainer-1",
+						Env: []api.EnvVar{
+							{
+								Name: "env-1",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+									},
 								},
 							},
 						},
@@ -639,6 +697,33 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 							ValueFrom: &api.EnvVarSource{
 								SecretKeyRef: &api.SecretKeySelector{
 									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.EphemeralContainers, true)()
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			EphemeralContainers: []api.EphemeralContainer{
+				{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "ephemeralcontainer-1",
+						Env: []api.EnvVar{
+							{
+								Name: "env-1",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+									},
 								},
 							},
 						},

@@ -16,6 +16,7 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:go_default_library",
@@ -41,11 +42,14 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
+        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
     ],
 )
 
