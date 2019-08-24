@@ -568,8 +568,6 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 }
 
 func TestCheckVolumeFSResize(t *testing.T) {
-	mode := v1.PersistentVolumeFilesystem
-
 	setCapacity := func(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, capacity int) {
 		pv.Spec.Capacity = volumeCapacity(capacity)
 		pvc.Spec.Resources.Requests = volumeCapacity(capacity)
@@ -580,6 +578,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 		verify       func(*testing.T, []v1.UniqueVolumeName, v1.UniqueVolumeName)
 		enableResize bool
 		readOnlyVol  bool
+		volumeMode   v1.PersistentVolumeMode
 	}{
 		{
 			// No resize request for volume, volumes in ASW shouldn't be marked as fsResizeRequired
@@ -591,6 +590,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 				}
 			},
 			enableResize: true,
+			volumeMode:   v1.PersistentVolumeFilesystem,
 		},
 		{
 			// Disable the feature gate, so volume shouldn't be marked as fsResizeRequired
@@ -603,6 +603,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 				}
 			},
 			enableResize: false,
+			volumeMode:   v1.PersistentVolumeFilesystem,
 		},
 		{
 			// Make volume used as ReadOnly, so volume shouldn't be marked as fsResizeRequired
@@ -616,6 +617,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 			},
 			readOnlyVol:  true,
 			enableResize: true,
+			volumeMode:   v1.PersistentVolumeFilesystem,
 		},
 		{
 			// Clear ASW, so volume shouldn't be marked as fsResizeRequired because they are not mounted
@@ -629,6 +631,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 				}
 			},
 			enableResize: true,
+			volumeMode:   v1.PersistentVolumeFilesystem,
 		},
 		{
 			// volume in ASW should be marked as fsResizeRequired
@@ -647,6 +650,26 @@ func TestCheckVolumeFSResize(t *testing.T) {
 				}
 			},
 			enableResize: true,
+			volumeMode:   v1.PersistentVolumeFilesystem,
+		},
+		{
+			// volume in ASW should be marked as fsResizeRequired
+			resize: func(_ *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, _ *desiredStateOfWorldPopulator) {
+				setCapacity(pv, pvc, 2)
+			},
+			verify: func(t *testing.T, vols []v1.UniqueVolumeName, volName v1.UniqueVolumeName) {
+				if len(vols) == 0 {
+					t.Fatalf("Request resize for volume, but volume in ASW hasn't been marked as fsResizeRequired")
+				}
+				if len(vols) != 1 {
+					t.Errorf("Some unexpected volumes are marked as fsResizeRequired: %v", vols)
+				}
+				if vols[0] != volName {
+					t.Fatalf("Mark wrong volume as fsResizeRequired: %s", vols[0])
+				}
+			},
+			enableResize: true,
+			volumeMode:   v1.PersistentVolumeBlock,
 		},
 	}
 
@@ -659,7 +682,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 				PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}},
 				Capacity:               volumeCapacity(1),
 				ClaimRef:               &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-				VolumeMode:             &mode,
+				VolumeMode:             &tc.volumeMode,
 			},
 		}
 		pvc := &v1.PersistentVolumeClaim{
@@ -677,10 +700,10 @@ func TestCheckVolumeFSResize(t *testing.T) {
 
 		dswp, fakePodManager, fakeDSW := createDswpWithVolume(t, pv, pvc)
 		fakeASW := dswp.actualStateOfWorld
+		containers := []v1.Container{}
 
-		// create pod
-		containers := []v1.Container{
-			{
+		if tc.volumeMode == v1.PersistentVolumeFilesystem {
+			containers = append(containers, v1.Container{
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      pv.Name,
@@ -688,9 +711,20 @@ func TestCheckVolumeFSResize(t *testing.T) {
 						ReadOnly:  tc.readOnlyVol,
 					},
 				},
-			},
+			})
+		} else {
+			containers = append(containers, v1.Container{
+				VolumeDevices: []v1.VolumeDevice{
+					{
+						Name:       pv.Name,
+						DevicePath: "/mnt/foobar",
+					},
+				},
+			})
 		}
+
 		pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+		pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = tc.readOnlyVol
 		uniquePodName := types.UniquePodName(pod.UID)
 		uniqueVolumeName := v1.UniqueVolumeName("fake-plugin/" + pod.Spec.Volumes[0].Name)
 
