@@ -492,7 +492,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			expected: &spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					AdditionalProperties: &spec.SchemaOrBool{
-						Allows: false,
+						Allows: true,
 						Schema: spec.BooleanProperty(),
 					},
 				},

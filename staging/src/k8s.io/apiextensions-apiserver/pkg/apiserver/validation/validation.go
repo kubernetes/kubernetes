@@ -58,10 +58,14 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 		switch err := err.(type) {
 
 		case *openapierrors.Validation:
-			switch err.Code() {
+			errPath := fldPath
+			if len(err.Name) > 0 && err.Name != "." {
+				errPath = errPath.Child(strings.TrimPrefix(err.Name, "."))
+			}
 
+			switch err.Code() {
 			case openapierrors.RequiredFailCode:
-				allErrs = append(allErrs, field.Required(fldPath.Child(strings.TrimPrefix(err.Name, ".")), ""))
+				allErrs = append(allErrs, field.Required(errPath, ""))
 
 			case openapierrors.EnumFailCode:
 				values := []string{}
@@ -73,14 +77,14 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 						values = append(values, string(allowedJSON))
 					}
 				}
-				allErrs = append(allErrs, field.NotSupported(fldPath.Child(strings.TrimPrefix(err.Name, ".")), err.Value, values))
+				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
 
 			default:
 				value := interface{}("")
 				if err.Value != nil {
 					value = err.Value
 				}
-				allErrs = append(allErrs, field.Invalid(fldPath.Child(strings.TrimPrefix(err.Name, ".")), value, err.Error()))
+				allErrs = append(allErrs, field.Invalid(errPath, value, err.Error()))
 			}
 
 		default:
