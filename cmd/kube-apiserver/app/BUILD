@@ -5,6 +5,10 @@ go_library(
     srcs = [
         "aggregator.go",
         "apiextensions.go",
+        "auth.go",
+        "dialer.go",
+        "generic.go",
+        "kubeapiserver.go",
         "server.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app",

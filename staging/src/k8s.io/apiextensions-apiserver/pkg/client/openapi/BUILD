@@ -5,7 +5,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 gen_openapi(
     outs = ["zz_generated.openapi.go"],
-    output_pkg = "k8s.io/apiextensions-apiserver/pkg/generated/openapi",
+    include_pkgs = [
+        "staging/src/k8s.io/api/autoscaling/v1",
+        "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1",
+        "staging/src/k8s.io/apimachinery/pkg/runtime",
+        "staging/src/k8s.io/apimachinery/pkg/version",
+        "staging/src/k8s.io/apiextensions-apiserver",
+    ],
+    output_pkg = "k8s.io/apiextensions-apiserver/pkg/client/openapi",
 )
 
 go_library(
@@ -14,8 +21,8 @@ go_library(
         "doc.go",
         "zz_generated.openapi.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/generated/openapi",
-    importpath = "k8s.io/apiextensions-apiserver/pkg/generated/openapi",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/openapi",
+    importpath = "k8s.io/apiextensions-apiserver/pkg/client/openapi",
     deps = openapi_deps(),  # keep
 )
 

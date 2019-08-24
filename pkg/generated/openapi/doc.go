@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// openapi contains generated OpenAPI definitions.
+// openapi generated definitions.
 package openapi
