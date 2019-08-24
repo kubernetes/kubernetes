@@ -129,6 +129,9 @@ func TestJSONPatchForUnstructured(t *testing.T) {
 		t.Fatal(err)
 	}
 	patchedJS, err := patchObj.Apply(crJS)
+	if err != nil {
+		t.Fatal(err)
+	}
 	patchedObj := unstructured.Unstructured{}
 	err = json.Unmarshal(patchedJS, &patchedObj)
 	if err != nil {

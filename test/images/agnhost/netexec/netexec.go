@@ -154,7 +154,7 @@ func exitHandler(w http.ResponseWriter, r *http.Request) {
 
 func hostnameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /hostname")
-	fmt.Fprintf(w, getHostName())
+	fmt.Fprint(w, getHostName())
 }
 
 // healthHandler response with a 200 if the UDP server is ready. It also serves
@@ -247,7 +247,7 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	bytes, err := json.Marshal(output)
 	if err == nil {
-		fmt.Fprintf(w, string(bytes))
+		fmt.Fprint(w, string(bytes))
 	} else {
 		http.Error(w, fmt.Sprintf("response could not be serialized. %v", err), http.StatusExpectationFailed)
 	}
@@ -314,7 +314,7 @@ func shellHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Output: %s", output)
 	bytes, err := json.Marshal(output)
 	if err == nil {
-		fmt.Fprintf(w, string(bytes))
+		fmt.Fprint(w, string(bytes))
 	} else {
 		http.Error(w, fmt.Sprintf("response could not be serialized. %v", err), http.StatusExpectationFailed)
 	}
@@ -328,7 +328,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		result["error"] = "Unable to upload file."
 		bytes, err := json.Marshal(result)
 		if err == nil {
-			fmt.Fprintf(w, string(bytes))
+			fmt.Fprint(w, string(bytes))
 		} else {
 			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
 		}
@@ -342,7 +342,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		result["error"] = "Unable to open file for write"
 		bytes, err := json.Marshal(result)
 		if err == nil {
-			fmt.Fprintf(w, string(bytes))
+			fmt.Fprint(w, string(bytes))
 		} else {
 			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
 		}
@@ -354,7 +354,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		result["error"] = "Unable to write file."
 		bytes, err := json.Marshal(result)
 		if err == nil {
-			fmt.Fprintf(w, string(bytes))
+			fmt.Fprint(w, string(bytes))
 		} else {
 			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
 		}
@@ -367,7 +367,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		result["error"] = "Unable to chmod file."
 		bytes, err := json.Marshal(result)
 		if err == nil {
-			fmt.Fprintf(w, string(bytes))
+			fmt.Fprint(w, string(bytes))
 		} else {
 			http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
 		}
@@ -378,12 +378,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	result["output"] = UploadFile
 	w.WriteHeader(http.StatusCreated)
 	bytes, err := json.Marshal(result)
-	fmt.Fprintf(w, string(bytes))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%s. Also unable to serialize output. %v", result["error"], err), http.StatusInternalServerError)
+		return
+	}
+	fmt.Fprint(w, string(bytes))
 }
 
 func hostNameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /hostName")
-	fmt.Fprintf(w, getHostName())
+	fmt.Fprint(w, getHostName())
 }
 
 // udp server supports the hostName, echo and clientIP commands.
