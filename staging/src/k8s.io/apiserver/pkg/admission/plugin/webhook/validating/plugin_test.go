@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
 
 // TestValidate tests that ValidatingWebhook#Validate works as expected
@@ -87,9 +88,9 @@ func TestValidate(t *testing.T) {
 			continue
 		}
 		if len(tt.ExpectAnnotations) == 0 {
-			assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+			assert.Empty(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 		} else {
-			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 		}
 	}
 }
