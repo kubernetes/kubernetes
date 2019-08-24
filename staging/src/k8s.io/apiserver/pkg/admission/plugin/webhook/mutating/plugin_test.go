@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -32,6 +33,75 @@ import (
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
+
+// BenchmarkAdmit tests the performance cost of invoking a mutating webhook
+func BenchmarkAdmit(b *testing.B) {
+	testServerURL := os.Getenv("WEBHOOK_TEST_SERVER_URL")
+	if len(testServerURL) == 0 {
+		b.Log("warning, WEBHOOK_TEST_SERVER_URL not set, starting in-process server, benchmarks will include webhook cost.")
+		b.Log("to run a standalone server, run:")
+		b.Log("go run ./vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/testing/main/main.go")
+		testServer := webhooktesting.NewTestServer(b)
+		testServer.StartTLS()
+		defer testServer.Close()
+		testServerURL = testServer.URL
+	}
+
+	serverURL, err := url.ParseRequestURI(testServerURL)
+	if err != nil {
+		b.Fatalf("this should never happen? %v", err)
+	}
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL, "test-webhooks"),
+		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL), "test-webhooks")...)
+
+	for _, tt := range testCases {
+		// For now, skip failure cases or tests that explicitly skip benchmarking
+		if !tt.ExpectAllow || tt.SkipBenchmark {
+			continue
+		}
+		b.Run(tt.Name, func(b *testing.B) {
+			wh, err := NewMutatingWebhook(nil)
+			if err != nil {
+				b.Errorf("failed to create mutating webhook: %v", err)
+				return
+			}
+
+			ns := "webhook-test"
+			client, informer := webhooktesting.NewFakeMutatingDataSource(ns, tt.Webhooks, stopCh)
+
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
+			wh.SetExternalKubeClientSet(client)
+			wh.SetExternalKubeInformerFactory(informer)
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
+
+			if err = wh.ValidateInitialization(); err != nil {
+				b.Errorf("failed to validate initialization: %v", err)
+				return
+			}
+
+			var attr admission.Attributes
+			if tt.IsCRD {
+				attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
+			} else {
+				attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				wh.Admit(context.TODO(), attr, objectInterfaces)
+			}
+		})
+	}
+}
 
 // TestAdmit tests that MutatingWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
