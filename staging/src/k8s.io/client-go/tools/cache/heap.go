@@ -164,16 +164,21 @@ func (h *Heap) Add(obj interface{}) error {
 // variable. It is useful when the caller would like to add all of the items
 // to the queue before consumer starts processing them.
 func (h *Heap) BulkAdd(list []interface{}) error {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	if h.closed {
-		return fmt.Errorf(closedMsg)
-	}
+	keys := make([]string, 0, len(list))
 	for _, obj := range list {
 		key, err := h.data.keyFunc(obj)
 		if err != nil {
 			return KeyError{obj, err}
 		}
+		keys = append(keys, key)
+	}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if h.closed {
+		return fmt.Errorf(closedMsg)
+	}
+	for i, obj := range list {
+		key := keys[i]
 		if _, exists := h.data.items[key]; exists {
 			h.data.items[key].obj = obj
 			heap.Fix(h.data, h.data.items[key].index)
