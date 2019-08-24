@@ -102,7 +102,9 @@ Provide links to any additional relevant documentation in the docs block below O
 
 The Kubernetes Release Notes website (https://relnotes.k8s.io) provides additional documentation to the end users about the changes in this PR.
 
-If you decide to add links which point to resources within git repositories, please ensure that the appropriate revision is included in the link and not generic ones like `master`. The same applies to external documentation, which may be not available any more because it got updated to a more recent version.
+If you decide to add links which point to resources within git repositories, please ensure that the appropriate revision is included in the link and not generic ones like `master`. This ensures that links reference a specific point in time, rather than a document that may change over time. The same applies to external documentation, which may be not available any more because it got updated to a more recent version.
+
+See here for guidance on getting permanent links to files: https://help.github.com/en/articles/getting-permanent-links-to-files
 
 Use one or more of the following templates in the docs block for linking to documentation:
 - [KEP]: <url>
