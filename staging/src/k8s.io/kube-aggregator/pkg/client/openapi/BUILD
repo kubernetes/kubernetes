@@ -1,16 +1,17 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//build:code_generation.bzl", "gen_openapi", "openapi_deps")
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 gen_openapi(
     outs = ["zz_generated.openapi.go"],
-    exclude_pkgs = [
-        "staging/src/k8s.io/code-generator",
+    include_pkgs = [
+        "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1",
+        "staging/src/k8s.io/apimachinery/pkg/runtime",
+        "staging/src/k8s.io/apimachinery/pkg/version",
         "staging/src/k8s.io/kube-aggregator",
-        "staging/src/k8s.io/sample-apiserver",
     ],
-    output_pkg = "k8s.io/kubernetes/pkg/generated/openapi",
+    output_pkg = "k8s.io/kube-aggregator/pkg/client/openapi",
 )
 
 go_library(
@@ -19,7 +20,8 @@ go_library(
         "doc.go",
         "zz_generated.openapi.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/generated/openapi",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/openapi",
+    importpath = "k8s.io/kube-aggregator/pkg/client/openapi",
     deps = openapi_deps(),  # keep
 )
 
@@ -34,14 +36,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["openapi_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/github.com/go-openapi/spec:go_default_library",
-    ],
+    visibility = ["//visibility:public"],
 )

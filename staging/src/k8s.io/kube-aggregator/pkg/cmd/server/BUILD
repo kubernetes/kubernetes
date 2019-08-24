@@ -19,6 +19,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver/scheme:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/openapi:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],

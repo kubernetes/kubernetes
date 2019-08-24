@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
+	aggregatoropenapi "k8s.io/kube-aggregator/pkg/client/openapi"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
@@ -146,6 +148,10 @@ func (cfg *Config) Complete() CompletedConfig {
 	c.GenericConfig.EnableDiscovery = false
 	version := version.Get()
 	c.GenericConfig.Version = &version
+
+	c.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(aggregatoropenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(aggregatorscheme.Scheme))
+	c.GenericConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
+	c.GenericConfig.OpenAPIConfig.Info.Version = "1.0"
 
 	return CompletedConfig{&c}
 }
