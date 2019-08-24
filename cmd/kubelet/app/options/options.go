@@ -248,9 +248,9 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	}
 
 	for k, v := range f.NodeExtendedResources {
-		// This is possibly a little more restrictive then necessary, but all pure integers are valid Quantities
+		// This is possibly a little more restrictive than necessary, but all pure integers are valid Quantities
 		if i, err := strconv.ParseInt(v, 10, 64); err != nil || i < 0 {
-			return fmt.Errorf("node extended resources must be whole 64-bit signed (but non-negative) integers. Instead we saw %s=%s", k, v)
+			return fmt.Errorf("node extended resources must be 64bit signed (but non-negative) integers; saw %s=%s", k, v)
 		}
 	}
 
