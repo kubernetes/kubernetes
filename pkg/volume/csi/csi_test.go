@@ -305,7 +305,8 @@ func TestCSI_VolumeAll(t *testing.T) {
 				go func(spec *volume.Spec, nodeName types.NodeName) {
 					attachID, err := volAttacher.Attach(spec, nodeName)
 					if err != nil {
-						t.Fatalf("csiTest.VolumeAll attacher.Attach failed: %s", err)
+						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
+						return
 					}
 					t.Logf("csiTest.VolumeAll got attachID %s", attachID)
 

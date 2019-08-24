@@ -879,14 +879,10 @@ var _ volume.BlockVolumeMapper = &rbdDiskMapper{}
 
 type rbdDiskMapper struct {
 	*rbd
-	mon           []string
-	id            string
-	keyring       string
-	secret        string
-	adminSecret   string
-	adminID       string
-	imageFormat   string
-	imageFeatures []string
+	mon     []string
+	id      string
+	keyring string
+	secret  string
 }
 
 var _ volume.BlockVolumeUnmapper = &rbdDiskUnmapper{}

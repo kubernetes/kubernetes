@@ -623,7 +623,7 @@ func TestPluginNewMounter(t *testing.T) {
 			}
 			csiClient, err := csiMounter.csiClientGetter.Get()
 			if csiClient == nil {
-				t.Error("mounter csiClient is nil")
+				t.Errorf("mounter csiClient is nil: %v", err)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -765,7 +765,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				}
 				csiClient, err := csiMounter.csiClientGetter.Get()
 				if csiClient == nil {
-					t.Error("mounter csiClient is nil")
+					t.Errorf("mounter csiClient is nil: %v", err)
 				}
 				if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 					t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
@@ -860,7 +860,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 
 	csiClient, err := csiUnmounter.csiClientGetter.Get()
 	if csiClient == nil {
-		t.Error("mounter csiClient is nil")
+		t.Errorf("mounter csiClient is nil: %v", err)
 	}
 }
 
@@ -1185,7 +1185,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	}
 	csiClient, err := csiMapper.csiClientGetter.Get()
 	if csiClient == nil {
-		t.Error("mapper csiClient is nil")
+		t.Errorf("mapper csiClient is nil: %v", err)
 	}
 
 	// ensure data file is created
@@ -1248,7 +1248,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 
 	csiClient, err := csiUnmapper.csiClientGetter.Get()
 	if csiClient == nil {
-		t.Error("unmapper csiClient is nil")
+		t.Errorf("unmapper csiClient is nil: %v", err)
 	}
 
 	// test loaded vol data

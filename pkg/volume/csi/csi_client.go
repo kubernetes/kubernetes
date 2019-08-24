@@ -23,7 +23,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"time"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -102,12 +101,6 @@ type nodeV1ClientCreator func(addr csiAddr) (
 	nodeClient csipbv1.NodeClient,
 	closer io.Closer,
 	err error,
-)
-
-const (
-	initialDuration = 1 * time.Second
-	factor          = 2.0
-	steps           = 5
 )
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC

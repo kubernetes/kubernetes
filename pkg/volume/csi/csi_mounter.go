@@ -73,7 +73,6 @@ type csiMountMgr struct {
 	spec                *volume.Spec
 	pod                 *api.Pod
 	podUID              types.UID
-	options             volume.VolumeOptions
 	publishContext      map[string]string
 	kubeVolHost         volume.KubeletVolumeHost
 	volume.MetricsProvider
