@@ -41,7 +41,13 @@ var (
 var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	ginkgo.Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
+	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
+
+		ginkgo.BeforeEach(func() {
+			// Windows does not support the FSGroup SecurityContext option.
+			framework.SkipIfNodeOSDistroIs("windows")
+		})
+
 		ginkgo.It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})

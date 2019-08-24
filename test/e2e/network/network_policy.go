@@ -42,11 +42,16 @@ connections from one of the clients. The test then asserts that the clients
 failed or successfully connected as expected.
 */
 
-var _ = SIGDescribe("NetworkPolicy", func() {
+var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
 	f := framework.NewDefaultFramework("network-policy")
+
+	ginkgo.BeforeEach(func() {
+		// Windows does not support network policies.
+		framework.SkipIfNodeOSDistroIs("windows")
+	})
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		ginkgo.BeforeEach(func() {

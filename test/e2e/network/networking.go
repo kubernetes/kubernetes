@@ -52,7 +52,9 @@ var _ = SIGDescribe("Networking", func() {
 			framework.CheckConnectivityToHost(f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental]", func() {
+	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]", func() {
+		// IPv6 is not supported on Windows.
+		framework.SkipIfNodeOSDistroIs("windows")
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
 			framework.CheckConnectivityToHost(f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))

@@ -265,7 +265,9 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 	})
 
-	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP", func() {
+	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func() {
+		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
+		framework.SkipIfNodeOSDistroIs("windows")
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
