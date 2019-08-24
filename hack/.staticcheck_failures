@@ -115,7 +115,6 @@ test/integration/etcd
 test/integration/examples
 test/integration/framework
 test/integration/garbagecollector
-test/integration/kubelet
 test/integration/master
 test/integration/replicationcontroller
 test/integration/scale
