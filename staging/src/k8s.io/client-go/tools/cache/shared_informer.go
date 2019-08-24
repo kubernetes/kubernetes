@@ -316,9 +316,6 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
-
 	if s.controller == nil {
 		return false
 	}
