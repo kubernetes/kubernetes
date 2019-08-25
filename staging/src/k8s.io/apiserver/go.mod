@@ -408,7 +408,7 @@ replace (
 	github.com/google/gofuzz => github.com/google/gofuzz v1.0.0
 	github.com/google/renameio => github.com/google/renameio v0.1.0
 	github.com/google/uuid => github.com/google/uuid v1.1.1
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
+	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.1.0
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 	github.com/gorilla/context => github.com/gorilla/context v1.1.1
