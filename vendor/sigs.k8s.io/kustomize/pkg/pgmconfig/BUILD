@@ -2,10 +2,20 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["gvk.go"],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/kustomize/pkg/gvk",
-    importpath = "sigs.k8s.io/kustomize/pkg/gvk",
+    srcs = [
+        "config.go",
+        "constants.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/kustomize/pkg/pgmconfig",
+    importpath = "sigs.k8s.io/kustomize/pkg/pgmconfig",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["config_test.go"],
+    embed = [":go_default_library"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -20,11 +30,4 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["gvk_test.go"],
-    embed = [":go_default_library"],
-    tags = ["manual"],
 )

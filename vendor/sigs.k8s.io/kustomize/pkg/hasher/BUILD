@@ -2,10 +2,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["gvk.go"],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/kustomize/pkg/gvk",
-    importpath = "sigs.k8s.io/kustomize/pkg/gvk",
+    srcs = ["hasher.go"],
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/kustomize/pkg/hasher",
+    importpath = "sigs.k8s.io/kustomize/pkg/hasher",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["hasher_test.go"],
+    embed = [":go_default_library"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -20,11 +27,4 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["gvk_test.go"],
-    embed = [":go_default_library"],
-    tags = ["manual"],
 )

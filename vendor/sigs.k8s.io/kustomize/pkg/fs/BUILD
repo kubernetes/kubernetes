@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -14,7 +14,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/kustomize/pkg/fs",
     importpath = "sigs.k8s.io/kustomize/pkg/fs",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/sigs.k8s.io/kustomize/pkg/constants:go_default_library"],
+    deps = ["//vendor/sigs.k8s.io/kustomize/pkg/pgmconfig:go_default_library"],
 )
 
 filegroup(
@@ -29,4 +29,15 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "confirmeddir_test.go",
+        "fakefs_test.go",
+        "realfs_test.go",
+    ],
+    embed = [":go_default_library"],
+    tags = ["manual"],
 )
