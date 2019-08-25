@@ -549,7 +549,7 @@ replace (
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/gcfg.v1 => gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/gemnasium/logrus-airbrake-hook.v2 => gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
-	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0
+	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.1
 	gopkg.in/mcuadros/go-syslog.v2 => gopkg.in/mcuadros/go-syslog.v2 v2.2.1
 	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
