@@ -185,7 +185,6 @@ filegroup(
         "//vendor/github.com/fatih/camelcase:all-srcs",
         "//vendor/github.com/fatih/color:all-srcs",
         "//vendor/github.com/fsnotify/fsnotify:all-srcs",
-        "//vendor/github.com/ghodss/yaml:all-srcs",
         "//vendor/github.com/globalsign/mgo/bson:all-srcs",
         "//vendor/github.com/globalsign/mgo/internal/json:all-srcs",
         "//vendor/github.com/go-bindata/go-bindata:all-srcs",
