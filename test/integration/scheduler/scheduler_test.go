@@ -41,6 +41,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -352,7 +353,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	context := initTest(t, "unschedulable-nodes")
 	defer cleanupTest(t, context)
 
-	nodeLister := context.schedulerConfigArgs.NodeInformer.Lister()
+	nodeLister := context.informerFactory.Core().V1().Nodes().Lister()
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
 	defer context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
@@ -603,27 +604,38 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerplugins.NewDefaultRegistry(),
-		nil, []kubeschedulerconfig.PluginConfig{}, stopCh))
-	schedulerConfig2, err := schedulerConfigFactory2.Create()
+	eventBroadcaster2 := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet2.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster2.NewRecorder(legacyscheme.Scheme, "k8s.io/"+fooScheduler)
+	provider := schedulerconfig.SchedulerDefaultProviderName
+	algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
+		Provider: &provider,
+	}
+	sched2, err := scheduler.New(
+		clientSet2,
+		informerFactory2.Core().V1().Nodes(),
+		podInformer2,
+		informerFactory2.Core().V1().PersistentVolumes(),
+		informerFactory2.Core().V1().PersistentVolumeClaims(),
+		informerFactory2.Core().V1().ReplicationControllers(),
+		informerFactory2.Apps().V1().ReplicaSets(),
+		informerFactory2.Apps().V1().StatefulSets(),
+		informerFactory2.Core().V1().Services(),
+		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory2.Storage().V1().StorageClasses(),
+		informerFactory2.Storage().V1beta1().CSINodes(),
+		recorder,
+		algorithmSrc,
+		stopCh,
+		schedulerplugins.NewDefaultRegistry(),
+		nil,
+		[]kubeschedulerconfig.PluginConfig{},
+		scheduler.WithName(fooScheduler),
+		scheduler.WithBindTimeoutSeconds(600),
+	)
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}
-	eventBroadcaster2 := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet2.EventsV1beta1().Events("")})
-	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, "k8s.io/"+fooScheduler)
 	eventBroadcaster2.StartRecordingToSink(stopCh)
-
-	sched2 := scheduler.NewFromConfig(schedulerConfig2)
-	scheduler.AddAllEventHandlers(sched2,
-		fooScheduler,
-		context.informerFactory.Core().V1().Nodes(),
-		podInformer2,
-		context.informerFactory.Core().V1().PersistentVolumes(),
-		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Storage().V1().StorageClasses(),
-		context.informerFactory.Storage().V1beta1().CSINodes(),
-	)
 
 	go podInformer2.Informer().Run(stopCh)
 	informerFactory2.Start(stopCh)
