@@ -971,6 +971,7 @@ func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
 	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "true"
 	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
 	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
 	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
 	assert.EqualValues(t, fwdRule.AllowGlobalAccess, true)
 	assert.NoError(t, err)
@@ -978,7 +979,9 @@ func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
 	delete(svc.Annotations, ServiceAnnotationILBGlobalAccess)
 	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
 	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
 	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.NoError(t, err)
 	assert.EqualValues(t, fwdRule.AllowGlobalAccess, false)
 	// Delete the service
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
@@ -1003,13 +1006,16 @@ func TestEnsureInternalLoadBalancerDisableGlobalAccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
 	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.NoError(t, err)
 	assert.EqualValues(t, fwdRule.AllowGlobalAccess, true)
 
 	// disable global access - setting the annotation to false or removing annotation will disabld it
 	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "false"
 	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
 	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
 	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.NoError(t, err)
 	assert.EqualValues(t, fwdRule.AllowGlobalAccess, false)
 
 	// Delete the service
@@ -1036,6 +1042,7 @@ func TestGlobalAccessChangeScheme(t *testing.T) {
 	// Change service to include the global access annotation
 	svc.Annotations[ServiceAnnotationILBGlobalAccess] = "true"
 	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NotEmpty(t, status.Ingress)
 	assert.NoError(t, err)
 	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
 	assert.EqualValues(t, fwdRule.AllowGlobalAccess, true)
@@ -1043,10 +1050,12 @@ func TestGlobalAccessChangeScheme(t *testing.T) {
 	// change the scheme to externalLoadBalancer
 	delete(svc.Annotations, ServiceAnnotationLoadBalancerType)
 	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NotEmpty(t, status.Ingress)
 	assert.NoError(t, err)
 	// Firewall is deleted when the service is deleted
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, false)
 	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	assert.NoError(t, err)
 	assert.EqualValues(t, fwdRule.AllowGlobalAccess, false)
 	// Delete the service
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
