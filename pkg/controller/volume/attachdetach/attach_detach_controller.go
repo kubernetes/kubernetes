@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -233,18 +234,18 @@ const (
 // indexByPVCKey returns PVC keys for given pod. Note that the index is only
 // used for attaching, so we are only interested in active pods with nodeName
 // set.
-func indexByPVCKey(obj interface{}) ([]string, error) {
+func indexByPVCKey(obj interface{}) (sets.String, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		return []string{}, nil
+		return sets.String{}, nil
 	}
 	if len(pod.Spec.NodeName) == 0 || volumeutil.IsPodTerminated(pod, pod.Status) {
-		return []string{}, nil
+		return sets.String{}, nil
 	}
-	keys := []string{}
+	keys := sets.String{}
 	for _, podVolume := range pod.Spec.Volumes {
 		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
+			keys.Insert(fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
 		}
 	}
 	return keys, nil

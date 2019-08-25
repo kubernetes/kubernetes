@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
@@ -366,15 +367,15 @@ func NewNodeLifecycleController(
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 	podInformer.Informer().AddIndexers(cache.Indexers{
-		nodeNameKeyIndex: func(obj interface{}) ([]string, error) {
+		nodeNameKeyIndex: func(obj interface{}) (sets.String, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
-				return []string{}, nil
+				return sets.String{}, nil
 			}
 			if len(pod.Spec.NodeName) == 0 {
-				return []string{}, nil
+				return sets.String{}, nil
 			}
-			return []string{pod.Spec.NodeName}, nil
+			return sets.NewString(pod.Spec.NodeName), nil
 		},
 	})
 

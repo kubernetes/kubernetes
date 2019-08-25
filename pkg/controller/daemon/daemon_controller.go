@@ -229,16 +229,16 @@ func NewDaemonSetsController(
 	return dsc, nil
 }
 
-func indexByPodNodeName(obj interface{}) ([]string, error) {
+func indexByPodNodeName(obj interface{}) (sets.String, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		return []string{}, nil
+		return sets.String{}, nil
 	}
 	// We are only interested in active pods with nodeName set
 	if len(pod.Spec.NodeName) == 0 || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return []string{}, nil
+		return sets.String{}, nil
 	}
-	return []string{pod.Spec.NodeName}, nil
+	return sets.NewString(pod.Spec.NodeName), nil
 }
 
 func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {

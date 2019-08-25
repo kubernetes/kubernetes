@@ -123,8 +123,8 @@ func testStoreKeyFunc(obj interface{}) (string, error) {
 	return obj.(testStoreObject).id, nil
 }
 
-func testStoreIndexFunc(obj interface{}) ([]string, error) {
-	return []string{obj.(testStoreObject).val}, nil
+func testStoreIndexFunc(obj interface{}) (sets.String, error) {
+	return sets.NewString(obj.(testStoreObject).val), nil
 }
 
 func testStoreIndexers() Indexers {

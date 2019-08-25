@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -39,12 +40,12 @@ func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
 
 // accessModesIndexFunc is an indexing function that returns a persistent
 // volume's AccessModes as a string
-func accessModesIndexFunc(obj interface{}) ([]string, error) {
+func accessModesIndexFunc(obj interface{}) (sets.String, error) {
 	if pv, ok := obj.(*v1.PersistentVolume); ok {
 		modes := v1helper.GetAccessModesAsString(pv.Spec.AccessModes)
-		return []string{modes}, nil
+		return sets.NewString(modes), nil
 	}
-	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
+	return sets.NewString(""), fmt.Errorf("object is not a persistent volume: %v", obj)
 }
 
 // listByAccessModes returns all volumes with the given set of

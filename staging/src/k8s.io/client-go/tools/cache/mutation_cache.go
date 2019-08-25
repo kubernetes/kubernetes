@@ -160,12 +160,8 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 				klog.V(4).Infof("Unable to calculate an index entry for mutation cache entry %s: %v", key, err)
 				continue
 			}
-			for _, inIndex := range elements {
-				if inIndex != indexKey {
-					continue
-				}
+			if elements.Has(indexKey) {
 				items = append(items, updated)
-				break
 			}
 		}
 	}

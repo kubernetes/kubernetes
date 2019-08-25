@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -119,10 +120,10 @@ func objInfoKeyFunc(obj interface{}) (string, error) {
 	return objInfo.name, nil
 }
 
-func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
+func (c *assumeCache) objInfoIndexFunc(obj interface{}) (sets.String, error) {
 	objInfo, ok := obj.(*objInfo)
 	if !ok {
-		return []string{""}, &errWrongType{"objInfo", obj}
+		return sets.NewString(""), &errWrongType{"objInfo", obj}
 	}
 	return c.indexFunc(objInfo.latestObj)
 }
@@ -348,11 +349,11 @@ type pvAssumeCache struct {
 	AssumeCache
 }
 
-func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
+func pvStorageClassIndexFunc(obj interface{}) (sets.String, error) {
 	if pv, ok := obj.(*v1.PersistentVolume); ok {
-		return []string{pv.Spec.StorageClassName}, nil
+		return sets.NewString(pv.Spec.StorageClassName), nil
 	}
-	return []string{""}, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
+	return sets.NewString(""), fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
 }
 
 // NewPVAssumeCache creates a PV assume cache.

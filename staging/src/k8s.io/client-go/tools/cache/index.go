@@ -53,7 +53,7 @@ type Indexer interface {
 }
 
 // IndexFunc knows how to compute the set of indexed values for an object.
-type IndexFunc func(obj interface{}) ([]string, error)
+type IndexFunc func(obj interface{}) (sets.String, error)
 
 // IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc.  This is only useful if your index function returns
 // unique values for every object.  This is conversion can create errors when more than one key is found.  You
@@ -70,7 +70,10 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 		if len(indexKeys) == 0 {
 			return "", fmt.Errorf("unexpected empty indexKeys")
 		}
-		return indexKeys[0], nil
+		for k := range indexKeys {
+			return k, nil
+		}
+		return "", err
 	}
 }
 
@@ -80,12 +83,12 @@ const (
 )
 
 // MetaNamespaceIndexFunc is a default index function that indexes based on an object's namespace
-func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
+func MetaNamespaceIndexFunc(obj interface{}) (sets.String, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
-		return []string{""}, fmt.Errorf("object has no meta: %v", err)
+		return sets.String{}, fmt.Errorf("object has no meta: %v", err)
 	}
-	return []string{meta.GetNamespace()}, nil
+	return sets.NewString(meta.GetNamespace()), nil
 }
 
 // Index maps the indexed value to a set of keys in the store that match on that value

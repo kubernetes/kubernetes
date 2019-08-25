@@ -25,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func testIndexFunc(obj interface{}) ([]string, error) {
+func testIndexFunc(obj interface{}) (sets.String, error) {
 	pod := obj.(*v1.Pod)
-	return []string{pod.Labels["foo"]}, nil
+	return sets.NewString(pod.Labels["foo"]), nil
 }
 
 func TestGetIndexFuncValues(t *testing.T) {
@@ -53,11 +53,16 @@ func TestGetIndexFuncValues(t *testing.T) {
 	}
 }
 
-func testUsersIndexFunc(obj interface{}) ([]string, error) {
+func testUsersIndexFunc(obj interface{}) (sets.String, error) {
 	pod := obj.(*v1.Pod)
 	usersString := pod.Annotations["users"]
 
-	return strings.Split(usersString, ","), nil
+	users := strings.Split(usersString, ",")
+	userSet := sets.String{}
+	for _, user := range users {
+		userSet.Insert(user)
+	}
+	return userSet, nil
 }
 
 func TestMultiIndexKeys(t *testing.T) {

@@ -152,12 +152,15 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 	if len(indexKeys) == 1 {
 		// In majority of cases, there is exactly one value matching.
 		// Optimize the most common path - deduping is not needed here.
-		returnKeySet = index[indexKeys[0]]
+		for k := range indexKeys {
+			returnKeySet = index[k]
+			break
+		}
 	} else {
 		// Need to de-dupe the return list.
 		// Since multiple keys are allowed, this can happen.
 		returnKeySet = sets.String{}
-		for _, indexKey := range indexKeys {
+		for indexKey := range indexKeys {
 			for key := range index[indexKey] {
 				returnKeySet.Insert(key)
 			}
@@ -264,7 +267,7 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 			c.indices[name] = index
 		}
 
-		for _, indexValue := range indexValues {
+		for indexValue := range indexValues {
 			set := index[indexValue]
 			if set == nil {
 				set = sets.String{}
@@ -288,7 +291,7 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) {
 		if index == nil {
 			continue
 		}
-		for _, indexValue := range indexValues {
+		for indexValue := range indexValues {
 			set := index[indexValue]
 			if set != nil {
 				set.Delete(key)
