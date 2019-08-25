@@ -347,7 +347,7 @@ func ensureNodeExistsByProviderID(instances cloudprovider.Instances, node *v1.No
 	providerID := node.Spec.ProviderID
 	if providerID == "" {
 		var err error
-		providerID, err := cloudprovider.GetInstanceProviderID(context.TODO(), cloud, types.NodeName(node.Name))
+		providerID, err = cloudprovider.GetInstanceProviderID(context.TODO(), cloud, types.NodeName(node.Name))
 		if err != nil {
 			if err == cloudprovider.InstanceNotFound {
 				return false, nil
