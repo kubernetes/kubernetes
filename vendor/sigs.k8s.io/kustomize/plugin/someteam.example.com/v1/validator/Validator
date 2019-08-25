@@ -1,0 +1,35 @@
+#!/bin/bash
+
+
+# Validator transformer plugin by kubeval
+# https://github.com/instrumenta/kubeval
+#
+# Assumes that kubeval is available from $PATH
+#
+# Reads Kubernetes resources from stdin
+# Validates them and output in the stdout
+#
+# Example execution:
+# cat <raw K8s yaml> | ./plugin/someteam.example.com/v1/Validator
+
+if ! [ -x "$(command -v kubeval)" ]; then
+  echo "Error: kubeval is not installed."
+  exit 1
+fi
+
+temp_file=$(mktemp)
+output_file=$(mktemp)
+cat - > $temp_file
+
+kubeval $temp_file > $output_file
+
+if [ $? -eq 0 ]; then
+    cat $temp_file
+    rm $temp_file $output_file
+    exit 0
+fi
+
+cat $output_file
+rm $temp_file $output_file
+exit 1
+

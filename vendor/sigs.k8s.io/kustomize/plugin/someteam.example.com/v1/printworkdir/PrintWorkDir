@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+dir=`pwd`
+
+echo "
+kind: WorkDir
+apiVersion: v1
+metadata:
+  name: $dir
+spec:
+  path: ${KUSTOMIZE_PLUGIN_CONFIG_ROOT}
+"

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Skip the config file name argument.
+shift
+
+echo "
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: example-configmap-test
+data:
+  username: $1
+  password: $2
+"

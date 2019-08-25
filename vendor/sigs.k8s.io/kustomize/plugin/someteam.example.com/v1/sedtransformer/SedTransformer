@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Skip the config file name argument.
+shift
+
+args=""
+for arg in $@; do
+  args="$args -e $arg"
+done
+
+cat - | sed $args
