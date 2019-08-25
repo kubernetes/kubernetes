@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"sigs.k8s.io/kustomize/pkg/constants"
+	"sigs.k8s.io/kustomize/pkg/pgmconfig"
 )
 
 var _ FileSystem = &fakeFs{}
@@ -158,7 +158,7 @@ func (fs *fakeFs) ReadFile(name string) ([]byte, error) {
 }
 
 func (fs *fakeFs) ReadTestKustomization() ([]byte, error) {
-	return fs.ReadFile(constants.KustomizationFileNames[0])
+	return fs.ReadFile(pgmconfig.KustomizationFileNames[0])
 }
 
 // WriteFile always succeeds and does nothing.
@@ -176,7 +176,7 @@ func (fs *fakeFs) WriteTestKustomization() {
 
 // WriteTestKustomizationWith writes a standard test file.
 func (fs *fakeFs) WriteTestKustomizationWith(bytes []byte) {
-	fs.WriteFile(constants.KustomizationFileNames[0], bytes)
+	fs.WriteFile(pgmconfig.KustomizationFileNames[0], bytes)
 }
 
 func (fs *fakeFs) pathMatch(path, pattern string) bool {

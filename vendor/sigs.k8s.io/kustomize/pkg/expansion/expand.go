@@ -19,6 +19,7 @@ package expansion
 
 import (
 	"bytes"
+	"fmt"
 )
 
 const (
@@ -38,13 +39,18 @@ func syntaxWrap(input string) string {
 // for the input is found.
 func MappingFuncFor(
 	counts map[string]int,
-	context ...map[string]string) func(string) string {
-	return func(input string) string {
+	context ...map[string]interface{}) func(string) interface{} {
+	return func(input string) interface{} {
 		for _, vars := range context {
 			val, ok := vars[input]
 			if ok {
 				counts[input]++
-				return val
+				switch typedV := val.(type) {
+				case string, int64, float64, bool:
+					return typedV
+				default:
+					return syntaxWrap(input)
+				}
 			}
 		}
 		return syntaxWrap(input)
@@ -54,7 +60,7 @@ func MappingFuncFor(
 // Expand replaces variable references in the input string according to
 // the expansion spec using the given mapping function to resolve the
 // values of variables.
-func Expand(input string, mapping func(string) string) string {
+func Expand(input string, mapping func(string) interface{}) interface{} {
 	var buf bytes.Buffer
 	checkpoint := 0
 	for cursor := 0; cursor < len(input); cursor++ {
@@ -71,7 +77,14 @@ func Expand(input string, mapping func(string) string) string {
 				// We were able to read a variable name correctly;
 				// apply the mapping to the variable name and copy the
 				// bytes into the buffer
-				buf.WriteString(mapping(read))
+				mapped := mapping(read)
+				if input == syntaxWrap(read) {
+					// Preserve the type of variable
+					return mapped
+				}
+
+				// Variable is used in a middle of a string
+				buf.WriteString(fmt.Sprintf("%v", mapped))
 			} else {
 				// Not a variable name; copy the read bytes into the buffer
 				buf.WriteString(read)

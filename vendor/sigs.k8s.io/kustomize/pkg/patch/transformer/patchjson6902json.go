@@ -19,13 +19,13 @@ package transformer
 import (
 	"fmt"
 
-	"github.com/evanphx/json-patch"
-	"github.com/ghodss/yaml"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/pkg/resid"
 	"sigs.k8s.io/kustomize/pkg/resmap"
 	"sigs.k8s.io/kustomize/pkg/resource"
 	"sigs.k8s.io/kustomize/pkg/transformers"
+	"sigs.k8s.io/yaml"
 )
 
 // patchJson6902JSONTransformer applies patches.
@@ -42,6 +42,11 @@ func newPatchJson6902JSONTransformer(
 	id resid.ResId, rawOp []byte) (transformers.Transformer, error) {
 	op := rawOp
 	var err error
+
+	if len(op) == 0 {
+		return nil, fmt.Errorf("json patch file is empty %v", id)
+	}
+
 	if !isJsonFormat(op) {
 		// if it isn't JSON, try to parse it as YAML
 		op, err = yaml.YAMLToJSON(rawOp)
@@ -82,7 +87,7 @@ func (t *patchJson6902JSONTransformer) Transform(m resmap.ResMap) error {
 
 func (t *patchJson6902JSONTransformer) findTargetObj(
 	m resmap.ResMap) (*resource.Resource, error) {
-	var matched []resid.ResId
+	var matched []*resource.Resource
 	// TODO(monopole): namespace bug in json patch?
 	// Since introduction in PR #300
 	// (see pkg/patch/transformer/util.go),
@@ -90,10 +95,10 @@ func (t *patchJson6902JSONTransformer) findTargetObj(
 	// rather than like an additional restriction to match
 	// only the empty namespace.  No test coverage to confirm.
 	// Not sure if desired, keeping it for now.
-	if t.target.Namespace() != "" {
-		matched = m.GetMatchingIds(t.target.NsGvknEquals)
+	if t.target.Namespace != "" {
+		matched = m.GetMatchingResourcesByOriginalId(t.target.Equals)
 	} else {
-		matched = m.GetMatchingIds(t.target.GvknEquals)
+		matched = m.GetMatchingResourcesByOriginalId(t.target.GvknEquals)
 	}
 	if len(matched) == 0 {
 		return nil, fmt.Errorf(
@@ -104,5 +109,5 @@ func (t *patchJson6902JSONTransformer) findTargetObj(
 			"found multiple targets %v matching %v for json patch",
 			matched, t.target)
 	}
-	return m[matched[0]], nil
+	return matched[0], nil
 }

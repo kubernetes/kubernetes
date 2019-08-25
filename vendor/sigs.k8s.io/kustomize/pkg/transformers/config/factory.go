@@ -19,8 +19,8 @@ package config
 import (
 	"log"
 
-	"github.com/ghodss/yaml"
 	"sigs.k8s.io/kustomize/pkg/ifc"
+	"sigs.k8s.io/yaml"
 )
 
 // Factory makes instances of TransformerConfig.

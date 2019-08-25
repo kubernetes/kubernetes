@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,7 +47,7 @@ func (g *GenArgs) String() string {
 		"}"
 }
 
-// NeedHashSuffix returns true if the hash suffix is needed.
+// NeedsHashSuffix returns true if the hash suffix is needed.
 // It is needed when the two conditions are both met
 //  1) GenArgs is not nil
 //  2) DisableNameSuffixHash in GeneratorOptions is not set to true

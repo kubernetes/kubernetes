@@ -108,13 +108,15 @@ nameReference:
     kind: Job
   - path: spec/jobTemplate/spec/template/spec/volumes/configMap/name
     kind: CronJob
+  - path: spec/jobTemplate/spec/template/spec/volumes/projected/sources/configMap/name
+    kind: CronJob
   - path: spec/jobTemplate/spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
     kind: CronJob
   - path: spec/jobTemplate/spec/template/spec/initContainers/env/valueFrom/configMapKeyRef/name
     kind: CronJob
   - path: spec/jobTemplate/spec/template/spec/containers/envFrom/configMapRef/name
     kind: CronJob
-  - path: spec/jobTemplate/spec/template/spec/initContainers/envFrom/configmapRef/name
+  - path: spec/jobTemplate/spec/template/spec/initContainers/envFrom/configMapRef/name
     kind: CronJob
 
 - kind: Secret
@@ -204,6 +206,8 @@ nameReference:
     kind: Job
   - path: spec/jobTemplate/spec/template/spec/volumes/secret/secretName
     kind: CronJob
+  - path: spec/jobTemplate/spec/template/spec/volumes/projected/sources/secret/name
+    kind: CronJob
   - path: spec/jobTemplate/spec/template/spec/containers/env/valueFrom/secretKeyRef/name
     kind: CronJob
   - path: spec/jobTemplate/spec/template/spec/initContainers/env/valueFrom/secretKeyRef/name
@@ -248,6 +252,12 @@ nameReference:
   - path: spec/service/name
     kind: APIService
     group: apiregistration.k8s.io
+  - path: webhooks/clientConfig/service/name
+    kind: ValidatingWebhookConfiguration
+    group: admissionregistration.k8s.io
+  - path: webhooks/clientConfig/service/name
+    kind: MutatingWebhookConfiguration
+    group: admissionregistration.k8s.io
 
 - kind: Role
   group: rbac.authorization.k8s.io
@@ -286,7 +296,7 @@ nameReference:
   - path: spec/jobTemplate/spec/template/spec/serviceAccountName
     kind: CronJob
   - path: spec/template/spec/serviceAccountName
-    kind: job
+    kind: Job
   - path: spec/template/spec/serviceAccountName
     kind: DaemonSet
 
@@ -312,6 +322,15 @@ nameReference:
   version: v1
   fieldSpecs:
   - path: spec/volumeName
+    kind: PersistentVolumeClaim
+
+- kind: StorageClass
+  version: v1
+  group: storage.k8s.io
+  fieldSpecs:
+  - path: spec/storageClassName
+    kind: PersistentVolume
+  - path: spec/storageClassName
     kind: PersistentVolumeClaim
 `
 )

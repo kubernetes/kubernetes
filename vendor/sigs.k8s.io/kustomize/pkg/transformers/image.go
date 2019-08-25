@@ -23,32 +23,68 @@ import (
 
 	"sigs.k8s.io/kustomize/pkg/image"
 	"sigs.k8s.io/kustomize/pkg/resmap"
+	"sigs.k8s.io/kustomize/pkg/transformers/config"
 )
 
 // imageTransformer replace image names and tags
 type imageTransformer struct {
-	images []image.Image
+	images     []image.Image
+	fieldSpecs []config.FieldSpec
 }
 
 var _ Transformer = &imageTransformer{}
 
 // NewImageTransformer constructs an imageTransformer.
-func NewImageTransformer(slice []image.Image) (Transformer, error) {
-	return &imageTransformer{slice}, nil
+func NewImageTransformer(slice []image.Image, fs []config.FieldSpec) (Transformer, error) {
+	return &imageTransformer{slice, fs}, nil
 }
 
 // Transform finds the matching images and replaces name, tag and/or digest
-func (pt *imageTransformer) Transform(resources resmap.ResMap) error {
+func (pt *imageTransformer) Transform(m resmap.ResMap) error {
 	if len(pt.images) == 0 {
 		return nil
 	}
-	for _, res := range resources {
-		err := pt.findAndReplaceImage(res.Map())
-		if err != nil {
+	for _, r := range m.Resources() {
+		for _, path := range pt.fieldSpecs {
+			if !r.OrgId().IsSelected(&path.Gvk) {
+				continue
+			}
+			err := MutateField(r.Map(), path.PathSlice(), false, pt.mutateImage)
+			if err != nil {
+				return err
+			}
+		}
+		// Kept for backward compatibility
+		if err := pt.findAndReplaceImage(r.Map()); err != nil && r.OrgId().Kind != `CustomResourceDefinition` {
 			return err
 		}
 	}
 	return nil
+}
+
+func (pt *imageTransformer) mutateImage(in interface{}) (interface{}, error) {
+	original, ok := in.(string)
+	if !ok {
+		return nil, fmt.Errorf("image path is not of type string but %T", in)
+	}
+
+	for _, img := range pt.images {
+		if !isImageMatched(original, img.Name) {
+			continue
+		}
+		name, tag := split(original)
+		if img.NewName != "" {
+			name = img.NewName
+		}
+		if img.NewTag != "" {
+			tag = ":" + img.NewTag
+		}
+		if img.Digest != "" {
+			tag = "@" + img.Digest
+		}
+		return name + tag, nil
+	}
+	return original, nil
 }
 
 /*
@@ -59,26 +95,26 @@ func (pt *imageTransformer) Transform(resources resmap.ResMap) error {
 */
 func (pt *imageTransformer) findAndReplaceImage(obj map[string]interface{}) error {
 	paths := []string{"containers", "initContainers"}
-	found := false
+	updated := false
 	for _, path := range paths {
-		_, found = obj[path]
+		containers, found := obj[path]
 		if found {
-			err := pt.updateContainers(obj, path)
-			if err != nil {
+			if _, err := pt.updateContainers(containers); err != nil {
 				return err
 			}
+			updated = true
 		}
 	}
-	if !found {
+	if !updated {
 		return pt.findContainers(obj)
 	}
 	return nil
 }
 
-func (pt *imageTransformer) updateContainers(obj map[string]interface{}, path string) error {
-	containers, ok := obj[path].([]interface{})
+func (pt *imageTransformer) updateContainers(in interface{}) (interface{}, error) {
+	containers, ok := in.([]interface{})
 	if !ok {
-		return fmt.Errorf("containers path is not of type []interface{} but %T", obj[path])
+		return nil, fmt.Errorf("containers path is not of type []interface{} but %T", in)
 	}
 	for i := range containers {
 		container := containers[i].(map[string]interface{})
@@ -92,21 +128,15 @@ func (pt *imageTransformer) updateContainers(obj map[string]interface{}, path st
 			if !isImageMatched(imageName, img.Name) {
 				continue
 			}
-			name, tag := split(imageName)
-			if img.NewName != "" {
-				name = img.NewName
+			newImage, err := pt.mutateImage(imageName)
+			if err != nil {
+				return nil, err
 			}
-			if img.NewTag != "" {
-				tag = ":" + img.NewTag
-			}
-			if img.Digest != "" {
-				tag = "@" + img.Digest
-			}
-			container["image"] = name + tag
+			container["image"] = newImage
 			break
 		}
 	}
-	return nil
+	return containers, nil
 }
 
 func (pt *imageTransformer) findContainers(obj map[string]interface{}) error {

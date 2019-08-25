@@ -110,7 +110,7 @@ commonLabels:
   group: apps
   kind: StatefulSet
 
-- path: spec/volumeClaimTemplates/metadata/labels
+- path: spec/volumeClaimTemplates[]/metadata/labels
   create: true
   group: apps
   kind: StatefulSet

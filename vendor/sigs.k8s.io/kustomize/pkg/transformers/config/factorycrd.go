@@ -20,12 +20,12 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/go-openapi/spec"
 	"github.com/pkg/errors"
 	"k8s.io/kube-openapi/pkg/common"
 	"sigs.k8s.io/kustomize/pkg/gvk"
 	"sigs.k8s.io/kustomize/pkg/ifc"
+	"sigs.k8s.io/yaml"
 )
 
 type myProperties map[string]spec.Schema

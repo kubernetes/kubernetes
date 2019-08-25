@@ -75,29 +75,43 @@ type VarSet struct {
 	set []Var
 }
 
-// Set returns a copy of the var set.
-func (vs *VarSet) Set() []Var {
+// AsSlice returns the vars as a slice.
+func (vs *VarSet) AsSlice() []Var {
 	s := make([]Var, len(vs.set))
 	copy(s, vs.set)
 	return s
 }
 
+// Copy returns a copy of the var set.
+func (vs *VarSet) Copy() VarSet {
+	return VarSet{set: vs.AsSlice()}
+}
+
 // MergeSet absorbs other vars with error on name collision.
-func (vs *VarSet) MergeSet(incoming *VarSet) error {
+func (vs *VarSet) MergeSet(incoming VarSet) error {
 	return vs.MergeSlice(incoming.set)
 }
 
-// MergeSlice absorbs other vars with error on name collision.
+// MergeSlice absorbs a Var slice with error on name collision.
 // Empty fields in incoming vars are defaulted.
 func (vs *VarSet) MergeSlice(incoming []Var) error {
 	for _, v := range incoming {
-		if vs.Contains(v) {
-			return fmt.Errorf(
-				"var %s already encountered", v.Name)
+		if err := vs.Merge(v); err != nil {
+			return err
 		}
-		v.defaulting()
-		vs.insert(v)
 	}
+	return nil
+}
+
+// Merge absorbs another Var with error on name collision.
+// Empty fields in incoming Var is defaulted.
+func (vs *VarSet) Merge(v Var) error {
+	if vs.Contains(v) {
+		return fmt.Errorf(
+			"var '%s' already encountered", v.Name)
+	}
+	v.defaulting()
+	vs.insert(v)
 	return nil
 }
 

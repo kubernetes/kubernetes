@@ -1,18 +1,5 @@
-/*
-Copyright 2018 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2019 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
 
 package gvk
 
@@ -32,6 +19,29 @@ type Gvk struct {
 func FromKind(k string) Gvk {
 	return Gvk{
 		Kind: k,
+	}
+}
+
+// FromString makes a Gvk with a string,
+// which is constructed by String() function
+func FromString(s string) Gvk {
+	values := strings.Split(s, separator)
+	g := values[0]
+	if g == noGroup {
+		g = ""
+	}
+	v := values[1]
+	if v == noVersion {
+		v = ""
+	}
+	k := values[2]
+	if k == noKind {
+		k = ""
+	}
+	return Gvk{
+		Group:   g,
+		Version: v,
+		Kind:    k,
 	}
 }
 
@@ -69,13 +79,13 @@ func (x Gvk) Equals(o Gvk) bool {
 // a Service should come before things that refer to it.
 // Namespace should be first.
 // In some cases order just specified to provide determinism.
-var order = []string{
+var orderFirst = []string{
 	"Namespace",
 	"StorageClass",
 	"CustomResourceDefinition",
 	"MutatingWebhookConfiguration",
-	"ValidatingWebhookConfiguration",
 	"ServiceAccount",
+	"PodSecurityPolicy",
 	"Role",
 	"ClusterRole",
 	"RoleBinding",
@@ -83,33 +93,32 @@ var order = []string{
 	"ConfigMap",
 	"Secret",
 	"Service",
+	"LimitRange",
 	"Deployment",
 	"StatefulSet",
 	"CronJob",
 	"PodDisruptionBudget",
 }
+var orderLast = []string{
+	"ValidatingWebhookConfiguration",
+}
 var typeOrders = func() map[string]int {
 	m := map[string]int{}
-	for i, n := range order {
-		m[n] = i
+	for i, n := range orderFirst {
+		m[n] = -len(orderFirst) + i
+	}
+	for i, n := range orderLast {
+		m[n] = 1 + i
 	}
 	return m
 }()
 
 // IsLessThan returns true if self is less than the argument.
 func (x Gvk) IsLessThan(o Gvk) bool {
-	indexI, foundI := typeOrders[x.Kind]
-	indexJ, foundJ := typeOrders[o.Kind]
-	if foundI && foundJ {
-		if indexI != indexJ {
-			return indexI < indexJ
-		}
-	}
-	if foundI && !foundJ {
-		return true
-	}
-	if !foundI && foundJ {
-		return false
+	indexI := typeOrders[x.Kind]
+	indexJ := typeOrders[o.Kind]
+	if indexI != indexJ {
+		return indexI < indexJ
 	}
 	return x.String() < o.String()
 }
@@ -158,6 +167,8 @@ var clusterLevelKinds = []string{
 	"CustomResourceDefinition",
 	"Namespace",
 	"PersistentVolume",
+	"MutatingWebhookConfiguration",
+	"ValidatingWebhookConfiguration",
 }
 
 // IsClusterKind returns true if x is a cluster-level Gvk
@@ -168,13 +179,4 @@ func (x Gvk) IsClusterKind() bool {
 		}
 	}
 	return false
-}
-
-// ClusterLevelGvks returns a slice of cluster-level Gvks
-func ClusterLevelGvks() []Gvk {
-	var result []Gvk
-	for _, k := range clusterLevelKinds {
-		result = append(result, Gvk{Kind: k})
-	}
-	return result
 }

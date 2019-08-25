@@ -41,24 +41,60 @@ func ClonerUsingGitExec(repoSpec *RepoSpec) error {
 	}
 	cmd := exec.Command(
 		gitProgram,
-		"clone",
-		repoSpec.CloneSpec(),
+		"init",
 		repoSpec.cloneDir.String())
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Run()
 	if err != nil {
-		return errors.Wrapf(err, "trouble cloning %s", repoSpec.raw)
+		return errors.Wrapf(
+			err,
+			"trouble initializing empty git repo in %s",
+			repoSpec.cloneDir.String())
 	}
-	if repoSpec.ref == "" {
-		return nil
-	}
-	cmd = exec.Command(gitProgram, "checkout", repoSpec.ref)
+
+	cmd = exec.Command(
+		gitProgram,
+		"remote",
+		"add",
+		"origin",
+		repoSpec.CloneSpec())
+	cmd.Stdout = &out
 	cmd.Dir = repoSpec.cloneDir.String()
 	err = cmd.Run()
 	if err != nil {
 		return errors.Wrapf(
-			err, "trouble checking out href %s", repoSpec.ref)
+			err,
+			"trouble adding remote %s",
+			repoSpec.CloneSpec())
+	}
+	if repoSpec.ref == "" {
+		repoSpec.ref = "master"
+	}
+	cmd = exec.Command(
+		gitProgram,
+		"fetch",
+		"--depth=1",
+		"origin",
+		repoSpec.ref)
+	cmd.Stdout = &out
+	cmd.Dir = repoSpec.cloneDir.String()
+	err = cmd.Run()
+	if err != nil {
+		return errors.Wrapf(err, "trouble fetching %s", repoSpec.ref)
+	}
+
+	cmd = exec.Command(
+		gitProgram,
+		"reset",
+		"--hard",
+		"FETCH_HEAD")
+	cmd.Stdout = &out
+	cmd.Dir = repoSpec.cloneDir.String()
+	err = cmd.Run()
+	if err != nil {
+		return errors.Wrapf(
+			err, "trouble hard resetting empty repository to %s", repoSpec.ref)
 	}
 	return nil
 }
