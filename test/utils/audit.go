@@ -137,7 +137,6 @@ func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, er
 	// existingEvents holds a slice of audit events that have been seen
 	existingEvents := []AuditEvent{}
 	duplicates := auditinternal.EventList{}
-	var err error
 	for _, e := range el.Items {
 		event, err := testEventFromInternal(&e)
 		if err != nil {
@@ -147,12 +146,17 @@ func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, er
 		for _, existing := range existingEvents {
 			if reflect.DeepEqual(existing, event) {
 				duplicates.Items = append(duplicates.Items, e)
-				err = fmt.Errorf("failed duplicate check")
 				continue
 			}
 		}
 		existingEvents = append(existingEvents, event)
 	}
+
+	var err error
+	if len(duplicates.Items) > 0 {
+		err = fmt.Errorf("failed duplicate check")
+	}
+
 	return duplicates, err
 }
 

@@ -124,7 +124,6 @@ test/integration/serviceaccount
 test/integration/serving
 test/integration/ttlcontroller
 test/integration/volume
-test/utils
 vendor/k8s.io/apimachinery/pkg/api/meta
 vendor/k8s.io/apimachinery/pkg/api/resource
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
