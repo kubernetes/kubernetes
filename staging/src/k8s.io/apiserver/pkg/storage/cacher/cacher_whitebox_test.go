@@ -703,7 +703,7 @@ func testCacherSendBookmarkEvents(t *testing.T, watchCacheEnabled, allowWatchBoo
 			}
 			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
 			if err != nil {
-				t.Errorf("failed to parse resource version from %#v", event.Object)
+				t.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
 			}
 			if event.Type == watch.Bookmark {
 				if !expectedBookmarks {
