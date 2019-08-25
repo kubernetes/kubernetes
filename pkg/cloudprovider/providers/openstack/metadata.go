@@ -153,10 +153,12 @@ func getMetadataFromMetadataService(metadataVersion string) (*Metadata, error) {
 	metadataURL := getMetadataURL(metadataVersion)
 	klog.V(4).Infof("Attempting to fetch metadata from %s", metadataURL)
 	resp, err := http.Get(metadataURL)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error fetching %s: %v", metadataURL, err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataURL, resp.Status)
