@@ -335,8 +335,6 @@ github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.3.3 => github.com/docker/go-units v0.3.3
 github.com/docker/go-units
-# github.com/docker/libnetwork v0.0.0-20180830151422-a9cd636e3789 => github.com/docker/libnetwork v0.0.0-20180830151422-a9cd636e3789
-github.com/docker/libnetwork/ipvs
 # github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96 => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
