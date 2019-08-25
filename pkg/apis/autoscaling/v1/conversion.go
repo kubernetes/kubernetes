@@ -323,9 +323,9 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		}
 	}
 
-	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 || len(currentConditions) > 0 {
+	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 || len(currentConditions) > 0 || in.Spec.Constraints != nil {
 		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old)+3)
+		out.Annotations = make(map[string]string, len(old)+4)
 		for k, v := range old {
 			out.Annotations[k] = v
 		}
@@ -345,6 +345,14 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 			return err
 		}
 		out.Annotations[autoscaling.MetricStatusesAnnotation] = string(currentMetricsEnc)
+	}
+
+	if in.Spec.Constraints != nil {
+		constraintsEnc, err := json.Marshal(in.Spec.Constraints)
+		if err != nil {
+			return err
+		}
+		out.Annotations[autoscaling.ConstraintSpecsAnnotation] = string(constraintsEnc)
 	}
 
 	if len(in.Status.Conditions) > 0 {
@@ -381,6 +389,15 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		}
 		out.Spec.Metrics = outMetrics
 		delete(out.Annotations, autoscaling.MetricSpecsAnnotation)
+	}
+
+	if constraintsEnc, hasConstraints := out.Annotations[autoscaling.ConstraintSpecsAnnotation]; hasConstraints {
+		var constraints autoscaling.HPAScaleConstraints
+		if err := json.Unmarshal([]byte(constraintsEnc), &constraints); err != nil {
+			return err
+		}
+		out.Spec.Constraints = &constraints
+		delete(out.Annotations, autoscaling.ConstraintSpecsAnnotation)
 	}
 
 	if currentMetricsEnc, hasCurrentMetrics := out.Annotations[autoscaling.MetricStatusesAnnotation]; hasCurrentMetrics {

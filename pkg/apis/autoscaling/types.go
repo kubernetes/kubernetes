@@ -95,10 +95,72 @@ type HorizontalPodAutoscalerSpec struct {
 	// more information about how each type of metric must respond.
 	// +optional
 	Metrics []MetricSpec
+	// constraints contain HPA object configuration parameters
+	// that configure each particular HPA scaling behaviour.
+	// +optional
+	Constraints *HPAScaleConstraints
 }
 
 // MetricSourceType indicates the type of metric.
 type MetricSourceType string
+
+// HPAScaleConstraints configures a scaling velocity for Up and Down direction
+// (scaleUp and scaleDown fields respectively)
+type HPAScaleConstraints struct {
+	// constraint value for scaling Up
+	// +optional
+	ScaleUp *HPAScaleConstraintValue
+	// constraint value for scaling Down
+	// +optional
+	ScaleDown *HPAScaleConstraintValue
+}
+
+// HPAScaleConstraintRateValue configures the scaling velocity
+// by specifying the "absolute" value (in number of pods) and "relative" values (in percents)
+// and the corresponding time period, for which this constraints are applied
+// If both parameters are specified the largest constraint is used.
+type HPAScaleConstraintRateValue struct {
+	// In order to enable the constraint, either `pods` or `percent` should be set
+	// To support backward compatibility it's possible that none may be set,
+	//   in which case the default values are used
+
+	// Pods specifies the absolute speed, in number of pods per <PeriodSeconds> time period
+	// i.e. if Pods = 5 , then we can add/remove 5 pods (10 -> 15 or 10 -> 5)
+	//      if Pods = -1 (or any negative value), this parameter should not be used
+	//		if Pods is not specified, the default value is used:
+	//			for scaleUp: Pods = 4
+	//			for scaleDown: Pods = -1
+	// more info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883
+	// +optional
+	Pods *int32
+	// Percent specifies the relative speed in percentages
+	// i.e. if Percent = 50, then we can add/remove 50% pods (20 -> 30, or 20 -> 10)
+	//		if Percent = -1 (or any negative value), this parameter should not be used
+	//		if Percent is not specified, the default value is used:
+	//			for scaleUp: Percent = 100
+	//			for scaleDown: Percent = -1
+	// more info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883
+	// +optional
+	Percent *int32
+	// Time period, for which the constraint is applied.
+	// I.e. Pods = 5, PeriodSeconds = 120, then no more than 5 pods could be removed (or added)
+	//		during 120 seconds
+	// Default value is 60sec
+	// +optional
+	PeriodSeconds *int32
+}
+
+// HPAScaleConstraintValue configures the scaling velocity and delay before applying this change
+type HPAScaleConstraintValue struct {
+	// Rate specifies the scale velocity itself
+	// +optional
+	Rate *HPAScaleConstraintRateValue
+	// DelaySeconds specifies a window size to gather recommendations for the scale.
+	// Then the HPA controller considers all recommendations within the window
+	// and chooses the highest one
+	// +optional
+	DelaySeconds *int32
+}
 
 var (
 	// ObjectMetricSourceType is a metric describing a kubernetes object

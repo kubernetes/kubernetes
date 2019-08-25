@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -54,6 +55,19 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 )
+
+// From now on, the HPA controller does have history in it (scaleUpEvents, scaleDownEvents)
+// Hence the second HPA controller reconcile cycle might return different result (comparing with the first run).
+// Current test infrastructure has a race condition, when several reconcile cycles will be performed
+//    while it should be stopped right after the first one. And the second will raise an exception
+//    because of different result.
+
+// This comment has more info: https://github.com/kubernetes/kubernetes/pull/74525#issuecomment-502653106
+// We need to rework this infrastructure:  https://github.com/kubernetes/kubernetes/issues/79222
+
+// For now I solve this by adding resync period for the informers so that the next reconcile cycle
+// will be run with some delay, during which the test will be checked and stopped
+var defaultTestResyncPeriod = 200 * time.Millisecond
 
 var statusOk = []autoscalingv2.HorizontalPodAutoscalerCondition{
 	{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
@@ -92,10 +106,13 @@ type fakeResource struct {
 
 type testCase struct {
 	sync.Mutex
-	minReplicas    int32
-	maxReplicas    int32
-	specReplicas   int32
-	statusReplicas int32
+	minReplicas         int32
+	maxReplicas         int32
+	specReplicas        int32
+	statusReplicas      int32
+	initialReplicas     int32
+	scaleUpConstraint   *autoscalingv2.HPAScaleConstraintValue
+	scaleDownConstraint *autoscalingv2.HPAScaleConstraintValue
 
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget                    int32
@@ -713,6 +730,10 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	if shouldWait {
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
 		timeoutTime := time.Now().Add(2 * time.Second)
+		// We need to wait a little longer then the defaultTestResyncPeriod
+		//	 but not too long for the second resync to happen
+		// Check the comment  before the `defaultTestResyncPeriod`
+		//timeoutTime := time.Now().Add(time.Duration(1.5 * float32(defaultTestResyncPeriod)))
 		for now := time.Now(); timeoutTime.After(now); now = time.Now() {
 			sleepUntil := timeoutTime.Sub(now)
 			select {
@@ -2143,6 +2164,8 @@ func TestUpscaleCap(t *testing.T) {
 		maxReplicas:             100,
 		specReplicas:            3,
 		statusReplicas:          3,
+		scaleUpConstraint:       &autoscalingv2.HPAScaleConstraintValue{Rate: &autoscalingv2.HPAScaleConstraintRateValue{Percent: createInt32Pointer(700)}},
+		initialReplicas:         3,
 		expectedDesiredReplicas: 24,
 		CPUTarget:               10,
 		reportedLevels:          []uint64{100, 200, 300},
@@ -2159,10 +2182,12 @@ func TestUpscaleCap(t *testing.T) {
 
 func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 	tc := testCase{
-		minReplicas:    1,
-		maxReplicas:    20,
-		specReplicas:   3,
-		statusReplicas: 3,
+		minReplicas:       1,
+		maxReplicas:       20,
+		specReplicas:      3,
+		statusReplicas:    3,
+		scaleUpConstraint: &autoscalingv2.HPAScaleConstraintValue{Rate: &autoscalingv2.HPAScaleConstraintRateValue{Percent: createInt32Pointer(700)}},
+		initialReplicas:   3,
 		// expectedDesiredReplicas would be 24 without maxReplicas
 		expectedDesiredReplicas: 20,
 		CPUTarget:               10,
@@ -2946,6 +2971,80 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 	}
 }
 
+func TestConvertDesiredReplicasConstrainedWithRules(t *testing.T) {
+	conversionTestCases := []struct {
+		currentReplicas                  int32
+		expectedDesiredReplicas          int32
+		hpaMinReplicas                   int32
+		hpaMaxReplicas                   int32
+		expectedConvertedDesiredReplicas int32
+		expectedCondition                string
+		annotation                       string
+	}{
+		{
+			currentReplicas:                  3,
+			expectedDesiredReplicas:          1000,
+			hpaMinReplicas:                   1,
+			hpaMaxReplicas:                   2000,
+			expectedConvertedDesiredReplicas: calculateScaleUpLimitWithConstraints(3, 0, *generateHPAScaleUpConstraint(nil).Rate),
+			expectedCondition:                "ScaleUpLimit",
+			annotation:                       "scaleUpLimit is the limit because scaleUpLimit < maxReplicas",
+		},
+	}
+
+	for _, ctc := range conversionTestCases {
+		hc := HorizontalController{}
+		arg := NormalizationArg{
+			CurrentReplicas:     ctc.currentReplicas,
+			DesiredReplicas:     ctc.expectedDesiredReplicas,
+			MinReplicas:         &ctc.hpaMinReplicas,
+			MaxReplicas:         ctc.hpaMaxReplicas,
+			ScaleUpConstraint:   generateHPAScaleUpConstraint(nil),
+			ScaleDownConstraint: generateHPAScaleDownConstraint(nil),
+		}
+		actualConvertedDesiredReplicas, actualCondition, _ := hc.convertDesiredReplicasWithConstraintRate(arg)
+
+		assert.Equal(t, ctc.expectedConvertedDesiredReplicas, actualConvertedDesiredReplicas, ctc.annotation)
+		assert.Equal(t, ctc.expectedCondition, actualCondition, ctc.annotation)
+	}
+}
+
+func createInt32Pointer(x int32) *int32 {
+	return &x
+}
+
+func generateConstraint(pods, percent, period *int32) *autoscalingv2.HPAScaleConstraintValue {
+	return &autoscalingv2.HPAScaleConstraintValue{Rate: &autoscalingv2.HPAScaleConstraintRateValue{
+		Pods:          pods,
+		Percent:       percent,
+		PeriodSeconds: period,
+	}}
+}
+
+func generateEvents(rawEvents []int, periodSeconds int) []timestampedScaleEvent {
+	events := make([]timestampedScaleEvent, len(rawEvents)+2)
+	for idx, event := range rawEvents {
+		// calculate random duration less then periodSeconds
+		secondsAgo := time.Duration(rand.Intn(periodSeconds))
+		events[idx] = timestampedScaleEvent{
+			replicaChange: int32(event),
+			timestamp:     time.Now().Add(-time.Second * secondsAgo),
+		}
+	}
+	// Adds one more event that is 1 second below the threshold
+	events[len(rawEvents)] = timestampedScaleEvent{
+		replicaChange: int32(42),
+		timestamp:     time.Now().Add(-time.Second * time.Duration(periodSeconds+1)),
+	}
+	// Adds one more event with outdated=true
+	events[len(rawEvents)+1] = timestampedScaleEvent{
+		replicaChange: int32(42),
+		timestamp:     time.Now().Add(-time.Second * time.Duration(periodSeconds+100)),
+		outdated:      true,
+	}
+	return events
+}
+
 func TestNormalizeDesiredReplicas(t *testing.T) {
 	tests := []struct {
 		name                         string
@@ -3023,6 +3122,965 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 		}
 		if len(hc.recommendations[tc.key]) != tc.expectedLogLength {
 			t.Errorf("[%s] after  stabilization recommendations log has %d entries, expected %d", tc.name, len(hc.recommendations[tc.key]), tc.expectedLogLength)
+		}
+	}
+}
+
+func TestScaleRate(t *testing.T) {
+	type TestCase struct {
+		name string
+		key  string
+		// controller arguments
+		scaleUpEvents   []timestampedScaleEvent
+		scaleDownEvents []timestampedScaleEvent
+		// HPA Spec arguments
+		specMinReplicas       *int32
+		specMaxReplicas       int32
+		rateUpPods            *int32
+		rateUpPercent         *int32
+		rateUpPeriodSeconds   *int32
+		rateDownPods          *int32
+		rateDownPercent       *int32
+		rateDownPeriodSeconds *int32
+		// external world state
+		currentReplicas              int32
+		prenormalizedDesiredReplicas int32
+		// test expected result
+		expectedReplicas int32
+	}
+
+	tests := []TestCase{
+		// ScaleUp without PeriodSeconds usage
+		{
+			name:                         "scaleUp with default constraint",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 50,
+			expectedReplicas:             20,
+		},
+		{
+			name:                         "scaleUp with rate.Pods is larger then rate.Percent",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateUpPods:                   createInt32Pointer(100),
+			rateUpPercent:                createInt32Pointer(100),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             110,
+		},
+		{
+			name:                         "scaleUp with rate.Percent is larger then rate.Pods",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateUpPods:                   createInt32Pointer(2),
+			rateUpPercent:                createInt32Pointer(100),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             20,
+		},
+		{
+			name:                         "scaleUp with spec MaxReplicas limitation with large rate.Pods",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPods:                   createInt32Pointer(100),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 50,
+			expectedReplicas:             50,
+		},
+		{
+			name:                         "scaleUp with spec MaxReplicas limitation with large rate.Percent",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPercent:                createInt32Pointer(10000),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 50,
+			expectedReplicas:             50,
+		},
+		{
+			name:                         "scaleUp with rate.Pods limitation",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPods:                   createInt32Pointer(30),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 50,
+			expectedReplicas:             40,
+		},
+		{
+			name:                         "scaleUp with rate.Percent limitation",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPercent:                createInt32Pointer(200),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 50,
+			expectedReplicas:             30,
+		},
+		// ScaleDown without PeriodSeconds usage
+		{
+			name:                         "scaleDown with default constraint",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 5,
+			expectedReplicas:             5,
+		},
+		{
+			name:                         "scaleDown with rate.Pods is larger then rate.Percent",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateDownPods:                 createInt32Pointer(20),
+			rateDownPercent:              createInt32Pointer(1),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 2,
+			expectedReplicas:             99,
+		},
+		{
+			name:                         "scaleDown with rate.Percent is larger then rate.Pods",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateDownPods:                 createInt32Pointer(2),
+			rateDownPercent:              createInt32Pointer(10),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 2,
+			expectedReplicas:             98,
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas=nil limitation with large rate.Pods",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPods:                 createInt32Pointer(100),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             1,
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas limitation with large rate.Pods",
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateDownPods:                 createInt32Pointer(100),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             1,
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas limitation with large rate.Percent",
+			specMinReplicas:              createInt32Pointer(5),
+			specMaxReplicas:              1000,
+			rateDownPercent:              createInt32Pointer(100), // 100% removal - is always to 0 => limited by MinReplicas
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 2,
+			expectedReplicas:             5,
+		},
+		{
+			name:                         "scaleDown with rate.Pods limitation",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPods:                 createInt32Pointer(5),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 2,
+			expectedReplicas:             5,
+		},
+		{
+			name:                         "scaleDown with rate.Percent limitation",
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPercent:              createInt32Pointer(50),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 5,
+			expectedReplicas:             5,
+		},
+		// ScaleUp with PeriodSeconds usage
+		{
+			name:                         "scaleUp with rate.PeriodSeconds with default rate",
+			scaleUpEvents:                generateEvents([]int{1, 2, 3, 4, 5}, 60),
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateUpPeriodSeconds:          createInt32Pointer(60),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             170, // (100 - 15) + 100%
+		},
+		{
+			name:                         "scaleUp with spec MaxReplicas limitation with large rate.Pods with rate.PeriodSeconds",
+			scaleUpEvents:                generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              200,
+			rateUpPeriodSeconds:          createInt32Pointer(60),
+			rateUpPods:                   createInt32Pointer(300),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             200, // 200 < 100 - 15 + 300
+		},
+		{
+			name:                         "scaleUp with spec MaxReplicas limitation with large rate.Percent with rate.PeriodSeconds",
+			scaleUpEvents:                generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              200,
+			rateUpPeriodSeconds:          createInt32Pointer(60),
+			rateUpPercent:                createInt32Pointer(10000),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             200,
+		},
+		{
+			// corner case for calculating the scaleUpLimit, when we changed rate.Pods after a lot of scaleUp events
+			// in this case we shouldn't allow scale up, though, the naive formula will suggest that scaleUplimit is less then CurrentReplicas (100-15+5 < 100)
+			name:                         "scaleUp with currentReplicas limitation with rate.PeriodSeconds with a lot of recent scale up events",
+			scaleUpEvents:                generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPeriodSeconds:          createInt32Pointer(120),
+			rateUpPods:                   createInt32Pointer(5),
+			rateUpPercent:                createInt32Pointer(0),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             100, // 120 seconds ago we had (100 - 15) replicas, now the rate.Pods = 5,
+		},
+		{
+			name:                         "scaleUp with rate.Pods limitation with rate.PeriodSeconds",
+			scaleUpEvents:                generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPeriodSeconds:          createInt32Pointer(120),
+			rateUpPods:                   createInt32Pointer(150),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             235, // 100 - 15 + 150
+		},
+		{
+			name:                         "scaleUp with rate.Percent limitation with rate.PeriodSeconds",
+			scaleUpEvents:                generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateUpPeriodSeconds:          createInt32Pointer(120),
+			rateUpPercent:                createInt32Pointer(200),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 500,
+			expectedReplicas:             255, // (100 - 15) + 200%
+		},
+		// ScaleDown with PeriodSeconds usage
+		{
+			name:                         "scaleDown with default constraint with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              createInt32Pointer(1),
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 5,
+			expectedReplicas:             5, // without scaleDown rate limitations the PeriodSeconds does not influence anything
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas=nil limitation with large rate.Pods with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPods:                 createInt32Pointer(115),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             1,
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas limitation with large rate.Pods with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              createInt32Pointer(5),
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPods:                 createInt32Pointer(130),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             5,
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas limitation with large rate.Percent with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              createInt32Pointer(5),
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPercent:              createInt32Pointer(100), // 100% removal - is always to 0 => limited by MinReplicas
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 2,
+			expectedReplicas:             5,
+		},
+		{
+			name:                         "scaleDown with rate.Pods limitation with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{1, 5, 9}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPods:                 createInt32Pointer(5),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 2,
+			expectedReplicas:             100, // 100 + 15 - 5
+		},
+		{
+			name:                         "scaleDown with rate.Percent limitation with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{2, 4, 6}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPercent:              createInt32Pointer(50),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             56, // (100 + 12) - 50%
+		},
+		{
+			// corner case for calculating the scaleDownLimit, when we changed rate.Pods or rate.Percent after a lot of scaleDown events
+			// in this case we shouldn't allow scale down, though, the naive formula will suggest that scaleDownlimit is more then CurrentReplicas (100+30-10% > 100)
+			name:                         "scaleDown with currentReplicas limitation with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{10, 10, 10}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPercent:              createInt32Pointer(10),
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             100, // (100 + 30) - 10% = 117 is more then 100 (currentReplicas), keep 100
+		},
+		{
+			// corner case, the same as above, but calculation shows that we should go below zero
+			name:                         "scaleDown with currentReplicas limitation with PeriodSeconds usage",
+			scaleDownEvents:              generateEvents([]int{10, 10, 10}, 120),
+			specMinReplicas:              nil,
+			specMaxReplicas:              1000,
+			rateDownPeriodSeconds:        createInt32Pointer(120),
+			rateDownPercent:              createInt32Pointer(1000),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 5,
+			expectedReplicas:             5, // (10 + 30) - 1000% = -360 is less than 0 and less then 5 (desired by metrics), set 5
+		},
+	}
+
+	for _, tc := range tests {
+		hc := HorizontalController{
+			scaleUpEvents: map[string][]timestampedScaleEvent{
+				tc.key: tc.scaleUpEvents,
+			},
+			scaleDownEvents: map[string][]timestampedScaleEvent{
+				tc.key: tc.scaleDownEvents,
+			},
+		}
+		var constraints *autoscalingv2.HPAScaleConstraints = nil
+		var scaleUpConstraint *autoscalingv2.HPAScaleConstraintValue = nil
+		var scaleDownConstraint *autoscalingv2.HPAScaleConstraintValue = nil
+
+		if tc.rateUpPods != nil || tc.rateUpPercent != nil || tc.rateUpPeriodSeconds != nil {
+			scaleUpConstraint = generateConstraint(tc.rateUpPods, tc.rateUpPercent, tc.rateUpPeriodSeconds)
+		}
+		if tc.rateDownPods != nil || tc.rateDownPercent != nil || tc.rateDownPeriodSeconds != nil {
+			scaleDownConstraint = generateConstraint(tc.rateDownPods, tc.rateDownPercent, tc.rateDownPeriodSeconds)
+		}
+		if scaleDownConstraint != nil || scaleUpConstraint != nil {
+			constraints = &autoscalingv2.HPAScaleConstraints{
+				ScaleUp:   scaleUpConstraint,
+				ScaleDown: scaleDownConstraint,
+			}
+		}
+		arg := NormalizationArg{
+			Key:                 tc.key,
+			ScaleUpConstraint:   generateHPAScaleUpConstraint(constraints),
+			ScaleDownConstraint: generateHPAScaleDownConstraint(constraints),
+			MinReplicas:         tc.specMinReplicas,
+			MaxReplicas:         tc.specMaxReplicas,
+			DesiredReplicas:     tc.prenormalizedDesiredReplicas,
+			CurrentReplicas:     tc.currentReplicas,
+		}
+
+		r, _, _ := hc.convertDesiredReplicasWithConstraintRate(arg)
+		if r != tc.expectedReplicas {
+			t.Errorf("[%s] got %d replicas, expected %d", tc.name, r, tc.expectedReplicas)
+		}
+	}
+
+}
+
+func TestGenerateScaleUpConstraint(t *testing.T) {
+	type TestCase struct {
+		rateUpPods          *int32
+		rateUpPercent       *int32
+		rateUpPeriodSeconds *int32
+		constraintUpDelay   *int32
+
+		expectedRateUpPods          int32
+		expectedRateUpPercent       int32
+		expectedRateUpPeriodSeconds int32
+		expectedConstraintUpDelay   int32
+		annotation                  string
+	}
+	tests := []TestCase{
+		{
+			annotation:                  "Default values",
+			expectedRateUpPods:          4,
+			expectedRateUpPercent:       100,
+			expectedRateUpPeriodSeconds: 60,
+			expectedConstraintUpDelay:   0,
+		},
+		{
+			annotation:                  "Only DelaySeconds is defined",
+			constraintUpDelay:           createInt32Pointer(5),
+			expectedRateUpPods:          4,
+			expectedRateUpPercent:       100,
+			expectedRateUpPeriodSeconds: 60,
+			expectedConstraintUpDelay:   5,
+		},
+		{
+			annotation:                  "DelaySeconds and Pods are defined",
+			constraintUpDelay:           createInt32Pointer(5),
+			rateUpPods:                  createInt32Pointer(6),
+			expectedRateUpPods:          6,
+			expectedRateUpPercent:       100,
+			expectedRateUpPeriodSeconds: 60,
+			expectedConstraintUpDelay:   5,
+		},
+		{
+			annotation:                  "Pods and Percent are defined",
+			rateUpPods:                  createInt32Pointer(6),
+			rateUpPercent:               createInt32Pointer(7),
+			expectedRateUpPods:          6,
+			expectedRateUpPercent:       7,
+			expectedRateUpPeriodSeconds: 60,
+			expectedConstraintUpDelay:   0,
+		},
+		{
+			annotation:                  "All Rate fields are defined",
+			rateUpPods:                  createInt32Pointer(6),
+			rateUpPercent:               createInt32Pointer(7),
+			rateUpPeriodSeconds:         createInt32Pointer(8),
+			expectedRateUpPods:          6,
+			expectedRateUpPercent:       7,
+			expectedRateUpPeriodSeconds: 8,
+			expectedConstraintUpDelay:   0,
+		},
+		{
+			annotation:                  "All fields are defined",
+			constraintUpDelay:           createInt32Pointer(5),
+			rateUpPods:                  createInt32Pointer(6),
+			rateUpPercent:               createInt32Pointer(7),
+			rateUpPeriodSeconds:         createInt32Pointer(8),
+			expectedRateUpPods:          6,
+			expectedRateUpPercent:       7,
+			expectedRateUpPeriodSeconds: 8,
+			expectedConstraintUpDelay:   5,
+		},
+	}
+	for _, tc := range tests {
+		var rate *autoscalingv2.HPAScaleConstraintRateValue
+		if tc.rateUpPods != nil || tc.rateUpPercent != nil || tc.rateUpPeriodSeconds != nil {
+			rate = &autoscalingv2.HPAScaleConstraintRateValue{
+				Pods:          tc.rateUpPods,
+				Percent:       tc.rateUpPercent,
+				PeriodSeconds: tc.rateUpPeriodSeconds,
+			}
+		}
+		var constraint *autoscalingv2.HPAScaleConstraintValue
+		if rate != nil || tc.constraintUpDelay != nil {
+			constraint = &autoscalingv2.HPAScaleConstraintValue{
+				Rate:         rate,
+				DelaySeconds: tc.constraintUpDelay,
+			}
+		}
+		var constraints *autoscalingv2.HPAScaleConstraints
+		if constraint != nil {
+			constraints = &autoscalingv2.HPAScaleConstraints{
+				ScaleUp: constraint,
+			}
+		}
+		up := generateHPAScaleUpConstraint(constraints)
+		assert.Equal(t, tc.expectedRateUpPods, *up.Rate.Pods, tc.annotation)
+		assert.Equal(t, tc.expectedRateUpPercent, *up.Rate.Percent, tc.annotation)
+		assert.Equal(t, tc.expectedRateUpPeriodSeconds, *up.Rate.PeriodSeconds, tc.annotation)
+		assert.Equal(t, tc.expectedConstraintUpDelay, *up.DelaySeconds, tc.annotation)
+	}
+}
+
+func TestGenerateScaleDownConstraint(t *testing.T) {
+	type TestCase struct {
+		rateDownPods          *int32
+		rateDownPercent       *int32
+		rateDownPeriodSeconds *int32
+		constraintDownDelay   *int32
+
+		expectedRateDownPods          *int32
+		expectedRateDownPercent       *int32
+		expectedRateDownPeriodSeconds *int32
+		expectedConstraintDownDelay   *int32
+		annotation                    string
+	}
+	tests := []TestCase{
+		{
+			annotation:                    "Default values",
+			expectedRateDownPods:          nil,
+			expectedRateDownPercent:       nil,
+			expectedRateDownPeriodSeconds: createInt32Pointer(60),
+			expectedConstraintDownDelay:   createInt32Pointer(300),
+		},
+		{
+			annotation:                    "Only DelaySeconds is defined",
+			constraintDownDelay:           createInt32Pointer(5),
+			expectedRateDownPods:          nil,
+			expectedRateDownPercent:       nil,
+			expectedRateDownPeriodSeconds: createInt32Pointer(60),
+			expectedConstraintDownDelay:   createInt32Pointer(5),
+		},
+		{
+			annotation:                    "DelaySeconds and Pods are defined",
+			constraintDownDelay:           createInt32Pointer(5),
+			rateDownPods:                  createInt32Pointer(6),
+			expectedRateDownPods:          createInt32Pointer(6),
+			expectedRateDownPercent:       nil,
+			expectedRateDownPeriodSeconds: createInt32Pointer(60),
+			expectedConstraintDownDelay:   createInt32Pointer(5),
+		},
+		{
+			annotation:                    "Pods and Percent are defined",
+			rateDownPods:                  createInt32Pointer(6),
+			rateDownPercent:               createInt32Pointer(7),
+			expectedRateDownPods:          createInt32Pointer(6),
+			expectedRateDownPercent:       createInt32Pointer(7),
+			expectedRateDownPeriodSeconds: createInt32Pointer(60),
+			expectedConstraintDownDelay:   createInt32Pointer(300),
+		},
+		{
+			annotation:                    "All Rate fields are defined",
+			rateDownPods:                  createInt32Pointer(6),
+			rateDownPercent:               createInt32Pointer(7),
+			rateDownPeriodSeconds:         createInt32Pointer(8),
+			expectedRateDownPods:          createInt32Pointer(6),
+			expectedRateDownPercent:       createInt32Pointer(7),
+			expectedRateDownPeriodSeconds: createInt32Pointer(8),
+			expectedConstraintDownDelay:   createInt32Pointer(300),
+		},
+		{
+			annotation:                    "All fields are defined",
+			constraintDownDelay:           createInt32Pointer(5),
+			rateDownPods:                  createInt32Pointer(6),
+			rateDownPercent:               createInt32Pointer(7),
+			rateDownPeriodSeconds:         createInt32Pointer(8),
+			expectedRateDownPods:          createInt32Pointer(6),
+			expectedRateDownPercent:       createInt32Pointer(7),
+			expectedRateDownPeriodSeconds: createInt32Pointer(8),
+			expectedConstraintDownDelay:   createInt32Pointer(5),
+		},
+	}
+	for _, tc := range tests {
+		var rate *autoscalingv2.HPAScaleConstraintRateValue
+		if tc.rateDownPods != nil || tc.rateDownPercent != nil || tc.rateDownPeriodSeconds != nil {
+			rate = &autoscalingv2.HPAScaleConstraintRateValue{
+				Pods:          tc.rateDownPods,
+				Percent:       tc.rateDownPercent,
+				PeriodSeconds: tc.rateDownPeriodSeconds,
+			}
+		}
+		var constraint *autoscalingv2.HPAScaleConstraintValue
+		if rate != nil || tc.constraintDownDelay != nil {
+			constraint = &autoscalingv2.HPAScaleConstraintValue{
+				Rate:         rate,
+				DelaySeconds: tc.constraintDownDelay,
+			}
+		}
+		var constraints *autoscalingv2.HPAScaleConstraints
+		if constraint != nil {
+			constraints = &autoscalingv2.HPAScaleConstraints{
+				ScaleDown: constraint,
+			}
+		}
+		down := generateHPAScaleDownConstraint(constraints)
+		if tc.expectedRateDownPods != nil && down.Rate.Pods != nil {
+			assert.Equal(t, *tc.expectedRateDownPods, *down.Rate.Pods, tc.annotation)
+		} else {
+			assert.Equal(t, tc.expectedRateDownPods, down.Rate.Pods, tc.annotation)
+		}
+
+		if tc.expectedRateDownPercent != nil && down.Rate.Percent != nil {
+			assert.Equal(t, *tc.expectedRateDownPercent, *down.Rate.Percent, tc.annotation)
+		} else {
+			assert.Equal(t, tc.expectedRateDownPercent, down.Rate.Percent, tc.annotation)
+		}
+		if tc.expectedRateDownPeriodSeconds != nil && down.Rate.PeriodSeconds != nil {
+			assert.Equal(t, *tc.expectedRateDownPeriodSeconds, *down.Rate.PeriodSeconds, tc.annotation)
+		} else {
+			assert.Equal(t, tc.expectedRateDownPeriodSeconds, down.Rate.PeriodSeconds, tc.annotation)
+		}
+		if tc.expectedConstraintDownDelay != nil && down.DelaySeconds != nil {
+			assert.Equal(t, *tc.expectedConstraintDownDelay, *down.DelaySeconds, tc.annotation)
+		} else {
+			assert.Equal(t, tc.expectedConstraintDownDelay, down.DelaySeconds, tc.annotation)
+		}
+	}
+}
+
+// TestStoreScaleUpEvents tests storeScaleEvent and getReplicasChangePerPeriod for scaleUp events
+func TestStoreScaleUpEvents(t *testing.T) {
+	tests := []struct {
+		name                   string
+		key                    string
+		prevReplicas           int32
+		newReplicas            int32
+		prevScaleEvents        []timestampedScaleEvent
+		newScaleEvents         []timestampedScaleEvent
+		expectedReplicasChange int32
+	}{
+		{
+			"empty entries",
+			"",
+			5,
+			10,
+			[]timestampedScaleEvent{},
+			[]timestampedScaleEvent{{5, time.Now(), false}},
+			0,
+		},
+		{
+			"one outdated entry to be replaced",
+			"",
+			5,
+			10,
+			[]timestampedScaleEvent{ // prevScaleEvents
+				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be replaced
+			},
+			[]timestampedScaleEvent{ // newScaleEvents
+				{5, time.Now(), false},
+			},
+			0,
+		},
+		{
+			"two entries, one of them to be replaced",
+			"",
+			5,
+			10,
+			[]timestampedScaleEvent{ // prevScaleEvents
+				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be replaced
+				{6, time.Now().Add(-time.Second * time.Duration(59)), false},
+			},
+			[]timestampedScaleEvent{ // newScaleEvents
+				{5, time.Now(), false},
+				{6, time.Now(), false},
+			},
+			6,
+		},
+		{
+			"two entries, both actual",
+			"",
+			5,
+			10,
+			[]timestampedScaleEvent{ // prevScaleEvents
+				{7, time.Now().Add(-time.Second * time.Duration(58)), false}, // outdated event, should be replaced
+				{6, time.Now().Add(-time.Second * time.Duration(59)), false},
+			},
+			[]timestampedScaleEvent{ // newScaleEvents
+				{7, time.Now(), false},
+				{6, time.Now(), false},
+				{5, time.Now(), false},
+			},
+			13,
+		},
+	}
+
+	for _, tc := range tests {
+		hc := HorizontalController{
+			scaleUpEvents: map[string][]timestampedScaleEvent{
+				tc.key: tc.prevScaleEvents,
+			},
+		}
+		gotReplicasChange := getReplicasChangePerPeriod(60, hc.scaleUpEvents[tc.key])
+		assert.Equal(t, tc.expectedReplicasChange, gotReplicasChange)
+		hc.storeScaleEvent(tc.key, tc.prevReplicas, tc.newReplicas)
+		if len(hc.scaleUpEvents[tc.key]) != len(tc.newScaleEvents) {
+			t.Errorf("[%s] got %d ScaleUpEvents, expected %d", tc.name, len(hc.scaleUpEvents[tc.key]), len(tc.newScaleEvents))
+			t.Errorf("     expected Events: %+v\n", tc.newScaleEvents)
+			t.Errorf("     got Events: %+v\n", hc.scaleUpEvents[tc.key])
+			break
+		}
+		for i, gotEvent := range hc.scaleUpEvents[tc.key] {
+			expEvent := tc.newScaleEvents[i]
+			if expEvent.replicaChange != gotEvent.replicaChange || expEvent.outdated != expEvent.outdated {
+				t.Errorf("[%s] got unexpected event (time is not taken into account)", tc.name)
+				t.Errorf("     expected Events: %+v\n", tc.newScaleEvents)
+				t.Errorf("     got Events: %+v\n", hc.scaleUpEvents[tc.key])
+				break
+			}
+		}
+	}
+}
+
+// TestStoreScaleDownEvents tests storeScaleEvent and getReplicasChangePerPeriod for scaleDownEvents
+func TestStoreScaleDownEvents(t *testing.T) {
+	tests := []struct {
+		name                   string
+		key                    string
+		prevReplicas           int32
+		newReplicas            int32
+		prevScaleEvents        []timestampedScaleEvent
+		newScaleEvents         []timestampedScaleEvent
+		expectedReplicasChange int32
+	}{
+		{
+			"empty entries",
+			"",
+			10,
+			5,
+			[]timestampedScaleEvent{},
+			[]timestampedScaleEvent{{5, time.Now(), false}},
+			0,
+		},
+		{
+			"one outdated entry to be replaced",
+			"",
+			10,
+			5,
+			[]timestampedScaleEvent{ // prevScaleEvents
+				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be replaced
+			},
+			[]timestampedScaleEvent{ // newScaleEvents
+				{5, time.Now(), false},
+			},
+			0,
+		},
+		{
+			"two entries, one of them to be replaced",
+			"",
+			10,
+			5,
+			[]timestampedScaleEvent{ // prevScaleEvents
+				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be replaced
+				{6, time.Now().Add(-time.Second * time.Duration(59)), false},
+			},
+			[]timestampedScaleEvent{ // newScaleEvents
+				{5, time.Now(), false},
+				{6, time.Now(), false},
+			},
+			6,
+		},
+		{
+			"two entries, both actual",
+			"",
+			10,
+			5,
+			[]timestampedScaleEvent{ // prevScaleEvents
+				{7, time.Now().Add(-time.Second * time.Duration(58)), false}, // outdated event, should be replaced
+				{6, time.Now().Add(-time.Second * time.Duration(59)), false},
+			},
+			[]timestampedScaleEvent{ // newScaleEvents
+				{7, time.Now(), false},
+				{6, time.Now(), false},
+				{5, time.Now(), false},
+			},
+			13,
+		},
+	}
+
+	for _, tc := range tests {
+		hc := HorizontalController{
+			scaleDownEvents: map[string][]timestampedScaleEvent{
+				tc.key: tc.prevScaleEvents,
+			},
+		}
+		gotReplicasChange := getReplicasChangePerPeriod(60, hc.scaleDownEvents[tc.key])
+		assert.Equal(t, tc.expectedReplicasChange, gotReplicasChange)
+		hc.storeScaleEvent(tc.key, tc.prevReplicas, tc.newReplicas)
+		if len(hc.scaleDownEvents[tc.key]) != len(tc.newScaleEvents) {
+			t.Errorf("[%s] got %d ScaleDownEvents, expected %d", tc.name, len(hc.scaleDownEvents[tc.key]), len(tc.newScaleEvents))
+			t.Errorf("     expected Events: %+v\n", tc.newScaleEvents)
+			t.Errorf("     got Events: %+v\n", hc.scaleDownEvents[tc.key])
+			break
+		}
+		for i, gotEvent := range hc.scaleDownEvents[tc.key] {
+			expEvent := tc.newScaleEvents[i]
+			if expEvent.replicaChange != gotEvent.replicaChange || expEvent.outdated != expEvent.outdated {
+				t.Errorf("[%s] got unexpected event (time is not taken into account)", tc.name)
+				t.Errorf("     expected Events: %+v\n", tc.newScaleEvents)
+				t.Errorf("     got Events: %+v\n", hc.scaleDownEvents[tc.key])
+				break
+			}
+		}
+	}
+}
+
+func TestNormalizeWithConstraintsDesiredReplicas(t *testing.T) {
+	type TestCase struct {
+		name                         string
+		key                          string
+		recommendations              []timestampedRecommendation
+		currentReplicas              int32
+		prenormalizedDesiredReplicas int32
+		delay                        *int32
+		expectedStabilizedReplicas   int32
+		expectedRecommendations      []timestampedRecommendation
+	}
+	tests := []TestCase{
+		{
+			name:                         "empty recommendations for scaling down",
+			key:                          "",
+			recommendations:              []timestampedRecommendation{},
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 5,
+			expectedStabilizedReplicas:   5,
+			expectedRecommendations: []timestampedRecommendation{
+				{5, time.Now()},
+			},
+		},
+		{
+			name: "simple scale down stabilization",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{4, time.Now().Add(-2 * time.Minute)},
+				{5, time.Now().Add(-1 * time.Minute)}},
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 3,
+			expectedStabilizedReplicas:   5,
+			expectedRecommendations: []timestampedRecommendation{
+				{4, time.Now()},
+				{5, time.Now()},
+				{3, time.Now()},
+			},
+		},
+		{
+			name: "simple scale up stabilization",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{4, time.Now().Add(-2 * time.Minute)},
+				{5, time.Now().Add(-1 * time.Minute)}},
+			delay:                        createInt32Pointer(150), // 150 seconds to include all recomendation events
+			currentReplicas:              1,
+			prenormalizedDesiredReplicas: 7,
+			expectedStabilizedReplicas:   4,
+			expectedRecommendations: []timestampedRecommendation{
+				{4, time.Now()},
+				{5, time.Now()},
+				{3, time.Now()},
+			},
+		},
+		{
+			name: "no scale down stabilization",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{1, time.Now().Add(-2 * time.Minute)},
+				{2, time.Now().Add(-1 * time.Minute)}},
+			currentReplicas:              100, // to apply scaleDown delay we should have current > desired
+			prenormalizedDesiredReplicas: 3,
+			expectedStabilizedReplicas:   3,
+			expectedRecommendations: []timestampedRecommendation{
+				{1, time.Now()},
+				{2, time.Now()},
+				{3, time.Now()},
+			},
+		},
+		{
+			name: "no scale up stabilization",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{4, time.Now().Add(-2 * time.Minute)},
+				{5, time.Now().Add(-1 * time.Minute)}},
+			delay:                        createInt32Pointer(150), // 150 seconds to include all recomendation events
+			currentReplicas:              1,                       // to apply scaleDown delay we should have current > desired
+			prenormalizedDesiredReplicas: 3,
+			expectedStabilizedReplicas:   3,
+			expectedRecommendations: []timestampedRecommendation{
+				{1, time.Now()},
+				{2, time.Now()},
+				{3, time.Now()},
+			},
+		},
+		{
+			name: "no scale down stabilization, reuse recommendation element",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{10, time.Now().Add(-10 * time.Minute)},
+				{9, time.Now().Add(-9 * time.Minute)}},
+			currentReplicas:              100, // to apply scaleDown delay we should have current > desired
+			prenormalizedDesiredReplicas: 3,
+			expectedStabilizedReplicas:   3,
+			expectedRecommendations: []timestampedRecommendation{
+				{10, time.Now()},
+				{3, time.Now()},
+			},
+		},
+		{
+			name: "no scale up stabilization, reuse recommendation element",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{10, time.Now().Add(-10 * time.Minute)},
+				{9, time.Now().Add(-9 * time.Minute)}},
+			delay:                        createInt32Pointer(60), // 60 seconds to include no previous recommendations
+			currentReplicas:              1,
+			prenormalizedDesiredReplicas: 100,
+			expectedStabilizedReplicas:   100,
+			expectedRecommendations: []timestampedRecommendation{
+				{10, time.Now()},
+				{100, time.Now()},
+			},
+		},
+		{
+			name: "scale down stabilization, reuse one of obsolete recommendation element",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{10, time.Now().Add(-10 * time.Minute)},
+				{4, time.Now().Add(-1 * time.Minute)},
+				{5, time.Now().Add(-2 * time.Minute)},
+				{9, time.Now().Add(-9 * time.Minute)}},
+			delay:                        createInt32Pointer(150), // 150 seconds to include only two previous recommendations
+			currentReplicas:              100,
+			prenormalizedDesiredReplicas: 3,
+			expectedStabilizedReplicas:   5,
+			expectedRecommendations: []timestampedRecommendation{
+				{10, time.Now()},
+				{4, time.Now()},
+				{5, time.Now()},
+				{3, time.Now()},
+			},
+		},
+		{
+			// we can reuse only the first recommendation element
+			// as the scale up delay = 150 (set in test), scale down delay = 300 (by default)
+			// hence, only the first recommendation is obsolete for both scale up and scale down
+			name: "scale up stabilization, reuse one of obsolete recommendation element",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{10, time.Now().Add(-100 * time.Minute)},
+				{6, time.Now().Add(-1 * time.Minute)},
+				{5, time.Now().Add(-2 * time.Minute)},
+				{9, time.Now().Add(-3 * time.Minute)}},
+			delay:                        createInt32Pointer(150), // 150 seconds to include only two previous recommendations
+			currentReplicas:              1,
+			prenormalizedDesiredReplicas: 100,
+			expectedStabilizedReplicas:   5,
+			expectedRecommendations: []timestampedRecommendation{
+				{100, time.Now()},
+				{4, time.Now()},
+				{5, time.Now()},
+				{9, time.Now()},
+			},
+		},
+	}
+	for _, tc := range tests {
+		hc := HorizontalController{
+			recommendations: map[string][]timestampedRecommendation{
+				tc.key: tc.recommendations,
+			},
+		}
+		var constraints *autoscalingv2.HPAScaleConstraints
+		if tc.delay != nil {
+			constraint := &autoscalingv2.HPAScaleConstraintValue{DelaySeconds: tc.delay}
+			if tc.prenormalizedDesiredReplicas > tc.currentReplicas {
+				constraints = &autoscalingv2.HPAScaleConstraints{ScaleUp: constraint}
+			} else if tc.prenormalizedDesiredReplicas < tc.currentReplicas {
+				constraints = &autoscalingv2.HPAScaleConstraints{ScaleDown: constraint}
+			}
+		}
+		arg := NormalizationArg{
+			Key:                 tc.key,
+			ScaleDownConstraint: generateHPAScaleDownConstraint(constraints),
+			ScaleUpConstraint:   generateHPAScaleUpConstraint(constraints),
+			DesiredReplicas:     tc.prenormalizedDesiredReplicas,
+			CurrentReplicas:     tc.currentReplicas,
+		}
+		r, _, _ := hc.stabilizeRecommendationWithConstraints(arg)
+		if r != tc.expectedStabilizedReplicas {
+			t.Errorf("[%s] got %d stabilized replicas, expected %d", tc.name, r, tc.expectedStabilizedReplicas)
+		}
+		if len(hc.recommendations[tc.key]) != len(tc.expectedRecommendations) {
+			t.Errorf("[%s] after  stabilization recommendations, got unexpected recommendations length: got %d, expected %d\n", tc.name, len(hc.recommendations[tc.key]), len(tc.expectedRecommendations))
+			t.Errorf("      got recommendations: %+v\n", hc.recommendations[tc.key])
+			t.Errorf("      expected recommendations: %+v\n", tc.expectedRecommendations)
 		}
 	}
 }
@@ -3126,4 +4184,4 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 	tc.runTest(t)
 }
 
-// TODO: add more tests
+// TODO: add more tests for stabilization

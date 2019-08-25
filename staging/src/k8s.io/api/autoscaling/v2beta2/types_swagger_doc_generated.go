@@ -58,6 +58,37 @@ func (ExternalMetricStatus) SwaggerDoc() map[string]string {
 	return map_ExternalMetricStatus
 }
 
+var map_HPAScaleConstraintRateValue = map[string]string{
+	"":              "HPAScaleConstraintRateValue configures the scaling velocity by specifying the \"absolute\" value (in number of pods) and \"relative\" values (in percents) and the corresponding time period, for which this constraints are applied If both parameters are specified the largest constraint is used.",
+	"pods":          "Pods specifies the absolute speed, in number of pods per <PeriodSeconds> time period i.e. if Pods = 5 , then we can add/remove 5 pods (10 -> 15 or 10 -> 5)\n     if Pods = -1 (or any negative value), this parameter should not be used\n\t\tif Pods is not specified, the default value is used:\n\t\t\tfor scaleUp: Pods = 4\n\t\t\tfor scaleDown: Pods = -1\nmore info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883",
+	"percent":       "Percent specifies the relative speed in percentages i.e. if Percent = 50, then we can add/remove 50% pods (20 -> 30, or 20 -> 10)\n\t\tif Percent = -1 (or any negative value), this parameter should not be used\n\t\tif Percent is not specified, the default value is used:\n\t\t\tfor scaleUp: Percent = 100\n\t\t\tfor scaleDown: Percent = -1\nmore info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883",
+	"periodSeconds": "Time period, for which the constraint is applied. I.e. Pods = 5, PeriodSeconds = 120, then no more than 5 pods could be removed (or added)\n\t\tduring 120 seconds\nDefault value is 60sec",
+}
+
+func (HPAScaleConstraintRateValue) SwaggerDoc() map[string]string {
+	return map_HPAScaleConstraintRateValue
+}
+
+var map_HPAScaleConstraintValue = map[string]string{
+	"":             "HPAScaleConstraintValue configures the scaling velocity and delay before applying this change",
+	"rate":         "Rate specifies the scale velocity itself",
+	"delaySeconds": "DelaySeconds specifies a window size to gather recommendations for the scale. Then the HPA controller considers all recommendations within the window and chooses the highest one",
+}
+
+func (HPAScaleConstraintValue) SwaggerDoc() map[string]string {
+	return map_HPAScaleConstraintValue
+}
+
+var map_HPAScaleConstraints = map[string]string{
+	"":          "HPAScaleConstraints configures a scaling velocity for Up and Down direction (scaleUp and scaleDown fields respectively)",
+	"scaleUp":   "constraint value for scaling Up",
+	"scaleDown": "constraint value for scaling Down",
+}
+
+func (HPAScaleConstraints) SwaggerDoc() map[string]string {
+	return map_HPAScaleConstraints
+}
+
 var map_HorizontalPodAutoscaler = map[string]string{
 	"":         "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
 	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -98,6 +129,7 @@ var map_HorizontalPodAutoscalerSpec = map[string]string{
 	"minReplicas":    "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
 	"maxReplicas":    "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
 	"metrics":        "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the default metric will be set to 80% average CPU utilization.",
+	"constraints":    "constraints contain HPA object configuration parameters that configure each particular HPA scaling behaviour.",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {

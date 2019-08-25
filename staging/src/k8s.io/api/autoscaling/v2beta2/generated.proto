@@ -64,6 +64,64 @@ message ExternalMetricStatus {
   optional MetricValueStatus current = 2;
 }
 
+// HPAScaleConstraintRateValue configures the scaling velocity
+// by specifying the "absolute" value (in number of pods) and "relative" values (in percents)
+// and the corresponding time period, for which this constraints are applied
+// If both parameters are specified the largest constraint is used.
+message HPAScaleConstraintRateValue {
+  // Pods specifies the absolute speed, in number of pods per <PeriodSeconds> time period
+  // i.e. if Pods = 5 , then we can add/remove 5 pods (10 -> 15 or 10 -> 5)
+  //      if Pods = -1 (or any negative value), this parameter should not be used
+  // 		if Pods is not specified, the default value is used:
+  // 			for scaleUp: Pods = 4
+  // 			for scaleDown: Pods = -1
+  // more info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883
+  // +optional
+  optional int32 pods = 1;
+
+  // Percent specifies the relative speed in percentages
+  // i.e. if Percent = 50, then we can add/remove 50% pods (20 -> 30, or 20 -> 10)
+  // 		if Percent = -1 (or any negative value), this parameter should not be used
+  // 		if Percent is not specified, the default value is used:
+  // 			for scaleUp: Percent = 100
+  // 			for scaleDown: Percent = -1
+  // more info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883
+  // +optional
+  optional int32 percent = 2;
+
+  // Time period, for which the constraint is applied.
+  // I.e. Pods = 5, PeriodSeconds = 120, then no more than 5 pods could be removed (or added)
+  // 		during 120 seconds
+  // Default value is 60sec
+  // +optional
+  optional int32 periodSeconds = 3;
+}
+
+// HPAScaleConstraintValue configures the scaling velocity and delay before applying this change
+message HPAScaleConstraintValue {
+  // Rate specifies the scale velocity itself
+  // +optional
+  optional HPAScaleConstraintRateValue rate = 1;
+
+  // DelaySeconds specifies a window size to gather recommendations for the scale.
+  // Then the HPA controller considers all recommendations within the window
+  // and chooses the highest one
+  // +optional
+  optional int32 delaySeconds = 2;
+}
+
+// HPAScaleConstraints configures a scaling velocity for Up and Down direction
+// (scaleUp and scaleDown fields respectively)
+message HPAScaleConstraints {
+  // constraint value for scaling Up
+  // +optional
+  optional HPAScaleConstraintValue scaleUp = 1;
+
+  // constraint value for scaling Down
+  // +optional
+  optional HPAScaleConstraintValue scaleDown = 2;
+}
+
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
 // implementing the scale subresource based on the metrics specified.
@@ -145,6 +203,11 @@ message HorizontalPodAutoscalerSpec {
   // If not set, the default metric will be set to 80% average CPU utilization.
   // +optional
   repeated MetricSpec metrics = 4;
+
+  // constraints contain HPA object configuration parameters
+  // that configure each particular HPA scaling behaviour.
+  // +optional
+  optional HPAScaleConstraints constraints = 5;
 }
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.

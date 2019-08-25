@@ -72,6 +72,10 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default metric will be set to 80% average CPU utilization.
 	// +optional
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
+	// constraints contain HPA object configuration parameters
+	// that configure each particular HPA scaling behaviour.
+	// +optional
+	Constraints *HPAScaleConstraints `json:"constraints,omitempty" protobuf:"bytes,5,opt,name=constraints"`
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
@@ -119,6 +123,64 @@ type MetricSpec struct {
 
 // MetricSourceType indicates the type of metric.
 type MetricSourceType string
+
+// HPAScaleConstraints configures a scaling velocity for Up and Down direction
+// (scaleUp and scaleDown fields respectively)
+type HPAScaleConstraints struct {
+	// constraint value for scaling Up
+	// +optional
+	ScaleUp *HPAScaleConstraintValue `json:"scaleUp,omitempty" protobuf:"bytes,1,opt,name=scaleUp"`
+	// constraint value for scaling Down
+	// +optional
+	ScaleDown *HPAScaleConstraintValue `json:"scaleDown,omitempty" protobuf:"bytes,2,opt,name=scaleDown"`
+}
+
+// HPAScaleConstraintRateValue configures the scaling velocity
+// by specifying the "absolute" value (in number of pods) and "relative" values (in percents)
+// and the corresponding time period, for which this constraints are applied
+// If both parameters are specified the largest constraint is used.
+type HPAScaleConstraintRateValue struct {
+	// In order to enable the constraint, either `pods` or `percent` should be set
+	// To support backward compatibility it's possible that none may be set,
+	//   in which case the default values are used
+
+	// Pods specifies the absolute speed, in number of pods per <PeriodSeconds> time period
+	// i.e. if Pods = 5 , then we can add/remove 5 pods (10 -> 15 or 10 -> 5)
+	//      if Pods = -1 (or any negative value), this parameter should not be used
+	//		if Pods is not specified, the default value is used:
+	//			for scaleUp: Pods = 4
+	//			for scaleDown: Pods = -1
+	// more info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883
+	// +optional
+	Pods *int32 `json:"pods,omitempty" protobuf:"bytes,1,opt,name=pods"`
+	// Percent specifies the relative speed in percentages
+	// i.e. if Percent = 50, then we can add/remove 50% pods (20 -> 30, or 20 -> 10)
+	//		if Percent = -1 (or any negative value), this parameter should not be used
+	//		if Percent is not specified, the default value is used:
+	//			for scaleUp: Percent = 100
+	//			for scaleDown: Percent = -1
+	// more info could be found in the KEP https://github.com/kubernetes/enhancements/pull/883
+	// +optional
+	Percent *int32 `json:"percent,omitempty" protobuf:"bytes,2,opt,name=percent"`
+	// Time period, for which the constraint is applied.
+	// I.e. Pods = 5, PeriodSeconds = 120, then no more than 5 pods could be removed (or added)
+	//		during 120 seconds
+	// Default value is 60sec
+	// +optional
+	PeriodSeconds *int32 `json:"periodSeconds,omitempty" protobuf:"bytes,3,opt,name=periodSeconds"`
+}
+
+// HPAScaleConstraintValue configures the scaling velocity and delay before applying this change
+type HPAScaleConstraintValue struct {
+	// Rate specifies the scale velocity itself
+	// +optional
+	Rate *HPAScaleConstraintRateValue `json:"rate,omitempty" protobuf:"bytes,1,opt,name=rate"`
+	// DelaySeconds specifies a window size to gather recommendations for the scale.
+	// Then the HPA controller considers all recommendations within the window
+	// and chooses the highest one
+	// +optional
+	DelaySeconds *int32 `json:"delaySeconds,omitempty" protobuf:"bytes,2,opt,name=delaySeconds"`
+}
 
 var (
 	// ObjectMetricSourceType is a metric describing a kubernetes object
