@@ -18,12 +18,14 @@ package statefulset
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/retry"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -68,6 +70,22 @@ func TestSpecReplicasChange(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to verify .Status.ObservedGeneration has incremented for sts %s: %v", sts.Name, err)
 	}
+}
+
+func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
+	var pod *v1.Pod
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		updateFunc(newPod)
+		pod, err = podClient.Update(newPod)
+		return err
+	}); err != nil {
+		t.Fatalf("failed to update pod %s: %v", podName, err)
+	}
+	return pod
 }
 
 func TestDeletingAndFailedPods(t *testing.T) {

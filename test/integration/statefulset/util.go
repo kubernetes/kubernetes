@@ -231,22 +231,6 @@ func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.Stat
 	}
 }
 
-func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
-	var pod *v1.Pod
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		updateFunc(newPod)
-		pod, err = podClient.Update(newPod)
-		return err
-	}); err != nil {
-		t.Fatalf("failed to update pod %s: %v", podName, err)
-	}
-	return pod
-}
-
 func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
