@@ -1,4 +1,3 @@
-cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
 cmd/controller-manager/app
 cmd/kube-controller-manager/app
