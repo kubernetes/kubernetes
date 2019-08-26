@@ -33,7 +33,7 @@ func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.Topo
 	if a.Preferred != b.Preferred {
 		return a.Preferred == true
 	}
-	return a.SocketAffinity.IsNarrowerThan(b.SocketAffinity)
+	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
 }
 
 func TestGetTopologyHints(t *testing.T) {
@@ -99,16 +99,16 @@ func TestGetTopologyHints(t *testing.T) {
 			container: *testContainer1,
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: firstSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: firstSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: secondSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      false,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
 				},
 			},
 		},
@@ -118,12 +118,12 @@ func TestGetTopologyHints(t *testing.T) {
 			container: *testContainer2,
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: secondSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      false,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
 				},
 			},
 		},
@@ -133,8 +133,8 @@ func TestGetTopologyHints(t *testing.T) {
 			container: *testContainer3,
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        true,
 				},
 			},
 		},
