@@ -102,7 +102,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, numaNodeInfo topology.NUMANodeInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 
@@ -113,7 +113,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 
 	case PolicyStatic:
 		var err error
-		topo, err := topology.Discover(machineInfo)
+		topo, err := topology.Discover(machineInfo, numaNodeInfo)
 		if err != nil {
 			return nil, err
 		}

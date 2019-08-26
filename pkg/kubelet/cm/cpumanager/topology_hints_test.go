@@ -70,7 +70,12 @@ func TestGetTopologyHints(t *testing.T) {
 		},
 	}
 
-	topology, _ := topology.Discover(&machineInfo)
+	numaNodeInfo := topology.NUMANodeInfo{
+		0: cpuset.NewCPUSet(0, 6, 1, 7, 2, 8),
+		1: cpuset.NewCPUSet(3, 9, 4, 10, 5, 11),
+	}
+
+	topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
 
 	m := manager{
 		policy: &staticPolicy{
