@@ -43,7 +43,6 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
@@ -67,6 +66,16 @@ const (
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+
+	// serviceNodeExclusionFeature is the feature gate name that
+	// enables nodes to exclude themselves from service load balancers
+	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
+	serviceNodeExclusionFeature = "ServiceNodeExclusion"
+
+	// ServiceLoadBalancerFinalizerFeature is the feature gate name that
+	// enables Finalizer Protection for Service LoadBalancers.
+	// orginated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L433
+	serviceLoadBalancerFinalizerFeature = "ServiceLoadBalancerFinalizer"
 )
 
 type cachedService struct {
@@ -150,7 +159,7 @@ func New(
 				}
 			},
 			DeleteFunc: func(old interface{}) {
-				if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceLoadBalancerFinalizer) {
+				if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
 					// No need to handle deletion event if finalizer feature gate is
 					// enabled. Because the deletion would be handled by the update
 					// path when the deletion timestamp is added.
@@ -327,7 +336,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		op = ensureLoadBalancer
 		klog.V(2).Infof("Ensuring load balancer for service %s", key)
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceLoadBalancerFinalizer) {
+		if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
 			// Always try to add finalizer prior to load balancer creation.
 			// It will be a no-op if finalizer already exists.
 			// Note this also retrospectively puts on finalizer if the cluster
@@ -623,7 +632,7 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
+		if utilfeature.DefaultFeatureGate.Enabled(serviceNodeExclusionFeature) {
 			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
