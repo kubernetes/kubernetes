@@ -56,7 +56,6 @@ pkg/scheduler/algorithm/priorities
 pkg/scheduler/api/v1
 pkg/scheduler/apis/config/v1alpha1
 pkg/scheduler/internal/queue
-pkg/security/podsecuritypolicy/sysctl
 pkg/util/coverage
 pkg/util/ebtables
 pkg/util/ipconfig
