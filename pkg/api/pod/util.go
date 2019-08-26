@@ -445,8 +445,12 @@ func dropDisabledGMSAFields(podSpec, oldPodSpec *api.PodSpec) {
 	if podSpec.SecurityContext != nil {
 		dropDisabledGMSAFieldsFromWindowsSecurityOptions(podSpec.SecurityContext.WindowsOptions)
 	}
-	dropDisabledGMSAFieldsFromContainers(podSpec.Containers)
-	dropDisabledGMSAFieldsFromContainers(podSpec.InitContainers)
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.SecurityContext != nil {
+			dropDisabledGMSAFieldsFromWindowsSecurityOptions(c.SecurityContext.WindowsOptions)
+		}
+		return true
+	})
 }
 
 // dropDisabledGMSAFieldsFromWindowsSecurityOptions removes disabled fields
@@ -455,15 +459,6 @@ func dropDisabledGMSAFieldsFromWindowsSecurityOptions(windowsOptions *api.Window
 	if windowsOptions != nil {
 		windowsOptions.GMSACredentialSpecName = nil
 		windowsOptions.GMSACredentialSpec = nil
-	}
-}
-
-// dropDisabledGMSAFieldsFromContainers removes disabled fields
-func dropDisabledGMSAFieldsFromContainers(containers []api.Container) {
-	for i := range containers {
-		if containers[i].SecurityContext != nil {
-			dropDisabledGMSAFieldsFromWindowsSecurityOptions(containers[i].SecurityContext.WindowsOptions)
-		}
 	}
 }
 
@@ -478,8 +473,12 @@ func dropDisabledRunAsUserNameFields(podSpec, oldPodSpec *api.PodSpec) {
 	if podSpec.SecurityContext != nil {
 		dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(podSpec.SecurityContext.WindowsOptions)
 	}
-	dropDisabledRunAsUserNameFieldsFromContainers(podSpec.Containers)
-	dropDisabledRunAsUserNameFieldsFromContainers(podSpec.InitContainers)
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.SecurityContext != nil {
+			dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(c.SecurityContext.WindowsOptions)
+		}
+		return true
+	})
 }
 
 // dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions removes disabled fields
@@ -487,15 +486,6 @@ func dropDisabledRunAsUserNameFields(podSpec, oldPodSpec *api.PodSpec) {
 func dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(windowsOptions *api.WindowsSecurityContextOptions) {
 	if windowsOptions != nil {
 		windowsOptions.RunAsUserName = nil
-	}
-}
-
-// dropDisabledRunAsUserNameFieldsFromContainers removes disabled fields
-func dropDisabledRunAsUserNameFieldsFromContainers(containers []api.Container) {
-	for i := range containers {
-		if containers[i].SecurityContext != nil {
-			dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(containers[i].SecurityContext.WindowsOptions)
-		}
 	}
 }
 
@@ -739,8 +729,16 @@ func gMSAFieldsInUse(podSpec *api.PodSpec) bool {
 		return true
 	}
 
-	return gMSAFieldsInUseInAnyContainer(podSpec.Containers) ||
-		gMSAFieldsInUseInAnyContainer(podSpec.InitContainers)
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.SecurityContext != nil && gMSAFieldsInUseInWindowsSecurityOptions(c.SecurityContext.WindowsOptions) {
+			inUse = true
+			return false
+		}
+		return true
+	})
+
+	return inUse
 }
 
 // gMSAFieldsInUseInWindowsSecurityOptions returns true if the given WindowsSecurityContextOptions is
@@ -754,18 +752,6 @@ func gMSAFieldsInUseInWindowsSecurityOptions(windowsOptions *api.WindowsSecurity
 		windowsOptions.GMSACredentialSpec != nil
 }
 
-// gMSAFieldsInUseInAnyContainer returns true if any of the given Containers has its
-// SecurityContext's GMSACredentialSpecName or GMSACredentialSpec fields set.
-func gMSAFieldsInUseInAnyContainer(containers []api.Container) bool {
-	for _, container := range containers {
-		if container.SecurityContext != nil && gMSAFieldsInUseInWindowsSecurityOptions(container.SecurityContext.WindowsOptions) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // runAsUserNameFieldsInUse returns true if the pod spec is non-nil and has the RunAsUserName
 // field set in the PodSecurityContext or any container's SecurityContext.
 func runAsUserNameFieldsInUse(podSpec *api.PodSpec) bool {
@@ -777,26 +763,22 @@ func runAsUserNameFieldsInUse(podSpec *api.PodSpec) bool {
 		return true
 	}
 
-	return runAsUserNameFieldsInUseInAnyContainer(podSpec.Containers) ||
-		runAsUserNameFieldsInUseInAnyContainer(podSpec.InitContainers)
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.SecurityContext != nil && runAsUserNameFieldsInUseInWindowsSecurityOptions(c.SecurityContext.WindowsOptions) {
+			inUse = true
+			return false
+		}
+		return true
+	})
+
+	return inUse
 }
 
 // runAsUserNameFieldsInUseInWindowsSecurityOptions returns true if the given WindowsSecurityContextOptions is
 // non-nil and its RunAsUserName field is set.
 func runAsUserNameFieldsInUseInWindowsSecurityOptions(windowsOptions *api.WindowsSecurityContextOptions) bool {
 	return windowsOptions != nil && windowsOptions.RunAsUserName != nil
-}
-
-// runAsUserNameFieldsInUseInAnyContainer returns true if any of the given Containers has its
-// SecurityContext's RunAsUserName field set.
-func runAsUserNameFieldsInUseInAnyContainer(containers []api.Container) bool {
-	for _, container := range containers {
-		if container.SecurityContext != nil && runAsUserNameFieldsInUseInWindowsSecurityOptions(container.SecurityContext.WindowsOptions) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature
