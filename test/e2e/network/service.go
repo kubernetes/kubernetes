@@ -348,6 +348,33 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
+	ginkgo.It("should allow pods to hairpin back to themselves through services", func() {
+		serviceName := "hairpin-test"
+		ns := f.Namespace.Name
+
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := e2eservice.NewTestJig(cs, serviceName)
+		servicePort := 8080
+		svc := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
+		jig.SanityCheckService(svc, v1.ServiceTypeClusterIP)
+		serviceIP := svc.Spec.ClusterIP
+		framework.Logf("hairpin-test cluster ip: %s", serviceIP)
+
+		ginkgo.By("creating a client/server pod")
+		serverPodName := "hairpin"
+		podTemplate := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		podTemplate.Labels = jig.Labels
+		pod, err := cs.CoreV1().Pods(ns).Create(podTemplate)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("waiting for the service to expose an endpoint")
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("Checking if the pod can reach itself")
+		jig.CheckServiceReachability(ns, svc, pod)
+	})
+
 	ginkgo.It("should be able to up and down services", func() {
 		// TODO: use the ServiceTestJig here
 		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
