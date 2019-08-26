@@ -25,7 +25,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	volumeevents "k8s.io/kubernetes/pkg/controller/volume/events"
@@ -313,21 +313,21 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with waitForFirstConsumer mode and storage policy :%s", compatPolicy))
 		scParameters[SpbmStoragePolicy] = compatPolicy
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, nil, storage.VolumeBindingWaitForFirstConsumer)
+		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, nil, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode with allowedTopologies", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with waitForFirstConsumer mode, storage policy :%s and zone :%s", compatPolicy, zoneA))
 		scParameters[SpbmStoragePolicy] = compatPolicy
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, storage.VolumeBindingWaitForFirstConsumer)
+		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode with multiple allowedTopologies", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with waitForFirstConsumer mode and zones : %s, %s", zoneA, zoneB))
 		zones = append(zones, zoneA)
 		zones = append(zones, zoneB)
-		verifyPVCAndPodCreationSucceeds(client, namespace, nil, zones, storage.VolumeBindingWaitForFirstConsumer)
+		verifyPVCAndPodCreationSucceeds(client, namespace, nil, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 
 	ginkgo.It("Verify a PVC creation fails when multiple zones are specified in the storage class without shared datastores among the zones in waitForFirstConsumer binding mode", func() {
@@ -351,11 +351,11 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 			// nodeSelector set as zoneB
 			v1.LabelZoneFailureDomain: zoneB,
 		}
-		verifyPodSchedulingFails(client, namespace, nodeSelectorMap, scParameters, zones, storage.VolumeBindingWaitForFirstConsumer)
+		verifyPodSchedulingFails(client, namespace, nodeSelectorMap, scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 })
 
-func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storage.VolumeBindingMode) {
+func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
@@ -370,7 +370,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 
 	var persistentvolumes []*v1.PersistentVolume
 	// If WaitForFirstConsumer mode, verify pvc binding status after pod creation. For immediate mode, do now.
-	if volumeBindingMode != storage.VolumeBindingWaitForFirstConsumer {
+	if volumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
 		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 	}
 
@@ -378,7 +378,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 	framework.ExpectNoError(err)
 
-	if volumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+	if volumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
 		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 	}
 
@@ -398,7 +398,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 }
 
 func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) error {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, storage.VolumeBindingWaitForFirstConsumer))
+	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
@@ -437,7 +437,7 @@ func waitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 	return persistentvolumes
 }
 
-func verifyPodSchedulingFails(client clientset.Interface, namespace string, nodeSelector map[string]string, scParameters map[string]string, zones []string, volumeBindingMode storage.VolumeBindingMode) {
+func verifyPodSchedulingFails(client clientset.Interface, namespace string, nodeSelector map[string]string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
@@ -456,7 +456,7 @@ func verifyPodSchedulingFails(client clientset.Interface, namespace string, node
 	defer framework.DeletePodWithWait(f, client, pod)
 }
 
-func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storage.VolumeBindingMode) error {
+func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) error {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
