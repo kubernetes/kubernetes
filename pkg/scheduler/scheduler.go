@@ -632,10 +632,10 @@ func (sched *Scheduler) scheduleOne() {
 		}
 
 		// Run "prebind" plugins.
-		prebindStatus := fwk.RunPrebindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
-		if !prebindStatus.IsSuccess() {
+		preBindStatus := fwk.RunPreBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
+		if !preBindStatus.IsSuccess() {
 			var reason string
-			if prebindStatus.Code() == framework.Unschedulable {
+			if preBindStatus.Code() == framework.Unschedulable {
 				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
@@ -647,7 +647,7 @@ func (sched *Scheduler) scheduleOne() {
 			}
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunUnreservePlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPod, prebindStatus.AsError(), reason, prebindStatus.Message())
+			sched.recordSchedulingFailure(assumedPod, preBindStatus.AsError(), reason, preBindStatus.Message())
 			return
 		}
 
@@ -670,7 +670,7 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PodScheduleSuccesses.Inc()
 
 			// Run "postbind" plugins.
-			fwk.RunPostbindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
+			fwk.RunPostBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
 }

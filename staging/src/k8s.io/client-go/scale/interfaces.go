@@ -23,8 +23,9 @@ import (
 )
 
 // ScalesGetter can produce a ScaleInterface
-// for a particular namespace.
 type ScalesGetter interface {
+	// Scales produces a ScaleInterface for a particular namespace.
+	// Set namespace to the empty string for non-namespaced resources.
 	Scales(namespace string) ScaleInterface
 }
 

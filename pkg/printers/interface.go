@@ -39,14 +39,13 @@ func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 
 // PrintOptions struct defines a struct for various print options
 type PrintOptions struct {
-	NoHeaders          bool
-	WithNamespace      bool
-	WithKind           bool
-	Wide               bool
-	ShowLabels         bool
-	AbsoluteTimestamps bool
-	Kind               schema.GroupKind
-	ColumnLabels       []string
+	NoHeaders     bool
+	WithNamespace bool
+	WithKind      bool
+	Wide          bool
+	ShowLabels    bool
+	Kind          schema.GroupKind
+	ColumnLabels  []string
 
 	SortBy string
 

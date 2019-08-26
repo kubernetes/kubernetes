@@ -35,7 +35,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	k8sclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -47,16 +46,11 @@ import (
 )
 
 var (
-	crdPublishOpenAPIVersion = utilversion.MustParseSemantic("v1.14.0")
-	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
+	metaPattern = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
 var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
-
-	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessServerVersionGTE(crdPublishOpenAPIVersion, f.ClientSet.Discovery())
-	})
 
 	ginkgo.It("works for CRD with validation schema", func() {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")

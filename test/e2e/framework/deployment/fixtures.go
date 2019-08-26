@@ -30,14 +30,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*appsv1.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, e2elog.Logf, poll, pollShortTimeout)
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, framework.Logf, poll, pollShortTimeout)
 }
 
 // CheckDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
@@ -67,7 +67,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error 
 			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
 			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
 			if err == nil && nerr == nil {
-				e2elog.Logf("%+v", d)
+				framework.Logf("%+v", d)
 				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
 				logPodsOfDeployment(c, d, append(allOldRSs, newRS))
 			}
@@ -128,7 +128,7 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
-	e2elog.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
+	framework.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
 	err = WaitForDeploymentComplete(client, deployment)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)

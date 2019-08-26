@@ -114,7 +114,7 @@ func newGenerics(s *apiextensions.JSONSchemaProps) (*Generic, error) {
 			if err != nil {
 				return nil, err
 			}
-			g.AdditionalProperties = &StructuralOrBool{Structural: ss}
+			g.AdditionalProperties = &StructuralOrBool{Structural: ss, Bool: true}
 		} else {
 			g.AdditionalProperties = &StructuralOrBool{Bool: s.AdditionalProperties.Allows}
 		}
@@ -248,7 +248,7 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 
 	if s.XPreserveUnknownFields != nil {
 		if !*s.XPreserveUnknownFields {
-			return nil, fmt.Errorf("'x-kubernetes-preserve-unknown-fields' must be true or undefined")
+			return nil, fmt.Errorf("internal error: 'x-kubernetes-preserve-unknown-fields' must be true or undefined")
 		}
 		ret.XPreserveUnknownFields = true
 	}

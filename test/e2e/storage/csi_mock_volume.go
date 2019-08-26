@@ -470,8 +470,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
-				pvc, err = testsuites.ExpandPVCSize(pvc, newSize, m.cs)
+				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
+				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -561,8 +562,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
-				pvc, err = testsuites.ExpandPVCSize(pvc, newSize, m.cs)
+				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
+				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]

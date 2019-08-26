@@ -286,16 +286,11 @@ func TestFormatResourceName(t *testing.T) {
 	}
 }
 
-func PrintCustomType(obj *TestPrintType, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
-	data := obj.Data
-	kind := options.Kind
-	if options.WithKind {
-		data = kind.String() + "/" + data
-	}
-	return []metav1beta1.TableRow{{Cells: []interface{}{data}}}, nil
+func PrintCustomType(obj *TestPrintType, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
+	return []metav1beta1.TableRow{{Cells: []interface{}{obj.Data}}}, nil
 }
 
-func ErrorPrintHandler(obj *TestPrintType, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func ErrorPrintHandler(obj *TestPrintType, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	return nil, fmt.Errorf("ErrorPrintHandler error")
 }
 
@@ -1634,7 +1629,7 @@ func TestPrintPod(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.PrintOptions{})
+		rows, err := printPod(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1758,7 +1753,7 @@ func TestPrintPodwide(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.PrintOptions{Wide: true})
+		rows, err := printPod(&test.pod, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1808,7 +1803,7 @@ func TestPrintPodList(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rows, err := printPodList(&test.pods, printers.PrintOptions{})
+		rows, err := printPodList(&test.pods, printers.GenerateOptions{})
 
 		if err != nil {
 			t.Fatal(err)

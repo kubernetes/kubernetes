@@ -19,7 +19,7 @@ spec:
     spec:
       priorityClassName: system-cluster-critical
       containers:
-        - image: k8s.gcr.io/cpvpa-amd64:v0.7.1
+        - image: k8s.gcr.io/cpvpa-amd64:v0.8.1
           name: autoscaler
           command:
             - /cpvpa

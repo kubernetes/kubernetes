@@ -167,6 +167,8 @@ var _ = SIGDescribe("Networking IPerf IPv4 [Experimental] [Feature:Networking-IP
 
 // Declared as Flakey since it has not been proven to run in parallel on small nodes or slow networks in CI
 // TODO jayunit100 : Retag this test according to semantics from #22401
-var _ = SIGDescribe("Networking IPerf IPv6 [Experimental] [Feature:Networking-IPv6] [Slow] [Feature:Networking-Performance]", func() {
+var _ = SIGDescribe("Networking IPerf IPv6 [Experimental] [Feature:Networking-IPv6] [Slow] [Feature:Networking-Performance] [LinuxOnly]", func() {
+	// IPv6 is not supported on Windows.
+	framework.SkipIfNodeOSDistroIs("windows")
 	networkingIPerfTest(true)
 })

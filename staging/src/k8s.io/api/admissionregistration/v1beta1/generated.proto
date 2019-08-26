@@ -179,6 +179,7 @@ message MutatingWebhook {
 }
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 MutatingWebhookConfiguration instead.
 message MutatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
@@ -414,6 +415,7 @@ message ValidatingWebhook {
 }
 
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 message ValidatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional

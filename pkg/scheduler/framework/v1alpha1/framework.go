@@ -39,15 +39,15 @@ type framework struct {
 	waitingPods               *waitingPodsMap
 	pluginNameToWeightMap     map[string]int
 	queueSortPlugins          []QueueSortPlugin
-	prefilterPlugins          []PrefilterPlugin
+	preFilterPlugins          []PreFilterPlugin
 	filterPlugins             []FilterPlugin
 	postFilterPlugins         []PostFilterPlugin
 	scorePlugins              []ScorePlugin
 	scoreWithNormalizePlugins []ScoreWithNormalizePlugin
 	reservePlugins            []ReservePlugin
-	prebindPlugins            []PrebindPlugin
+	preBindPlugins            []PreBindPlugin
 	bindPlugins               []BindPlugin
-	postbindPlugins           []PostbindPlugin
+	postBindPlugins           []PostBindPlugin
 	unreservePlugins          []UnreservePlugin
 	permitPlugins             []PermitPlugin
 }
@@ -105,11 +105,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.PreFilter != nil {
 		for _, pf := range plugins.PreFilter.Enabled {
 			if pg, ok := pluginsMap[pf.Name]; ok {
-				p, ok := pg.(PrefilterPlugin)
+				p, ok := pg.(PreFilterPlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend prefilter plugin", pf.Name)
 				}
-				f.prefilterPlugins = append(f.prefilterPlugins, p)
+				f.preFilterPlugins = append(f.preFilterPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prefilter plugin %q does not exist", pf.Name)
 			}
@@ -186,11 +186,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.PreBind != nil {
 		for _, pb := range plugins.PreBind.Enabled {
 			if pg, ok := pluginsMap[pb.Name]; ok {
-				p, ok := pg.(PrebindPlugin)
+				p, ok := pg.(PreBindPlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend prebind plugin", pb.Name)
 				}
-				f.prebindPlugins = append(f.prebindPlugins, p)
+				f.preBindPlugins = append(f.preBindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prebind plugin %q does not exist", pb.Name)
 			}
@@ -214,11 +214,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.PostBind != nil {
 		for _, pb := range plugins.PostBind.Enabled {
 			if pg, ok := pluginsMap[pb.Name]; ok {
-				p, ok := pg.(PostbindPlugin)
+				p, ok := pg.(PostBindPlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend postbind plugin", pb.Name)
 				}
-				f.postbindPlugins = append(f.postbindPlugins, p)
+				f.postBindPlugins = append(f.postBindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("postbind plugin %q does not exist", pb.Name)
 			}
@@ -283,14 +283,14 @@ func (f *framework) QueueSortFunc() LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
-// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
 // anything but Success. If a non-success status is returned, then the scheduling
 // cycle is aborted.
-func (f *framework) RunPrefilterPlugins(
+func (f *framework) RunPreFilterPlugins(
 	pc *PluginContext, pod *v1.Pod) *Status {
-	for _, pl := range f.prefilterPlugins {
-		status := pl.Prefilter(pc, pod)
+	for _, pl := range f.preFilterPlugins {
+		status := pl.PreFilter(pc, pod)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
 				msg := fmt.Sprintf("rejected by %q at prefilter: %v", pl.Name(), status.Message())
@@ -425,13 +425,13 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	return pluginToNodeScores, nil
 }
 
-// RunPrebindPlugins runs the set of configured prebind plugins. It returns a
+// RunPreBindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.
-func (f *framework) RunPrebindPlugins(
+func (f *framework) RunPreBindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
-	for _, pl := range f.prebindPlugins {
-		status := pl.Prebind(pc, pod, nodeName)
+	for _, pl := range f.preBindPlugins {
+		status := pl.PreBind(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.Code() == Unschedulable {
 				msg := fmt.Sprintf("rejected by %q at prebind: %v", pl.Name(), status.Message())
@@ -467,11 +467,11 @@ func (f *framework) RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName stri
 	return status
 }
 
-// RunPostbindPlugins runs the set of configured postbind plugins.
-func (f *framework) RunPostbindPlugins(
+// RunPostBindPlugins runs the set of configured postbind plugins.
+func (f *framework) RunPostBindPlugins(
 	pc *PluginContext, pod *v1.Pod, nodeName string) {
-	for _, pl := range f.postbindPlugins {
-		pl.Postbind(pc, pod, nodeName)
+	for _, pl := range f.postBindPlugins {
+		pl.PostBind(pc, pod, nodeName)
 	}
 }
 

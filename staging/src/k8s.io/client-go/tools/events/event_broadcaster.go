@@ -111,7 +111,9 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
 			if recordedEvent, retry := recordEvent(e.sink, event); !retry {
-				e.eventCache[isomorphicKey] = recordedEvent
+				if recordedEvent != nil {
+					e.eventCache[isomorphicKey] = recordedEvent
+				}
 			}
 		}
 	}

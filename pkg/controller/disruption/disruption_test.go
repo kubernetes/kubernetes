@@ -41,8 +41,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
-
-	"github.com/Azure/go-autorest/autorest/to"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
@@ -445,7 +444,7 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = to.Int32Ptr(5)
+	rs.Spec.Replicas = utilpointer.Int32Ptr(5)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(pdbName)
@@ -470,7 +469,7 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = to.Int32Ptr(3)
+	rs.Spec.Replicas = utilpointer.Int32Ptr(3)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(pdbName)

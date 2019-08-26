@@ -84,8 +84,7 @@ func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options Gener
 		return nil, fmt.Errorf("no table handler registered for this type %v", t)
 	}
 
-	printOptions := PrintOptions{NoHeaders: options.NoHeaders, Wide: options.Wide}
-	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(printOptions)}
+	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(options)}
 	results := handler.printFunc.Call(args)
 	if !results[1].IsNil() {
 		return nil, results[1].Interface().(error)
@@ -151,7 +150,7 @@ func (h *HumanReadableGenerator) TableHandler(columnDefinitions []metav1beta1.Ta
 // ValidateRowPrintHandlerFunc validates print handler signature.
 // printFunc is the function that will be called to print an object.
 // It must be of the following type:
-//  func printFunc(object ObjectType, options PrintOptions) ([]metav1beta1.TableRow, error)
+//  func printFunc(object ObjectType, options GenerateOptions) ([]metav1beta1.TableRow, error)
 // where ObjectType is the type of the object that will be printed, and the first
 // return value is an array of rows, with each row containing a number of cells that
 // match the number of columns defined for that printer function.
@@ -164,11 +163,11 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 		return fmt.Errorf("invalid print handler." +
 			"Must accept 2 parameters and return 2 value.")
 	}
-	if funcType.In(1) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
+	if funcType.In(1) != reflect.TypeOf((*GenerateOptions)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*[]metav1beta1.TableRow)(nil)).Elem() ||
 		funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, options PrintOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
+			"func handler(obj %v, options GenerateOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
 	}
 	return nil
 }
