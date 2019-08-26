@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 const kubeProxySubsystem = "kubeproxy"
@@ -143,6 +145,17 @@ func RegisterMetrics() {
 		prometheus.MustRegister(ServiceChangesTotal)
 		prometheus.MustRegister(IptablesRestoreFailuresTotal)
 	})
+}
+
+// RecordNetworkProgrammingLatency exports NetworkProgrammingLatency metric from set of timestamps indicating the service has been updated.
+func RecordNetworkProgrammingLatency(m map[types.NamespacedName][]time.Time) {
+	for name, lastChangeTriggerTimes := range m {
+		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
+			latency := SinceInSeconds(lastChangeTriggerTime)
+			NetworkProgrammingLatency.Observe(latency)
+			klog.V(4).Infof("Network programming of %s took %f seconds", name, latency)
+		}
+	}
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.

@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -388,7 +388,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		nodePortAddresses:        make([]string, 0),
 		networkInterfacer:        utilproxytest.NewFakeNetwork(),
 	}
-	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", func() { p.syncProxyRules(true) }, 0, time.Minute, 1)
 	return p
 }
 
@@ -594,7 +594,7 @@ func TestClusterIPReject(t *testing.T) {
 		}),
 	)
 	makeEndpointsMap(fp)
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP))))
 	svcRules := ipt.GetRules(svcChain)
@@ -643,7 +643,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	epStr := fmt.Sprintf("%s:%d", epIP, svcPort)
 	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP))))
@@ -707,7 +707,7 @@ func TestLoadBalancer(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	proto := strings.ToLower(string(v1.ProtocolTCP))
 	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
@@ -771,7 +771,7 @@ func TestNodePort(t *testing.T) {
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
 	fp.nodePortAddresses = []string{}
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	proto := strings.ToLower(string(v1.ProtocolTCP))
 	svcChain := string(servicePortChainName(svcPortName.String(), proto))
@@ -808,7 +808,7 @@ func TestExternalIPsReject(t *testing.T) {
 	)
 	makeEndpointsMap(fp)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	kubeSvcRules := ipt.GetRules(string(kubeExternalServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcExternalIPs, svcPort) {
@@ -841,7 +841,7 @@ func TestNodePortReject(t *testing.T) {
 	)
 	makeEndpointsMap(fp)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	kubeSvcRules := ipt.GetRules(string(kubeExternalServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP, svcNodePort) {
@@ -905,7 +905,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	proto := strings.ToLower(string(v1.ProtocolTCP))
 	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
@@ -1003,7 +1003,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.nodePortAddresses = []string{"10.20.30.0/24"}
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	proto := strings.ToLower(string(v1.ProtocolTCP))
 	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
@@ -2250,4 +2250,4 @@ func Test_updateEndpointsMap(t *testing.T) {
 	}
 }
 
-// TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.
+// TODO(thockin): add *more* tests for syncProxyRules(true) or break it down further and test the pieces.

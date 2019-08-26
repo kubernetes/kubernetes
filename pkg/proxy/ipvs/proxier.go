@@ -448,7 +448,7 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 	burstSyncs := 2
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
+	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", func() { proxier.syncProxyRules(true) }, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
 }
@@ -749,7 +749,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.syncProxyRules(false)
 }
 
 // OnEndpointsAdd is called whenever creation of new endpoints object is observed.
@@ -777,7 +777,7 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.syncProxyRules(false)
 }
 
 // EntryInvalidErr indicates if an ipset entry is invalid or not
@@ -785,7 +785,7 @@ const EntryInvalidErr = "error adding entry %s to ipset %s"
 
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules(recordProgrammingLatency bool) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -1317,12 +1317,9 @@ func (proxier *Proxier) syncProxyRules() {
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
-	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
-		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
-			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
-			metrics.NetworkProgrammingLatency.Observe(latency)
-			klog.V(4).Infof("Network programming of %s took %f seconds", name, latency)
-		}
+
+	if recordProgrammingLatency {
+		metrics.RecordNetworkProgrammingLatency(endpointUpdateResult.LastChangeTriggerTimes)
 	}
 
 	// Close old local ports and save new ones.

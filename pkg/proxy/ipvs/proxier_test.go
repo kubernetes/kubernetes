@@ -250,7 +250,7 @@ func TestCleanupLeftovers(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// test cleanup left over
 	if CleanupLeftovers(ipvs, ipt, ipset, true) {
@@ -708,7 +708,7 @@ func TestNodePort(t *testing.T) {
 			makeServiceMap(fp, test.services...)
 			makeEndpointsMap(fp, test.endpoints...)
 
-			fp.syncProxyRules()
+			fp.syncProxyRules(true)
 
 			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
 				t.Logf("actual ipvs state: %v", ipvs)
@@ -874,7 +874,7 @@ func TestClusterIP(t *testing.T) {
 			makeServiceMap(fp, test.services...)
 			makeEndpointsMap(fp, test.endpoints...)
 
-			fp.syncProxyRules()
+			fp.syncProxyRules(true)
 
 			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
 				t.Logf("actual ipvs state: %v", ipvs)
@@ -914,7 +914,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 
 	makeEndpointsMap(fp)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// check ipvs service and destinations
 	services, err := ipvs.GetVirtualServers()
@@ -982,7 +982,7 @@ func TestExternalIPs(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// check ipvs service and destinations
 	services, err := ipvs.GetVirtualServers()
@@ -1052,7 +1052,7 @@ func TestLoadBalancer(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// Expect 2 services and 1 destination
 	epVS := &netlinktest.ExpectedVirtualServer{
@@ -1149,7 +1149,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
 	fp.nodePortAddresses = []string{"100.101.102.0/24", "2001:db8::0/64"}
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// Expect 3 services and 1 destination
 	epVS := &netlinktest.ExpectedVirtualServer{
@@ -1229,7 +1229,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// Check ipvs service and destinations
 	epVS := &netlinktest.ExpectedVirtualServer{
@@ -1334,7 +1334,7 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 			}),
 		)
 	}
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
@@ -1406,7 +1406,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		}),
 	)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// Expect 2 services and 1 destination
 	epVS := &netlinktest.ExpectedVirtualServer{
@@ -1755,7 +1755,7 @@ func TestSessionAffinity(t *testing.T) {
 	)
 	makeEndpointsMap(fp)
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 
 	// check ipvs service and destinations
 	services, err := ipvs.GetVirtualServers()
@@ -3320,7 +3320,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 
 	// first, add multi-port service1
 	fp.OnServiceAdd(service1)
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
 	// should only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
@@ -3332,7 +3332,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 
 	// update multi-port service1 to single-port service2
 	fp.OnServiceUpdate(service1, service2)
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
 	// should still only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
@@ -3343,7 +3343,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 
 	// update single-port service2 to multi-port service3
 	fp.OnServiceUpdate(service2, service3)
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
 	// should still only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
@@ -3354,7 +3354,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 
 	// delete multi-port service3
 	fp.OnServiceDelete(service3)
-	fp.syncProxyRules()
+	fp.syncProxyRules(true)
 	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
 	// all addresses should be unbound
 	if len(remainingAddrs) != 0 {
