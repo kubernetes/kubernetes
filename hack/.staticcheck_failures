@@ -251,6 +251,5 @@ vendor/k8s.io/kubectl/pkg/describe/versioned
 vendor/k8s.io/kubectl/pkg/scale
 vendor/k8s.io/legacy-cloud-providers/aws
 vendor/k8s.io/legacy-cloud-providers/azure
-vendor/k8s.io/legacy-cloud-providers/vsphere
 vendor/k8s.io/metrics/pkg/client/custom_metrics
 vendor/k8s.io/sample-controller

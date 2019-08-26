@@ -181,10 +181,10 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	}()
 
 	for i := 0; i < POOL_SIZE; i++ {
+		wg.Add(1)
 		go func() {
 			for res := range queueChannel {
 				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
 				if err != nil {
 					klog.V(4).Infof("Error while looking for vm=%+v in vc=%s and datacenter=%s: %v",
@@ -195,6 +195,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 						klog.V(4).Infof("Did not find node %s in vc=%s and datacenter=%s",
 							node.Name, res.vc, res.datacenter.Name())
 					}
+					cancel()
 					continue
 				}
 				if vm != nil {
@@ -210,12 +211,12 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					for range queueChannel {
 					}
 					setVMFound(true)
+					cancel()
 					break
 				}
 			}
 			wg.Done()
 		}()
-		wg.Add(1)
 	}
 	wg.Wait()
 	if vmFound {
