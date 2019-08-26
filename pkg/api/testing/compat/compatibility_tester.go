@@ -106,7 +106,7 @@ func getJSONValue(data map[string]interface{}, keys ...string) (interface{}, boo
 	// Get the key (and optional index)
 	key := keys[0]
 	index := -1
-	if matches := regexp.MustCompile(`^(.*)\[(\d+)\]$`).FindStringSubmatch(key); len(matches) > 0 {
+	if matches := regexp.MustCompile(`^(.*)\[(\d+)]$`).FindStringSubmatch(key); len(matches) > 0 {
 		key = matches[1]
 		index, _ = strconv.Atoi(matches[2])
 	}
