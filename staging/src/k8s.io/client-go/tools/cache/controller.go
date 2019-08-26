@@ -131,6 +131,8 @@ func (c *controller) HasSynced() bool {
 }
 
 func (c *controller) LastSyncResourceVersion() string {
+	c.reflectorMutex.RLock()
+	defer c.reflectorMutex.RUnlock()
 	if c.reflector == nil {
 		return ""
 	}
