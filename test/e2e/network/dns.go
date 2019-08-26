@@ -380,7 +380,12 @@ var _ = SIGDescribe("DNS", func() {
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
-	ginkgo.It("should support configurable pod DNS nameservers", func() {
+	/*
+		Release : v1.17
+		Testname: Pod configurable DNS
+		Description: Create a pod with a set DNS. Creation MUST succeed. Pod MUST use configured DNS of 1.1.1.1
+	*/
+	framework.ConformanceIt("should support configurable pod DNS nameservers", func() {
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testServerIP := "1.1.1.1"
 		testSearchPath := "resolv.conf.local"
