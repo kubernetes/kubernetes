@@ -475,6 +475,7 @@ func (elb *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttribut
 
 // expectDescribeLoadBalancers is not implemented but is required for interface
 // conformance
+//lint:ignore U1000 required for interface conformance
 func (elb *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
 	panic("Not implemented")
 }
