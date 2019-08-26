@@ -159,7 +159,7 @@ The CRD in [`crd-status-subresource.yaml`](./artifacts/examples/crd-status-subre
 for custom resources.
 This means that [`UpdateStatus`](./controller.go#L330) can be used by the controller to update only the status part of the custom resource.
 
-To understand why only the status part of the custom resource should be updated, please refer to the [Kubernetes API conventions](https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status).
+To understand why only the status part of the custom resource should be updated, please refer to the [Kubernetes API conventions](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status).
 
 In the above steps, use `crd-status-subresource.yaml` to create the CRD:
 
