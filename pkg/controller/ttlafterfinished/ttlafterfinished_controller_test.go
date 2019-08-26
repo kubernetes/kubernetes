@@ -247,14 +247,14 @@ func TestTimeLeftForPod(t *testing.T) {
 	numberOfContainers := 5
 
 	testCases := []struct {
-		name               string
-		completionTime     metav1.Time
-		failedTime         metav1.Time
-		ttl                *int32
-		since              *time.Time
-		expectErr          bool
-		expectErrStr       string
-		expectedTimeLeft   *time.Duration
+		name             string
+		completionTime   metav1.Time
+		failedTime       metav1.Time
+		ttl              *int32
+		since            *time.Time
+		expectErr        bool
+		expectErrStr     string
+		expectedTimeLeft *time.Duration
 	}{
 		{
 			name:         "Error case: Pod unfinished",

@@ -20,99 +20,101 @@ import (
 	"fmt"
 	"time"
 
-	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/metrics"
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
+	batchinformers "k8s.io/client-go/informers/batch/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	batchlisters "k8s.io/client-go/listers/batch/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 	jobutil "k8s.io/kubernetes/pkg/controller/job"
+	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-// Controller watches for changes of Jobs/Pods API objects. Triggered by Job creation
-// and updates, it enqueues Jobs/Pods that have non-nil `.spec.ttlSecondsAfterFinished`
+// Controller watches for changes of Jobs API objects. Triggered by Job creation
+// and updates, it enqueues Jobs that have non-nil `.spec.ttlSecondsAfterFinished`
 // to the `queue`. The Controller has workers who consume `queue`, check whether
-// the TTL has expired or not; if the TTL hasn't expired, it will add the
-// Job/Pod to the queue after the TTL is expected to expire; if the TTL has expired, the
-// worker will send requests to the API server to delete the Jobs/Pods accordingly.
-// This is implemented outside of Job/Pod controller for separation of concerns, and
+// the Job TTL has expired or not; if the Job TTL hasn't expired, it will add the
+// Job to the queue after the TTL is expected to expire; if the TTL has expired, the
+// worker will send requests to the API server to delete the Jobs accordingly.
+// This is implemented outside of Job controller for separation of concerns, and
 // because it will be extended to handle other finishable resource types.
 type Controller struct {
-	client   dynamic.NamespaceableResourceInterface
+	client   clientset.Interface
 	recorder record.EventRecorder
 
-	resource schema.GroupVersionResource
-	// rLister can list/get resources from the shared informer's store
-	rLister cache.GenericLister
+	// jLister can list/get Jobs from the shared informer's store
+	jLister batchlisters.JobLister
 
-	// rInformer can register the watch event handler for the resource
-	rInformer informers.GenericInformer
-
-	// rStoreSynced returns true if the resource store has been synced at least once.
+	// jListerSynced returns true if the Job store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	rListerSynced cache.InformerSynced
+	jListerSynced cache.InformerSynced
 
-	// Resources that the controller will check its TTL and attempt to delete when the TTL expires.
+	// pLister can list/get Pods from the shared informer's store
+	pLister corelisters.PodLister
+
+	// pListerSynced returns true if the Pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	pListerSynced cache.InformerSynced
+
+	// Jobs that the controller will check its TTL and attempt to delete when the TTL expires.
 	queue workqueue.RateLimitingInterface
 
 	// The clock for tracking time
 	clock clock.Clock
 }
 
-// New creates an instance o Controller
-func New(informerFactory informers.SharedInformerFactory, resource schema.GroupVersionResource, dynamicClient dynamic.Interface, client clientset.Interface) *Controller {
+// New creates an instance of Controller
+func New(jobInformer batchinformers.JobInformer, podInformer coreinformers.PodInformer, client clientset.Interface) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-
-		metrics.RegisterMetricAndTrackRateLimiterUsage(fmt.Sprintf("ttl_%v_after_finished_controller", resource.Resource), client.CoreV1().RESTClient().GetRateLimiter())
+		metrics.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	tc := &Controller{
-		client:   dynamicClient.Resource(resource),
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: fmt.Sprintf("ttl-%v-after-finished-controller", resource.Resource)}),
-		resource: resource,
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("ttl_%s_to_delete", resource.Resource)),
+		client:   client,
+		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
+		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_objects_to_delete"),
 	}
 
-	genericInformer, err := informerFactory.ForResource(resource)
-	if err != nil {
-		return nil
-	}
-
-	tc.rInformer = genericInformer
-
-	tc.rInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    tc.addResource,
 		UpdateFunc: tc.updateResource,
 	})
 
-	tc.rListerSynced = tc.rInformer.Informer().HasSynced
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    tc.addResource,
+		UpdateFunc: tc.updateResource,
+	})
+
+	tc.jLister = jobInformer.Lister()
+	tc.jListerSynced = jobInformer.Informer().HasSynced
+
+	tc.pLister = podInformer.Lister()
+	tc.pListerSynced = podInformer.Informer().HasSynced
 
 	tc.clock = clock.RealClock{}
 
 	return tc
 }
 
-// Run starts the workers to clean up Jobs/Pods.
+// Run starts the workers to clean up Jobs.
 func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
@@ -132,39 +134,50 @@ func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 }
 
 func (tc *Controller) addResource(obj interface{}) {
-	resource := obj.(metav1.Object)
-	klog.V(4).Infof("Adding %s %s%s", tc.resource.Resource, resource.GetNamespace(), resource.GetName())
-
-	if resource.GetDeletionTimestamp() == nil && needsCleanup(obj) {
-		tc.enqueue(resource)
+	switch resource := obj.(type) {
+	case *batch.Job:
+		klog.V(4).Infof("Adding job %s/%s", resource.Namespace, resource.Name)
+		if resource.DeletionTimestamp == nil && jobNeedsCleanup(resource) {
+			tc.enqueue(resource, resource.Namespace, resource.Name)
+		}
+	case *v1.Pod:
+		klog.V(4).Infof("Adding pod %s/%s", resource.Namespace, resource.Name)
+		if resource.DeletionTimestamp == nil && podNeedsCleanup(resource) {
+			tc.enqueue(resource, resource.Namespace, resource.Name)
+		}
 	}
 }
 
 func (tc *Controller) updateResource(old, cur interface{}) {
-	resource := old.(metav1.Object)
-	klog.V(4).Infof("Updating %s %s%s", tc.resource.Resource, resource.GetNamespace(), resource.GetName())
-
-	if resource.GetDeletionTimestamp() == nil && needsCleanup(old) {
-		tc.enqueue(resource)
+	switch obj := cur.(type) {
+	case *batch.Job:
+		klog.V(4).Infof("Updating job %s/%s", obj.Namespace, obj.Name)
+		if obj.DeletionTimestamp == nil && jobNeedsCleanup(obj) {
+			tc.enqueue(obj, obj.Namespace, obj.Name)
+		}
+	case *v1.Pod:
+		klog.V(4).Infof("Updating pod %s/%s", obj.Namespace, obj.Name)
+		if obj.DeletionTimestamp == nil && podNeedsCleanup(obj) {
+			tc.enqueue(obj, obj.Namespace, obj.Name)
+		}
 	}
 }
 
-func (tc *Controller) enqueue(obj metav1.Object) {
-	klog.V(4).Infof("Add %s %s/%s to cleanup", tc.resource.Resource, obj.GetNamespace(), obj.GetName())
+func (tc *Controller) enqueue(obj interface{}, namespace, name string) {
+	klog.V(4).Infof("Add obj %s/%s to cleanup", namespace, name)
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for %s %#v: %v", tc.resource.Resource, obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 
 	tc.queue.Add(key)
 }
 
-func (tc *Controller) enqueueAfter(obj metav1.Object, after time.Duration) {
-	klog.V(4).Infof("Add %s %s/%s to cleanup after %#v", tc.resource.Resource, obj.GetNamespace(), obj.GetName(), after)
+func (tc *Controller) enqueueAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for %s %#v: %v", tc.resource.Resource, obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 
@@ -183,9 +196,9 @@ func (tc *Controller) processNextWorkItem() bool {
 	}
 	defer tc.queue.Done(key)
 
-	err := tc.process(key.(string))
-	tc.handleErr(err, key)
-
+	jErr, pErr := tc.process(key.(string))
+	tc.handleErr(jErr, key)
+	tc.handleErr(pErr, key)
 	return true
 }
 
@@ -195,76 +208,132 @@ func (tc *Controller) handleErr(err error, key interface{}) {
 		return
 	}
 
-	utilruntime.HandleError(fmt.Errorf("error cleaning up %s %v, will retry: %v", tc.resource.Resource, key, err))
+	utilruntime.HandleError(fmt.Errorf("error cleaning up Job/Pod %v, will retry: %v", key, err))
 	tc.queue.AddRateLimited(key)
 }
 
-// process will check the resource's state and TTL and delete the resource when it
-// finishes and its TTL after finished has expired. If the resource hasn't finished or
+// process will check try to get the named job/pod, processes TTL for them.
+// It collects and returns errors for jobs and pods separately
+func (tc *Controller) process(key string) (error, error) {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err, nil
+	}
+	var jErr, pErr error
+	var job *batch.Job
+	var pod *v1.Pod
+
+	klog.V(4).Infof("Checking if Job %s/%s and Pod %s/%s is ready for cleanup", namespace, name, namespace, name)
+	// Ignore the Jobs/Pods that are already deleted or being deleted, or the ones that don't need clean up.
+	job, jErr = tc.jLister.Jobs(namespace).Get(name)
+	pod, pErr = tc.pLister.Pods(namespace).Get(name)
+	if errors.IsNotFound(jErr) && errors.IsNotFound(pErr) {
+		return nil, nil
+	}
+
+	if jErr == nil {
+		jErr = tc.processJob(job)
+	}
+	if pErr == nil {
+		pErr = tc.processPod(pod)
+	}
+	return jErr, pErr
+}
+
+// processJob will check the Job's state and TTL and delete the Job when it
+// finishes and its TTL after finished has expired. If the Job hasn't finished or
 // its TTL hasn't expired, it will be added to the queue after the TTL is expected
 // to expire.
 // This function is not meant to be invoked concurrently with the same key.
-func (tc *Controller) process(key string) error {
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
+func (tc *Controller) processJob(job *batch.Job) error {
+	if expired, err := tc.processJobTTL(job); err != nil {
 		return err
+	} else if !expired {
+		return nil
 	}
 
-	klog.V(4).Infof("Checking if %s %s/%s is ready for cleanup", tc.resource.Resource, namespace, name)
-	fresh, err := tc.client.Namespace(namespace).Get(name, metav1.GetOptions{})
+	// The Job's TTL is assumed to have expired, but the Job TTL might be stale.
+	// Before deleting the Job, do a final sanity check.
+	// If TTL is modified before we do this check, we cannot be sure if the TTL truly expires.
+	// The latest Job may have a different UID, but it's fine because the checks will be run again.
+	fresh, err := tc.client.BatchV1().Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	// Use the latest resource TTL to see if the TTL truly expires.
-	if expired, err := tc.processTTL(fresh); err != nil {
+	// Use the latest Job TTL to see if the TTL truly expires.
+	expired, err := tc.processJobTTL(fresh)
+	if err != nil {
+		return err
+	}
+	if !expired {
+		return nil
+	}
+	// Cascade deletes the Jobs if TTL truly expires.
+	policy := metav1.DeletePropagationForeground
+	options := &metav1.DeleteOptions{
+		PropagationPolicy: &policy,
+		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
+	}
+	klog.V(4).Infof("Cleaning up Job %s/%s", job.Namespace, job.Name)
+	return tc.client.BatchV1().Jobs(fresh.Namespace).Delete(fresh.Name, options)
+}
+
+// processPod will check the Pod's state and TTL and delete the Pod when it
+// finishes and its TTL after finished has expired. If the Pod hasn't finished or
+// its TTL hasn't expired, it will be added to the queue after the TTL is expected
+// to expire.
+// This function is not meant to be invoked concurrently with the same key.
+func (tc *Controller) processPod(pod *v1.Pod) error {
+	if expired, err := tc.processPodTTL(pod); err != nil {
 		return err
 	} else if !expired {
 		return nil
 	}
-	// Cascade deletes the Resource if TTL truly expires.
+
+	// The Pod's TTL is assumed to have expired, but the Pod TTL might be stale.
+	// Before deleting the Pod, do a final sanity check.
+	// If TTL is modified before we do this check, we cannot be sure if the TTL truly expires.
+	// The latest Pod may have a different UID, but it's fine because the checks will be run again.
+	fresh, err := tc.client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	// Use the latest Job TTL to see if the TTL truly expires.
+	expired, err := tc.processPodTTL(fresh)
+	if err != nil {
+		return err
+	}
+	if !expired {
+		return nil
+	}
+	// Cascade deletes the Jobs if TTL truly expires.
 	policy := metav1.DeletePropagationForeground
-	uid := fresh.GetUID()
 	options := &metav1.DeleteOptions{
 		PropagationPolicy: &policy,
-		Preconditions:     &metav1.Preconditions{UID: &uid},
+		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}
-	klog.V(4).Infof("Cleaning up %s %s/%s", tc.resource.Resource, namespace, name)
-	return tc.client.Namespace(fresh.GetNamespace()).Delete(fresh.GetName(), options)
+	klog.V(4).Infof("Cleaning up Pod %s/%s", pod.Namespace, pod.Name)
+	return tc.client.CoreV1().Pods(fresh.Namespace).Delete(fresh.Name, options)
 }
 
-// processTTL checks whether a given resource's TTL has expired, and add it to the queue after the TTL is expected to expire
+// processJobTTL checks whether a given Job's TTL has expired, and add it to the queue after the TTL is expected to expire
 // if the TTL will expire later.
-func (tc *Controller) processTTL(u *unstructured.Unstructured) (bool, error) {
-	// We don't care about the resources that are going to be deleted, or the ones that don't need clean up.
-	var j *batch.Job
-	var p *v1.Pod
-	var t *time.Duration
-	var err error
-	now := tc.clock.Now()
-	if u.GetKind() == "job" {
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, j); err != nil {
-			return false, err
-		}
-		t, err = timeLeftForJob(j, &now)
-		if err != nil {
-			return false, err
-		}
-	} else if u.GetKind() == "pod" {
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, p); err != nil {
-			return false, err
-		}
-		t, err = timeLeftForPod(p, &now)
-		if err != nil {
-			return false, err
-		}
-	} else {
+func (tc *Controller) processJobTTL(job *batch.Job) (expired bool, err error) {
+	// We don't care about the Jobs that are going to be deleted, or the ones that don't need clean up.
+	if job.DeletionTimestamp != nil || !jobNeedsCleanup(job) {
 		return false, nil
 	}
-	if u.GetDeletionTimestamp() != nil || !needsCleanup(u) {
-		return false, nil
+
+	now := tc.clock.Now()
+	t, err := timeLeftForJob(job, &now)
+	if err != nil {
+		return false, err
 	}
 
 	// TTL has expired
@@ -272,33 +341,45 @@ func (tc *Controller) processTTL(u *unstructured.Unstructured) (bool, error) {
 		return true, nil
 	}
 
-	tc.enqueueAfter(u, *t)
+	tc.enqueueAfter(job, *t)
 	return false, nil
 }
 
-// needsCleanup checks whether a resource has finished and has a TTL set.
-func needsCleanup(obj interface{}) bool {
-	if job, ok := obj.(*batch.Job); ok {
-		return needsCleanupJob(job)
+// processPodTTL checks whether a given Job's TTL has expired, and add it to the queue after the TTL is expected to expire
+// if the TTL will expire later.
+func (tc *Controller) processPodTTL(pod *v1.Pod) (expired bool, err error) {
+	// We don't care about the Jobs that are going to be deleted, or the ones that don't need clean up.
+	if pod.DeletionTimestamp != nil || !podNeedsCleanup(pod) {
+		return false, nil
 	}
-	if pod, ok := obj.(*v1.Pod); ok {
-		return needsCleanupPod(pod)
+
+	now := tc.clock.Now()
+	t, err := timeLeftForPod(pod, &now)
+	if err != nil {
+		return false, err
 	}
-	return false
+
+	// TTL has expired
+	if *t <= 0 {
+		return true, nil
+	}
+
+	tc.enqueueAfter(pod, *t)
+	return false, nil
 }
 
-// needsCleanupPod checks whether a Pod has finished and has a TTL set.
-func needsCleanupPod(p *v1.Pod) bool {
-	return p.Spec.TTLSecondsAfterFinished != nil && isPodFinished(p)
-}
-
-// needsCleanupJob checks whether a Job has finished and has a TTL set.
-func needsCleanupJob(j *batch.Job) bool {
+// jobNeedsCleanup checks whether a Job has finished and has a TTL set.
+func jobNeedsCleanup(j *batch.Job) bool {
 	return j.Spec.TTLSecondsAfterFinished != nil && jobutil.IsJobFinished(j)
 }
 
+// podNeedsCleanup checks whether a Pod has finished and has a TTL set.
+func podNeedsCleanup(p *v1.Pod) bool {
+	return p.Spec.TTLSecondsAfterFinished != nil && isPodFinished(p)
+}
+
 func getFinishAndExpireTimeForJob(j *batch.Job) (*time.Time, *time.Time, error) {
-	if !needsCleanup(j) {
+	if !jobNeedsCleanup(j) {
 		return nil, nil, fmt.Errorf("job %s/%s should not be cleaned up", j.Namespace, j.Name)
 	}
 	finishAt, err := jobFinishTime(j)
@@ -354,7 +435,7 @@ func timeLeftForPod(p *v1.Pod, since *time.Time) (*time.Duration, error) {
 }
 
 func getFinishAndExpireTimeForPod(p *v1.Pod) (*time.Time, *time.Time, error) {
-	if !needsCleanup(p) {
+	if !podNeedsCleanup(p) {
 		return nil, nil, fmt.Errorf("pod %s/%s should not be cleaned up", p.Namespace, p.Name)
 	}
 	finishAt, err := podFinishTime(p)
@@ -378,6 +459,7 @@ func podFinishTime(finishedPod *v1.Pod) (metav1.Time, error) {
 	}
 	return t, nil
 }
+
 func isPodFinished(p *v1.Pod) bool {
 	if p.Status.Phase == v1.PodSucceeded || p.Status.Phase == v1.PodFailed {
 		return true
