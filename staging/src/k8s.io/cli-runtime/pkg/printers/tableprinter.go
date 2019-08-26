@@ -94,9 +94,8 @@ func printHeader(columnNames []string, w io.Writer) error {
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 
-	w, found := output.(*tabwriter.Writer)
-	if !found {
-		w = GetNewTabWriter(output)
+	if _, found := output.(*tabwriter.Writer); !found {
+		w := GetNewTabWriter(output)
 		output = w
 		defer w.Flush()
 	}

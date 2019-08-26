@@ -67,7 +67,6 @@ type acrAuthResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// 5 minutes buffer time to allow timeshift between local machine and AAD
 const userAgentHeader = "User-Agent"
 const userAgent = "kubernetes-credentialprovider-acr"
 

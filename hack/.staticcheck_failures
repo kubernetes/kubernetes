@@ -6,7 +6,6 @@ pkg/controller/podautoscaler
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/probe/http
 pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/core/namespace/storage
 pkg/registry/core/persistentvolumeclaim/storage
@@ -81,7 +80,6 @@ vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook
-vendor/k8s.io/cli-runtime/pkg/printers
 vendor/k8s.io/client-go/discovery/cached/memory
 vendor/k8s.io/client-go/dynamic/fake
 vendor/k8s.io/client-go/metadata/fake
