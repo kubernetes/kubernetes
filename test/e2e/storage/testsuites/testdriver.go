@@ -114,7 +114,9 @@ type EphemeralTestDriver interface {
 
 	// GetCSIDriverName returns the name that was used when registering with
 	// kubelet. Depending on how the driver was deployed, this can be different
-	// from DriverInfo.Name.
+	// from DriverInfo.Name. Starting with Kubernetes 1.16, there must also
+	// be a CSIDriver object under the same name with a "mode" field that enables
+	// usage of the driver for ephemeral inline volumes.
 	GetCSIDriverName(config *PerTestConfig) string
 }
 

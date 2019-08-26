@@ -43,6 +43,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -196,7 +197,6 @@ var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
 func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 	driverManifests := []string{
-		"test/e2e/testing-manifests/storage-csi/cluster-driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -207,7 +207,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 	}
 
 	if driverOpts.RegisterDriver {
-		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-cluster-driver-registrar.yaml")
+		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 	}
 
 	if !driverOpts.DisableAttach {
@@ -289,14 +289,18 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	}
 
 	o := utils.PatchCSIOptions{
-		OldDriverName:                 "csi-mock",
-		NewDriverName:                 "csi-mock-" + f.UniqueName,
-		DriverContainerName:           "mock",
-		DriverContainerArguments:      containerArgs,
-		ProvisionerContainerName:      "csi-provisioner",
-		ClusterRegistrarContainerName: "csi-cluster-driver-registrar",
-		NodeName:                      config.ClientNodeName,
-		PodInfo:                       m.podInfo,
+		OldDriverName:            "csi-mock",
+		NewDriverName:            "csi-mock-" + f.UniqueName,
+		DriverContainerName:      "mock",
+		DriverContainerArguments: containerArgs,
+		ProvisionerContainerName: "csi-provisioner",
+		NodeName:                 config.ClientNodeName,
+		PodInfo:                  m.podInfo,
+		CanAttach:                &m.attachable,
+		VolumeLifecycleModes: []storagev1beta1.VolumeLifecycleMode{
+			storagev1beta1.VolumeLifecyclePersistent,
+			storagev1beta1.VolumeLifecycleEphemeral,
+		},
 	}
 	cleanup, err := f.CreateFromManifests(func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)

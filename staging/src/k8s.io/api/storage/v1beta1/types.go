@@ -291,9 +291,58 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
+	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volume
+	//                                 defined by a CSIVolumeSource, otherwise "false"
+	//
+	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
+	// required for drivers which support both the "Persistent" and "Ephemeral" VolumeLifecycleMode.
+	// Other drivers can leave pod info disabled and/or ignore this field.
+	// As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when
+	// deployed on such a cluster and the deployment determines which mode that is, for example
+	// via a command line parameter of the driver.
 	// +optional
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
+
+	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+	// The default if the list is empty is "Persistent", which is the usage
+	// defined by the CSI specification and implemented in Kubernetes via the usual
+	// PV/PVC mechanism.
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline
+	// inside the pod spec with CSIVolumeSource and their lifecycle is tied to
+	// the lifecycle of that pod. A driver has to be aware of this
+	// because it is only going to get a NodePublishVolume call for such a volume.
+	// For more information about implementing this mode, see
+	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
+	// A driver can support one or more of these modes and
+	// more modes may be added in the future.
+	// +optional
+	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 }
+
+// VolumeLifecycleMode is an enumeration of possible usage modes for a volume
+// provided by a CSI driver. More modes may be added in the future.
+type VolumeLifecycleMode string
+
+const (
+	// VolumeLifecyclePersistent explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.VolumeLifecycleModes is not
+	// set. Such volumes are managed in Kubernetes via the persistent volume
+	// claim mechanism and have a lifecycle that is independent of the pods which
+	// use them.
+	VolumeLifecyclePersistent VolumeLifecycleMode = "Persistent"
+
+	// VolumeLifecycleEphemeral indicates that the driver can be used for
+	// ephemeral inline volumes. Such volumes are specified inside the pod
+	// spec with a CSIVolumeSource and, as far as Kubernetes is concerned, have
+	// a lifecycle that is tied to the lifecycle of the pod. For example, such
+	// a volume might contain data that gets created specifically for that pod,
+	// like secrets.
+	// But how the volume actually gets created and managed is entirely up to
+	// the driver. It might also use reference counting to share the same volume
+	// instance among different pods if the CSIVolumeSource of those pods is
+	// identical.
+	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
+)
 
 // +genclient
 // +genclient:nonNamespaced

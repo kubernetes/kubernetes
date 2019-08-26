@@ -344,6 +344,7 @@ API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClassList,Ite
 API rule violation: list_type_missing,k8s.io/api/storage/v1,VolumeAttachmentList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1alpha1,VolumeAttachmentList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSIDriverList,Items
+API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSIDriverSpec,VolumeLifecycleModes
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSINodeDriver,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSINodeList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSINodeSpec,Drivers
