@@ -146,14 +146,19 @@ type GenericAPIServer struct {
 	preShutdownHooksCalled bool
 
 	// healthz checks
-	healthzLock                sync.Mutex
-	healthzChecks              []healthz.HealthChecker
-	healthzChecksInstalled     bool
-	readyzLock                 sync.Mutex
-	readyzChecks               []healthz.HealthChecker
-	readyzChecksInstalled      bool
-	maxStartupSequenceDuration time.Duration
-	healthzClock               clock.Clock
+	healthzLock            sync.Mutex
+	healthzChecks          []healthz.HealthChecker
+	healthzChecksInstalled bool
+	// livez checks
+	livezLock            sync.Mutex
+	livezChecks          []healthz.HealthChecker
+	livezChecksInstalled bool
+	// readyz checks
+	readyzLock            sync.Mutex
+	readyzChecks          []healthz.HealthChecker
+	readyzChecksInstalled bool
+	livezGracePeriod      time.Duration
+	livezClock            clock.Clock
 	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
 	// will cause readyz to return unhealthy.
 	readinessStopCh chan struct{}
@@ -281,7 +286,12 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	s.installHealthz()
-	s.installReadyz(s.readinessStopCh)
+	s.installLivez()
+	err := s.addReadyzShutdownCheck(s.readinessStopCh)
+	if err != nil {
+		klog.Errorf("Failed to install readyz shutdown check %s", err)
+	}
+	s.installReadyz()
 
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
