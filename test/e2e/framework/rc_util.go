@@ -120,7 +120,7 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 
 // ScaleRC scales Replication Controller to be desired size.
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
+	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.SchemeGroupVersion.WithResource("replicationcontrollers"))
 }
 
 // RunRC Launches (and verifies correctness) of a Replication Controller
