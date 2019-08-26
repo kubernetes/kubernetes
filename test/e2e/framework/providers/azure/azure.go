@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
@@ -38,7 +37,7 @@ func newProvider() (framework.ProviderInterface, error) {
 	}
 	config, err := os.Open(framework.TestContext.CloudConfig.ConfigFile)
 	if err != nil {
-		e2elog.Logf("Couldn't open cloud provider configuration %s: %#v",
+		framework.Logf("Couldn't open cloud provider configuration %s: %#v",
 			framework.TestContext.CloudConfig.ConfigFile, err)
 	}
 	defer config.Close()
@@ -73,7 +72,7 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 // DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
 	if err := p.azureCloud.DeleteVolume(pdName); err != nil {
-		e2elog.Logf("failed to delete Azure volume %q: %v", pdName, err)
+		framework.Logf("failed to delete Azure volume %q: %v", pdName, err)
 		return err
 	}
 	return nil

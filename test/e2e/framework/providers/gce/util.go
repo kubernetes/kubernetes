@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // RecreateNodes recreates the given nodes in a managed instance group.
@@ -62,7 +61,7 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 
 		args = append(args, fmt.Sprintf("--instances=%s", strings.Join(nodeNames, ",")))
 		args = append(args, fmt.Sprintf("--zone=%s", zone))
-		e2elog.Logf("Recreating instance group %s.", instanceGroup)
+		framework.Logf("Recreating instance group %s.", instanceGroup)
 		stdout, stderr, err := framework.RunCmd("gcloud", args...)
 		if err != nil {
 			return fmt.Errorf("error recreating nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
@@ -79,7 +78,7 @@ func WaitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout 
 		if err := wait.Poll(30*time.Second, timeout, func() (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 			if err != nil {
-				e2elog.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
+				framework.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
 				return false, nil
 			}
 			return node.Status.NodeInfo.BootID != newNode.Status.NodeInfo.BootID, nil
