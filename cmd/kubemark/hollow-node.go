@@ -50,6 +50,7 @@ import (
 	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/legacy-cloud-providers/aws/eks"
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
@@ -64,6 +65,11 @@ type hollowNodeConfig struct {
 	UseRealProxier       bool
 	ProxierSyncPeriod    time.Duration
 	ProxierMinSyncPeriod time.Duration
+
+	AuthProvider       string
+	ClusterContextName string
+	Region             string
+	ClusterName        string
 }
 
 const (
@@ -86,6 +92,11 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.UseRealProxier, "use-real-proxier", true, "Set to true if you want to use real proxier inside hollow-proxy.")
 	fs.DurationVar(&c.ProxierSyncPeriod, "proxier-sync-period", 30*time.Second, "Period that proxy rules are refreshed in hollow-proxy.")
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
+
+	fs.StringVar(&c.AuthProvider, "auth-provider", "", "The name of the auth provider (currently only supports 'eks').")
+	fs.StringVar(&c.ClusterContextName, "cluster-context-name", "", "The name of the cluster context, required to get CA from kubeconfig.")
+	fs.StringVar(&c.Region, "region", "", "Region where the cluster is deployed.")
+	fs.StringVar(&c.ClusterName, "cluster-name", "", "The name of the cluster.")
 }
 
 func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -145,9 +156,29 @@ func run(config *hollowNodeConfig) {
 	}
 
 	// create a client to communicate with API server.
-	clientConfig, err := config.createClientConfigFromFile()
-	if err != nil {
-		klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+	var clientConfig *restclient.Config
+	var err error
+	if config.AuthProvider == "" {
+		clientConfig, err = config.createClientConfigFromFile()
+		if err != nil {
+			klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+		}
+	} else {
+		switch config.AuthProvider {
+		case "eks":
+			clientConfig, err = eks.NewClientConfig(eks.ClientConfig{
+				ContentType:        config.ContentType,
+				KubeconfigPath:     config.KubeconfigPath,
+				ClusterContextName: config.ClusterContextName,
+				Region:             config.Region,
+				ClusterName:        config.ClusterName,
+			})
+			if err != nil {
+				klog.Fatalf("Failed to create a EKS ClientConfig: %v. Exiting.", err)
+			}
+		default:
+			klog.Fatalf("unknown auth provider %q given", config.AuthProvider)
+		}
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)

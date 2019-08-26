@@ -38,6 +38,7 @@ go_library(
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/restclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/aws/eks:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
