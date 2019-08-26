@@ -36,7 +36,7 @@ Line 3.
 `,
 			Expected: `Multiple lines.
 
- Line 2. Line 3.`,
+Line 2. Line 3.`,
 		},
 		{
 			In: `
@@ -47,7 +47,7 @@ Line 3.
 `,
 			Expected: `Whitespace trimming  preserves   inline    spaces.
 
- Line 2. Line 3.`,
+Line 2. Line 3.`,
 		},
 		{
 			In:       `TEXT_WITH_UNDERSCORE`,

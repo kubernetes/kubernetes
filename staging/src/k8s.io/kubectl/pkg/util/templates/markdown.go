@@ -47,7 +47,14 @@ func (r *ASCIIRenderer) NormalText(out *bytes.Buffer, text []byte) {
 	for _, line := range lines {
 		trimmed := strings.Trim(line, " \n\t")
 		if len(trimmed) > 0 && trimmed[0] != '_' {
-			out.WriteString(" ")
+			b := out.Bytes()
+			if len(b) == 0 {
+				// Don't lead with a space
+			} else if c := b[len(b)-1]; c == ' ' || c == '\n' {
+				// Don't insert an extra space next to a space
+			} else {
+				out.WriteString(" ")
+			}
 		}
 		out.WriteString(trimmed)
 	}
