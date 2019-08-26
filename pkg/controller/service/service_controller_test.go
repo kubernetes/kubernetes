@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,8 +40,6 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -53,7 +51,6 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 			Name:      name,
 			Namespace: "default",
 			UID:       uid,
-			SelfLink:  testapi.Default.SelfLink("services", name),
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
@@ -74,7 +71,7 @@ func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
 
 	client := fake.NewSimpleClientset()
 
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
@@ -146,7 +143,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
-					SelfLink:  testapi.Default.SelfLink("services", "udp-service"),
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -166,7 +162,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -186,7 +181,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "sctp-service",
 					Namespace: "default",
-					SelfLink:  testapi.Default.SelfLink("services", "sctp-service"),
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -232,7 +226,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
+
 					DeletionTimestamp: &metav1.Time{
 						Time: time.Now(),
 					},
@@ -266,7 +260,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -286,9 +279,9 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			enableFeatureGate: true,
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:       "basic-service1",
-					Namespace:  "default",
-					SelfLink:   testapi.Default.SelfLink("services", "basic-service1"),
+					Name:      "basic-service1",
+					Namespace: "default",
+
 					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
 				},
 				Spec: v1.ServiceSpec{
