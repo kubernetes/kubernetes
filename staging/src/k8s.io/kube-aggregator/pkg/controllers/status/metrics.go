@@ -24,15 +24,17 @@ import (
 var (
 	unavailableCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name: "aggregator_unavailable_apiservice_count",
-			Help: "Counter of APIServices which are marked as unavailable broken down by APIService name and reason.",
+			Name:           "aggregator_unavailable_apiservice_count",
+			Help:           "Counter of APIServices which are marked as unavailable broken down by APIService name and reason.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name", "reason"},
 	)
 	unavailableGauge = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Name: "aggregator_unavailable_apiservice",
-			Help: "Gauge of APIServices which are marked as unavailable broken down by APIService name.",
+			Name:           "aggregator_unavailable_apiservice",
+			Help:           "Gauge of APIServices which are marked as unavailable broken down by APIService name.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name"},
 	)
