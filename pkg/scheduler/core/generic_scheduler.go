@@ -167,7 +167,7 @@ type genericScheduler struct {
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
 	alwaysCheckAllPredicates bool
-	nodeInfoSnapshot         *internalcache.NodeInfoSnapshot
+	nodeInfoSnapshot         *schedulernodeinfo.Snapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                algorithm.PDBLister

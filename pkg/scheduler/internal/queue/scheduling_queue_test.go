@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -163,7 +163,7 @@ func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	}
 }
 
-func (*fakeFramework) NodeInfoSnapshot() *internalcache.NodeInfoSnapshot {
+func (*fakeFramework) NodeInfoSnapshot() *schedulernodeinfo.Snapshot {
 	return nil
 }
 
