@@ -30,6 +30,10 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/openshift-kube-apiserver/configdefault"
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/openshiftkubeapiserver"
+
 	"github.com/go-openapi/spec"
 	"github.com/spf13/cobra"
 
@@ -112,6 +116,31 @@ cluster's shared state through which all other components interact.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cmd.Flags())
+
+			if len(s.OpenShiftConfig) > 0 {
+				enablement.ForceOpenShift()
+				openshiftConfig, err := enablement.GetOpenshiftConfig(s.OpenShiftConfig)
+				if err != nil {
+					klog.Fatal(err)
+				}
+
+				// this forces a patch to be called
+				// TODO we're going to try to remove bits of the patching.
+				configPatchFn, serverPatchContext := openshiftkubeapiserver.NewOpenShiftKubeAPIServerConfigPatch(genericapiserver.NewEmptyDelegate(), openshiftConfig)
+				OpenShiftKubeAPIServerConfigPatch = configPatchFn
+				OpenShiftKubeAPIServerServerPatch = serverPatchContext.PatchServer
+
+				args, err := openshiftkubeapiserver.ConfigToFlags(openshiftConfig)
+				if err != nil {
+					return err
+				}
+				// hopefully this resets the flags?
+				if err := cmd.ParseFlags(args); err != nil {
+					return err
+				}
+
+				enablement.ForceGlobalInitializationForOpenShift(s)
+			}
 
 			// set default options
 			completedOptions, err := Complete(s)
@@ -565,6 +594,9 @@ func buildGenericConfig(
 		return
 	}
 
+	if enablement.IsOpenShift() {
+		configdefault.SetAdmissionDefaults(s, versionedInformers, clientgoExternalClient)
+	}
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
