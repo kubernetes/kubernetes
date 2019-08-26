@@ -17,9 +17,11 @@ limitations under the License.
 package ipvs
 
 import (
+	"errors"
 	"net"
 	"reflect"
 	"testing"
+	"time"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilipvstest "k8s.io/kubernetes/pkg/util/ipvs/testing"
@@ -397,6 +399,280 @@ func Test_GracefulDeleteRS(t *testing.T) {
 				t.Logf("expected : %+v", test.expectedIPVS)
 				t.Errorf("unexpected IPVS servers")
 			}
+		})
+	}
+}
+
+func Test_deleteRsFunc(t *testing.T) {
+	tests := []struct {
+		name         string
+		existingIPVS *utilipvstest.FakeIPVS
+		item         *listItem
+		deleted      bool
+		err          error
+	}{
+		{
+			name: "delete UDP real server, should be deleted",
+			existingIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.1.1.1",
+						Port:     53,
+						Protocol: "udp",
+					}: {
+						Address:  net.ParseIP("1.1.1.1"),
+						Protocol: "udp",
+						Port:     uint16(53),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.1.1.1",
+						Port:     53,
+						Protocol: "udp",
+					}: {
+						{
+							Address:      net.ParseIP("10.0.0.1"),
+							Port:         uint16(53),
+							Weight:       100,
+							ActiveConn:   10,
+							InactiveConn: 10,
+						},
+					},
+				},
+			},
+			item: &listItem{
+				VirtualServer: &utilipvs.VirtualServer{
+					Address:  net.ParseIP("1.1.1.1"),
+					Protocol: "udp",
+					Port:     uint16(53),
+				},
+				RealServer: &utilipvs.RealServer{
+					Address:      net.ParseIP("10.0.0.1"),
+					Port:         uint16(53),
+					Weight:       100,
+					ActiveConn:   10,
+					InactiveConn: 10,
+				},
+				createdAt: time.Now(),
+			},
+			deleted: true,
+			err:     nil,
+		},
+		{
+			name: "delete TCP real server with no connections, should be deleted",
+			existingIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						Address:  net.ParseIP("1.2.3.4"),
+						Protocol: "tcp",
+						Port:     uint16(80),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						{
+							Address:      net.ParseIP("10.0.0.1"),
+							Port:         uint16(80),
+							Weight:       100,
+							ActiveConn:   0,
+							InactiveConn: 0,
+						},
+					},
+				},
+			},
+			item: &listItem{
+				VirtualServer: &utilipvs.VirtualServer{
+					Address:  net.ParseIP("1.2.3.4"),
+					Protocol: "tcp",
+					Port:     uint16(80),
+				},
+				RealServer: &utilipvs.RealServer{
+					Address:      net.ParseIP("10.0.0.1"),
+					Port:         uint16(80),
+					Weight:       100,
+					ActiveConn:   0,
+					InactiveConn: 0,
+				},
+				createdAt: time.Now(),
+			},
+			deleted: true,
+			err:     nil,
+		},
+		{
+			name: "delete TCP recent real server with connections, should not be deleted",
+			existingIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						Address:  net.ParseIP("1.2.3.4"),
+						Protocol: "tcp",
+						Port:     uint16(80),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						{
+							Address:      net.ParseIP("10.0.0.1"),
+							Port:         uint16(80),
+							Weight:       100,
+							ActiveConn:   1,
+							InactiveConn: 1,
+						},
+					},
+				},
+			},
+			item: &listItem{
+				VirtualServer: &utilipvs.VirtualServer{
+					Address:  net.ParseIP("1.2.3.4"),
+					Protocol: "tcp",
+					Port:     uint16(80),
+				},
+				RealServer: &utilipvs.RealServer{
+					Address:      net.ParseIP("10.0.0.1"),
+					Port:         uint16(80),
+					Weight:       100,
+					ActiveConn:   1,
+					InactiveConn: 1,
+				},
+				// graceful termination started 1 minute ago
+				createdAt: time.Now().Add(-1 * time.Minute),
+			},
+			deleted: false,
+			err:     nil,
+		},
+		{
+			name: "delete TCP real server with connections but after grace period, should be deleted",
+			existingIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						Address:  net.ParseIP("1.2.3.4"),
+						Protocol: "tcp",
+						Port:     uint16(80),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						{
+							Address:      net.ParseIP("10.0.0.1"),
+							Port:         uint16(80),
+							Weight:       100,
+							ActiveConn:   1,
+							InactiveConn: 1,
+						},
+					},
+				},
+			},
+			item: &listItem{
+				VirtualServer: &utilipvs.VirtualServer{
+					Address:  net.ParseIP("1.2.3.4"),
+					Protocol: "tcp",
+					Port:     uint16(80),
+				},
+				RealServer: &utilipvs.RealServer{
+					Address:      net.ParseIP("10.0.0.1"),
+					Port:         uint16(80),
+					Weight:       100,
+					ActiveConn:   1,
+					InactiveConn: 1,
+				},
+				// graceful termination started 15 minute ago
+				createdAt: time.Now().Add(-15 * time.Minute),
+			},
+			deleted: true,
+			err:     nil,
+		},
+		{
+			name: "delete real server that doesn't exist, should err",
+			existingIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						Address:  net.ParseIP("1.2.3.4"),
+						Protocol: "tcp",
+						Port:     uint16(80),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.2.3.4",
+						Port:     80,
+						Protocol: "tcp",
+					}: {
+						{
+							Address:      net.ParseIP("10.0.0.1"),
+							Port:         uint16(80),
+							Weight:       100,
+							ActiveConn:   1,
+							InactiveConn: 1,
+						},
+					},
+				},
+			},
+			item: &listItem{
+				VirtualServer: &utilipvs.VirtualServer{
+					Address:  net.ParseIP("1.2.3.4"),
+					Protocol: "tcp",
+					Port:     uint16(80),
+				},
+				RealServer: &utilipvs.RealServer{
+					Address:      net.ParseIP("10.0.0.2"), // 10.0.0.2 doens't exist
+					Port:         uint16(80),
+					Weight:       100,
+					ActiveConn:   1,
+					InactiveConn: 1,
+				},
+				createdAt: time.Now(),
+			},
+			deleted: true,
+			err:     errors.New("Failed to delete rs \"1.2.3.4:80/tcp/10.0.0.2:80\", can't find the real server"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipvs := test.existingIPVS
+			gracefulTerminationManager := NewGracefulTerminationManager(ipvs)
+
+			deleted, err := gracefulTerminationManager.deleteRsFunc(test.item)
+			if !reflect.DeepEqual(err, test.err) {
+				t.Logf("actual error: %v", err)
+				t.Logf("expected error: %v", test.err)
+				t.Fatal("unexpected error deleting real server")
+			}
+
+			if deleted != test.deleted {
+				t.Logf("actual deleted state: %v", deleted)
+				t.Logf("expected deleted state: %v", test.deleted)
+				t.Errorf("unexpected deleted state for real server")
+			}
+
 		})
 	}
 }
