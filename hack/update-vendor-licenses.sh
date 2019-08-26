@@ -174,7 +174,7 @@ cat "${LICENSE_ROOT}/LICENSE"
 echo
 echo "= LICENSE $(kube::util::md5 "${LICENSE_ROOT}/LICENSE")"
 echo "================================================================================"
-) > ${TMP_LICENSE_FILE}
+) > "${TMP_LICENSE_FILE}"
 mv "${TMP_LICENSE_FILE}" "${TMP_VENDOR_LICENSE_DIR}/LICENSE"
 
 # Loop through every vendored package
