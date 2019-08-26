@@ -93,7 +93,7 @@ func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (boo
 			success = false
 		}
 		if deleted {
-			klog.Infof("lw: remote out of the list: %s", name)
+			klog.V(5).Infof("lw: remote out of the list: %s", name)
 			q.remove(rs)
 		}
 	}
