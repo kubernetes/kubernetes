@@ -3373,7 +3373,7 @@ func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.Res
 		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
-				reqs[podReqName] = *podReqValue.Copy()
+				reqs[podReqName] = podReqValue.DeepCopy()
 			} else {
 				value.Add(podReqValue)
 				reqs[podReqName] = value
@@ -3381,7 +3381,7 @@ func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.Res
 		}
 		for podLimitName, podLimitValue := range podLimits {
 			if value, ok := limits[podLimitName]; !ok {
-				limits[podLimitName] = *podLimitValue.Copy()
+				limits[podLimitName] = podLimitValue.DeepCopy()
 			} else {
 				value.Add(podLimitValue)
 				limits[podLimitName] = value

@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	. "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -35,7 +35,7 @@ type Mock struct {
 	mock.Mock
 }
 
-var _ Runtime = new(Mock)
+var _ kubecontainer.Runtime = new(Mock)
 
 func (r *Mock) Start() error {
 	args := r.Called()
@@ -47,32 +47,32 @@ func (r *Mock) Type() string {
 	return args.Get(0).(string)
 }
 
-func (r *Mock) Version() (Version, error) {
+func (r *Mock) Version() (kubecontainer.Version, error) {
 	args := r.Called()
-	return args.Get(0).(Version), args.Error(1)
+	return args.Get(0).(kubecontainer.Version), args.Error(1)
 }
 
-func (r *Mock) APIVersion() (Version, error) {
+func (r *Mock) APIVersion() (kubecontainer.Version, error) {
 	args := r.Called()
-	return args.Get(0).(Version), args.Error(1)
+	return args.Get(0).(kubecontainer.Version), args.Error(1)
 }
 
-func (r *Mock) Status() (*RuntimeStatus, error) {
+func (r *Mock) Status() (*kubecontainer.RuntimeStatus, error) {
 	args := r.Called()
-	return args.Get(0).(*RuntimeStatus), args.Error(0)
+	return args.Get(0).(*kubecontainer.RuntimeStatus), args.Error(0)
 }
 
-func (r *Mock) GetPods(all bool) ([]*Pod, error) {
+func (r *Mock) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	args := r.Called(all)
-	return args.Get(0).([]*Pod), args.Error(1)
+	return args.Get(0).([]*kubecontainer.Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *v1.Pod, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
+func (r *Mock) SyncPod(pod *v1.Pod, status *kubecontainer.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) kubecontainer.PodSyncResult {
 	args := r.Called(pod, status, secrets, backOff)
-	return args.Get(0).(PodSyncResult)
+	return args.Get(0).(kubecontainer.PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (r *Mock) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
 	args := r.Called(pod, runningPod, gracePeriodOverride)
 	return args.Error(0)
 }
@@ -87,64 +87,64 @@ func (r *Mock) KillContainerInPod(container v1.Container, pod *v1.Pod) error {
 	return args.Error(0)
 }
 
-func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
+func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	args := r.Called(uid, name, namespace)
-	return args.Get(0).(*PodStatus), args.Error(1)
+	return args.Get(0).(*kubecontainer.PodStatus), args.Error(1)
 }
 
-func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (r *Mock) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
 
-func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (r *Mock) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	args := r.Called(containerID, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
 
-func (r *Mock) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (r *Mock) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	args := r.Called(pod, containerID, logOptions, stdout, stderr)
 	return args.Error(0)
 }
 
-func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *Mock) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	args := r.Called(image, pullSecrets)
 	return image.Image, args.Error(0)
 }
 
-func (r *Mock) GetImageRef(image ImageSpec) (string, error) {
+func (r *Mock) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
 	args := r.Called(image)
 	return args.Get(0).(string), args.Error(1)
 }
 
-func (r *Mock) ListImages() ([]Image, error) {
+func (r *Mock) ListImages() ([]kubecontainer.Image, error) {
 	args := r.Called()
-	return args.Get(0).([]Image), args.Error(1)
+	return args.Get(0).([]kubecontainer.Image), args.Error(1)
 }
 
-func (r *Mock) RemoveImage(image ImageSpec) error {
+func (r *Mock) RemoveImage(image kubecontainer.ImageSpec) error {
 	args := r.Called(image)
 	return args.Error(0)
 }
 
-func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
+func (r *Mock) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	args := r.Called(pod, port, stream)
 	return args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (r *Mock) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
 	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)
 }
 
-func (r *Mock) DeleteContainer(containerID ContainerID) error {
+func (r *Mock) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	args := r.Called(containerID)
 	return args.Error(0)
 }
 
-func (r *Mock) ImageStats() (*ImageStats, error) {
+func (r *Mock) ImageStats() (*kubecontainer.ImageStats, error) {
 	args := r.Called()
-	return args.Get(0).(*ImageStats), args.Error(1)
+	return args.Get(0).(*kubecontainer.ImageStats), args.Error(1)
 }
 
 // UpdatePodCIDR fulfills the cri interface.

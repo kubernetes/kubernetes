@@ -121,10 +121,12 @@ func (km *Manager) Kustomize(res []byte) ([]byte, error) {
 		resources = append(resources, r)
 
 		resourcePatches := km.us.FilterResource(r.GroupVersionKind(), r.GetNamespace(), r.GetName())
-		patches = append(patches, resourcePatches...)
-	}
 
-	fmt.Printf("[kustomize] Applying %d patches\n", len(patches))
+		if len(resourcePatches) > 0 {
+			fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", len(resourcePatches), r.GroupVersionKind(), r.GetNamespace(), r.GetName())
+			patches = append(patches, resourcePatches...)
+		}
+	}
 
 	// if there are no patches, for the target resources, exit
 	if len(patches) == 0 {

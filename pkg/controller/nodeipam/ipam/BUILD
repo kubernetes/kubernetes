@@ -35,7 +35,7 @@ go_library(
         "adapter.go",
         "cidr_allocator.go",
         "cloud_cidr_allocator.go",
-        "controller.go",
+        "controller_legacyprovider.go",
         "doc.go",
         "range_allocator.go",
         "timeout.go",

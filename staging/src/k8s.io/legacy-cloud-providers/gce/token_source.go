@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -17,6 +19,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -104,7 +107,7 @@ func (a *AltTokenSource) token() (*oauth2.Token, error) {
 
 // NewAltTokenSource constructs a new alternate token source for generating tokens.
 func NewAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
-	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
+	client := oauth2.NewClient(context.Background(), google.ComputeTokenSource(""))
 	a := &AltTokenSource{
 		oauthClient: client,
 		tokenURL:    tokenURL,

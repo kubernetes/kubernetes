@@ -587,7 +587,7 @@ func TestEtcdCreate(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingStorage.Create(ctx, &api.Binding{
+	_, err = bindingStorage.Create(ctx, "foo", &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -613,7 +613,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	// - Create (apiserver)
 	// - Schedule (scheduler)
 	// - Delete (apiserver)
-	_, err := bindingStorage.Create(ctx, &api.Binding{
+	_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -657,7 +657,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingStorage.Create(ctx, &api.Binding{
+	_, err = bindingStorage.Create(ctx, "foo", &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   metav1.NamespaceDefault,
 			Name:        "foo",
@@ -700,12 +700,12 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 		},
 		Target: api.ObjectReference{Name: "machine"},
 	}
-	_, err = bindingStorage.Create(ctx, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err = bindingStorage.Create(ctx, binding.Name, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = bindingStorage.Create(ctx, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err = bindingStorage.Create(ctx, binding.Name, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err == nil || !errors.IsConflict(err) {
 		t.Fatalf("expected resource conflict error, not: %v", err)
 	}
@@ -722,7 +722,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingStorage.Create(ctx, &api.Binding{
+	_, err = bindingStorage.Create(ctx, "foo", &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -740,8 +740,9 @@ func TestEtcdCreateBinding(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testCases := map[string]struct {
-		binding api.Binding
-		errOK   func(error) bool
+		binding      api.Binding
+		badNameInURL bool
+		errOK        func(error) bool
 	}{
 		"noName": {
 			binding: api.Binding{
@@ -749,6 +750,14 @@ func TestEtcdCreateBinding(t *testing.T) {
 				Target:     api.ObjectReference{},
 			},
 			errOK: func(err error) bool { return err != nil },
+		},
+		"badNameInURL": {
+			binding: api.Binding{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{},
+			},
+			badNameInURL: true,
+			errOK:        func(err error) bool { return err != nil },
 		},
 		"badKind": {
 			binding: api.Binding{
@@ -778,7 +787,11 @@ func TestEtcdCreateBinding(t *testing.T) {
 		if _, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := bindingStorage.Create(ctx, &test.binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); !test.errOK(err) {
+		name := test.binding.Name
+		if test.badNameInURL {
+			name += "badNameInURL"
+		}
+		if _, err := bindingStorage.Create(ctx, name, &test.binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
 			// If bind succeeded, verify Host field in pod's Spec.

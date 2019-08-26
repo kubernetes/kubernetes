@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
@@ -115,9 +114,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-type DummyImpl struct {
-	dummy string
-}
+type DummyImpl struct{}
 
 func NewDummyImpl() *DummyImpl {
 	return &DummyImpl{}
@@ -185,7 +182,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 		dsw,
 		asw,
 	)
-	reconciler.AddHandler(pluginwatcherapi.DevicePlugin, cache.PluginHandler(di))
+	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
 	stopChan := make(chan struct{})
@@ -230,7 +227,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 		dsw,
 		asw,
 	)
-	reconciler.AddHandler(pluginwatcherapi.DevicePlugin, cache.PluginHandler(di))
+	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
 	stopChan := make(chan struct{})
@@ -285,7 +282,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 		dsw,
 		asw,
 	)
-	reconciler.AddHandler(pluginwatcherapi.DevicePlugin, cache.PluginHandler(di))
+	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
 	stopChan := make(chan struct{})

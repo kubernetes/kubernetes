@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const fakeFilename = "testdata/metric.go"
@@ -33,7 +35,7 @@ func TestSkipMetrics(t *testing.T) {
 			testName: "Skip alpha metric with local variable",
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var name = "metric"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -46,7 +48,7 @@ var _ = metrics.NewCounter(
 			testName: "Skip alpha metric created via function call",
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 func getName() string {
 	return "metric"
 }
@@ -61,7 +63,7 @@ var _ = metrics.NewCounter(
 			testName: "Skip metric without stability set",
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Name: "metric",
@@ -123,22 +125,24 @@ func TestStableMetric(t *testing.T) {
 		{
 			testName: "Counter",
 			metric: metric{
-				Name:           "metric",
-				Namespace:      "namespace",
-				Subsystem:      "subsystem",
-				StabilityLevel: "STABLE",
-				Help:           "help",
-				Type:           counterMetricType,
+				Name:              "metric",
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				StabilityLevel:    "STABLE",
+				DeprecatedVersion: "1.16",
+				Help:              "help",
+				Type:              counterMetricType,
 			},
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounter(
 	&metrics.CounterOpts{
 		Name: "metric",
 		Subsystem: "subsystem",
 		Namespace: "namespace",
 		Help: "help",
+		DeprecatedVersion: "1.16",
 		StabilityLevel: metrics.STABLE,
 	},
 )
@@ -146,23 +150,25 @@ var _ = metrics.NewCounter(
 		{
 			testName: "CounterVec",
 			metric: metric{
-				Name:           "metric",
-				Namespace:      "namespace",
-				Subsystem:      "subsystem",
-				Labels:         []string{"label-1"},
-				StabilityLevel: "STABLE",
-				Help:           "help",
-				Type:           counterMetricType,
+				Name:              "metric",
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Labels:            []string{"label-1"},
+				StabilityLevel:    "STABLE",
+				DeprecatedVersion: "1.16",
+				Help:              "help",
+				Type:              counterMetricType,
 			},
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name: "metric",
 			Namespace: "namespace",
 			Subsystem: "subsystem",
 			Help: "help",
+			DeprecatedVersion: "1.16",
 			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"label-1"},
@@ -171,22 +177,24 @@ var _ = metrics.NewCounterVec(
 		{
 			testName: "Gauge",
 			metric: metric{
-				Name:           "gauge",
-				Namespace:      "namespace",
-				Subsystem:      "subsystem",
-				StabilityLevel: "STABLE",
-				Help:           "help",
-				Type:           gaugeMetricType,
+				Name:              "gauge",
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				StabilityLevel:    "STABLE",
+				DeprecatedVersion: "1.16",
+				Help:              "help",
+				Type:              gaugeMetricType,
 			},
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Name: "gauge",
 			Namespace: "namespace",
 			Subsystem: "subsystem",
 			Help: "help",
+			DeprecatedVersion: "1.16",
 			StabilityLevel: metrics.STABLE,
 		},
 	)
@@ -194,23 +202,25 @@ var _ = metrics.NewGauge(
 		{
 			testName: "GaugeVec",
 			metric: metric{
-				Name:           "gauge",
-				Namespace:      "namespace",
-				Subsystem:      "subsystem",
-				StabilityLevel: "STABLE",
-				Help:           "help",
-				Type:           gaugeMetricType,
-				Labels:         []string{"label-1", "label-2"},
+				Name:              "gauge",
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				StabilityLevel:    "STABLE",
+				DeprecatedVersion: "1.16",
+				Help:              "help",
+				Type:              gaugeMetricType,
+				Labels:            []string{"label-1", "label-2"},
 			},
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Name: "gauge",
 			Namespace: "namespace",
 			Subsystem: "subsystem",
 			Help: "help",
+			DeprecatedVersion: "1.16",
 			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"label-2", "label-1"},
@@ -219,17 +229,18 @@ var _ = metrics.NewGaugeVec(
 		{
 			testName: "Histogram",
 			metric: metric{
-				Name:           "histogram",
-				Namespace:      "namespace",
-				Subsystem:      "subsystem",
-				StabilityLevel: "STABLE",
-				Buckets:        []float64{0.001, 0.01, 0.1, 1, 10, 100},
-				Help:           "help",
-				Type:           histogramMetricType,
+				Name:              "histogram",
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				DeprecatedVersion: "1.16",
+				StabilityLevel:    "STABLE",
+				Buckets:           []float64{0.001, 0.01, 0.1, 1, 10, 100},
+				Help:              "help",
+				Type:              histogramMetricType,
 			},
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Name: "histogram",
@@ -237,6 +248,7 @@ var _ = metrics.NewHistogram(
 			Subsystem: "subsystem",
 			StabilityLevel: metrics.STABLE,
 			Help: "help",
+			DeprecatedVersion: "1.16",
 			Buckets: []float64{0.001, 0.01, 0.1, 1, 10, 100},
 		},
 	)
@@ -244,18 +256,19 @@ var _ = metrics.NewHistogram(
 		{
 			testName: "HistogramVec",
 			metric: metric{
-				Name:           "histogram",
-				Namespace:      "namespace",
-				Subsystem:      "subsystem",
-				StabilityLevel: "STABLE",
-				Buckets:        []float64{0.001, 0.01, 0.1, 1, 10, 100},
-				Help:           "help",
-				Type:           histogramMetricType,
-				Labels:         []string{"label-1", "label-2"},
+				Name:              "histogram",
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				DeprecatedVersion: "1.16",
+				StabilityLevel:    "STABLE",
+				Buckets:           []float64{0.001, 0.01, 0.1, 1, 10, 100},
+				Help:              "help",
+				Type:              histogramMetricType,
+				Labels:            []string{"label-1", "label-2"},
 			},
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Name: "histogram",
@@ -263,6 +276,7 @@ var _ = metrics.NewHistogramVec(
 			Subsystem: "subsystem",
 			StabilityLevel: metrics.STABLE,
 			Help: "help",
+			DeprecatedVersion: "1.16",
 			Buckets: []float64{0.001, 0.01, 0.1, 1, 10, 100},
 		},
 		[]string{"label-2", "label-1"},
@@ -277,11 +291,71 @@ var _ = metrics.NewHistogramVec(
 			},
 			src: `
 package test
-import custom "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import custom "k8s.io/component-base/metrics"
 var _ = custom.NewCounter(
 		&custom.CounterOpts{
 			Name: "metric",
 			StabilityLevel: custom.STABLE,
+		},
+	)
+`},
+		{
+			testName: "Histogram with linear buckets",
+			metric: metric{
+				Name:           "histogram",
+				StabilityLevel: "STABLE",
+				Buckets:        prometheus.LinearBuckets(1, 1, 3),
+				Type:           histogramMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "github.com/prometheus/client_golang/prometheus"
+var _ = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Name: "histogram",
+			StabilityLevel: metrics.STABLE,
+			Buckets: prometheus.LinearBuckets(1, 1, 3),
+		},
+	)
+`},
+		{
+			testName: "Histogram with exponential buckets",
+			metric: metric{
+				Name:           "histogram",
+				StabilityLevel: "STABLE",
+				Buckets:        prometheus.ExponentialBuckets(1, 2, 3),
+				Type:           histogramMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "github.com/prometheus/client_golang/prometheus"
+var _ = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Name: "histogram",
+			StabilityLevel: metrics.STABLE,
+			Buckets: prometheus.ExponentialBuckets(1, 2, 3),
+		},
+	)
+`},
+		{
+			testName: "Histogram with default buckets",
+			metric: metric{
+				Name:           "histogram",
+				StabilityLevel: "STABLE",
+				Buckets:        prometheus.DefBuckets,
+				Type:           histogramMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "github.com/prometheus/client_golang/prometheus"
+var _ = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Name: "histogram",
+			StabilityLevel: metrics.STABLE,
+			Buckets: prometheus.DefBuckets,
 		},
 	)
 `},
@@ -315,7 +389,7 @@ func TestIncorrectStableMetricDeclarations(t *testing.T) {
 			err:      fmt.Errorf("testdata/metric.go:4:9: Stable summary metric is not supported"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewSummary(
 		&metrics.SummaryOpts{
 			StabilityLevel: metrics.STABLE,
@@ -327,7 +401,7 @@ var _ = metrics.NewSummary(
 			err:      fmt.Errorf("testdata/metric.go:7:4: Non string attribute it not supported"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 const name = "metric"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -341,7 +415,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:9:4: Non string attribute it not supported"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 func getName() string {
 	return "metric"
 }
@@ -357,7 +431,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:7:4: Non string attribute it not supported"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 import "k8s.io/kubernetes/utils"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -371,7 +445,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:9:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 func getMetricStability() metrics.StabilityLevel {
 	return metrics.STABLE
 }
@@ -386,7 +460,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
 			StabilityLevel: "stable",
@@ -398,7 +472,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
 			StabilityLevel: metrics.UNKNOWN,
@@ -410,7 +484,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:7:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var stable = metrics.STABLE
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -423,7 +497,7 @@ var _ = metrics.NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:6:10: Opts for STABLE metric was not directly passed to new metric function"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounter(getStableCounterOpts())
 func getStableCounterOpts() *metrics.CounterOpts {
 	return &metrics.CounterOpts{
@@ -433,10 +507,10 @@ func getStableCounterOpts() *metrics.CounterOpts {
 `},
 		{
 			testName: "error . package import of metric framework",
-			err:      fmt.Errorf(`testdata/metric.go:3:8: Importing through "." metrics framework is not supported`),
+			err:      fmt.Errorf(`testdata/metric.go:3:8: Importing using "." is not supported`),
 			src: `
 package test
-import . "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import . "k8s.io/component-base/metrics"
 var _ = NewCounter(
 		&CounterOpts{
 			StabilityLevel: STABLE,
@@ -448,7 +522,7 @@ var _ = NewCounter(
 			err:      fmt.Errorf("testdata/metric.go:4:9: Opts for STABLE metric was not directly passed to new metric function"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = RegisterMetric(
 		&metrics.CounterOpts{
 			StabilityLevel: metrics.STABLE,
@@ -460,7 +534,7 @@ var _ = RegisterMetric(
 			err:      fmt.Errorf("testdata/metric.go:4:9: Opts for STABLE metric was not directly passed to new metric function"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = test.RegisterMetric(
 		&metrics.CounterOpts{
 			StabilityLevel: metrics.STABLE,
@@ -472,10 +546,55 @@ var _ = test.RegisterMetric(
 			err:      fmt.Errorf("testdata/metric.go:6:4: Positional arguments are not supported"),
 			src: `
 package test
-import "k8s.io/kubernetes/staging/src/k8s.io/component-base/metrics"
+import "k8s.io/component-base/metrics"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
 			"counter",
+		},
+	)
+`},
+		{
+			testName: "error stable historgram with unknown prometheus bucket variable",
+			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "github.com/prometheus/client_golang/prometheus"
+var _ = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Name: "histogram",
+			StabilityLevel: metrics.STABLE,
+			Buckets: prometheus.FakeBuckets,
+		},
+	)
+`},
+		{
+			testName: "error stable historgram with unknown bucket variable",
+			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+var buckets = []float64{1, 2, 3}
+var _ = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Name: "histogram",
+			StabilityLevel: metrics.STABLE,
+			Buckets: buckets,
+		},
+	)
+`},
+		{
+			testName: "error stable historgram with unknown bucket variable from unknown library",
+			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "github.com/fake_prometheus/prometheus"
+var _ = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Name: "histogram",
+			StabilityLevel: metrics.STABLE,
+			Buckets: prometheus.DefBuckets,
 		},
 	)
 `},

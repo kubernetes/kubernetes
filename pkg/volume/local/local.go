@@ -313,7 +313,9 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 	mountOptions := util.MountOptionFromSpec(spec, options...)
 	err = dm.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
 	if err != nil {
-		os.Remove(deviceMountPath)
+		if rmErr := os.Remove(deviceMountPath); rmErr != nil {
+			klog.Warningf("local: failed to remove %s: %v", deviceMountPath, rmErr)
+		}
 		return fmt.Errorf("local: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
 	}
 	klog.V(3).Infof("local: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
@@ -531,7 +533,9 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 				return err
 			}
 		}
-		os.Remove(dir)
+		if rmErr := os.Remove(dir); rmErr != nil {
+			klog.Warningf("failed to remove %s: %v", dir, rmErr)
+		}
 		return err
 	}
 	if !m.readOnly {

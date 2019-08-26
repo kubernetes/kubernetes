@@ -89,11 +89,13 @@ func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*
 	// Total cpu reservation is 200m.
 	for k, v := range capacity {
 		if k == v1.ResourceCPU {
-			allocatableCPU = v.Copy()
+			c := v.DeepCopy()
+			allocatableCPU = &c
 			allocatableCPU.Sub(resource.MustParse(cpu))
 		}
 		if k == v1.ResourceMemory {
-			allocatableMemory = v.Copy()
+			c := v.DeepCopy()
+			allocatableMemory = &c
 			allocatableMemory.Sub(resource.MustParse(memory))
 		}
 	}

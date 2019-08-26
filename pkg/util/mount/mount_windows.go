@@ -22,15 +22,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"k8s.io/klog"
 	"k8s.io/utils/keymutex"
-
-	utilpath "k8s.io/utils/path"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -55,7 +51,7 @@ var getSMBMountMutex = keymutex.NewHashed(0)
 // Mount : mounts source to target with given options.
 // currently only supports cifs(smb), bind mount(for disk)
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	target = normalizeWindowsPath(target)
+	target = NormalizeWindowsPath(target)
 
 	if source == "tmpfs" {
 		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, options)
@@ -74,7 +70,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	// tell it's going to mount azure disk or azure file according to options
 	if bind, _, _ := IsBind(options); bind {
 		// mount azure disk
-		bindSource = normalizeWindowsPath(source)
+		bindSource = NormalizeWindowsPath(source)
 	} else {
 		if len(options) < 2 {
 			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
@@ -155,7 +151,7 @@ func removeSMBMapping(remotepath string) (string, error) {
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
 	klog.V(4).Infof("azureMount: Unmount target (%q)", target)
-	target = normalizeWindowsPath(target)
+	target = NormalizeWindowsPath(target)
 	if output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
 		klog.Errorf("rmdir failed: %v, output: %q", err, string(output))
 		return err
@@ -198,7 +194,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 
 // GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	windowsPath := normalizeWindowsPath(pathname)
+	windowsPath := NormalizeWindowsPath(pathname)
 	pathExists, pathErr := PathExists(windowsPath)
 	if !pathExists {
 		return []string{}, nil
@@ -238,34 +234,12 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		return err
 	}
 	driverPath := driveLetter + ":"
-	target = normalizeWindowsPath(target)
+	target = NormalizeWindowsPath(target)
 	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, driverPath, target)
 	if output, err := mounter.Exec.Run("cmd", "/c", "mklink", "/D", target, driverPath); err != nil {
 		klog.Errorf("mklink failed: %v, output: %q", err, string(output))
 		return err
 	}
-	return nil
-}
-
-func normalizeWindowsPath(path string) string {
-	normalizedPath := strings.Replace(path, "/", "\\", -1)
-	if strings.HasPrefix(normalizedPath, "\\") {
-		normalizedPath = "c:" + normalizedPath
-	}
-	return normalizedPath
-}
-
-// ValidateDiskNumber : disk number should be a number in [0, 99]
-func ValidateDiskNumber(disk string) error {
-	diskNum, err := strconv.Atoi(disk)
-	if err != nil {
-		return fmt.Errorf("wrong disk number format: %q, err:%v", disk, err)
-	}
-
-	if diskNum < 0 || diskNum > 99 {
-		return fmt.Errorf("disk number out of range: %q", disk)
-	}
-
 	return nil
 }
 
@@ -307,118 +281,4 @@ func getAllParentLinks(path string) ([]string, error) {
 	}
 
 	return links, nil
-}
-
-type hostUtil struct{}
-
-// NewHostUtil returns a struct that implements the HostUtils interface on
-// windows platforms
-func NewHostUtil() HostUtils {
-	return &hostUtil{}
-}
-
-// GetDeviceNameFromMount given a mnt point, find the device
-func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
-}
-
-// getDeviceNameFromMount find the device(drive) name in which
-// the mount path reference should match the given plugin mount directory. In case no mount path reference
-// matches, returns the volume name taken from its given mountPath
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	refs, err := mounter.GetMountRefs(mountPath)
-	if err != nil {
-		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
-		return "", err
-	}
-	if len(refs) == 0 {
-		return "", fmt.Errorf("directory %s is not mounted", mountPath)
-	}
-	basemountPath := normalizeWindowsPath(pluginMountDir)
-	for _, ref := range refs {
-		if strings.Contains(ref, basemountPath) {
-			volumeID, err := filepath.Rel(normalizeWindowsPath(basemountPath), ref)
-			if err != nil {
-				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
-				return "", err
-			}
-			return volumeID, nil
-		}
-	}
-
-	return path.Base(mountPath), nil
-}
-
-// DeviceOpened determines if the device is in use elsewhere
-func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-
-// PathIsDevice determines if a path is a device.
-func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
-	return false, nil
-}
-
-// MakeRShared checks that given path is on a mount with 'rshared' mount
-// propagation. Empty implementation here.
-func (hu *hostUtil) MakeRShared(path string) error {
-	return nil
-}
-
-// GetFileType checks for sockets/block/character devices
-func (hu *(hostUtil)) GetFileType(pathname string) (FileType, error) {
-	return getFileType(pathname)
-}
-
-// MakeFile creates a new directory
-func (hu *hostUtil) MakeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-// MakeFile creates an empty file
-func (hu *hostUtil) MakeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-// PathExists checks whether the path exists
-func (hu *hostUtil) PathExists(pathname string) (bool, error) {
-	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
-}
-
-// EvalHostSymlinks returns the path name after evaluating symlinks
-func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
-	return filepath.EvalSymlinks(pathname)
-}
-
-// GetOwner returns the integer ID for the user and group of the given path
-// Note that on windows, it always returns 0. We actually don't set Group on
-// windows platform, see SetVolumeOwnership implementation.
-func (hu *hostUtil) GetOwner(pathname string) (int64, int64, error) {
-	return -1, -1, nil
-}
-
-func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
-	// Windows does not support SELinux.
-	return false, nil
-}
-
-func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
-	info, err := os.Stat(pathname)
-	if err != nil {
-		return 0, err
-	}
-	return info.Mode(), nil
 }

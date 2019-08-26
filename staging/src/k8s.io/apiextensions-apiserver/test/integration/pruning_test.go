@@ -137,7 +137,7 @@ properties:
             type: string
 `
 
-	fooSchemaEmbeddedResourceInstance = fooInstance + `
+	fooSchemaEmbeddedResourceInstance = pruningFooInstance + `
 embeddedPruning:
   apiVersion: foo/v1
   kind: Foo
@@ -170,7 +170,7 @@ embeddedNested:
     specified: bar
 `
 
-	fooInstance = `
+	pruningFooInstance = `
 kind: Foo
 apiVersion: tests.example.com/v1beta1
 metadata:
@@ -199,7 +199,7 @@ func TestPruningCreate(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "bar", "unspecified")
@@ -251,7 +251,7 @@ func TestPruningStatus(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
@@ -342,7 +342,7 @@ func TestPruningFromStorage(t *testing.T) {
 	t.Logf("Creating object with unknown field manually in etcd")
 
 	original := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &original.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &original.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(original.Object, "bar", "unspecified")
@@ -404,7 +404,7 @@ func TestPruningPatch(t *testing.T) {
 
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
@@ -457,7 +457,7 @@ func TestPruningCreatePreservingUnknownFields(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' field to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "bar", "unspecified")

@@ -68,7 +68,7 @@ const (
 
 var (
 	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
-	ErrVersionNotSupported = errors.New("Runtime api version is not supported")
+	ErrVersionNotSupported = errors.New("runtime api version is not supported")
 )
 
 // podStateProvider can determine if a pod is deleted ir terminated
@@ -842,7 +842,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 		if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
 		}
-		err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
+		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
 		klog.V(3).Infof("%s", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}

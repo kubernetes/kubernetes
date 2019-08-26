@@ -195,9 +195,9 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 	}
 
 	// Run "prefilter" plugins.
-	prefilterStatus := g.framework.RunPrefilterPlugins(pluginContext, pod)
-	if !prefilterStatus.IsSuccess() {
-		return result, prefilterStatus.AsError()
+	preFilterStatus := g.framework.RunPreFilterPlugins(pluginContext, pod)
+	if !preFilterStatus.IsSuccess() {
+		return result, preFilterStatus.AsError()
 	}
 
 	numNodes := g.cache.NodeTree().NumNodes()
@@ -573,7 +573,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
-// any pod was found, 2) augmented meta data, 3) augmented nodeInfo.
+// any pod was added, 2) augmented meta data, 3) augmented nodeInfo.
 func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 	nodeInfo *schedulernodeinfo.NodeInfo, queue internalqueue.SchedulingQueue) (bool, predicates.PredicateMetadata,
 	*schedulernodeinfo.NodeInfo) {
@@ -590,15 +590,17 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 		metaOut = meta.ShallowCopy()
 	}
 	nodeInfoOut := nodeInfo.Clone()
+	podsAdded := false
 	for _, p := range nominatedPods {
 		if util.GetPodPriority(p) >= util.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
 				metaOut.AddPod(p, nodeInfoOut)
 			}
+			podsAdded = true
 		}
 	}
-	return true, metaOut, nodeInfoOut
+	return podsAdded, metaOut, nodeInfoOut
 }
 
 // podFitsOnNode checks whether a node given by NodeInfo satisfies the given predicate functions.

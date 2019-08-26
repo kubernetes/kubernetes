@@ -46,7 +46,6 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1:all-srcs",
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/openapi:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/apiapproval:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish:all-srcs",

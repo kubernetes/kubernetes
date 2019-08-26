@@ -10,6 +10,7 @@ go_library(
         "//pkg/apis/node:go_default_library",
         "//pkg/apis/node/v1beta1:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/util/tolerations:go_default_library",
         "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -287,27 +287,6 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 }
 
-func waitForPluginRegistrationStatus(t *testing.T, statusChan chan registerapi.RegistrationStatus) bool {
-	select {
-	case status := <-statusChan:
-		return status.PluginRegistered
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("Timed out while waiting for registration status")
-	}
-	return false
-}
-
-func waitForEvent(t *testing.T, expected examplePluginEvent, eventChan chan examplePluginEvent) bool {
-	select {
-	case event := <-eventChan:
-		return event == expected
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("Timed out while waiting for registration status %v", expected)
-	}
-
-	return false
-}
-
 func newWatcher(t *testing.T, testDeprecatedDir bool, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {
 	depSocketDir := ""
 	if testDeprecatedDir {

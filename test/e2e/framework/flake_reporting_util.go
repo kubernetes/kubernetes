@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sync"
 
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
@@ -60,7 +59,7 @@ func (f *FlakeReport) RecordFlakeIfError(err error, optionalDescription ...inter
 	if desc != "" {
 		msg = fmt.Sprintf("%v (Description: %v)", msg, desc)
 	}
-	e2elog.Logf(msg)
+	Logf(msg)
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.Flakes = append(f.Flakes, msg)

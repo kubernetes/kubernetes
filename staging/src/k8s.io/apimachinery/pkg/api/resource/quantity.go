@@ -726,21 +726,3 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
 }
-
-// Copy is a convenience function that makes a deep copy for you. Non-deep
-// copies of quantities share pointers and you will regret that.
-func (q *Quantity) Copy() *Quantity {
-	if q.d.Dec == nil {
-		return &Quantity{
-			s:      q.s,
-			i:      q.i,
-			Format: q.Format,
-		}
-	}
-	tmp := &inf.Dec{}
-	return &Quantity{
-		s:      q.s,
-		d:      infDecAmount{tmp.Set(q.d.Dec)},
-		Format: q.Format,
-	}
-}

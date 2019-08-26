@@ -34,6 +34,7 @@ go_library(
         "azure_vmss_cache.go",
         "azure_wrap.go",
         "azure_zones.go",
+        "doc.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure",
     importpath = "k8s.io/legacy-cloud-providers/azure",

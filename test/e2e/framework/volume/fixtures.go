@@ -185,7 +185,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 			},
 		},
 	}
-	endpoints, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
+	_, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
 	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip

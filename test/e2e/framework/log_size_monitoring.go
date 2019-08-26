@@ -26,7 +26,6 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -259,10 +258,10 @@ func (g *LogSizeGatherer) Work() bool {
 		TestContext.Provider,
 	)
 	if err != nil {
-		e2elog.Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
+		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
 		// In case of repeated error give up.
 		if workItem.backoffMultiplier >= 128 {
-			e2elog.Logf("Failed to ssh to a node %v multiple times in a row. Giving up.", workItem.ip)
+			Logf("Failed to ssh to a node %v multiple times in a row. Giving up.", workItem.ip)
 			g.wg.Done()
 			return false
 		}
@@ -278,7 +277,7 @@ func (g *LogSizeGatherer) Work() bool {
 		path := results[i]
 		size, err := strconv.Atoi(results[i+1])
 		if err != nil {
-			e2elog.Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
+			Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
 			continue
 		}
 		g.data.addNewData(workItem.ip, path, now, size)

@@ -17,8 +17,11 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
+	"strings"
 	"sync"
 
 	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -29,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -136,6 +140,11 @@ type FakeAttributes struct {
 
 // AddAnnotation adds an annotation key value pair to FakeAttributes
 func (f *FakeAttributes) AddAnnotation(k, v string) error {
+	return f.AddAnnotationWithLevel(k, v, auditinternal.LevelMetadata)
+}
+
+// AddAnnotationWithLevel adds an annotation key value pair to FakeAttributes
+func (f *FakeAttributes) AddAnnotationWithLevel(k, v string, _ auditinternal.Level) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	if err := f.Attributes.AddAnnotation(k, v); err != nil {
@@ -149,7 +158,7 @@ func (f *FakeAttributes) AddAnnotation(k, v string) error {
 }
 
 // GetAnnotations reads annotations from FakeAttributes
-func (f *FakeAttributes) GetAnnotations() map[string]string {
+func (f *FakeAttributes) GetAnnotations(level auditinternal.Level) map[string]string {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	return f.annotations
@@ -233,9 +242,26 @@ type MutatingTest struct {
 }
 
 // ConvertToMutatingTestCases converts a validating test case to a mutating one for test purposes.
-func ConvertToMutatingTestCases(tests []ValidatingTest) []MutatingTest {
+func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string) []MutatingTest {
 	r := make([]MutatingTest, len(tests))
 	for i, t := range tests {
+		for idx, hook := range t.Webhooks {
+			if t.ExpectAnnotations == nil {
+				t.ExpectAnnotations = map[string]string{}
+			}
+			// Add expected annotation if the converted webhook is intended to match
+			if reflect.DeepEqual(hook.NamespaceSelector, &metav1.LabelSelector{}) &&
+				reflect.DeepEqual(hook.ObjectSelector, &metav1.LabelSelector{}) &&
+				reflect.DeepEqual(hook.Rules, matchEverythingRules) {
+				key := fmt.Sprintf("mutation.webhook.admission.k8s.io/round_0_index_%d", idx)
+				value := mutationAnnotationValue(configurationName, hook.Name, false)
+				t.ExpectAnnotations[key] = value
+			}
+			// Break if the converted webhook is intended to fail close
+			if strings.Contains(hook.Name, "internalErr") && (hook.FailurePolicy == nil || *hook.FailurePolicy == registrationv1beta1.Fail) {
+				break
+			}
+		}
 		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
 	}
 	return r
@@ -631,10 +657,18 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 	}
 }
 
+func mutationAnnotationValue(configuration, webhook string, mutated bool) string {
+	return fmt.Sprintf(`{"configuration":"%s","webhook":"%s","mutated":%t}`, configuration, webhook, mutated)
+}
+
+func patchAnnotationValue(configuration, webhook string, patch string) string {
+	return strings.Replace(fmt.Sprintf(`{"configuration": "%s", "webhook": "%s", "patch": %s, "patchType": "JSONPatch"}`, configuration, webhook, patch), " ", "", -1)
+}
+
 // NewMutatingTestCases returns test cases with a given base url.
 // All test cases in NewMutatingTestCases have Patch set in
 // AdmissionResponse. The test cases are only used by both MutatingAdmissionWebhook.
-func NewMutatingTestCases(url *url.URL) []MutatingTest {
+func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest {
 	return []MutatingTest{
 		{
 			Name: "match & remove label",
@@ -646,10 +680,14 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectAllow:       true,
-			AdditionalLabels:  map[string]string{"remove": "me"},
-			ExpectLabels:      map[string]string{"pod.name": "my-pod"},
-			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
+			ExpectAllow:      true,
+			AdditionalLabels: map[string]string{"remove": "me"},
+			ExpectLabels:     map[string]string{"pod.name": "my-pod"},
+			ExpectAnnotations: map[string]string{
+				"removelabel.example.com/key1":                      "value1",
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "removelabel.example.com", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "removelabel.example.com", `[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
 		},
 		{
 			Name: "match & add label",
@@ -663,6 +701,10 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			}},
 			ExpectAllow:  true,
 			ExpectLabels: map[string]string{"pod.name": "my-pod", "added": "test"},
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "addLabel", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "addLabel", `[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
 		},
 		{
 			Name: "match CRD & add label",
@@ -677,6 +719,10 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			IsCRD:        true,
 			ExpectAllow:  true,
 			ExpectLabels: map[string]string{"crd.name": "my-test-crd", "added": "test"},
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "addLabel", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "addLabel", `[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
 		},
 		{
 			Name: "match CRD & remove label",
@@ -688,11 +734,15 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			IsCRD:             true,
-			ExpectAllow:       true,
-			AdditionalLabels:  map[string]string{"remove": "me"},
-			ExpectLabels:      map[string]string{"crd.name": "my-test-crd"},
-			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
+			IsCRD:            true,
+			ExpectAllow:      true,
+			AdditionalLabels: map[string]string{"remove": "me"},
+			ExpectLabels:     map[string]string{"crd.name": "my-test-crd"},
+			ExpectAnnotations: map[string]string{
+				"removelabel.example.com/key1":                      "value1",
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "removelabel.example.com", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "removelabel.example.com", `[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
 		},
 		{
 			Name: "match & invalid mutation",
@@ -706,6 +756,9 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			}},
 			ExpectStatusCode: http.StatusInternalServerError,
 			ErrorContains:    "invalid character",
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "invalidMutation", false),
+			},
 		},
 		{
 			Name: "match & remove label dry run unsupported",
@@ -721,6 +774,9 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			IsDryRun:         true,
 			ExpectStatusCode: http.StatusBadRequest,
 			ErrorContains:    "does not support dry run",
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "removeLabel", false),
+			},
 		},
 		{
 			Name: "first webhook remove labels, second webhook shouldn't be called",
@@ -747,10 +803,14 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				Rules:                   matchEverythingRules,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectAllow:       true,
-			AdditionalLabels:  map[string]string{"remove": "me"},
-			ExpectLabels:      map[string]string{"pod.name": "my-pod"},
-			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
+			ExpectAllow:      true,
+			AdditionalLabels: map[string]string{"remove": "me"},
+			ExpectLabels:     map[string]string{"pod.name": "my-pod"},
+			ExpectAnnotations: map[string]string{
+				"removelabel.example.com/key1":                      "value1",
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "removelabel.example.com", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "removelabel.example.com", `[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
 		},
 		{
 			Name: "first webhook remove labels from CRD, second webhook shouldn't be called",
@@ -777,11 +837,15 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				Rules:                   matchEverythingRules,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			IsCRD:             true,
-			ExpectAllow:       true,
-			AdditionalLabels:  map[string]string{"remove": "me"},
-			ExpectLabels:      map[string]string{"crd.name": "my-test-crd"},
-			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
+			IsCRD:            true,
+			ExpectAllow:      true,
+			AdditionalLabels: map[string]string{"remove": "me"},
+			ExpectLabels:     map[string]string{"crd.name": "my-test-crd"},
+			ExpectAnnotations: map[string]string{
+				"removelabel.example.com/key1":                      "value1",
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "removelabel.example.com", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "removelabel.example.com", `[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
 		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
@@ -807,6 +871,12 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			AdditionalLabels:       map[string]string{"remove": "me"},
 			ExpectAllow:            true,
 			ExpectReinvokeWebhooks: map[string]bool{"addLabel": true},
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "addLabel", true),
+				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue(configurationName, "removeLabel", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "addLabel", `[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+				"patch.webhook.admission.k8s.io/round_0_index_1":    patchAnnotationValue(configurationName, "removeLabel", `[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
 		},
 		{
 			Name: "match & never reinvoke policy",
@@ -821,6 +891,10 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			}},
 			ExpectAllow:            true,
 			ExpectReinvokeWebhooks: map[string]bool{"addLabel": false},
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "addLabel", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "addLabel", `[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
 		},
 		{
 			Name: "match & never reinvoke policy (by default)",
@@ -834,6 +908,10 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			}},
 			ExpectAllow:            true,
 			ExpectReinvokeWebhooks: map[string]bool{"addLabel": false},
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "addLabel", true),
+				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "addLabel", `[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
 		},
 		{
 			Name: "match & no reinvoke",
@@ -846,6 +924,9 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectAllow: true,
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "noop", false),
+			},
 		},
 	}
 }

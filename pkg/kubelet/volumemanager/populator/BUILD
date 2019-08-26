@@ -11,7 +11,6 @@ go_library(
     srcs = ["desired_state_of_world_populator.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/populator",
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",

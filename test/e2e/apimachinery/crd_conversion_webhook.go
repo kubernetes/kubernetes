@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -53,8 +52,6 @@ const (
 	serviceCRDName     = "e2e-test-crd-conversion-webhook"
 	roleBindingCRDName = "crd-conversion-webhook-auth-reader"
 )
-
-var serverCRDConversionWebhookVersion = utilversion.MustParseSemantic("v1.13.0-alpha")
 
 var apiVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 	{
@@ -128,9 +125,6 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		namespaceName = f.Namespace.Name
-
-		// Make sure the relevant provider supports conversion webhook
-		framework.SkipUnlessServerVersionGTE(serverCRDConversionWebhookVersion, f.ClientSet.Discovery())
 
 		ginkgo.By("Setting up server cert")
 		context = setupServerCert(f.Namespace.Name, serviceCRDName)

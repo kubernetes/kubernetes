@@ -273,8 +273,8 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	return ips, nil
 }
 
-// Proxier implements ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// Proxier implements proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // parseExcludedCIDRs parses the input strings and returns net.IPNet
 // The validation has been done earlier so the error condition will never happen under normal conditions
@@ -1317,10 +1317,12 @@ func (proxier *Proxier) syncProxyRules() {
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
-	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
-		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
-		metrics.NetworkProgrammingLatency.Observe(latency)
-		klog.V(4).Infof("Network programming took %f seconds", latency)
+	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
+		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
+			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+			metrics.NetworkProgrammingLatency.Observe(latency)
+			klog.V(4).Infof("Network programming of %s took %f seconds", name, latency)
+		}
 	}
 
 	// Close old local ports and save new ones.

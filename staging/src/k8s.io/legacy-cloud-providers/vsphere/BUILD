@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "credentialmanager.go",
+        "doc.go",
         "nodemanager.go",
         "vsphere.go",
         "vsphere_util.go",

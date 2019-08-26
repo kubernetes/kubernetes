@@ -25,7 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -876,23 +876,25 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		// Create a random custom resource definition and ensure it's available for
 		// use.
-		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
-			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
 			if err != nil && !errors.IsNotFound(err) {
 				e2elog.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
+		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
-		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: version.Name, Resource: definition.Spec.Names.Plural}
 		resourceClient := f.DynamicClient.Resource(gvr)
 
-		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+		apiVersion := definition.Spec.Group + "/" + version.Name
 
 		// Create a custom owner resource.
 		ownerName := names.SimpleNameGenerator.GenerateName("owner")
@@ -977,23 +979,25 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		// Create a random custom resource definition and ensure it's available for
 		// use.
-		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
-			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
 			if err != nil && !errors.IsNotFound(err) {
 				e2elog.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
+		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
-		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: version.Name, Resource: definition.Spec.Names.Plural}
 		resourceClient := f.DynamicClient.Resource(gvr)
 
-		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+		apiVersion := definition.Spec.Group + "/" + version.Name
 
 		// Create a custom owner resource.
 		ownerName := names.SimpleNameGenerator.GenerateName("owner")

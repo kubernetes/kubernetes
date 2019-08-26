@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -28,7 +30,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -324,7 +326,15 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 }
 
 func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	// if volume is not a fs file system, there is nothing for us to do here.
+	if !fsVolume {
+		return true, nil
+	}
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}

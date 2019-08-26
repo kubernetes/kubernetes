@@ -17,13 +17,10 @@ limitations under the License.
 package main
 
 import (
-	"os"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func main() {
-	if err := app.Run(); err != nil {
-		os.Exit(1)
-	}
+	util.CheckErr(app.Run())
 }

@@ -153,8 +153,8 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		return nil, err
 	}
 
-	err = aggregatorServer.GenericAPIServer.AddHealthzChecks(
-		makeAPIServiceAvailableHealthzCheck(
+	err = aggregatorServer.GenericAPIServer.AddHealthChecks(
+		makeAPIServiceAvailableHealthCheck(
 			"autoregister-completion",
 			apiServices,
 			aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(),
@@ -186,9 +186,9 @@ func makeAPIService(gv schema.GroupVersion) *v1.APIService {
 	}
 }
 
-// makeAPIServiceAvailableHealthzCheck returns a healthz check that returns healthy
+// makeAPIServiceAvailableHealthCheck returns a healthz check that returns healthy
 // once all of the specified services have been observed to be available at least once.
-func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*v1.APIService, apiServiceInformer informers.APIServiceInformer) healthz.HealthzChecker {
+func makeAPIServiceAvailableHealthCheck(name string, apiServices []*v1.APIService, apiServiceInformer informers.APIServiceInformer) healthz.HealthChecker {
 	// Track the auto-registered API services that have not been observed to be available yet
 	pendingServiceNamesLock := &sync.RWMutex{}
 	pendingServiceNames := sets.NewString()

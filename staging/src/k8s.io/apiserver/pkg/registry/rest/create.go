@@ -163,12 +163,20 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 		return func(ctx context.Context, obj runtime.Object) error { return nil }
 	}
 	return func(ctx context.Context, obj runtime.Object) error {
+		name := staticAttributes.GetName()
+		// in case the generated name is populated
+		if len(name) == 0 {
+			if metadata, err := meta.Accessor(obj); err == nil {
+				name = metadata.GetName()
+			}
+		}
+
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			staticAttributes.GetOldObject(),
 			staticAttributes.GetKind(),
 			staticAttributes.GetNamespace(),
-			staticAttributes.GetName(),
+			name,
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),

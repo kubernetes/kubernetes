@@ -1394,7 +1394,7 @@ func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 		}
 		copy := make(v1.ResourceList, len(rl))
 		for k, v := range rl {
-			copy[k] = *v.Copy()
+			copy[k] = v.DeepCopy()
 		}
 		return copy
 	}

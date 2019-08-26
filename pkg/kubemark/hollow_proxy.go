@@ -70,7 +70,7 @@ func NewHollowProxyOrDie(
 	proxierMinSyncPeriod time.Duration,
 ) (*HollowProxy, error) {
 	// Create proxier and service/endpoint handlers.
-	var proxier proxy.ProxyProvider
+	var proxier proxy.Provider
 	var err error
 
 	if useRealProxier {

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -20,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -206,9 +209,9 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 	}
 
 	for _, disk := range disks {
-		if disk.Lun != nil && (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
-			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) ||
-			(disk.ManagedDisk != nil && *disk.ManagedDisk.ID == diskURI) {
+		if disk.Lun != nil && (disk.Name != nil && diskName != "" && strings.EqualFold(*disk.Name, diskName)) ||
+			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && strings.EqualFold(*disk.Vhd.URI, diskURI)) ||
+			(disk.ManagedDisk != nil && strings.EqualFold(*disk.ManagedDisk.ID, diskURI)) {
 			// found the disk
 			klog.V(2).Infof("azureDisk - find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
 			return *disk.Lun, nil
@@ -260,7 +263,7 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 
 	for _, disk := range disks {
 		for _, diskName := range diskNames {
-			if disk.Name != nil && diskName != "" && *disk.Name == diskName {
+			if disk.Name != nil && diskName != "" && strings.EqualFold(*disk.Name, diskName) {
 				attached[diskName] = true
 			}
 		}

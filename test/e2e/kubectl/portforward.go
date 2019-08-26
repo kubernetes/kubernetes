@@ -438,8 +438,8 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	f := framework.NewDefaultFramework("port-forwarding")
 
-	framework.KubeDescribe("With a server listening on 0.0.0.0", func() {
-		framework.KubeDescribe("that expects a client request", func() {
+	ginkgo.Describe("With a server listening on 0.0.0.0", func() {
+		ginkgo.Describe("that expects a client request", func() {
 			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func() {
 				doTestMustConnectSendNothing("0.0.0.0", f)
 			})
@@ -448,7 +448,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			})
 		})
 
-		framework.KubeDescribe("that expects NO client request", func() {
+		ginkgo.Describe("that expects NO client request", func() {
 			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestConnectSendDisconnect("0.0.0.0", f)
 			})
@@ -460,8 +460,8 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	})
 
 	// kubectl port-forward may need elevated privileges to do its job.
-	framework.KubeDescribe("With a server listening on localhost", func() {
-		framework.KubeDescribe("that expects a client request", func() {
+	ginkgo.Describe("With a server listening on localhost", func() {
+		ginkgo.Describe("that expects a client request", func() {
 			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func() {
 				doTestMustConnectSendNothing("localhost", f)
 			})
@@ -470,7 +470,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			})
 		})
 
-		framework.KubeDescribe("that expects NO client request", func() {
+		ginkgo.Describe("that expects NO client request", func() {
 			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestConnectSendDisconnect("localhost", f)
 			})

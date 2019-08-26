@@ -167,7 +167,7 @@ func (*fakeFramework) NodeInfoSnapshot() *internalcache.NodeInfoSnapshot {
 	return nil
 }
 
-func (*fakeFramework) RunPrefilterPlugins(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+func (*fakeFramework) RunPreFilterPlugins(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
 	return nil
 }
 
@@ -179,7 +179,7 @@ func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, 
 	return nil, nil
 }
 
-func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunPreBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
@@ -187,7 +187,7 @@ func (*fakeFramework) RunBindPlugins(pc *framework.PluginContext, pod *v1.Pod, n
 	return nil
 }
 
-func (*fakeFramework) RunPostbindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
+func (*fakeFramework) RunPostBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
 
 func (*fakeFramework) RunPostFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses framework.NodeToStatusMap) *framework.Status {
 	return nil

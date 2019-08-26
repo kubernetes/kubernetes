@@ -6,6 +6,7 @@ go_library(
         "complete.go",
         "convert.go",
         "goopenapi.go",
+        "skeleton.go",
         "structural.go",
         "unfold.go",
         "validation.go",

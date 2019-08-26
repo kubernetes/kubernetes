@@ -43,6 +43,38 @@ const (
 	noxuInstanceNum int64 = 9223372036854775807
 )
 
+// NewRandomNameV1CustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
+func NewRandomNameV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	// ensure the singular doesn't end in an s for now
+	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: pointer.BoolPtr(true),
+							Type:                   "object",
+						},
+					},
+				},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   gName + "s",
+				Singular: gName,
+				Kind:     gName,
+				ListKind: gName + "List",
+			},
+			Scope: scope,
+		},
+	}
+}
+
 // NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
 func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	// ensure the singular doesn't end in an s for now

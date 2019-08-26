@@ -229,7 +229,7 @@ func (j *TestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, 
 func (j *TestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool,
 	tweak func(svc *v1.Service)) *v1.Service {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and ExternalTrafficPolicy=Local")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+	j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
 		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
@@ -244,7 +244,7 @@ func (j *TestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName stri
 		j.RunOrFail(namespace, nil)
 	}
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
+	svc := j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	return svc
 }
@@ -253,7 +253,7 @@ func (j *TestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName stri
 // for it to acquire an ingress IP.
 func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+	j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
 		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
@@ -263,7 +263,7 @@ func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeo
 	})
 
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
+	svc := j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	return svc
 }

@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 kube::golang::verify_go_version
 
 FOCUS="${1:-}"
+FOCUS="${FOCUS%/}" # Remove the ending "/"
 
 # See https://staticcheck.io/docs/checks
 CHECKS=(
@@ -55,12 +56,9 @@ cd "${KUBE_ROOT}"
 failure_file="${KUBE_ROOT}/hack/.staticcheck_failures"
 kube::util::check-file-in-alphabetical-order "${failure_file}"
 
-export IFS=$'\n'
-# NOTE: when "go list -e ./..." is run within GOPATH, it turns the k8s.io/kubernetes
-# as the prefix, however if we run it outside it returns the full path of the file
-# with a leading underscore. We'll need to support both scenarios for all_packages.
 all_packages=()
 while IFS='' read -r line; do
+  # Prepend './' to get staticcheck to treat these as paths, not packages.
   all_packages+=("./$line")
 done < <( hack/make-rules/helpers/cache_go_dirs.sh "${KUBE_ROOT}/_tmp/all_go_dirs" |
             grep "^${FOCUS:-.}" |
@@ -71,7 +69,6 @@ failing_packages=()
 if [[ -z $FOCUS ]]; then # Ignore failing_packages in FOCUS mode
   while IFS='' read -r line; do failing_packages+=("$line"); done < <(cat "$failure_file")
 fi
-unset IFS
 errors=()
 not_failing=()
 
@@ -93,8 +90,8 @@ while read -r error; do
   fi
 done < <(staticcheck -checks "${checks}" "${all_packages[@]}" 2>/dev/null || true)
 
-export IFS=$'\n'
-mapfile -t really_failing < <(sort -u <<<"${really_failing[*]}")
+export IFS=$'\n'  # Expand ${really_failing[*]} to separate lines
+kube::util::read-array really_failing < <(sort -u <<<"${really_failing[*]}")
 unset IFS
 for pkg in "${failing_packages[@]}"; do
   if ! kube::util::array_contains "$pkg" "${really_failing[@]}"; then
@@ -112,7 +109,7 @@ done
 
 # Check to be sure all the packages that should pass check are.
 if [ ${#errors[@]} -eq 0 ]; then
-  echo 'Congratulations!  All Go source files have been checked.'
+  echo 'Congratulations!  All Go source files have passed staticcheck.'
 else
   {
     echo "Errors from staticcheck:"
@@ -121,7 +118,7 @@ else
     done
     echo
     echo 'Please review the above warnings. You can test via:'
-    echo "  staticcheck -checks \"${checks}\""
+    echo '  hack/verify-staticcheck.sh <failing package>'
     echo 'If the above warnings do not make sense, you can exempt the line or file. See:'
     echo '  https://staticcheck.io/docs/#ignoring-problems'
     echo

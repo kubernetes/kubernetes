@@ -511,7 +511,12 @@ var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 	})
 })
 
-var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6]", func() {
+var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6] [LinuxOnly]", func() {
+
+	ginkgo.BeforeEach(func() {
+		// IPv6 is not supported on Windows.
+		framework.SkipIfNodeOSDistroIs("windows")
+	})
 
 	ginkgo.Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}

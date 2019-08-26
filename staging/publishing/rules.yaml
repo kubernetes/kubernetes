@@ -110,6 +110,10 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/component-base
@@ -126,6 +130,10 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: apiserver
   library: true
   branches:
@@ -540,6 +548,10 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kube-proxy
@@ -560,6 +572,10 @@ rules:
       branch: release-1.16
     - repository: component-base
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: kubelet
   library: true
   branches:
@@ -604,6 +620,10 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kube-scheduler
@@ -624,6 +644,10 @@ rules:
       branch: release-1.16
     - repository: component-base
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: kube-controller-manager
   library: true
   branches:
@@ -636,6 +660,10 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kube-controller-manager
@@ -656,6 +684,10 @@ rules:
       branch: release-1.16
     - repository: component-base
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: cluster-bootstrap
   library: true
   branches:

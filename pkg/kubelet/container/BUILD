@@ -46,6 +46,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cache_test.go",
+        "container_hash_test.go",
         "helpers_test.go",
         "ref_test.go",
         "runtime_cache_test.go",

@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "metadata.go",
         "openstack.go",
         "openstack_client.go",

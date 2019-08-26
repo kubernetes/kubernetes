@@ -510,8 +510,8 @@ type closeable interface {
 	Close() error
 }
 
-// Proxier implements ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// Proxier implements proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new Proxier
 func NewProxier(

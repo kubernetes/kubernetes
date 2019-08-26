@@ -73,6 +73,10 @@ func TestTar(t *testing.T) {
 			}
 
 			data, err := readAllTar(tc.outpath)
+			if err != nil {
+				t.Fatalf("Failed to read tarball: %v", err)
+			}
+
 			if !reflect.DeepEqual(data, tc.expect) {
 				t.Errorf("Expected data %v but got %v", tc.expect, data)
 			}

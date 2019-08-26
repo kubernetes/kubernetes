@@ -295,9 +295,6 @@ func (h *holder) record(version string, phase string, converted bool, request *a
 	}
 
 	name := request.Name
-	if name == "" && request.Object.Object != nil {
-		name = request.Object.Object.(*unstructured.Unstructured).GetName()
-	}
 	if name != h.recordName {
 		if debug {
 			h.t.Log(name, "!=", h.recordName)

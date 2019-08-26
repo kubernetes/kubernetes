@@ -18,7 +18,10 @@ go_library(
     name = "go_default_library",
     srcs = ["kubeadm.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm",
-    deps = ["//cmd/kubeadm/app:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app:go_default_library",
+        "//cmd/kubeadm/app/util:go_default_library",
+    ],
 )
 
 filegroup(

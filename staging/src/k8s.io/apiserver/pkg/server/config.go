@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
@@ -137,10 +137,10 @@ type Config struct {
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
-	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
-	HealthzChecks []healthz.HealthzChecker
+	// The default set of healthz checks. There might be more added via AddHealthChecks dynamically.
+	HealthzChecks []healthz.HealthChecker
 	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
-	ReadyzChecks []healthz.HealthzChecker
+	ReadyzChecks []healthz.HealthChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -247,6 +247,9 @@ type SecureServingInfo struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// DisableHTTP2 indicates that http2 should not be enabled.
+	DisableHTTP2 bool
 }
 
 type AuthenticationInfo struct {
@@ -269,15 +272,15 @@ type AuthorizationInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
-	defaultHealthChecks := []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz}
+	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	return &Config{
 		Serializer:                  codecs,
 		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
 		HandlerChainWaitGroup:       new(utilwaitgroup.SafeWaitGroup),
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:      sets.NewString(),
-		HealthzChecks:               append([]healthz.HealthzChecker{}, defaultHealthChecks...),
-		ReadyzChecks:                append([]healthz.HealthzChecker{}, defaultHealthChecks...),
+		HealthzChecks:               append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		ReadyzChecks:                append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		EnableIndex:                 true,
 		EnableDiscovery:             true,
 		EnableProfiling:             true,

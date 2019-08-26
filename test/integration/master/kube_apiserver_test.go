@@ -96,7 +96,7 @@ func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
 func TestStartupSequenceHealthzAndReadyz(t *testing.T) {
 	hc := &delayedCheck{}
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
-		InjectedHealthzChecker: hc,
+		InjectedHealthChecker: hc,
 	}
 	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{"--maximum-startup-sequence-duration", "15s"}, framework.SharedEtcd())
 	defer server.TearDownFn()

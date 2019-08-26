@@ -60,7 +60,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())
+		framework.ExpectNotEqual(len(nodes.Items), 0)
 		hosts := []string{}
 		for _, node := range nodes.Items {
 			for _, addr := range node.Status.Addresses {
@@ -95,14 +95,14 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			psCmd := "ps aux | grep [n]ode-problem-detector"
 			result, err = e2essh.SSH(psCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			gomega.Expect(result.Code).To(gomega.BeZero())
+			framework.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 			ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 			journalctlCmd := "sudo journalctl -u node-problem-detector"
 			result, err = e2essh.SSH(journalctlCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			gomega.Expect(result.Code).To(gomega.BeZero())
+			framework.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 			if isStandaloneMode[host] {
@@ -116,7 +116,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			gomega.Expect(result.Code).To(gomega.BeZero())
+			framework.ExpectEqual(result.Code, 0)
 		}
 
 		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
@@ -221,22 +221,22 @@ func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64
 	memCmd := "cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.usage_in_bytes && cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.stat"
 	result, err := e2essh.SSH(memCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	gomega.Expect(result.Code).To(gomega.BeZero())
+	framework.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
 
 	memoryUsage, err := strconv.ParseFloat(lines[0], 64)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 
 	var totalInactiveFile float64
 	for _, line := range lines[1:] {
 		tokens := strings.Split(line, " ")
 		if tokens[0] == "total_rss" {
 			rss, err = strconv.ParseFloat(tokens[1], 64)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 		}
 		if tokens[0] == "total_inactive_file" {
 			totalInactiveFile, err = strconv.ParseFloat(tokens[1], 64)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 		}
 	}
 
@@ -257,7 +257,7 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 	cpuCmd := "cat /sys/fs/cgroup/cpu/system.slice/node-problem-detector.service/cpuacct.usage && cat /proc/uptime | awk '{print $1}'"
 	result, err := e2essh.SSH(cpuCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	gomega.Expect(result.Code).To(gomega.BeZero())
+	framework.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
@@ -283,6 +283,6 @@ func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, work
 		hasNpdPod = true
 		break
 	}
-	gomega.Expect(hasNpdPod).To(gomega.BeTrue())
+	framework.ExpectEqual(hasNpdPod, true)
 	return
 }

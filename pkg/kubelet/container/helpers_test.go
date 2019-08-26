@@ -574,3 +574,37 @@ func TestMakePortMappings(t *testing.T) {
 		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
 	}
 }
+
+func TestHashContainer(t *testing.T) {
+	testCases := []struct {
+		name          string
+		image         string
+		args          []string
+		containerPort int32
+		expectedHash  uint64
+	}{
+		{
+			name:  "test_container",
+			image: "foo/image:v1",
+			args: []string{
+				"/bin/sh",
+				"-c",
+				"echo abc",
+			},
+			containerPort: int32(8001),
+			expectedHash:  uint64(0x3c42280f),
+		},
+	}
+
+	for _, tc := range testCases {
+		container := v1.Container{
+			Name:  tc.name,
+			Image: tc.image,
+			Args:  tc.args,
+			Ports: []v1.ContainerPort{{ContainerPort: tc.containerPort}},
+		}
+
+		hashVal := HashContainer(&container)
+		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
+	}
+}

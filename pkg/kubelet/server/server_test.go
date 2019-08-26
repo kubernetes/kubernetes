@@ -288,13 +288,11 @@ func (f *fakeAuth) Authorize(a authorizer.Attributes) (authorized authorizer.Dec
 }
 
 type serverTestFramework struct {
-	serverUnderTest         *Server
-	fakeKubelet             *fakeKubelet
-	fakeAuth                *fakeAuth
-	testHTTPServer          *httptest.Server
-	fakeRuntime             *fakeRuntime
-	testStreamingHTTPServer *httptest.Server
-	criHandler              *utiltesting.FakeHandler
+	serverUnderTest *Server
+	fakeKubelet     *fakeKubelet
+	fakeAuth        *fakeAuth
+	testHTTPServer  *httptest.Server
+	criHandler      *utiltesting.FakeHandler
 }
 
 func newServerTest() *serverTestFramework {
@@ -674,11 +672,6 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	if resp.StatusCode != expectedErrorCode {
 		t.Errorf("expected status code %d, got %d", expectedErrorCode, resp.StatusCode)
 	}
-}
-
-type authTestCase struct {
-	Method string
-	Path   string
 }
 
 // Ensure all registered handlers & services have an associated testcase.

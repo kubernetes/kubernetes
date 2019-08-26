@@ -27,9 +27,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// GenerateOptions encapsulates attributes for table generation.
+type GenerateOptions struct {
+	NoHeaders bool
+	Wide      bool
+}
+
 // TableGenerator - an interface for generating metav1beta1.Table provided a runtime.Object
 type TableGenerator interface {
-	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
+	GenerateTable(obj runtime.Object, options GenerateOptions) (*metav1beta1.Table, error)
 }
 
 // PrintHandler - interface to handle printing provided an array of metav1beta1.TableColumnDefinition
@@ -71,7 +77,7 @@ func (h *HumanReadableGenerator) With(fns ...func(PrintHandler)) *HumanReadableG
 // GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
 // a table that includes all of the information requested by options, but will not remove rows or columns. The
 // caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
+func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options GenerateOptions) (*metav1beta1.Table, error) {
 	t := reflect.TypeOf(obj)
 	handler, ok := h.handlerMap[t]
 	if !ok {
@@ -115,11 +121,6 @@ func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options Print
 			table.SelfLink = m.GetSelfLink()
 		}
 	}
-	// TODO(seans3): Remove the following decorateTable call. This should only be
-	// called in the table printer.
-	if err := decorateTable(table, options); err != nil {
-		return nil, err
-	}
 	return table, nil
 }
 
@@ -149,7 +150,7 @@ func (h *HumanReadableGenerator) TableHandler(columnDefinitions []metav1beta1.Ta
 // ValidateRowPrintHandlerFunc validates print handler signature.
 // printFunc is the function that will be called to print an object.
 // It must be of the following type:
-//  func printFunc(object ObjectType, options PrintOptions) ([]metav1beta1.TableRow, error)
+//  func printFunc(object ObjectType, options GenerateOptions) ([]metav1beta1.TableRow, error)
 // where ObjectType is the type of the object that will be printed, and the first
 // return value is an array of rows, with each row containing a number of cells that
 // match the number of columns defined for that printer function.
@@ -162,11 +163,11 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 		return fmt.Errorf("invalid print handler." +
 			"Must accept 2 parameters and return 2 value.")
 	}
-	if funcType.In(1) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
+	if funcType.In(1) != reflect.TypeOf((*GenerateOptions)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*[]metav1beta1.TableRow)(nil)).Elem() ||
 		funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, options PrintOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
+			"func handler(obj %v, options GenerateOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
 	}
 	return nil
 }

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -15,10 +17,6 @@ limitations under the License.
 */
 
 package gce
-
-import (
-	"fmt"
-)
 
 const (
 	// AlphaFeatureNetworkTiers allows Services backed by a GCP load balancer to choose
@@ -51,11 +49,4 @@ func NewAlphaFeatureGate(features []string) *AlphaFeatureGate {
 		featureMap[name] = true
 	}
 	return &AlphaFeatureGate{featureMap}
-}
-
-func (g *Cloud) alphaFeatureEnabled(feature string) error {
-	if !g.AlphaFeatureGate.Enabled(feature) {
-		return fmt.Errorf("alpha feature %q is not enabled", feature)
-	}
-	return nil
 }

@@ -120,7 +120,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		}
 
-		ginkgo.It("should run with an explicit non-root user ID", func() {
+		ginkgo.It("should run with an explicit non-root user ID [LinuxOnly]", func() {
+			// creates a pod with RunAsUser, which is not supported on Windows.
+			framework.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
 			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(1234))
 			pod = podClient.Create(pod)
@@ -128,7 +130,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
 		})
-		ginkgo.It("should not run with an explicit root user ID", func() {
+		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func() {
+			// creates a pod with RunAsUser, which is not supported on Windows.
+			framework.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
 			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
 			pod = podClient.Create(pod)

@@ -165,10 +165,14 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
 	// static default values to cfg only for values not provided with flags
 	kubeadmscheme.Scheme.Default(versionedInitCfg)
-	kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil)
+	if err := kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil); err != nil {
+		return nil, err
+	}
 
 	kubeadmscheme.Scheme.Default(versionedClusterCfg)
-	kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil)
+	if err := kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil); err != nil {
+		return nil, err
+	}
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
@@ -195,7 +199,7 @@ func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 
 // LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
 // If cfgPath is specified, the versioned configs will always get overridden with the one in the file (specified by cfgPath).
-// The the external, versioned configuration is defaulted and converted to the internal type.
+// The external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
 func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
@@ -283,7 +287,9 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 		kubeadmscheme.Scheme.Default(extinitcfg)
 		// Set initcfg to an empty struct value the deserializer will populate
 		initcfg = &kubeadmapi.InitConfiguration{}
-		kubeadmscheme.Scheme.Convert(extinitcfg, initcfg, nil)
+		if err := kubeadmscheme.Scheme.Convert(extinitcfg, initcfg, nil); err != nil {
+			return nil, err
+		}
 	}
 	// If ClusterConfiguration was given, populate it in the InitConfiguration struct
 	if clustercfg != nil {

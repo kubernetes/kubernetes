@@ -28,7 +28,6 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const dummyFinalizer = "k8s.io/dummy-finalizer"
@@ -88,11 +87,11 @@ func testFinishedJob(f *framework.Framework) {
 	framework.ExpectNoError(err)
 	finishTime := jobutil.FinishTime(job)
 	finishTimeUTC := finishTime.UTC()
-	gomega.Expect(finishTime.IsZero()).NotTo(gomega.BeTrue())
+	framework.ExpectNotEqual(finishTime.IsZero(), true)
 
 	deleteAtUTC := job.ObjectMeta.DeletionTimestamp.UTC()
-	gomega.Expect(deleteAtUTC).NotTo(gomega.BeNil())
+	framework.ExpectNotEqual(deleteAtUTC, nil)
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
-	gomega.Expect(deleteAtUTC.Before(expireAtUTC)).To(gomega.BeFalse())
+	framework.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
 }

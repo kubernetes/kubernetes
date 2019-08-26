@@ -88,9 +88,8 @@ func GetValidatedSources(sources []string) ([]string, error) {
 			return []string{FileSource, HTTPSource, ApiserverSource}, nil
 		case FileSource, HTTPSource, ApiserverSource:
 			validated = append(validated, source)
-			break
 		case "":
-			break
+			// Skip
 		default:
 			return []string{}, fmt.Errorf("unknown pod source %q", source)
 		}
@@ -165,10 +164,7 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 
 // IsCriticalPodBasedOnPriority checks if the given pod is a critical pod based on priority resolved from pod Spec.
 func IsCriticalPodBasedOnPriority(priority int32) bool {
-	if priority >= scheduling.SystemCriticalPriority {
-		return true
-	}
-	return false
+	return priority >= scheduling.SystemCriticalPriority
 }
 
 // IsStaticPod returns true if the pod is a static pod.
