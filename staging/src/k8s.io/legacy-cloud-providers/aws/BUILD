@@ -109,6 +109,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/aws/eks:all-srcs",
+    ],
     tags = ["automanaged"],
 )
