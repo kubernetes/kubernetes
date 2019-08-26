@@ -57,6 +57,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		klog.Infof("Internal LoadBalancer options specified %v", options)
 		if g.isLegacyNetwork {
 			klog.Warningf("Internal LoadBalancer options are not supported with Legacy Networks.")
+			options = nil
 		}
 	}
 
@@ -104,13 +105,15 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	requestedIP := determineRequestedIP(svc, existingFwdRule)
 	ipToUse := requestedIP
 
-	// If the ILB already exists, continue using the subnet that it's already using.
-	// This is to support existing ILBs that were setup using the wrong subnet.
 	subnetworkURL := g.SubnetworkURL()
-	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-		// external LBs have an empty Subnetwork field.
-		subnetworkURL = existingFwdRule.Subnetwork
+	if options != nil && options.SubnetName != "" && g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		if options.SubnetName != existingFwdRule.Subnetwork {
+			// Subnet has changed, reset the requestedIP field
+			requestedIP = ""
+		}
+		subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
 	}
+
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !g.IsLegacyNetwork() {
@@ -699,7 +702,7 @@ func fwdRuleGAEqual(a, b *compute.ForwardingRule) bool {
 		a.IPProtocol == b.IPProtocol &&
 		a.LoadBalancingScheme == b.LoadBalancingScheme &&
 		equalStringSets(a.Ports, b.Ports) &&
-		a.BackendService == b.BackendService
+		a.BackendService == b.BackendService && a.Subnetwork == b.Subnetwork
 }
 
 func fwdRuleBetaEqual(a, b *computebeta.ForwardingRule) bool {
@@ -707,7 +710,7 @@ func fwdRuleBetaEqual(a, b *computebeta.ForwardingRule) bool {
 		a.IPProtocol == b.IPProtocol &&
 		a.LoadBalancingScheme == b.LoadBalancingScheme &&
 		equalStringSets(a.Ports, b.Ports) &&
-		a.BackendService == b.BackendService && a.AllowGlobalAccess == b.AllowGlobalAccess
+		a.BackendService == b.BackendService && a.AllowGlobalAccess == b.AllowGlobalAccess && a.Subnetwork == b.Subnetwork
 }
 
 func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1.Protocol) {
@@ -749,10 +752,12 @@ func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) stri
 }
 
 func getILBOptions(svc *v1.Service) *ILBOptions {
-	if GetLoadBalancerAnnotationGlobalAccess(svc) {
-		return &ILBOptions{EnableGlobalAccess: true}
+	globalAccess := GetLoadBalancerAnnotationGlobalAccess(svc)
+	subnetName := GetLoadBalancerAnnotationSubnet(svc)
+	if !globalAccess && subnetName == "" {
+		return nil
 	}
-	return nil
+	return &ILBOptions{EnableGlobalAccess: globalAccess, SubnetName: subnetName}
 }
 
 type forwardingRuleIntf struct {
