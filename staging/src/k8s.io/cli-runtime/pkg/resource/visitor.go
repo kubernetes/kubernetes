@@ -44,8 +44,8 @@ import (
 )
 
 const (
-	constSTDINstr       string = "STDIN"
-	stopValidateMessage        = "if you choose to ignore these errors, turn validation off with --validate=false"
+	constSTDINstr       = "STDIN"
+	stopValidateMessage = "if you choose to ignore these errors, turn validation off with --validate=false"
 )
 
 // Watchable describes a resource that can be watched for changes that occur on the server,

@@ -207,7 +207,6 @@ vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook
-vendor/k8s.io/cli-runtime/pkg/resource
 vendor/k8s.io/client-go/discovery/cached/memory
 vendor/k8s.io/client-go/dynamic/fake
 vendor/k8s.io/client-go/metadata/fake
@@ -217,7 +216,6 @@ vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/cache
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
-vendor/k8s.io/cloud-provider/service/helpers
 vendor/k8s.io/code-generator/cmd/client-gen/generators/fake
 vendor/k8s.io/code-generator/cmd/client-gen/generators/util
 vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
@@ -246,4 +244,3 @@ vendor/k8s.io/kubectl/pkg/scale
 vendor/k8s.io/legacy-cloud-providers/aws
 vendor/k8s.io/legacy-cloud-providers/azure
 vendor/k8s.io/metrics/pkg/client/custom_metrics
-vendor/k8s.io/sample-controller
