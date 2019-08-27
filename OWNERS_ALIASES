@@ -363,7 +363,6 @@ aliases:
     - janetkuo
     - justinsb
     - pwittrock
-    - roberthbailey
     - ncdc
     - tallclair
     - yifan-gu
@@ -461,7 +460,7 @@ aliases:
     - prydonius       # Apps
     - pwittrock       # CLI
     - quinton-hoole   # Multicluster
-    - roberthbailey   # Cluster Lifecycle
+    - justinsb        # Cluster Lifecycle
     - saad-ali        # Storage
     - seans3          # CLI
     - soltysh         # CLI
