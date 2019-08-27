@@ -91,29 +91,6 @@ func (hu *(hostUtil)) GetFileType(pathname string) (FileType, error) {
 	return getFileType(pathname)
 }
 
-// MakeFile creates a new directory
-func (hu *hostUtil) MakeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-// MakeFile creates an empty file
-func (hu *hostUtil) MakeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
 // PathExists checks whether the path exists
 func (hu *hostUtil) PathExists(pathname string) (bool, error) {
 	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)

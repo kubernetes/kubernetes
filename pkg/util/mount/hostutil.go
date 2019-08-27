@@ -57,10 +57,6 @@ type HostUtils interface {
 	MakeRShared(path string) error
 	// GetFileType checks for file/directory/socket/block/character devices.
 	GetFileType(pathname string) (FileType, error)
-	// MakeFile creates an empty file.
-	MakeFile(pathname string) error
-	// MakeDir creates a new directory.
-	MakeDir(pathname string) error
 	// PathExists tests if the given path already exists
 	// Error is returned on any other error than "file not found".
 	PathExists(pathname string) (bool, error)
