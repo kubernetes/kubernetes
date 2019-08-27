@@ -1359,10 +1359,6 @@ func ExpectNoError(err error, explain ...interface{}) {
 // ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
 func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
-	if err != nil {
-		e2elog.Logf("Unexpected error occurred: %v", err)
-		debug.PrintStack()
-	}
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
@@ -2187,10 +2183,10 @@ func ScaleResource(
 	size uint,
 	wait bool,
 	kind schema.GroupKind,
-	gr schema.GroupResource,
+	gvr schema.GroupVersionResource,
 ) error {
 	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gr); err != nil {
+	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gvr); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {

@@ -10,7 +10,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
     ],
 )
 

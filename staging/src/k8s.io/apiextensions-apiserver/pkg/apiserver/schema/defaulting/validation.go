@@ -33,7 +33,7 @@ import (
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
-func ValidateDefaults(pth *field.Path, s *structuralschema.Structural, isResourceRoot bool) (field.ErrorList, error) {
+func ValidateDefaults(pth *field.Path, s *structuralschema.Structural, isResourceRoot, requirePrunedDefaults bool) (field.ErrorList, error) {
 	f := NewRootObjectFunc().WithTypeMeta(metav1.TypeMeta{APIVersion: "validation/v1", Kind: "Validation"})
 
 	if isResourceRoot {
@@ -47,13 +47,13 @@ func ValidateDefaults(pth *field.Path, s *structuralschema.Structural, isResourc
 		}
 	}
 
-	return validate(pth, s, s, f, false)
+	return validate(pth, s, s, f, false, requirePrunedDefaults)
 }
 
 // validate is the recursive step func for the validation. insideMeta is true if s specifies
 // TypeMeta or ObjectMeta. The SurroundingObjectFunc f is used to validate defaults of
 // TypeMeta or ObjectMeta fields.
-func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *structuralschema.Structural, f SurroundingObjectFunc, insideMeta bool) (field.ErrorList, error) {
+func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *structuralschema.Structural, f SurroundingObjectFunc, insideMeta, requirePrunedDefaults bool) (field.ErrorList, error) {
 	if s == nil {
 		return nil, nil
 	}
@@ -88,10 +88,12 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 			}
 		} else {
 			// check whether default is pruned
-			pruned := runtime.DeepCopyJSONValue(s.Default.Object)
-			pruning.Prune(pruned, s, s.XEmbeddedResource)
-			if !reflect.DeepEqual(pruned, s.Default.Object) {
-				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, "must not have unknown fields"))
+			if requirePrunedDefaults {
+				pruned := runtime.DeepCopyJSONValue(s.Default.Object)
+				pruning.Prune(pruned, s, s.XEmbeddedResource)
+				if !reflect.DeepEqual(pruned, s.Default.Object) {
+					allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, "must not have unknown fields"))
+				}
 			}
 
 			// check ObjectMeta/TypeMeta and everything else
@@ -108,7 +110,7 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 	// do not follow additionalProperties because defaults are forbidden there
 
 	if s.Items != nil {
-		errs, err := validate(pth.Child("items"), s.Items, rootSchema, f.Index(), insideMeta)
+		errs, err := validate(pth.Child("items"), s.Items, rootSchema, f.Index(), insideMeta, requirePrunedDefaults)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +122,7 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 		if s.XEmbeddedResource && (k == "metadata" || k == "apiVersion" || k == "kind") {
 			subInsideMeta = true
 		}
-		errs, err := validate(pth.Child("properties").Key(k), &subSchema, rootSchema, f.Child(k), subInsideMeta)
+		errs, err := validate(pth.Child("properties").Key(k), &subSchema, rootSchema, f.Child(k), subInsideMeta, requirePrunedDefaults)
 		if err != nil {
 			return nil, err
 		}

@@ -63,6 +63,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, nil),
 		requireValidPropertyType:                 requireValidPropertyType(requestGV, nil),
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, nil),
+		requirePrunedDefaults:                    true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -88,6 +89,8 @@ type validationOptions struct {
 	requireValidPropertyType bool
 	// requireStructuralSchema indicates that any schemas present must be structural
 	requireStructuralSchema bool
+	// requirePrunedDefaults indicates that defaults must be pruned
+	requirePrunedDefaults bool
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
@@ -99,6 +102,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, &oldObj.Spec),
 		requireValidPropertyType:                 requireValidPropertyType(requestGV, &oldObj.Spec),
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, &oldObj.Spec),
+		requirePrunedDefaults:                    requirePrunedDefaults(&oldObj.Spec),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
@@ -665,7 +669,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 				}
 			} else if validationErrors := structuralschema.ValidateStructural(fldPath.Child("openAPIV3Schema"), ss); len(validationErrors) > 0 {
 				allErrs = append(allErrs, validationErrors...)
-			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(fldPath.Child("openAPIV3Schema"), ss, true); err != nil {
+			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(fldPath.Child("openAPIV3Schema"), ss, true, opts.requirePrunedDefaults); err != nil {
 				// this should never happen
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 			} else {
@@ -1184,6 +1188,41 @@ func schemaIsNonStructural(schema *apiextensions.JSONSchemaProps) bool {
 		return true
 	}
 	return len(structuralschema.ValidateStructural(nil, ss)) > 0
+}
+
+// requirePrunedDefaults returns false if there are any unpruned default in oldCRDSpec, and true otherwise.
+func requirePrunedDefaults(oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if oldCRDSpec.Validation != nil {
+		if has, err := schemaHasUnprunedDefaults(oldCRDSpec.Validation.OpenAPIV3Schema); err == nil && has {
+			return false
+		}
+	}
+	for _, v := range oldCRDSpec.Versions {
+		if v.Schema == nil {
+			continue
+		}
+		if has, err := schemaHasUnprunedDefaults(v.Schema.OpenAPIV3Schema); err == nil && has {
+			return false
+		}
+	}
+	return true
+}
+func schemaHasUnprunedDefaults(schema *apiextensions.JSONSchemaProps) (bool, error) {
+	if schema == nil || !schemaHasDefaults(schema) {
+		return false, nil
+	}
+	ss, err := structuralschema.NewStructural(schema)
+	if err != nil {
+		return false, err
+	}
+	if errs := structuralschema.ValidateStructural(nil, ss); len(errs) > 0 {
+		return false, errs.ToAggregate()
+	}
+	pruned := ss.DeepCopy()
+	if err := structuraldefaulting.PruneDefaults(pruned); err != nil {
+		return false, err
+	}
+	return !reflect.DeepEqual(ss, pruned), nil
 }
 
 // requireValidPropertyType returns true if valid openapi v3 types should be required for the given API version

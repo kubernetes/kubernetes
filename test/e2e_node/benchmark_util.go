@@ -59,7 +59,7 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 // as "cpu" and "memory". If an error occurs, no perf data will be logged.
 func logPerfData(p *perftype.PerfData, perfType string) {
 	if framework.TestContext.ReportDir == "" {
-		e2eperf.PrintPerfData(p)
+		printPerfData(p)
 		return
 	}
 	dumpDataToFile(p, p.Labels, "performance-"+perfType)
@@ -188,5 +188,14 @@ func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[stri
 		"image":   image,
 		"machine": fmt.Sprintf("cpu:%dcore,memory:%.1fGB", cpuValue, float32(memoryValue)/(1024*1024*1024)),
 		"desc":    testDesc,
+	}
+}
+
+// printPerfData prints the perfdata in json format with PerfResultTag prefix.
+// If an error occurs, nothing will be printed.
+func printPerfData(p *perftype.PerfData) {
+	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
+	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+		e2elog.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }

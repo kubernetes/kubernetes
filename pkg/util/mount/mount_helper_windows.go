@@ -91,3 +91,8 @@ func ValidateDiskNumber(disk string) error {
 
 	return nil
 }
+
+// isMountPointMatch determines if the mountpoint matches the dir
+func isMountPointMatch(mp MountPoint, dir string) bool {
+	return mp.Path == dir
+}

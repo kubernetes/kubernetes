@@ -22,7 +22,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -90,7 +89,7 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 						framework.ExpectNoError(err, "error listing nodes")
 						for _, node := range nodes.Items {
 							if !subnetWithinSubnet(ps.(string), node.Spec.PodCIDR) {
-								e2elog.Failf("failed due to node(%v) IP %v not inside configured pod subnet: %s", node.Name, node.Spec.PodCIDR, ps)
+								framework.Failf("failed due to node(%v) IP %v not inside configured pod subnet: %s", node.Name, node.Spec.PodCIDR, ps)
 							}
 						}
 					}
@@ -114,7 +113,7 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 						svc, err := f.ClientSet.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
 						framework.ExpectNoError(err, "error getting Service %q from namespace %q", "kubernetes", "default")
 						if !ipWithinSubnet(ss.(string), svc.Spec.ClusterIP) {
-							e2elog.Failf("failed due to service(%v) cluster-IP %v not inside configured service subnet: %s", svc.Name, svc.Spec.ClusterIP, ss)
+							framework.Failf("failed due to service(%v) cluster-IP %v not inside configured service subnet: %s", svc.Name, svc.Spec.ClusterIP, ss)
 						}
 					}
 				}
@@ -149,7 +148,7 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 									}
 								}
 								if !found {
-									e2elog.Failf("failed due to the PodCIDRs (%v) of Node %q not being inside the configuration podSubnet CIDR %q", node.Spec.PodCIDRs, node.Name, configCIDRs)
+									framework.Failf("failed due to the PodCIDRs (%v) of Node %q not being inside the configuration podSubnet CIDR %q", node.Spec.PodCIDRs, node.Name, configCIDRs)
 								}
 							}
 						}

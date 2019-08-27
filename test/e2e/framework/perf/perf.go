@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/perftype"
 )
 
@@ -39,15 +37,6 @@ func ResourceUsageToPerfData(usagePerNode e2ekubelet.ResourceUsagePerNode) *perf
 // CPUUsageToPerfData transforms NodesCPUSummary to PerfData.
 func CPUUsageToPerfData(usagePerNode e2ekubelet.NodesCPUSummary) *perftype.PerfData {
 	return CPUUsageToPerfDataWithLabels(usagePerNode, nil)
-}
-
-// PrintPerfData prints the perfdata in json format with PerfResultTag prefix.
-// If an error occurs, nothing will be printed.
-func PrintPerfData(p *perftype.PerfData) {
-	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
-		e2elog.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
-	}
 }
 
 // ResourceUsageToPerfDataWithLabels transforms ResourceUsagePerNode to PerfData with additional labels.
