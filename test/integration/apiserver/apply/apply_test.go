@@ -193,7 +193,7 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 	}
 
 	// Need to update once for some reason
-	// TODO: Remove this once possible
+	// TODO (#82042): Remove this update once possible
 	b, err := json.MarshalIndent(o, "\t", "\t")
 	if err != nil {
 		t.Fatalf("Failed to marshal created object: %v", err)
