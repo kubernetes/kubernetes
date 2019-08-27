@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/utils/integer"
 )
 
@@ -68,13 +67,13 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 	for _, pod := range agentPods.Items {
 		contStatuses := pod.Status.ContainerStatuses
 		if len(contStatuses) == 0 {
-			e2elog.Logf("There are no container statuses for pod %s", pod.Name)
+			framework.Logf("There are no container statuses for pod %s", pod.Name)
 			continue
 		}
 		restartCount := int(contStatuses[0].RestartCount)
 		maxRestartCount = integer.IntMax(maxRestartCount, restartCount)
 
-		e2elog.Logf("Logging agent %s on node %s was restarted %d times",
+		framework.Logf("Logging agent %s on node %s was restarted %d times",
 			pod.Name, pod.Spec.NodeName, restartCount)
 	}
 

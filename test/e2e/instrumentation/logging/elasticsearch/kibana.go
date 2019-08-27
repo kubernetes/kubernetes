@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
@@ -64,7 +63,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// being run as the first e2e test just after the e2e cluster has been created.
 	err := wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
 		if _, err := s.Get("kibana-logging", metav1.GetOptions{}); err != nil {
-			e2elog.Logf("Kibana is unreachable: %v", err)
+			framework.Logf("Kibana is unreachable: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -86,7 +85,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	err = wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
 		req, err := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if err != nil {
-			e2elog.Logf("Failed to get services proxy request: %v", err)
+			framework.Logf("Failed to get services proxy request: %v", err)
 			return false, nil
 		}
 
@@ -98,7 +97,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 			Name("kibana-logging").
 			DoRaw()
 		if err != nil {
-			e2elog.Logf("Proxy call to kibana-logging failed: %v", err)
+			framework.Logf("Proxy call to kibana-logging failed: %v", err)
 			return false, nil
 		}
 		return true, nil
