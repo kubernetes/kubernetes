@@ -186,36 +186,6 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
-// getMountRefsByDev finds all references to the device provided
-// by mountPath; returns a list of paths.
-// Note that mountPath should be path after the evaluation of any symbolic links.
-func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
-	mps, err := mounter.List()
-	if err != nil {
-		return nil, err
-	}
-
-	// Finding the device mounted to mountPath
-	diskDev := ""
-	for i := range mps {
-		if mountPath == mps[i].Path {
-			diskDev = mps[i].Device
-			break
-		}
-	}
-
-	// Find all references to the device.
-	var refs []string
-	for i := range mps {
-		if mps[i].Device == diskDev || mps[i].Device == mountPath {
-			if mps[i].Path != mountPath {
-				refs = append(refs, mps[i].Path)
-			}
-		}
-	}
-	return refs, nil
-}
-
 // GetDeviceNameFromMount when given a mnt point, find the device from /proc/mounts
 // returns the device name, reference count, and error code.
 func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, error) {
@@ -318,9 +288,7 @@ func isBind(options []string) (bool, []string, []string) {
 		switch option {
 		case "bind":
 			bind = true
-			break
 		case "remount":
-			break
 		default:
 			bindRemountOpts = append(bindRemountOpts, option)
 		}

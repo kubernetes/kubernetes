@@ -137,11 +137,11 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		// systemd-mount is not used because it's too new for older distros
 		// (CentOS 7, Debian Jessie).
 		mountCmd, mountArgs = addSystemdScope("systemd-run", target, mountCmd, mountArgs)
-	} else {
-		// No systemd-run on the host (or we failed to check it), assume kubelet
-		// does not run as a systemd service.
-		// No code here, mountCmd and mountArgs are already populated.
-	}
+	} //else {
+	// No systemd-run on the host (or we failed to check it), assume kubelet
+	// does not run as a systemd service.
+	// No code here, mountCmd and mountArgs are already populated.
+	//}
 
 	klog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
@@ -413,11 +413,11 @@ func (mounter *Mounter) MakeDir(pathname string) error {
 // MakeFile creates a file with permissions 0644 at the specified path.
 func (mounter *Mounter) MakeFile(pathname string) error {
 	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
 	if err != nil {
 		if !os.IsExist(err) {
 			return err
 		}
+		defer f.Close()
 	}
 	return nil
 }
