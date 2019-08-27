@@ -86,31 +86,45 @@ func openAndLockProjectFiles() (*os.File, *os.File, error) {
 		err = fmt.Errorf("unable to open %s: %v", projectsFile, err)
 		return nil, nil, err
 	}
+
 	fProjid, err := os.OpenFile(projidFile, os.O_RDONLY|os.O_CREATE, 0644)
-	if err == nil {
-		// Check once more, to ensure nothing got changed out from under us
-		if err := projFilesAreOK(); err == nil {
-			err = lockFile(fProjects)
-			if err == nil {
-				err = lockFile(fProjid)
-				if err == nil {
-					return fProjects, fProjid, nil
-				}
-				// Nothing useful we can do if we get an error here
-				err = fmt.Errorf("unable to lock %s: %v", projidFile, err)
-				unlockFile(fProjects)
-			} else {
-				err = fmt.Errorf("unable to lock %s: %v", projectsFile, err)
-			}
-		} else {
-			err = fmt.Errorf("system project files failed re-verification: %v", err)
-		}
-		fProjid.Close()
-	} else {
+	if err != nil {
 		err = fmt.Errorf("unable to open %s: %v", projidFile, err)
+		// fProjects was successfully opened, so it needs to close
+		fProjects.Close()
+		return nil, nil, err
 	}
-	fProjects.Close()
-	return nil, nil, err
+
+	// Check once more, to ensure nothing got changed out from under us
+	err = projFilesAreOK()
+	if err != nil {
+		err = fmt.Errorf("system project files failed re-verification: %v", err)
+		// Nothing useful we can do if we get an error here
+		fProjects.Close()
+		fProjid.Close()
+		return nil, nil, err
+	}
+
+	err = lockFile(fProjects)
+	if err != nil {
+		err = fmt.Errorf("unable to lock %s: %v", projectsFile, err)
+		// Nothing useful we can do if we get an error here
+		fProjects.Close()
+		fProjid.Close()
+		return nil, nil, err
+	}
+
+	err = lockFile(fProjid)
+	if err != nil {
+		err = fmt.Errorf("unable to lock %s: %v", projidFile, err)
+		// Nothing useful we can do if we get an error here
+		unlockFile(fProjects)
+		fProjects.Close()
+		fProjid.Close()
+		return nil, nil, err
+	}
+
+	return fProjects, fProjid, nil
 }
 
 func closeProjectFiles(fProjects *os.File, fProjid *os.File) error {
