@@ -314,7 +314,7 @@ var _ = SIGDescribe("kubelet", func() {
 				Replicas:     totalPods,
 				NodeSelector: nodeLabels,
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed creating a ReplicationController")
 			if resourceMonitor != nil {
 				resourceMonitor.LogLatest()
 			}
