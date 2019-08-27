@@ -26,41 +26,33 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/kustomize/pkg/ifc"
 )
 
-// UnstructuredSlice is a slice of Unstructured objects.
-// Unstructured objects are used to represent both resources and patches of any group/version/kind.
-type UnstructuredSlice []*unstructured.Unstructured
+// strategicMergeSlice is a slice of strategic merge patches.
+// Unstructured objects are used to represent strategic merge patches of any group/version/kind.
+type strategicMergeSlice []*unstructured.Unstructured
 
-// NewUnstructuredSliceFromFiles returns a ResMap given a resource path slice.
-// This func use a Loader to mimic the behavior of kubectl kustomize, and most specifically support for reading from
-// a local git repository like git@github.com:someOrg/someRepo.git or https://github.com/someOrg/someRepo?ref=someHash
-func NewUnstructuredSliceFromFiles(loader ifc.Loader, paths []string) (UnstructuredSlice, error) {
-	var result UnstructuredSlice
-	for _, path := range paths {
-		content, err := loader.Load(path)
-		if err != nil {
-			return nil, errors.Wrapf(err, "load from path %q failed", path)
-		}
-		res, err := NewUnstructuredSliceFromBytes(content)
-		if err != nil {
-			return nil, errors.Wrapf(err, "convert %q to Unstructured failed", path)
-		}
-
-		result = append(result, res...)
+// newStrategicMergeSliceFromFile returns a slice of strategic merge patches from a file
+func newStrategicMergeSliceFromFile(loader ifc.Loader, path string) (strategicMergeSlice, error) {
+	content, err := loader.Load(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "load from path %q failed", path)
 	}
-	return result, nil
+	res, err := newStrategicMergeSliceFromBytes(content)
+	if err != nil {
+		return nil, errors.Wrapf(err, "convert %q to Unstructured failed", path)
+	}
+	return res, nil
 }
 
-// NewUnstructuredSliceFromBytes returns a slice of Unstructured.
+// newStrategicMergeSliceFromBytes returns a strategic merge patches contained in a []byte.
 // This functions handles all the nuances of Kubernetes yaml (e.g. many yaml
 // documents in one file, List of objects)
-func NewUnstructuredSliceFromBytes(in []byte) (UnstructuredSlice, error) {
+func newStrategicMergeSliceFromBytes(in []byte) (strategicMergeSlice, error) {
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(in), 1024)
-	var result UnstructuredSlice
+	var result strategicMergeSlice
 	var err error
 	// Parse all the yaml documents in the file
 	for err == nil || isEmptyYamlError(err) {
@@ -88,13 +80,13 @@ func NewUnstructuredSliceFromBytes(in []byte) (UnstructuredSlice, error) {
 						return err
 					}
 
-					// Get the UnstructuredSlice for the item
-					itemU, err := NewUnstructuredSliceFromBytes(itemJSON)
+					// Get the stategicMergeSlice for the item
+					itemU, err := newStrategicMergeSliceFromBytes(itemJSON)
 					if err != nil {
 						return err
 					}
 
-					// append the UnstructuredSlice for the item to the UnstructuredSlice
+					// append the stategicMergeSlice for the item to the stategicMergeSlice
 					result = append(result, itemU...)
 
 					return nil
@@ -105,7 +97,7 @@ func NewUnstructuredSliceFromBytes(in []byte) (UnstructuredSlice, error) {
 				continue
 			}
 
-			// append the object to the UnstructuredSlice
+			// append the object to the stategicMergeSlice
 			result = append(result, &u)
 		}
 	}
@@ -115,14 +107,14 @@ func NewUnstructuredSliceFromBytes(in []byte) (UnstructuredSlice, error) {
 	return result, nil
 }
 
-// FilterResource returns all the Unstructured items in the UnstructuredSlice corresponding to a given resource
-func (rs *UnstructuredSlice) FilterResource(gvk schema.GroupVersionKind, namespace, name string) UnstructuredSlice {
-	var result UnstructuredSlice
-	for _, r := range *rs {
-		if r.GroupVersionKind() == gvk &&
-			r.GetNamespace() == namespace &&
-			r.GetName() == name {
-			result = append(result, r)
+// filterByResource returns all the strategic merge patches in the strategicMergeSlice corresponding to a given resource
+func (s *strategicMergeSlice) filterByResource(r *unstructured.Unstructured) strategicMergeSlice {
+	var result strategicMergeSlice
+	for _, p := range *s {
+		if p.GroupVersionKind() == r.GroupVersionKind() &&
+			p.GetNamespace() == r.GetNamespace() &&
+			p.GetName() == r.GetName() {
+			result = append(result, p)
 		}
 	}
 	return result
