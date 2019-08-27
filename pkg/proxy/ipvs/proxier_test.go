@@ -1120,6 +1120,27 @@ func TestClusterIP(t *testing.T) {
 	}
 }
 
+func TestMasqueradeRule(t *testing.T) {
+	for _, testcase := range []bool{false, true} {
+		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
+		ipvs := ipvstest.NewFake()
+		ipset := ipsettest.NewFake(testIPSetVersion)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+		makeServiceMap(fp)
+		makeEndpointsMap(fp)
+		fp.syncProxyRules()
+
+		postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
+		if !hasJump(postRoutingRules, "MASQUERADE", "") {
+			t.Errorf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain)
+		}
+		if hasMasqRandomFully(postRoutingRules) != testcase {
+			probs := map[bool]string{false: "found", true: "did not find"}
+			t.Errorf("%s --random-fully in -j MASQUERADE rule in %s chain for HasRandomFully()=%v", probs[testcase], kubePostroutingChain, testcase)
+		}
+	}
+}
+
 func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -3107,6 +3128,15 @@ func hasJump(rules []iptablestest.Rule, destChain, ipSet string) bool {
 			if strings.Contains(r[iptablestest.MatchSet], ipSet) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func hasMasqRandomFully(rules []iptablestest.Rule) bool {
+	for _, r := range rules {
+		if r[iptablestest.Masquerade] == "--random-fully" {
+			return true
 		}
 	}
 	return false
