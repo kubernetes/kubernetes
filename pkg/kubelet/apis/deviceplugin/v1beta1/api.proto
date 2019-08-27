@@ -74,7 +74,7 @@ message ListAndWatchResponse {
 }
 
 message TopologyInfo {
-    	NUMANode node = 1;
+	repeated NUMANode nodes = 1;
 }
 
 message NUMANode {
