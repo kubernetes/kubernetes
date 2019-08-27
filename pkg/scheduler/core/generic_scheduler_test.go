@@ -144,7 +144,7 @@ var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []sched
 // FakeFilterPlugin is a test filter plugin used by default scheduler.
 type FakeFilterPlugin struct {
 	numFilterCalled int32
-	failFilter      bool
+	returnCode      framework.Code
 }
 
 var filterPlugin = &FakeFilterPlugin{}
@@ -157,7 +157,7 @@ func (fp *FakeFilterPlugin) Name() string {
 // reset is used to reset filter plugin.
 func (fp *FakeFilterPlugin) reset() {
 	fp.numFilterCalled = 0
-	fp.failFilter = false
+	fp.returnCode = framework.Success
 }
 
 // Filter is a test function that returns an error or nil, depending on the
@@ -165,11 +165,11 @@ func (fp *FakeFilterPlugin) reset() {
 func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	atomic.AddInt32(&fp.numFilterCalled, 1)
 
-	if fp.failFilter {
-		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	if fp.returnCode == framework.Success {
+		return nil
 	}
 
-	return nil
+	return framework.NewStatus(fp.returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 }
 
 // NewFilterPlugin is the factory for filter plugin.
@@ -282,7 +282,7 @@ func TestGenericScheduler(t *testing.T) {
 		pod                      *v1.Pod
 		pods                     []*v1.Pod
 		buildPredMeta            bool // build predicates metadata or not
-		failFilter               bool
+		filterReturnCode         framework.Code
 		expectedHosts            sets.String
 		expectsErr               bool
 		wErr                     error
@@ -598,14 +598,14 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			name:          "test with failed filter plugin",
-			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers:  []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
-			nodes:         []string{"3"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
-			failFilter:    true,
-			expectsErr:    true,
+			name:             "test with filter plugin returning Unschedulable status",
+			predicates:       map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			prioritizers:     []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			nodes:            []string{"3"},
+			pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			expectedHosts:    nil,
+			filterReturnCode: framework.Unschedulable,
+			expectsErr:       true,
 			wErr: &FitError{
 				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes:      1,
@@ -615,10 +615,28 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:             "test with filter plugin returning UnschedulableAndUnresolvable status",
+			predicates:       map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			prioritizers:     []priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			nodes:            []string{"3"},
+			pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			expectedHosts:    nil,
+			filterReturnCode: framework.UnschedulableAndUnresolvable,
+			expectsErr:       true,
+			wErr: &FitError{
+				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				NumAllNodes:      1,
+				FailedPredicates: FailedPredicateMap{},
+				FilteredNodesStatuses: framework.NodeToStatusMap{
+					"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter"),
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			filterPlugin.failFilter = test.failFilter
+			filterPlugin.returnCode = test.filterReturnCode
 
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
@@ -1495,7 +1513,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 
 func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	// Prepare 4 node names.
-	nodeNames := []string{}
+	nodeNames := make([]string, 0, 4)
 	for i := 1; i < 5; i++ {
 		nodeNames = append(nodeNames, fmt.Sprintf("machine%d", i))
 	}
@@ -1503,6 +1521,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	tests := []struct {
 		name          string
 		failedPredMap FailedPredicateMap
+		nodesStatuses framework.NodeToStatusMap
 		expected      map[string]bool // set of expected node names. Value is ignored.
 	}{
 		{
@@ -1586,11 +1605,41 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
+		{
+			name:          "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
+			failedPredMap: FailedPredicateMap{},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+				"machine3": framework.NewStatus(framework.Unschedulable, ""),
+				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+			},
+			expected: map[string]bool{"machine1": true, "machine3": true},
+		},
+		{
+			name: "Failed predicates and statuses should be evaluated",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine4": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+			},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.Unschedulable, ""),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+				"machine3": framework.NewStatus(framework.Unschedulable, ""),
+				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+			},
+			expected: map[string]bool{"machine1": true},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodes := nodesWherePreemptionMightHelp(makeNodeList(nodeNames), test.failedPredMap)
+			fitErr := FitError{
+				FailedPredicates:      test.failedPredMap,
+				FilteredNodesStatuses: test.nodesStatuses,
+			}
+			nodes := nodesWherePreemptionMightHelp(makeNodeList(nodeNames), &fitErr)
 			if len(test.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(test.expected), len(nodes), nodes)
 			}

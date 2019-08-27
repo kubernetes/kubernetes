@@ -615,7 +615,7 @@ func (sched *Scheduler) scheduleOne() {
 		permitStatus := fwk.RunPermitPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		if !permitStatus.IsSuccess() {
 			var reason string
-			if permitStatus.Code() == framework.Unschedulable {
+			if permitStatus.IsUnschedulable() {
 				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
@@ -635,7 +635,7 @@ func (sched *Scheduler) scheduleOne() {
 		preBindStatus := fwk.RunPreBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		if !preBindStatus.IsSuccess() {
 			var reason string
-			if preBindStatus.Code() == framework.Unschedulable {
+			if preBindStatus.IsUnschedulable() {
 				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
