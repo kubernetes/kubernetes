@@ -20,15 +20,15 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"time"
+
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
-	"time"
 
 	"github.com/onsi/ginkgo"
 )
@@ -66,13 +66,13 @@ var _ = SIGDescribe("Certificates API", func() {
 		}
 		csrs := f.ClientSet.CertificatesV1beta1().CertificateSigningRequests()
 
-		e2elog.Logf("creating CSR")
+		framework.Logf("creating CSR")
 		csr, err = csrs.Create(csr)
 		framework.ExpectNoError(err)
 
 		csrName := csr.Name
 
-		e2elog.Logf("approving CSR")
+		framework.Logf("approving CSR")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
 			csr.Status.Conditions = []certificatesv1beta1.CertificateSigningRequestCondition{
 				{
@@ -84,27 +84,27 @@ var _ = SIGDescribe("Certificates API", func() {
 			csr, err = csrs.UpdateApproval(csr)
 			if err != nil {
 				csr, _ = csrs.Get(csrName, metav1.GetOptions{})
-				e2elog.Logf("err updating approval: %v", err)
+				framework.Logf("err updating approval: %v", err)
 				return false, nil
 			}
 			return true, nil
 		}))
 
-		e2elog.Logf("waiting for CSR to be signed")
+		framework.Logf("waiting for CSR to be signed")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
 			csr, err = csrs.Get(csrName, metav1.GetOptions{})
 			if err != nil {
-				e2elog.Logf("error getting csr: %v", err)
+				framework.Logf("error getting csr: %v", err)
 				return false, nil
 			}
 			if len(csr.Status.Certificate) == 0 {
-				e2elog.Logf("csr not signed yet")
+				framework.Logf("csr not signed yet")
 				return false, nil
 			}
 			return true, nil
 		}))
 
-		e2elog.Logf("testing the client")
+		framework.Logf("testing the client")
 		rcfg, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 

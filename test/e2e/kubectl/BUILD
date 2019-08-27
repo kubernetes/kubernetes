@@ -35,7 +35,6 @@ go_library(
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/endpoints:go_default_library",
         "//test/e2e/framework/job:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
