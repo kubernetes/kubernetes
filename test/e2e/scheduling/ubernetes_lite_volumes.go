@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
@@ -67,7 +66,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	// Get all the zones that the nodes are in
 	expectedZones, err := gceCloud.GetAllZonesFromCloudProvider()
 	framework.ExpectNoError(err)
-	e2elog.Logf("Expected zones: %v", expectedZones)
+	framework.Logf("Expected zones: %v", expectedZones)
 
 	// Get all the zones in this current region
 	region := gceCloud.Region()
@@ -122,7 +121,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	defer func() {
 		// Teardown of the compute instance
-		e2elog.Logf("Deleting compute resource: %v", name)
+		framework.Logf("Deleting compute resource: %v", name)
 		err := gceCloud.DeleteInstance(project, zone, name)
 		framework.ExpectNoError(err)
 	}()
@@ -142,10 +141,10 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 		// Defer the cleanup
 		defer func() {
-			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil {
-				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
 	}
