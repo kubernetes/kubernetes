@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package egressselector
 
 import (
 	"bufio"
@@ -34,6 +34,7 @@ import (
 
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
 
+// EgressSelector is the map of network context type to context dialer, for network egress.
 type EgressSelector struct {
 	egressToDialer map[EgressType]utilnet.DialFunc
 }
@@ -59,9 +60,10 @@ type NetworkContext struct {
 	EgressSelectionName EgressType
 }
 
-// EgressSelectorLookup is the interface to get the dialer function for the network context.
-type EgressSelectorLookup func(networkContext NetworkContext) (utilnet.DialFunc, error)
+// Lookup is the interface to get the dialer function for the network context.
+type Lookup func(networkContext NetworkContext) (utilnet.DialFunc, error)
 
+// String returns the canonical string representation of the egress type
 func (s EgressType) String() string {
 	switch s {
 	case Master:
@@ -73,6 +75,11 @@ func (s EgressType) String() string {
 	default:
 		return "invalid"
 	}
+}
+
+// AsNetworkContext is a helper function to make it easy to get the basic NetworkContext objects.
+func (s EgressType) AsNetworkContext() NetworkContext {
+	return NetworkContext{EgressSelectionName: s}
 }
 
 func lookupServiceName(name string) (EgressType, error) {
