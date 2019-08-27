@@ -414,7 +414,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		})
 	})
 
-	ginkgo.Context("CSI Volume expansion [Feature:ExpandCSIVolumes]", func() {
+	ginkgo.Context("CSI Volume expansion", func() {
 		tests := []struct {
 			name                    string
 			nodeExpansionRequired   bool
@@ -525,7 +525,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
-	ginkgo.Context("CSI online volume expansion [Feature:ExpandCSIVolumes][Feature:ExpandInUseVolumes]", func() {
+	ginkgo.Context("CSI online volume expansion", func() {
 		tests := []struct {
 			name          string
 			disableAttach bool
