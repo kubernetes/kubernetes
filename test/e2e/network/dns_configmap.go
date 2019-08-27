@@ -26,7 +26,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 type dnsFederationsConfigMapTest struct {
@@ -409,12 +408,12 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	serviceName := "dns-externalname-upstream-test"
 	externalNameService := e2eservice.CreateServiceSpec(serviceName, googleDNSHostname, false, nil)
 	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService); err != nil {
-		e2elog.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
+		ginkgo.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
 	}
 	serviceNameLocal := "dns-externalname-upstream-local"
 	externalNameServiceLocal := e2eservice.CreateServiceSpec(serviceNameLocal, fooHostname, false, nil)
 	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameServiceLocal); err != nil {
-		e2elog.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
+		ginkgo.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
 	}
 	defer func() {
 		ginkgo.By("deleting the test externalName service")

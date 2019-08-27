@@ -31,7 +31,6 @@ import (
 	morereporters "github.com/onsi/ginkgo/reporters"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 func init() {
@@ -49,7 +48,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2E(t *testing.T) {
-	gomega.RegisterFailHandler(e2elog.Fail)
+	gomega.RegisterFailHandler(ginkgo.Fail)
 	reporters := []ginkgo.Reporter{}
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {

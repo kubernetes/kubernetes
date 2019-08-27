@@ -34,7 +34,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/onsi/ginkgo"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 

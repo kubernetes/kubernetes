@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // FailurePanic is the value that will be panicked from Fail.
@@ -65,7 +64,7 @@ func Fail(message string, callerSkip ...int) {
 		}
 	}()
 
-	e2elog.Fail(message, skip)
+	ginkgo.Fail(message, skip)
 }
 
 // SkipPanic is the value that will be panicked from Skip.
