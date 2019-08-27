@@ -415,6 +415,8 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
 // using the Cluster IP address of the kubernetes service created in the default namespace
 // This unequivocally identifies the default IP family because services are single family
+// TODO: dual-stack may support multiple families per service
+// but we can detect if a cluster is dual stack because pods have two addresses (one per family)
 func getDefaultClusterIPFamily(c clientset.Interface) string {
 	// Get the ClusterIP of the kubernetes service created in the default namespace
 	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
@@ -426,6 +428,11 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 		return "ipv6"
 	}
 	return "ipv4"
+}
+
+// ClusterIsIPv6 returns true if the cluster is IPv6
+func ClusterIsIPv6() bool {
+	return TestContext.IPFamily == "ipv6"
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
