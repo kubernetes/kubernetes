@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
 
@@ -139,10 +139,11 @@ func TestPodAdmission(t *testing.T) {
 		{
 			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
-			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
-			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
-			admit:                     false,
-			testName:                  "conflicting pod and namespace tolerations",
+			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule"}},
+			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule"}},
+			mergedTolerations:         []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule"}, {Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule"}},
+			admit:                     true,
+			testName:                  "duplicate key pod and namespace tolerations",
 		},
 		{
 			pod:                       bestEffortPod,
@@ -210,10 +211,11 @@ func TestPodAdmission(t *testing.T) {
 			whitelist:                 []api.Toleration{},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}, {Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
 			mergedTolerations: []api.Toleration{
+				{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil},
 				{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil},
 			},
 			admit:    true,
-			testName: "Besteffort pod should overwrite for conflicting tolerations",
+			testName: "Pod with duplicate key tolerations should not be modified",
 		},
 		{
 			pod:                       guaranteedPod,
@@ -275,8 +277,8 @@ func TestPodAdmission(t *testing.T) {
 			}
 
 			updatedPodTolerations := pod.Spec.Tolerations
-			if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
-				t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
+			if test.admit {
+				assert.ElementsMatch(t, updatedPodTolerations, test.mergedTolerations)
 			}
 		})
 	}
