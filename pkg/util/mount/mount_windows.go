@@ -164,11 +164,6 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-// IsMountPointMatch determines if the mountpoint matches the dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return mp.Path == dir
-}
-
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	stat, err := os.Lstat(file)

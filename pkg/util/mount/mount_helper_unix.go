@@ -131,3 +131,10 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 	}
 	return infos, nil
 }
+
+// isMountPointMatch returns true if the path in mp is the same as dir.
+// Handles case where mountpoint dir has been renamed due to stale NFS mount.
+func isMountPointMatch(mp MountPoint, dir string) bool {
+	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
+	return ((mp.Path == dir) || (mp.Path == deletedDir))
+}

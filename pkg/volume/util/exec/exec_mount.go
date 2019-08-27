@@ -91,10 +91,6 @@ func (m *execMounter) List() ([]mount.MountPoint, error) {
 	return m.wrappedMounter.List()
 }
 
-func (m *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return m.wrappedMounter.IsMountPointMatch(mp, dir)
-}
-
 // IsLikelyNotMountPoint determines whether a path is a mountpoint.
 func (m *execMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return m.wrappedMounter.IsLikelyNotMountPoint(file)

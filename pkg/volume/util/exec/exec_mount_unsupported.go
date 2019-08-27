@@ -46,10 +46,6 @@ func (mounter *execMounter) List() ([]mount.MountPoint, error) {
 	return []mount.MountPoint{}, nil
 }
 
-func (mounter *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return (mp.Path == dir)
-}
-
 func (mounter *execMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }

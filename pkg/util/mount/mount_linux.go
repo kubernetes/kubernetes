@@ -213,12 +213,6 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
 }
 
-// IsMountPointMatch returns true if the path in mp is the same as dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
-	return ((mp.Path == dir) || (mp.Path == deletedDir))
-}
-
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 // It is fast but not necessarily ALWAYS correct. If the path is in fact
 // a bind mount from one part of a mount to another it will not be detected.
