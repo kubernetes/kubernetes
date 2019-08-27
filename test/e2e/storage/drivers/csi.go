@@ -41,7 +41,7 @@ import (
 	"strconv"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -87,17 +87,25 @@ var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver() testsuites.TestDriver {
+	capabilities := map[testsuites.Capability]bool{
+		testsuites.CapPersistence:         true,
+		testsuites.CapSnapshotDataSource:  true,
+		testsuites.CapMultiPODs:           true,
+		testsuites.CapBlock:               true,
+		testsuites.CapPVCDataSource:       true,
+		testsuites.CapControllerExpansion: true,
+	}
 	return initHostPathCSIDriver("csi-hostpath",
-		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapSnapshotDataSource: true,
-			testsuites.CapMultiPODs: true, testsuites.CapBlock: true,
-			testsuites.CapPVCDataSource: true},
+		capabilities,
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-resizer.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
