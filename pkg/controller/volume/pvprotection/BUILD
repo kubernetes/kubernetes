@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/pvprotection",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/controller/volume/protectionutil:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/slice:go_default_library",

@@ -197,7 +197,7 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
-	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 		return
 	}
 

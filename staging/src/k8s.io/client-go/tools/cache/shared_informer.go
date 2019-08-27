@@ -190,8 +190,24 @@ const (
 	initialBufferSize = 1024
 )
 
+// WaitForNamedCacheSync is a wrapper around WaitForCacheSync that generates log messages
+// indicating that the caller identified by name is waiting for syncs, followed by
+// either a successful or failed sync.
+func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
+	klog.Infof("Waiting for caches to sync for %s", controllerName)
+
+	if !WaitForCacheSync(stopCh, cacheSyncs...) {
+		utilruntime.HandleError(fmt.Errorf("unable to sync caches for %s", controllerName))
+		return false
+	}
+
+	klog.Infof("Caches are synced for %s ", controllerName)
+	return true
+}
+
 // WaitForCacheSync waits for caches to populate.  It returns true if it was successful, false
 // if the controller should shutdown
+// callers should prefer WaitForNamedCacheSync()
 func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
 	err := wait.PollUntil(syncedPollPeriod,
 		func() (bool, error) {

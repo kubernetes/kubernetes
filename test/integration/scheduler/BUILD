@@ -83,7 +83,6 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/controller/disruption:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
@@ -111,6 +110,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils/image:go_default_library",

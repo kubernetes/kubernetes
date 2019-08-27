@@ -71,18 +71,6 @@ func (hu *FakeHostUtil) GetFileType(pathname string) (FileType, error) {
 	return FileType("Directory"), nil
 }
 
-// MakeDir creates a new directory.
-// No-op for testing
-func (hu *FakeHostUtil) MakeDir(pathname string) error {
-	return nil
-}
-
-// MakeFile creates a new file.
-// No-op for testing
-func (hu *FakeHostUtil) MakeFile(pathname string) error {
-	return nil
-}
-
 // PathExists checks if pathname exists.
 func (hu *FakeHostUtil) PathExists(pathname string) (bool, error) {
 	if _, ok := hu.Filesystem[pathname]; ok {

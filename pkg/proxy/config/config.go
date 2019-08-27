@@ -25,7 +25,6 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 // ServiceHandler is an abstract interface of objects which receive
@@ -95,7 +94,7 @@ func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 	klog.Info("Starting endpoints config controller")
 
-	if !controller.WaitForCacheSync("endpoints config", stopCh, c.listerSynced) {
+	if !cache.WaitForNamedCacheSync("endpoints config", stopCh, c.listerSynced) {
 		return
 	}
 
@@ -186,7 +185,7 @@ func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 	klog.Info("Starting service config controller")
 
-	if !controller.WaitForCacheSync("service config", stopCh, c.listerSynced) {
+	if !cache.WaitForNamedCacheSync("service config", stopCh, c.listerSynced) {
 		return
 	}
 
