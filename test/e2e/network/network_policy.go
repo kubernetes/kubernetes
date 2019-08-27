@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -164,7 +163,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err)
 
 			// Create Server with Service in NS-B
-			e2elog.Logf("Waiting for server to come up.")
+			framework.Logf("Waiting for server to come up.")
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
 			framework.ExpectNoError(err)
 
@@ -389,7 +388,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			// Wait for Server in namespaces-a to be ready
-			e2elog.Logf("Waiting for server to come up.")
+			framework.Logf("Waiting for server to come up.")
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
 
@@ -856,7 +855,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			defer func() {
 				ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podClient.Name, nil); err != nil {
-					e2elog.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+					framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 				}
 			}()
 			checkNoConnectivity(f, f.Namespace, podClient, service)
@@ -882,7 +881,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			nsBpodServerB, nsBserviceB = createServerPodAndService(f, nsB, "ns-b-server-b", []int{80})
 
 			// Wait for Server with Service in NS-A to be ready
-			e2elog.Logf("Waiting for servers to come up.")
+			framework.Logf("Waiting for servers to come up.")
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
 
@@ -1389,7 +1388,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
-			e2elog.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
 	checkConnectivity(f, ns, podClient, service)
@@ -1401,36 +1400,36 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
-			e2elog.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
 	checkNoConnectivity(f, ns, podClient, service)
 }
 
 func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
+	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	framework.ExpectNoError(err, "Pod did not finish as expected.")
 
-	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
+	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Collect pod logs when we see a failure.
 		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
 		if logErr != nil {
-			e2elog.Failf("Error getting container logs: %s", logErr)
+			framework.Failf("Error getting container logs: %s", logErr)
 		}
 
 		// Collect current NetworkPolicies applied in the test namespace.
 		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
+			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		// Collect the list of pods running in the test namespace.
 		podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 		if err != nil {
-			e2elog.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
+			framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		pods := []string{}
@@ -1438,7 +1437,7 @@ func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.P
 			pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
 		}
 
-		e2elog.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
+		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
 		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
@@ -1446,7 +1445,7 @@ func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.P
 }
 
 func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
+	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 
 	// We expect an error here since it's a cannot connect test.
@@ -1455,19 +1454,19 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 		// Collect pod logs when we see a failure.
 		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
 		if logErr != nil {
-			e2elog.Failf("Error getting container logs: %s", logErr)
+			framework.Failf("Error getting container logs: %s", logErr)
 		}
 
 		// Collect current NetworkPolicies applied in the test namespace.
 		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
+			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		// Collect the list of pods running in the test namespace.
 		podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 		if err != nil {
-			e2elog.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
+			framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		pods := []string{}
@@ -1475,7 +1474,7 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 			pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
 		}
 
-		e2elog.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
+		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
 		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
@@ -1543,7 +1542,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		},
 	})
 	framework.ExpectNoError(err)
-	e2elog.Logf("Created pod %v", pod.ObjectMeta.Name)
+	framework.Logf("Created pod %v", pod.ObjectMeta.Name)
 
 	svcName := fmt.Sprintf("svc-%s", podName)
 	ginkgo.By(fmt.Sprintf("Creating a service %s for pod %s in namespace %s", svcName, podName, namespace.Name))
@@ -1559,7 +1558,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		},
 	})
 	framework.ExpectNoError(err)
-	e2elog.Logf("Created service %s", svc.Name)
+	framework.Logf("Created service %s", svc.Name)
 
 	return pod, svc
 }
@@ -1567,11 +1566,11 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1.Service) {
 	ginkgo.By("Cleaning up the server.")
 	if err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
-		e2elog.Failf("unable to cleanup pod %v: %v", pod.Name, err)
+		framework.Failf("unable to cleanup pod %v: %v", pod.Name, err)
 	}
 	ginkgo.By("Cleaning up the server's service.")
 	if err := f.ClientSet.CoreV1().Services(service.Namespace).Delete(service.Name, nil); err != nil {
-		e2elog.Failf("unable to cleanup svc %v: %v", service.Name, err)
+		framework.Failf("unable to cleanup svc %v: %v", service.Name, err)
 	}
 }
 
@@ -1631,6 +1630,6 @@ func updateNetworkClientPodLabel(f *framework.Framework, namespace *v1.Namespace
 func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPolicy) {
 	ginkgo.By("Cleaning up the policy.")
 	if err := f.ClientSet.NetworkingV1().NetworkPolicies(policy.Namespace).Delete(policy.Name, nil); err != nil {
-		e2elog.Failf("unable to cleanup policy %v: %v", policy.Name, err)
+		framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 	}
 }

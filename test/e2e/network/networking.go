@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -39,10 +38,10 @@ var _ = SIGDescribe("Networking", func() {
 		ginkgo.By("Executing a successful http request from the external internet")
 		resp, err := http.Get("http://google.com")
 		if err != nil {
-			e2elog.Failf("Unable to connect/talk to the internet: %v", err)
+			framework.Failf("Unable to connect/talk to the internet: %v", err)
 		}
 		if resp.StatusCode != http.StatusOK {
-			e2elog.Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
+			framework.Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
 		}
 	})
 
@@ -82,7 +81,7 @@ var _ = SIGDescribe("Networking", func() {
 				AbsPath(test.path).
 				DoRaw()
 			if err != nil {
-				e2elog.Failf("ginkgo.Failed: %v\nBody: %s", err, string(data))
+				framework.Failf("ginkgo.Failed: %v\nBody: %s", err, string(data))
 			}
 		}
 	})
@@ -209,13 +208,13 @@ var _ = SIGDescribe("Networking", func() {
 			// Check if number of endpoints returned are exactly one.
 			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIP, framework.ClusterHTTPPort, framework.SessionAffinityChecks)
 			if err != nil {
-				e2elog.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
 			}
 			if len(eps) == 0 {
-				e2elog.Failf("Unexpected no endpoints return")
+				framework.Failf("Unexpected no endpoints return")
 			}
 			if len(eps) > 1 {
-				e2elog.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
 
@@ -226,13 +225,13 @@ var _ = SIGDescribe("Networking", func() {
 			// Check if number of endpoints returned are exactly one.
 			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIP, framework.ClusterUDPPort, framework.SessionAffinityChecks)
 			if err != nil {
-				e2elog.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
 			}
 			if len(eps) == 0 {
-				e2elog.Failf("Unexpected no endpoints return")
+				framework.Failf("Unexpected no endpoints return")
 			}
 			if len(eps) > 1 {
-				e2elog.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
 	})
