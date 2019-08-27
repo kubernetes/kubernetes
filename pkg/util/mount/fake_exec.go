@@ -16,23 +16,6 @@ limitations under the License.
 
 package mount
 
-import "k8s.io/utils/exec"
-
-// NewOSExec returns a new Exec interface implementation based on exec()
-func NewOSExec() Exec {
-	return &osExec{}
-}
-
-// Real implementation of Exec interface that uses simple utils.Exec
-type osExec struct{}
-
-var _ Exec = &osExec{}
-
-func (e *osExec) Run(cmd string, args ...string) ([]byte, error) {
-	exe := exec.New()
-	return exe.Command(cmd, args...).CombinedOutput()
-}
-
 // NewFakeExec returns a new FakeExec
 func NewFakeExec(run runHook) *FakeExec {
 	return &FakeExec{runHook: run}

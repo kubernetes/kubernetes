@@ -19,7 +19,7 @@ package flexvolume
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -42,7 +42,7 @@ func TestSetUpAt(tt *testing.T) {
 			ServiceAccountName: "my-sa",
 		},
 	}
-	mounter := &mount.FakeMounter{}
+	mounter := mount.NewFakeMounter(nil)
 
 	plugin, rootDir := testPlugin(t)
 	plugin.unsupportedCommands = []string{"unsupportedCmd"}

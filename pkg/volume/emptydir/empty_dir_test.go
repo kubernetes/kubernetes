@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -117,7 +117,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 			VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: config.medium}},
 		}
 
-		physicalMounter = mount.FakeMounter{}
+		physicalMounter = mount.NewFakeMounter(nil)
 		mountDetector   = fakeMountDetector{}
 		pod             = &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -148,7 +148,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 
 	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec),
 		pod,
-		&physicalMounter,
+		physicalMounter,
 		&mountDetector,
 		volume.VolumeOptions{})
 	if err != nil {
@@ -186,12 +186,13 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Volume directory was created unexpectedly")
 	}
 
+	log := physicalMounter.GetLog()
 	// Check the number of mounts performed during setup
-	if e, a := config.expectedSetupMounts, len(physicalMounter.Log); e != a {
+	if e, a := config.expectedSetupMounts, len(log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during setup, got %v", e, a)
 	} else if config.expectedSetupMounts == 1 &&
-		(physicalMounter.Log[0].Action != mount.FakeActionMount || (physicalMounter.Log[0].FSType != "tmpfs" && physicalMounter.Log[0].FSType != "hugetlbfs")) {
-		t.Errorf("Unexpected physicalMounter action during setup: %#v", physicalMounter.Log[0])
+		(log[0].Action != mount.FakeActionMount || (log[0].FSType != "tmpfs" && log[0].FSType != "hugetlbfs")) {
+		t.Errorf("Unexpected physicalMounter action during setup: %#v", log[0])
 	}
 	physicalMounter.ResetLog()
 
@@ -201,7 +202,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		teardownMedium = v1.StorageMediumMemory
 	}
 	unmounterMountDetector := &fakeMountDetector{medium: teardownMedium, isMount: config.shouldBeMountedBeforeTeardown}
-	unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal(volumeName, types.UID("poduid"), &physicalMounter, unmounterMountDetector)
+	unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal(volumeName, types.UID("poduid"), physicalMounter, unmounterMountDetector)
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -219,11 +220,12 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("TearDown() failed: %v", err)
 	}
 
+	log = physicalMounter.GetLog()
 	// Check the number of physicalMounter calls during tardown
-	if e, a := config.expectedTeardownMounts, len(physicalMounter.Log); e != a {
+	if e, a := config.expectedTeardownMounts, len(log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during teardown, got %v", e, a)
-	} else if config.expectedTeardownMounts == 1 && physicalMounter.Log[0].Action != mount.FakeActionUnmount {
-		t.Errorf("Unexpected physicalMounter action during teardown: %#v", physicalMounter.Log[0])
+	} else if config.expectedTeardownMounts == 1 && log[0].Action != mount.FakeActionUnmount {
+		t.Errorf("Unexpected physicalMounter action during teardown: %#v", log[0])
 	}
 	physicalMounter.ResetLog()
 }

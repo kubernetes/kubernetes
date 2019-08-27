@@ -73,15 +73,14 @@ func mountPointsEqual(a, b *MountPoint) bool {
 }
 
 func TestGetMountRefs(t *testing.T) {
-	fm := &FakeMounter{
-		MountPoints: []MountPoint{
+	fm := NewFakeMounter(
+		[]MountPoint{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod1"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2"},
-		},
-	}
+		})
 
 	tests := []struct {
 		mountPath    string
@@ -137,14 +136,13 @@ func setEquivalent(set1, set2 []string) bool {
 }
 
 func TestGetDeviceNameFromMount(t *testing.T) {
-	fm := &FakeMounter{
-		MountPoints: []MountPoint{
+	fm := NewFakeMounter(
+		[]MountPoint{
 			{Device: "/dev/disk/by-path/prefix-lun-1",
 				Path: "/mnt/111"},
 			{Device: "/dev/disk/by-path/prefix-lun-1",
 				Path: "/mnt/222"},
-		},
-	}
+		})
 
 	tests := []struct {
 		mountPath      string
@@ -166,15 +164,14 @@ func TestGetDeviceNameFromMount(t *testing.T) {
 }
 
 func TestGetMountRefsByDev(t *testing.T) {
-	fm := &FakeMounter{
-		MountPoints: []MountPoint{
+	fm := NewFakeMounter(
+		[]MountPoint{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod1"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2"},
-		},
-	}
+		})
 
 	tests := []struct {
 		mountPath    string

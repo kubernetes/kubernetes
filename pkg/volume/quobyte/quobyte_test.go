@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -89,7 +89,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*quobytePlugin).newMounterInternal(spec, pod, &mount.FakeMounter{})
+	mounter, err := plug.(*quobytePlugin).newMounterInternal(spec, pod, mount.NewFakeMounter(nil))
 	volumePath := mounter.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -104,7 +104,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	unmounter, err := plug.(*quobytePlugin).newUnmounterInternal("vol", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*quobytePlugin).newUnmounterInternal("vol", types.UID("poduid"), mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new unmounter: %v", err)
 	}
