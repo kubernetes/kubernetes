@@ -25,7 +25,6 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -86,7 +85,7 @@ func networkingIPerfTest(isIPv6 bool) {
 		)
 
 		if err != nil {
-			e2elog.Failf("Fatal error waiting for iperf server endpoint : %v", err)
+			framework.Failf("Fatal error waiting for iperf server endpoint : %v", err)
 		}
 
 		iperfClientPodLabels := f.CreatePodsPerNodeForSimpleApp(
@@ -110,8 +109,8 @@ func networkingIPerfTest(isIPv6 bool) {
 			numClient,
 		)
 
-		e2elog.Logf("Reading all perf results to stdout.")
-		e2elog.Logf("date,cli,cliPort,server,serverPort,id,interval,transferBits,bandwidthBits")
+		framework.Logf("Reading all perf results to stdout.")
+		framework.Logf("date,cli,cliPort,server,serverPort,id,interval,transferBits,bandwidthBits")
 
 		// Calculate expected number of clients based on total nodes.
 		expectedCli := func() int {
@@ -133,19 +132,19 @@ func networkingIPerfTest(isIPv6 bool) {
 
 		pods, err2 := iperfClusterVerification.WaitFor(expectedCli, iperfTimeout)
 		if err2 != nil {
-			e2elog.Failf("Error in wait...")
+			framework.Failf("Error in wait...")
 		} else if len(pods) < expectedCli {
-			e2elog.Failf("IPerf restuls : Only got %v out of %v, after waiting %v", len(pods), expectedCli, iperfTimeout)
+			framework.Failf("IPerf restuls : Only got %v out of %v, after waiting %v", len(pods), expectedCli, iperfTimeout)
 		} else {
 			// For each builds up a collection of IPerfRecords
 			iperfClusterVerification.ForEach(
 				func(p v1.Pod) {
 					resultS, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "iperf-client", "0-", 1*time.Second)
 					if err == nil {
-						e2elog.Logf(resultS)
+						framework.Logf(resultS)
 						iperfResults.Add(NewIPerf(resultS))
 					} else {
-						e2elog.Failf("Unexpected error, %v when running forEach on the pods.", err)
+						framework.Failf("Unexpected error, %v when running forEach on the pods.", err)
 					}
 				})
 		}
@@ -154,7 +153,7 @@ func networkingIPerfTest(isIPv6 bool) {
 		fmt.Println("[end] Node,Bandwidth CSV")
 
 		for ipClient, bandwidth := range iperfResults.BandwidthMap {
-			e2elog.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))
+			framework.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))
 		}
 	})
 }
