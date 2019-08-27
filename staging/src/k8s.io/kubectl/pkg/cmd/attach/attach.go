@@ -322,6 +322,11 @@ func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container,
 				return &pod.Spec.InitContainers[i], nil
 			}
 		}
+		for i := range pod.Spec.EphemeralContainers {
+			if pod.Spec.EphemeralContainers[i].Name == o.ContainerName {
+				return (*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), nil
+			}
+		}
 		return nil, fmt.Errorf("container not found (%s)", o.ContainerName)
 	}
 
