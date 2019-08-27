@@ -31,7 +31,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -88,7 +87,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		e2elog.Logf("PodSpec: initContainers in spec.initContainers")
+		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		framework.ExpectNoError(err, "error watching a pod")
@@ -159,7 +158,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		e2elog.Logf("PodSpec: initContainers in spec.initContainers")
+		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		framework.ExpectNoError(err, "error watching a pod")
@@ -231,7 +230,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		e2elog.Logf("PodSpec: initContainers in spec.initContainers")
+		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		framework.ExpectNoError(err, "error watching a pod")
@@ -281,7 +280,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 					if status.RestartCount < 3 {
 						return false, nil
 					}
-					e2elog.Logf("init container has failed twice: %#v", t)
+					framework.Logf("init container has failed twice: %#v", t)
 					// TODO: more conditions
 					return true, nil
 				default:
@@ -348,7 +347,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		e2elog.Logf("PodSpec: initContainers in spec.initContainers")
+		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
