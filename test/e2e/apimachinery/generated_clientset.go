@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -70,10 +69,10 @@ func observeCreation(w watch.Interface) {
 	select {
 	case event, _ := <-w.ResultChan():
 		if event.Type != watch.Added {
-			e2elog.Failf("Failed to observe the creation: %v", event)
+			framework.Failf("Failed to observe the creation: %v", event)
 		}
 	case <-time.After(30 * time.Second):
-		e2elog.Failf("Timeout while waiting for observing the creation")
+		framework.Failf("Timeout while waiting for observing the creation")
 	}
 }
 
@@ -94,7 +93,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 		}
 	}
 	if !updated {
-		e2elog.Failf("Failed to observe pod update")
+		framework.Failf("Failed to observe pod update")
 	}
 	return
 }
@@ -113,7 +112,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		options := metav1.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		if err != nil {
-			e2elog.Failf("Failed to query for pods: %v", err)
+			framework.Failf("Failed to query for pods: %v", err)
 		}
 		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
@@ -122,13 +121,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		w, err := podClient.Watch(options)
 		if err != nil {
-			e2elog.Failf("Failed to set up watch: %v", err)
+			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the pod")
 		pod, err = podClient.Create(pod)
 		if err != nil {
-			e2elog.Failf("Failed to create pod: %v", err)
+			framework.Failf("Failed to create pod: %v", err)
 		}
 
 		ginkgo.By("verifying the pod is in kubernetes")
@@ -138,7 +137,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		pods, err = podClient.List(options)
 		if err != nil {
-			e2elog.Failf("Failed to query for pods: %v", err)
+			framework.Failf("Failed to query for pods: %v", err)
 		}
 		framework.ExpectEqual(len(pods.Items), 1)
 
@@ -152,7 +151,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
 		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
-			e2elog.Failf("Failed to delete pod: %v", err)
+			framework.Failf("Failed to delete pod: %v", err)
 		}
 
 		ginkgo.By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
@@ -229,7 +228,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		options := metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err := cronJobClient.List(options)
 		if err != nil {
-			e2elog.Failf("Failed to query for cronJobs: %v", err)
+			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
 		framework.ExpectEqual(len(cronJobs.Items), 0)
 		options = metav1.ListOptions{
@@ -238,13 +237,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		w, err := cronJobClient.Watch(options)
 		if err != nil {
-			e2elog.Failf("Failed to set up watch: %v", err)
+			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the cronJob")
 		cronJob, err = cronJobClient.Create(cronJob)
 		if err != nil {
-			e2elog.Failf("Failed to create cronJob: %v", err)
+			framework.Failf("Failed to create cronJob: %v", err)
 		}
 
 		ginkgo.By("verifying the cronJob is in kubernetes")
@@ -254,7 +253,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
-			e2elog.Failf("Failed to query for cronJobs: %v", err)
+			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
 		framework.ExpectEqual(len(cronJobs.Items), 1)
 
@@ -265,13 +264,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
 		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
-			e2elog.Failf("Failed to delete cronJob: %v", err)
+			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
-			e2elog.Failf("Failed to list cronJobs to verify deletion: %v", err)
+			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
 		framework.ExpectEqual(len(cronJobs.Items), 0)
 	})
