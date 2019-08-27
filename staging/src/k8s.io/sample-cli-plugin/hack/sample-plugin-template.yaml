@@ -1,0 +1,49 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: sample-plugin
+spec:
+  version: "v0.0.1"
+  platforms:
+    - uri: https://github.com/kubernetes/sample-cli-plugin/INVALID
+      sha256: $ARCHIVE_SHASUM
+      bin: kubectl-ns-linux
+      files:
+        - from: ./kubectl-ns-linux
+          to: "."
+      selector:
+        matchLabels:
+          os: linux
+          arch: amd64
+    - uri: https://github.com/kubernetes/sample-cli-plugin/INVALID
+      sha256: $ARCHIVE_SHASUM
+      bin: kubectl-ns-darwin
+      files:
+        - from: ./kubectl-ns-darwin
+          to: "."
+      selector:
+        matchLabels:
+          os: darwin
+          arch: amd64
+    - uri: https://github.com/kubernetes/sample-cli-plugin/INVALID
+      sha256: $ARCHIVE_SHASUM
+      bin: kubectl-ns-windows.exe
+      files:
+        - from: ./kubectl-ns-windows
+          to: kubectl-ns-windows.exe
+      selector:
+        matchLabels:
+          os: windows
+          arch: amd64
+  shortDescription: Show the active kubernetes namespace
+  homepage: https://github.com/kubernetes/sample-cli-plugin
+  caveats: |
+    This note is shown post-install and should list required dependencies
+  description: |+2
+
+      Show the active kubernetes namespace
+
+      This is a sample cli plugin which reads your current kube-config file,
+      and prints the active namespace.
+      It solely servers as an example for how to develop a kubectl plugin in Go and
+      how to distribute it via Krew.

@@ -27,15 +27,47 @@ In order to be as non-destructive as possible, no existing contexts are modified
 
 This is an example of how to build a kubectl plugin using the same set of tools and helpers available to kubectl.
 
-## Running
+## Installation
+
+### Manual
 
 ```sh
 # assumes you have a working KUBECONFIG
 $ GO111MODULE="on" go build cmd/kubectl-ns.go
 # place the built binary somewhere in your PATH
 $ cp ./kubectl-ns /usr/local/bin
+```
 
-# you can now begin using this plugin as a regular kubectl command:
+##### Cleanup
+
+You can "uninstall" this plugin from kubectl by simply removing it from your PATH:
+
+    $ rm /usr/local/bin/kubectl-ns
+
+### Krew
+
+Krew is a kubectl plugin manager which simplifies the plugin installation.
+Visit [krew.dev](https://krew.dev/#installation) to set up krew.
+
+```sh
+# build the plugin archive to be used by krew
+$ hack/create-plugin-archive.sh
+# generate a ready-to-use krew manifest from the template
+$ hack/generate-krew-manifest.sh
+# install the plugin via krew
+$ kubectl krew install --manifest out/sample-plugin.yaml --archive out/archive.tar.gz
+```
+
+##### Cleanup
+
+You can uninstall this plugin via krew:
+
+    $ kubectl krew remove sample-plugin
+
+## Running
+
+```sh
+# After installation, you can use this plugin as a regular kubectl command:
 # update your configuration to point to "new-namespace"
 $ kubectl ns new-namespace
 # any kubectl commands you perform from now on will use "new-namespace"
@@ -57,12 +89,6 @@ that kubectl points to.
 
 It can also be used as a means of showcasing usage of the cli-runtime set of utilities to aid in
 third-party plugin development.
-
-## Cleanup
-
-You can "uninstall" this plugin from kubectl by simply removing it from your PATH:
-
-    $ rm /usr/local/bin/kubectl-ns
 
 ## Compatibility
 
