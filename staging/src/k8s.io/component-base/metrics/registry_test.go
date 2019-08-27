@@ -27,7 +27,6 @@ import (
 
 var (
 	v115         = semver.MustParse("1.15.0")
-	v114         = semver.MustParse("1.14.0")
 	alphaCounter = NewCounter(
 		&CounterOpts{
 			Namespace:      "some_namespace",
@@ -209,6 +208,9 @@ func TestShowHiddenMetric(t *testing.T) {
 	registry.MustRegister(alphaHiddenCounter)
 
 	ms, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
 	if len(ms) != expectedMetricCount {
 		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 	}
@@ -227,11 +229,11 @@ func TestShowHiddenMetric(t *testing.T) {
 	expectedMetricCount = 1
 
 	ms, err = registry.Gather()
-	if len(ms) != expectedMetricCount {
-		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-	}
 	if err != nil {
 		t.Fatalf("Gather failed %v", err)
+	}
+	if len(ms) != expectedMetricCount {
+		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 	}
 
 }
