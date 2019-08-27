@@ -122,11 +122,12 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		return err
 	}
 	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) {
-		config.RequestManagement = utilflowcontrol.NewRequestManager(
+		config.FlowControl = utilflowcontrol.NewRequestManager(
 			config.SharedInformerFactory,
 			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1alpha1(),
 			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-			config.RequestTimeout/4)
+			config.RequestTimeout/4,
+			false)
 	}
 
 	return nil

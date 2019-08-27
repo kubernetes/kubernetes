@@ -81,7 +81,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
-	flowcontrolbootstrap "k8s.io/kubernetes/pkg/registry/flowcontrol/bootstrap"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -521,7 +520,7 @@ func buildGenericConfig(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RequestManagement) {
-		genericConfig.RequestManagement = BuildRequestManager(s, clientgoExternalClient, versionedInformers)
+		genericConfig.FlowControl = BuildRequestManager(s, clientgoExternalClient, versionedInformers)
 	}
 
 	return
@@ -553,13 +552,12 @@ func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinf
 
 // BuildRequestManager constructs the request manager
 func BuildRequestManager(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
-	return utilflowcontrol.NewRequestManagerWithPreservation(
+	return utilflowcontrol.NewRequestManager(
 		versionedInformer,
 		extclient.FlowcontrolV1alpha1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
-		flowcontrolbootstrap.PreservingFlowSchemas,
-		flowcontrolbootstrap.PreservingPriorityLevelConfigurations,
+		true,
 	)
 }
 
