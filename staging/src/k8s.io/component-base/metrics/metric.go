@@ -166,6 +166,8 @@ func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 var noopCounterVec = &prometheus.CounterVec{}
 var noopHistogramVec = &prometheus.HistogramVec{}
 var noopGaugeVec = &prometheus.GaugeVec{}
+//lint:ignore U1000 Keep it for future use
+var noopSummaryVec = &prometheus.SummaryVec{}
 var noopObserverVec = &noopObserverVector{}
 
 // just use a convenience struct for all the no-ops
