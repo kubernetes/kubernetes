@@ -28,6 +28,8 @@
                     "--kubeconfig=/etc/srv/kubernetes/vpa-recommender/kubeconfig",
                     "--v=4",
                     "--logtostderr=true",
+                    "--kube-api-qps=15",
+                    "--kube-api-burst=30",
                     "--leader-elect=true {{uas_params}}"
                 ],
                 "volumeMounts": [
