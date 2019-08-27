@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	kubeadmversion "k8s.io/kubernetes/cmd/kubeadm/app/version"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsexec "k8s.io/utils/exec"
 	utilsnet "k8s.io/utils/net"
 )
@@ -867,20 +866,10 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
-// IPVSProxierCheck tests if IPVS proxier can be used.
-type IPVSProxierCheck struct {
-	exec utilsexec.Interface
-}
-
-// Name returns label for IPVSProxierCheck
-func (r IPVSProxierCheck) Name() string {
-	return "IPVSProxierCheck"
-}
-
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
 // The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
-// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks and RunOptionalJoinNodeChecks.
+// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
 func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool, downloadCerts bool) error {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
@@ -912,11 +901,6 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 	if !isSecondaryControlPlane {
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
-
-		// Check if IVPS kube-proxy mode is supported
-		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-			checks = append(checks, IPVSProxierCheck{exec: execer})
-		}
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
@@ -996,18 +980,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
 		)
-	}
-
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
-}
-
-// RunOptionalJoinNodeChecks executes all individual, applicable to node configuration dependant checks
-func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
-	checks := []Checker{}
-
-	// Check if IPVS kube-proxy mode is supported
-	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
