@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/storage/names"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -49,7 +49,7 @@ func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns
 	case testpatterns.DynamicPV:
 		// No need to create volume
 	default:
-		e2elog.Failf("Invalid volType specified: %v", volType)
+		framework.Failf("Invalid volType specified: %v", volType)
 	}
 	return nil
 }
