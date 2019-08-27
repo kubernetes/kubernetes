@@ -131,7 +131,7 @@ function setup_master_prom_to_sd_monitor_component {
   local -r manifests_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   mkdir -p "${manifests_dir}/master-prom-to-sd-monitor"
 
-  cp "${manifests_dir}/master-prom-to-sd-monitor-rbac.yaml" "${manifests_dir}/master-prom-to-sd-monitor"
+  cp "${manifests_dir}/internal-master-prom-to-sd-monitor-rbac.yaml" "${manifests_dir}/master-prom-to-sd-monitor"
   setup-addon-manifests "addons" "master-prom-to-sd-monitor"
 
   create-static-auth-kubeconfig-for-component master-prom-to-sd-monitor
