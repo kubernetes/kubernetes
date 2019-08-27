@@ -29,11 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	flowcontrolbootstrap "k8s.io/apiserver/pkg/util/flowcontrol/bootstrap"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
-	flowcontrolbootstrap "k8s.io/kubernetes/pkg/registry/flowcontrol/bootstrap"
 	flowschemastore "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema/storage"
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
 )
@@ -70,20 +70,19 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 }
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
-	systemPreset := SystemPresetData{
-		FlowSchemas:                 flowcontrolbootstrap.DefaultFlowSchemas(),
-		PriorityLevelConfigurations: flowcontrolbootstrap.DefaultPriorityLevelConfigurations(),
+	predefined := PredefinedData{
+		FlowSchemas:                 flowcontrolbootstrap.PredefinedFlowSchemas(),
+		PriorityLevelConfigurations: flowcontrolbootstrap.PredefinedPriorityLevelConfigurations(),
 	}
-	// TODO: default flow-schemas and priority levels
-	return PostStartHookName, systemPreset.EnsureSystemPresetConfiguration(), nil
+	return PostStartHookName, predefined.EnsurePredefinedConfiguration(), nil
 }
 
-type SystemPresetData struct {
+type PredefinedData struct {
 	FlowSchemas                 []*flowcontrolv1alpha1.FlowSchema
 	PriorityLevelConfigurations []*flowcontrolv1alpha1.PriorityLevelConfiguration
 }
 
-func (d SystemPresetData) EnsureSystemPresetConfiguration() genericapiserver.PostStartHookFunc {
+func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		flowcontrolClientSet := flowcontrolclient.NewForConfigOrDie(hookContext.LoopbackClientConfig)
 		// Adding system priority classes is important. If they fail to add, many critical system

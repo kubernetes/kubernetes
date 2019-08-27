@@ -17,24 +17,26 @@ limitations under the License.
 package bootstrap
 
 import (
+	"math"
+
 	rmv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-// all the preserving objects
+// The objects that define an apiserver's initial behavior
 var (
-	PreservingPriorityLevelConfigurations = []*rmv1a1.PriorityLevelConfiguration{
+	InitialPriorityLevelConfigurations = []*rmv1a1.PriorityLevelConfiguration{
 		DefaultPriorityLevelConfigurationExempt,
 		DefaultPriorityLevelConfigurationDefault,
 	}
-	PreservingFlowSchemas = []*rmv1a1.FlowSchema{
+	InitialFlowSchemas = []*rmv1a1.FlowSchema{
 		DefaultFlowSchemaExempt,
 		DefaultFlowSchemaDefault,
 	}
 )
 
-// preserving default priority-levels
+// Initial PriorityLevelConfiguration objects
 var (
 	DefaultPriorityLevelConfigurationExempt = pl(
 		rmv1a1.PriorityLevelConfigurationNameExempt,
@@ -50,7 +52,7 @@ var (
 		})
 )
 
-// preserving default flow-schemas
+// Initial FlowSchema objects
 var (
 	DefaultFlowSchemaExempt = fs(
 		"exempt",
@@ -73,7 +75,7 @@ var (
 	DefaultFlowSchemaDefault = fs(
 		"default",
 		"default",
-		10000, rmv1a1.FlowDistinguisherMethodByUserType,
+		math.MaxInt32, rmv1a1.FlowDistinguisherMethodByUserType,
 		rmv1a1.PolicyRuleWithSubjects{
 			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
 			Rule: resourceRule(
@@ -90,10 +92,9 @@ var (
 	)
 )
 
-// DefaultPriorityLevelConfigurations returns the instances of
-// the ones defined in the KEP, with system-top in position 0 and
-// workload-low in position 1
-func DefaultPriorityLevelConfigurations() []*rmv1a1.PriorityLevelConfiguration {
+// PredefinedPriorityLevelConfigurations returns the instances of
+// the ones defined in the KEP
+func PredefinedPriorityLevelConfigurations() []*rmv1a1.PriorityLevelConfiguration {
 	return []*rmv1a1.PriorityLevelConfiguration{
 		DefaultPriorityLevelConfigurationExempt,
 		pl("system", rmv1a1.PriorityLevelConfigurationSpec{
@@ -114,9 +115,9 @@ func DefaultPriorityLevelConfigurations() []*rmv1a1.PriorityLevelConfiguration {
 	}
 }
 
-// DefaultFlowSchemas returns instances of the FlowSchema
+// PredefinedFlowSchemas returns instances of the FlowSchema
 // objects shown in the Example Configuration section of the KEP
-func DefaultFlowSchemas() []*rmv1a1.FlowSchema {
+func PredefinedFlowSchemas() []*rmv1a1.FlowSchema {
 	verbAll := []string{rmv1a1.VerbAll}
 	apiGroupAll := []string{rmv1a1.APIGroupAll}
 	apiGroupCore := ""

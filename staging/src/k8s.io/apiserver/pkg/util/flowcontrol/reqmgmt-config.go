@@ -39,68 +39,68 @@ import (
 
 // initializeConfigController sets up the controller that processes
 // config API objects.
-func (reqMgmt *requestManagementSystem) initializeConfigController(informerFactory kubeinformers.SharedInformerFactory) {
-	reqMgmt.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "req_mgmt_config_queue")
+func (reqMgr *requestManager) initializeConfigController(informerFactory kubeinformers.SharedInformerFactory) {
+	reqMgr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "req_mgmt_config_queue")
 	fci := informerFactory.Flowcontrol().V1alpha1()
 	pli := fci.PriorityLevelConfigurations()
 	fsi := fci.FlowSchemas()
-	reqMgmt.plLister = pli.Lister()
-	reqMgmt.plInformerSynced = pli.Informer().HasSynced
-	reqMgmt.fsLister = fsi.Lister()
-	reqMgmt.fsInformerSynced = fsi.Informer().HasSynced
-	pli.Informer().AddEventHandler(reqMgmt)
-	fsi.Informer().AddEventHandler(reqMgmt)
+	reqMgr.plLister = pli.Lister()
+	reqMgr.plInformerSynced = pli.Informer().HasSynced
+	reqMgr.fsLister = fsi.Lister()
+	reqMgr.fsInformerSynced = fsi.Informer().HasSynced
+	pli.Informer().AddEventHandler(reqMgr)
+	fsi.Informer().AddEventHandler(reqMgr)
 }
 
-func (reqMgmt *requestManagementSystem) triggerReload() {
+func (reqMgr *requestManager) triggerReload() {
 	klog.V(7).Info("triggered request-management system reloading")
-	reqMgmt.configQueue.Add(0)
+	reqMgr.configQueue.Add(0)
 }
 
 // OnAdd handles notification from an informer of object creation
-func (reqMgmt *requestManagementSystem) OnAdd(obj interface{}) {
-	reqMgmt.triggerReload()
+func (reqMgr *requestManager) OnAdd(obj interface{}) {
+	reqMgr.triggerReload()
 }
 
 // OnUpdate handles notification from an informer of object update
-func (reqMgmt *requestManagementSystem) OnUpdate(oldObj, newObj interface{}) {
-	reqMgmt.triggerReload()
+func (reqMgr *requestManager) OnUpdate(oldObj, newObj interface{}) {
+	reqMgr.triggerReload()
 }
 
 // OnDelete handles notification from an informer of object deletion
-func (reqMgmt *requestManagementSystem) OnDelete(obj interface{}) {
-	reqMgmt.triggerReload()
+func (reqMgr *requestManager) OnDelete(obj interface{}) {
+	reqMgr.triggerReload()
 }
 
-func (reqMgmt *requestManagementSystem) Run(stopCh <-chan struct{}) error {
-	defer reqMgmt.configQueue.ShutDown()
+func (reqMgr *requestManager) Run(stopCh <-chan struct{}) error {
+	defer reqMgr.configQueue.ShutDown()
 	klog.Info("Starting reqmgmt config controller")
-	if ok := cache.WaitForCacheSync(stopCh, reqMgmt.readyFunc, reqMgmt.plInformerSynced, reqMgmt.fsInformerSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, reqMgr.readyFunc, reqMgr.plInformerSynced, reqMgr.fsInformerSynced); !ok {
 		return fmt.Errorf("Never achieved initial sync")
 	}
 	klog.Info("Running reqmgmt config worker")
-	wait.Until(reqMgmt.runWorker, time.Second, stopCh)
+	wait.Until(reqMgr.runWorker, time.Second, stopCh)
 	klog.Info("Shutting down reqmgmt config worker")
 	return nil
 }
 
-func (reqMgmt *requestManagementSystem) runWorker() {
-	for reqMgmt.processNextWorkItem() {
+func (reqMgr *requestManager) runWorker() {
+	for reqMgr.processNextWorkItem() {
 	}
 }
 
-func (reqMgmt *requestManagementSystem) processNextWorkItem() bool {
-	obj, shutdown := reqMgmt.configQueue.Get()
+func (reqMgr *requestManager) processNextWorkItem() bool {
+	obj, shutdown := reqMgr.configQueue.Get()
 	if shutdown {
 		return false
 	}
 
 	func(obj interface{}) {
-		defer reqMgmt.configQueue.Done(obj)
-		if !reqMgmt.syncOne() {
-			reqMgmt.configQueue.AddRateLimited(obj)
+		defer reqMgr.configQueue.Done(obj)
+		if !reqMgr.syncOne() {
+			reqMgr.configQueue.AddRateLimited(obj)
 		} else {
-			reqMgmt.configQueue.Forget(obj)
+			reqMgr.configQueue.Forget(obj)
 		}
 	}(obj)
 
@@ -110,26 +110,26 @@ func (reqMgmt *requestManagementSystem) processNextWorkItem() bool {
 // syncOne attempts to sync all the config for the reqmgmt filter.  It
 // either succeeds and returns `true` or logs an error and returns
 // `false`.
-func (reqMgmt *requestManagementSystem) syncOne() bool {
+func (reqMgr *requestManager) syncOne() bool {
 	all := labels.Everything()
-	newPLs, err := reqMgmt.plLister.List(all)
+	newPLs, err := reqMgr.plLister.List(all)
 	if err != nil {
 		klog.Errorf("Unable to list PriorityLevelConfiguration objects: %s", err.Error())
 		return false
 	}
-	newFSs, err := reqMgmt.fsLister.List(all)
+	newFSs, err := reqMgr.fsLister.List(all)
 	if err != nil {
 		klog.Errorf("Unable to list FlowSchema objects: %s", err.Error())
 		return false
 	}
-	reqMgmt.digestConfigObjects(newPLs, newFSs)
+	reqMgr.digestConfigObjects(newPLs, newFSs)
 	return true
 }
 
-func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a1.PriorityLevelConfiguration, newFSs []*rmtypesv1a1.FlowSchema) {
-	oldRMState := reqMgmt.curState.Load().(*requestManagementState)
+func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.PriorityLevelConfiguration, newFSs []*rmtypesv1a1.FlowSchema) {
+	oldRMState := reqMgr.curState.Load().(*requestManagerState)
 	var shareSum float64
-	newRMState := &requestManagementState{
+	newRMState := &requestManagerState{
 		priorityLevelStates: make(map[string]*priorityLevelState),
 	}
 	newlyQuiescent := make([]*priorityLevelState, 0)
@@ -141,11 +141,6 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 				config: pl.Spec,
 			}
 		} else {
-			if state.config.Exempt {
-				newRMState.priorityLevelStates[pl.Name] = state
-				continue
-			}
-
 			oState := *state
 			state = &oState
 			state.config = pl.Spec
@@ -155,7 +150,9 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 				state.queues.Quiesce(nil)
 			}
 		}
-		shareSum += float64(state.config.AssuredConcurrencyShares)
+		if !pl.Spec.Exempt {
+			shareSum += float64(state.config.AssuredConcurrencyShares)
+		}
 		newRMState.priorityLevelStates[pl.Name] = state
 		plByName[pl.Name] = newPLs[i]
 	}
@@ -163,7 +160,7 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 	fsSeq := make(rmtypesv1a1.FlowSchemaSequence, 0, len(newFSs))
 	for i, fs := range newFSs {
 		_, flowSchemaExists := newRMState.priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
-		reqMgmt.syncFlowSchemaStatus(fs, !flowSchemaExists)
+		reqMgr.syncFlowSchemaStatus(fs, !flowSchemaExists)
 		if flowSchemaExists {
 			fsSeq = append(fsSeq, newFSs[i])
 		}
@@ -182,19 +179,18 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 		} else if plState.emptyHandler != nil && plState.emptyHandler.IsEmpty() {
 			// undesired, empty, and never going to get another request
 			klog.V(3).Infof("Priority level %s removed from implementation", plName)
-		} else if !plState.config.Exempt {
-			oState := *plState
-			plState = &oState
+		} else {
 			if plState.emptyHandler == nil {
 				klog.V(3).Infof("Priority level %s became undesired", plName)
-				plState.emptyHandler = &emptyRelay{reqMgmt: reqMgmt}
+				newState := *plState
+				plState = &newState
+				plState.emptyHandler = &emptyRelay{reqMgr: reqMgr}
 				newlyQuiescent = append(newlyQuiescent, plState)
 			}
 			newRMState.priorityLevelStates[plName] = plState
-			shareSum += float64(plState.config.AssuredConcurrencyShares)
-		} else {
-			// keeps exempt or global-default
-			newRMState.priorityLevelStates[plName] = plState
+			if !plState.config.Exempt {
+				shareSum += float64(plState.config.AssuredConcurrencyShares)
+			}
 		}
 	}
 	for plName, plState := range newRMState.priorityLevelStates {
@@ -202,28 +198,28 @@ func (reqMgmt *requestManagementSystem) digestConfigObjects(newPLs []*rmtypesv1a
 			klog.V(5).Infof("Using exempt priority level %s: quiescent=%v", plName, plState.emptyHandler != nil)
 			continue
 		}
-		plState.concurrencyLimit = int(math.Ceil(float64(reqMgmt.serverConcurrencyLimit) * float64(plState.config.AssuredConcurrencyShares) / shareSum))
+		plState.concurrencyLimit = int(math.Ceil(float64(reqMgr.serverConcurrencyLimit) * float64(plState.config.AssuredConcurrencyShares) / shareSum))
 		metrics.UpdateSharedConcurrencyLimit(plName, plState.concurrencyLimit)
 		if plState.queues == nil {
 			klog.V(5).Infof("Introducing priority level %s: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
-			plState.queues = reqMgmt.queueSetFactory.NewQueueSet(plName, plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgmt.requestWaitLimit)
+			plState.queues = reqMgr.queueSetFactory.NewQueueSet(plName, plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgr.requestWaitLimit)
 		} else {
 			klog.V(5).Infof("Retaining priority level %s: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
-			plState.queues.SetConfiguration(plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgmt.requestWaitLimit)
+			plState.queues.SetConfiguration(plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgr.requestWaitLimit)
 		}
 	}
-	reqMgmt.curState.Store(newRMState)
+	reqMgr.curState.Store(newRMState)
 	klog.V(5).Infof("Switched to new RequestManagementState")
 	// We do the following only after updating curState to guarantee
 	// that if Wait returns `quiescent==true` then a fresh load from
-	// curState will yield an requestManagementState that is at least
+	// curState will yield an requestManagerState that is at least
 	// as up-to-date as the data here.
 	for _, plState := range newlyQuiescent {
 		plState.queues.Quiesce(plState.emptyHandler)
 	}
 }
 
-func (reqMgmt *requestManagementSystem) syncFlowSchemaStatus(fs *rmtypesv1a1.FlowSchema, isDangling bool) {
+func (reqMgr *requestManager) syncFlowSchemaStatus(fs *rmtypesv1a1.FlowSchema, isDangling bool) {
 	danglingCondition := rmtypesv1a1.GetFlowSchemaConditionByType(fs, rmtypesv1a1.FlowSchemaConditionDangling)
 	if danglingCondition == nil {
 		danglingCondition = &rmtypesv1a1.FlowSchemaCondition{
@@ -245,7 +241,7 @@ func (reqMgmt *requestManagementSystem) syncFlowSchemaStatus(fs *rmtypesv1a1.Flo
 
 	rmtypesv1a1.SetFlowSchemaCondition(fs, *danglingCondition)
 
-	_, err := reqMgmt.flowcontrolClient.FlowSchemas().UpdateStatus(fs)
+	_, err := reqMgr.flowcontrolClient.FlowSchemas().UpdateStatus(fs)
 	if err != nil {
 		klog.Warningf("failed updating condition for flow-schema %s", fs.Name)
 	}
@@ -253,8 +249,8 @@ func (reqMgmt *requestManagementSystem) syncFlowSchemaStatus(fs *rmtypesv1a1.Flo
 
 type emptyRelay struct {
 	sync.RWMutex
-	reqMgmt *requestManagementSystem
-	empty   bool
+	reqMgr *requestManager
+	empty  bool
 }
 
 var _ fq.EmptyHandler = &emptyRelay{}
@@ -264,9 +260,9 @@ func (er *emptyRelay) HandleEmpty() {
 	er.empty = true
 	// TODO: to support testing of the config controller, extend
 	// goroutine tracking to the config queue and worker
-	er.reqMgmt.configQueue.Add(0)
+	er.reqMgr.configQueue.Add(0)
 	er.Unlock()
-	er.reqMgmt.wg.Decrement()
+	er.reqMgr.wg.Decrement()
 }
 
 func (er *emptyRelay) IsEmpty() bool {

@@ -111,8 +111,8 @@ type Config struct {
 	AdmissionControl      admission.Interface
 	CorsAllowedOriginList []string
 
-	// RequestManagement performs flow-control of a given request
-	RequestManagement utilflowcontrol.Interface
+	// FlowControl gives priority and fairness to request handling
+	FlowControl utilflowcontrol.Interface
 
 	EnableIndex     bool
 	EnableProfiling bool
@@ -580,7 +580,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	requestManagementHookName := "generic-apiserver-request-management"
 	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) && !s.isPostStartHookRegistered(requestManagementHookName) {
 		err := s.AddPostStartHook(requestManagementHookName, func(context PostStartHookContext) error {
-			go c.RequestManagement.Run(context.StopCh)
+			go c.FlowControl.Run(context.StopCh)
 			return nil
 		})
 		if err != nil {
@@ -622,7 +622,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := genericapifilters.WithAuthorization(apiHandler, c.Authorization.Authorizer, c.Serializer)
 	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) {
-		handler = genericfilters.WithRequestManagement(handler, c.LongRunningFunc, c.RequestManagement)
+		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl)
 	} else {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
 	}
