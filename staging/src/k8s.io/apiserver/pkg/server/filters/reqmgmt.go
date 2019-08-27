@@ -32,15 +32,15 @@ import (
 	"k8s.io/klog"
 )
 
-// WithRequestManagement limits the number of in-flight
+// WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
-func WithRequestManagement(
+func WithPriorityAndFairness(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
-	reqMgmt utilflowcontrol.Interface,
+	fcIfc utilflowcontrol.Interface,
 ) http.Handler {
-	if reqMgmt == nil {
-		klog.Warningf("request management system not found, skipping setup flow-control system")
+	if fcIfc == nil {
+		klog.Warningf("priority and fairness support not found, skipping")
 		return handler
 	}
 
@@ -65,7 +65,7 @@ func WithRequestManagement(
 			return
 		}
 
-		execute, afterExecute := reqMgmt.Wait(requestDigest)
+		execute, afterExecute := fcIfc.Wait(requestDigest)
 		if execute {
 			timedOut := ctx.Done()
 			finished := make(chan struct{})
