@@ -240,18 +240,18 @@ func (reqMgr *requestManager) Wait(requestDigest RequestDigest) (bool, func()) {
 		fs := rmState.pickFlowSchema(requestDigest)
 		if fs == nil { // reject
 			metrics.AddReject("<none>", "non-match")
-			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v because no FlowSchema matched", requestDigest.RequestInfo, requestDigest.User)
+			klog.V(7).Infof("Rejecting requestInfo=%#+v, userInfo=%#+v because no FlowSchema matched", requestDigest.RequestInfo, requestDigest.User)
 			return false, func() {}
 		}
-		matchingpriorityLevelName := fs.Spec.PriorityLevelConfiguration.Name
+		plName := fs.Spec.PriorityLevelConfiguration.Name
 
 		// 2. early out for exempt
-		ps := rmState.priorityLevelStates[matchingpriorityLevelName]
+		ps := rmState.priorityLevelStates[plName]
 		if ps.config.Exempt {
-			klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q without delay", requestDigest.RequestInfo, requestDigest.User, fs.Name)
+			klog.V(7).Infof("Serving requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s without delay", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
 			startExecutionTime := time.Now()
 			return true, func() {
-				metrics.ObserveExecutionDuration(matchingpriorityLevelName, fs.Name, time.Now().Sub(startExecutionTime))
+				metrics.ObserveExecutionDuration(plName, fs.Name, time.Now().Sub(startExecutionTime))
 			}
 		}
 
@@ -262,20 +262,20 @@ func (reqMgr *requestManager) Wait(requestDigest RequestDigest) (bool, func()) {
 		// 4. queuing
 		quiescent, execute, afterExecute := ps.queues.Wait(hashValue, ps.config.HandSize)
 		if quiescent {
-			klog.V(5).Infof("Request requestInfo=%v, user=%v, fs=%q landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fs.Name)
+			klog.V(5).Infof("Request requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
 			continue
 		}
 
 		// 5. execute or reject
-		metrics.ObserveWaitingDuration(matchingpriorityLevelName, fs.Name, strconv.FormatBool(execute), time.Now().Sub(startWaitingTime))
+		metrics.ObserveWaitingDuration(plName, fs.Name, strconv.FormatBool(execute), time.Now().Sub(startWaitingTime))
 		if !execute {
-			klog.V(7).Infof("Rejecting requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
+			klog.V(7).Infof("Rejecting requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
 			return false, func() {}
 		}
-		klog.V(7).Infof("Serving requestInfo=%v, user=%v, fs=%q after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name)
+		klog.V(7).Infof("Serving requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
 		startExecutionTime := time.Now()
 		return execute, func() {
-			metrics.ObserveExecutionDuration(matchingpriorityLevelName, fs.Name, time.Now().Sub(startExecutionTime))
+			metrics.ObserveExecutionDuration(plName, fs.Name, time.Now().Sub(startExecutionTime))
 			afterExecute()
 		}
 	}
