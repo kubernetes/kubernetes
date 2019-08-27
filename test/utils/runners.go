@@ -160,6 +160,9 @@ type RCConfig struct {
 	// Maximum allowable container failures. If exceeded, RunRC returns an error.
 	// Defaults to replicas*0.1 if unspecified.
 	MaxContainerFailures *int
+	// Maximum allowed pod deletions count. If exceeded, RunRC returns an error.
+	// Defaults to 0.
+	MaxAllowedPodDeletions int
 
 	// If set to false starting RC will print progress, otherwise only errors will be printed.
 	Silent bool
@@ -787,6 +790,7 @@ func (config *RCConfig) start() error {
 	oldPods := make([]*v1.Pod, 0)
 	oldRunning := 0
 	lastChange := time.Now()
+	podDeletionsCount := 0
 	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
@@ -817,9 +821,10 @@ func (config *RCConfig) start() error {
 
 		diff := Diff(oldPods, pods)
 		deletedPods := diff.DeletedPods()
-		if len(deletedPods) != 0 {
-			// There are some pods that have disappeared.
-			err := fmt.Errorf("%d pods disappeared for %s: %v", len(deletedPods), config.Name, strings.Join(deletedPods, ", "))
+		podDeletionsCount += len(deletedPods)
+		if podDeletionsCount > config.MaxAllowedPodDeletions {
+			// Number of pods which disappeared is over threshold
+			err := fmt.Errorf("%d pods disappeared for %s: %v", podDeletionsCount, config.Name, strings.Join(deletedPods, ", "))
 			config.RCConfigLog(err.Error())
 			config.RCConfigLog(diff.String(sets.NewString()))
 			return err
