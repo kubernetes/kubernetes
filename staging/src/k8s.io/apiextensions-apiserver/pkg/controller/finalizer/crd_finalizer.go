@@ -149,8 +149,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		cond, deleteErr := c.deleteInstances(crd)
 		apiextensions.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
-			crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
-			if err != nil {
+			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd); err != nil {
 				utilruntime.HandleError(err)
 			}
 			return deleteErr

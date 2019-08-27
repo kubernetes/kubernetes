@@ -524,8 +524,7 @@ func TestDiscovery(t *testing.T) {
 
 	scope := apiextensionsv1beta1.NamespaceScoped
 	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(scope)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
-	if err != nil {
+	if _, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient); err != nil {
 		t.Fatal(err)
 	}
 
@@ -828,12 +827,18 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 	noxuNamespacedResourceClient1 := newNamespacedCustomResourceClient(ns1, dynamicClient, noxuDefinition)
 	instances[ns1] = createInstanceWithNamespaceHelper(t, ns1, "foo1", noxuNamespacedResourceClient1, noxuDefinition)
 	noxuNamespacesWatch1, err := noxuNamespacedResourceClient1.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	if err != nil {
+		t.Fatalf("Failed to watch namespace: %s, error: %v", ns1, err)
+	}
 	defer noxuNamespacesWatch1.Stop()
 
 	ns2 := "namespace-2"
 	noxuNamespacedResourceClient2 := newNamespacedCustomResourceClient(ns2, dynamicClient, noxuDefinition)
 	instances[ns2] = createInstanceWithNamespaceHelper(t, ns2, "foo2", noxuNamespacedResourceClient2, noxuDefinition)
 	noxuNamespacesWatch2, err := noxuNamespacedResourceClient2.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	if err != nil {
+		t.Fatalf("Failed to watch namespace: %s, error: %v", ns2, err)
+	}
 	defer noxuNamespacesWatch2.Stop()
 
 	createdList, err := noxuResourceClient.List(metav1.ListOptions{})

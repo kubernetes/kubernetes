@@ -34,6 +34,9 @@ import (
 func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
 	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
 	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	fakeKubeConfig.WriteString(`
 apiVersion: v1
 kind: Config

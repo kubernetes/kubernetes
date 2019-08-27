@@ -137,16 +137,6 @@ test/integration/ttlcontroller
 test/integration/volume
 test/integration/volumescheduling
 test/utils
-vendor/k8s.io/apiextensions-apiserver/pkg/apiserver
-vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
-vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema
-vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta
-vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning
-vendor/k8s.io/apiextensions-apiserver/pkg/controller/finalizer
-vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource
-vendor/k8s.io/apiextensions-apiserver/test/integration
-vendor/k8s.io/apiextensions-apiserver/test/integration/conversion
-vendor/k8s.io/apiextensions-apiserver/test/integration/fixtures
 vendor/k8s.io/apimachinery/pkg/api/meta
 vendor/k8s.io/apimachinery/pkg/api/resource
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured

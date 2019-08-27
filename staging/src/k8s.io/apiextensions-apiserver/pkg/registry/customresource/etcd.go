@@ -342,7 +342,7 @@ func scaleFromCustomResource(cr *unstructured.Unstructured, specReplicasPath, st
 	var labelSelector string
 	if len(labelSelectorPath) > 0 {
 		labelSelectorPath = strings.TrimPrefix(labelSelectorPath, ".") // ignore leading period
-		labelSelector, found, err = unstructured.NestedString(cr.UnstructuredContent(), strings.Split(labelSelectorPath, ".")...)
+		labelSelector, _, err = unstructured.NestedString(cr.UnstructuredContent(), strings.Split(labelSelectorPath, ".")...)
 		if err != nil {
 			return nil, false, err
 		}
