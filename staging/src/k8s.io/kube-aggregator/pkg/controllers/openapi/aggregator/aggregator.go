@@ -25,6 +25,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
+
 	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/server"
@@ -107,7 +108,11 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	// Build initial spec to serve.
 	klog.V(2).Infof("Building initial OpenAPI spec")
 	defer func(start time.Time) {
-		klog.V(2).Infof("Finished initial OpenAPI spec generation after %v", time.Now().Sub(start))
+		duration := time.Now().Sub(start)
+		klog.V(2).Infof("Finished initial OpenAPI spec generation after %v", duration)
+
+		regenerationCounter.With(map[string]string{"apiservice": "*", "reason": "startup"})
+		regenerationDurationGauge.With(map[string]string{"reason": "startup"}).Set(duration.Seconds())
 	}(time.Now())
 	specToServe, err := s.buildOpenAPISpec()
 	if err != nil {
@@ -207,6 +212,7 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	if specInfo == nil {
 		return fmt.Errorf("invalid input: specInfo must be non-nil")
 	}
+	_, updated := s.openAPISpecs[specInfo.apiService.Name]
 	origSpecInfo, existedBefore := s.openAPISpecs[specInfo.apiService.Name]
 	s.openAPISpecs[specInfo.apiService.Name] = specInfo
 
@@ -216,7 +222,16 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	}
 	klog.V(2).Infof("Updating OpenAPI spec because %s is updated", specInfo.apiService.Name)
 	defer func(start time.Time) {
-		klog.V(2).Infof("Finished OpenAPI spec generation after %v", time.Now().Sub(start))
+		duration := time.Now().Sub(start)
+		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
+
+		reason := "add"
+		if updated {
+			reason = "update"
+		}
+
+		regenerationCounter.With(map[string]string{"apiservice": specInfo.apiService.Name, "reason": reason})
+		regenerationDurationGauge.With(map[string]string{"reason": reason}).Set(duration.Seconds())
 	}(time.Now())
 	if err := s.updateOpenAPISpec(); err != nil {
 		if existedBefore {
@@ -239,7 +254,11 @@ func (s *specAggregator) tryDeleteServiceSpecs(apiServiceName string) error {
 	delete(s.openAPISpecs, apiServiceName)
 	klog.V(2).Infof("Updating OpenAPI spec because %s is removed", apiServiceName)
 	defer func(start time.Time) {
-		klog.V(2).Infof("Finished OpenAPI spec generation after %v", time.Now().Sub(start))
+		duration := time.Now().Sub(start)
+		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
+
+		regenerationCounter.With(map[string]string{"apiservice": apiServiceName, "reason": "delete"})
+		regenerationDurationGauge.With(map[string]string{"reason": "delete"}).Set(duration.Seconds())
 	}(time.Now())
 	if err := s.updateOpenAPISpec(); err != nil {
 		s.openAPISpecs[apiServiceName] = orgSpecInfo
