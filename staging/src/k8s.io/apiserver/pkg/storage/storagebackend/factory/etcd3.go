@@ -48,6 +48,10 @@ const keepaliveTimeout = 10 * time.Second
 const dialTimeout = 20 * time.Second
 
 func init() {
+	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
+	// using the global prometheus registry and using our own wrapped global registry,
+	// we need to explicitly register these metrics to our global registry here.
+	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
 	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
 }
 
